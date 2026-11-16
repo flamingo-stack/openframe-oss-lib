@@ -4,7 +4,7 @@
 import { DOWNLOADS_API_PATH, TRUST_CENTER_API_PATH } from '@flamingo-stack/openframe-frontend-core/types'
 import { CONTENT, CONTENT_PREFIX } from './content'
 
-// approvalToolUrl + the three conversational ticket tool paths derive from
+// The three conversational ticket tool paths derive from
 // this one agent base, so `/chat/agent` lives in a single spot. Ticket
 // REALTIME (stream + read receipts) is NOT agent-based — it lives on the
 // dedicated `/api/tickets/*` surface below.
@@ -49,7 +49,6 @@ export const EP = {
   // the renderer picks it up without an explicit prop on <DocsHubPage>.
   resolveLink: `${CONTENT}/docs/resolve-link`,
   agentBase: AGENT_BASE,
-  approval: `${AGENT_BASE}/confirm-tool`,
   // tickets (Help Center) — conversational reads/writes. These three are
   // chat-agent TOOL routes on the hub (`/api/chat/agent/*`), hence
   // AGENT_BASE.

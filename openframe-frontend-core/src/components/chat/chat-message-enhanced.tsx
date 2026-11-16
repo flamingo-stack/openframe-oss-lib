@@ -1,7 +1,26 @@
 'use client';
 
-import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
-import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
+import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useState } from 'react';
+import {
+  type ChatAskPart,
+  type ChatFilePart,
+  type ChatPart,
+  type ChatSourcePart,
+  type ChatToolPart,
+  approvalBatchIdOf,
+  approvalStatusOf,
+  isSourcePart,
+  isToolPart,
+  textOfParts,
+} from '../../chat-protocol/chat-message';
+import { parseCitationHref, textWithCitationChips } from '../../chat-protocol/citations';
+import { normalizeRecordUri, parseRecordHref, recordHref, recordLinksInParts } from '../../chat-protocol/record-link';
+import {
+  CHAT_INTERRUPTED_AFTER_RUN_NOTICE,
+  CHAT_INTERRUPTED_NOTICE,
+  saysStreamEnded,
+} from '../../chat-protocol/ui-chunks';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
@@ -11,7 +30,6 @@ import type { MdRenderProps } from '../ui/markdown/base-components';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ApprovalBatchMessage } from './approval-batch-message';
-import { ApprovalRequestMessage } from './approval-request-message';
 import { AskDisplay } from './ask-display';
 import { ChatAppearanceContext, useChatAppearance } from './chat-appearance-context';
 import { ChatContextChipStrip } from './chat-context-picker';
@@ -27,37 +45,33 @@ import {
   CHAT_MESSAGE_USER_ROW_CLASS,
 } from './chat-message-layout';
 import type { ChatRef } from './chat-ref.types';
+import { CitationChip } from './citation-chip';
 import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
+import { chatCardLabel, RecordChip } from './entity-cards/dispatch';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { remarkCardLinks } from './remark-card-links';
-import { remarkMentionChips } from './remark-mention-chips';
-import { remarkStripCitations } from './remark-strip-citations';
+import { MessageCitationsProvider, useMessageCitations } from './message-citations';
+import { MessageRecordLinkProvider } from './record-actions';
 import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
 import { ThinkingDisplay } from './thinking-display';
 import { TicketEscalatedMessage } from './ticket-escalated-message';
 import { TicketEventMessage } from './ticket-event-message';
 import { ToolExecutionDisplay } from './tool-execution-display';
-import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from './types';
+import type { ChatMessageEnhancedProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
-
-/** Inline `@marker:id` mention token in the message body (sibling of the
- *  `[card://]` grammar) — used to filter out items rendered inline from the
- *  chip strip below. MUST mirror the left-boundary `(^|\s)` of `MENTION_REGEX`
- *  in `remark-mention-chips.ts`: without it this regex is WIDER than the plugin
- *  (e.g. it matches `x@device:1` mid-word, which the plugin skips), so a context
- *  item would be stripped from the chip strip yet never rendered inline — lost
- *  from display entirely. The id is capture group 2 (group 1 is the boundary).
- *  Marker `[a-zA-Z]+` (markers are mostly lowercase but not all — e.g.
- *  `scheduledScript`); id is the mention-token charset. */
-const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g;
-
-/** Scanner for `[card://type:id]` in answer text. Built from the shared
- *  grammar so the body renderer and the metadata decoder cannot disagree on
- *  what a marker is — see `chat-protocol/card-marker.ts`. */
-const CARD_MARKER_REGEX = createCardMarkerScanner();
+import type { ChatMessageActions } from './types/message.types';
+import { chatFilePartMarkdown } from './utils/chat-attachment-markdown';
+import { sourceRowInputOf, sourceTitleOf } from './utils/cited-sources';
+import {
+  approvalBatchViewOf,
+  failedBeforeRunning,
+  holdsApprovalThatRan,
+  progressExecutionDataOf,
+  toolExecutionDataOf,
+  waitsOnAnotherTier,
+} from './utils/tool-part-display';
 
 /** Timestamp label: today's messages show time only ("2:47 PM"),
  *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
@@ -67,35 +81,87 @@ function formatMessageTimestamp(timestamp: Date): string {
   return isToday(timestamp) ? time : `${formatDate(timestamp)} ${time}`;
 }
 
-function normalizeContent(content: MessageContent): MessageSegment[] {
-  if (typeof content === 'string') {
-    return content ? [{ type: 'text', text: content }] : [];
-  }
-  return content;
+/** The plain text of a link's children (its name), as markdown hands them to the `<a>` override. */
+function textOf(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join('');
+  if (React.isValidElement<{ children?: ReactNode }>(node)) return textOf(node.props.children);
+  return '';
 }
 
 /**
- * A RUN of consecutive `ask` segments is one paged card, not a stack of
- * near-identical ones. Returns the run keyed by the index of its FIRST segment;
- * the render draws the card there and skips every later index of the same run
- * (an `ask` index missing from this map is a tail member).
+ * A RUN of consecutive `data-ask` parts is one paged card, not a stack of near-identical ones. Returns the run keyed by
+ * the index of its FIRST part; the render draws the card there and skips every later index of the same run (an ask index
+ * missing from this map is a tail member).
  */
-function groupAskRuns(segments: MessageSegment[]): Map<number, AskSegment[]> {
-  const runs = new Map<number, AskSegment[]>();
+function groupAskRuns(parts: readonly ChatPart[]): Map<number, ChatAskPart['data'][]> {
+  const runs = new Map<number, ChatAskPart['data'][]>();
   let headIndex = -1;
-  segments.forEach((segment, index) => {
-    if (segment.type !== 'ask') {
+  parts.forEach((part, index) => {
+    if (part.type !== 'data-ask') {
       headIndex = -1;
       return;
     }
     if (headIndex === -1) {
       headIndex = index;
-      runs.set(index, [segment]);
+      runs.set(index, [part.data]);
       return;
     }
-    runs.get(headIndex)?.push(segment);
+    runs.get(headIndex)?.push(part.data);
   });
   return runs;
+}
+
+/**
+ * The tool parts of each batch, keyed by the index of the batch's FIRST part: the renderer draws a run with one
+ * `batchId` as one card, wherever its rows sit, and skips every later index of the batch.
+ */
+function groupBatches(parts: readonly ChatPart[]): Map<number, ChatToolPart[]> {
+  const heads = new Map<string, number>();
+  const batches = new Map<number, ChatToolPart[]>();
+  parts.forEach((part, index) => {
+    if (!isToolPart(part)) return;
+    const batchId = approvalBatchIdOf(part);
+    if (batchId === undefined) return;
+    const head = heads.get(batchId);
+    if (head === undefined) {
+      heads.set(batchId, index);
+      batches.set(index, [part]);
+    } else {
+      batches.get(head)?.push(part);
+    }
+  });
+  return batches;
+}
+
+/** A card's Approve or Reject: its button calls with the card's own id. */
+function bound(handler: ((id: string) => unknown) | undefined, fallbackId: string) {
+  return handler
+    ? (requestId?: string) => handler(requestId ?? fallbackId) as void | boolean | Promise<void | boolean>
+    : undefined;
+}
+
+/** The handlers of a card that resolves, or none: a thread with no way to act draws it read-only. */
+function approvalHandlers(actions: ChatMessageActions | undefined, id: string) {
+  return { onApprove: bound(actions?.approve, id), onReject: bound(actions?.reject, id) };
+}
+
+/** What a user attached, inside their bubble: the same two forms a bubble has always shown. */
+function ChatFileParts({
+  files,
+  componentOverrides,
+}: {
+  files: ChatFilePart[];
+  componentOverrides: React.ComponentProps<typeof SimpleMarkdownRenderer>['componentOverrides'];
+}) {
+  const viewUrlPrefix = useChatRuntime()?.endpoints.attachmentViewUrlPrefix;
+  return (
+    <SimpleMarkdownRenderer
+      content={files.map(file => chatFilePartMarkdown(file, viewUrlPrefix)).join('\n\n')}
+      textSize="compact"
+      componentOverrides={componentOverrides}
+    />
+  );
 }
 
 const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>(
@@ -103,7 +169,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     {
       className,
       role,
-      content,
+      parts,
       name,
       avatar,
       isTyping = false,
@@ -119,333 +185,160 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       contextItems,
       resolveContextIcon,
       renderContextItem,
-      renderMention,
+      renderRecordChip,
       renderEntityCard,
-      refs,
-      onAskSelect,
+      actions,
+      displayApprovalTypes,
+      progress,
+      interrupted = false,
       NavLinkAnchor,
       ...props
     },
     ref,
   ) => {
-    // A `user` row is a PERSON (the end user, a technician, a system line); the
-    // agent's turns are `assistant`. Which person is the viewer is the thread's
-    // call (`selfAuthorType`): the viewer's own turns draw as the bubble on the
-    // right, another person's as an incoming reply.
-    const isHuman = role === 'user';
-    const isError = role === 'error';
+    // A `user` row is a PERSON (the end user, a technician); a `system` row is a line
+    // said to the thread; the agent's turns are `assistant`. Which person is the viewer
+    // is the thread's call (`selfAuthorType`): the viewer's own turns draw as the bubble
+    // on the right, another person's as an incoming reply.
+    const isSystemRow = role === 'system';
+    const isHuman = role === 'user' || isSystemRow;
     const inheritedAppearance = useChatAppearance();
     const appearance = appearanceProp ?? inheritedAppearance;
     const isV2 = appearance === CHAT_APPEARANCE.V2;
-    const authorType = authorTypeProp ?? (isHuman ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae');
+    const authorType =
+      authorTypeProp ?? (isSystemRow ? 'system' : isHuman ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae');
     const isOtherPerson =
       isHuman && selfAuthorType !== undefined && authorType !== 'system' && authorType !== selfAuthorType;
     const isUser = isHuman && !isOtherPerson;
 
-    // Inline-card rendering uses a HOST-PROVIDED `renderEntityCard` function
-    // (v6.1 §B.2.7 — DRY duplications #2). The OSS-lib stays data-agnostic:
-    // it doesn't know about entity types, slash commands, or app routing.
-    // The host (multi-platform-hub) returns whatever JSX it wants for each
-    // marker's descriptor — typically a self-fetching card that hydrates by
-    // id from the host's per-object APIs.
-    //
-    // The remark plugin runs whenever the host opts in with
-    // `renderEntityCard`, so we always strip raw markers from rendered text
-    // (Logic MED-4). When the host's `renderEntityCard` is unset OR returns
-    // null, the override falls back to the bare cardId. Never renders the
-    // literal `[card://...]` URL.
-    const hasMarkerSupport = !!renderEntityCard;
+    // What the renderer maps over: source parts are not drawn in the body, and a source arriving mid-answer (a cited
+    // collection) must not shift an index and remount every part after it. A system row's words are its name line.
+    const bodyParts = useMemo(
+      () => (isSystemRow ? [] : parts.filter(part => !isSourcePart(part))),
+      [isSystemRow, parts],
+    );
 
-    const segments = useMemo(() => normalizeContent(content), [content]);
+    const citations = useMessageCitations(parts);
+    const { sources, numbers } = citations;
 
-    const askRuns = useMemo(() => groupAskRuns(segments), [segments]);
+    const askRuns = useMemo(() => groupAskRuns(bodyParts), [bodyParts]);
+    const batches = useMemo(() => groupBatches(bodyParts), [bodyParts]);
 
-    // Inline `@marker:id` mentions: the composer commits these tokens when the
-    // user picks context via the `@`-flow, and the ASSISTANT routinely echoes
-    // the same `@device:machineId` token back in its reply. The lib detects the
-    // token and delegates rendering to the host's `renderMention` (mirror of
-    // `renderEntityCard`): the host returns a SELF-FETCHING chip per entity
-    // type. Enabled whenever the host opts in by supplying `renderMention`.
-    const hasMentionSupport = !!renderMention;
-
-    // Ids that appear as `@marker:id` in the body → rendered inline, so they are
-    // excluded from the chip strip below (no duplicate inline + strip).
-    const inlineMentionIds = useMemo(() => {
-      const ids = new Set<string>();
-      if (!hasMentionSupport) return ids;
-      for (const seg of segments) {
-        if (seg.type !== 'text' || !seg.text || !seg.text.includes('@')) continue;
-        for (const mm of seg.text.matchAll(MENTION_MARKER_REGEX)) ids.add(mm[2]);
-      }
-      return ids;
-    }, [hasMentionSupport, segments]);
+    // Records the body links (`[name](record://type/id)`) are drawn inline, so they are left off the chip strip below.
+    const inlineRecordIds = useMemo(() => new Set(recordLinksInParts(bodyParts).map(record => record.id)), [bodyParts]);
 
     // Chip strip = only context NOT already shown inline (e.g. `+`-added items).
     const stripContextItems = useMemo(
       () =>
-        inlineMentionIds.size > 0 && contextItems
-          ? contextItems.filter(it => !inlineMentionIds.has(it.id))
+        inlineRecordIds.size > 0 && contextItems
+          ? contextItems.filter(it => !inlineRecordIds.has(it.id))
           : contextItems,
-      [contextItems, inlineMentionIds],
+      [contextItems, inlineRecordIds],
     );
 
-    // Markdown plugins per message: card markers (assistant) + mention tokens
-    // (user). Each is gated independently so neither fires without its data.
-    const cardRemarkPlugins = useMemo(
-      () => [
-        ...(hasMarkerSupport ? [remarkCardLinks, remarkStripCitations] : []),
-        ...(hasMentionSupport ? [remarkMentionChips] : []),
-      ],
-      [hasMarkerSupport, hasMentionSupport],
-    );
-
-    // Cross-render cache of rendered inline-card nodes, keyed by `type:id`.
-    // A fetch-mode card lives inside the assistant message, which re-renders on
-    // every stream chunk (and the whole list re-renders when a new message
-    // arrives). `renderEntityCard` produces a FRESH element each time, so React
-    // re-mounts the card — closing any open menu/popover and re-triggering its
-    // fetch. Caching the produced node by key and returning the SAME element
-    // reference lets React bail out of re-rendering that subtree, so the card
-    // (and its open menu) survives across chunks. Invalidated per key when the
-    // render fn identity changes.
-    const renderedCardNodeCache = useRef(
-      new Map<
-        string,
-        {
-          render: ((ref: ChatRef) => React.ReactNode) | undefined;
-          /** The descriptor the node was built from. Part of the cache identity
-           *  because metadata can arrive AFTER the marker was first rendered —
-           *  a card mounted from the bare `{type, id}` descriptor has to be
-           *  rebuilt once its real title and URL land. */
-          ref: ChatRef | undefined;
-          node: React.ReactNode;
-        }
-      >(),
-    );
-
-    /** The answer's own references, by `type:id`. What turns a bare marker into
-     *  a card with a title and a link, without a per-entity lookup the host may
-     *  not even have an API for. */
-    const refByKey = useMemo(() => {
-      const byKey = new Map<string, ChatRef>();
-      for (const described of refs ?? []) byKey.set(`${described.type}:${described.id}`, described);
-      return byKey;
-    }, [refs]);
+    /** The message's own source parts, by URI: what gives a card its title and link before its row loads. */
+    const sourceByUri = useMemo(() => {
+      const byUri = new Map<string, ChatSourcePart>();
+      for (const source of sources) byUri.set(normalizeRecordUri(source.sourceId) ?? source.sourceId, source);
+      return byUri;
+    }, [sources]);
 
     /**
-     * Per-message rendering plan for `[card://type:id]` markers.
+     * The answer's record cards, by part: each `data-record-cards` part (the model's `show_records` call, checked by the
+     * server) is drawn where it sits in the message, between the text before and after the call, the way a tool's
+     * widget sits in a reply. Never read out of the text: a record the text names is a chip there. A card takes its
+     * title and url from the message's own source part with the same URI, else the name the text gives the record, and
+     * loads the rest itself.
      *
-     * Block-bearing markers SPLIT their containing text segment so the
-     * block payload (e.g. video player) renders AT THE MARKER POSITION
-     * in the text flow — not at the end of the segment, which causes
-     * the block to "appear high and drift down" while text streams in.
-     *
-     * Per-segment output is an array of parts:
-     *   - `{ kind: 'text' }` — substring of the segment text, rendered
-     *                         through `<SimpleMarkdownRenderer>`. Ends
-     *                         with the block marker so the inline pill
-     *                         lands at the right spot via the `<a>`
-     *                         override.
-     *   - `{ kind: 'block' }` — block payload, rendered as a sibling
-     *                         BELOW the preceding text chunk and above
-     *                         the next one.
-     *
-     * Inline-only markers (no `<BlockCard>` wrapper) do NOT split the
-     * segment; they're handled by the override at marker position via
-     * the shared `inlineByKey` map.
-     *
-     * Streaming behaviour: as a marker becomes complete in the streamed
-     * text, the regex matches, the segment splits at that point, and
-     * the block card lands right after the inline pill. Subsequent
-     * tokens render in the trailing chunk — block stays in position.
+     * Each card's node is kept across renders (same URI, same render function, same source part) so a card does not
+     * remount, re-fetch or close its open menu on every streamed token.
      */
-    const renderingPlan = useMemo(() => {
-      if (!hasMarkerSupport) return null;
-      const render = renderEntityCard;
-      const inlineByKey = new Map<string, React.ReactNode>();
-      type SegmentPart = { kind: 'text'; text: string } | { kind: 'block'; key: string; node: React.ReactNode };
-      const partsBySegment = new Map<number, SegmentPart[]>();
-      const usedKeys = new Set<string>();
-      if (!render) return { inlineByKey, partsBySegment, usedKeys };
-      const cache = renderedCardNodeCache.current;
-      // Card keys already emitted as a hoisted block (`b-<key>`). The same
-      // marker can legitimately appear twice in one message (LLM references
-      // the same entity twice); we hoist the FIRST occurrence and skip the
-      // duplicates so two siblings never collide on the same React key.
-      const emittedBlockKeys = new Set<string>();
-      segments.forEach((segment, segIdx) => {
-        if (segment.type !== 'text') return;
-        const text = segment.text;
-        const parts: SegmentPart[] = [];
-        let cursor = 0;
-        CARD_MARKER_REGEX.lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = CARD_MARKER_REGEX.exec(text)) !== null) {
-          const cardType = match[1];
-          const cardId = match[2];
-          const key = `${cardType}:${cardId}`;
-          usedKeys.add(key);
-          // Reuse the cached node when the render fn didn't change —
-          // returning the SAME element reference across renders is what
-          // stops React from re-mounting the card (and closing its open
-          // menu / re-fetching) on every stream chunk. Also dedups the same
-          // key emitted twice within one message.
-          // The answer's metadata wins when it described this reference: it
-          // carries the title, URL and source the wire marker cannot.
-          const describedRef = refByKey.get(key);
+    const [recordCardCache] = useState(
+      () =>
+        new Map<
+          string,
+          {
+            render: (ref: ChatRef) => React.ReactNode;
+            source: ChatSourcePart | undefined;
+            label: string;
+            node: React.ReactNode;
+          }
+        >(),
+    );
+    const recordCards = useMemo(() => {
+      const byPart = new Map<number, Array<{ key: string; node: React.ReactNode }>>();
+      if (!renderEntityCard || isHuman) return byPart;
+      if (!bodyParts.some(part => part.type === 'data-record-cards')) return byPart;
+      const names = new Map(
+        recordLinksInParts(bodyParts).map(record => [recordHref(record.type, record.id), record.label]),
+      );
+      const cache = recordCardCache;
+      // One card per record in a message, where it first shows: every wire and stored row can name a record again.
+      const shown = new Set<string>();
+      bodyParts.forEach((part, index) => {
+        if (part.type !== 'data-record-cards') return;
+        const cards: Array<{ key: string; node: React.ReactNode }> = [];
+        for (const uri of part.data.records) {
+          const record = parseRecordHref(uri);
+          // A type the chat draws no card for (a device, a script) stays a chip in the text.
+          if (!record || (record.type !== 'video' && !chatCardLabel(record.type))) continue;
+          const key = recordHref(record.type, record.id);
+          if (shown.has(key)) continue;
+          shown.add(key);
+          const source = sourceByUri.get(key);
+          const label = names.get(key) ?? '';
           let entry = cache.get(key);
-          if (!entry || entry.render !== render || entry.ref !== describedRef) {
-            // The marker is the ONLY data on the wire: cards hydrate by id
-            // from the host's per-object APIs, so a minimal {type, id}
-            // descriptor is all the renderer needs to mount the loader.
-            // For types with nothing to fetch the host's render() returns
-            // null and we fall through to the bare-cardId fallback in the
-            // `<a card://…>` override below.
-            //
-            // DESCRIPTOR DEFAULTS: `ChatRef.title` and `ChatRef.url` are
-            // non-optional in the type; a bare `{type, id}` cast would lie
-            // to consumers that read those fields. Default `title` to the
-            // cardId (so any host renderer that prints `ref.title` shows
-            // the id rather than `undefined`) and `url` to null (matches
-            // the no-link semantics fetch-mode cards rely on — they
-            // resolve their own URL after fetch).
-            const refForRender: ChatRef = describedRef ?? {
-              type: cardType,
-              id: cardId,
-              title: cardId,
-              url: null,
+          if (!entry || entry.render !== renderEntityCard || entry.source !== source || entry.label !== label) {
+            const row = source ? sourceRowInputOf(source) : null;
+            const cardRef: ChatRef = {
+              type: record.type,
+              id: record.id,
+              title: source ? sourceTitleOf(source) : label,
+              url: row?.externalUrl ?? null,
             };
-            entry = { render, ref: describedRef, node: render(refForRender) };
+            const rendered = renderEntityCard(cardRef);
+            // A block card (a video) draws its block here.
+            const node =
+              React.isValidElement(rendered) && rendered.type === BlockCard
+                ? (rendered.props as BlockCardProps).children
+                : rendered;
+            entry = { render: renderEntityCard, source, label, node };
             cache.set(key, entry);
           }
-          const rendered = entry.node;
-          if (React.isValidElement(rendered) && rendered.type === BlockCard) {
-            const cardProps = rendered.props as BlockCardProps;
-            const markerEnd = match.index + match[0].length;
-            // Text chunk INCLUDING the marker — the inline pill renders
-            // at the marker position via the `<a>` override.
-            parts.push({ kind: 'text', text: text.slice(cursor, markerEnd) });
-            // Hoist the block payload only on the FIRST occurrence of this key
-            // — a repeated marker still gets its inline pill (text + override
-            // above) but must not push a second `b-<key>` sibling.
-            if (!emittedBlockKeys.has(key)) {
-              emittedBlockKeys.add(key);
-              parts.push({ kind: 'block', key, node: cardProps.children });
-            }
-            cursor = markerEnd;
-            inlineByKey.set(
-              key,
-              cardProps.inline != null ? (
-                cardProps.inline
-              ) : (
-                <span className="font-medium text-ods-text-primary">{cardId}</span>
-              ),
-            );
-          } else if (rendered != null) {
-            // Hoist fetch-mode entity cards (roadmap/blog/case-study/release/…)
-            // OUT of the markdown as stable-keyed block siblings — exactly like
-            // BlockCard. Rendered INSIDE `<SimpleMarkdownRenderer>` they remount
-            // on every streaming re-parse (react-markdown rebuilds its subtree
-            // token-by-token), which closes any open menu/popover and re-fires
-            // the card's fetch. As a sibling keyed by the card key (`b-<key>`)
-            // the card survives streaming: appending more text/markers only adds
-            // NEW siblings, existing cards keep their React instance.
-            //
-            // We EXCLUDE the marker from the surrounding text (cursor jumps past
-            // it) so no inline pill renders — the full card IS the content.
-            // Hoist only the FIRST occurrence; a duplicate marker is dropped
-            // entirely (no inline pill for hoisted cards) so we never push a
-            // second sibling colliding on the same `b-<key>` React key.
-            parts.push({ kind: 'text', text: text.slice(cursor, match.index) });
-            if (!emittedBlockKeys.has(key)) {
-              emittedBlockKeys.add(key);
-              parts.push({ kind: 'block', key, node: rendered });
-            }
-            cursor = match.index + match[0].length;
-          }
+          if (entry.node != null) cards.push({ key, node: entry.node });
         }
-        // Trailing text after the last block marker (or the entire
-        // segment when no block markers fired).
-        if (cursor < text.length) {
-          parts.push({ kind: 'text', text: text.slice(cursor) });
-        }
-        // Only register the split plan when at least one block marker
-        // fired — otherwise the segment renders as one SimpleMarkdown-
-        // Renderer call (existing behaviour preserved for the
-        // overwhelming majority of segments that have no block cards).
-        if (parts.some(p => p.kind === 'block')) {
-          partsBySegment.set(segIdx, parts);
-        }
+        if (cards.length > 0) byPart.set(index, cards);
       });
-      return { inlineByKey, partsBySegment, usedKeys };
-    }, [hasMarkerSupport, renderEntityCard, refByKey, segments]);
+      return byPart;
+    }, [renderEntityCard, isHuman, bodyParts, sourceByUri, recordCardCache]);
 
-    // Drop cached nodes for markers no longer present so the cache can't grow
-    // unbounded as a long message's markers change. Deliberately an EFFECT,
-    // not part of the memo above: pruning is a mutation, and doing it in the
-    // render phase is non-idempotent (StrictMode's double-invoke, or a render
-    // React throws away, would evict nodes the committed tree still uses and
-    // remount the cards it was built to preserve).
     useEffect(() => {
-      const cache = renderedCardNodeCache.current;
-      const usedKeys = renderingPlan?.usedKeys;
-      if (!usedKeys) return;
-      if (cache.size <= usedKeys.size) return;
-      for (const k of [...cache.keys()]) {
-        if (!usedKeys.has(k)) cache.delete(k);
-      }
-    }, [renderingPlan]);
-
-    // The plan is read through a REF inside the `<a>` override, not captured
-    // in the override's closure. `renderingPlan` is rebuilt on every text
-    // delta (its `segments` dep is a fresh array per delta), so depending on
-    // it here would give `cardComponentOverrides` a new identity every token
-    // — which re-creates the markdown engine's `components` memo and defeats
-    // its per-block `StreamingBlockRenderer` memoization for the WHOLE
-    // message, on every token. The ref keeps the override identity stable
-    // while still reading the current plan at call time.
-    const renderingPlanRef = useRef(renderingPlan);
-    renderingPlanRef.current = renderingPlan;
+      const cache = recordCardCache;
+      const shown = new Set([...recordCards.values()].flat().map(card => card.key));
+      for (const key of [...cache.keys()]) if (!shown.has(key)) cache.delete(key);
+    }, [recordCards, recordCardCache]);
 
     const cardComponentOverrides = useMemo(() => {
-      if (!hasMarkerSupport && !hasMentionSupport) return undefined;
       return {
-        // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`.
-        // The render result was pre-computed in `renderingPlan` so block-level
-        // payloads (e.g. video player cards) can be hoisted out of the
-        // paragraph as siblings — the inline pill stays at the marker
-        // position. Other href schemes pass through unchanged.
+        // Override `<a>`: a record link becomes its chip; every other link goes through the host's navigation.
         a: ({ href, children, className: linkClassName, ...rest }: MdRenderProps<'a'>) => {
-          // Inline entity mention `@marker:id`, emitted as a `mention://marker:id`
-          // link by `remarkMentionChips`. Delegate to the host's `renderMention`
-          // (mirror of the `card://` → `renderEntityCard` path): the host returns
-          // a self-fetching chip for that entity type. Null/unknown → raw token.
-          if (typeof href === 'string' && href.startsWith('mention://')) {
-            const stripped = href.slice('mention://'.length);
-            const sepIdx = stripped.indexOf(':');
-            const marker = sepIdx === -1 ? stripped : stripped.slice(0, sepIdx);
-            const id = sepIdx === -1 ? '' : stripped.slice(sepIdx + 1);
-            const node = renderMention?.({ marker, id });
-            if (node != null) return <>{node}</>;
-            return <span className="text-ods-text-secondary opacity-60">{children}</span>;
-          }
-          if (typeof href === 'string' && href.startsWith('card://')) {
-            const stripped = href.slice('card://'.length);
-            const sepIdx = stripped.lastIndexOf(':');
-            if (sepIdx !== -1) {
-              const cardType = stripped.slice(0, sepIdx);
-              const cardId = stripped.slice(sepIdx + 1);
-              const key = `${cardType}:${cardId}`;
-              const inline = renderingPlanRef.current?.inlineByKey.get(key);
-              if (inline != null) return inline;
-              // No rendered card for this marker (the host's renderer
-              // returned null — no card type registered for `cardType`, or
-              // the id resolved to nothing). Render the raw `cardId` as a
-              // dim span so the marker never LOOKS like a real card: a
-              // hallucinated id must stay visibly broken, never dressed up
-              // with borrowed data.
-              return <span className="text-ods-text-secondary opacity-60">{cardId}</span>;
-            }
+          // A citation's chip (`[3](#citation-3)`, written into a render-only copy of the text). Before the
+          // anchor-only branch below, which would take it for a place on the page.
+          const citationNumber = parseCitationHref(href);
+          if (citationNumber !== null) return <CitationChip number={citationNumber} />;
+          // A record link (`[Patch script](record://script/<id>)`, `chat-protocol/record-link.ts`): the chip, inside
+          // the sentence, showing the link's own text. The host draws its own chip for the type where it has one
+          // (`renderRecordChip`, given the name); otherwise the lib's, which opens the record where its card does.
+          const record = parseRecordHref(href);
+          if (record) {
+            const label = textOf(children) || record.id;
+            const hosted = renderRecordChip?.({ type: record.type, id: record.id, label });
+            // In an answer, so the chip (the host's `RecordChip` or the lib's) offers the record's menu.
+            return (
+              <MessageRecordLinkProvider>
+                {hosted ?? <RecordChip type={record.type} id={record.id} label={label} />}
+              </MessageRecordLinkProvider>
+            );
           }
           // The host's `NavLinkAnchor` draws the link (the lib's
           // `NavLinkAnchorViaRuntime`, or a host anchor over the same
@@ -474,64 +367,23 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           );
         },
       };
-      // DEPS ARE DELIBERATELY MINIMAL — every one of them is stable across a
-      // streaming turn (booleans + host-stable fn/component identities, both
-      // enforced by this file's `memo` comparator). The rendering plan is
-      // read through a ref above precisely so it does NOT appear here.
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor]);
+      // DEPS ARE DELIBERATELY MINIMAL: both are host-stable identities (enforced by this file's `memo` comparator), so
+      // the overrides keep one identity across a streaming turn and the markdown engine's block memoization holds. A
+      // citation chip reads its message from context for this reason.
+    }, [renderRecordChip, NavLinkAnchor]);
 
     /**
-     * Body of a markdown-bearing segment (`text` / `guide`).
-     *
-     * No block markers in this segment → a single SimpleMarkdownRenderer call
-     * (the vast majority of messages). Otherwise the text is split at each
-     * marker and block payloads are interleaved: each text chunk includes its
-     * trailing marker so the inline pill renders at the right position via the
-     * `<a>` override, and block payloads land AS SIBLINGS between text chunks —
-     * HTML-valid (block DOM never nests inside `<p>`) AND positionally correct
-     * (the block appears where the marker is in the flow, not at the segment's
-     * end). Stable React keys come from the card key (block) and chunk position
-     * (text); streaming token-by-token reuses the same React instances so
-     * `<Video>` doesn't remount mid-play.
-     *
-     * `isStreaming` opts the segment into the markdown engine's streaming path
-     * (atomic-block memoization + fence tail-completion + aria-live). Only the
-     * actively streaming segment gets it, and within a marker-split segment
-     * only the LAST text chunk — the earlier chunks are already final.
+     * Body of a text part. `isStreaming` opts it into the markdown engine's streaming path (atomic-block memoization,
+     * fence tail-completion, aria-live); only the actively streaming part gets it.
      */
-    const renderSegmentBody = (segIndex: number, text: string, isStreaming: boolean) => {
-      const parts = renderingPlan?.partsBySegment.get(segIndex);
-      if (!parts || parts.length === 0) {
-        return (
-          <SimpleMarkdownRenderer
-            content={text}
-            textSize="compact"
-            additionalRemarkPlugins={cardRemarkPlugins}
-            componentOverrides={cardComponentOverrides}
-            streaming={isStreaming}
-          />
-        );
-      }
-      return parts.map((part, pIdx) => {
-        if (part.kind === 'text') {
-          return (
-            <SimpleMarkdownRenderer
-              key={`t-${pIdx}`}
-              content={part.text}
-              textSize="compact"
-              additionalRemarkPlugins={cardRemarkPlugins}
-              componentOverrides={cardComponentOverrides}
-              streaming={isStreaming && pIdx === parts.length - 1}
-            />
-          );
-        }
-        return (
-          <div key={`b-${part.key}`} className="my-3">
-            {part.node}
-          </div>
-        );
-      });
-    };
+    const renderTextBody = (text: string, isStreaming: boolean) => (
+      <SimpleMarkdownRenderer
+        content={text}
+        textSize="compact"
+        componentOverrides={cardComponentOverrides}
+        streaming={isStreaming}
+      />
+    );
 
     const isSystem = authorType === 'system';
 
@@ -550,7 +402,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const showName =
       isSystem || isOtherPerson || (authorType === 'admin' && !isUser) || (nameEveryTurn && role === 'assistant');
     const showSelfName = nameEveryTurn && isUser && !isSystem;
-    const displayName = name || (isHuman ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
+    const systemLine = isSystemRow ? textOfParts(parts) : '';
+    const displayName = systemLine || name || (isHuman ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
     const nameLabel = <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>;
     const faceBox = 'h-5 w-5 flex-shrink-0';
     const face: ReactNode =
@@ -577,9 +430,30 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         </span>
       );
 
+    const hasBody = !isSystem || bodyParts.length > 0;
+    const files = bodyParts.filter((part): part is ChatFilePart => part.type === 'file');
+    const lastTextIndex = bodyParts.reduce(
+      (last, part, index) => (part.type === 'text' && part.text.trim() !== '' ? index : last),
+      -1,
+    );
+    // Under an approval that ran the words after it were cut, and "ask again" would run it twice.
+    const approvalRan = holdsApprovalThatRan(bodyParts);
+    // A stream cut before any text says so too: the notice is all that row has. Text of its own may say it already (a
+    // server that writes the notice itself). An approval nobody knows the end of says the one thing to do itself, check
+    // before trying again.
+    const interruptedNotice =
+      !interrupted ||
+      saysStreamEnded(textOfParts(bodyParts)) ||
+      bodyParts.some(part => isToolPart(part) && approvalStatusOf(part) === 'unknown')
+        ? null
+        : approvalRan
+          ? CHAT_INTERRUPTED_AFTER_RUN_NOTICE
+          : CHAT_INTERRUPTED_NOTICE;
+
     // v2 draws a system line (e.g. a technician joining) as an in-thread
     // receipt card rather than as an author row with no body.
-    if (isV2 && isSystem && name) {
+    const systemText = systemLine || name;
+    if (isV2 && isSystem && systemText) {
       return (
         <div
           ref={ref}
@@ -587,7 +461,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           {...props}
         >
           <ChatAppearanceContext.Provider value={appearance}>
-            <SystemEventMessage text={name} timestamp={timestamp} />
+            <SystemEventMessage text={systemText} timestamp={timestamp} />
           </ChatAppearanceContext.Provider>
         </div>
       );
@@ -595,22 +469,23 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
     return (
       <ChatAppearanceContext.Provider value={appearance}>
-        <div
-          ref={ref}
-          className={cn(
-            'relative',
-            CHAT_MESSAGE_ROW_PADDING_CLASS[isV2 ? CHAT_APPEARANCE.V2 : CHAT_APPEARANCE.CLASSIC],
-            className,
-          )}
-          {...props}
-        >
-          {/* Message Content — full panel width.
+        <MessageCitationsProvider value={citations}>
+          <div
+            ref={ref}
+            className={cn(
+              'relative',
+              CHAT_MESSAGE_ROW_PADDING_CLASS[isV2 ? CHAT_APPEARANCE.V2 : CHAT_APPEARANCE.CLASSIC],
+              className,
+            )}
+            {...props}
+          >
+            {/* Message Content — full panel width.
             Avatar is INLINE in the name row below (2025-2026 chat
             pattern — Claude.ai, ChatGPT, Gemini, Perplexity).
             Legacy hanging-avatar layout (`absolute -left-16`) wasted
             64px of gutter and clipped in narrow panels.
 
-            Single-column GRID, not `flex flex-col` — here, in the segment
+            Single-column GRID, not `flex flex-col` — here, in the part
             stack below, in the thread's per-message wrapper and in the
             card/video pair (entity-cards/dispatch): WebKit re-lays-out the
             children of every nested column flexbox to measure them, so the
@@ -618,146 +493,189 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             layout per drawer-resize frame in Safari / the desktop WKWebView
             vs ~9ms as grid (Chrome: ~2ms either way). Same gap and stretch,
             no margin collapsing — visually identical. */}
-          <div className={CHAT_MESSAGE_STACK_CLASS}>
-            {(face || showName || showSelfName) && (
-              <div className={cn(CHAT_MESSAGE_HEADER_CLASS, isUser && 'justify-end')}>
-                {showSelfName && nameLabel}
-                {face}
-                {showName && nameLabel}
-                {showName && timestamp && (
-                  <span className="ml-auto shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
-                    {formatMessageTimestamp(timestamp)}
-                  </span>
-                )}
-              </div>
-            )}
+            <div className={CHAT_MESSAGE_STACK_CLASS}>
+              {(face || showName || showSelfName) && (
+                <div className={cn(CHAT_MESSAGE_HEADER_CLASS, isUser && 'justify-end')}>
+                  {showSelfName && nameLabel}
+                  {face}
+                  {showName && nameLabel}
+                  {showName && timestamp && (
+                    <span className="ml-auto shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
+                      {formatMessageTimestamp(timestamp)}
+                    </span>
+                  )}
+                </div>
+              )}
 
-            {/* Message segments — hidden for system messages without content */}
-            {(!isSystem || segments.length > 0) && (
-              <div className={CHAT_MESSAGE_SEGMENTS_CLASS}>
-                {segments.map((segment, index) => {
-                  // The engine's streaming path (atomic-block memoization +
-                  // fence tail-completion + aria-live) applies ONLY to the
-                  // actively streaming segment: last segment of a message that
-                  // is still typing. On completion `isTyping` flips false and
-                  // the engine does one authoritative whole-document parse.
-                  const segmentIsStreaming = index === segments.length - 1 && !!isTyping;
-                  if (segment.type === 'text') {
-                    // The layout of Claude and ChatGPT: what the USER said is a
-                    // bubble on the right; what anyone else says is plain text
-                    // across the thread's full width, with no bubble. Nothing
-                    // takes a column, so every line gets the whole width (the
-                    // speaker's face is the short line above).
-                    if (isUser) {
-                      return (
-                        <div key={index} className={CHAT_MESSAGE_USER_ROW_CLASS}>
-                          <div className={CHAT_MESSAGE_USER_BUBBLE_CLASS}>
-                            {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+              {/* The message's parts, in order, under the turn's stage rows. Hidden for a system line: its words are the
+              name line above. */}
+              {hasBody && (
+                <div className={CHAT_MESSAGE_SEGMENTS_CLASS}>
+                  {progress?.map(row => (
+                    <ToolExecutionDisplay
+                      key={row.id}
+                      message={progressExecutionDataOf(row)}
+                      assistantType={assistantType}
+                      variant={approvalVariant}
+                    />
+                  ))}
+                  {bodyParts.map((part, index) => {
+                    // The engine's streaming path (atomic-block memoization +
+                    // fence tail-completion + aria-live) applies ONLY to the
+                    // actively streaming part: the last part of a message that
+                    // is still typing. On completion `isTyping` flips false and
+                    // the engine does one authoritative whole-document parse.
+                    const partIsStreaming = index === bodyParts.length - 1 && !!isTyping;
+                    switch (part.type) {
+                      case 'text': {
+                        // Whitespace between two cards draws nothing, not an empty block with its gap.
+                        if (part.text.trim() === '') return null;
+                        // The layout of Claude and ChatGPT: what the USER said is a
+                        // bubble on the right; what anyone else says is plain text
+                        // across the thread's full width, with no bubble. Nothing
+                        // takes a column, so every line gets the whole width (the
+                        // speaker's face is the short line above).
+                        if (isUser) {
+                          return (
+                            <div key={index} className={CHAT_MESSAGE_USER_ROW_CLASS}>
+                              <div className={CHAT_MESSAGE_USER_BUBBLE_CLASS}>
+                                {renderTextBody(part.text, partIsStreaming)}
+                                {index === lastTextIndex && files.length > 0 && (
+                                  <ChatFileParts files={files} componentOverrides={cardComponentOverrides} />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+                        const answer = textWithCitationChips(part, numbers);
+                        return (
+                          <div key={index} className={cn(CHAT_MESSAGE_TEXT_CLASS, 'text-ods-text-primary')}>
+                            {renderTextBody(answer, partIsStreaming)}
+                            {index === lastTextIndex && files.length > 0 && (
+                              <ChatFileParts files={files} componentOverrides={cardComponentOverrides} />
+                            )}
                           </div>
-                        </div>
-                      );
+                        );
+                      }
+                      case 'file':
+                        // In the bubble of the text beside it. A message of attachments alone has a bubble of its own.
+                        if (lastTextIndex !== -1 || part !== files[0]) return null;
+                        return (
+                          <div key={index} className={CHAT_MESSAGE_USER_ROW_CLASS}>
+                            <div className={CHAT_MESSAGE_USER_BUBBLE_CLASS}>
+                              <ChatFileParts files={files} componentOverrides={cardComponentOverrides} />
+                            </div>
+                          </div>
+                        );
+                      case 'data-ask': {
+                        // Only the run's head draws: the tail parts are pages of the card already drawn above them.
+                        const run = askRuns.get(index);
+                        if (!run) return null;
+                        return <AskDisplay key={index} cards={run} onSelect={actions?.selectAsk} />;
+                      }
+                      case 'data-suggestions':
+                        return <SuggestionsDisplay key={index} data={part.data} onPick={actions?.pickSuggestion} />;
+                      case 'dynamic-tool': {
+                        // ONE approval card: a run of parts with one `batchId`, or a single gated part as a batch of one.
+                        const batched = approvalBatchIdOf(part) !== undefined;
+                        const approvalRows = batched ? batches.get(index) : approvalStatusOf(part) ? [part] : undefined;
+                        if (batched && !approvalRows) return null;
+                        if (!approvalRows && failedBeforeRunning(part) && part.state === 'output-error') {
+                          return <ErrorMessageDisplay key={index} title={part.errorText} />;
+                        }
+                        if (!approvalRows) {
+                          return (
+                            <ToolExecutionDisplay
+                              key={index}
+                              message={toolExecutionDataOf(part)}
+                              assistantType={assistantType}
+                              variant={approvalVariant}
+                            />
+                          );
+                        }
+                        if (approvalRows.some(row => waitsOnAnotherTier(row, displayApprovalTypes))) return null;
+                        const view = approvalBatchViewOf(approvalRows);
+                        return (
+                          <ApprovalBatchMessage
+                            key={index}
+                            data={view.data}
+                            status={view.status}
+                            answerPending={view.answerPending}
+                            resolvedByName={view.resolvedByName}
+                            {...approvalHandlers(actions, view.data.approvalRequestId)}
+                            assistantType={assistantType}
+                            variant={approvalVariant}
+                          />
+                        );
+                      }
+                      case 'data-escalation-offer':
+                        return (
+                          <EscalationOfferMessage
+                            key={index}
+                            data={{ offerId: part.id, text: part.data.text ?? '', origin: part.data.origin }}
+                            status={part.data.status}
+                            resolvedByName={part.data.resolvedByName}
+                            onApprove={bound(actions?.approveEscalation, part.id)}
+                            onReject={bound(actions?.rejectEscalation, part.id)}
+                          />
+                        );
+                      case 'data-ticket-escalated':
+                        return <TicketEscalatedMessage key={index} data={part.data} timestamp={timestamp} />;
+                      case 'data-ticket-event':
+                        // The card's own event time; the bubble timestamp is the
+                        // turn's FIRST row and lags every later lifecycle event.
+                        return (
+                          <TicketEventMessage
+                            key={index}
+                            data={part.data}
+                            timestamp={part.data.occurredAt ? new Date(part.data.occurredAt) : timestamp}
+                          />
+                        );
+                      case 'data-error':
+                        return <ErrorMessageDisplay key={index} title={part.data.title} details={part.data.details} />;
+                      case 'data-context-compaction':
+                        return <ContextCompactionDisplay key={index} status={part.data.status} />;
+                      case 'reasoning':
+                        return <ThinkingDisplay key={index} text={part.text} isStreaming={partIsStreaming} />;
+                      case 'data-record-cards': {
+                        // A record-cards part, drawn where it sits: between the text around the call.
+                        const cards = recordCards.get(index);
+                        if (!cards) return null;
+                        return (
+                          <div key={index} className={CHAT_MESSAGE_SEGMENTS_CLASS} data-testid="chat-record-cards">
+                            {cards.map(card => (
+                              <div key={`r-${card.key}`}>{card.node}</div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      default:
+                        return null;
                     }
-                    return (
-                      <div
-                        key={index}
-                        className={cn(CHAT_MESSAGE_TEXT_CLASS, isError ? 'text-ods-error' : 'text-ods-text-primary')}
-                      >
-                        {renderSegmentBody(index, segment.text, segmentIsStreaming)}
-                      </div>
-                    );
-                  } else if (segment.type === 'ask') {
-                    // Only the run's head draws — the tail segments are pages of
-                    // the card already rendered above them.
-                    const run = askRuns.get(index);
-                    if (!run) return null;
-                    return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />;
-                  } else if (segment.type === 'suggestions') {
-                    return <SuggestionsDisplay key={index} segment={segment} />;
-                  } else if (segment.type === 'tool_execution') {
-                    return (
-                      <ToolExecutionDisplay
-                        key={index}
-                        message={segment.data}
-                        assistantType={assistantType}
-                        variant={approvalVariant}
-                      />
-                    );
-                  } else if (segment.type === 'approval_request') {
-                    return (
-                      <ApprovalRequestMessage
-                        key={index}
-                        data={segment.data}
-                        status={segment.status}
-                        resolvedByName={segment.resolvedByName}
-                        onApprove={segment.onApprove}
-                        onReject={segment.onReject}
-                        assistantType={assistantType}
-                        variant={approvalVariant}
-                      />
-                    );
-                  } else if (segment.type === 'approval_batch') {
-                    return (
-                      <ApprovalBatchMessage
-                        key={index}
-                        data={segment.data}
-                        status={segment.status}
-                        resolvedByName={segment.resolvedByName}
-                        onApprove={segment.onApprove}
-                        onReject={segment.onReject}
-                        assistantType={assistantType}
-                        variant={approvalVariant}
-                      />
-                    );
-                  } else if (segment.type === 'escalation_offer') {
-                    return (
-                      <EscalationOfferMessage
-                        key={index}
-                        data={segment.data}
-                        status={segment.status}
-                        resolvedByName={segment.resolvedByName}
-                        onApprove={segment.onApprove}
-                        onReject={segment.onReject}
-                      />
-                    );
-                  } else if (segment.type === 'ticket_escalated') {
-                    return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />;
-                  } else if (segment.type === 'ticket_event') {
-                    // The card's own event time; the bubble timestamp is the
-                    // turn's FIRST row and lags every later lifecycle event.
-                    return (
-                      <TicketEventMessage key={index} data={segment.data} timestamp={segment.occurredAt ?? timestamp} />
-                    );
-                  } else if (segment.type === 'error') {
-                    return <ErrorMessageDisplay key={index} title={segment.title} details={segment.details} />;
-                  } else if (segment.type === 'context_compaction') {
-                    return <ContextCompactionDisplay key={index} status={segment.status} />;
-                  } else if (segment.type === 'thinking') {
-                    const isStreaming = index === segments.length - 1 && isTyping;
-                    return <ThinkingDisplay key={index} text={segment.text} isStreaming={isStreaming} />;
-                  }
-                  return null;
-                })}
-              </div>
-            )}
+                  })}
+                  {interruptedNotice && <p className="text-ods-text-secondary text-h6">{interruptedNotice}</p>}
+                </div>
+              )}
 
-            {timestamp && !showName && (
-              <span className={cn('text-ods-text-secondary text-h6', isUser && 'justify-self-end')}>
-                {formatMessageTimestamp(timestamp)}
-              </span>
-            )}
+              {timestamp && !showName && (
+                <span className={cn('text-ods-text-secondary text-h6', isUser && 'justify-self-end')}>
+                  {formatMessageTimestamp(timestamp)}
+                </span>
+              )}
 
-            {/* Attached entity-context chips (user bubbles). Read-only — no
+              {/* Attached entity-context chips (user bubbles). Read-only — no
               remove affordance once the message is sent (Figma 31:28709). */}
-            {stripContextItems && stripContextItems.length > 0 && (
-              <ChatContextChipStrip
-                items={stripContextItems}
-                resolveIcon={resolveContextIcon}
-                renderItem={renderContextItem}
-                className="mt-2"
-              />
-            )}
+              {stripContextItems && stripContextItems.length > 0 && (
+                <ChatContextChipStrip
+                  items={stripContextItems}
+                  resolveIcon={resolveContextIcon}
+                  renderItem={renderContextItem}
+                  className="mt-2"
+                />
+              )}
+            </div>
           </div>
-        </div>
+        </MessageCitationsProvider>
       </ChatAppearanceContext.Provider>
     );
   },
@@ -768,7 +686,8 @@ ChatMessageEnhanced.displayName = 'ChatMessageEnhanced';
 const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextProps) => {
   return (
     prevProps.role === nextProps.role &&
-    prevProps.content === nextProps.content &&
+    // Copy-on-write: an unchanged message keeps its array, however long the thread.
+    prevProps.parts === nextProps.parts &&
     prevProps.name === nextProps.name &&
     prevProps.avatar === nextProps.avatar &&
     prevProps.isTyping === nextProps.isTyping &&
@@ -789,15 +708,13 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.renderContextItem === nextProps.renderContextItem &&
     // Host keeps this stable (module const / useCallback), so reference
     // equality holds across streaming chunks.
-    prevProps.renderMention === nextProps.renderMention &&
+    prevProps.renderRecordChip === nextProps.renderRecordChip &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
-    // Reference equality: the reducer sets this once per answer and the host
-    // forwards the same array instance, so it holds across streaming chunks.
-    prevProps.refs === nextProps.refs &&
-    // Same stability contract as the renderers above: hosts pass a `useCallback`
-    // (EmbeddableChat passes its memoized `handleSend`), so this holds across
-    // streaming chunks instead of re-rendering every ask card per chunk.
-    prevProps.onAskSelect === nextProps.onAskSelect &&
+    // A stable object from each adapter, so this holds across streaming chunks instead of re-rendering every card.
+    prevProps.actions === nextProps.actions &&
+    prevProps.displayApprovalTypes === nextProps.displayApprovalTypes &&
+    prevProps.progress === nextProps.progress &&
+    prevProps.interrupted === nextProps.interrupted &&
     prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
   );
 });

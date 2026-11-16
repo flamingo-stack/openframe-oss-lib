@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MessageTypeTest {
 
     @ParameterizedTest
-    @EnumSource(MessageType.class)
+    @EnumSource(value = MessageType.class, mode = EnumSource.Mode.EXCLUDE, names = "ACCESS_CHANGE_EVENT")
     void getDestinationList_eventLoggedTypes_saveDetailsBeforePublishingToTheList(MessageType type) {
         List<String> destinations = type.getDestinationList().stream().map(Destination::name).toList();
         if (destinations.contains("KAFKA_PINOT")) {
@@ -33,6 +33,31 @@ class MessageTypeTest {
         assertThat(type.getDestinationList())
                 .containsExactly(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
         assertThat(type.getEventHandlerType()).isEqualTo(EventHandlerType.COMMON_TYPE);
+    }
+
+    @Test
+    void accessChangeEvent_preEnrichedOpenframeToLokiThenPinot() {
+        // setup
+        MessageType type = MessageType.ACCESS_CHANGE_EVENT;
+
+        // execution
+        IntegratedToolType toolType = type.getIntegratedToolType();
+
+        // verifications
+        assertThat(toolType).isEqualTo(IntegratedToolType.OPENFRAME);
+        assertThat(type.getDataEnrichmentServiceType()).isEqualTo(DataEnrichmentServiceType.PRE_ENRICHED);
+        assertThat(type.getDestinationList())
+                .containsExactly(Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+        assertThat(type.getEventHandlerType()).isEqualTo(EventHandlerType.COMMON_TYPE);
+    }
+
+    @Test
+    void openframeToolType_dbNameOpenframe() {
+        // execution
+        String dbName = IntegratedToolType.OPENFRAME.getDbName();
+
+        // verifications
+        assertThat(dbName).isEqualTo("openframe");
     }
 
     @Test

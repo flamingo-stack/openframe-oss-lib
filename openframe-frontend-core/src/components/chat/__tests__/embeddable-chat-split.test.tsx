@@ -21,6 +21,7 @@ vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
 
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatHandle, type EmbeddableChatProps } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { DialogItem } from '../types/component.types';
 import type { ChatContextPickerConfig } from '../types/context-item.types';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
@@ -28,7 +29,6 @@ import type { UnifiedChatState } from '../types/unified-chat-state.types';
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -46,8 +46,18 @@ const DIALOG: DialogItem = {
 };
 
 const MESSAGES: UnifiedChatState['messages'] = [
-  { id: 'm-1', role: 'user', content: 'hello there', timestamp: new Date('2026-01-01T00:00:00Z') },
-  { id: 'm-2', role: 'assistant', content: 'Hi, how can I help?', timestamp: new Date('2026-01-01T00:00:01Z') },
+  {
+    id: 'm-1',
+    role: 'user',
+    metadata: { createdAt: new Date('2026-01-01T00:00:00Z').toISOString() },
+    parts: [{ type: 'text', text: 'hello there' }],
+  },
+  {
+    id: 'm-2',
+    role: 'assistant',
+    metadata: { createdAt: new Date('2026-01-01T00:00:01Z').toISOString() },
+    parts: [{ type: 'text', text: 'Hi, how can I help?' }],
+  },
 ];
 
 const PICKER: ChatContextPickerConfig = {
@@ -56,7 +66,7 @@ const PICKER: ChatContextPickerConfig = {
 };
 const DEVICE = { type: 'DEVICE', id: 'machine-7', label: 'ELK-PROD-07' };
 
-/** The injected-state path (`mingoState`): no transport, the test drives it. */
+/** A host's engine (`ChatEngineProvider`): no transport, the test drives it. */
 function createState(overrides: Partial<UnifiedChatState> = {}): UnifiedChatState {
   const noop = () => {};
   const asyncNoop = async () => {};
@@ -92,10 +102,10 @@ function createState(overrides: Partial<UnifiedChatState> = {}): UnifiedChatStat
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
+    dialogCapabilities: { canRename: true, canArchive: true },
     ...overrides,
   };
 }
@@ -106,29 +116,30 @@ function renderChat(
   state: UnifiedChatState,
   props: ChatProps = {},
   handleRef?: React.Ref<EmbeddableChatHandle>,
-): { rerender: (props: ChatProps) => void } {
+): { rerender: (props: ChatProps, nextState?: UnifiedChatState) => void } {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const tree = (p: ChatProps) => (
+  const tree = (p: ChatProps, engine: UnifiedChatState) => (
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          ref={handleRef}
-          shell="inline"
-          appearance="v2"
-          closable={false}
-          open
-          onOpenChange={vi.fn()}
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={state}
-          mingoDialogCapabilities={{ canRename: true, canArchive: true }}
-          {...p}
-        />
+        <ChatEngineProvider engine={engine}>
+          <EmbeddableChat
+            ref={handleRef}
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={vi.fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+
+            {...p}
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>
   );
-  const view = render(tree(props));
-  return { rerender: next => view.rerender(tree(next)) };
+  const view = render(tree(props, state));
+  return { rerender: (next, nextState) => view.rerender(tree(next, nextState ?? state)) };
 }
 
 /** The chat page's node the thread portals into. */
@@ -219,9 +230,8 @@ describe('EmbeddableChat split: thread portalled into the page', () => {
     const page = pageNode();
     const compact = vi.fn();
     const hostItem = vi.fn();
-    renderChat(createState(), {
+    renderChat(createState({ dialogCapabilities: { canRename: true, canArchive: true, compactDialog: compact } }), {
       threadContainer: page,
-      mingoDialogCapabilities: { canRename: true, canArchive: true, compactDialog: compact },
       composerMenuItems: [{ id: 'host', label: 'Host Action', onClick: hostItem }],
     });
 
@@ -409,10 +419,7 @@ describe('EmbeddableChat onDialogCreated', () => {
     expect(sendMessage).toHaveBeenCalledTimes(1);
     return {
       land: (id: string) =>
-        view.rerender({
-          ...props,
-          mingoState: createState({ activeDialogId: id, activeDialog: { id, title: '' }, sendMessage }),
-        }),
+        view.rerender(props, createState({ activeDialogId: id, activeDialog: { id, title: '' }, sendMessage })),
     };
   }
 
@@ -431,7 +438,7 @@ describe('EmbeddableChat onDialogCreated', () => {
     const onDialogCreated = vi.fn();
     const empty = createState({ messages: [], activeDialogId: null, activeDialog: null });
     const { rerender } = renderChat(empty, { threadContainer: null, onDialogCreated });
-    rerender({ threadContainer: null, onDialogCreated, mingoState: createState() });
+    rerender({ threadContainer: null, onDialogCreated }, createState());
     expect(onDialogCreated).not.toHaveBeenCalled();
   });
 });

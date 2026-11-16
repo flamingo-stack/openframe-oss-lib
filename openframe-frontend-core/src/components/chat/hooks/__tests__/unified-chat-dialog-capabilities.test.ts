@@ -7,15 +7,14 @@
  * ONE object, and never on a transport name. This file pins the resolution
  * rule so that gate can never silently change meaning:
  *
- *   - GUIDE mode reports whatever the SSE adapter reports — `undefined`
+ *   - GUIDE mode reports whatever the hub's engine reports — `undefined`
  *     without `chatConversationsUrl`, so a plain Guide panel stays
  *     single-thread even when a Mingo config is also present;
- *   - MINGO mode reports the NATS adapter's object, which is always present;
- *   - a HOST-INJECTED state (`mingoStateOverride`) that carries no
- *     capabilities of its own falls back to the `injectedDialogCapabilities`
- *     companion, and to an EMPTY object when the host passes neither — so
- *     injecting a state never costs a host its list surface;
- *   - capabilities ON the injected state win over the companion prop.
+ *   - MINGO mode reports its engine's, which is always present: a live-tail
+ *     panel owns a list, one with no affordances without `fetchDialogs`;
+ *   - an engine a host provides (`ChatEngineProvider`) IS the Mingo mode: its
+ *     capabilities are the panel's, and nothing is laid over them (what a host
+ *     adds, the link to copy or Compact, is the engine's own configuration).
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -23,12 +22,13 @@ import { renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
+import { ChatEngineProvider } from '../../engine/chat-engine-context';
 import type { ChatDialogCapabilities, UnifiedChatState } from '../../types/unified-chat-state.types';
+import { natsWsEngineConfig } from '../use-nats-chat-adapter';
 import { useUnifiedChat, type UseUnifiedChatModes } from '../use-unified-chat';
 
 const endpoints: ChatRuntime['endpoints'] = {
   chatStreamUrl: '/api/docs/chat',
-  approvalToolUrl: '/api/chat/agent/confirm-tool',
   commandsUrl: '/api/docs/commands',
   buildListUrl: () => null,
   attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -36,13 +36,14 @@ const endpoints: ChatRuntime['endpoints'] = {
   identityUrl: '/api/chat/identity',
 };
 
-function wrapperFor(runtime: ChatRuntime) {
+function wrapperFor(runtime: ChatRuntime, engine?: UnifiedChatState) {
   return function wrapper({ children }: { children: ReactNode }) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const inner = engine ? createElement(ChatEngineProvider, { engine }, children) : children;
     return createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(ChatRuntimeContext.Provider, { value: runtime }, children),
+      createElement(ChatRuntimeContext.Provider, { value: runtime }, inner),
     );
   };
 }
@@ -55,19 +56,19 @@ const managedRuntime: ChatRuntime = {
 };
 
 /** A Mingo mode config that is structurally valid but never opens a socket. */
-const mingoMode: UseUnifiedChatModes['mingo'] = {
+const mingoMode: UseUnifiedChatModes['mingo'] = natsWsEngineConfig({
   dialogId: null,
   getNatsWsUrl: () => null,
   publishUserMessage: vi.fn(),
-};
+});
 
-/** Minimal host-built state — only the fields this contract reads. */
-function injectedState(overrides: Partial<UnifiedChatState> = {}): UnifiedChatState {
+/** Minimal provided engine — only the fields this contract reads. */
+function hostEngine(overrides: Partial<UnifiedChatState> = {}): UnifiedChatState {
   return { dialogs: [], activeDialogId: null, ...overrides } as unknown as UnifiedChatState;
 }
 
-function capsOf(options: Parameters<typeof useUnifiedChat>[0], runtime = plainRuntime) {
-  const { result } = renderHook(() => useUnifiedChat(options), { wrapper: wrapperFor(runtime) });
+function capsOf(options: Parameters<typeof useUnifiedChat>[0], runtime = plainRuntime, engine?: UnifiedChatState) {
+  const { result } = renderHook(() => useUnifiedChat(options), { wrapper: wrapperFor(runtime, engine) });
   return result.current.dialogCapabilities;
 }
 
@@ -81,49 +82,29 @@ describe('useUnifiedChat — dialogCapabilities resolution', () => {
     expect(caps).toMatchObject({ canRename: true, canArchive: true, emptyListSkipsToCompose: true });
   });
 
-  it('mingo mode reports the NATS adapter object — the Mingo panel always owns a list', () => {
+  it('mingo mode reports its engine object — the Mingo panel always owns a list', () => {
     const caps = capsOf({ modes: { mingo: mingoMode }, activeMode: 'mingo' }, managedRuntime);
     // Present despite the runtime endpoint, which belongs to the OTHER transport.
     expect(caps).toBeDefined();
     expect(caps?.emptyListSkipsToCompose).toBeUndefined();
   });
 
-  it('an injected state with no capabilities falls back to the companion prop', () => {
-    const injected: ChatDialogCapabilities = { canRename: true, canArchive: true, searchQuery: 'q' };
-    const caps = capsOf({
-      modes: {},
-      activeMode: 'mingo',
-      mingoStateOverride: injectedState(),
-      injectedDialogCapabilities: injected,
-    });
-    expect(caps).toBe(injected);
-  });
-
-  it('an injected state with NEITHER still owns a list (empty, not undefined)', () => {
-    // Injecting a state must never cost a host its list surface — this is the
-    // case the removed `activeMode === 'mingo'` check used to carry.
-    const caps = capsOf({ modes: {}, activeMode: 'mingo', mingoStateOverride: injectedState() });
-    expect(caps).toEqual({});
-  });
-
-  it('capabilities ON the injected state win over the companion prop', () => {
-    const own: ChatDialogCapabilities = { canRename: true };
-    const caps = capsOf({
-      modes: {},
-      activeMode: 'mingo',
-      mingoStateOverride: injectedState({ dialogCapabilities: own }),
-      injectedDialogCapabilities: { canArchive: true },
-    });
+  it("a provided engine is the Mingo mode, its capabilities the panel's as they are", () => {
+    const own: ChatDialogCapabilities = { canRename: true, onCopyLink: vi.fn() };
+    const caps = capsOf({ modes: {}, activeMode: 'mingo' }, plainRuntime, hostEngine({ dialogCapabilities: own }));
     expect(caps).toBe(own);
   });
 
-  it('the companion prop is ignored when the injected state is NOT active', () => {
-    const caps = capsOf({
-      modes: { guide: {} },
-      activeMode: 'guide',
-      mingoStateOverride: injectedState(),
-      injectedDialogCapabilities: { canRename: true },
-    });
+  it('a provided engine with no list is one thread', () => {
+    expect(capsOf({ modes: {}, activeMode: 'mingo' }, plainRuntime, hostEngine())).toBeUndefined();
+  });
+
+  it('a provided engine does not stand for the Guide mode', () => {
+    const caps = capsOf(
+      { modes: { guide: {} }, activeMode: 'guide' },
+      plainRuntime,
+      hostEngine({ dialogCapabilities: { canRename: true } }),
+    );
     expect(caps).toBeUndefined();
   });
 });

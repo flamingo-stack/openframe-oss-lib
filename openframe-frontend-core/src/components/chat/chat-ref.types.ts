@@ -1,24 +1,16 @@
 /**
- * Wire schema for an inline entity reference emitted by the chat backend.
+ * What a record's card or chip draws: the record a URI names (`chat-protocol/record-link`), and what is known about it
+ * before its row arrives. The title and url come from the message's own source part with the same URI, else the link's
+ * label.
  *
- * Mirrors `ChatRef` in `lib/data/doc-chat-utils.ts` on the multi-platform-hub
- * server. The OSS-lib has NO knowledge of which entity types exist or how to
- * render them — the host (consumer of this library) supplies a renderer via
- * `<ChatMessageEnhanced renderEntityCard={...} />`. v6.1 §B.2.6+§B.2.7.
- *
- * The metadata frame on the wire carries `refs: Record<\`<type>:<id>\`, ChatRef>`,
- * and `[card://<type>:<id>]` markers inside the assistant body expand into
- * whatever JSX the host returns.
+ * The OSS-lib has NO knowledge of which entity types exist or how to render them: the host (consumer of this library)
+ * supplies a renderer via `<ChatMessageEnhanced renderEntityCard={...} />`.
  */
 export interface ChatRef {
   /** documentType from the host's RAG config (e.g. 'webinar', 'customer_interview').
    *  Treated as opaque by the OSS-lib — the host owns the type vocabulary. */
   type: string;
-  /** RagTableConfig.id (e.g. 'data-room-docs', 'webinars'). Drives the
-   *  icon + label lookup in the host's `RAG_SOURCE_DISPLAY` registry —
-   *  same direct-keyed lookup the chips + search results use. Optional
-   *  for backward-compat with older wire payloads; when absent the host
-   *  resolver falls back to reverse-mapping `type → sourceRepo`. */
+  /** RagTableConfig.id, when a row knows it: drives the icon + label lookup. Derived, in memory only: no wire carries it. */
   sourceRepo?: string;
   /** Primary-key value. Opaque string downstream. */
   id: string;
@@ -27,21 +19,14 @@ export interface ChatRef {
   title: string;
   /** Resolved external URL — null when the entity has no public link. */
   url: string | null;
-  /** Platform that owns the destination at `url` — sourced by the host's
-   *  RAG mapper from the row's `platforms` junction (or the rag-config's
-   *  default). Threaded through to the host's nav hook so the same-app-
-   *  vs-cross-app routing decision is deterministic (no origin guess in
-   *  dev where every platform shares localhost). Null when `url` is
-   *  external/unknown or the mapper didn't supply it (backward-compat). */
+  /** The platform that owns `url`, as the host's composer answered it. Derived, in memory only: no wire carries it. */
   targetPlatform?: string | null;
+  /** A ClickUp task's own address, as its row answers it. In memory only: what the record's menu links to, never composed. */
+  clickupUrl?: string | null;
   /** ISO date for the entity's canonical time. Optional. */
   date?: string;
   /** PII-sanitized hover preview text. Optional. */
   preview?: string;
-  /** Type-specific extras carried opaquely through the wire — keyed map
-   *  the host's renderer can pull from. Used today by `slack_message`
-   *  refs to ship `{ channelName, userName }` resolved server-side from
-   *  the slack-channels / slack-users tables, so the compact card
-   *  surfaces human-readable names instead of opaque Slack IDs. */
+  /** Type-specific extras, a keyed map the host's renderer can pull from. */
   metadata?: Record<string, unknown>;
 }

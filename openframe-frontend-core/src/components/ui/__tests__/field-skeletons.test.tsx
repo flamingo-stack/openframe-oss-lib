@@ -31,6 +31,16 @@ describe('Textarea loading form', () => {
     expect(loading).toContain('aria-hidden="true"');
   });
 
+  it('hides the empty box by class, since the box class’s `flex` beats the `hidden` attribute', () => {
+    const html = renderToStaticMarkup(
+      <LoadingScope>
+        <Textarea rows={3} />
+      </LoadingScope>,
+    );
+    const box = /<textarea[^>]*>/.exec(html)?.[0] ?? '';
+    expect(box).toMatch(/class="[^"]*\bhidden\b/);
+  });
+
   it('takes the browser’s default two rows when none are named', () => {
     expect(
       renderToStaticMarkup(

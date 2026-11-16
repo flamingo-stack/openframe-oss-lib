@@ -5,17 +5,16 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { within, userEvent } from 'storybook/test';
 import { EmbeddableChat } from '../components/chat/embeddable-chat';
-import type {
-  UseNatsChatAdapterConfig,
-  FetchDialogsResult,
-  FetchDialogMessagesResult,
-} from '../components/chat/hooks/use-nats-chat-adapter';
+import { ChatEngineProvider } from '../components/chat/engine/chat-engine-context';
+import type { FetchDialogMessagesResult } from '../components/chat/engine/chat-transport';
+import { natsWsEngineConfig, type UseNatsChatAdapterConfig } from '../components/chat/hooks/use-nats-chat-adapter';
 import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands';
 import type { MingoQuickAction } from '../components/chat/mingo-welcome';
 import type { DialogItem } from '../components/chat/types/component.types';
-import type { UnifiedChatState, UnifiedChatMessage } from '../components/chat/types/unified-chat-state.types';
+import type { FetchDialogsResult, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import { BracketCurlyIcon, Rocket01Icon, SearchIcon } from '../components/icons-v2-generated';
 import { ChatRuntimeContext, type ChatRuntime } from '../contexts/chat-runtime-context';
+import { type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messages';
 
 // =============================================================================
 // Stub commands endpoint — module-level constant referenced both by the
@@ -71,7 +70,6 @@ function createMockRuntime(): ChatRuntime {
   return {
     endpoints: {
       chatStreamUrl: '/__story__/chat',
-      approvalToolUrl: '/__story__/confirm-tool',
       commandsUrl: COMMANDS_URL,
       buildListUrl: () => null,
       attachmentUploadUrl: '/__story__/upload',
@@ -109,19 +107,23 @@ function createMockMingoConfig(): UseNatsChatAdapterConfig {
             id: `${dialogId}-u1`,
             createdAt: new Date().toISOString(),
             owner: { type: 'CLIENT' },
-            messageData: {
-              type: 'TEXT',
-              text: 'Which devices have not sent any logs in the last 24 hours?',
-            },
+            parts: [
+              {
+                type: 'TEXT',
+                text: 'Which devices have not sent any logs in the last 24 hours?',
+              },
+            ],
           },
           {
             id: `${dialogId}-a1`,
             createdAt: new Date().toISOString(),
             owner: { type: 'ASSISTANT' },
-            messageData: {
-              type: 'TEXT',
-              text: 'Found 3 devices that have not reported in over 24 hours. Want me to run a full diagnostic?',
-            },
+            parts: [
+              {
+                type: 'TEXT',
+                text: 'Found 3 devices that have not reported in over 24 hours. Want me to run a full diagnostic?',
+              },
+            ],
           },
         ],
         nextCursor: null,
@@ -524,7 +526,7 @@ export const MingoOnly: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfig(),
+        mingo: natsWsEngineConfig(createMockMingoConfig()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -545,7 +547,7 @@ export const ComposerLocked: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfig(),
+        mingo: natsWsEngineConfig(createMockMingoConfig()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -575,7 +577,7 @@ export const BothModes: Story = {
       {...args}
       modes={{
         guide: {},
-        mingo: createMockMingoConfig(),
+        mingo: natsWsEngineConfig(createMockMingoConfig()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -607,7 +609,7 @@ export const ReturningUser: Story = {
       {...args}
       modes={{
         guide: {},
-        mingo: createMockMingoConfigWithDialogs(),
+        mingo: natsWsEngineConfig(createMockMingoConfigWithDialogs()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -634,7 +636,7 @@ export const ChatsLoading: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfigChatsLoading(),
+        mingo: natsWsEngineConfig(createMockMingoConfigChatsLoading()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -660,7 +662,7 @@ export const ChatLoading: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfigChatLoading(),
+        mingo: natsWsEngineConfig(createMockMingoConfigChatLoading()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -692,7 +694,7 @@ export const ChatsError: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfigChatsError(),
+        mingo: natsWsEngineConfig(createMockMingoConfigChatsError()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -718,7 +720,7 @@ export const ArchiveEmpty: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfigArchiveEmpty(),
+        mingo: natsWsEngineConfig(createMockMingoConfigArchiveEmpty()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -800,13 +802,13 @@ const TS_247 = new Date(2024, 0, 1, 14, 47, 0);
 const RUN_SCRIPT_TITLE =
   '`run_script` -- PowerShell: `Get-LocalUser | Where-Object { $_.PasswordRequired -eq $false -or $_.PasswordLastSet -lt (Get-Date).AddDays(-90) }`';
 
-const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
+const SCRIPTED_MESSAGES_ROWS: StoryRow[] = [
   {
     id: 'm1',
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo', // cyan name (Figma flamingo-colors/cyan)
-    content: 'How can I help?',
+    parts: textPart('How can I help?'),
     timestamp: TS_247,
   },
   {
@@ -815,7 +817,7 @@ const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
     name: 'Roman Smith',
     authorType: 'admin', // yellow name (Figma open-colors/yellow)
     avatar: ROMAN_AVATAR,
-    content: 'Check machines with weak password',
+    parts: textPart('Check machines with weak password'),
     timestamp: TS_247,
   },
   {
@@ -823,26 +825,25 @@ const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo',
-    content: '', // body lives entirely in `segments`
     timestamp: TS_247,
-    segments: [
+    parts: [
       {
-        type: 'tool_execution',
-        data: {
-          type: 'EXECUTING_TOOL', // → DotsLoader status + collapsed command block
-          integratedToolType: 'OPENFRAME',
-          toolFunction: 'run_script',
-          toolTitle: RUN_SCRIPT_TITLE,
-          parameters: {},
-        },
+        type: 'dynamic-tool',
+        toolName: 'run_script',
+        toolCallId: 'run-1',
+        title: RUN_SCRIPT_TITLE,
+        state: 'input-available', // → DotsLoader status + collapsed command block
+        input: {},
+        toolMetadata: { integratedToolType: 'OPENFRAME' },
       },
     ],
   },
 ];
+const SCRIPTED_MESSAGES = SCRIPTED_MESSAGES_ROWS.map(storyMessage);
 
 /**
  * Fully-stubbed `UnifiedChatState` factory. This is the "inject a static Mingo
- * thread" path (`EmbeddableChat`'s `mingoState` prop): the panel renders this
+ * thread" path (a host's engine, `ChatEngineProvider`): the panel renders this
  * object directly and opens NO NATS subscription. Every action is a no-op so
  * the scene stays read-only. `isLoading: true` + `streamingPhase: 'thinking'`
  * drives the trailing "Mingo is working" dots loader under the command block.
@@ -884,8 +885,7 @@ function createScriptedMingoState(): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };
@@ -897,7 +897,7 @@ function createScriptedMingoState(): UnifiedChatState {
  * "Check machines with weak password" → a PowerShell `run_script` command block
  * (executing) → Mingo working (dots).
  *
- * Rendered via the `mingoState` injection path with `shell="none"`, so the chat
+ * Rendered through a host's engine (`ChatEngineProvider`) with `shell="none"`, so the chat
  * body sits inline inside our own 440-wide framed box (matching the Figma
  * frame) with zero backend — no NATS, no fetch, fully static + read-only.
  *
@@ -918,15 +918,17 @@ export const ScriptedConversation: Story = {
     <DialogPrimitive.Root open>
       <div className="fixed inset-0 z-[10] flex items-center justify-center bg-ods-bg p-6">
         <div className="h-[560px] w-[440px] overflow-hidden rounded-[6px] border border-ods-border shadow-2xl">
-          <EmbeddableChat
-            shell="none"
-            defaultOpen
-            defaultActiveMode="mingo"
-            showInternalTrigger={false}
-            previewMode
-            mingoState={createScriptedMingoState()}
-            mingoDialogCapabilities={{ canRename: true, canArchive: true }}
-          />
+          <ChatEngineProvider
+            engine={{ ...createScriptedMingoState(), dialogCapabilities: { canRename: true, canArchive: true } }}
+          >
+            <EmbeddableChat
+              shell="none"
+              defaultOpen
+              defaultActiveMode="mingo"
+              showInternalTrigger={false}
+              previewMode
+            />
+          </ChatEngineProvider>
         </div>
       </div>
     </DialogPrimitive.Root>

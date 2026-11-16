@@ -8,7 +8,9 @@ import { ErrorMessageDisplay } from '../error-message-display';
 
 describe('chat appearance', () => {
   it('an assistant turn is plain text under the agent mark, with no written name', () => {
-    render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" />);
+    render(
+      <ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" parts={[{ type: 'text', text: 'Hi' }]} />,
+    );
     expect(screen.getByText('Hi')).toBeTruthy();
     expect(screen.getByRole('img', { name: 'Fae' })).toBeTruthy();
     expect(screen.queryByText('Fae')).toBeNull();
@@ -16,7 +18,15 @@ describe('chat appearance', () => {
   });
 
   it('v2 draws the same, with no written name', () => {
-    render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" appearance="v2" />);
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        assistantType="fae"
+        name="Fae"
+        parts={[{ type: 'text', text: 'Hi' }]}
+        appearance="v2"
+      />,
+    );
     expect(screen.getByText('Hi')).toBeTruthy();
     expect(screen.queryByText('Fae')).toBeNull();
   });
@@ -24,7 +34,7 @@ describe('chat appearance', () => {
   it('a user turn is a bubble under their face, with no written name, in a v2 thread too', () => {
     render(
       <ChatAppearanceContext.Provider value="v2">
-        <ChatMessageEnhanced role="user" name="John Smith" content="Hi" />
+        <ChatMessageEnhanced role="user" name="John Smith" parts={[{ type: 'text', text: 'Hi' }]} />
       </ChatAppearanceContext.Provider>,
     );
     expect(screen.getByText('Hi')).toBeTruthy();
@@ -35,7 +45,13 @@ describe('chat appearance', () => {
   it("an admin's own turn in Mingo is a bubble under their face, with no written name", () => {
     render(
       <ChatAppearanceContext.Provider value="v2">
-        <ChatMessageEnhanced role="user" authorType="admin" assistantType="mingo" name="Roman Smith" content="Hi" />
+        <ChatMessageEnhanced
+          role="user"
+          authorType="admin"
+          assistantType="mingo"
+          name="Roman Smith"
+          parts={[{ type: 'text', text: 'Hi' }]}
+        />
       </ChatAppearanceContext.Provider>,
     );
     expect(screen.getByTitle('Roman Smith')).toBeTruthy();
@@ -52,7 +68,7 @@ describe('chat appearance', () => {
           selfAuthorType="user"
           assistantType="fae"
           name="Test Owner"
-          content="On it"
+          parts={[{ type: 'text', text: 'On it' }]}
           timestamp={new Date(2026, 9, 13, 12, 26)}
         />
       </ChatAppearanceContext.Provider>,
@@ -67,7 +83,15 @@ describe('chat appearance', () => {
   });
 
   it("the end user's own turn stays a bubble on the right when the thread names its owner", () => {
-    render(<ChatMessageEnhanced role="user" authorType="user" selfAuthorType="user" name="You" content="Hi" />);
+    render(
+      <ChatMessageEnhanced
+        role="user"
+        authorType="user"
+        selfAuthorType="user"
+        name="You"
+        parts={[{ type: 'text', text: 'Hi' }]}
+      />,
+    );
     expect(document.body).toContainHTML('bg-ods-bg-active');
     expect(document.body).toContainHTML('justify-end');
     expect(screen.queryByText('You')).toBeNull();
@@ -82,7 +106,7 @@ describe('chat appearance', () => {
           selfAuthorType="admin"
           nameEveryTurn
           name="Test Owner"
-          content="On it"
+          parts={[{ type: 'text', text: 'On it' }]}
           timestamp={new Date(2026, 9, 13, 12, 26)}
         />
       </ChatAppearanceContext.Provider>,
@@ -103,7 +127,7 @@ describe('chat appearance', () => {
         selfAuthorType="admin"
         nameEveryTurn
         name="LAPTOP-88Q44ERC"
-        content="I want Call of Duty"
+        parts={[{ type: 'text', text: 'I want Call of Duty' }]}
       />,
     );
     expect(screen.getAllByText('LAPTOP-88Q44ERC')).toHaveLength(1);
@@ -118,7 +142,7 @@ describe('chat appearance', () => {
         selfAuthorType="admin"
         nameEveryTurn
         name="Ava"
-        content="Hi"
+        parts={[{ type: 'text', text: 'Hi' }]}
         timestamp={new Date(2026, 9, 13, 12, 26)}
       />,
     );
@@ -130,17 +154,32 @@ describe('chat appearance', () => {
   });
 
   it("a user turn with no author type is the user's own in a thread the user owns", () => {
-    render(<ChatMessageEnhanced role="user" selfAuthorType="user" content="Hi" />);
+    render(<ChatMessageEnhanced role="user" selfAuthorType="user" parts={[{ type: 'text', text: 'Hi' }]} />);
     expect(document.body).toContainHTML('bg-ods-bg-active');
   });
 
   it('a turn can hide its face', () => {
-    render(<ChatMessageEnhanced role="assistant" assistantType="fae" name="Fae" content="Hi" showAvatar={false} />);
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        assistantType="fae"
+        name="Fae"
+        parts={[{ type: 'text', text: 'Hi' }]}
+        showAvatar={false}
+      />,
+    );
     expect(screen.queryByRole('img')).toBeNull();
   });
 
   it('a technician in the thread keeps a name caption', () => {
-    render(<ChatMessageEnhanced role="assistant" authorType="admin" name="Roman Smith" content="On it" />);
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        authorType="admin"
+        name="Roman Smith"
+        parts={[{ type: 'text', text: 'On it' }]}
+      />,
+    );
     expect(screen.getByText('Roman Smith')).toBeTruthy();
   });
 
@@ -165,7 +204,7 @@ describe('chat appearance', () => {
         role="user"
         authorType="system"
         name="Roman Smith joined the chat"
-        content=""
+        parts={[]}
         appearance="v2"
       />,
     );
@@ -174,7 +213,7 @@ describe('chat appearance', () => {
   });
 
   it('classic keeps the system line as an author row', () => {
-    render(<ChatMessageEnhanced role="user" authorType="system" name="Roman Smith joined the chat" content="" />);
+    render(<ChatMessageEnhanced role="user" authorType="system" name="Roman Smith joined the chat" parts={[]} />);
     expect(screen.getByText('Roman Smith joined the chat')).toBeTruthy();
     expect(screen.queryByText('Technician Joined')).toBeNull();
   });

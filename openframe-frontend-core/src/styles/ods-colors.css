@@ -377,6 +377,9 @@
   /* Three-column shell (ODS v2): its sidebars' ground and divider, their
    * secondary grey (icons, category labels) and the active entry's tint. */
   --color-bg-panel: var(--ods-backgrounds-panel);
+  /* The deepest ground (ODS v2 backgrounds/openframe-background): the strip
+   * above the chat composer. Unlike `--color-bg`, no `data-surface` tints it. */
+  --color-bg-base: var(--ods-backgrounds-openframe-background);
   --color-border-panel: var(--ods-borders-subtle);
   /* A menu that floats over the page (ODS v2 Dropdown-menu): its ground
    * (backgrounds/overlay) and a hovered row's (backgrounds/overlay hover).

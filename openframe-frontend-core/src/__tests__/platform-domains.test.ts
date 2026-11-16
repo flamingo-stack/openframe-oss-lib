@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   PLATFORM_DOMAINS,
   byKey,
+  getPlatformCanonicalUrl,
   getPlatformProductionUrl,
   getPlatformUrl,
+  platformOfUrl,
   getDeploymentUrl,
   getRequestOrigin,
   isLocalUrl,
@@ -350,5 +352,92 @@ describe('cookie-domain guard + match (shared SSOT primitives)', () => {
   });
   it('matchCookieDomain accepts dotless bases and still returns the dotted form', () => {
     expect(matchCookieDomain('foo.tmcg.miami', ['tmcg.miami'])).toBe('.tmcg.miami');
+  });
+});
+
+describe('getPlatformCanonicalUrl: the origin a record`s address is stored on', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('is the registry`s site, else its default', () => {
+    expect(getPlatformCanonicalUrl('openframe')).toBe('https://hub.openframe.ai');
+    expect(getPlatformCanonicalUrl('flamingo')).toBe('https://www.flamingo.run');
+    expect(getPlatformCanonicalUrl('coding-hub')).toBe('https://coding-hub.flamingo.so');
+    expect(getPlatformCanonicalUrl('universal')).toBe('https://www.flamingo.run');
+  });
+
+  it('every platform answers an absolute origin with no trailing slash', () => {
+    for (const entry of PLATFORM_DOMAINS) {
+      expect(getPlatformCanonicalUrl(entry.key)).toMatch(/^https:\/\/[^/]+$/);
+    }
+  });
+
+  it('falls back to flamingo for an unknown key, like the other resolvers', () => {
+    expect(getPlatformCanonicalUrl('not-a-platform')).toBe('https://www.flamingo.run');
+  });
+
+  it('reads no environment: a dev run and a preview store the same address', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NEXT_PUBLIC_DEV_URL', 'http://localhost:3000');
+    vi.stubEnv('NEXT_PUBLIC_FLAMINGO_URL', 'https://flamingo-git-branch.vercel.app');
+    vi.stubEnv('NEXT_PUBLIC_OPENFRAME_URL', 'https://staging.openframe.miami');
+    vi.resetModules();
+    const mod = await import('@/platform-domains');
+    expect(mod.getPlatformCanonicalUrl('flamingo')).toBe('https://www.flamingo.run');
+    expect(mod.getPlatformCanonicalUrl('openframe')).toBe('https://hub.openframe.ai');
+    // What it replaces answers both of those from the environment.
+    expect(mod.getPlatformUrl('flamingo')).toBe('http://localhost:3000');
+    expect(mod.getPlatformProductionUrl('flamingo')).toBe('https://flamingo-git-branch.vercel.app');
+  });
+});
+
+describe('platformOfUrl and the host superset', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('names the platform of a canonical address', () => {
+    expect(platformOfUrl('https://www.flamingo.run/blog/a')).toBe('flamingo');
+    expect(platformOfUrl('https://hub.openframe.ai/knowledge-base')).toBe('openframe');
+    expect(platformOfUrl('https://openframe.ai/x')).toBe('openframe');
+    expect(platformOfUrl('https://product-hub.flamingo.so/admin/design-docs/a')).toBe('product-hub');
+    expect(platformOfUrl('https://flamingo.cx/a')).toBe('flamingo');
+  });
+
+  it('every platform`s canonical url resolves back to it (a pseudo key to its real owner)', () => {
+    for (const entry of PLATFORM_DOMAINS) {
+      if (entry.pseudo || entry.key === 'universal') continue;
+      expect(platformOfUrl(`${getPlatformCanonicalUrl(entry.key)}/page`)).toBe(entry.key);
+    }
+  });
+
+  it('is null for a third party, the local machine and anything that is not an absolute url', () => {
+    expect(platformOfUrl('https://github.com/flamingo-stack/x')).toBeNull();
+    expect(platformOfUrl('http://localhost:3000/blog/a')).toBeNull();
+    expect(platformOfUrl('http://127.0.0.1:3000/a')).toBeNull();
+    expect(platformOfUrl('/blog/a')).toBeNull();
+    expect(platformOfUrl('')).toBeNull();
+    expect(platformOfUrl(null)).toBeNull();
+    expect(platformOfUrl(undefined)).toBeNull();
+  });
+
+  it('a canonical host still answers when the deployment repoints its platform', async () => {
+    vi.stubEnv('NEXT_PUBLIC_FLAMINGO_URL', 'https://flamingo-git-branch.vercel.app');
+    vi.stubEnv('NEXT_PUBLIC_OPENFRAME_URL', 'https://staging.openframe.miami');
+    vi.stubEnv('NEXT_PUBLIC_OPENMSP_URL', 'http://localhost:3000');
+    vi.resetModules();
+    const mod = await import('@/platform-domains');
+    expect(mod.platformOfUrl('https://www.flamingo.run/blog/a')).toBe('flamingo');
+    expect(mod.platformOfUrl('https://hub.openframe.ai/knowledge-base')).toBe('openframe');
+    expect(mod.platformOfUrl('https://www.openmsp.ai/blog/a')).toBe('openmsp');
+    // And the override's own host, as before.
+    expect(mod.platformOfUrl('https://flamingo-git-branch.vercel.app/a')).toBe('flamingo');
+    expect(mod.platformOfUrl('https://staging.openframe.miami/a')).toBe('openframe');
+    // The local machine stays nobody's, even with a platform pointed at it.
+    expect(mod.platformOfUrl('http://localhost:3000/blog/a')).toBeNull();
+    expect(mod.getPlatformByHostname('localhost')).toBe('openmsp');
   });
 });

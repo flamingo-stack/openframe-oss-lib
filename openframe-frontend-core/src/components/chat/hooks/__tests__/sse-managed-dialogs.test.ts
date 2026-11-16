@@ -20,6 +20,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { textOfParts } from '../../../../chat-protocol/chat-message';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
 import { useSseChatAdapter } from '../use-sse-chat-adapter';
 
@@ -29,7 +30,6 @@ const CONVERSATIONS_URL = '/api/docs/chat/conversations';
 
 const baseEndpoints: ChatRuntime['endpoints'] = {
   chatStreamUrl: '/api/docs/chat',
-  approvalToolUrl: '/api/chat/agent/confirm-tool',
   commandsUrl: '/api/docs/commands',
   buildListUrl: () => null,
   attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -64,21 +64,32 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
     },
   });
 }
-const USAGE_END_TRAILER = '{"kind":"usage","stage":"end","input_tokens":10,"output_tokens":5,"hit_rate_pct":50}';
+/** A turn on the standard's wire, echoing a server-minted conversation id. */
 function wireTurn(conversationId: string, answer: string): string[] {
   return [
-    `{"modelLabel":"Claude Sonnet","provider":"anthropic","conversationId":"${conversationId}"}\0`,
-    '\x1E',
-    answer,
-    '\x1F' + USAGE_END_TRAILER,
-  ];
+    { type: 'start', messageId: 'a-1', messageMetadata: { conversationId } },
+    { type: 'text-delta', id: 't1', delta: answer },
+    { type: 'finish', finishReason: 'stop' },
+  ]
+    .map(chunk => `data: ${JSON.stringify(chunk)}\n\n`)
+    .concat('data: [DONE]\n\n');
 }
 
 const historyFor = (id: string) => ({
   data: {
     messages: [
-      { seq: 0, role: 'user', content: `q for ${id}`, created_at: '2026-09-01T09:00:00.000Z' },
-      { seq: 1, role: 'assistant', content: `a for ${id}`, created_at: '2026-09-01T09:00:05.000Z' },
+      {
+        id: `${id}-q`,
+        role: 'user',
+        metadata: { seq: 0, createdAt: '2026-09-01T09:00:00.000Z' },
+        parts: [{ type: 'text', text: `q for ${id}` }],
+      },
+      {
+        id: `${id}-a`,
+        role: 'assistant',
+        metadata: { seq: 1, createdAt: '2026-09-01T09:00:05.000Z' },
+        parts: [{ type: 'text', text: `a for ${id}` }],
+      },
     ],
   },
 });
@@ -150,7 +161,7 @@ describe('useSseChatAdapter — managed conversation list', () => {
     act(() => result.current.selectDialog('b'));
     expect(result.current.activeDialogId).toBe('b');
     expect(JSON.parse(window.localStorage.getItem(CONVERSATION_KEY) ?? '{}')).toEqual({ conversationId: 'b' });
-    await waitFor(() => expect(result.current.messages.map(m => m.content)).toEqual(['q for b', 'a for b']));
+    await waitFor(() => expect(result.current.messages.map(m => textOfParts(m.parts))).toEqual(['q for b', 'a for b']));
     expect(result.current.isMessagesLoading).toBe(false);
     expect(urlsOf(calls, '/api/docs/chat/history')).toEqual([
       '/api/docs/chat/history?conversationId=a',

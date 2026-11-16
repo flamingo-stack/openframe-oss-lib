@@ -3,6 +3,7 @@ package com.openframe.data.repository.ticket;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.ClientOwnerScope;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
@@ -16,8 +17,12 @@ public interface CustomTicketRepository {
         return buildTicketQuery(filter, null, null, null);
     }
 
+    /**
+     * @param ownerScope restricts the result to the tickets a device may see (AGENT principals), null for
+     *                   an unrestricted (admin) query
+     */
     Query buildTicketQuery(TicketQueryFilter filter, String search,
-                           List<String> restrictToTicketIds, String ownerMachineId);
+                           List<String> restrictToTicketIds, ClientOwnerScope ownerScope);
 
     List<Ticket> findTicketsWithCursor(Query query, String cursor, int limit,
                                         String sortField, String sortDirection);

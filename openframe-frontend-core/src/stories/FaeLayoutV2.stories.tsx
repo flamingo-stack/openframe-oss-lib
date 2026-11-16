@@ -6,7 +6,6 @@ import { ChatMessageList } from '../components/chat/chat-message-list';
 import { ChatListItem, ChatNavSidebar } from '../components/chat/chat-nav-sidebar';
 import { ChatTopNavigation } from '../components/chat/chat-top-navigation';
 import { MspOrganizationCard } from '../components/chat/msp-organization-card';
-import type { Message } from '../components/chat/types/message.types';
 import {
   ChatPlusIcon,
   ChatQuestionIcon,
@@ -20,16 +19,17 @@ import {
 } from '../components/icons-v2-generated';
 import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
 import { Button } from '../components/ui/button';
+import { type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messages';
 import { withFaeBrand } from './fae-brand-decorator';
 
 const at = (minute: number) => new Date(2026, 8, 29, 14, minute);
 
-const THREAD: Message[] = [
+const THREAD_ROWS: StoryRow[] = [
   {
     id: 'u1',
     role: 'user',
     name: 'John Smith',
-    content: 'My laptop has been running really slowly lately',
+    parts: textPart('My laptop has been running really slowly lately'),
     timestamp: at(47),
   },
   {
@@ -37,10 +37,11 @@ const THREAD: Message[] = [
     role: 'assistant',
     name: 'Fae',
     assistantType: 'fae',
-    content: "I'll run a quick diagnostic to identify what's causing the performance issues.",
+    parts: textPart("I'll run a quick diagnostic to identify what's causing the performance issues."),
     timestamp: at(47),
   },
 ];
+const THREAD = THREAD_ROWS.map(storyMessage);
 
 const CHATS = [
   { id: '1', title: 'Slow Laptop', mark: <DotsLoaderIcon className="text-ods-accent" /> },

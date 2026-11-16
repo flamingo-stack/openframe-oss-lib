@@ -4,15 +4,16 @@ import { useRef, useState } from 'react';
 import { fn } from 'storybook/test';
 
 import { EmbeddableChat, type EmbeddableChatHandle } from '../components/chat/embeddable-chat';
+import { ChatEngineProvider } from '../components/chat/engine/chat-engine-context';
 import { QuickActionChipButton } from '../components/chat/quick-action-chip';
-import type { UnifiedChatMessage, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
+import type { UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import { PackageCheckIcon } from '../components/icons-v2-generated';
 import { type ChatRuntime, ChatRuntimeContext } from '../contexts/chat-runtime-context';
+import { type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messages';
 
 const RUNTIME: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/__story__/chat',
-    approvalToolUrl: '/__story__/confirm-tool',
     commandsUrl: '/__story__/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/__story__/upload',
@@ -31,13 +32,13 @@ const DIALOG = {
   timestamp: AT,
   owner: { name: 'Roman Smith' },
 };
-const MESSAGES: UnifiedChatMessage[] = [
+const MESSAGES_ROWS: StoryRow[] = [
   {
     id: 'm1',
     role: 'user',
     name: 'Roman Smith',
     authorType: 'admin',
-    content: 'why is osqueryd.exe cert expiring in 3 days?',
+    parts: textPart('why is osqueryd.exe cert expiring in 3 days?'),
     timestamp: AT,
   },
   {
@@ -45,13 +46,15 @@ const MESSAGES: UnifiedChatMessage[] = [
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo',
-    content:
+    parts: textPart(
       "The renewal job ran ~6 hours ago but didn't complete. If it's not renewed before then, the agent will fail signature validation and stop reporting.\n\nWant me to trigger a manual renewal?",
+    ),
     timestamp: AT,
   },
 ];
+const MESSAGES = MESSAGES_ROWS.map(storyMessage);
 
-/** A static Mingo thread through the `mingoState` injection path: no transport. */
+/** A static Mingo thread through a host's engine (`ChatEngineProvider`): no transport. */
 function createState(conversation: boolean): UnifiedChatState {
   const noop = () => {};
   const asyncNoop = async () => {};
@@ -87,8 +90,7 @@ function createState(conversation: boolean): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };
@@ -166,37 +168,43 @@ function Shell({ page: initialPage }: { page: Page }) {
       {/* The dock: no fixed height and no overflow clipping, so the composer's
           menus can open above it over the page. */}
       <div className="mx-auto w-full max-w-[900px] shrink-0">
-        <EmbeddableChat
-          ref={chatRef}
-          shell="inline"
-          appearance="v2"
-          closable={false}
-          open
-          onOpenChange={fn()}
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={page === 'home' ? NEW_CHAT : CONVERSATION}
-          mingoDialogCapabilities={{ canRename: true, canArchive: true, onCopyLink: fn() }}
-          threadContainer={onChat ? chatPage : null}
-          renameMode="inline"
-          showModel={page !== 'home'}
-          onModelClick={fn()}
-          modelTooltip="Change in Settings → AI Settings"
-          composerPlaceholder={page === 'home' ? 'Ask Mingo or describe a task…' : 'Reply to Mingo…'}
-          onDialogCreated={fn()}
-          composerMenuItems={
-            page === 'home'
-              ? undefined
-              : [
-                  {
-                    id: 'compact',
-                    label: 'Compact Chat Memory',
-                    icon: <PackageCheckIcon className="h-full w-full text-ods-text-secondary" />,
-                    onClick: fn(),
-                  },
-                ]
-          }
-        />
+        <ChatEngineProvider
+          engine={{
+            ...(page === 'home' ? NEW_CHAT : CONVERSATION),
+            dialogCapabilities: { canRename: true, canArchive: true, onCopyLink: fn() },
+          }}
+        >
+          <EmbeddableChat
+            ref={chatRef}
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+
+            threadContainer={onChat ? chatPage : null}
+            renameMode="inline"
+            showModel={page !== 'home'}
+            onModelClick={fn()}
+            modelTooltip="Change in Settings → AI Settings"
+            composerPlaceholder={page === 'home' ? 'Ask Mingo or describe a task…' : 'Reply to Mingo…'}
+            onDialogCreated={fn()}
+            composerMenuItems={
+              page === 'home'
+                ? undefined
+                : [
+                    {
+                      id: 'compact',
+                      label: 'Compact Chat Memory',
+                      icon: <PackageCheckIcon className="h-full w-full text-ods-text-secondary" />,
+                      onClick: fn(),
+                    },
+                  ]
+            }
+          />
+        </ChatEngineProvider>
       </div>
     </div>
   );

@@ -1,24 +1,22 @@
 // ONE factory for both lib runtime contexts. Every endpoint comes from EP, so the
 // `/content` base is the single source. Mounted (memoized) in app-providers.tsx.
 import type { ChatRuntime, EndpointsRuntime } from '@flamingo-stack/openframe-frontend-core/contexts'
-import { buildListUrl, makeComposeContentUrl, DEFAULT_CONTENT_SUFFIXES, DEV_SECTION_PARAM_KEYS, faqItemAnchor } from '@flamingo-stack/openframe-frontend-core/utils'
+import { buildListUrl, makeEmbedderComposeContentUrl } from '@flamingo-stack/openframe-frontend-core/utils'
 import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
 import { DOCS_BASE_ROUTE } from '../config/content'
 import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 
-// The content types THIS embedder hosts on its own slugged DETAIL routes (see
-// app-routes.tsx: /onboarding-guides/:slug, /releases/:slug). `makeComposeContentUrl`
-// returns a relative in-app href `/<suffix>/<slug>` for these (soft-navigates) and the
-// canonical hub origin for everything else.
-//
-// NOTE: the list-filter sections (roadmap, delivery) are deliberately NOT here — they
-// have no `/<x>/<slug>` detail page; a chat card / page link deep-links into the
-// existing LIST route via `?search=<id>` (see `overrides` below). Suffix logic would
-// wrongly produce `/<suffix>/<id>`, so they need an explicit override instead.
-// `markdown` (the product docs) is hosted too: this app mounts its own `<DocsHubPage>` at `DOCS_BASE_ROUTE`, so a
-// doc card or chip opens there, by the same rule as every hosted type.
-const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release', 'markdown'])
-const SUFFIXES = { ...DEFAULT_CONTENT_SUFFIXES, markdown: DOCS_BASE_ROUTE.replace(/^\/+/, '') }
+// The pages THIS embedder serves the hub's content on (see app-routes.tsx): the guide and release detail routes, its
+// own docs viewer, and the roadmap, delivery and FAQ lists. The lib's one embedder composer opens a record of those
+// there (a relative route, soft-navigated) and every other record at the address the hub answers, in a new tab.
+const CONTENT_ROUTES = {
+  onboardingGuide: (slug: string) => `/onboarding-guides/${slug}`,
+  release: (slug: string) => `/releases/${slug}`,
+  knowledgeBase: DOCS_BASE_ROUTE,
+  roadmap: '/roadmap',
+  delivery: '/bug-fixes-and-enhancements',
+  faqs: '/faqs',
+}
 
 // The embedder is platform-agnostic: it does NOT set `source` (the lib types it as
 // optional). The chat wire resolves source server-side from the proxied hub's
@@ -33,7 +31,6 @@ export function buildChatRuntime(navigate: ChatRuntime['navigation']['navigate']
       // hub lists the conversations of the identity the proxy's credentials
       // resolve to (the /debug page's key and act-as email).
       chatConversationsUrl: EP.chatConversations,
-      approvalToolUrl: EP.approval,
       commandsUrl: EP.commands,
       // Guide-mode empty-state config (greeting + enabled RAG tables + quick-action
       // chips WITH icons). Injected at SSR in the host; the embedder fetches it here
@@ -87,36 +84,8 @@ export function buildChatRuntime(navigate: ChatRuntime['navigation']['navigate']
     // above (sibling API route, same `/content/api` base) — so entity cards
     // with no cover image get the branded placeholder automatically. To point
     // it elsewhere, set `endpoints.ogPlaceholderUrl` explicitly.
-    // The existing composeContentUrl seam, wired from the lib helper: relative
-    // in-app href for the types we host (HOSTED_TYPES), canonical hub origin for
-    // the rest. Suffix table is the lib default (DEFAULT_CONTENT_SUFFIXES) — no
-    // hand-rolled per-type route map in this app.
-    composeContentUrl: makeComposeContentUrl({
-      hostedTypes: HOSTED_TYPES,
-      contentOrigin: HUB_PUBLIC_ORIGIN,
-      suffixes: SUFFIXES,
-      // List-filter types deep-link into their EXISTING list route with `?search=<id>`
-      // — the param `DevSectionView` writes and `RoadmapView` / `DeliveryLists` read.
-      // (Verified against the live hub: /api/roadmap + /api/delivery match the task id
-      // in their `search`, returning exactly that one row.) Both page links AND chat
-      // cards flow through this one composeContentUrl, so a roadmap/delivery item lands
-      // in the SAME filtered place wherever it's rendered. `id` is the row's
-      // primary-key id (the ClickUp task id the chat ref carries).
-      //
-      // Without these, delivery_item would fall through to its server-baked relative
-      // `externalUrl` (`/bug-fixes-and-enhancements?search=<id>` — the HUB's route, which
-      // 404s in this app), and roadmap_item to a `#hash` the list never reads.
-      overrides: {
-        roadmap_item: (id) => ({ href: `/roadmap?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
-        delivery_item: (id) => ({ href: `/bug-fixes-and-enhancements?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
-        // FAQ deep-link: the hub bakes `/faqs#faq-item-<id>` as the card's externalUrl
-        // (the canonical HUB origin → opens in a new tab here). Override to the in-app
-        // `/faqs` hash so the card soft-navigates instead; `<FaqSection>`'s hash dispatch
-        // then expands + scrolls to that row. `faqItemAnchor` is the same lib SSOT the
-        // page uses to mint the row anchors, so target and anchor always match.
-        faq: (id) => ({ href: `/faqs#${faqItemAnchor(id)}`, targetPlatform: null }),
-      },
-    }),
+    // The lib's embedder composer: this app's own pages for the records it shows, the hub's address for the rest.
+    composeContentUrl: makeEmbedderComposeContentUrl({ contentOrigin: HUB_PUBLIC_ORIGIN, routes: CONTENT_ROUTES }),
   }
 }
 

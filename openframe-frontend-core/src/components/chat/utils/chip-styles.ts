@@ -1,7 +1,7 @@
 /**
  * Shared className generator for the chat-adjacent UI family:
  *  - **Source chips** (citation list below an assistant turn)
- *  - **Inline entity-card pills** (within prose, marker-rendered)
+ *  - **Inline entity-card pills** (within prose, a record link)
  *  - **Search-result rows** (dropdown beneath the search input)
  *
  * Centralising the token here means a single ODS change propagates to
@@ -14,7 +14,7 @@
  *
  * The `density` arg controls size / padding:
  *  - `'chip'`     — inline pill (`px-2 py-0.5 text-[11px]`). Default;
- *    used by the citation row and inline entity-card markers.
+ *    used by the citation row and inline record links.
  *  - `'list-row'` — wider, taller row (`px-3 py-2 text-sm`). Used by
  *    the search-bar dropdown. Same ODS family — same border, hover
  *    transition, accent treatment — just larger touch target.

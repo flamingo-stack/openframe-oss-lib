@@ -11,6 +11,8 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
+import com.openframe.stream.service.rmm.AgentResultReport;
+import com.openframe.stream.service.rmm.ExecutionOutcomeClassifier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -40,14 +42,17 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptRepository scriptRepository;
+    private final ExecutionOutcomeClassifier outcomeClassifier;
     private final ObjectMapper scriptMapper;
 
     public ScriptResultDeserializer(ObjectMapper mapper,
                                     ScriptExecutionRepository scriptExecutionRepository,
-                                    ScriptRepository scriptRepository) {
+                                    ScriptRepository scriptRepository,
+                                    ExecutionOutcomeClassifier outcomeClassifier) {
         super(mapper);
         this.scriptExecutionRepository = scriptExecutionRepository;
         this.scriptRepository = scriptRepository;
+        this.outcomeClassifier = outcomeClassifier;
         this.scriptMapper = this.mapper.rebuild()
                 .changeDefaultPropertyInclusion(inclusion -> inclusion.withValueInclusion(JsonInclude.Include.NON_NULL))
                 .build();
@@ -61,6 +66,11 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     @Override
     protected Optional<String> getSourceEventType(JsonNode after) {
         return Optional.of(isFailed(after) ? SourceEventTypes.Rmm.SCRIPT_RUN_FAILED : SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
+    }
+
+    private boolean isFailed(JsonNode after) {
+        AgentResultReport report = agentReport(after);
+        return !outcomeClassifier.classify(report, false).succeeded();
     }
 
     @Override

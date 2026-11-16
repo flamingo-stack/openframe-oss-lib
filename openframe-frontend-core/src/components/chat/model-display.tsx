@@ -144,9 +144,9 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // `contextWindow` is the agent's context budget, not the model's window:
     // the chat's memory is compacted before it fills, so the tail says how
     // close the chat is to that. It renders as soon as the budget is known
-    // (typically from the leading metadata frame); `usedTokens` lags by a
-    // tick — it only becomes non-null after the first `message_start`
-    // usage frame, so the tail shows "— / 150K context budget" until then.
+    // (typically from the first `message-metadata` chunk); `usedTokens` lags
+    // by a tick — it only becomes non-null after the first usage chunk, so
+    // the tail shows "— / 150K context budget" until then.
     const inline = (
       <div ref={ref} className={cn(MODEL_DISPLAY_ROW_CLASS, 'text-ods-text-secondary', className)} {...props}>
         {labelWithTooltip}

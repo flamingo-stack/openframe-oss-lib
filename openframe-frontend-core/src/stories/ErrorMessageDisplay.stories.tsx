@@ -4,7 +4,7 @@ import type React from 'react';
 import { ErrorMessageDisplay } from '../components/chat/error-message-display';
 
 /**
- * Inline error card for `error` message segments — mono uppercase title
+ * Inline error card for `data-error` parts — mono uppercase title
  * with an alert icon; optional details expand under the chevron.
  * `type` tints the icon: error (red) / warning (yellow) / info (grey).
  */
@@ -23,7 +23,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Renders an `error` message segment — collapsed mono title row, expandable details. Icon tint follows type: error / warning / info.',
+          'Renders a `data-error` part — collapsed mono title row, expandable details. Icon tint follows type: error / warning / info.',
       },
     },
   },

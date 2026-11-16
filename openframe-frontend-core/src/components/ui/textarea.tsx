@@ -109,6 +109,9 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
             'resize-y',
             isInvalid && 'border-ods-error hover:border-ods-error focus:border-ods-error',
             className,
+            // The box class's `flex` beats the `hidden` attribute, so the class hides it: while the field loads only its
+            // skeleton shows, never the empty box under it.
+            (inScope || props.hidden) && 'hidden',
           )}
           ref={ref}
           {...props}

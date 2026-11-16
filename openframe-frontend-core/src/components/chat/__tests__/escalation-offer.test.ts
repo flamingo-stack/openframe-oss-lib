@@ -1,22 +1,18 @@
 /**
- * Ticket-escalation offer: decode → accumulate → resolve, across both the
- * live NATS path and history replay.
+ * Ticket-escalation offer: decode → part → resolve, across both the live NATS path and history replay.
  *
- * The two behaviours worth pinning are the ones that were expensive to get
- * right, not the happy path:
- *   - an offer arriving with NO preceding MESSAGE_START must APPEND to the
- *     trailing bubble, never replace its segments (the backend surfaces
- *     deferred offers after the turn ends, so this is the normal shape, and
- *     a cumulative emit there wipes the reply the user is reading);
- *   - an offer and its resolution are two persisted rows separated by the
- *     user message that caused SUPERSEDED, so the flip has to reach a bubble
- *     that was already flushed.
+ * The two behaviours worth pinning are the ones that were expensive to get right, not the happy path:
+ *   - an offer arriving with NO preceding MESSAGE_START must APPEND to the trailing bubble, never replace its parts (the
+ *     backend surfaces deferred offers after the turn ends, so this is the normal shape);
+ *   - an offer and its resolution are two persisted rows separated by the user message that caused SUPERSEDED, so the flip
+ *     has to reach a bubble that was already flushed.
  */
 
 import { describe, expect, it } from 'vitest';
-import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder';
+import type { ChatEscalationOfferPart, ChatMessage, ChatPart } from '../../../chat-protocol/chat-message';
+import { createMingoDecoder } from '../../../chat-protocol/message-decoder';
 import { createChatStreamReducer } from '../stream/chat-stream-reducer';
-import type { EscalationOfferSegment, HistoricalMessage, MessageSegment } from '../types';
+import type { HistoricalMessage } from '../types';
 import { processHistoricalMessages } from '../utils/process-historical-messages';
 
 const OFFER_ID = 'offer-1';
@@ -39,112 +35,128 @@ const resolvedChunk = (state: string, streamSeq: number) => ({
   streamSeq,
 });
 
-const offers = (segments: MessageSegment[] | string | undefined): EscalationOfferSegment[] =>
-  Array.isArray(segments) ? segments.filter(s => s.type === 'escalation_offer') : [];
+const offers = (parts: readonly ChatPart[]): ChatEscalationOfferPart[] =>
+  parts.filter((part): part is ChatEscalationOfferPart => part.type === 'data-escalation-offer');
+const offersIn = (messages: readonly ChatMessage[]) => offers(messages.flatMap(message => message.parts));
 
 const historyRow = (id: string, data: Record<string, unknown>): HistoricalMessage => ({
   id,
   createdAt: '2026-08-06T12:00:00Z',
   owner: { type: 'ASSISTANT' },
-  messageData: [data as never],
+  parts: [data as never],
 });
 
-describe('decodeNatsChunk — ESCALATION_OFFER', () => {
+const chunksOf = (raw: unknown) => createMingoDecoder().decode(raw).chunks;
+
+describe('the decoder — ESCALATION_OFFER', () => {
   it('decodes the PENDING chunk as an offer', () => {
-    expect(decodeNatsChunk(offerChunk(1))).toEqual({
-      type: 'escalation-offer',
-      offerId: OFFER_ID,
-      text: OFFER_TEXT,
-      origin: 'MANUAL',
-      seq: 1,
-    });
+    expect(chunksOf(offerChunk(1))).toEqual([
+      {
+        type: 'data-escalation-offer',
+        id: OFFER_ID,
+        data: { text: OFFER_TEXT, status: 'pending', origin: 'MANUAL' },
+      },
+    ]);
   });
 
   it('maps the terminal states onto the shared approval-status vocabulary', () => {
-    expect(decodeNatsChunk(resolvedChunk('APPROVED', 2))).toMatchObject({ status: 'approved' });
-    expect(decodeNatsChunk(resolvedChunk('DECLINED', 3))).toMatchObject({ status: 'rejected' });
-    expect(decodeNatsChunk(resolvedChunk('SUPERSEDED', 4))).toMatchObject({ status: 'cancelled' });
+    const statusOf = (state: string) => offerStatusOf(chunksOf(resolvedChunk(state, 2)));
+    expect(statusOf('APPROVED')).toBe('approved');
+    expect(statusOf('DECLINED')).toBe('rejected');
+    expect(statusOf('SUPERSEDED')).toBe('cancelled');
   });
 
   it('reads the resolver from `displayName` (chunk) or `resolvedByName` (row)', () => {
-    expect(decodeNatsChunk(resolvedChunk('APPROVED', 5))).toMatchObject({
-      resolvedByName: 'John Smith',
-    });
+    expect(chunksOf(resolvedChunk('APPROVED', 5))[0]).toMatchObject({ data: { resolvedByName: 'John Smith' } });
     expect(
-      decodeNatsChunk({ ...resolvedChunk('APPROVED', 6), displayName: undefined, resolvedByName: 'Ada' }),
-    ).toMatchObject({ resolvedByName: 'Ada' });
+      chunksOf({ ...resolvedChunk('APPROVED', 6), displayName: undefined, resolvedByName: 'Ada' })[0],
+    ).toMatchObject({ data: { resolvedByName: 'Ada' } });
   });
 
   it('drops malformed chunks instead of emitting a card with no id', () => {
-    expect(decodeNatsChunk({ type: 'ESCALATION_OFFER', state: 'PENDING' })).toBeNull();
-    expect(decodeNatsChunk({ type: 'ESCALATION_OFFER', offerId: OFFER_ID, state: 'WAT' })).toBeNull();
+    expect(chunksOf({ type: 'ESCALATION_OFFER', state: 'PENDING' })).toEqual([]);
+    expect(chunksOf({ type: 'ESCALATION_OFFER', offerId: OFFER_ID, state: 'WAT' })).toEqual([]);
   });
 });
 
-describe('chat stream reducer — escalation offer', () => {
-  const trailingSegments = (reducer: ReturnType<typeof createChatStreamReducer>): MessageSegment[] => {
-    const { messages } = reducer.state;
-    return messages[messages.length - 1]?.segments ?? [];
-  };
+function offerStatusOf(chunks: ReturnType<typeof chunksOf>): unknown {
+  const [chunk] = chunks;
+  return chunk.type === 'data-escalation-offer' ? chunk.data.status : undefined;
+}
 
-  const feed = (reducer: ReturnType<typeof createChatStreamReducer>, chunks: unknown[]) => {
-    for (const chunk of chunks) {
-      const event = decodeNatsChunk(chunk);
-      if (event) reducer.apply(event);
-    }
+describe('chat stream reducer — escalation offer', () => {
+  const setup = () => {
+    const reducer = createChatStreamReducer();
+    const decoder = createMingoDecoder();
+    const feed = (chunks: unknown[]) => {
+      for (const chunk of chunks) reducer.apply(decoder.decode(chunk));
+    };
+    return { reducer, feed };
   };
 
   it('appends to the trailing bubble when the offer arrives after MESSAGE_END', () => {
-    const reducer = createChatStreamReducer({ transport: 'nats' });
-    feed(reducer, [
+    const { reducer, feed } = setup();
+    feed([
       { type: 'MESSAGE_START', streamSeq: 1 },
       { type: 'TEXT', text: 'Let me take a look at that.', streamSeq: 2 },
       { type: 'MESSAGE_END', streamSeq: 3 },
       offerChunk(4),
     ]);
 
-    const segments = trailingSegments(reducer);
-    // The prose the user was reading survives — this is the whole point.
-    expect(segments.find((s: MessageSegment) => s.type === 'text')).toMatchObject({
-      text: 'Let me take a look at that.',
-    });
-    expect(offers(segments)).toHaveLength(1);
+    const [trailing] = reducer.state.messages;
+    // The prose the user was reading survives: this is the whole point.
+    expect(trailing.parts.find(part => part.type === 'text')).toMatchObject({ text: 'Let me take a look at that.' });
+    expect(offers(trailing.parts)).toHaveLength(1);
   });
 
   it('flips the card in place on resolution and stamps the resolver', () => {
-    const reducer = createChatStreamReducer({ transport: 'nats' });
-    feed(reducer, [{ type: 'MESSAGE_START', streamSeq: 1 }, offerChunk(2), resolvedChunk('APPROVED', 3)]);
+    const { reducer, feed } = setup();
+    feed([{ type: 'MESSAGE_START', streamSeq: 1 }, offerChunk(2), resolvedChunk('APPROVED', 3)]);
 
-    const rendered = offers(trailingSegments(reducer));
+    const rendered = offersIn(reducer.state.messages);
     expect(rendered).toHaveLength(1);
-    expect(rendered[0]).toMatchObject({ status: 'approved', resolvedByName: 'John Smith' });
+    expect(rendered[0].data).toEqual({
+      text: OFFER_TEXT,
+      status: 'approved',
+      origin: 'MANUAL',
+      resolvedByName: 'John Smith',
+    });
+    expect(reducer.state.approvalStatuses[OFFER_ID]).toBe('approved');
   });
 
-  it('does not claim the agent is working while an offer is pending', () => {
-    const busy: unknown[] = [];
-    const reducer = createChatStreamReducer({
-      transport: 'nats',
-      onEffect: effect => {
-        if (effect.name === 'onAgentBusy') busy.push(effect);
-      },
-    });
-    feed(reducer, [{ type: 'MESSAGE_START', streamSeq: 1 }, offerChunk(2), resolvedChunk('APPROVED', 3)]);
-    expect(busy).toHaveLength(0);
+  it('does not claim the agent is working while an offer is pending, or after it is answered', () => {
+    const { reducer, feed } = setup();
+    feed([offerChunk(1)]);
+    expect(reducer.state.streamingPhase).toBe('idle');
+    feed([resolvedChunk('APPROVED', 2)]);
+    expect(reducer.state.streamingPhase).toBe('idle');
   });
 
   it('is idempotent across a redelivered offer (JetStream catch-up)', () => {
-    const reducer = createChatStreamReducer({ transport: 'nats' });
-    feed(reducer, [{ type: 'MESSAGE_START', streamSeq: 1 }, offerChunk(2), { type: 'MESSAGE_END', streamSeq: 3 }]);
-    // A replay re-decodes the same chunk with its original seq; the seq gate
-    // drops it, but the upsert must hold even if the gate ever moves.
-    const event = decodeNatsChunk({ ...offerChunk(2), streamSeq: 9 });
-    if (event) reducer.apply(event);
-    expect(offers(trailingSegments(reducer))).toHaveLength(1);
+    const { reducer, feed } = setup();
+    feed([{ type: 'MESSAGE_START', streamSeq: 1 }, offerChunk(2), { type: 'MESSAGE_END', streamSeq: 3 }]);
+    // A replay re-decodes the same chunk with its original seq; the seq gate drops it, but the upsert must hold even if the
+    // gate ever moves.
+    feed([{ ...offerChunk(2), streamSeq: 9 }]);
+    expect(offersIn(reducer.state.messages)).toHaveLength(1);
+  });
+
+  it('a pending replay keeps the answer this client already knows', () => {
+    const reducer = createChatStreamReducer({ approvalStatuses: { [OFFER_ID]: 'rejected' } });
+    reducer.apply(createMingoDecoder().decode(offerChunk(1)));
+    expect(offersIn(reducer.state.messages)[0].data.status).toBe('rejected');
+  });
+
+  it('a resolution told from another side reaches its card, whichever message holds it', () => {
+    const { reducer, feed } = setup();
+    feed([offerChunk(1), { type: 'MESSAGE_START', streamSeq: 2 }, { type: 'TEXT', text: 'later', streamSeq: 3 }]);
+    reducer.projectApprovalResolution(OFFER_ID, 'cancelled', 'Ada');
+    expect(offersIn(reducer.state.messages)[0].data).toMatchObject({ status: 'cancelled', resolvedByName: 'Ada' });
   });
 });
 
 describe('processHistoricalMessages — escalation offer', () => {
-  it('renders the offer inline rather than deferring it to the sticky flush', () => {
+  it('renders the offer inline', () => {
     const { messages } = processHistoricalMessages([
       historyRow('m1', {
         type: 'ESCALATION_OFFER',
@@ -155,7 +167,7 @@ describe('processHistoricalMessages — escalation offer', () => {
       }),
     ]);
     expect(messages).toHaveLength(1);
-    expect(offers(messages[0].content)[0]).toMatchObject({ status: 'pending' });
+    expect(offers(messages[0].parts)[0].data.status).toBe('pending');
   });
 
   it('flips a card that was flushed into an EARLIER bubble than its resolution', () => {
@@ -166,13 +178,13 @@ describe('processHistoricalMessages — escalation offer', () => {
         state: 'PENDING',
         text: OFFER_TEXT,
       }),
-      // The user typing is exactly what produces SUPERSEDED, so this message
-      // is not incidental — it is what splits the two rows apart.
+      // The user typing is exactly what produces SUPERSEDED, so this message is not incidental: it is what splits the two
+      // rows apart.
       {
         id: 'm2',
         createdAt: '2026-08-06T12:01:00Z',
         owner: { type: 'CLIENT' },
-        messageData: [{ type: 'TEXT', text: 'actually, never mind' } as never],
+        parts: [{ type: 'TEXT', text: 'actually, never mind' } as never],
       },
       historyRow('m3', {
         type: 'ESCALATION_OFFER',
@@ -182,11 +194,13 @@ describe('processHistoricalMessages — escalation offer', () => {
       }),
     ]);
 
-    const rendered = messages.flatMap(m => offers(m.content));
+    const rendered = offersIn(messages);
     expect(rendered).toHaveLength(1);
-    expect(rendered[0]).toMatchObject({ status: 'cancelled', resolvedByName: 'John Smith' });
+    expect(rendered[0].data).toMatchObject({ status: 'cancelled', resolvedByName: 'John Smith' });
     // Card text comes from the PENDING row; the resolution row carries none.
     expect(rendered[0].data.text).toBe(OFFER_TEXT);
+    // The resolution's own row drew nothing.
+    expect(messages.map(message => message.id)).toEqual(['m1', 'm2']);
   });
 
   it('honours the host overlay when the resolution row is not in the fetched pages', () => {
@@ -201,7 +215,7 @@ describe('processHistoricalMessages — escalation offer', () => {
       ],
       { escalationOfferStates: { [OFFER_ID]: 'approved' } },
     );
-    expect(messages.flatMap(m => offers(m.content))[0]).toMatchObject({ status: 'approved' });
+    expect(offersIn(messages)[0].data.status).toBe('approved');
   });
 });
 
@@ -215,55 +229,53 @@ describe('TICKET_ESCALATED — the handoff receipt', () => {
     ...over,
   });
 
-  const receipts = (segments: MessageSegment[] | string | undefined) =>
-    Array.isArray(segments) ? segments.filter(s => s.type === 'ticket_escalated') : [];
+  const receipts = (parts: readonly ChatPart[]) => parts.filter(part => part.type === 'data-ticket-escalated');
 
   it('decodes the chunk, keeping the backend copy verbatim', () => {
-    expect(decodeNatsChunk({ ...escalated(), streamSeq: 42 })).toEqual({
-      type: 'ticket-escalated',
-      ticketId: 't-1',
-      ticketNumber: 1002,
-      reason: 'INACTIVITY',
-      text: 'Automatically escalated to a human technician because the conversation had no new messages.',
-      seq: 42,
-    });
+    expect(chunksOf({ ...escalated(), streamSeq: 42 })).toEqual([
+      {
+        type: 'data-ticket-escalated',
+        id: 't-1',
+        data: {
+          ticketId: 't-1',
+          ticketNumber: 1002,
+          reason: 'INACTIVITY',
+          text: 'Automatically escalated to a human technician because the conversation had no new messages.',
+        },
+      },
+    ]);
   });
 
   it('drops payloads missing a non-null wire field', () => {
-    expect(decodeNatsChunk({ type: 'TICKET_ESCALATED', reason: 'INACTIVITY' })).toBeNull();
-    expect(decodeNatsChunk({ type: 'TICKET_ESCALATED', ticketId: 't-1' })).toBeNull();
+    expect(chunksOf({ type: 'TICKET_ESCALATED', reason: 'INACTIVITY' })).toEqual([]);
+    expect(chunksOf({ type: 'TICKET_ESCALATED', ticketId: 't-1' })).toEqual([]);
   });
 
   it('survives an unknown reason without a client change', () => {
-    expect(decodeNatsChunk(escalated({ reason: 'USER_REQUESTED' }))).toMatchObject({
-      reason: 'USER_REQUESTED',
-    });
+    expect(chunksOf(escalated({ reason: 'USER_REQUESTED' }))[0]).toMatchObject({ data: { reason: 'USER_REQUESTED' } });
   });
 
   it('appends to the trailing bubble when it arrives with no turn open', () => {
-    // The inactivity auto-escalation fires from a scheduler: no MESSAGE_START
-    // precedes it, so a cumulative emit here would wipe the last reply.
-    const reducer = createChatStreamReducer({ transport: 'nats' });
+    // The inactivity auto-escalation fires from a scheduler: no MESSAGE_START precedes it, and it must not wipe the last
+    // reply.
+    const reducer = createChatStreamReducer();
+    const decoder = createMingoDecoder();
     for (const chunk of [
       { type: 'MESSAGE_START', streamSeq: 1 },
       { type: 'TEXT', text: 'Let me look into that.', streamSeq: 2 },
       { type: 'MESSAGE_END', streamSeq: 3 },
       { ...escalated(), streamSeq: 4 },
     ]) {
-      const event = decodeNatsChunk(chunk);
-      if (event) reducer.apply(event);
+      reducer.apply(decoder.decode(chunk));
     }
-    const { messages } = reducer.state;
-    const segments = messages[messages.length - 1]?.segments ?? [];
-    expect(segments.find((s: MessageSegment) => s.type === 'text')).toMatchObject({
-      text: 'Let me look into that.',
-    });
-    expect(receipts(segments)).toHaveLength(1);
+    const { parts } = reducer.state.messages[0];
+    expect(parts.find(part => part.type === 'text')).toMatchObject({ text: 'Let me look into that.' });
+    expect(receipts(parts)).toHaveLength(1);
   });
 
   it('renders on history replay with no escalation offer anywhere in the thread', () => {
     const { messages } = processHistoricalMessages([historyRow('m1', escalated())]);
-    const rendered = messages.flatMap(m => receipts(m.content));
+    const rendered = receipts(messages.flatMap(m => m.parts));
     expect(rendered).toHaveLength(1);
     expect(rendered[0]).toMatchObject({ data: { ticketId: 't-1', reason: 'INACTIVITY' } });
   });

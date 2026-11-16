@@ -6,7 +6,7 @@
  * under /api/mingo-guide/* to hub.openframe.ai/api/*).
  *
  * Three concerns, one context:
- *   1. API endpoints: chatStreamUrl / approvalToolUrl / commandsUrl /
+ *   1. API endpoints: chatStreamUrl / commandsUrl /
  *      buildListUrl + attachment endpoints + chat-identity. The chat
  *      reads them from runtime; hub vs embedded app supply different
  *      strings via different providers.
@@ -47,8 +47,6 @@ export interface ChatRuntime {
   endpoints: {
     /** POST streaming chat. Hub: '/api/docs/chat'. */
     chatStreamUrl: string;
-    /** POST agent approve/reject. Hub: '/api/chat/agent/confirm-tool'. */
-    approvalToolUrl: string;
     /** Customer-ticket agent endpoints (Help Center). OPTIONAL — when unset,
      *  the ticket hooks fall back to the bare hub paths
      *  (`/api/chat/agent/{find-ticket,ticket-action,list-engagements}`).
@@ -225,6 +223,10 @@ export interface ChatRuntime {
      *  origin → new tab). The OpenFrame app wires it to ignore `targetPlatform` (its knowledge base tags every row
      *  with its own platform); the hub omits it. */
     decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean;
+    /** Whether this window can open a new tab at all (a phone app shell cannot; a narrow window should not). False
+     *  leaves the "Open in new tab" button out of every record's menu, a card's and a chip's alike
+     *  (`recordMenuActions`). Omitted, it opens tabs. */
+    opensTabs?: boolean;
   };
   /** Optional content-URL composer. Returns the platform-aware href +
    *  target-platform tuple for a content entity. Hub wires this to its
@@ -237,7 +239,7 @@ export interface ChatRuntime {
    *  views (onboarding catalog/detail, releases) AND chat cards / chips /
    *  search results all resolve content links through this one seam, so a
    *  given type lands in the SAME place regardless of where it's rendered.
-   *  Embedders wire `makeComposeContentUrl({ hostedTypes, contentOrigin })`;
+   *  Embedders wire `makeEmbedderComposeContentUrl({ contentOrigin, routes })`;
    *  omit it and lib views fall back to a same-origin relative path
    *  (`buildDefaultHref`).
    *

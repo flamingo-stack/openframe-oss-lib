@@ -1,5 +1,7 @@
 package com.openframe.stream.handler.software;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
@@ -18,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +29,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
+import static com.openframe.stream.handler.software.FleetRowFields.isSnapshotRead;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -35,10 +39,20 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Slf4j
 public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
+    static final Duration SNAPSHOT_HOST_WINDOW = Duration.ofHours(24);
+    static final Duration SNAPSHOT_UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
+
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
+
+    private final Cache<Long, Boolean> snapshotReconciledHosts = Caffeine.newBuilder()
+            .expireAfterWrite(SNAPSHOT_HOST_WINDOW)
+            .build();
+    private final Cache<Long, Boolean> snapshotUnresolvedHosts = Caffeine.newBuilder()
+            .expireAfterWrite(SNAPSHOT_UNRESOLVED_HOST_WINDOW)
+            .build();
 
     @Override
     public EventHandlerType getType() {
@@ -64,14 +78,25 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (hostId == null) {
             return;
         }
+        boolean snapshotRead = isSnapshotRead(payload.getOperation());
+        if (snapshotRead && (snapshotReconciledHosts.getIfPresent(hostId) != null
+                || snapshotUnresolvedHosts.getIfPresent(hostId) != null)) {
+            return;
+        }
         String fleetHostId = String.valueOf(hostId);
         if (!fleetHostResolver.isResolvable(fleetHostId)) {
+            if (snapshotRead) {
+                snapshotUnresolvedHosts.put(hostId, Boolean.TRUE);
+            }
             log.debug("[software-cdc] host_software for unresolved Fleet host {} — skipping", hostId);
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
         long commitTs = commitTimestamp(payload);
         reconcile(host, hostId, commitTs);
+        if (snapshotRead) {
+            snapshotReconciledHosts.put(hostId, Boolean.TRUE);
+        }
     }
 
     // the source commit time: every row event of one Fleet commit shares it, so a burst re-reads Fleet once,

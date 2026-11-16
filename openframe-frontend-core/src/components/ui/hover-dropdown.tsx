@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Link from '../../embed-shims/next-link';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { Button } from './button';
@@ -83,7 +84,13 @@ interface HoverDropdownProps {
  * Generic hover dropdown — shows a list of clickable items on hover.
  *
  * Uses fixed positioning with getBoundingClientRect for proper placement
- * inside containers with overflow hidden (e.g., Sheet, modals).
+ * inside containers with overflow hidden (e.g., Sheet, modals), and is drawn in
+ * a portal: on the page body, since inside the chat's message list a `fixed`
+ * panel stays in that list's stacking context whatever its z-index, and the
+ * composer below the list painted over it (2026-11-04); inside a modal dialog,
+ * at the end of that dialog, since a modal takes pointer events off the rest of
+ * the page (`modalDialogOf`). The panel keeps the hover open itself, since it
+ * is no longer inside the trigger.
  *
  * Usage:
  *   <HoverDropdown items={[{ label: 'Blog Post', href: '/blog/1' }]}>
@@ -98,6 +105,15 @@ function DefaultAnchor({ href, className, children }: HoverDropdownRenderAnchorA
   );
 }
 
+/**
+ * The modal dialog a node sits in, or null. Radix marks a modal by taking pointer events off the page body while it is
+ * open, so a dialog counts only then: a non-modal panel keeps the page body as its layer.
+ */
+function modalDialogOf(node: HTMLElement | null): HTMLElement | null {
+  if (!node || document.body.style.pointerEvents !== 'none') return null;
+  return node.closest<HTMLElement>('[role="dialog"]');
+}
+
 export function HoverDropdown({
   children,
   items,
@@ -110,6 +126,11 @@ export function HoverDropdown({
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Where the panel is drawn: the page body, above every local stacking context (inside the chat's message list
+  // the composer below it painted over a panel drawn there). Except inside a MODAL dialog (the hubs' chat drawer):
+  // a modal makes the page outside it ignore the pointer, so a panel on the body closed as the cursor reached it.
+  // There it is drawn at the end of the dialog itself.
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   // Viewport-fit placement is a DOM MEASUREMENT — the panel's own rendered
   // width/height plus the trigger's live rect — so it is written to the node
@@ -131,29 +152,39 @@ export function HoverDropdown({
     const spaceLeft = rect.left;
     const fitsRight = spaceRight >= elWidth + 8;
     const fitsLeft = spaceLeft >= elWidth + 8;
+    const besideTop = Math.min(Math.max(rect.top, 8), window.innerHeight - elHeight - 8);
 
+    let left: number;
+    let top: number;
     if (fitsRight || (!fitsLeft && spaceRight >= spaceLeft)) {
-      // Place to the right
-      el.style.left = `${rect.right + 4}px`;
-      el.style.top = `${Math.min(Math.max(rect.top, 8), window.innerHeight - elHeight - 8)}px`;
+      left = rect.right + 4;
+      top = besideTop;
     } else if (fitsLeft) {
-      // Place to the left
-      el.style.left = `${rect.left - elWidth - 4}px`;
-      el.style.top = `${Math.min(Math.max(rect.top, 8), window.innerHeight - elHeight - 8)}px`;
+      left = rect.left - elWidth - 4;
+      top = besideTop;
     } else {
       // Fallback: place above or below
-      const left = Math.min(Math.max(rect.left, 8), window.innerWidth - elWidth - 8);
-      el.style.left = `${left}px`;
-      if (side === 'top' || window.innerHeight - rect.bottom < elHeight + 8) {
-        el.style.top = `${Math.max(rect.top - elHeight - 4, 8)}px`;
-      } else {
-        el.style.top = `${rect.bottom + 4}px`;
-      }
+      left = Math.min(Math.max(rect.left, 8), window.innerWidth - elWidth - 8);
+      top =
+        side === 'top' || window.innerHeight - rect.bottom < elHeight + 8
+          ? Math.max(rect.top - elHeight - 4, 8)
+          : rect.bottom + 4;
+    }
+
+    // The panel may sit in a portal host inside a transformed surface (the chat drawer), where `fixed` is laid out
+    // against that surface rather than the viewport. Place it, measure where it landed, and move it by the difference.
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    const placed = el.getBoundingClientRect();
+    if (placed.left !== left || placed.top !== top) {
+      el.style.left = `${left + (left - placed.left)}px`;
+      el.style.top = `${top + (top - placed.top)}px`;
     }
   });
 
   const show = useCallback(() => {
     clearTimeout(timeoutRef.current);
+    setPortalTarget(modalDialogOf(containerRef.current) ?? document.body);
     setOpen(true);
   }, []);
 
@@ -169,6 +200,7 @@ export function HoverDropdown({
   const toggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     clearTimeout(timeoutRef.current);
+    setPortalTarget(modalDialogOf(containerRef.current) ?? document.body);
     setOpen(prev => !prev);
   }, []);
 
@@ -181,95 +213,100 @@ export function HoverDropdown({
   return (
     <div ref={containerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onClick={toggle}>
       {children}
-      {open && (
-        <div
-          className={`fixed z-[9999] max-h-[420px] min-w-[220px] max-w-[340px] overflow-y-auto rounded-lg border border-ods-border bg-ods-card p-1 shadow-xl ${className || ''}`}
-          // `left`/`top` are intentionally absent here — the layout effect above
-          // owns them, because both values are live DOM measurements.
-          ref={panelRef}
-        >
-          {items.map((item, i) => {
-            const content = (
-              <>
-                {item.icon && <span className="flex-shrink-0 [&_svg]:size-3.5">{item.icon}</span>}
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              </>
-            );
-
-            // Each row is a flex container: primary action (link or button)
-            // occupies the left expanding region; the optional secondary
-            // action ("Ask") sits at the right as a sibling icon-button so
-            // its click is independent of the primary navigation.
-            const rowClass =
-              'group flex w-full items-center gap-1.5 pl-2 pr-1 py-1.5 rounded text-h6 text-ods-text-secondary hover:bg-ods-accent/10 transition-colors text-left';
-            const primaryClass =
-              'flex flex-1 items-center gap-1.5 min-w-0 hover:text-ods-accent cursor-pointer no-underline';
-
-            // Bound before the JSX: the `onClick` handler fires long after this
-            // render, so the `item.secondaryAction` narrowing does not reach
-            // inside it — the local does.
-            const secondaryAction = item.secondaryAction;
-            const secondary = secondaryAction ? (
-              <Button
-                variant="bare"
-                size="icon-sm"
-                type="button"
-                onClick={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  secondaryAction.onClick();
-                }}
-                aria-label={secondaryAction.label}
-                title={secondaryAction.label}
-                className="shrink-0"
-              >
-                {secondaryAction.icon}
-              </Button>
-            ) : null;
-
-            if (item.href) {
-              // Caller supplies the anchor renderer (defaults to plain <a>).
-              // Chat consumers wire `NavLinkAnchorViaRuntime` here so clicks
-              // route through the chat runtime.
-              return (
-                <div key={i} className={rowClass}>
-                  {renderAnchorFn({
-                    href: item.href,
-                    targetPlatform: item.targetPlatform,
-                    path: item.path,
-                    alwaysNewTab: item.alwaysNewTab,
-                    className: primaryClass,
-                    children: content,
-                  })}
-                  {secondary}
-                </div>
+      {open &&
+        portalTarget &&
+        createPortal(
+          <div
+            onMouseEnter={show}
+            onMouseLeave={hide}
+            className={`fixed z-[9999] max-h-[420px] min-w-[220px] max-w-[340px] overflow-y-auto rounded-lg border border-ods-border bg-ods-card p-1 shadow-xl ${className || ''}`}
+            // `left`/`top` are intentionally absent here — the layout effect above
+            // owns them, because both values are live DOM measurements.
+            ref={panelRef}
+          >
+            {items.map((item, i) => {
+              const content = (
+                <>
+                  {item.icon && <span className="flex-shrink-0 [&_svg]:size-3.5">{item.icon}</span>}
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                </>
               );
-            }
 
-            // Item has no primary action — render the label as a
-            // non-interactive span. The secondary Ask button remains
-            // active, so the row is still useful for rows that have no
-            // public viewer URL but DO have a working Ask drill-in.
-            if (!item.onClick) {
-              return (
-                <div key={i} className={rowClass}>
-                  <span className={`${primaryClass} cursor-default hover:!text-ods-text-secondary`}>{content}</span>
-                  {secondary}
-                </div>
-              );
-            }
+              // Each row is a flex container: primary action (link or button)
+              // occupies the left expanding region; the optional secondary
+              // action ("Ask") sits at the right as a sibling icon-button so
+              // its click is independent of the primary navigation.
+              const rowClass =
+                'group flex w-full items-center gap-1.5 pl-2 pr-1 py-1.5 rounded text-h6 text-ods-text-secondary hover:bg-ods-accent/10 transition-colors text-left';
+              const primaryClass =
+                'flex flex-1 items-center gap-1.5 min-w-0 hover:text-ods-accent cursor-pointer no-underline';
 
-            return (
-              <div key={i} className={rowClass}>
-                <Button variant="row" type="button" onClick={item.onClick} className="min-w-0 flex-1">
-                  {content}
+              // Bound before the JSX: the `onClick` handler fires long after this
+              // render, so the `item.secondaryAction` narrowing does not reach
+              // inside it — the local does.
+              const secondaryAction = item.secondaryAction;
+              const secondary = secondaryAction ? (
+                <Button
+                  variant="bare"
+                  size="icon-sm"
+                  type="button"
+                  onClick={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    secondaryAction.onClick();
+                  }}
+                  aria-label={secondaryAction.label}
+                  title={secondaryAction.label}
+                  className="shrink-0"
+                >
+                  {secondaryAction.icon}
                 </Button>
-                {secondary}
-              </div>
-            );
-          })}
-        </div>
-      )}
+              ) : null;
+
+              if (item.href) {
+                // Caller supplies the anchor renderer (defaults to plain <a>).
+                // Chat consumers wire `NavLinkAnchorViaRuntime` here so clicks
+                // route through the chat runtime.
+                return (
+                  <div key={i} className={rowClass}>
+                    {renderAnchorFn({
+                      href: item.href,
+                      targetPlatform: item.targetPlatform,
+                      path: item.path,
+                      alwaysNewTab: item.alwaysNewTab,
+                      className: primaryClass,
+                      children: content,
+                    })}
+                    {secondary}
+                  </div>
+                );
+              }
+
+              // Item has no primary action — render the label as a
+              // non-interactive span. The secondary Ask button remains
+              // active, so the row is still useful for rows that have no
+              // public viewer URL but DO have a working Ask drill-in.
+              if (!item.onClick) {
+                return (
+                  <div key={i} className={rowClass}>
+                    <span className={`${primaryClass} cursor-default hover:!text-ods-text-secondary`}>{content}</span>
+                    {secondary}
+                  </div>
+                );
+              }
+
+              return (
+                <div key={i} className={rowClass}>
+                  <Button variant="row" type="button" onClick={item.onClick} className="min-w-0 flex-1">
+                    {content}
+                  </Button>
+                  {secondary}
+                </div>
+              );
+            })}
+          </div>,
+          portalTarget,
+        )}
     </div>
   );
 }

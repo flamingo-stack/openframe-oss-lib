@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * HubSpot Ticket Card — unified visual for hubspot-tickets markers.
+ * HubSpot Ticket Card — unified visual for a HubSpot ticket record.
  *
  * PURE PRESENTATION (no internal nav). The card receives the structured
  * `<Link>` prop bundle via `anchorProps` (composed by the caller from a

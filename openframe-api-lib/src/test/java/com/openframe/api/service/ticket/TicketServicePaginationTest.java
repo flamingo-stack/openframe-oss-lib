@@ -5,6 +5,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.api.service.device.ClientOwnerScopeResolver;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.repository.device.MachineRepository;
@@ -54,6 +55,7 @@ class TicketServicePaginationTest {
     @Mock private AssignmentService assignmentService;
     @Mock private TicketLifecycleService ticketLifecycleService;
     @Mock private TicketResolverStamp ticketResolverStamp;
+    @Mock private ClientOwnerScopeResolver clientOwnerScopeResolver;
     @Mock private TicketEventListener listener;
 
     @Spy private List<TicketEventListener> listeners = new ArrayList<>();

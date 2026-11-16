@@ -38,13 +38,13 @@ import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
-import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { type ChatMessage, writingMessageIndex } from '../../chat-protocol/chat-message';
+import { recordHref, replaceRecordLinks } from '../../chat-protocol/record-link';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
-import { formatCitationIndices } from '../../utils/source-grouping';
 import { getSourceIconName } from '../../utils/source-icons';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
@@ -61,11 +61,8 @@ import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { TextHold } from '../ui/layout-hold';
-import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
+import { LoadingItems } from '../ui/loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
-import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatAppearanceContext } from './chat-appearance-context';
 import { ChatArchivePage } from './chat-archive-page';
@@ -75,9 +72,11 @@ import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { CHAT_BLOCK_MIN_WIDTH, MINGO_V2_RAIL_WIDTH } from './chat-dimensions';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatMessageList } from './chat-message-list';
+import { ChatMessageSources } from './chat-message-sources';
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context';
 import { ChatPanelHeader, type ChatPanelHeaderProps } from './chat-panel-header';
 import type { ChatRef } from './chat-ref.types';
+import { useChatEngineContext } from './engine/chat-engine-context';
 import { renderChatInlineEntityCard } from './entity-cards/dispatch';
 import type { ChatCardDispatchExtras } from './entity-cards/dispatch';
 import { GuideModeBanner } from './guide-mode-banner';
@@ -91,7 +90,7 @@ import { useEmptyStateConfig } from './hooks/use-empty-state-config';
 import { fetchSlashCommands, useSlashCommandRegistry } from './hooks/use-slash-commands';
 import type { UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
-import { awaitsDecision, useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
+import { useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
 import { MingoChatHeader, type MingoChatHeaderAction } from './mingo-chat-header';
 import type { MingoDialogStatus } from './mingo-chat-list-shared';
@@ -102,26 +101,16 @@ import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onb
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { type QuickActionAccent, accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
-import { SourceActionButton } from './source-action-button';
+import { RecordActionsProvider } from './record-actions';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
-import type { ChatSource, MessageSegment, Message } from './types/message.types';
-import type {
-  ChatDialogCapabilities,
-  UnifiedChatState,
-  UnifiedSendMessageOptions,
-} from './types/unified-chat-state.types';
+import type { ChatDialogCapabilities, UnifiedSendMessageOptions } from './types/unified-chat-state.types';
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
-import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { chatDayLabel } from './utils/chat-day-label';
-import { chatChipClass } from './utils/chip-styles';
-import { FALLBACK_TOP_RETRIEVED, groupedRowLabels, splitCitedSources } from './utils/cited-sources';
-import { flattenAssistantContent } from './utils/flatten-assistant-content';
-import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
-import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
+import { awaitsDecision } from './utils/thread-display';
 
 /**
  * Split (wide) Mingo layout metrics (Figma 113:60931 / 113:63630). The
@@ -166,10 +155,6 @@ const drawerDefaultWidthWithoutRail = (viewportWidth: number) => drawerDefaultWi
 // =============================================================================
 
 export interface EmbeddableChatProps {
-  /** How many source chips the strip under an answer draws while the answer is written (default 1). `0` draws no
-   *  strip until the answer ends: for a host whose answers rarely cite sources, where a strip that appears and then
-   *  goes away would move the thread. */
-  sourceSkeletonCount?: number;
   /** DB-driven list of enabled RAG table ids (chip catalog filter).
    *  Prefetched server-side by the embedder's wrapper. Empty/null → no
    *  empty-state chips render. */
@@ -198,7 +183,7 @@ export interface EmbeddableChatProps {
    * static visual — every hover state and click is blocked (via
    * `pointer-events-none` on the panel body) and the composer no longer
    * auto-focuses. Use it to embed the chat as a marketing/hero mock (e.g. a
-   * scripted `mingoState` thread) that should look live but not respond to the
+   * scripted engine's thread) that should look live but not respond to the
    * cursor. Scrolling is intentionally disabled too. Defaults to `false`.
    */
   previewMode?: boolean;
@@ -239,47 +224,6 @@ export interface EmbeddableChatProps {
    * history (each mode keeps its own local thread).
    */
   modes?: UseUnifiedChatModes;
-
-  /**
-   * Pre-built Mingo-mode state, supplied by the host instead of letting the
-   * built-in NATS adapter own it. When provided, the panel renders Mingo mode
-   * from this object and opens no subscription of its own — the host keeps
-   * chat data + streaming in its own store/cache so it survives the panel
-   * unmounting (no `keepMounted` needed). The host should then NOT pass
-   * `modes.mingo` (Guide-mode wiring via `modes.guide` is unaffected).
-   */
-  mingoState?: UnifiedChatState;
-
-  /**
-   * Approval cards to pin as the sticky footer under the thread.
-   *
-   * Hosts that lift PENDING approvals out of the message list (mingo does:
-   * a pending card is filtered out of its bubble so an interrupted retry cannot
-   * render the same request twice) must hand them back here — otherwise the
-   * card exists in the reducer, is stripped on the way to the view, and is
-   * displayed nowhere at all. `ChatMessageList` renders them with the same
-   * component the inline path uses, so the approve/reject handlers stamped on
-   * the segments keep working.
-   */
-  pendingApprovals?: MessageSegment[];
-
-  /**
-   * Dialog-management capabilities for injected Mingo mode (`mingoState`).
-   *
-   * When the host injects `mingoState`, it doesn't pass `modes.mingo` (that
-   * would re-activate the idle built-in adapter), so the rename/archive/
-   * restore/archive-page affordances can't read their capability flags off the
-   * callback config. Supply them here instead. Default OFF: the row ⋯ menu and
-   * the archive page appear only when the host opts in, so nothing advertises
-   * an action the host hasn't wired. Ignored unless `mingoState` is set.
-   *
-   * Same shape an adapter reports through `UnifiedChatState.dialogCapabilities`
-   * (`ChatDialogCapabilities`) — one type, whether the list is host-owned or
-   * adapter-owned. `onCopyLink` adds "Copy Chat Link" to the header ⋯ menu and
-   * every row menu; the host owns the URL shape and the clipboard write.
-   * `compactDialog` adds "Compact Chat Memory" to the same menus.
-   */
-  mingoDialogCapabilities?: ChatDialogCapabilities;
 
   /**
    * Controlled active-mode. When provided, `onActiveModeChange` MUST
@@ -439,23 +383,19 @@ export interface EmbeddableChatProps {
    */
   contextPicker?: ChatContextPickerConfig;
   /**
-   * Host renderer for inline AI mentions `@marker:id` (e.g. the assistant
-   * echoing `@device:<machineId>` in its reply). DIRECT MIRROR of
-   * `renderEntityCard` for the `[card://]` grammar: the lib detects the token,
-   * parses `{marker, id}`, and renders whatever the host returns — typically a
-   * SELF-FETCHING chip (each entity type has its own fetcher) that resolves its
-   * own display name by id. SEPARATE from `contextPicker`/`contextItems` (the
-   * USER's attachments). Keep the function identity stable (module const /
-   * `useCallback`) so the thread's streaming memo holds. Return null for a
-   * marker the host can't render → the lib falls back to the bare token.
+   * Host renderer for the chip of a record link (`[MacBook Pro](record://device/<id>)`) in a message, the user's or
+   * the assistant's: given the record and the name the link shows, return the host's chip for that type (typically a
+   * self-fetching one with a link to the record). SEPARATE from `contextPicker`/`contextItems` (the USER's
+   * attachments). Keep the function identity stable (module const / `useCallback`) so the thread's streaming memo
+   * holds. Return null for a type the host has no chip for → the lib draws its own.
    */
-  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode;
+  renderRecordChip?: (record: { type: string; id: string; label: string }) => React.ReactNode;
   /**
    * Host renderer that REPLACES the default label-only context chip on a sent
    * user bubble with a self-fetching entity chip — so a user's manually
    * attached context (`contextItems`) renders IDENTICALLY to an inline
-   * `@marker:id` mention (same live name resolution + link). Mirror of
-   * `renderMention`, for the attached-chip strip instead of inline tokens.
+   * record link (same live name resolution + link). Mirror of
+   * `renderRecordChip`, for the attached-chip strip instead of inline links.
    * Return null for an item the host can't render → the lib falls back to the
    * label pill. Keep the identity stable (module const / `useCallback`).
    */
@@ -498,7 +438,7 @@ export interface EmbeddableChatProps {
    * Host content pinned between the thread and the composer: the thread
    * scrolls above it, the composer stays below, and it keeps its place while
    * the thread grows (e.g. a guided tour the host attaches to one
-   * conversation, deciding by `mingoState.activeDialogId`). Rendered wherever
+   * conversation, deciding by its engine's `activeDialogId`). Rendered wherever
    * the composer is - a conversation or the new-chat surface - and never on
    * the chat list. Sized by its content: a tall block is the host's to cap or
    * scroll. `null`/unset leaves the layout as it was.
@@ -553,7 +493,7 @@ export interface EmbeddableChatProps {
    * Its ⋯ is the chat's, Compact included. The composer never remounts
    * when this changes, so the draft, staged context, picker and uploads
    * survive it; the thread remounts in each new container and opens on the
-   * latest message (its data is the host's `mingoState`). Meant for
+   * latest message (its data is the host's engine, `ChatEngineProvider`). Meant for
    * `shell="inline"`; the host must not clip the composer's root — the
    * context picker, `@` / slash menus and the memory popover open above it.
    * The portalled thread paints no background: the host paints the area that
@@ -637,6 +577,12 @@ export interface EmbeddableChatProps {
    */
   onDialogCreated?: (dialogId: string) => void;
   /**
+   * Called as a send from this panel goes out (the composer, a quick-action chip, a clarification card, the Guide
+   * launcher prompt), with the dialog it goes into, or null when it will create one. What a host does around a send
+   * (raise the conversation over the page, follow the chat it creates) is here; the send itself is the engine's.
+   */
+  onMessageSent?: (send: { dialogId: string | null }) => void;
+  /**
    * Host-set ghost text in the composer: the same non-destructive preview a
    * hovered quick-action chip shows (the prompt that clicking it would send),
    * for chips the host draws itself (e.g. a home page beside a docked
@@ -650,24 +596,22 @@ export interface EmbeddableChatProps {
 // Chip href resolution
 // =============================================================================
 
-/** Tiny inline replacement for hub's `formatRelativePath`. */
-const formatRelativePath = (p: string): string => p.replace(/^\/+/, '').replace(/\/+$/, '');
-
 /**
- * The committed `@`-mention text token, derived from a `type:id` identity key.
- * The TYPE is replaced with its backend mention MARKER (`markerByType`, e.g.
- * `KB_ARTICLE → 'kb'`), falling back to a lowercased type when the host didn't
- * declare one (`@device:…`, not `@DEVICE:…`); the `id` is left verbatim. The
- * structured context items keep the original (upper) entity-kind for the wire
- * enum, so this only affects the inline draft token. `[A-Za-z…]` in the input
- * regex matches either case, so commit/strip/detect stay symmetric.
+ * The committed `@`-mention's token: the href of its record link (`record://device/<id>`), derived from a `type:id`
+ * identity key. The TYPE is replaced with its backend MARKER (`markerByType`, e.g. `KB_ARTICLE → 'kb'`), falling back
+ * to a lowercased type when the host didn't declare one; the `id` is left verbatim. The structured context items keep
+ * the original (upper) entity-kind for the wire enum, so this only affects the draft's link.
  */
 const mentionTokenOf = (key: string, markerByType: Map<string, string>): string => {
   const ci = key.indexOf(':');
   const type = ci === -1 ? key : key.slice(0, ci);
   const id = ci === -1 ? '' : key.slice(ci + 1);
-  return `${markerByType.get(type) ?? type.toLowerCase()}:${id}`;
+  return recordHref(markerByType.get(type) ?? type.toLowerCase(), id);
 };
+
+/** The draft without the record link whose href is `href` (whatever name it shows). */
+const withoutRecordLink = (value: string, href: string): string =>
+  replaceRecordLinks(value, link => (recordHref(link.type, link.id) === href ? '' : value.slice(link.start, link.end)));
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
@@ -816,289 +760,6 @@ function dispatchSlashCommandAction(
 }
 
 // =============================================================================
-// SourceChip
-// =============================================================================
-
-/**
- * Source chip — TWO affordances per the hub original:
- *  1. Open: click → chip's URL (in-app for docs, new-tab for external).
- *  2. Ask: small `MessageSquare` icon-button on the right → fires
- *     `onDiscuss(ref)` to drill into THIS row via `entityIdFilter`.
- */
-/** A no-break space: one line of the chip's text, so a bar that holds it is exactly one text line tall. */
-const ONE_TEXT_LINE = '\u00a0';
-
-/** How many chips the strip's loading form draws by default, at every width: one, the row a phone shows a strip's
- *  first chip in (a strip has no page size, so its loading form draws a typical count, and the strip is one row either
- *  way). An embedder sets its own with `sourceSkeletonCount`. */
-const SOURCE_CHIP_SKELETON_COUNT = 1;
-
-/**
- * A source chip's loading form, built like the chip (`wrapChip` around `chipBody`): the chip's frame, its icon,
- * its title as a bar one text line tall (so the chip is the loaded chip's height), and the Ask slot beside it.
- */
-function SourceChipSkeleton(props: { 'data-loading-item'?: boolean }) {
-  return (
-    <span aria-hidden className="pointer-events-none inline-flex shrink-0 items-center" {...loadingItemProps(props)}>
-      <span className={chatChipClass({ tone: 'secondary' })}>
-        <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3.5 w-3.5 rounded-sm')} />
-        <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{ONE_TEXT_LINE}</span>
-      </span>
-      <span className={cn(SKELETON_SURFACE_CLASS, '-mr-1 ml-1 inline-block h-5 w-5 rounded-sm')} />
-    </span>
-  );
-}
-
-function SourceChip(props: {
-  src: ChatSource;
-  onDiscuss?: (ref: ChatRef) => void;
-  /** The strip's list-item marker, carried by the chip's frame like its loading form's. */
-  'data-loading-item'?: boolean;
-}) {
-  const { src, onDiscuss } = props;
-  const marks = loadingItemProps(props);
-  const runtime = useRequiredChatRuntime();
-  // Single CTA resolver — same icon, same href chain, same ChatRef
-  // synthesis the inline card and search-result paths use.
-  const cta = resolveSourceRowCTA(
-    {
-      sourceRepo: src.sourceRepo,
-      documentType: src.documentType,
-      id: src.id,
-      title: src.name,
-      externalUrl: src.externalUrl,
-      targetPlatform: src.targetPlatform ?? null,
-      path: src.path,
-    },
-    sourceRowCtxFromRuntime(runtime),
-  );
-  const Icon = cta.icon;
-  const icon = <Icon className="h-3.5 w-3.5" />;
-  const chipClass = chatChipClass({ tone: 'secondary' });
-
-  // Grouped source: a click opens a menu with Open + Ask per row. The menu is the shared `DropdownMenu`, portalled
-  // out of the thread: drawn inside it, it faded with the thread's end and sat under the composer dock.
-  if (src.items && src.items.length > 0) {
-    // A server-grouped chip answers to one number; a client-built one answers
-    // to every number its rows were cited by.
-    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
-    const rowLabels = groupedRowLabels(src.items);
-    const rows = src.items.map((item, i) => {
-      const itemCta = resolveSourceRowCTA(
-        {
-          sourceRepo: src.sourceRepo,
-          documentType: item.documentType,
-          id: item.id,
-          title: item.name,
-          externalUrl: item.externalUrl,
-          targetPlatform: item.targetPlatform ?? null,
-          path: item.path,
-        },
-        sourceRowCtxFromRuntime(runtime),
-      );
-      const ItemIcon = itemCta.icon;
-      // Read out of the CTA before the `onSelect` closure below is built: a
-      // property narrowing does not survive into a callback.
-      const itemChatRef = itemCta.chatRef;
-      return {
-        key: `${item.id}-${i}`,
-        label: rowLabels[i],
-        icon: <ItemIcon />,
-        href: itemCta.href ?? undefined,
-        targetPlatform: itemCta.targetPlatform ?? null,
-        path: item.path ?? null,
-        ask:
-          onDiscuss && itemCta.askable && itemChatRef
-            ? { label: `Ask about ${item.name}`, run: () => onDiscuss(itemChatRef) }
-            : undefined,
-      };
-    });
-
-    const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
-    const rowLabelClass = 'min-w-0 flex-1 truncate';
-
-    return (
-      <span className="inline-flex" {...marks}>
-        {/* Not modal: the thread keeps scrolling under an open menu, and the menu leaves with its chip. */}
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger className={`${chipClass} cursor-pointer`}>
-            {icon}
-            <span className="max-w-[160px] truncate">
-              [{groupIndices}] {src.name}
-            </span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            align="start"
-            className="max-h-[min(420px,var(--radix-dropdown-menu-content-available-height))] min-w-[220px] max-w-[340px] overflow-y-auto"
-          >
-            {rows.map(row => (
-              <div
-                key={row.key}
-                data-testid="source-group-row"
-                className="flex items-center gap-[var(--spacing-system-xxs)]"
-              >
-                {row.href ? (
-                  <DropdownMenuItem
-                    asChild
-                    className="min-w-0 flex-1 text-ods-text-secondary no-underline [&_svg]:size-3.5"
-                  >
-                    <NavLinkAnchorViaRuntime href={row.href} targetPlatform={row.targetPlatform} path={row.path}>
-                      {row.icon}
-                      <span className={rowLabelClass}>{row.label}</span>
-                    </NavLinkAnchorViaRuntime>
-                  </DropdownMenuItem>
-                ) : (
-                  // Nothing to open: the label only, out of the keyboard's way; its Ask still works.
-                  <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-ods-text-secondary text-h6 [&_svg]:size-3.5 [&_svg]:shrink-0">
-                    {row.icon}
-                    <span className={rowLabelClass}>{row.label}</span>
-                  </span>
-                )}
-                {row.ask && (
-                  <DropdownMenuItem
-                    aria-label={row.ask.label}
-                    title={row.ask.label}
-                    onSelect={row.ask.run}
-                    className="shrink-0 px-1.5 text-ods-text-secondary"
-                  >
-                    <MessageSquare />
-                  </DropdownMenuItem>
-                )}
-              </div>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </span>
-    );
-  }
-
-  // Single-row chip helpers — wrap whatever clickable element each branch
-  // produces with the trailing Ask `SourceActionButton`.
-  const displayName = src.name || formatRelativePath(src.path);
-  const chipBody = (label: string) => (
-    <>
-      {icon}
-      <span className="max-w-[160px] truncate">
-        [{src.index}] {label}
-      </span>
-    </>
-  );
-  const wrapChip = (clickable: React.ReactNode) => (
-    <span className="inline-flex items-center" {...marks}>
-      {clickable}
-      <SourceActionButton chatRef={cta.chatRef} onDiscuss={onDiscuss} density="inline" className="-mr-1 ml-1" />
-    </span>
-  );
-
-  // A chip that opens something is THE chat link (`NavLinkAnchorViaRuntime`): the one navigation decision, the one
-  // click executor, and the panel closing on a same-tab navigation, exactly as markdown links and cards.
-  if (cta.href) {
-    const isEntity = !!src.externalUrl;
-    return wrapChip(
-      <NavLinkAnchorViaRuntime
-        href={cta.href}
-        path={isEntity ? null : src.path}
-        targetPlatform={cta.targetPlatform ?? null}
-        className={chipClass}
-        title={isEntity ? undefined : displayName}
-      >
-        {chipBody(isEntity ? src.name : displayName)}
-      </NavLinkAnchorViaRuntime>,
-    );
-  }
-
-  // No openable destination — static label + Ask affordance only.
-  return wrapChip(
-    <span className={`${chipClass} cursor-default`} title={displayName}>
-      {chipBody(displayName)}
-    </span>,
-  );
-}
-
-/**
- * Cited-by-default source chip strip (Perplexity / ChatGPT pattern).
- * Cited rows render first; uncited tail hidden behind an expander.
- */
-function SourceChips({
-  cited,
-  uncited,
-  onDiscuss,
-  loading,
-  skeletonCount,
-}: {
-  cited: ChatSource[];
-  uncited: ChatSource[];
-  onDiscuss?: (ref: ChatRef) => void;
-  /** The answer is still being written: the strip's frame, heading and a row of chips in their loading form, so
-   *  the strip does not appear under the answer when it finishes. */
-  loading?: boolean;
-  /** How many chips the loading form draws (`EmbeddableChatProps.sourceSkeletonCount`). */
-  skeletonCount: number;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (loading) {
-    return (
-      <div aria-hidden className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
-        <span className="uppercase text-ods-text-muted text-h6">
-          <TextHold>Sources</TextHold>
-        </span>
-        {/* One row at every width: a chip that does not fit is cut, never wrapped or hidden (a strip's chips fit one
-            row in the answers measured, and a wrapped skeleton shrinks when the answer ends). */}
-        <div className="flex flex-nowrap gap-1.5 overflow-hidden">
-          <LoadingItems count={skeletonCount}>{() => <SourceChipSkeleton data-loading-item />}</LoadingItems>
-        </div>
-      </div>
-    );
-  }
-
-  if (cited.length === 0) {
-    const fallback = uncited.slice(0, FALLBACK_TOP_RETRIEVED);
-    if (fallback.length === 0) return null;
-    return (
-      <div className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
-        <span className="uppercase text-ods-text-muted text-h6">Top retrieved sources</span>
-        <div className="flex flex-wrap gap-1.5">
-          {fallback.map(src => (
-            <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const hiddenCount = uncited.length;
-  const hasOverflow = hiddenCount > 0;
-
-  return (
-    <div className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
-      <span className="uppercase text-ods-text-muted text-h6">Sources</span>
-      <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
-        {cited.map(src => (
-          <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
-        ))}
-        {expanded &&
-          uncited.map(src => <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />)}
-        {hasOverflow && (
-          <Button
-            variant="link"
-            size="compact"
-            noPaddingX
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            aria-expanded={expanded}
-            aria-label={expanded ? 'Show fewer sources' : `Show ${hiddenCount} additional retrieved sources`}
-          >
-            {expanded ? 'Show less' : `+${hiddenCount} more retrieved ${hiddenCount === 1 ? 'source' : 'sources'}`}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
 // Component
 // =============================================================================
 
@@ -1133,7 +794,7 @@ export interface EmbeddableChatHandle {
    * A new chat with the composer PREFILLED and nothing sent: the host has a
    * suggested message (e.g. "Fix with Mingo" on an incident) and the user
    * decides whether to send it. `mentions` are attached as context items up
-   * front, each committed as an inline `@marker:id` chip exactly as if picked
+   * front, each committed as an inline record-link chip exactly as if picked
    * from the `@` picker, and `text` follows them in the draft.
    */
   prefillDraft: (draft: ChatPrefillDraft) => void;
@@ -1168,7 +829,6 @@ export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableC
 EmbeddableChat.displayName = 'EmbeddableChat';
 
 function EmbeddableChatInner({
-  sourceSkeletonCount = SOURCE_CHIP_SKELETON_COUNT,
   enabledRagTableIds = null,
   emptyStateGreeting = null,
   suggestedQueries = null,
@@ -1181,9 +841,6 @@ function EmbeddableChatInner({
   extras,
   tableIdForDocumentType,
   modes,
-  mingoState,
-  pendingApprovals,
-  mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
   activeAgentSlug,
@@ -1203,7 +860,7 @@ function EmbeddableChatInner({
   guideWelcome,
   quickActionAccent,
   contextPicker,
-  renderMention,
+  renderRecordChip,
   renderContextItem,
   guidePendingPrompt,
   onGuidePromptConsumed,
@@ -1230,6 +887,7 @@ function EmbeddableChatInner({
   renameMode = 'modal',
   safeAreaBottom = true,
   onDialogCreated,
+  onMessageSent,
   composerPreviewText = null,
   handleRef,
 }: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
@@ -1256,7 +914,6 @@ function EmbeddableChatInner({
   // endpoint returns BOTH the auth tier and the resolved user, so the
   // displayed name always matches who the server thinks the user is.
   const { attachmentsEnabled, user: identityUser } = useChatIdentity();
-  const viewUrlPrefix = runtime.endpoints.attachmentViewUrlPrefix;
 
   // Dev-only warning when only one of `open` / `onOpenChange` is set.
   useEffect(() => {
@@ -1403,9 +1060,11 @@ function EmbeddableChatInner({
     return { guide: guideOptions };
   }, [modes, tableIdForDocumentType]);
 
-  // "Does Mingo mode exist?" — true via either the callback config OR injected
-  // state. Gates the guide↔mingo back-chevron and the guide-mode banner.
-  const hasMingoMode = !!effectiveModes.mingo || !!mingoState;
+  // The engine a host runs once for its session (`ChatEngineProvider`): it is this panel's Mingo mode.
+  const hostEngine = useChatEngineContext();
+  // "Does Mingo mode exist?" — true via either the callback config OR the host's engine. Gates the guide↔mingo
+  // back-chevron and the guide-mode banner.
+  const hasMingoMode = !!effectiveModes.mingo || !!hostEngine;
 
   // Initial active mode picks the first configured slot when neither
   // controlled `activeMode` nor `defaultActiveMode` is provided. Guide
@@ -1507,7 +1166,10 @@ function EmbeddableChatInner({
 
   const {
     messages: rawMessages,
+    actions: chatActions,
+    displayApprovalTypes,
     isLoading: chatLoading,
+    writingMessageId,
     sendMessage: sendMessageRaw,
     discussRef,
     stopMessage,
@@ -1517,6 +1179,7 @@ function EmbeddableChatInner({
     currentContextWindowMaxTokens,
     currentInputTokens,
     currentOutputTokens,
+    currentContextTokens,
     currentCacheHitRatePct,
     currentUsageBreakdown,
     displayRef,
@@ -1541,8 +1204,6 @@ function EmbeddableChatInner({
   } = useUnifiedChat({
     modes: effectiveModes,
     activeMode,
-    mingoStateOverride: mingoState,
-    injectedDialogCapabilities: mingoDialogCapabilities,
   });
 
   // THE conversation-list gate. `dialogCapabilities` is present iff the ACTIVE
@@ -1562,9 +1223,14 @@ function EmbeddableChatInner({
   // switch. Every send path goes through here — the composer, a clarification
   // card, a quick-action chip, the Guide launcher prompt.
   const [namingNewChat, setNamingNewChat] = useState(false);
+  const onMessageSentRef = useRef(onMessageSent);
+  useEffect(() => {
+    onMessageSentRef.current = onMessageSent;
+  });
   const sendMessage = useCallback(
     async (text: string, options?: UnifiedSendMessageOptions) => {
       if (activeDialogId == null) setNamingNewChat(true);
+      onMessageSentRef.current?.({ dialogId: activeDialogId ?? null });
       try {
         return await sendMessageRaw(text, options);
       } finally {
@@ -1600,7 +1266,8 @@ function EmbeddableChatInner({
       guidePromptSentRef.current = false;
       return;
     }
-    if (activeMode !== 'guide' || guidePromptSentRef.current) return;
+    // A send on an open stream would be refused and the question lost: it goes out when the stream has closed.
+    if (activeMode !== 'guide' || guidePromptSentRef.current || chatLoading) return;
     guidePromptSentRef.current = true;
     // Same asymmetry as `handleSend` below: the SSE adapter settles its own
     // failures into an error row, but the Mingo/NATS one rejects on a failed
@@ -1612,7 +1279,7 @@ function EmbeddableChatInner({
       console.error('[EmbeddableChat] guide launcher prompt failed:', err);
     });
     onGuidePromptConsumed?.();
-  }, [guidePendingPrompt, activeMode, sendMessage, onGuidePromptConsumed]);
+  }, [guidePendingPrompt, activeMode, chatLoading, sendMessage, onGuidePromptConsumed]);
 
   // Chat-attachment hooks (v2 attachment feature).
   const {
@@ -1646,7 +1313,7 @@ function EmbeddableChatInner({
     mentionActiveRef.current = mentionQuery !== null;
   }, [mentionQuery]);
   // Keys (`"<type>:<id>"`) of context items that were committed via `@` and so
-  // have a `@type:id` token in the draft text. MULTI-mention: several coexist.
+  // have a record link in the draft text. MULTI-mention: several coexist.
   // Source of truth = the input text — deleting a token's chip drops its item.
   const mentionKeysRef = useRef<Set<string>>(new Set());
 
@@ -1702,9 +1369,9 @@ function EmbeddableChatInner({
     if (createdDialogId != null) onDialogCreatedRef.current?.(createdDialogId);
   }, [createdDialogId]);
 
-  // Map each entity type to its backend mention marker (host-declared on the
-  // entity type). Drives the committed `@marker:id` token; missing markers fall
-  // back to a lowercased type inside `mentionTokenOf`.
+  // Map each entity type to its backend marker (host-declared on the entity
+  // type): the type of the committed record link; missing markers fall back to
+  // a lowercased type inside `mentionTokenOf`.
   const mentionMarkerByType = useMemo(() => {
     const m = new Map<string, string>();
     for (const t of contextPicker?.entityTypes ?? []) if (t.marker) m.set(t.type, t.marker);
@@ -1725,7 +1392,7 @@ function EmbeddableChatInner({
   const toggleContextItem = useCallback(
     (item: ChatContextItem) => {
       const key = `${item.type}:${item.id}`;
-      // `@`-mention flow → MULTI-select: commit a `@type:id` chip into the draft
+      // `@`-mention flow → MULTI-select: commit a record-link chip into the draft
       // (prior mentions left in place) so each picked entity stays visible inline
       // AND rides out in the context. The `+` flow (mention inactive) is the same
       // multi-select on the chip strip.
@@ -1756,14 +1423,13 @@ function EmbeddableChatInner({
     (item: ChatContextItem) => {
       const key = `${item.type}:${item.id}`;
       setContextItems(prev => prev.filter(p => `${p.type}:${p.id}` !== key));
-      // Removing a mention-backed chip must also strip its `@type:id` token from
+      // Removing a mention-backed chip must also strip its record link from
       // the draft, keeping text and context in lockstep (the inverse of deleting
       // the chip in the input, which drops the item via `handleContextValueChange`).
       if (mentionKeysRef.current.has(key)) {
         mentionKeysRef.current.delete(key);
         const cur = chatInputRef.current?.getValue() ?? '';
-        const next = cur
-          .replace(`@${mentionTokenOf(key, mentionMarkerByType)}`, '')
+        const next = withoutRecordLink(cur, mentionTokenOf(key, mentionMarkerByType))
           .replace(/\s{2,}/g, ' ')
           .trimStart();
         chatInputRef.current?.setValue(next);
@@ -1772,13 +1438,13 @@ function EmbeddableChatInner({
     [mentionMarkerByType],
   );
 
-  // Draft → context reconciliation: when the user deletes a `@type:id` chip from
+  // Draft → context reconciliation: when the user deletes a mention chip from
   // the input, drop the matching mention item. Checks EVERY token-backed key
   // (multi-mention). `+`-added items have no token in the text and are untouched.
   const handleContextValueChange = useCallback(
     (value: string) => {
       for (const key of Array.from(mentionKeysRef.current)) {
-        if (!value.includes(`@${mentionTokenOf(key, mentionMarkerByType)}`)) {
+        if (!value.includes(`(${mentionTokenOf(key, mentionMarkerByType)})`)) {
           mentionKeysRef.current.delete(key);
           setContextItems(prev => prev.filter(p => `${p.type}:${p.id}` !== key));
         }
@@ -1812,10 +1478,9 @@ function EmbeddableChatInner({
     setContextPickerOpen(query !== null);
   }, []);
 
-  // `renderMention` is HOST-provided (see the prop doc): the per-type renderer
-  // for inline AI mentions `@marker:id` (mirror of `renderEntityCard`). The lib
-  // forwards it verbatim to the message list and calls it from the `mention://`
-  // override; the host returns a self-fetching chip.
+  // `renderRecordChip` is HOST-provided (see the prop doc): the per-type chip
+  // of a record link. The lib forwards it verbatim to the message list and calls
+  // it from the `<a>` override; the host returns a self-fetching chip.
 
   const handleClose = useCallback(() => setIsOpen(false), [setIsOpen]);
   // What the header close controls call; absent on a panel that cannot close.
@@ -1827,7 +1492,7 @@ function EmbeddableChatInner({
   }, [setIsOpen]);
 
   // Stable panel-level handle for descendants (inline cards via
-  // `ChatCardNavWrap` and markdown-body links via
+  // `RecordNavWrap` and markdown-body links via
   // `NavLinkAnchorViaRuntime`) to close the panel after same-tab
   // navigation. Uses `handleNavigationClose` (not `handleClose`) so the
   // iOS scroll-restore cleanup effect at the bottom of this file sees
@@ -1854,17 +1519,28 @@ function EmbeddableChatInner({
   // (`askAboutRef.current` is set next to it: an archived chat is read-only).
   const askAboutRef = useRef<(reference: ChatRef) => void>(discussRef);
   const askAbout = useCallback((reference: ChatRef) => askAboutRef.current(reference), []);
+  // What the thread's own Ask and Display do. Each is a send, gated like an ask card and the composer: no second send while a
+  // turn is in flight, so nothing in the thread offers one the turn would have to refuse.
+  const threadAsk = chatLoading ? undefined : askAbout;
+  const threadDisplay = chatLoading ? undefined : displayRef;
 
   // Host-provided renderer for inline entity cards — routes through the
   // shared dispatcher in lib's `entity-cards/dispatch.tsx`.
   const renderEntityCard = useCallback(
     (reference: ChatRef): React.ReactNode =>
       renderChatInlineEntityCard(reference, {
-        onDiscuss: askAbout,
-        onDisplay: displayRef,
+        onDiscuss: threadAsk,
+        onDisplay: threadDisplay,
+        held: chatLoading,
         extras,
       }),
-    [askAbout, displayRef, extras],
+    [threadAsk, threadDisplay, chatLoading, extras],
+  );
+
+  // The same Ask and Display a card gets, for every record chip in the thread (`RecordActionsProvider`).
+  const recordActions = useMemo(
+    () => ({ onDiscuss: threadAsk, onDisplay: threadDisplay, held: chatLoading }),
+    [threadAsk, threadDisplay, chatLoading],
   );
 
   // Stable assistant-icon element. `<ChatMessageList>` forwards this prop to
@@ -1886,24 +1562,6 @@ function EmbeddableChatInner({
     [effectiveAssistantIcon],
   );
 
-  // Stable per-message timestamps. The memoized `<ChatMessageEnhanced>`
-  // compares `timestamp.getTime()`, so we must NOT stamp `new Date()` fresh
-  // on each render: a moving clock makes every message's timestamp differ
-  // between renders, defeating memoization and forcing the WHOLE list (and
-  // every open menu/card inside it) to re-render on every realtime chunk.
-  // Prefer the host's real timestamp; otherwise stamp once per id and reuse
-  // it (keeps the displayed time stable and lets memoization hold even when
-  // the host omits a timestamp).
-  //
-  // Held as an instance-lifetime map from `useState`'s lazy initialiser, not a
-  // ref: a ref read during render is untracked, and `useRef(new Map())`
-  // additionally allocated a throwaway map on every single render. Filling it
-  // inside the memo below is safe even if React discards that render attempt —
-  // the value cached for an id is an arbitrary "now" either way, so an entry
-  // left behind by a discarded attempt is exactly as correct as the one the
-  // retry would have written.
-  const [timestampCache] = useState(() => new Map<string, Date>());
-
   // GUIDE MODE ONLY. Guide-mode user bubbles carry no host-supplied name/avatar
   // (the SSE adapter emits bare `{ role, content }`), so fall back to the
   // server-resolved identity (`useChatIdentity`): full name (first + last, or
@@ -1912,11 +1570,11 @@ function EmbeddableChatInner({
   // this is correct.
   //
   // Mingo mode is EXCLUDED on purpose: its bubbles can belong to DIFFERENT
-  // participants, whose name/avatar come from the host (`mingoState` messages) —
+  // participants, whose name/avatar come from the host's engine messages —
   // a different identity source. Overlaying the current viewer's identity there
   // stamped the viewer's photo onto EVERY user's bubble (the reported bug). When
   // not in guide mode these stay `undefined`, so Mingo bubbles use only their
-  // host-supplied `m.name`/`m.avatar` (or the generic 'You' / no-avatar default).
+  // host-supplied `metadata.author` (or the generic 'You' / no-avatar default).
   const guideUserName =
     activeMode === 'guide'
       ? [identityUser?.firstName, identityUser?.lastName].filter(Boolean).join(' ').trim() ||
@@ -1925,14 +1583,28 @@ function EmbeddableChatInner({
       : undefined;
   const guideUserAvatar = activeMode === 'guide' ? identityUser?.avatarUrl?.trim() || undefined : undefined;
 
-  // Map the host's rows → the lib's Message type. The mapping itself lives in
-  // `mapHostMessage`, which is where its pass-through list is pinned by tests.
-  const hostMessages: Message[] = useMemo(() => {
-    const options = { userName: guideUserName, userAvatar: guideUserAvatar, timestampCache };
-    const mapped = rawMessages.map(m => mapHostMessage(m, options));
-    pruneTimestampCache(timestampCache, new Set(rawMessages.map(m => m.id)));
-    return mapped;
-  }, [rawMessages, guideUserName, guideUserAvatar, timestampCache]);
+  // The role's default name and avatar, under whatever a row says itself. A message's `parts` keep their identity, so a
+  // new object here re-renders no row whose parts and names did not change.
+  const hostMessages = useMemo(
+    () =>
+      rawMessages.map(message => {
+        const author = message.metadata?.author;
+        const isAssistant = message.role === 'assistant';
+        return {
+          ...message,
+          metadata: {
+            ...message.metadata,
+            author: {
+              ...author,
+              name: author?.name ?? (isAssistant ? 'Mingo' : (guideUserName ?? 'You')),
+              avatar: author?.avatar ?? (message.role === 'user' ? (guideUserAvatar ?? null) : null),
+              ...(isAssistant ? { assistantType: 'mingo' as const } : {}),
+            },
+          },
+        };
+      }),
+    [rawMessages, guideUserName, guideUserAvatar],
+  );
 
   // "What to ask?" exchanges (`whatToAsk`) are the panel's own, shown in the
   // thread beside the host's messages; a new chat holding one reads as a
@@ -1958,20 +1630,12 @@ function EmbeddableChatInner({
       // stale ref call still lands here — refused at the seam, not by luck.
       if (composerLock) return;
       noteWhatToAskSend();
-      // Append chat-attachment markdown lines to the user's bubble.
-      let augmentedText = text;
-      if (readyAttachments.length > 0) {
-        const markdown = readyAttachments
-          .map(att => formatChatAttachmentMarkdownForBubble(att, viewUrlPrefix))
-          .join('');
-        augmentedText = `${text}${markdown}`;
-      }
       // The unified `sendMessage` delegates to the ACTIVE adapter: the SSE one
       // settles its own failures into an error row, but the Mingo/NATS one
       // rejects on a failed publish. There is no composer promise for that
       // rejection to surface through, so log it here the way the NATS
       // adapter's `discussRef` does rather than leave it unhandled.
-      void sendMessage(augmentedText, {
+      void sendMessage(text, {
         ...(readyAttachments.length > 0 ? { attachments: readyAttachments } : {}),
         ...(contextItems.length > 0 ? { contextItems } : {}),
       }).catch((err: unknown) => {
@@ -1985,19 +1649,18 @@ function EmbeddableChatInner({
         setContextItems([]);
       }
     },
-    [composerLock, noteWhatToAskSend, sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
+    [composerLock, noteWhatToAskSend, sendMessage, readyAttachments, clearAttachments, contextItems],
   );
 
   /**
    * Picking an option on a clarification card — deliberately NOT `handleSend`.
    *
-   * `handleSend` belongs to the composer: it appends the staged attachments'
-   * markdown to the text, ships the staged context items, and then clears both.
-   * Routing an ask click through it would (a) send `label + attachment markdown`
-   * where the backend's classifier expects the label VERBATIM to resolve which
-   * reading was picked, and (b) consume a draft's attachments/context into a
-   * one-word answer the user never attached them to. So the label goes out on
-   * its own and whatever is staged in the composer stays staged.
+   * `handleSend` belongs to the composer: it ships the staged attachments and
+   * context items, and then clears both. Routing an ask click through it would
+   * consume a draft's attachments/context into a one-word answer the user never
+   * attached them to. So the label goes out on its own, VERBATIM (the backend's
+   * classifier resolves which reading was picked from it), and whatever is
+   * staged in the composer stays staged.
    */
   const handleAskSelect = useCallback(
     (label: string) => {
@@ -2008,6 +1671,18 @@ function EmbeddableChatInner({
       });
     },
     [sendMessage],
+  );
+
+  // What the thread's cards do. An ask card is gated on `chatLoading` for the same reason the composer is: no second
+  // send while a turn is in flight. Passive demo hosts (previewMode) stay read-only. A "What to ask?" chip goes out the
+  // way the panel sends a prompt, not the adapter's: that send knows a blocked chat, and keeps a new chat's exchange.
+  const messageActions = useMemo(
+    () => ({
+      ...chatActions,
+      selectAsk: chatLoading || previewMode ? undefined : handleAskSelect,
+      pickSuggestion: chatPanelHandle.sendPrompt,
+    }),
+    [chatActions, chatLoading, previewMode, handleAskSelect, chatPanelHandle],
   );
 
   // Admin "try-asking chips" → GUIDE-mode quick-action chips only (Mingo mode
@@ -2174,7 +1849,7 @@ function EmbeddableChatInner({
   // history has loaded (`hasMessages`). Driving the surface + content branch
   // off this makes the normal-chat open animate identically to the archived
   // one instead of lagging behind the message fetch.
-  // In `previewMode`, the host drives the whole state (`mingoStateOverride`) and
+  // In `previewMode`, the host drives the whole state (its engine) and
   // there is no dialog manager to set `isOpeningDialog`. So an embedded preview
   // that wants a message-list skeleton (real header + composer, skeleton bubbles)
   // signals it via `isMessagesLoading` — treat that as an open conversation so
@@ -2230,6 +1905,14 @@ function EmbeddableChatInner({
     return out;
   }, [commandsById, enabledSet]);
 
+  // The message a running turn writes, the one its transport names, as the thread reads it.
+  const writingIndex = writingMessageIndex(messages, writingMessageId);
+  // The thread as it last stood with no turn running: what a strip draws while one is.
+  const settledMessages = useRef<readonly ChatMessage[]>([]);
+  useEffect(() => {
+    if (!chatLoading) settledMessages.current = messages;
+  }, [chatLoading, messages]);
+
   /**
    * Source chips, under the answer that cited them.
    *
@@ -2240,34 +1923,24 @@ function EmbeddableChatInner({
    * is no longer a Guide-mode-only affordance either.
    */
   const renderMessageSources = useCallback(
-    (message: Message, index: number) => {
+    (message: ChatMessage, index: number) => {
       if (message.role !== 'assistant') return null;
-      // Suppressed only on the answer still being written: the citation markers
-      // the order is derived from arrive WITH the text, so a strip rendered
-      // mid-turn reshuffles under the reader as more sentences land.
+      // The strip of the message being written holds still until its turn ends: the citations the order is derived from
+      // arrive WITH the text, so a strip drawn from the live parts reshuffles under the reader as more sentences land. A
+      // message on screen when the turn began keeps what its strip showed (a card's message, which its answer continues:
+      // on Mingo every answer does, its resume opens no message of its own), so the click leaves the thread nothing to
+      // move. A message this turn began has none yet: the turn's own stage rows already say it is working.
       //
-      // Scoped to the trailing row on purpose. `chatLoading` is a property of
-      // the THREAD, so testing it alone pulls the strips off every earlier
-      // answer too — a reader scrolled up watches finished citations blink out
-      // for the duration of an unrelated turn.
-      // Its strip is drawn in its loading form meanwhile, so the strip is already there when the answer ends.
-      if (chatLoading && index === messages.length - 1) {
-        if (sourceSkeletonCount <= 0) return null;
-        return (
-          <div className="pb-2">
-            <SourceChips loading skeletonCount={sourceSkeletonCount} cited={[]} uncited={[]} />
-          </div>
-        );
+      // Scoped to that one row on purpose. `chatLoading` is a property of the THREAD, so testing it alone pulls the strips
+      // off every other answer too: a reader scrolled up watches finished citations blink out for the duration of an
+      // unrelated turn.
+      if (chatLoading && index === writingIndex) {
+        const settled = settledMessages.current.find(({ id }) => id === message.id);
+        return settled ? <ChatMessageSources message={settled} onDiscuss={threadAsk} /> : null;
       }
-      const { cited, uncited } = splitCitedSources(message.sources, flattenAssistantContent(message.content));
-      if (cited.length === 0 && uncited.length === 0) return null;
-      return (
-        <div className="pb-2">
-          <SourceChips cited={cited} uncited={uncited} onDiscuss={askAbout} skeletonCount={sourceSkeletonCount} />
-        </div>
-      );
+      return <ChatMessageSources message={message} onDiscuss={threadAsk} />;
     },
-    [chatLoading, messages.length, askAbout, sourceSkeletonCount],
+    [chatLoading, writingIndex, threadAsk],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
@@ -2506,8 +2179,7 @@ function EmbeddableChatInner({
     chatLoading ||
     activeDialogStatus === 'working' ||
     activeDialogStatus === 'approval' ||
-    (pendingApprovals?.length ?? 0) > 0 ||
-    awaitsDecision(hostMessages);
+    awaitsDecision(hostMessages, displayApprovalTypes);
 
   // "What to ask Mingo?" with `whatToAsk`: every click opens a new chat with
   // the exchange - never the open conversation, whatever its state, and not
@@ -2561,8 +2233,15 @@ function EmbeddableChatInner({
   // queued until the host has let go of the archived dialog: until then its
   // `discussRef` still writes into the dialog it has open.
   const queuedAskRef = useRef<ChatRef | null>(null);
+  // A page's ask (a search result, `ask-ai:open-with-ref`) can arrive while an answer is being written, when the thread
+  // offers none of its own. A send then would be refused and the question lost, so it goes out when the stream has closed.
+  const heldAsksRef = useRef<ChatRef[]>([]);
   useEffect(() => {
     askAboutRef.current = reference => {
+      if (chatLoading) {
+        heldAsksRef.current.push(reference);
+        return;
+      }
       if (!isViewingArchived) {
         discussRef(reference);
         return;
@@ -2579,6 +2258,11 @@ function EmbeddableChatInner({
     queuedAskRef.current = null;
     discussRef(reference);
   }, [activeDialogId, discussRef]);
+  useEffect(() => {
+    if (chatLoading) return;
+    const reference = heldAsksRef.current.shift();
+    if (reference) askAboutRef.current(reference);
+  }, [chatLoading]);
 
   // The conversation open last, for the |← control: going back to the list
   // closes it, and widening the panel again should bring it back.
@@ -2878,75 +2562,73 @@ function EmbeddableChatInner({
                 box (e.g. the Mingo hero demo): `fill` top-anchors and clips
                 the loading rows so they read as "the whole panel is
                 loading" and never scroll. */}
-            <ChatMessageList
-              messages={messages}
-              isLoading={messagesInitialLoading}
-              fill={previewMode}
-              // The split layout's column: the thread fades out into the composer under it.
-              fadeEnd={splitMode && threadFadeEnd}
-              // v2 thread: names without the colon, 24px
-              // faces, 16px between messages (shared with fae v2).
-              appearance={appearance}
-              isTyping={chatLoading}
-              // Sticky footer for approvals the host lifted out of the
-              // thread — see the prop's docblock.
-              pendingApprovals={pendingApprovals}
-              // Real drawer: the library's smart follow. Passive in-page
-              // demo (previewMode): deterministic hard pin instead — a
-              // scripted assistant-only stream from a cold mount never
-              // satisfies the library's "at bottom" gate, so the reply
-              // landed below the fold. `pinBottom` snaps to bottom on
-              // every frame; identical mechanism to the Fae demo box, so
-              // both surfaces behave 1:1.
-              autoScroll={!previewMode}
-              pinBottom={previewMode}
-              // Passive in-page demos (previewMode) let the surrounding
-              // page scroll over the thread; the real drawer keeps
-              // containment (deck slide-scroll fix).
-              overscrollContain={!previewMode}
-              assistantType="mingo"
-              assistantIcon={mingoAssistantIcon}
-              renderEntityCard={renderEntityCard}
-              resolveContextIcon={resolveContextIcon}
-              renderContextItem={renderContextItem}
-              renderMention={renderMention}
-              renderAfterMessage={renderMessageSources}
-              // Gated on `chatLoading` for the same reason the composer
-              // is: no second send while a turn is in flight. Passive
-              // demo hosts (previewMode) stay read-only.
-              onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
-              NavLinkAnchor={NavLinkAnchorViaRuntime}
-              // Real Mingo drawer: hide the message-list scrollbar
-              // (scroll stays functional). Scoped here via `className`
-              // instead of `ChatMessageList` itself, so other list
-              // consumers (host chat, tickets) keep their thin bar.
-              //
-              // `previewMode` (the passive in-page demo) instead:
-              //  • KEEP the default thin scrollbar — the "elevator" —
-              //    so the Mingo demo's scroll controls match the Fae
-              //    demo box (which renders the default ChatMessageList
-              //    scrollbar) 1:1.
-              //  • Re-enable pointer events on the scroller: previewMode
-              //    puts `pointer-events-none` on the whole panel (line
-              //    ~1981) so the demo doesn't trap clicks, but that also
-              //    killed wheel/touch scroll on the thread (the Mingo
-              //    embed couldn't scroll while the Fae box could). Only
-              //    the scroller re-enables; composer + chrome stay inert.
-              className={
-                previewMode
-                  ? 'pointer-events-auto flex-1'
-                  : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-              }
-              // No inner `px`/`pb`: the panel wrapper already pads with
-              // `p-[var(--spacing-system-m)]`. The default content class
-              // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
-              // double-inset the thread; `pb-0` overrides via twMerge.
-              contentClassName={cn('max-w-none pb-0', splitMode && threadContentClassName)}
-              fullWidth
-              hasNextPage={hasMoreMessages}
-              isFetchingNextPage={isMessagesLoading}
-              onLoadMore={loadMoreMessages}
-            />
+            <RecordActionsProvider value={recordActions}>
+              <ChatMessageList
+                messages={messages}
+                isLoading={messagesInitialLoading}
+                fill={previewMode}
+                // The split layout's column: the thread fades out into the composer under it.
+                fadeEnd={splitMode && threadFadeEnd}
+                // v2 thread: names without the colon, 24px
+                // faces, 16px between messages (shared with fae v2).
+                appearance={appearance}
+                isTyping={chatLoading}
+                writingMessageId={writingMessageId}
+                // Real drawer: the library's smart follow. Passive in-page
+                // demo (previewMode): deterministic hard pin instead — a
+                // scripted assistant-only stream from a cold mount never
+                // satisfies the library's "at bottom" gate, so the reply
+                // landed below the fold. `pinBottom` snaps to bottom on
+                // every frame; identical mechanism to the Fae demo box, so
+                // both surfaces behave 1:1.
+                autoScroll={!previewMode}
+                pinBottom={previewMode}
+                // Passive in-page demos (previewMode) let the surrounding
+                // page scroll over the thread; the real drawer keeps
+                // containment (deck slide-scroll fix).
+                overscrollContain={!previewMode}
+                assistantType="mingo"
+                assistantIcon={mingoAssistantIcon}
+                renderEntityCard={renderEntityCard}
+                resolveContextIcon={resolveContextIcon}
+                renderContextItem={renderContextItem}
+                renderRecordChip={renderRecordChip}
+                renderAfterMessage={renderMessageSources}
+                actions={messageActions}
+                displayApprovalTypes={displayApprovalTypes}
+                NavLinkAnchor={NavLinkAnchorViaRuntime}
+                // Real Mingo drawer: hide the message-list scrollbar
+                // (scroll stays functional). Scoped here via `className`
+                // instead of `ChatMessageList` itself, so other list
+                // consumers (host chat, tickets) keep their thin bar.
+                //
+                // `previewMode` (the passive in-page demo) instead:
+                //  • KEEP the default thin scrollbar — the "elevator" —
+                //    so the Mingo demo's scroll controls match the Fae
+                //    demo box (which renders the default ChatMessageList
+                //    scrollbar) 1:1.
+                //  • Re-enable pointer events on the scroller: previewMode
+                //    puts `pointer-events-none` on the whole panel (line
+                //    ~1981) so the demo doesn't trap clicks, but that also
+                //    killed wheel/touch scroll on the thread (the Mingo
+                //    embed couldn't scroll while the Fae box could). Only
+                //    the scroller re-enables; composer + chrome stay inert.
+                className={
+                  previewMode
+                    ? 'pointer-events-auto flex-1'
+                    : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                }
+                // No inner `px`/`pb`: the panel wrapper already pads with
+                // `p-[var(--spacing-system-m)]`. The default content class
+                // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
+                // double-inset the thread; `pb-0` overrides via twMerge.
+                contentClassName={cn('max-w-none pb-0', splitMode && threadContentClassName)}
+                fullWidth
+                hasNextPage={hasMoreMessages}
+                isFetchingNextPage={isMessagesLoading}
+                onLoadMore={loadMoreMessages}
+              />
+            </RecordActionsProvider>
           </div>
         ) : activeMode === 'mingo' ? (
           /* Figma node 7532:222444 — default (Mingo-mode) empty state:
@@ -3117,7 +2799,8 @@ function EmbeddableChatInner({
               provider: currentProvider ?? 'anthropic',
               modelName: currentModelLabel ?? 'Claude',
               usedTokens:
-                currentInputTokens != null ? (currentInputTokens ?? 0) + (currentOutputTokens ?? 0) : undefined,
+                currentContextTokens ??
+                (currentInputTokens != null ? currentInputTokens + (currentOutputTokens ?? 0) : undefined),
               contextWindow: currentContextWindowMaxTokens ?? undefined,
               inputTokens: currentInputTokens ?? undefined,
               outputTokens: currentOutputTokens ?? undefined,

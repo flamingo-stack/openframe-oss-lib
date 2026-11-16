@@ -1,6 +1,6 @@
 ---
 name: realtime-chat-review
-description: Extra review angles for the NATS/JetStream realtime chat pipeline (chunk processors, accumulators, adapters, consumer stores). Use IN ADDITION to /code-review whenever a diff touches src/components/chat/**, src/nats/**, or any consumer copy of the chat pipeline.
+description: Extra review angles for the NATS/JetStream realtime chat pipeline (chunk processors, reducers, adapters, consumer stores). Use IN ADDITION to /code-review whenever a diff touches src/components/chat/**, src/nats/**, or any consumer copy of the chat pipeline.
 ---
 
 # Realtime chat pipeline review
@@ -14,7 +14,7 @@ correctness findings.
 ## Domain invariants (presume these; do not treat them as "speculative")
 
 - **JetStream is at-least-once.** Any chunk can be redelivered after later
-  chunks were already applied. Every message/segment updater MUST be
+  chunks were already applied. Every message/part updater MUST be
   idempotent and must never downgrade state (EXECUTED → EXECUTING, resolved
   approval → pending, completed compaction → started).
 - **CHAT_CHUNKS retention is 10 minutes.** A reconnect after a gap cannot be
@@ -65,18 +65,17 @@ history path:
 
 | Copy | Location |
 |------|----------|
-| Lib adapter | `openframe-frontend-core/src/components/chat/hooks/use-nats-chat-adapter.ts` (+ `use-chunk-catchup`, `use-realtime-chunk-processor`, `message-segment-accumulator`) |
+| Lib adapter | `openframe-frontend-core/src/components/chat/hooks/use-nats-chat-adapter.ts` (+ `use-chunk-catchup`, `use-realtime-chunk-processor`) |
 | Admin tickets | `openframe-frontend/src/app/(app)/tickets/` (store + `use-side-chunk-processor`) |
 | Admin mingo | `openframe-frontend/src/app/(app)/mingo/` (store + realtime subscription) |
 | Tauri client | `openframe-oss-tenant/clients/openframe-chat/src/hooks/` (`useChatMessages`, `useChat`) |
 
 And the paired paths inside each copy:
 
-- realtime processing vs `process-historical-messages` (defaults MUST match:
-  `displayApprovalTypes`, `batchApprovalsEnabled`, segment shapes);
-- live subscription vs catchup replay (same dedup keys, same boundaries);
-- standalone `tool_execution` segment vs `approval_batch.executions[execId]`
-  slot (guards added to one MUST exist in the other).
+- realtime processing vs `process-historical-messages` (both go through
+  `createMingoDecoder` and `applyChunkToMessages`; the default that MUST match is
+  `displayApprovalTypes`);
+- live subscription vs catchup replay (same dedup keys, same boundaries).
 
 Report any copy where a guard, default, dedup key, scan direction, or
 fallback added by the diff is absent or differs — that asymmetry IS the

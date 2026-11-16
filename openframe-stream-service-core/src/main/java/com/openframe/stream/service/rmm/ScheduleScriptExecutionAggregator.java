@@ -37,11 +37,17 @@ public class ScheduleScriptExecutionAggregator {
             return;
         }
 
-        ExecutionStatus finalStatus = counts.failed() > 0 ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
+        ExecutionStatus finalStatus = counts.settledStatus();
         long modified = scheduleScriptExecutionRepository.transitionIfRunning(
                 tenantId, executionId, finalStatus, Instant.now());
         if (modified > 0) {
             log.info("Transitioned schedule fire header: executionId={} status=RUNNING→{} tenantId={}",
+                    executionId, finalStatus, tenantId);
+            return;
+        }
+        long revised = scheduleScriptExecutionRepository.reviseSettledStatus(tenantId, executionId, finalStatus);
+        if (revised > 0) {
+            log.info("Revised settled schedule fire header after a late result: executionId={} status={} tenantId={}",
                     executionId, finalStatus, tenantId);
         }
     }

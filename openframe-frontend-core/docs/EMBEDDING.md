@@ -66,7 +66,6 @@ export function EmbeddedRuntimeProvider({ children }: { children: ReactNode }) {
   const chat = useMemo<ChatRuntime>(() => ({
     endpoints: {
       chatStreamUrl: `${PROXY_PREFIX}/docs/chat`,
-      approvalToolUrl: `${PROXY_PREFIX}/chat/agent/confirm-tool`,
       commandsUrl: `${PROXY_PREFIX}/docs/commands`,
       buildListUrl: (type, ids) => `${PROXY_PREFIX}/${type}?ids=${ids.join(',')}`,
     },
@@ -220,7 +219,7 @@ Open devtools, then:
 | Type `/` in chat input | `GET <PROXY_PREFIX>/docs/commands` |
 | Click source chip in chat | New tab opens at absolute `https://hub.openframe.ai/...` (or other source platform) |
 | `localStorage.setItem('nav-trace','true')` + click chip | Console: `reason=override:embed-mode` |
-| Approval card → approve | `POST <PROXY_PREFIX>/chat/agent/confirm-tool` |
+| Approval card → approve | `POST <PROXY_PREFIX>/docs/chat` (the card's message, `approval-responded` parts) |
 | Announcement bar visible | `GET <PROXY_PREFIX>/announcements/active` every 5 min |
 | Submit contact form | `POST <PROXY_PREFIX>/contact` |
 

@@ -444,11 +444,11 @@ export interface ChatContextChipStripProps {
   /**
    * Optional host renderer that REPLACES the default label-only pill for an
    * item — e.g. a self-fetching entity chip that resolves its own live display
-   * name by id, identical to an inline `@marker:id` mention. Return
+   * name by id, identical to an inline record link. Return
    * `null`/`undefined` for an item to fall back to the default pill. The lib
    * owns no entity knowledge, so the host node owns its full chrome (the
    * `onRemove` affordance is NOT wrapped around host-rendered items — this is
-   * meant for the read-only message bubble, mirroring `renderMention`).
+   * meant for the read-only message bubble, mirroring `renderRecordChip`).
    */
   renderItem?: (item: ChatContextItem) => ReactNode;
   disabled?: boolean;

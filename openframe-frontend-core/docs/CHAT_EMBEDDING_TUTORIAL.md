@@ -66,7 +66,6 @@ export function App() {
     () => ({
       endpoints: {
         chatStreamUrl: '/api/docs/chat',
-        approvalToolUrl: '/api/chat/agent/confirm-tool',
         commandsUrl: '/api/docs/commands',
         // Hub's `/api/chat/entity-list` dispatcher does the type → URL
         // lookup server-side. Embedders just hit this single endpoint.

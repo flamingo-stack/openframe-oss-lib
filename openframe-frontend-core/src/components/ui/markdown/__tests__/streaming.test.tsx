@@ -64,15 +64,9 @@ describe('splitStreamingBlocks', () => {
     expect(blocks[0].text).toContain('continuation');
   });
 
-  it('marks card:// and mention:// blocks non-memoizable (stale-card fix)', () => {
-    const blocks = splitStreamingBlocks(
-      'plain text block\n\nSee [card://blog:x] here\n\nCheck @device:r1 via mention\n\ntail',
-    );
-    expect(blocks.map(b => b.memoizable)).toEqual([true, false, true, false]);
-    // mention text without mention:// scheme stays memoizable; the scheme
-    // appears post-remark, so the splitter keys on the raw marker too:
-    const withScheme = splitStreamingBlocks('a [x](mention://device:r1) link\n\ntail');
-    expect(withScheme[0].memoizable).toBe(false);
+  it('memoizes a block holding a record link: its chip is drawn from its own text', () => {
+    const blocks = splitStreamingBlocks('See [Guide](record://onboarding_guide/a) here\n\ntail');
+    expect(blocks.map(b => b.memoizable)).toEqual([true, false]);
   });
 
   it('marks reference-definition/use and footnote blocks non-memoizable', () => {

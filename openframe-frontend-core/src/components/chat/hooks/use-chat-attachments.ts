@@ -25,21 +25,17 @@
 
 import { fileTypeFromBlob } from 'file-type';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER,
+  CHAT_ATTACHMENT_MAX_SIZE_BYTES,
+  CHAT_ATTACHMENT_MIME_TYPES,
+  CHAT_ATTACHMENTS_BUCKET,
+  CHAT_ATTACHMENTS_FOLDER,
+  type ChatAttachment,
+} from '../../../chat-protocol/attachment';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { randomId } from '../../../utils/random-id';
-import { CHAT_ATTACHMENT_MIME_TYPES, CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER } from '../chat-attachment-bar';
-import type { ChatAttachment } from '../utils/chat-attachment-markdown';
-
-// ---------------------------------------------------------------------------
-// Inlined hub-side constants (single source of truth — `lib/config/
-// chat-attachment-config.ts` on the hub). Hard-coded here so the lib
-// hook is self-contained; if hub-side bumps the cap, update both.
-// ---------------------------------------------------------------------------
-
-const CHAT_ATTACHMENTS_BUCKET = 'chat-attachments';
-const CHAT_ATTACHMENTS_FOLDER = 'chat';
-const CHAT_ATTACHMENT_MAX_SIZE_BYTES = 25 * 1024 * 1024;
 
 /** Cache-Control header for content-addressed uploads — Storage paths
  *  embed `{timestamp}-{random}-{filename}` so a given URL is immutable. */
@@ -76,8 +72,8 @@ interface UploadUrlResponse {
 
 interface UseChatAttachmentsApi {
   attachments: StagedAttachment[];
-  /** All staged files in 'ready' state, projected to the wire
-   *  `ChatAttachment` shape — pass to `sendMessage`'s `pendingAttachments`. */
+  /** All staged files in 'ready' state, projected to the
+   *  `ChatAttachment` shape — pass to `sendMessage`'s `attachments`, each sent as a `file` part. */
   readyAttachments: ChatAttachment[];
   /** True iff any attachment is mid-upload — Send button reads this
    *  to disable itself. */

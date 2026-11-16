@@ -13,6 +13,8 @@
  * chat card surfaces — no cross-surface drift.
  */
 
+import { parseRecordHref } from '../../../chat-protocol/record-link';
+import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
 import { resolveSourceIcon } from '../../chat/utils/source-row-cta';
 import { formatRelativePath } from './format-relative-path';
 
@@ -35,10 +37,9 @@ export interface DocSearchResultRowProps {
 }
 
 export function DocSearchResultRow({ result, isHighlighted }: DocSearchResultRowProps) {
-  const docType = (result.metadata?.documentType as string) || undefined;
-  const sourceRepo = (result.metadata?.sourceRepo as string) || undefined;
+  const docType = parseRecordHref(result.metadata?.sourceId)?.type;
   const { Icon: SourceIcon, label: iconLabel } = resolveSourceIcon({
-    sourceRepo,
+    sourceRepo: docType ? defaultTableIdForDocumentType(docType) : null,
     documentType: docType,
   });
   const isGroup = result.metadata?.isGroup as boolean | undefined;

@@ -10,23 +10,23 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder';
+import { applyChunkToMessages, createWireState } from '../../../chat-protocol/apply-chunk';
+import { isToolPart, type ChatMessage, type ChatToolPart } from '../../../chat-protocol/chat-message';
+import { createMingoDecoder } from '../../../chat-protocol/message-decoder';
 import { normalizePolicyReview } from '../../../chat-protocol/policy-review';
 import { approvalMetaToBatchData } from '../../features/notifications/types';
 import { ApprovalBatchMessage } from '../approval-batch-message';
 import { isPolicyEscalated } from '../policy-review';
-import { mergeToolExecutionIfPresent } from '../stream/message-mutations';
 import { ToolExecutionDisplay } from '../tool-execution-display';
 import type {
-  ApprovalBatchSegment,
+  ApprovalBatchData,
   HistoricalMessage,
   PendingToolCallData,
   PolicyReviewData,
   ToolExecutionData,
-  UnifiedChatMessage,
 } from '../types';
-import { createMessageSegmentAccumulator } from '../utils/message-segment-accumulator';
-import { processHistoricalMessagesWithErrors } from '../utils/process-historical-messages';
+import { processHistoricalMessages } from '../utils/process-historical-messages';
+import { approvalBatchViewOf, toolExecutionDataOf } from '../utils/tool-part-display';
 
 const wireEscalated = {
   source: 'CLASSIFIER',
@@ -62,7 +62,7 @@ const call = (policyReview?: PolicyReviewData): PendingToolCallData => ({
   ...(policyReview ? { policyReview } : {}),
 });
 
-const batch = (policyReview?: PolicyReviewData): ApprovalBatchSegment['data'] => ({
+const batch = (policyReview?: PolicyReviewData): ApprovalBatchData => ({
   approvalRequestId: 'req-1',
   approvalType: 'ADMIN',
   toolCalls: [call(policyReview)],
@@ -117,26 +117,46 @@ describe('isPolicyEscalated', () => {
   });
 });
 
+/** The live thread a run of NATS chunks builds, through the decoder and the reducer the chat uses. */
+function liveThread(chunks: unknown[]): ChatMessage[] {
+  const decoder = createMingoDecoder();
+  const wire = createWireState();
+  let messages: ChatMessage[] = [];
+  for (const raw of chunks) {
+    for (const chunk of decoder.decode(raw).chunks) messages = applyChunkToMessages(messages, chunk, wire);
+  }
+  return messages;
+}
+
+function toolParts(messages: ChatMessage[]): ChatToolPart[] {
+  return messages.flatMap(message => message.parts.filter(isToolPart));
+}
+
+const executingChunk = {
+  type: 'EXECUTING_TOOL',
+  integratedToolType: 'OPENFRAME',
+  toolFunction: 'runCommand',
+  toolExecutionRequestId: 'exec-1',
+};
+
 describe('the review on the wire', () => {
   it('rides a live EXECUTING_TOOL chunk', () => {
-    const event = decodeNatsChunk({
-      type: 'EXECUTING_TOOL',
-      integratedToolType: 'OPENFRAME',
-      toolFunction: 'runCommand',
-      toolExecutionRequestId: 'exec-1',
-      policyReview: wireEscalated,
-    });
-    expect(event?.type === 'tool-execution' && event.data.policyReview).toEqual(escalated);
+    const [part] = toolParts(liveThread([{ ...executingChunk, policyReview: wireEscalated }]));
+    expect(part && toolExecutionDataOf(part).policyReview).toEqual(escalated);
   });
 
   it('rides a live approval tool call', () => {
-    const event = decodeNatsChunk({
-      type: 'APPROVAL_REQUEST',
-      approvalRequestId: 'req-1',
-      approvalType: 'ADMIN',
-      toolCalls: [{ ...call(), policyReview: wireEscalated }],
-    });
-    expect(event?.type === 'approval-request' && event.toolCalls?.[0]?.policyReview).toEqual(escalated);
+    const parts = toolParts(
+      liveThread([
+        {
+          type: 'APPROVAL_REQUEST',
+          approvalRequestId: 'req-1',
+          approvalType: 'ADMIN',
+          toolCalls: [{ ...call(), toolCallArguments: { command: 'rm -rf ~/Downloads' }, policyReview: wireEscalated }],
+        },
+      ]),
+    );
+    expect(approvalBatchViewOf(parts).data.toolCalls[0]?.policyReview).toEqual(escalated);
   });
 
   it('rides an approval notification into the batch', () => {
@@ -154,52 +174,28 @@ describe('the review on the wire', () => {
       id: 'm1',
       createdAt: '2026-11-04T12:00:00Z',
       owner: { type: 'ASSISTANT' },
-      messageData: [
-        {
-          type: 'EXECUTING_TOOL',
-          integratedToolType: 'OPENFRAME',
-          toolFunction: 'runCommand',
-          toolExecutionRequestId: 'exec-1',
-          policyReview: wireEscalated,
-        },
-        {
-          type: 'EXECUTED_TOOL',
-          integratedToolType: 'OPENFRAME',
-          toolFunction: 'runCommand',
-          toolExecutionRequestId: 'exec-1',
-          success: true,
-          result: 'done',
-        },
-      ],
+      // The wire's review is raw JSON: the history decoder normalizes it, as the live one does.
+      parts: [
+        { ...executingChunk, policyReview: wireEscalated },
+        { ...executingChunk, type: 'EXECUTED_TOOL', success: true, result: 'done' },
+      ] as unknown as HistoricalMessage['parts'],
     };
-    const { messages } = processHistoricalMessagesWithErrors([message]);
-    const segments = Array.isArray(messages[0]?.content) ? messages[0].content : [];
-    const tool = segments.find(s => s.type === 'tool_execution');
-    expect(tool?.type === 'tool_execution' && tool.data.type).toBe('EXECUTED_TOOL');
-    expect(tool?.type === 'tool_execution' && tool.data.policyReview).toEqual(escalated);
+    const [part] = toolParts(processHistoricalMessages([message]).messages);
+    const row = part && toolExecutionDataOf(part);
+    expect(row?.type).toBe('EXECUTED_TOOL');
+    expect(row?.policyReview).toEqual(escalated);
   });
 
-  it('survives the merge into EXECUTED_TOOL in the accumulator and in the live thread', () => {
-    const executing: ToolExecutionData = {
-      type: 'EXECUTING_TOOL',
-      integratedToolType: 'OPENFRAME',
-      toolFunction: 'runCommand',
-      toolExecutionRequestId: 'exec-1',
-      policyReview: allowed,
-    };
-    const executed: ToolExecutionData = { ...executing, type: 'EXECUTED_TOOL', policyReview: undefined, success: true };
-
-    const accumulator = createMessageSegmentAccumulator();
-    accumulator.addToolExecution({ type: 'tool_execution', data: executing });
-    const [merged] = accumulator.addToolExecution({ type: 'tool_execution', data: executed });
-    expect(merged?.type === 'tool_execution' && merged.data.policyReview).toEqual(allowed);
-
-    const thread: UnifiedChatMessage[] = [
-      { id: 'a1', role: 'assistant', segments: [{ type: 'tool_execution', data: executing }] } as UnifiedChatMessage,
-    ];
-    const next = mergeToolExecutionIfPresent(thread, { type: 'tool_execution', data: executed });
-    const live = next?.[0]?.segments?.[0];
-    expect(live?.type === 'tool_execution' && live.data.policyReview).toEqual(allowed);
+  it('survives the merge into EXECUTED_TOOL in the live thread', () => {
+    const [part] = toolParts(
+      liveThread([
+        { ...executingChunk, policyReview: wireEscalated },
+        { ...executingChunk, type: 'EXECUTED_TOOL', success: true, result: 'done' },
+      ]),
+    );
+    const row = part && toolExecutionDataOf(part);
+    expect(row?.type).toBe('EXECUTED_TOOL');
+    expect(row?.policyReview).toEqual(escalated);
   });
 });
 
@@ -307,17 +303,13 @@ describe('ToolExecutionDisplay with a review', () => {
 
 describe('a redelivered chunk', () => {
   it('with an equal review is a no-op in the live thread', () => {
-    const executing: ToolExecutionData = {
-      type: 'EXECUTING_TOOL',
-      integratedToolType: 'OPENFRAME',
-      toolFunction: 'runCommand',
-      toolExecutionRequestId: 'exec-1',
-      policyReview: allowed,
-    };
-    const thread: UnifiedChatMessage[] = [
-      { id: 'a1', role: 'assistant', segments: [{ type: 'tool_execution', data: executing }] } as UnifiedChatMessage,
-    ];
-    const replayed = { ...executing, policyReview: structuredClone(allowed) };
-    expect(mergeToolExecutionIfPresent(thread, { type: 'tool_execution', data: replayed })).toBe(thread);
+    const decoder = createMingoDecoder();
+    const wire = createWireState();
+    const chunk = { ...executingChunk, policyReview: wireEscalated };
+    let thread: ChatMessage[] = [];
+    for (const c of decoder.decode(chunk).chunks) thread = applyChunkToMessages(thread, c, wire);
+    let replayed = thread;
+    for (const c of decoder.decode(structuredClone(chunk)).chunks) replayed = applyChunkToMessages(replayed, c, wire);
+    expect(replayed).toBe(thread);
   });
 });

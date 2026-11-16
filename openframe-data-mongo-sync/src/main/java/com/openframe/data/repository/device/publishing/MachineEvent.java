@@ -18,6 +18,7 @@ public class MachineEvent implements PublishedEvent {
     private String machineId;
     private String hostname;
     private String nickname;
+    private String organizationId;
 
     public String preferredName() {
         return MachineName.preferred(nickname, hostname);

@@ -26,6 +26,7 @@ public final class MachineFields {
     public static final MachineField<TelemetryStatus> TELEMETRY_STATUS =
             field("telemetryStatus", Machine::setTelemetryStatus);
     public static final MachineField<Instant> FIRST_CONNECTED_AT = field("firstConnectedAt", Machine::setFirstConnectedAt);
+    public static final MachineField<Instant> ORGANIZATION_ASSIGNED_AT = field("organizationAssignedAt", Machine::setOrganizationAssignedAt);
     public static final MachineField<DeviceType> TYPE = field("type", Machine::setType);
     public static final MachineField<Instant> LAST_SEEN = field("lastSeen", Machine::setLastSeen);
     public static final MachineField<String> ORGANIZATION_ID = field("organizationId", Machine::setOrganizationId);
