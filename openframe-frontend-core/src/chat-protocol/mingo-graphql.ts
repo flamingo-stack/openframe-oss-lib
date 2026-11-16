@@ -293,10 +293,17 @@ const DIALOG_OWNER_SELECTION = `
     }`;
 
 /**
- * One page of the dialog list. `pendingApproval` rides along when the list draws each row's status (the chat's own
- * list); the other lists (the archive, an incident's chats) need none and do not ask for it.
+ * One page of the dialog list. `pendingApproval` and `unread` (each row's `unreadMessageCount`: the replies its viewer
+ * has not read) ride along when the list draws each row's status (the chat's own list); the other lists (the archive,
+ * an incident's chats) need neither and do not ask for them.
  */
-export function mingoDialogsQuery({ pendingApproval }: { pendingApproval: boolean }): string {
+export function mingoDialogsQuery({
+  pendingApproval,
+  unread = false,
+}: {
+  pendingApproval: boolean;
+  unread?: boolean;
+}): string {
   return `
   query GetDialogs($filter: DialogFilterInput, $first: Int, $after: String, $search: String, $sort: SortInput) {
     dialogs(filter: $filter, first: $first, after: $after, search: $search, sort: $sort) {
@@ -307,7 +314,7 @@ export function mingoDialogsQuery({ pendingApproval }: { pendingApproval: boolea
           dialogId
           title
           status
-          streamState${pendingApproval ? '\n          pendingApproval {\n            id\n            approvalType\n          }' : ''}
+          streamState${pendingApproval ? '\n          pendingApproval {\n            id\n            approvalType\n          }' : ''}${unread ? '\n          unreadMessageCount' : ''}
           createdAt
           statusUpdatedAt
           lastActivityAt${DIALOG_OWNER_SELECTION}
@@ -324,7 +331,11 @@ export function mingoDialogsQuery({ pendingApproval }: { pendingApproval: boolea
 `;
 }
 
-/** The open dialog's own record: what the list may not hold (an archived dialog, one reached by link). */
+/**
+ * The open dialog's own record: what the list may not hold (an archived dialog, one reached by link). Its
+ * `unreadMessageCount` is the viewer's unread replies as of this read: a host that shows them reads the record again
+ * when a reply ended out of sight.
+ */
 export const MINGO_DIALOG_QUERY = `
   query GetDialog($id: ID!) {
     dialog(id: $id) {
@@ -332,7 +343,8 @@ export const MINGO_DIALOG_QUERY = `
       dialogId
       title
       status
-      streamState${DIALOG_OWNER_SELECTION}
+      streamState
+      unreadMessageCount${DIALOG_OWNER_SELECTION}
       createdAt
       statusUpdatedAt
       lastActivityAt
@@ -503,6 +515,11 @@ export interface MingoDialogNode {
   status?: string | null;
   streamState?: string | null;
   pendingApproval?: { id: string; approvalType?: string | null } | null;
+  /**
+   * Replies the viewer has not read. For a Mingo chat the backend counts them for its owner only (0 for everyone
+   * else). Absent when the document did not select it.
+   */
+  unreadMessageCount?: number | null;
   createdAt: string;
   statusUpdatedAt?: string | null;
   lastActivityAt?: string | null;

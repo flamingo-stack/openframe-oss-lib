@@ -62,6 +62,24 @@ describe('createMingoGraphqlDialogs', () => {
     expect(await backend({ dialog: null }).dialogs.fetchDialog('x')).toBeNull();
   });
 
+  it("asks for each row's unread replies only for a list that marks them, never for the archive", async () => {
+    const answer = { dialogs: { edges: [], pageInfo: { hasNextPage: false, endCursor: null } } };
+    const post = vi.fn(() => Promise.resolve(answer)) as unknown as MingoGraphqlPost & ReturnType<typeof vi.fn>;
+    const marking = createMingoGraphqlDialogs(post, { agentTypes: ['ADMIN'], statuses: ['ACTIVE'], unread: true });
+    await marking.fetchDialogs({ limit: 20 });
+    expect(post).toHaveBeenLastCalledWith(expect.stringContaining('unreadMessageCount'), expect.anything());
+    await marking.fetchArchivedDialogs({ limit: 20 });
+    expect(post).toHaveBeenLastCalledWith(expect.not.stringContaining('unreadMessageCount'), expect.anything());
+
+    const plain = backend(answer);
+    await plain.dialogs.fetchDialogs({ limit: 20 });
+    expect(plain.post).toHaveBeenLastCalledWith(expect.not.stringContaining('unreadMessageCount'), expect.anything());
+  });
+
+  it("the open dialog's record carries its viewer's unread replies", () => {
+    expect(MINGO_DIALOG_QUERY).toContain('unreadMessageCount');
+  });
+
   it("a mutation that refuses says why, in the API's words", async () => {
     const { post, dialogs } = backend({ renameDialog: { userErrors: [{ message: 'Title too long' }] } });
     await expect(dialogs.renameDialog('d1', 'x'.repeat(500))).rejects.toThrow('Title too long');

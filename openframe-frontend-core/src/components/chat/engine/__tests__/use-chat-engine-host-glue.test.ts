@@ -16,7 +16,7 @@ import type {
   ChatLiveTailTransport,
   FetchDialogMessagesResult,
 } from '../chat-transport';
-import { displayCommandFor, useChatEngine, type UseChatEngineConfig } from '../use-chat-engine';
+import { displayCommandFor, soonestRefreshMs, useChatEngine, type UseChatEngineConfig } from '../use-chat-engine';
 
 const persisted: HistoricalMessage[] = [
   {
@@ -111,6 +111,36 @@ describe('useChatEngine: the dialog list a host keeps', () => {
     await waitFor(() => expect(result.current.activeDialog?.title).toBe('Disk space'));
   });
 
+  it('reads the list sooner while the host expects it to change, and at the usual pace once it does not', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchDialogs = vi.fn(() => Promise.resolve({ dialogs: [], nextCursor: null }));
+    const transport: ChatLiveTailTransport = { replays: true, useLiveTail: () => undefined, publish: vi.fn() };
+    const history: ChatHistoryBackend = {
+      fetchDialogMessages: () => Promise.resolve({ messages: [], nextCursor: null }),
+      fetchDialogs,
+    };
+    const { rerender } = renderHook(
+      ({ expecting }: { expecting: boolean }) =>
+        useChatEngine({ transport, history, refresh: { intervalMs: 60_000, expectingMs: 10_000, expecting } }),
+      { initialProps: { expecting: true } },
+    );
+    await waitFor(() => expect(fetchDialogs).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(fetchDialogs).toHaveBeenCalledTimes(2);
+
+    rerender({ expecting: false });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(fetchDialogs).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(fetchDialogs).toHaveBeenCalledTimes(3);
+  });
+
   it('asks nothing while the host says no read may run', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const fetchDialogs = vi.fn(() => Promise.resolve({ dialogs: [], nextCursor: null }));
@@ -120,6 +150,23 @@ describe('useChatEngine: the dialog list a host keeps', () => {
       await vi.advanceTimersByTimeAsync(5_000);
     });
     expect(fetchDialogs).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('soonestRefreshMs', () => {
+  it('is the usual interval while no sooner reason holds', () => {
+    expect(soonestRefreshMs(60_000, [undefined, undefined])).toBe(60_000);
+    expect(soonestRefreshMs(undefined, [])).toBeUndefined();
+  });
+
+  it('is the shortest of the sooner intervals that hold, whatever the usual one is', () => {
+    expect(soonestRefreshMs(60_000, [10_000, undefined])).toBe(10_000);
+    expect(soonestRefreshMs(60_000, [15_000, 10_000])).toBe(10_000);
+    expect(soonestRefreshMs(undefined, [10_000])).toBe(10_000);
+  });
+
+  it('ignores a sooner interval of zero: unset, not "at once"', () => {
+    expect(soonestRefreshMs(60_000, [0])).toBe(60_000);
   });
 });
 
