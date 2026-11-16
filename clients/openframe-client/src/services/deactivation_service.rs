@@ -86,7 +86,7 @@ impl DeactivationService {
                 target: "deactivation",
                 reason = "marker_loaded",
                 gone_since = %ts,
-                "Loaded persisted tenant-gone marker; a live 410 must re-confirm before any uninstall"
+                "Loaded persisted tenant-gone marker; five live 410s must re-confirm before any uninstall"
             );
         }
 

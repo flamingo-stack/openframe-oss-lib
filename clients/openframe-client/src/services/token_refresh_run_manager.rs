@@ -186,7 +186,7 @@ impl RefreshSchedule {
         Self::after(boot_clock::now(), Duration::ZERO)
     }
 
-    /// Sleep until due or `suspended()`, re-reading the boot clock every slice (tokio's `Instant` stops in sleep).
+    /// Sleep until due or `suspended()`, re-reading the boot clock every slice (tokio's `Instant` stops in sleep on macOS and Linux).
     async fn wait(&self, slice: Duration, suspended: impl Fn() -> bool) {
         let remaining = self.due.saturating_sub(boot_clock::now());
         if !remaining.is_zero() {
