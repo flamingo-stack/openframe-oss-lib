@@ -50,6 +50,22 @@ public class PackageManagerAvailability {
                 .anyMatch(PackageManagerState.MANAGEABLE::contains);
     }
 
+    // a manager updates a program only on a device where it runs; a device that never reported its managers counts as
+    // having it, as everywhere else in Software Management
+    public static boolean isPresentOn(Machine machine, PackageManagerType manager) {
+        Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
+        return reported == null || reported.get(manager) == PackageManagerState.PRESENT;
+    }
+
+    // a program can be adopted into a manager the device has or can still get
+    public boolean isAdoptableOn(Machine machine, PackageManagerType manager) {
+        if (!isEnabled(manager)) {
+            return false;
+        }
+        Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
+        return isEmpty(reported) || PackageManagerState.MANAGEABLE.contains(reported.get(manager));
+    }
+
     public void requireSoftwareManageable(Collection<String> machineIds, Collection<PackageManagerType> packageManagers) {
         List<Machine> machines = machines(machineIds);
         List<String> unmanageable = machines.stream()
@@ -88,7 +104,7 @@ public class PackageManagerAvailability {
         return machineRepository.findByTenantIdAndMachineIdIn(tenantId, new HashSet<>(machineIds));
     }
 
-    private boolean isEnabled(PackageManagerType manager) {
+    public boolean isEnabled(PackageManagerType manager) {
         return !packageManagerProperties.isDisabled(manager);
     }
 }

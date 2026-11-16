@@ -74,6 +74,7 @@ public class DeviceSoftwareReadModelQuery {
         row.setPackageFamilyNames(sw.getPackageFamilyNames());
         row.setSystemComponent(sw.getSystemComponent());
         row.setPackageMatch(sw.getPackageMatch());
+        row.setAdoptionMatch(sw.getAdoptionMatch());
         row.setType(type);
         row.setDevicesCount(sw.getDevicesCount());
         row.setVulnerabilitySummary(summary);

@@ -27,6 +27,8 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
     private static final String SOURCE = "source";
     private static final String MATCH_STATE = "packageMatch.state";
     private static final String MATCH_MANAGER = "packageMatch.manager";
+    private static final String ADOPTION_STATE = "adoptionMatch.state";
+    private static final String ADOPTION_MANAGER = "adoptionMatch.manager";
     private static final String TITLE_ID = "softwareTitleId";
     private static final String BREW_SOURCE = FleetSource.HOMEBREW_PACKAGES.getFleetName();
 
@@ -116,9 +118,18 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
                     withoutPolicy(titles).orOperator(
                             Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED),
                             Criteria.where(SOURCE).is(BREW_SOURCE).and(MATCH_STATE).ne(PackageMatchState.NO_PACKAGE)));
-            case NO_PACKAGE -> withoutPolicy(titles).and(MATCH_STATE).is(PackageMatchState.NO_PACKAGE);
-            case NEEDS_ADOPTION -> Criteria.where(TITLE_ID).in(List.of());
+            case NO_PACKAGE -> new Criteria().andOperator(
+                    withoutPolicy(titles).and(MATCH_STATE).is(PackageMatchState.NO_PACKAGE),
+                    new Criteria().norOperator(adoptable(titles)));
+            case NEEDS_ADOPTION -> new Criteria().andOperator(
+                    withoutPolicy(titles).and(MATCH_STATE).ne(PackageMatchState.MATCHED),
+                    adoptable(titles));
         };
+    }
+
+    private static Criteria adoptable(SoftwareTitleQuery titles) {
+        return Criteria.where(ADOPTION_STATE).is(PackageMatchState.MATCHED)
+                .and(ADOPTION_MANAGER).in(titles.getAdoptionManagers());
     }
 
     private static Criteria withoutPolicy(SoftwareTitleQuery titles) {

@@ -7,11 +7,16 @@ import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import com.openframe.data.document.rmm.software.FleetSource;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
+import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
+import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -26,6 +31,7 @@ import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,11 +45,18 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SoftwareCatalogStatusTest {
 
+    private static final String TENANT_ID = "t1";
+    private static final String MACHINE_ID = "m1";
+
     @Mock private PackageCatalogRepository catalogRepository;
     @Mock private SoftwarePackageMatcher packageMatcher;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private MachineRepository machineRepository;
+    @Mock private TenantIdProvider tenantIdProvider;
 
     private SoftwareCatalogStatus status() {
-        return new SoftwareCatalogStatus(catalogRepository, packageMatcher);
+        return new SoftwareCatalogStatus(catalogRepository, packageMatcher, packageManagerAvailability, machineRepository,
+                tenantIdProvider);
     }
 
     @Test
@@ -335,6 +348,179 @@ class SoftwareCatalogStatusTest {
                 .source(source)
                 .currentVersion(currentVersion)
                 .olderVersionsCount(older)
+                .build();
+    }
+
+    @Test
+    void apply_programWithOnlyAPackageToAdoptInto_needsAdoptionWithItsLatestAndNoManagingPackage() {
+        // setup
+        SoftwareResponse sevenZip = program("7-Zip", "24.08");
+        PackageCatalogEntry choco7zip = chocoPackage("7zip", "24.09");
+        stubMatch(sevenZip, PackageMatch.noPackage());
+        stubAdoptionMatch(sevenZip, PackageMatch.of(choco7zip));
+        when(packageManagerAvailability.isEnabled(PackageManagerType.CHOCO)).thenReturn(true);
+
+        // execution
+        status().apply(List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getLatestVersion,
+                        SoftwareResponse::getVersionStatus, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareSource.UNMANAGED, "24.09", SoftwareVersionStatus.OUTDATED,
+                        SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, choco7zip);
+    }
+
+    @Test
+    void apply_packageToAdoptIntoOfADisabledManager_noPackageFound() {
+        // setup
+        SoftwareResponse sevenZip = program("7-Zip", "24.08");
+        stubMatch(sevenZip, PackageMatch.noPackage());
+        stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+        when(packageManagerAvailability.isEnabled(PackageManagerType.CHOCO)).thenReturn(false);
+
+        // execution
+        status().apply(List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip.getAutoUpdate()).isEqualTo(SoftwareAutoUpdateStatus.NO_PACKAGE);
+        assertThat(sevenZip.getAdoptionPackage()).isNull();
+        assertThat(sevenZip.getLatestVersion()).isNull();
+    }
+
+    @Test
+    void apply_wingetPackageAndAPackageToAdoptInto_wingetManagesForTheTenant() {
+        // setup
+        SoftwareResponse sevenZip = program("7-Zip", "24.08");
+        PackageCatalogEntry winget7zip = wingetPackage("7zip.7zip", "24.09");
+        stubMatch(sevenZip, PackageMatch.of(winget7zip));
+        stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+
+        // execution
+        status().apply(List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip.getManagingPackage()).isSameAs(winget7zip);
+        assertThat(sevenZip.getAdoptionPackage()).isNull();
+        assertThat(sevenZip.getAutoUpdate()).isEqualTo(SoftwareAutoUpdateStatus.OFF);
+    }
+
+    @Test
+    void applyOnDevice_wingetRunsOnTheDevice_wingetManages() {
+        // setup
+        SoftwareResponse sevenZip = program("7-Zip", "24.08");
+        PackageCatalogEntry winget7zip = wingetPackage("7zip.7zip", "24.09");
+        stubDevice(Map.of(PackageManagerType.WINGET, PackageManagerState.PRESENT,
+                PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        stubMatch(sevenZip, PackageMatch.of(winget7zip));
+        stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip.getManagingPackage()).isSameAs(winget7zip);
+        assertThat(sevenZip.getSource()).isEqualTo(SoftwareSource.WINGET);
+        assertThat(sevenZip.getAdoptionPackage()).isNull();
+    }
+
+    @Test
+    void applyOnDevice_wingetDoesNotRunOnTheDevice_thePackageToAdoptIntoInstead() {
+        // setup
+        SoftwareResponse sevenZip = program("7-Zip", "24.08");
+        PackageCatalogEntry choco7zip = chocoPackage("7zip", "24.09");
+        Machine server = stubDevice(Map.of(PackageManagerType.WINGET, PackageManagerState.UNSUPPORTED,
+                PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        stubMatch(sevenZip, PackageMatch.of(wingetPackage("7zip.7zip", "24.09")));
+        stubAdoptionMatch(sevenZip, PackageMatch.of(choco7zip));
+        when(packageManagerAvailability.isAdoptableOn(server, PackageManagerType.CHOCO)).thenReturn(true);
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, choco7zip);
+    }
+
+    @Test
+    void applyOnDevice_wingetDoesNotRunAndNothingToAdoptInto_noPackageButTheLatestVersionIsKnown() {
+        // setup
+        SoftwareResponse chrome = program("Google Chrome", "141.0");
+        stubDevice(Map.of(PackageManagerType.WINGET, PackageManagerState.UNSUPPORTED));
+        stubMatch(chrome, PackageMatch.of(wingetPackage("Google.Chrome", "142.0")));
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(chrome));
+
+        // verifications
+        assertThat(chrome)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getLatestVersion,
+                        SoftwareResponse::getVersionStatus, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getManagingPackage)
+                .containsExactly(SoftwareSource.UNMANAGED, "142.0", SoftwareVersionStatus.OUTDATED,
+                        SoftwareAutoUpdateStatus.NO_PACKAGE, null);
+    }
+
+    @Test
+    void applyOnDevice_deviceThatNeverReportedItsManagers_wingetManages() {
+        // setup
+        SoftwareResponse chrome = program("Google Chrome", "141.0");
+        PackageCatalogEntry wingetChrome = wingetPackage("Google.Chrome", "142.0");
+        stubDevice(null);
+        stubMatch(chrome, PackageMatch.of(wingetChrome));
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(chrome));
+
+        // verifications
+        assertThat(chrome.getManagingPackage()).isSameAs(wingetChrome);
+    }
+
+    @Test
+    void applyOnDevice_unknownDevice_asForTheTenant() {
+        // setup
+        SoftwareResponse chrome = program("Google Chrome", "141.0");
+        PackageCatalogEntry wingetChrome = wingetPackage("Google.Chrome", "142.0");
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Optional.empty());
+        stubMatch(chrome, PackageMatch.of(wingetChrome));
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(chrome));
+
+        // verifications
+        assertThat(chrome.getManagingPackage()).isSameAs(wingetChrome);
+    }
+
+    private Machine stubDevice(Map<PackageManagerType, PackageManagerState> packageManagers) {
+        Machine device = new Machine();
+        device.setMachineId(MACHINE_ID);
+        device.setPackageManagers(packageManagers);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Optional.of(device));
+        return device;
+    }
+
+    private void stubAdoptionMatch(SoftwareResponse row, PackageMatch match) {
+        when(packageMatcher.matchForAdoption(anyList())).thenAnswer(invocation -> {
+            List<InstalledProgram> programs = invocation.getArgument(0);
+            Map<InstalledProgram, PackageMatch> matches = new IdentityHashMap<>();
+            programs.stream()
+                    .filter(program -> row.getName().equals(program.getName()))
+                    .forEach(program -> matches.put(program, match));
+            return matches;
+        });
+    }
+
+    private static PackageCatalogEntry chocoPackage(String id, String version) {
+        return PackageCatalogEntry.builder()
+                .manager(PackageManagerType.CHOCO)
+                .packageId(id)
+                .version(version)
                 .build();
     }
 

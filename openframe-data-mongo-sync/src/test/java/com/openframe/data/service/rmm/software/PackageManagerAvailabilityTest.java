@@ -223,6 +223,95 @@ class PackageManagerAvailabilityTest {
         when(machineRepository.findByTenantIdAndMachineIdIn(TENANT_ID, machineIds)).thenReturn(List.of(machines));
     }
 
+    @Test
+    void isPresentOn_deviceThatNeverReportedItsManagers_true() {
+        // setup
+        Machine machine = machine("m-old-agent", null);
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, WINGET);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isPresentOn_managerPresent_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, MISSING));
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, WINGET);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PackageManagerState.class, names = {"MISSING", "UNSUPPORTED", "UNKNOWN"})
+    void isPresentOn_managerNotPresent_false(PackageManagerState state) {
+        // setup
+        Machine machine = machine("m-server", Map.of(WINGET, state, CHOCO, PRESENT));
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, WINGET);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isPresentOn_managerTheDeviceDidNotReport_false() {
+        // setup
+        Machine machine = machine("m-server", Map.of(CHOCO, PRESENT));
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, WINGET);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PackageManagerState.class, names = {"PRESENT", "MISSING", "UNKNOWN"})
+    void isAdoptableOn_enabledManagerTheDeviceHasOrCanGet_true(PackageManagerState state) {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine machine = machine("m-server", Map.of(WINGET, UNSUPPORTED, CHOCO, state));
+
+        // execution
+        boolean result = availability.isAdoptableOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isAdoptableOn_managerUnsupportedOnTheDevice_false() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine machine = machine("m-arm", Map.of(WINGET, PRESENT, CHOCO, UNSUPPORTED));
+
+        // execution
+        boolean result = availability.isAdoptableOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isAdoptableOn_disabledManager_false() {
+        // setup
+        packageManagerProperties.setChocoEnabled(false);
+        Machine machine = machine("m-server", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT));
+
+        // execution
+        boolean result = availability.isAdoptableOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
     private static Machine machine(String machineId, Map<PackageManagerType, PackageManagerState> packageManagers) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);

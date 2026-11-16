@@ -7,11 +7,15 @@ import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import com.openframe.core.util.SoftwareVersions;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
+import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -22,7 +26,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
@@ -45,24 +51,53 @@ public class SoftwareCatalogStatus {
 
     private final PackageCatalogRepository catalogRepository;
     private final SoftwarePackageMatcher packageMatcher;
+    private final PackageManagerAvailability packageManagerAvailability;
+    private final MachineRepository machineRepository;
+    private final TenantIdProvider tenantIdProvider;
 
     // Runs after SoftwareAutoUpdateService: a policy's ON / OFF stays, a row without one gets what the catalog allows.
     public void apply(List<SoftwareResponse> rows) {
+        apply(rows, manager -> true, packageManagerAvailability::isEnabled);
+    }
+
+    // a manager counts on a device only where it runs: there winget's package gives way to the one to adopt into
+    public void applyOnDevice(String machineId, List<SoftwareResponse> rows) {
+        String tenantId = tenantIdProvider.getTenantId();
+        Optional<Machine> found = machineRepository.findByTenantIdAndMachineId(tenantId, machineId);
+        if (found.isEmpty()) {
+            apply(rows);
+            return;
+        }
+        Machine device = found.get();
+        apply(rows, manager -> PackageManagerAvailability.isPresentOn(device, manager),
+                manager -> packageManagerAvailability.isAdoptableOn(device, manager));
+    }
+
+    private void apply(List<SoftwareResponse> rows, Predicate<PackageManagerType> manages,
+                       Predicate<PackageManagerType> adopts) {
         if (rows == null || rows.isEmpty()) {
             return;
         }
         Map<String, PackageCatalogEntry> brewPackages = brewPackagesByToken(rows);
-        Map<SoftwareResponse, PackageMatch> matches = matches(rows);
-        rows.forEach(row -> apply(row, brewPackages, matches));
-    }
-
-    private Map<SoftwareResponse, PackageMatch> matches(List<SoftwareResponse> rows) {
         Map<InstalledProgram, SoftwareResponse> rowByProgram = new IdentityHashMap<>();
         rows.forEach(row -> rowByProgram.put(programOf(row), row));
-        Map<SoftwareResponse, PackageMatch> matches = new IdentityHashMap<>();
-        packageMatcher.match(List.copyOf(rowByProgram.keySet()))
-                .forEach((program, match) -> matches.put(rowByProgram.get(program), match));
-        return matches;
+        List<InstalledProgram> programs = List.copyOf(rowByProgram.keySet());
+        Map<InstalledProgram, PackageMatch> matches = packageMatcher.match(programs);
+        Map<InstalledProgram, PackageMatch> adoptionMatches = packageMatcher.matchForAdoption(programs);
+        rowByProgram.forEach((program, row) -> {
+            PackageMatch match = matches.get(program);
+            PackageCatalogEntry managing = entryOf(match, manages);
+            PackageCatalogEntry adoption = entryOf(adoptionMatches.get(program), adopts);
+            apply(row, brewPackages, match, managing, adoption);
+        });
+    }
+
+    private static PackageCatalogEntry entryOf(PackageMatch match, Predicate<PackageManagerType> counts) {
+        if (match == null || !match.isMatched()) {
+            return null;
+        }
+        PackageCatalogEntry entry = match.getEntry();
+        return counts.test(entry.getManager()) ? entry : null;
     }
 
     static InstalledProgram programOf(SoftwareResponse row) {
@@ -75,18 +110,20 @@ public class SoftwareCatalogStatus {
                 .packageFamilyNames(row.getPackageFamilyNames() == null ? List.of() : row.getPackageFamilyNames())
                 .systemComponent(Boolean.TRUE.equals(row.getSystemComponent()))
                 .storedMatch(row.getPackageMatch())
+                .storedAdoptionMatch(row.getAdoptionMatch())
                 .build();
     }
 
-    private static void apply(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages,
-                              Map<SoftwareResponse, PackageMatch> matches) {
-        PackageMatch match = matches.get(row);
+    private static void apply(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages, PackageMatch match,
+                              PackageCatalogEntry managing, PackageCatalogEntry adoption) {
         if (isBrewPackage(row)) {
             applyBrewPackage(row, brewPackages);
-        } else if (match != null) {
-            applyMatch(row, match);
+        } else if (managing != null) {
+            applyManagingPackage(row, managing);
+        } else if (adoption != null) {
+            applyAdoptionPackage(row, adoption);
         } else {
-            applyLatest(row, null);
+            applyNoPackage(row, match);
         }
     }
 
@@ -102,21 +139,34 @@ public class SoftwareCatalogStatus {
     }
 
     // winget updates a program it matches whoever installed it, so a match alone makes the program manageable
-    private static void applyMatch(SoftwareResponse row, PackageMatch match) {
-        PackageCatalogEntry entry = match.getEntry();
-        String latest = match.isMatched() ? versionOf(entry) : null;
+    private static void applyManagingPackage(SoftwareResponse row, PackageCatalogEntry entry) {
+        String latest = versionOf(entry);
         applyLatest(row, latest);
-        if (match.isMatched()) {
-            SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
-            row.setSource(source);
-            row.setManagingPackage(entry);
-        }
-        if (row.getAutoUpdate() != null) {
-            return;
-        }
-        if (match.isMatched()) {
+        SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
+        row.setSource(source);
+        row.setManagingPackage(entry);
+        if (row.getAutoUpdate() == null) {
             row.setAutoUpdate(SoftwareAutoUpdateStatus.OFF);
-        } else if (match.hasNoPackage()) {
+        }
+    }
+
+    // the package's manager updates only what it installed: nothing manages the program until it is adopted
+    private static void applyAdoptionPackage(SoftwareResponse row, PackageCatalogEntry entry) {
+        String latest = versionOf(entry);
+        applyLatest(row, latest);
+        row.setAdoptionPackage(entry);
+        if (row.getAutoUpdate() == null) {
+            row.setAutoUpdate(SoftwareAutoUpdateStatus.NEEDS_ADOPTION);
+        }
+    }
+
+    // a package whose manager does not count here still tells the latest version; several packages leave it unknown
+    private static void applyNoPackage(SoftwareResponse row, PackageMatch match) {
+        boolean matched = match != null && match.isMatched();
+        String latest = matched ? versionOf(match.getEntry()) : null;
+        applyLatest(row, latest);
+        boolean noPackage = match != null && (matched || match.hasNoPackage());
+        if (row.getAutoUpdate() == null && noPackage) {
             row.setAutoUpdate(SoftwareAutoUpdateStatus.NO_PACKAGE);
         }
     }

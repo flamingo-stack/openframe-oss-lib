@@ -67,8 +67,8 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
-import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -633,7 +633,7 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> rows = deviceSoftware(machineId, filter, search);
         // the filter reads source and auto-update, so they are set on every row, not only on the page
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
-        catalogStatus.apply(rows);
+        catalogStatus.applyOnDevice(machineId, rows);
         List<SoftwareResponse> chosen = rows.stream()
                 .filter(row -> matchesCatalogFilter(row, filter))
                 .toList();
@@ -657,7 +657,7 @@ public class SoftwareInventoryService {
     public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
         List<SoftwareResponse> rows = deviceSoftware(machineId, null, search);
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
-        catalogStatus.apply(rows);
+        catalogStatus.applyOnDevice(machineId, rows);
         return softwareFilters(rows);
     }
 
@@ -873,15 +873,11 @@ public class SoftwareInventoryService {
         return titleRow.getSource() == SoftwareSource.WINGET ? SoftwareSource.WINGET : installedBy(fleetSource);
     }
 
-    // winget manages a program only on a device where it runs; a device that never reported its managers counts as
-    // having it, as everywhere else in Software Management
     private static SoftwareSource managedByOn(Machine device, SoftwareSource managedBy) {
         if (managedBy != SoftwareSource.WINGET) {
             return managedBy;
         }
-        Map<PackageManagerType, PackageManagerState> reported = device.getPackageManagers();
-        boolean hasWinget = reported == null || reported.get(PackageManagerType.WINGET) == PackageManagerState.PRESENT;
-        return hasWinget ? managedBy : null;
+        return PackageManagerAvailability.isPresentOn(device, PackageManagerType.WINGET) ? managedBy : null;
     }
 
     private List<HostVersion> hostVersionsOf(SoftwareTitleVersion version) {

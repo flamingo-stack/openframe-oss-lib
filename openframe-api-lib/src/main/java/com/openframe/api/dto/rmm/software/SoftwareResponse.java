@@ -38,5 +38,8 @@ public class SoftwareResponse {
     private List<String> packageFamilyNames;
     private Boolean systemComponent;
     private SoftwarePackageMatch packageMatch;
+    private SoftwarePackageMatch adoptionMatch;
     private PackageCatalogEntry managingPackage;
+    // the package the program can be adopted into; set only where no package manages it
+    private PackageCatalogEntry adoptionPackage;
 }
