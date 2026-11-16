@@ -152,7 +152,7 @@ public class SoftwareActionService {
                 .findByTenantIdAndStatusAndTriggerAndTimeReference(tenantId, ScriptStatus.ACTIVE,
                         ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)
                 .stream()
-                .filter(schedule -> aheadAtDeviceTime(schedule, now))
+                .filter(schedule -> isAheadAtDeviceTime(schedule, now))
                 .forEach(upcoming::add);
         List<SoftwareActionResponse> rows = new ArrayList<>();
         for (SoftwareSchedule schedule : upcoming) {
@@ -187,7 +187,7 @@ public class SoftwareActionService {
     }
 
     // a device-time schedule keeps no nextRunAt: its one-off run is ahead until the time passed in the last time zone
-    private static boolean aheadAtDeviceTime(SoftwareSchedule schedule, Instant now) {
+    private static boolean isAheadAtDeviceTime(SoftwareSchedule schedule, Instant now) {
         Instant startAt = schedule.getStartAt();
         if (startAt == null) {
             return false;

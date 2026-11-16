@@ -89,9 +89,7 @@ public class PackageAutoUpdateRetry {
             return;
         }
         Instant dueAt = Instant.now().plusSeconds(backoffSeconds);
-        PackageUpdateDeliverySeed seed = PackageUpdateWire.seed(machineId, requestId, request.getSource(),
-                request.getPackageManager(), request.getPackageName(), request.getBrewPackageType(), request.getMode(),
-                request.getForceCountdownSeconds(), request.getDeadlineSeconds());
+        PackageUpdateDeliverySeed seed = PackageUpdateWire.seed(machineId, request);
         deliveryDispatcher.schedule(seed, dueAt);
         int retries = state.getRetries() + 1;
         state.setRetries(retries);

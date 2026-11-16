@@ -80,9 +80,11 @@ class PackageUpdateWireFormatTest {
         PackageUpdateDeliverySpec spec = new PackageUpdateDeliverySpec();
 
         DeliveryRequest<PackageUpdateMessage> force = spec.request(PackageUpdateWire.deadlineForce("m1", request));
-        DeliveryRequest<PackageUpdateMessage> wait = spec.request(PackageUpdateWire.seed("m1", "req-1",
-                PackageUpdateSource.AUTO, PackageManagerType.WINGET, "Google.Chrome", null, PackageUpdateMode.WAIT, 300,
-                604800L));
+        PackageUpdateRequest waitRequest = PackageUpdateRequest.builder()
+                .requestId("req-1").source(PackageUpdateSource.AUTO)
+                .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome")
+                .mode(PackageUpdateMode.WAIT).forceCountdownSeconds(300).deadlineSeconds(604800L).build();
+        DeliveryRequest<PackageUpdateMessage> wait = spec.request(PackageUpdateWire.seed("m1", waitRequest));
 
         assertThat(force.getTargetId()).isEqualTo("req-1:deadline");     // never takes over the WAIT's row
         assertThat(wait.getTargetId()).isEqualTo("req-1");

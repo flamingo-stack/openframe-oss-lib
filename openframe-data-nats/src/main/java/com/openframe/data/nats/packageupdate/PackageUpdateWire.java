@@ -27,31 +27,33 @@ public class PackageUpdateWire {
         return ref.id(packageName).build();
     }
 
-    public PackageUpdateDeliverySeed seed(String machineId, String requestId, PackageUpdateSource source,
-                                          PackageManagerType manager, String packageName, BrewPackageType brewPackageType,
-                                          PackageUpdateMode mode, Integer forceCountdownSeconds,
-                                          Long deadlineSeconds) {
+    public PackageUpdateDeliverySeed seed(String machineId, PackageUpdateRequest request) {
+        PackageUpdateMode mode = request.getMode();
+        UpdateSource source = source(request.getSource());
+        PackageReference packageRef =
+                reference(request.getPackageManager(), request.getPackageName(), request.getBrewPackageType());
         return PackageUpdateDeliverySeed.builder()
                 .machineId(machineId)
-                .requestId(requestId)
-                .source(source(source))
-                .packageRef(reference(manager, packageName, brewPackageType))
+                .requestId(request.getRequestId())
+                .source(source)
+                .packageRef(packageRef)
                 .mode(mode)
-                .countdownSeconds(mode == PackageUpdateMode.FORCE ? forceCountdownSeconds : null)
-                .deadlineSeconds(mode == PackageUpdateMode.WAIT ? deadlineSeconds : null)
+                .countdownSeconds(mode == PackageUpdateMode.FORCE ? request.getForceCountdownSeconds() : null)
+                .deadlineSeconds(mode == PackageUpdateMode.WAIT ? request.getDeadlineSeconds() : null)
                 .build();
     }
 
     public PackageUpdateDeliverySeed deadlineForce(String machineId, PackageUpdateRequest request) {
-        return seed(machineId, request.getRequestId(), request.getSource(), request.getPackageManager(),
-                request.getPackageName(), request.getBrewPackageType(), PackageUpdateMode.FORCE,
-                request.getForceCountdownSeconds(), null)
+        return seed(machineId, request)
                 .toBuilder()
+                .mode(PackageUpdateMode.FORCE)
+                .countdownSeconds(request.getForceCountdownSeconds())
+                .deadlineSeconds(null)
                 .deadlineForce(true)
                 .build();
     }
 
-    // the agent keeps a zero countdown only for an order the device user started: any other origin is raised to its minimum
+    // origin USER is what keeps the countdown at zero: the agent raises it to its minimum for any other origin
     public PackageUpdateDeliverySeed approvedForce(String machineId, PackageUpdateRequest request) {
         PackageUpdateDeliverySeed force = deadlineForce(machineId, request);
         UpdateSource.Kind kind = force.getSource().getKind();
