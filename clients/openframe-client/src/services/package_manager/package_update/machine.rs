@@ -1,14 +1,16 @@
 use std::path::Path;
 
 use async_trait::async_trait;
+use tracing::warn;
 
 use super::close;
 use super::managers::{self, Probe, QueryError, UpgradeOutcome};
-use crate::models::PackageRef;
+use crate::models::{PackageRef, CHAT_TOOL_AGENT_ID};
 use crate::platform::process_snapshot::RunningProcess;
 use crate::platform::{app_close, user_session};
 use crate::services::package_manager::update_gate::{self, AppIdentity, Undetermined};
 use crate::services::package_manager::{ManagerId, Presence};
+use crate::services::ToolRunManager;
 
 /// Everything the worker asks of the device and its package managers.
 #[async_trait]
@@ -25,10 +27,14 @@ pub(super) trait Machine: Send + Sync {
     async fn reread(&self, package: &PackageRef) -> Result<Probe, QueryError>;
     async fn reopen(&self, image: &Path, session: Option<u32>, user: Option<&str>) -> bool;
     fn session_user(&self, session: Option<u32>) -> Option<String>;
+    /// Starts the chat if it is not running, so the user sees the prompt; returns at once.
+    fn wake_chat(&self);
 }
 
 /// The device the agent runs on.
-pub(super) struct System;
+pub(super) struct System {
+    pub(super) tool_run_manager: ToolRunManager,
+}
 
 #[async_trait]
 impl Machine for System {
@@ -70,5 +76,18 @@ impl Machine for System {
 
     fn session_user(&self, session: Option<u32>) -> Option<String> {
         user_session::session_user(session)
+    }
+
+    // Spawned like the remote-access wake, so a launch that waits for a console user never stalls the worker.
+    fn wake_chat(&self) {
+        let tool_run_manager = self.tool_run_manager.clone();
+        tokio::spawn(async move {
+            if let Err(e) = tool_run_manager
+                .ensure_gui_app_running(CHAT_TOOL_AGENT_ID)
+                .await
+            {
+                warn!("Failed to start the chat app for an update prompt: {:#}", e);
+            }
+        });
     }
 }

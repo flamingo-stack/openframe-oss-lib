@@ -20,7 +20,7 @@ use tracing::{info, warn};
 use crate::models::{DeliveryRef, DeliveryResultMessage};
 use crate::services::delivery_results::DeliveryResults;
 use crate::services::tool_run_manager::ClientUpdatePending;
-use crate::services::AgentConfigurationService;
+use crate::services::{AgentConfigurationService, ToolRunManager};
 use crate::utils::in_progress::InProgress;
 use crate::utils::latch::LatchView;
 use machine::{Machine, System};
@@ -62,10 +62,11 @@ impl PackageUpdateRunManager {
         config: AgentConfigurationService,
         signals: RestartSignals,
         package_upgrades: InProgress,
+        tool_run_manager: ToolRunManager,
     ) -> Self {
         Self {
             worker: Arc::new(Worker {
-                machine: Box::new(System),
+                machine: Box::new(System { tool_run_manager }),
                 orders,
                 status,
                 results,

@@ -118,6 +118,8 @@ impl Machine for Fake {
     fn session_user(&self, _session: Option<u32>) -> Option<String> {
         Some("jane".to_string())
     }
+
+    fn wake_chat(&self) {}
 }
 
 fn found(state: ProbeState, installed: &str, available: &str) -> Result<Found, QueryError> {

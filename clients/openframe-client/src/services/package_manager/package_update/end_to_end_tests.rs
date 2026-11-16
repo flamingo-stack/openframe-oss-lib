@@ -188,6 +188,8 @@ impl Machine for Fake {
     fn session_user(&self, _session: Option<u32>) -> Option<String> {
         None
     }
+
+    fn wake_chat(&self) {}
 }
 
 /// The agent's package-update path against a real NATS server: listener, ledger, outbox and worker, with a fake

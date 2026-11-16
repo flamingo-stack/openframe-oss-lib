@@ -575,6 +575,7 @@ impl Client {
                     agent_restart: agent_restart.view(),
                 },
                 package_upgrades.clone(),
+                tool_run_manager.clone(),
             );
             PackageUpdate { listener, manager }
         });
