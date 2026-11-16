@@ -225,7 +225,7 @@ fn boot_clock_keeps_pace_with_instant() {
 async fn wait_returns_once_due_passes() {
     let schedule = RefreshSchedule::after(boot_clock::now(), Duration::from_millis(50));
     let started = Instant::now();
-    schedule.wait(Duration::from_millis(10)).await;
+    schedule.wait(Duration::from_millis(10), || false).await;
     assert!(started.elapsed() >= Duration::from_millis(50));
 }
 
@@ -236,8 +236,28 @@ async fn wait_returns_at_once_when_already_due() {
         Duration::ZERO,
     );
     let started = Instant::now();
-    schedule.wait(PROD.wait_slice).await;
+    schedule.wait(PROD.wait_slice, || false).await;
     assert!(started.elapsed() < Duration::from_millis(100));
+}
+
+#[tokio::test]
+async fn wait_returns_once_suspended_instead_of_waiting_out_the_schedule() {
+    let schedule = RefreshSchedule::after(boot_clock::now(), Duration::from_secs(3600));
+    let suspended = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = suspended.clone();
+    tokio::spawn(async move {
+        sleep(Duration::from_millis(50)).await;
+        flag.store(true, std::sync::atomic::Ordering::Release);
+    });
+
+    timeout(
+        Duration::from_secs(2),
+        schedule.wait(Duration::from_millis(10), || {
+            suspended.load(std::sync::atomic::Ordering::Acquire)
+        }),
+    )
+    .await
+    .expect("wait ignored the pause");
 }
 
 /// Minimal HTTP/1.1 token endpoint: every request gets a token minted `issued_offset` seconds from now.
@@ -392,4 +412,33 @@ async fn real_loop_goes_quiet_once_the_token_endpoint_keeps_answering_403() {
 
     assert_eq!(server.requests().len(), 6, "token requests after the pause");
     assert!(manager.deactivation.is_suspended());
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[tokio::test]
+async fn real_loop_hands_a_pause_that_starts_mid_wait_to_the_probe() {
+    use crate::test_support::wait_until;
+
+    let server = mock_auth_server(TTL, 0).await;
+    let dir = tempfile::tempdir().unwrap();
+    let manager = registered_manager(&dir, server.url.clone()).await;
+    manager.start();
+    // Written only after the start refresh's 200 was recorded, so that 200 cannot end the pause below.
+    let shared_token = dir.path().join("secured").join("shared_token.enc");
+    wait_until(|| shared_token.exists()).await;
+
+    for _ in 0..5 {
+        manager
+            .deactivation
+            .on_gateway_status(reqwest::StatusCode::FORBIDDEN)
+            .await;
+    }
+    // The loop took the first probe delay, so the next one is doubled.
+    wait_until(|| manager.deactivation.probe_backoff() == Some(Duration::from_secs(120))).await;
+
+    assert_eq!(
+        server.hits().len(),
+        1,
+        "a refresh went out beside the probe"
+    );
 }

@@ -141,6 +141,12 @@ impl DeactivationService {
         delay
     }
 
+    /// The probe delay the next [`Self::next_probe_delay`] returns, or `None` while the state is locked.
+    #[cfg(test)]
+    pub(crate) fn probe_backoff(&self) -> Option<Duration> {
+        self.state.try_lock().ok().map(|st| st.probe_backoff)
+    }
+
     /// Spawn the supervisor that executes deactivation decisions off the detection path: stop /
     /// restart the managed tools and launch the detached self-uninstall. Call once, after the
     /// tool run manager exists. No-op if already started.

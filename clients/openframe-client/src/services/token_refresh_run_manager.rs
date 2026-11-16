@@ -127,7 +127,14 @@ impl TokenRefreshRunManager {
                     continue;
                 }
 
-                schedule.wait(timing.wait_slice).await;
+                schedule
+                    .wait(timing.wait_slice, || deactivation.is_suspended())
+                    .await;
+                // Paused mid-wait (e.g. by NATS reauth) — hand control to the backoff probe above.
+                if deactivation.is_suspended() {
+                    schedule = RefreshSchedule::now();
+                    continue;
+                }
 
                 // Retry on the short interval until a refresh succeeds.
                 loop {
@@ -179,16 +186,15 @@ impl RefreshSchedule {
         Self::after(boot_clock::now(), Duration::ZERO)
     }
 
-    /// Sleep until due, in slices: tokio timers run on `Instant`, which stands still through sleep on macOS and
-    /// Linux, so the boot clock is re-read after every slice and a nap costs at most one slice of lateness.
-    async fn wait(&self, slice: Duration) {
+    /// Sleep until due or `suspended()`, re-reading the boot clock every slice (tokio's `Instant` stops in sleep).
+    async fn wait(&self, slice: Duration, suspended: impl Fn() -> bool) {
         let remaining = self.due.saturating_sub(boot_clock::now());
         if !remaining.is_zero() {
             debug!("Next proactive token refresh in {}s", remaining.as_secs());
         }
         loop {
             let remaining = self.due.saturating_sub(boot_clock::now());
-            if remaining.is_zero() {
+            if remaining.is_zero() || suspended() {
                 return;
             }
             sleep(remaining.min(slice)).await;
