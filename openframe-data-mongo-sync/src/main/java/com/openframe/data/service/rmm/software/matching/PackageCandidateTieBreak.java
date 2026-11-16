@@ -24,7 +24,8 @@ class PackageCandidateTieBreak {
     private static final String VERSION_SEGMENTS = "\\d+(?:_\\d+)?(?:\\.\\d+(?:_\\d+)?)*";
     private static final String VARIANT_WORDS = "beta|rc|nightly|canary|preview|prerelease|dev|alpha|insiders|eap"
             + "|arm64|x86|x64|msi|exe|portable|msix|cn|lite|ltsr|lts|hotdesking|essentials|shared|bundle";
-    private static final String LOCALE_CODES = "[a-z]{2,3}(?:-[a-z]{2,4})?|ca-valencia";
+    // case decides: winget writes a locale as "af" or "en-US", so ".ESR" and ".Pro" are editions
+    private static final String LOCALE_CODES = "[a-z]{2,3}(?:-[A-Z]{2})?|ca-valencia";
 
     private static final Pattern VERSION_IN_NAME =
             Pattern.compile("(?<![a-z\\d_])v?(\\d+(?:\\.\\d+)*)(?!\\d|[- ]?bit)", Pattern.CASE_INSENSITIVE);
@@ -33,7 +34,7 @@ class PackageCandidateTieBreak {
             "\\.(" + VERSION_SEGMENTS + ")(?:\\.(?:" + VARIANT_WORDS + "))*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern VERSION_SUFFIX = Pattern.compile("\\d+(?:_\\d+)?(?:\\..*)?");
     private static final Pattern VARIANT_SUFFIX = Pattern.compile(
-            "(?:" + VARIANT_WORDS + "|" + LOCALE_CODES + ")(?:\\..*)?", Pattern.CASE_INSENSITIVE);
+            "(?:(?i:" + VARIANT_WORDS + ")|" + LOCALE_CODES + ")(?:\\..*)?");
     private static final Pattern ARCHITECTURE_WORD = Pattern.compile("\\b(?:x64|x86|arm64)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern PERSONAL_EDITION = Pattern.compile("\\(personal\\)", Pattern.CASE_INSENSITIVE);
     private static final String FREE_EDITION_SUFFIX = ".Free";

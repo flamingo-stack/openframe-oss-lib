@@ -83,6 +83,19 @@ class PackageCandidateTieBreakTest {
     }
 
     @ParameterizedTest
+    @MethodSource("basesNextToShortEditionsTheNameNames")
+    void narrow_shortEditionNamedInTheName_allCandidates(String programName, List<String> ids) {
+        // setup
+        List<PackageCatalogEntry> candidates = packages(ids);
+
+        // execution
+        List<PackageCatalogEntry> narrowed = PackageCandidateTieBreak.narrow(programName, candidates);
+
+        // verifications
+        assertThat(narrowed).isEqualTo(candidates);
+    }
+
+    @ParameterizedTest
     @MethodSource("unrelatedPackages")
     void narrow_unrelatedPackages_allCandidates(String programName, List<String> ids) {
         // setup
@@ -219,7 +232,18 @@ class PackageCandidateTieBreakTest {
                         "Duplicati.Duplicati"),
                 Arguments.of("Mozilla Firefox (x64 en-US)",
                         List.of("Mozilla.Firefox", "Mozilla.Firefox.af", "Mozilla.Firefox.en-GB", "Mozilla.Firefox.MSIX"),
+                        "Mozilla.Firefox"),
+                Arguments.of("Mozilla Firefox (x64 en-US)",
+                        List.of("Mozilla.Firefox", "Mozilla.Firefox.ast", "Mozilla.Firefox.ca-valencia"),
                         "Mozilla.Firefox"));
+    }
+
+    private static Stream<Arguments> basesNextToShortEditionsTheNameNames() {
+        return Stream.of(
+                Arguments.of("Mozilla Firefox ESR (x64 en-US)", List.of("Mozilla.Firefox", "Mozilla.Firefox.ESR")),
+                Arguments.of("DJI Assistant 2 (DJI FPV series) version V2.1.0.11",
+                        List.of("DJI.DJIAssistant2.FPV", "DJI.DJIAssistant2")),
+                Arguments.of("1Password CLI", List.of("AgileBits.1Password", "AgileBits.1Password.CLI")));
     }
 
     private static Stream<Arguments> unrelatedPackages() {
