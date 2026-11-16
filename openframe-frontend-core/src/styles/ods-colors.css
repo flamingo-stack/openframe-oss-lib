@@ -683,6 +683,22 @@
   --ods-accent: var(--ods-system-greys-white);
 }
 
+[data-app-type='security-hub'] {
+  --color-accent-primary: var(--ods-attention-red-error);
+  --color-accent-hover: var(--ods-attention-red-error-hover);
+  --color-accent-active: var(--ods-attention-red-error-action);
+  --color-accent-secondary: var(--ods-attention-red-error-secondary);
+  --color-accent-secondary-hover: var(--ods-attention-red-error-secondary-hover);
+  --color-accent-secondary-active: var(--ods-attention-red-error-secondary-action);
+  --color-accent-focus: var(--ods-attention-red-error);
+  --color-focus-ring: var(--ods-attention-red-error);
+  --color-focus-visible: var(--ods-attention-red-error);
+  --color-link: var(--ods-flamingo-cyan-base);
+  --color-link-hover: var(--ods-flamingo-cyan-hover);
+  --ods-current: var(--ods-attention-red-error);
+  --ods-accent: var(--ods-attention-red-error);
+}
+
 [data-app-type='company-hub'] {
   --color-accent-primary: var(--ods-attention-red-error);
   --color-accent-hover: var(--ods-attention-red-error-hover);

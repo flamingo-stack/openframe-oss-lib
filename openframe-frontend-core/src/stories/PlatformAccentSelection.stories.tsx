@@ -24,6 +24,7 @@ const PLATFORMS = [
   { appType: 'flamingo', label: 'Flamingo' },
   { appType: 'people-hub', label: 'People Hub' },
   { appType: 'coding-hub', label: 'Coding Hub' },
+  { appType: 'security-hub', label: 'Security Hub' },
 ] as const;
 
 const now = Date.now();
