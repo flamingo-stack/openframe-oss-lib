@@ -41,6 +41,9 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                         .append("packageFamilyNameLists", new Document("$addToSet", orEmpty("$packageFamilyNames")))
                         .append("installerTypeLists", new Document("$addToSet", orEmpty("$installerTypes")))
                         .append("wingetIds", new Document("$addToSet", "$wingetId"))
+                        .append("bundleIdentifier", new Document("$min", nonBlankOrRemove("$bundleIdentifier")))
+                        .append("appFileNameLists", new Document("$addToSet", orEmpty("$appFileNames")))
+                        .append("topLevelApp", new Document("$max", "$topLevelApp"))
                         .append("systemComponentReported", new Document("$sum", new Document("$cond",
                                 List.of(new Document("$eq", List.of(new Document("$type", "$systemComponent"), "bool")), 1, 0))))
                         .append("systemComponentSet", new Document("$sum", new Document("$cond",
@@ -59,7 +62,10 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                         .append("arpKeys", union("$arpKeyLists"))
                         .append("packageFamilyNames", union("$packageFamilyNameLists"))
                         .append("installerTypes", union("$installerTypeLists"))
-                        .append("wingetIds", 1));
+                        .append("wingetIds", 1)
+                        .append("bundleIdentifier", 1)
+                        .append("appFileNames", union("$appFileNameLists"))
+                        .append("topLevelApp", 1));
         List<Document> versionCounts = List.of(
                 new Document("$unwind", "$versions"),
                 new Document("$match", new Document("versions", new Document("$type", "string"))),
@@ -138,13 +144,17 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
         List<String> packageFamilyNames = strings(doc, "packageFamilyNames");
         List<String> installerTypes = strings(doc, "installerTypes");
         List<String> wingetIds = strings(doc, "wingetIds");
+        String bundleIdentifier = doc.getString("bundleIdentifier");
+        List<String> appFileNames = strings(doc, "appFileNames");
+        Boolean topLevelApp = doc.getBoolean("topLevelApp");
         int reported = intValue(doc.get("systemComponentReported"));
         int set = intValue(doc.get("systemComponentSet"));
         boolean systemComponent = reported > 0 && reported == set;
         Map<String, Integer> devicesByVersion = versionCounts.stream()
                 .collect(Collectors.toMap(count -> count.getString("_id"), count -> intValue(count.get("devices"))));
         return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
-                arpKeys, packageFamilyNames, installerTypes, wingetIds, systemComponent, devicesByVersion);
+                arpKeys, packageFamilyNames, installerTypes, wingetIds, bundleIdentifier, appFileNames, topLevelApp,
+                systemComponent, devicesByVersion);
     }
 
     private static CveRollup toCveRollup(Document doc) {

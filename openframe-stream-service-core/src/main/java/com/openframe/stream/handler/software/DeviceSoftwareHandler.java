@@ -3,6 +3,7 @@ package com.openframe.stream.handler.software;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -27,6 +28,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.isSnapshotRead;
@@ -41,6 +44,10 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
 
     static final Duration SNAPSHOT_HOST_WINDOW = Duration.ofHours(24);
     static final Duration SNAPSHOT_UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
+
+    private static final Pattern APP_PATH = Pattern.compile("(?:.*/)?([^/]+)\\.app", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TOP_LEVEL_APP_PATH = Pattern.compile(
+            "(/Users/[^/]+)?/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
 
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -149,6 +156,11 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
             deviceSoftware.setSystemComponent(systemComponentOf(title));
             deviceSoftware.setWingetId(firstOf(title, HostSoftwareInstalledVersion::getWingetId));
+            boolean app = FleetSource.of(title.getSource()) == FleetSource.APPS;
+            List<String> appPaths = app ? installedPathsOf(title) : List.of();
+            deviceSoftware.setBundleIdentifier(app ? title.getBundleIdentifier() : null);
+            deviceSoftware.setAppFileNames(appFileNamesOf(appPaths));
+            deviceSoftware.setTopLevelApp(topLevelAppOf(appPaths));
             deviceSoftware.setVulnerabilities(vulnerabilities);
             deviceSoftware.setUpdatedAt(now);
             if (newRow) {
@@ -194,6 +206,33 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         List<Boolean> flags = installedVersionsOf(title).stream()
                 .map(HostSoftwareInstalledVersion::getSystemComponent).filter(Objects::nonNull).toList();
         return flags.isEmpty() ? null : flags.stream().allMatch(Boolean::booleanValue);
+    }
+
+    private static List<String> installedPathsOf(HostSoftwareTitle title) {
+        return installedVersionsOf(title).stream()
+                .map(HostSoftwareInstalledVersion::getInstalledPaths)
+                .filter(Objects::nonNull)
+                .flatMap(List::stream)
+                .filter(path -> !isBlank(path))
+                .toList();
+    }
+
+    private static List<String> appFileNamesOf(List<String> installedPaths) {
+        return installedPaths.stream()
+                .map(APP_PATH::matcher)
+                .filter(Matcher::matches)
+                .map(appPath -> appPath.group(1))
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    // null when Fleet sent no path: unknown, which is not the same as nested
+    private static Boolean topLevelAppOf(List<String> installedPaths) {
+        if (installedPaths.isEmpty()) {
+            return null;
+        }
+        return installedPaths.stream().anyMatch(path -> TOP_LEVEL_APP_PATH.matcher(path).matches());
     }
 
     private static List<HostSoftwareInstalledVersion> installedVersionsOf(HostSoftwareTitle title) {

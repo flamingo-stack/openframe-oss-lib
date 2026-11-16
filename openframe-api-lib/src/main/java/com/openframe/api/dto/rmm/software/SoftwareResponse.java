@@ -35,6 +35,8 @@ public class SoftwareResponse {
     private FleetSource fleetSource;
     private String upgradeCode;
     private String bundleIdentifier;
+    private List<String> appFileNames;
+    private Boolean topLevelApp;
     private List<String> productCodes;
     private List<String> packageFamilyNames;
     private Boolean systemComponent;

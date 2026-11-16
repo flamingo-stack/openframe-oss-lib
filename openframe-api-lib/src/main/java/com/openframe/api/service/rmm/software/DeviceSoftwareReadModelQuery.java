@@ -73,6 +73,9 @@ public class DeviceSoftwareReadModelQuery {
         row.setProductCodes(sw.getArpKeys());
         row.setPackageFamilyNames(sw.getPackageFamilyNames());
         row.setSystemComponent(sw.getSystemComponent());
+        row.setBundleIdentifier(sw.getBundleIdentifier());
+        row.setAppFileNames(sw.getAppFileNames());
+        row.setTopLevelApp(sw.getTopLevelApp());
         row.setPackageMatch(sw.getPackageMatch());
         row.setAdoptionMatch(sw.getAdoptionMatch());
         row.setType(type);

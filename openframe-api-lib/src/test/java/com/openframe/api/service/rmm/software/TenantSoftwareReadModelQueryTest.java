@@ -432,6 +432,22 @@ class TenantSoftwareReadModelQueryTest {
         assertThat(row.getPackageMatch()).isEqualTo(stored);
     }
 
+    @Test
+    void get_macApp_carriesItsBundleIdAppFileNamesAndTopLevelFlag() {
+        // setup
+        Software slack = Software.builder().tenantId(TENANT).softwareTitleId(8L).name("Slack").source("apps")
+                .bundleIdentifier("com.tinyspeck.slackmacgap").appFileNames(List.of("Slack")).topLevelApp(true).build();
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 8L)).thenReturn(Optional.of(slack));
+
+        // execution
+        SoftwareResponse row = query.get(TENANT, "8");
+
+        // verifications
+        assertThat(row.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(row.getAppFileNames()).containsExactly("Slack");
+        assertThat(row.getTopLevelApp()).isTrue();
+    }
+
     private static Stream<Arguments> sourcesAndTheirQuery() {
         return Stream.of(
                 Arguments.of(List.of(SoftwareSource.WINGET), Set.of("winget_packages"), true, false),

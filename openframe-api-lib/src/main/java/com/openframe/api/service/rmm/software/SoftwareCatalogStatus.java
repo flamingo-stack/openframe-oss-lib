@@ -110,6 +110,9 @@ public class SoftwareCatalogStatus {
                 .productCodes(row.getProductCodes() == null ? List.of() : row.getProductCodes())
                 .packageFamilyNames(row.getPackageFamilyNames() == null ? List.of() : row.getPackageFamilyNames())
                 .systemComponent(Boolean.TRUE.equals(row.getSystemComponent()))
+                .bundleIdentifier(row.getBundleIdentifier())
+                .appFileNames(row.getAppFileNames() == null ? List.of() : row.getAppFileNames())
+                .topLevelApp(row.getTopLevelApp())
                 .storedMatch(row.getPackageMatch())
                 .storedAdoptionMatch(row.getAdoptionMatch())
                 .build();

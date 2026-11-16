@@ -10,7 +10,10 @@ import com.openframe.stream.handler.software.FleetHostResolver.FleetHostRef;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,6 +45,8 @@ class DeviceSoftwareHandlerTest {
     @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjectionTrigger projectionTrigger;
+
+    @Captor private ArgumentCaptor<DeviceSoftware> deviceSoftwareCaptor;
 
     @InjectMocks private DeviceSoftwareHandler handler;
 
@@ -333,5 +338,130 @@ class DeviceSoftwareHandlerTest {
         verify(deviceSoftwareRepository).save(captor.capture());
         assertThat(captor.getValue().getSystemComponent()).isNull();
         assertThat(captor.getValue().getVendor()).isNull();
+    }
+
+    @Test
+    void handle_macAppWithInstalledPaths_keepsBundleIdAndSortedAppFileNames() {
+        // setup
+        HostSoftwareTitle code = app("com.microsoft.VSCode", "/Applications/Visual Studio Code.app",
+                "/Users/alice/Applications/Code.app", "/Applications/Visual Studio Code.app", " ");
+        stubHostSoftware(code);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        assertThat(saved.getBundleIdentifier()).isEqualTo("com.microsoft.VSCode");
+        assertThat(saved.getAppFileNames()).containsExactly("Code", "Visual Studio Code");
+        assertThat(saved.getTopLevelApp()).isTrue();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "/Applications/Slack.app, true",
+            "/Users/alice/Applications/Slack.app, true",
+            "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app, false",
+            "/Users/alice/Applications/Chrome Apps.localized/Gmail.app, false",
+            "/Applications/Utilities/Slack.app, false",
+            "/Library/Application Support/Slack/Slack.app, false"
+    })
+    void handle_macAppByItsInstalledPath_topLevelOnlyDirectlyInAnApplicationsFolder(String path, boolean topLevel) {
+        // setup
+        HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap", path);
+        stubHostSoftware(slack);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        assertThat(deviceSoftwareCaptor.getValue().getTopLevelApp()).isEqualTo(topLevel);
+    }
+
+    @Test
+    void handle_macAppNestedAndTopLevel_topLevel() {
+        // setup
+        HostSoftwareTitle helper = app("com.example.helper",
+                "/Applications/Suite.app/Contents/Helpers/Helper.app", "/Applications/Helper.app");
+        stubHostSoftware(helper);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        assertThat(saved.getAppFileNames()).containsExactly("Helper");
+        assertThat(saved.getTopLevelApp()).isTrue();
+    }
+
+    @Test
+    void handle_macAppWithoutInstalledPaths_topLevelUnknownAndNoAppFileNames() {
+        // setup
+        HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap");
+        stubHostSoftware(slack);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        assertThat(saved.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isNull();
+    }
+
+    @Test
+    void handle_macAppPathThatIsNotAnApp_noAppFileNameAndNotTopLevel() {
+        // setup
+        HostSoftwareTitle tool = app("com.example.tool", "/usr/local/bin/tool");
+        stubHostSoftware(tool);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isFalse();
+    }
+
+    @Test
+    void handle_otherSourceWithBundleIdAndPaths_keepsNoAppKeys() {
+        // setup
+        HostSoftwareTitle cask = app("com.tinyspeck.slackmacgap", "/Applications/Slack.app");
+        cask.setSource("homebrew_packages");
+        stubHostSoftware(cask);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        assertThat(saved.getBundleIdentifier()).isNull();
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isNull();
+    }
+
+    private void stubHostSoftware(HostSoftwareTitle hostSoftwareTitle) {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(hostSoftwareTitle));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
+                .thenReturn(Optional.empty());
+    }
+
+    private HostSoftwareTitle app(String bundleIdentifier, String... installedPaths) {
+        HostSoftwareTitle app = title(42L, "App", "apps", "1.0");
+        app.setBundleIdentifier(bundleIdentifier);
+        if (installedPaths.length > 0) {
+            app.getInstalledVersions().getFirst().setInstalledPaths(List.of(installedPaths));
+        }
+        return app;
     }
 }

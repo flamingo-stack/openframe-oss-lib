@@ -573,4 +573,37 @@ class SoftwareCatalogStatusTest {
         assertThat(asked.getFirst().isSystemComponent()).isFalse();
         assertThat(asked.getFirst().getStoredMatch()).isNull();
     }
+
+    @Test
+    void programOf_macApp_carriesItsBundleIdAppFileNamesAndTopLevelFlag() {
+        // setup
+        SoftwareResponse slack = row("Slack", SoftwareSource.UNMANAGED, "4.4", 0);
+        slack.setFleetSource(FleetSource.APPS);
+        slack.setBundleIdentifier("com.tinyspeck.slackmacgap");
+        slack.setAppFileNames(List.of("Slack"));
+        slack.setTopLevelApp(true);
+
+        // execution
+        InstalledProgram program = SoftwareCatalogStatus.programOf(slack);
+
+        // verifications
+        assertThat(program.getFleetSource()).isEqualTo(FleetSource.APPS);
+        assertThat(program.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(program.getAppFileNames()).containsExactly("Slack");
+        assertThat(program.getTopLevelApp()).isTrue();
+    }
+
+    @Test
+    void programOf_rowWithoutAppKeys_noBundleIdNoAppFileNamesTopLevelUnknown() {
+        // setup
+        SoftwareResponse chrome = program("Google Chrome", "142.0");
+
+        // execution
+        InstalledProgram program = SoftwareCatalogStatus.programOf(chrome);
+
+        // verifications
+        assertThat(program.getBundleIdentifier()).isNull();
+        assertThat(program.getAppFileNames()).isEmpty();
+        assertThat(program.getTopLevelApp()).isNull();
+    }
 }

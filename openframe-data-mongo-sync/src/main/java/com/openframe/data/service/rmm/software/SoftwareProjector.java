@@ -91,6 +91,9 @@ public class SoftwareProjector {
                 .packageFamilyNames(rollup.packageFamilyNames())
                 .systemComponent(rollup.systemComponent())
                 .wingetIds(rollup.wingetIds())
+                .bundleIdentifier(rollup.bundleIdentifier())
+                .appFileNames(rollup.appFileNames())
+                .topLevelApp(rollup.topLevelApp())
                 .build();
     }
 
@@ -101,6 +104,9 @@ public class SoftwareProjector {
         software.setPackageFamilyNames(program.getPackageFamilyNames());
         software.setSystemComponent(program.isSystemComponent());
         software.setWingetIds(program.getWingetIds());
+        software.setBundleIdentifier(program.getBundleIdentifier());
+        software.setAppFileNames(program.getAppFileNames());
+        software.setTopLevelApp(program.getTopLevelApp());
     }
 
     // the handler projects every title of a host on every host_software event, so a title is matched again only
@@ -113,6 +119,9 @@ public class SoftwareProjector {
                 && Objects.equals(orEmpty(software.getArpKeys()), program.getProductCodes())
                 && Objects.equals(orEmpty(software.getPackageFamilyNames()), program.getPackageFamilyNames())
                 && Objects.equals(orEmpty(software.getWingetIds()), program.getWingetIds())
+                && Objects.equals(software.getBundleIdentifier(), program.getBundleIdentifier())
+                && Objects.equals(orEmpty(software.getAppFileNames()), program.getAppFileNames())
+                && Objects.equals(software.getTopLevelApp(), program.getTopLevelApp())
                 && Boolean.TRUE.equals(software.getSystemComponent()) == program.isSystemComponent();
     }
 
