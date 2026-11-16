@@ -27,17 +27,12 @@ import static java.util.stream.Collectors.toSet;
 @Service
 public class SoftwarePackageMatcher {
 
-    // the osquery table Fleet took a row from, and the package manager that can match such a row
-    private static final Map<FleetSource, PackageManagerType> MANAGER_BY_FLEET_SOURCE =
-            Map.of(FleetSource.PROGRAMS, PackageManagerType.WINGET,
-                    FleetSource.HOMEBREW_PACKAGES, PackageManagerType.BREW);
-
-    private final Map<PackageManagerType, PackageMatcher> matchers;
+    private final Map<FleetSource, PackageMatcher> matchers;
     private final PackageCatalogRepository catalogRepository;
 
-    // no matcher bean yet for a manager: its programs are left out and keep their status
+    // no matcher bean for an osquery table: its programs are left out and keep their status
     public SoftwarePackageMatcher(ObjectProvider<PackageMatcher> matchers, PackageCatalogRepository catalogRepository) {
-        this.matchers = matchers.orderedStream().collect(toMap(PackageMatcher::getManager, Function.identity()));
+        this.matchers = matchers.orderedStream().collect(toMap(PackageMatcher::getFleetSource, Function.identity()));
         this.catalogRepository = catalogRepository;
     }
 
@@ -102,7 +97,6 @@ public class SoftwarePackageMatcher {
 
     private Optional<PackageMatcher> matcherOf(InstalledProgram program) {
         return Optional.ofNullable(program.getFleetSource())
-                .map(MANAGER_BY_FLEET_SOURCE::get)
                 .map(matchers::get);
     }
 

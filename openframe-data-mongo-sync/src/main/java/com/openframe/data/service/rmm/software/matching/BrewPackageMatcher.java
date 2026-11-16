@@ -3,6 +3,7 @@ package com.openframe.data.service.rmm.software.matching;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -28,8 +29,8 @@ public class BrewPackageMatcher implements PackageMatcher {
     private final PackageCatalogRepository catalogRepository;
 
     @Override
-    public PackageManagerType getManager() {
-        return PackageManagerType.BREW;
+    public FleetSource getFleetSource() {
+        return FleetSource.HOMEBREW_PACKAGES;
     }
 
     @Override
