@@ -93,6 +93,7 @@ export function getPlatformSlogan(platformName: string): string {
 export type OdsColorStem =
   | 'flamingo-pink'
   | 'flamingo-cyan'
+  | 'flamingo-orange'
   | 'open-yellow'
   | 'success'
   | 'warning'
@@ -104,6 +105,7 @@ export type OdsColorStem =
 export const ODS_STEM_TOKENS: Record<OdsColorStem, string> = {
   'flamingo-pink': 'flamingo-pink-base',
   'flamingo-cyan': 'flamingo-cyan-base',
+  'flamingo-orange': 'flamingo-orange-base',
   'open-yellow': 'open-yellow-base',
   success: 'attention-green-success',
   warning: 'attention-yellow-warning',
@@ -130,6 +132,12 @@ export const ODS_STEM_CLASSES: Record<OdsColorStem, { text: string; bg: string; 
       bg: 'bg-ods-flamingo-cyan',
       bgSoft: 'bg-ods-flamingo-cyan/10',
       borderSoft: 'border-ods-flamingo-cyan/30',
+    },
+    'flamingo-orange': {
+      text: 'text-ods-flamingo-orange',
+      bg: 'bg-ods-flamingo-orange',
+      bgSoft: 'bg-ods-flamingo-orange/10',
+      borderSoft: 'border-ods-flamingo-orange/30',
     },
     'open-yellow': {
       text: 'text-ods-open-yellow',
@@ -211,7 +219,7 @@ export const PLATFORM_BRAND: Record<PlatformName, PlatformBrand> = {
   'revenue-hub': { accentStem: 'warning', secondaryStem: 'warning' },
   'people-hub': { accentStem: 'flamingo-cyan', secondaryStem: 'flamingo-cyan' },
   'coding-hub': { accentStem: 'text-primary', secondaryStem: 'text-primary' },
-  'security-hub': { accentStem: 'error', secondaryStem: 'flamingo-cyan' },
+  'security-hub': { accentStem: 'flamingo-orange', secondaryStem: 'flamingo-orange' },
   'company-hub': { accentStem: 'error', secondaryStem: 'error' },
   mlg: { accentStem: 'flamingo-pink', secondaryStem: 'flamingo-cyan' },
   universal: { accentStem: 'text-secondary', secondaryStem: 'text-secondary' },
@@ -295,7 +303,7 @@ export const platformHexColors: Record<PlatformName, string> = {
   'revenue-hub': '#e1b32f',
   'people-hub': '#5efaf0',
   'coding-hub': '#fafafa',
-  'security-hub': '#f36666',
+  'security-hub': '#ff8a3d',
   'company-hub': '#f36666',
   tmcg: '#f357bb',
   mlg: '#f357bb',
