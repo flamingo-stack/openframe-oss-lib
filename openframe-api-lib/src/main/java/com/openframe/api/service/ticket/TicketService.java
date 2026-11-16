@@ -442,7 +442,6 @@ public class TicketService {
         if (filter == null) {
             return new TicketQueryFilter();
         }
-        List<String> excludedTicketIds = ticketIdsForFilter.excludedTicketIds(filter);
         return TicketQueryFilter.builder()
                 .statusIds(filter.getStatusIds())
                 .organizationIds(filter.getOrganizationIds())
@@ -450,7 +449,6 @@ public class TicketService {
                 .assigneeIds(filter.getAssigneeIds())
                 .activity(ticketStalenessResolver.resolve(filter.getActivity()))
                 .escalatedByUser(filter.getEscalatedByUser())
-                .excludedTicketIds(excludedTicketIds)
                 .build();
     }
 

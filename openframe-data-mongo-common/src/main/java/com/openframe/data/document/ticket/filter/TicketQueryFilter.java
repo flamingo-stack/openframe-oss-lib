@@ -31,6 +31,4 @@ public class TicketQueryFilter {
     private Instant createdAtTo;
     private TicketActivityCriteria activity;
     private Boolean escalatedByUser;
-    // Left out by id, beside any id restriction the caller passes (hasPendingApproval:false).
-    private List<String> excludedTicketIds;
 }

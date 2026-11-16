@@ -118,7 +118,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             addCriteriaIfNotEmpty(query, FIELD_CREATION_SOURCE, filter.getCreationSources());
             applyActivityCriteria(query, filter.getActivity());
             applyFlag(query, FIELD_ESCALATED_BY_USER, filter.getEscalatedByUser());
-            applyExclusion(query, filter.getExcludedTicketIds());
         }
 
         applyIdRestriction(query, restrictToTicketIds);
@@ -162,20 +161,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 ? Criteria.where(field).is(true)
                 : Criteria.where(field).ne(true);
         query.addCriteria(criteria);
-    }
-
-    // Under $nor, not on '_id': the id restriction (tags, unread, pending approval) may already sit on that key.
-    private void applyExclusion(Query query, List<String> excludedIds) {
-        if (excludedIds == null || excludedIds.isEmpty()) {
-            return;
-        }
-        List<Object> keys = excludedIds.stream().map(CustomTicketRepositoryImpl::idKey).toList();
-        Criteria excluded = Criteria.where(ID_FIELD).in(keys);
-        query.addCriteria(new Criteria().norOperator(excluded));
-    }
-
-    private static Object idKey(String id) {
-        return ObjectId.isValid(id) ? new ObjectId(id) : id;
     }
 
     private void applySearchCriteria(Query query, String search) {

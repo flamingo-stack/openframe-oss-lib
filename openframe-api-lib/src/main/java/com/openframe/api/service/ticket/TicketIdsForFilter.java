@@ -49,18 +49,6 @@ public class TicketIdsForFilter {
         return restricted;
     }
 
-    // The tickets a hasPendingApproval:false filter leaves out; null when the filter does not exclude any.
-    public List<String> excludedTicketIds(TicketFilterInput filter) {
-        if (filter == null) {
-            return null;
-        }
-        Boolean hasPendingApproval = filter.getHasPendingApproval();
-        if (!Boolean.FALSE.equals(hasPendingApproval)) {
-            return null;
-        }
-        return pendingApprovalTicketIds();
-    }
-
     private boolean hasTagFilter(TicketFilterInput filter) {
         if (filter == null) {
             return false;
@@ -85,7 +73,6 @@ public class TicketIdsForFilter {
         return Boolean.TRUE.equals(hasPendingApproval);
     }
 
-    // Read from the approval requests on every query: a flag stored on the ticket could go stale.
     private List<String> pendingApprovalTicketIds() {
         TicketPendingApprovalProvider provider = pendingApprovalProvider.getIfAvailable();
         if (provider == null) {

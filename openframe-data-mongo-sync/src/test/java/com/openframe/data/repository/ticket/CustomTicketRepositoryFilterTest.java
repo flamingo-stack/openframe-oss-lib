@@ -6,7 +6,6 @@ import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
 import com.openframe.publishing.api.OutboxPublisher;
 import org.bson.Document;
-import org.bson.types.ObjectId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -26,8 +25,6 @@ class CustomTicketRepositoryFilterTest {
     private static final Instant CUT_OFF = Instant.parse("2026-10-20T10:00:00Z");
 
     private static final String ESCALATED_BY_USER = "escalatedByUser";
-    private static final String NOR = "$nor";
-    private static final String PENDING_TICKET_ID = "6740a1b2c3d4e5f601234567";
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
     @Mock private ObjectProvider<OutboxPublisher> outboxPublisher;
@@ -63,60 +60,6 @@ class CustomTicketRepositoryFilterTest {
 
         // verifications
         assertThat(query.get(ESCALATED_BY_USER, Document.class)).containsEntry("$ne", true);
-    }
-
-    @Test
-    void buildTicketQuery_excludedTicketIds_leftOutUnderNor() {
-        // setup
-        TicketQueryFilter filter = TicketQueryFilter.builder().excludedTicketIds(List.of(PENDING_TICKET_ID)).build();
-
-        // execution
-        Document query = repository.buildTicketQuery(filter, null, null, null).getQueryObject();
-
-        // verifications
-        assertThat(query.getList(NOR, Document.class))
-                .containsExactly(new Document("_id", new Document("$in", List.of(new ObjectId(PENDING_TICKET_ID)))));
-        assertThat(query).doesNotContainKey("_id");
-    }
-
-    // A tag or unread filter restricts '_id' as well; both have to apply without a second '_id' criterion.
-    @Test
-    void buildTicketQuery_excludedIdsBesideIdRestriction_bothApply() {
-        // setup
-        TicketQueryFilter filter = TicketQueryFilter.builder().excludedTicketIds(List.of(PENDING_TICKET_ID)).build();
-
-        // execution
-        Document query = repository.buildTicketQuery(filter, null, List.of("tagged-1"), null).getQueryObject();
-
-        // verifications
-        assertThat(query.get("_id", Document.class)).containsEntry("$in", List.of("tagged-1"));
-        assertThat(query).containsKey(NOR);
-    }
-
-    @Test
-    void buildTicketQuery_excludedIdNotAnObjectId_matchedAsText() {
-        // setup
-        TicketQueryFilter filter = TicketQueryFilter.builder().excludedTicketIds(List.of("legacy-1")).build();
-
-        // execution
-        Document query = repository.buildTicketQuery(filter, null, null, null).getQueryObject();
-
-        // verifications
-        assertThat(query.getList(NOR, Document.class))
-                .containsExactly(new Document("_id", new Document("$in", List.of("legacy-1"))));
-    }
-
-    // Nothing pending: hasPendingApproval:false keeps every ticket.
-    @Test
-    void buildTicketQuery_noExcludedIds_noNarrowing() {
-        // setup
-        TicketQueryFilter filter = TicketQueryFilter.builder().excludedTicketIds(List.of()).build();
-
-        // execution
-        Document query = repository.buildTicketQuery(filter, null, null, null).getQueryObject();
-
-        // verifications
-        assertThat(query).doesNotContainKey(NOR);
     }
 
     @Test

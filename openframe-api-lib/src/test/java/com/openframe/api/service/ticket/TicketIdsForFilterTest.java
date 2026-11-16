@@ -126,7 +126,6 @@ class TicketIdsForFilterTest {
         assertThat(restricted).containsExactly("ticket-5");
     }
 
-    // A deployment without approvals has nothing waiting: the filter matches no ticket, not every ticket.
     @Test
     void resolve_pendingApprovalOnlyWithoutProvider_emptyNotNull() {
         // setup
@@ -155,7 +154,6 @@ class TicketIdsForFilterTest {
         assertThat(restricted).containsExactly("ticket-2");
     }
 
-    // false is an exclusion, never a restriction: resolve leaves it to excludedTicketIds.
     @Test
     void resolve_pendingApprovalFalse_noRestriction() {
         // execution
@@ -163,52 +161,6 @@ class TicketIdsForFilterTest {
 
         // verifications
         assertThat(restricted).isNull();
-        verifyNoInteractions(pendingApprovalProvider);
-    }
-
-    @Test
-    void excludedTicketIds_pendingApprovalFalse_pendingTicketsLeftOut() {
-        // setup
-        when(pendingApprovalProvider.getIfAvailable()).thenReturn(pendingApproval);
-        when(pendingApproval.ticketIdsWithPendingApproval()).thenReturn(List.of("ticket-5"));
-
-        // execution
-        List<String> excluded = ticketIdsForFilter.excludedTicketIds(pendingApproval(false));
-
-        // verifications
-        assertThat(excluded).containsExactly("ticket-5");
-    }
-
-    @Test
-    void excludedTicketIds_pendingApprovalTrue_nothingExcluded() {
-        // execution
-        List<String> excluded = ticketIdsForFilter.excludedTicketIds(pendingApproval(true));
-
-        // verifications
-        assertThat(excluded).isNull();
-        verifyNoInteractions(pendingApprovalProvider);
-    }
-
-    @Test
-    void excludedTicketIds_noFilter_nothingExcluded() {
-        // execution
-        List<String> excluded = ticketIdsForFilter.excludedTicketIds(null);
-
-        // verifications
-        assertThat(excluded).isNull();
-        verifyNoInteractions(pendingApprovalProvider);
-    }
-
-    @Test
-    void excludedTicketIds_pendingApprovalOmitted_nothingExcluded() {
-        // setup
-        TicketFilterInput filter = new TicketFilterInput();
-
-        // execution
-        List<String> excluded = ticketIdsForFilter.excludedTicketIds(filter);
-
-        // verifications
-        assertThat(excluded).isNull();
         verifyNoInteractions(pendingApprovalProvider);
     }
 
