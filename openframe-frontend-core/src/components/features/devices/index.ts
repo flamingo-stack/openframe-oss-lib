@@ -28,6 +28,7 @@ export {
   type DeviceStatusConfig,
   type DeviceStatusVariant,
   getDeviceOperatingSystem,
+  getDeviceRowStatusConfig,
   getDeviceStatusConfig,
 } from './device-status';
 export {
@@ -37,6 +38,7 @@ export {
   type DefaultVisibleStatus,
   DEVICE_ENRICHMENT_FILTER,
   DEVICE_ENRICHMENT_STATUSES,
+  DEVICE_FILTER_OUTDATED,
   DEVICE_STATUS,
   type DeviceStatus,
   HIDDEN_DEVICE_STATUSES,
