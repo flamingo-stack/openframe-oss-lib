@@ -1,7 +1,9 @@
+use crate::models::InstalledTool;
 use crate::platform::DirectoryManager;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
 use anyhow::Result;
 use regex::Regex;
+use std::path::PathBuf;
 use std::sync::LazyLock;
 
 /// Regex for matching assets path placeholders like ${client.assetsPath.osquery}
@@ -65,6 +67,29 @@ impl ToolCommandParamsResolver {
             // Resolve dynamic asset path placeholders
             .map(|arg| self.process_assets_placeholders(&arg, tool_agent_id))
             .collect())
+    }
+
+    pub async fn missing_command_asset(&self, tool: &InstalledTool) -> Option<PathBuf> {
+        let asset_paths: Vec<PathBuf> = tool
+            .tool_agent_id_command_args
+            .iter()
+            .chain(&tool.run_command_args)
+            .flat_map(|arg| ASSETS_PATH_REGEX.captures_iter(arg))
+            .map(|caps| {
+                self.directory_manager
+                    .get_asset_path(&tool.tool_agent_id, &caps[1], true)
+            })
+            .collect();
+        for path in asset_paths {
+            if !self
+                .directory_manager
+                .tool_artifact_present(&path, false)
+                .await
+            {
+                return Some(path);
+            }
+        }
+        None
     }
 
     fn build_token_path(&self) -> String {

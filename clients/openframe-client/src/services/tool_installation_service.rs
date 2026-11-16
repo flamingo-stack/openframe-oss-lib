@@ -135,14 +135,21 @@ impl ToolInstallationService {
                     .directory_manager
                     .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
                     .await;
-                if binary_present {
+                if !binary_present {
+                    warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
+                } else if let Some(asset_path) = self
+                    .command_params_resolver
+                    .missing_command_asset(installed_tool)
+                    .await
+                {
+                    warn!("Tool {} has a registry record (version {}) but its asset is missing at {} — repairing via install", tool_agent_id, installed_tool.version, asset_path.display());
+                } else {
                     info!(
                         "Tool {} is already installed with version {}, skipping installation",
                         tool_agent_id, installed_tool.version
                     );
                     return Ok(());
                 }
-                warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
             }
         }
 
