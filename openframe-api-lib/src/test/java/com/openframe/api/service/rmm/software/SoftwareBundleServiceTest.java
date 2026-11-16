@@ -30,12 +30,14 @@ import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -43,6 +45,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,6 +82,10 @@ class SoftwareBundleServiceTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private PackageManagerAvailability packageManagerAvailability;
     @Mock private SoftwareInventoryService softwareInventoryService;
+    @Mock private PackageCatalogVersions packageCatalogVersions;
+
+    @Captor private ArgumentCaptor<SoftwareBundle> softwareBundleCaptor;
+    @Captor private ArgumentCaptor<List<SoftwareActionResult>> softwareActionResultsCaptor;
 
     private SoftwareBundleService service;
 
@@ -86,7 +93,8 @@ class SoftwareBundleServiceTest {
     void setUp() {
         service = new SoftwareBundleService(bundleRepository, onlineDispatchRepository, softwareScheduleService,
                 softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability,
-                new SoftwarePackageSelectionResolver(softwareInventoryService), softwareInventoryService);
+                new SoftwarePackageSelectionResolver(softwareInventoryService), softwareInventoryService,
+                packageCatalogVersions);
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(1));
         ReflectionTestUtils.setField(service, "scheduleReconnectWindowSeconds", RECONNECT_WINDOW);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -335,6 +343,117 @@ class SoftwareBundleServiceTest {
     }
 
     @Test
+    void submit_nowPackageGivenOnlyBySoftware_storedWithTheLatestCatalogVersion() {
+        // setup
+        stubPendingBundleOnOneMac();
+        stubNoSentinelYet();
+        PackageCatalogEntry slackCask = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.BREW).packageId("slack").brewType(BrewPackageType.CASK).build();
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(slackCask);
+        when(packageCatalogVersions.hasShownLatest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn(true);
+        when(packageCatalogVersions.shownLatest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn("4.41.2");
+        SoftwarePackageInput bySoftware = new SoftwarePackageInput();
+        bySoftware.setSoftwareId("title-7");
+        SubmitSoftwareBundleInput input = submitInput(bySoftware);
+        input.setAction(SoftwareAction.UPDATE);
+
+        // execution
+        service.submit(input, USER);
+
+        // verifications
+        verify(bundleRepository).save(softwareBundleCaptor.capture());
+        assertThat(softwareBundleCaptor.getValue().getPackages())
+                .extracting(SoftwareBundlePackage::getVersion)
+                .containsExactly("4.41.2");
+        verify(softwareActionResultRepository).saveAll(softwareActionResultsCaptor.capture());
+        assertThat(softwareActionResultsCaptor.getValue())
+                .extracting(SoftwareActionResult::getVersion)
+                .containsExactly("4.41.2");
+    }
+
+    @Test
+    void submit_nowCatalogPackageWithoutAVersion_storedWithTheLatestCatalogVersion() {
+        // setup
+        stubPendingBundleOnOneMac();
+        stubNoSentinelYet();
+        when(packageCatalogVersions.hasShownLatest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn(true);
+        when(packageCatalogVersions.shownLatest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn("4.41.2");
+        SubmitSoftwareBundleInput input = submitInput(brewPkgWithoutVersion("slack"));
+
+        // execution
+        service.submit(input, USER);
+
+        // verifications
+        verify(bundleRepository).save(softwareBundleCaptor.capture());
+        assertThat(softwareBundleCaptor.getValue().getPackages())
+                .extracting(SoftwareBundlePackage::getVersion)
+                .containsExactly("4.41.2");
+        verify(softwareActionResultRepository).saveAll(softwareActionResultsCaptor.capture());
+        assertThat(softwareActionResultsCaptor.getValue())
+                .extracting(SoftwareActionResult::getVersion)
+                .containsExactly("4.41.2");
+    }
+
+    @Test
+    void submit_nowPackageTheCatalogDoesNotKnow_versionStaysNull() {
+        // setup
+        stubPendingBundleOnOneMac();
+        stubNoSentinelYet();
+        when(packageCatalogVersions.hasShownLatest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn(false);
+        SubmitSoftwareBundleInput input = submitInput(brewPkgWithoutVersion("slack"));
+
+        // execution
+        service.submit(input, USER);
+
+        // verifications
+        verify(softwareActionResultRepository).saveAll(softwareActionResultsCaptor.capture());
+        assertThat(softwareActionResultsCaptor.getValue())
+                .extracting(SoftwareActionResult::getVersion)
+                .containsOnlyNulls();
+        verify(packageCatalogVersions, never()).shownLatest(PackageManagerType.BREW, "slack", BrewPackageType.CASK);
+    }
+
+    @Test
+    void submit_nowPackageWithAVersion_versionKeptAndTheCatalogNotAsked() {
+        // setup
+        stubPendingBundleOnOneMac();
+        stubNoSentinelYet();
+        SubmitSoftwareBundleInput input = submitInput(brewPkg("slack"));
+
+        // execution
+        service.submit(input, USER);
+
+        // verifications
+        verify(softwareActionResultRepository).saveAll(softwareActionResultsCaptor.capture());
+        assertThat(softwareActionResultsCaptor.getValue())
+                .extracting(SoftwareActionResult::getVersion)
+                .containsExactly("1.2.3");
+        verifyNoInteractions(packageCatalogVersions);
+    }
+
+    @Test
+    void submit_scheduledPackageWithoutAVersion_versionStaysNullAndTheCatalogNotAsked() {
+        // setup
+        stubPendingBundleOnOneMac();
+        SoftwareScheduleResponse created = SoftwareScheduleResponse.builder().id("s1").build();
+        when(softwareScheduleService.create(any(CreateSoftwareScheduleInput.class), eq(USER))).thenReturn(created);
+        SoftwareBundleScheduleInput schedule = new SoftwareBundleScheduleInput();
+        schedule.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        SubmitSoftwareBundleInput input = submitInput(brewPkgWithoutVersion("slack"));
+        input.setSchedule(schedule);
+
+        // execution
+        service.submit(input, USER);
+
+        // verifications
+        verify(softwareActionResultRepository).saveAll(softwareActionResultsCaptor.capture());
+        assertThat(softwareActionResultsCaptor.getValue())
+                .extracting(SoftwareActionResult::getVersion)
+                .containsOnlyNulls();
+        verifyNoInteractions(packageCatalogVersions);
+    }
+
+    @Test
     @DisplayName("turnOnAutoUpdate: the bundle's devices and the settings go to the Software, the bundle is COMPLETED, no update runs")
     void turnOnAutoUpdate_pendingBundleWithDevices_turnsOnForItsDevicesAndCompletesTheBundle() {
         SoftwareBundle draft = pending(null, null, List.of("m1", "m2"));
@@ -477,6 +596,23 @@ class SoftwareBundleServiceTest {
         p.setBrewPackageType(BrewPackageType.CASK);
         p.setVersion("1.2.3");
         return p;
+    }
+
+    private static SoftwarePackageInput brewPkgWithoutVersion(String name) {
+        SoftwarePackageInput p = brewPkg(name);
+        p.setVersion(null);
+        return p;
+    }
+
+    private void stubPendingBundleOnOneMac() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(machinePlatformResolver.osTypesByMachineId(List.of("m1"))).thenReturn(Map.of("m1", OsType.MAC_OS));
+    }
+
+    private void stubNoSentinelYet() {
+        when(onlineDispatchRepository.findByTenantIdAndMachineIdAndBundleId(TENANT, "m1", BUNDLE_ID))
+                .thenReturn(Optional.empty());
     }
 
     private static SoftwareBundle pending(SoftwareBundleMode mode, Instant startAt, List<String> machineIds,

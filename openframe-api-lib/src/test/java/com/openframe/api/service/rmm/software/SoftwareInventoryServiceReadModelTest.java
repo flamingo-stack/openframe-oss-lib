@@ -133,6 +133,16 @@ class SoftwareInventoryServiceReadModelTest {
                 .packageManager(PackageManagerType.BREW).packageName(packageName).softwareId(softwareId).build();
     }
 
+    private void stubPolicyOn(String softwareId, String machineId) {
+        doAnswer(inv -> {
+            List<SoftwareOnDeviceResponse> rows = inv.getArgument(1);
+            rows.stream()
+                    .filter(row -> machineId.equals(row.getDevice().getMachineId()))
+                    .forEach(row -> row.setAutoUpdate(SoftwareAutoUpdateStatus.ON));
+            return null;
+        }).when(autoUpdateService).applyToDevices(eq(softwareId), anyList());
+    }
+
     private void catalogManagesWith(PackageCatalogEntry managingPackage) {
         doAnswer(inv -> {
             List<SoftwareResponse> rows = inv.getArgument(0);
@@ -386,6 +396,57 @@ class SoftwareInventoryServiceReadModelTest {
         assertThat(result.items()).extracting(SoftwareOnDeviceResponse::getInstalledBy)
                 .containsOnly(SoftwareSource.BREW);
         org.mockito.Mockito.verify(autoUpdateService).applyToDevices(eq("42"), anyList());
+    }
+
+    @Test
+    void listDevicesForSoftware_managedTitleWithoutPolicy_autoUpdateIsOff() {
+        // setup
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
+                .thenReturn(List.of(onDevice("m1"), onDevice("m2")));
+        stubPolicyOn("42", "m1");
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items())
+                .extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getAutoUpdate)
+                .containsExactly(tuple("m1", SoftwareAutoUpdateStatus.ON), tuple("m2", SoftwareAutoUpdateStatus.OFF));
+    }
+
+    @Test
+    void listDevicesForSoftware_filterByOff_keepsManagedDevicesWithoutPolicy() {
+        // setup
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
+                .thenReturn(List.of(onDevice("m1"), onDevice("m2")));
+        stubPolicyOn("42", "m1");
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setAutoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.OFF));
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", filter, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items()).extracting(row -> row.getDevice().getMachineId()).containsExactly("m2");
+    }
+
+    @Test
+    void listDevicesForSoftware_unmanagedTitleWithoutPolicy_autoUpdateStaysNull() {
+        // setup
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "8")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "8")).thenReturn(row("8", SoftwareSource.UNMANAGED));
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "8", null, null))
+                .thenReturn(List.of(onDevice("m1")));
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("8", null, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareOnDeviceResponse::getAutoUpdate).containsOnlyNulls();
     }
 
     @Test

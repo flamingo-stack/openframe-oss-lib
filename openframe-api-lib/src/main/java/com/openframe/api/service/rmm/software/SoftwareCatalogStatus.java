@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
@@ -34,15 +35,12 @@ import java.util.function.Predicate;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
-import static org.springframework.util.StringUtils.hasText;
 
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class SoftwareCatalogStatus {
 
-    private static final String CASK_BUILD_SEPARATOR = ",";
-    private static final String UNVERSIONED_CASK = "latest";
     private static final Map<PackageManagerType, SoftwareSource> SOURCE_BY_MANAGER =
             Map.of(PackageManagerType.WINGET, SoftwareSource.WINGET);
 
@@ -137,7 +135,7 @@ public class SoftwareCatalogStatus {
     private static void applyBrewPackage(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages) {
         String token = brewTokenOf(row);
         PackageCatalogEntry entry = token == null ? null : brewPackages.get(token);
-        String latest = entry == null ? null : brewVersionOf(entry);
+        String latest = entry == null ? null : PackageCatalogVersions.shownVersionOf(entry);
         applyLatest(row, latest);
         row.setManagingPackage(entry);
         if (row.getAutoUpdate() == null) {
@@ -147,7 +145,7 @@ public class SoftwareCatalogStatus {
 
     // winget updates a program it matches whoever installed it, so a match alone makes the program manageable
     private static void applyManagingPackage(SoftwareResponse row, PackageCatalogEntry entry) {
-        String latest = versionOf(entry);
+        String latest = PackageCatalogVersions.shownVersionOf(entry);
         applyLatest(row, latest);
         SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
         row.setSource(source);
@@ -159,7 +157,7 @@ public class SoftwareCatalogStatus {
 
     // the package's manager updates only what it installed: nothing manages the program until it is adopted
     private static void applyAdoptionPackage(SoftwareResponse row, PackageCatalogEntry entry) {
-        String latest = latestOf(entry);
+        String latest = PackageCatalogVersions.shownVersionOf(entry);
         applyLatest(row, latest);
         SoftwareBundlePackage adoptionPackage = SoftwareBundlePackage.builder()
                 .packageManager(entry.getManager())
@@ -176,7 +174,7 @@ public class SoftwareCatalogStatus {
     // a package whose manager does not count here still tells the latest version; several packages leave it unknown
     private static void applyNoPackage(SoftwareResponse row, PackageMatch match) {
         boolean matched = match != null && match.isMatched();
-        String latest = matched ? latestOf(match.getEntry()) : null;
+        String latest = matched ? PackageCatalogVersions.shownVersionOf(match.getEntry()) : null;
         applyLatest(row, latest);
         boolean noPackage = match != null && (matched || match.hasNoPackage());
         if (row.getAutoUpdate() == null && noPackage) {
@@ -221,24 +219,6 @@ public class SoftwareCatalogStatus {
                 .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)))
                 .entrySet().stream()
                 .collect(toMap(Map.Entry::getKey, e -> e.getValue().stream().min(FORMULA_FIRST).orElseThrow()));
-    }
-
-    private static String latestOf(PackageCatalogEntry entry) {
-        return entry.getManager() == PackageManagerType.BREW ? brewVersionOf(entry) : versionOf(entry);
-    }
-
-    private static String versionOf(PackageCatalogEntry entry) {
-        return hasText(entry.getDisplayVersion()) ? entry.getDisplayVersion() : entry.getVersion();
-    }
-
-    // a cask version may end in a build after a comma (3.3.3,5004) that the app does not report, or be "latest"
-    private static String brewVersionOf(PackageCatalogEntry entry) {
-        String version = entry.getVersion();
-        if (version == null || UNVERSIONED_CASK.equals(version)) {
-            return null;
-        }
-        int build = version.indexOf(CASK_BUILD_SEPARATOR);
-        return build < 0 ? version : version.substring(0, build);
     }
 
     private static boolean isBrewPackage(SoftwareResponse row) {

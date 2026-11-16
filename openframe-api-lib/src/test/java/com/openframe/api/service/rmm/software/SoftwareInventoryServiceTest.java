@@ -1382,7 +1382,7 @@ class SoftwareInventoryServiceTest {
         assertThat(filters.getInstalledBy()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
                 .containsExactly(tuple("BREW", 3));
         assertThat(filters.getAutoUpdateStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
-                .containsExactly(tuple("ON", 1));
+                .containsExactly(tuple("ON", 1), tuple("OFF", 2));
         assertThat(filters.getDeviceStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
                 .containsExactlyInAnyOrder(tuple("ONLINE", 2), tuple("OFFLINE", 1));
         // a customer without a record still shows, by its id
