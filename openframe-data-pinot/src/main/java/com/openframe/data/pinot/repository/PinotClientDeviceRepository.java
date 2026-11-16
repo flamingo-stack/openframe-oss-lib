@@ -101,7 +101,6 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
-            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -109,7 +108,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues,
             List<String> directorySources,
             List<String> userLinks) {
-        // Two counts with the clientOutdated filter replaced by each side, every other filter as given
+        // Two counts, one per side of the clientOutdated filter, every other filter as given
         int outdated = getFilteredDeviceCount(tenantId, statuses, connectivity, Boolean.TRUE, deviceTypes, osTypes,
                 organizationIds, tagKeys, tagKeyValues, directorySources, userLinks);
         int notOutdated = getFilteredDeviceCount(tenantId, statuses, connectivity, Boolean.FALSE, deviceTypes, osTypes,
@@ -392,8 +391,8 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
         queryBuilder.whereOr(CONNECTIVITY, connectivity);
     }
 
-    // A row without a known version holds the column default -1 (IS NULL kept for queries run with null handling on),
-    // so it lands on the not-outdated side
+    // A row without a known version holds the column default -1 (0 is never a real key, ClientVersionKey reads 0.0.0
+    // as unknown); IS NULL is kept for queries run with null handling on. Either way it lands on the not-outdated side
     private void applyClientOutdatedFilter(PinotQueryBuilder queryBuilder, Boolean clientOutdated) {
         if (clientOutdated == null) {
             return;

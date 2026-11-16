@@ -36,7 +36,7 @@ class ClientVersionThresholdTest {
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = {"", " ", "latest"})
+    @ValueSource(strings = {"", " ", "latest", "0.0.0"})
     void constructor_notAVersion_failsFast(String version) {
         // execution
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> new ClientVersionThreshold(version));
@@ -47,7 +47,7 @@ class ClientVersionThresholdTest {
 
     @ParameterizedTest
     @CsvSource({
-            "0,                 true",
+            "1,                 true",
             "1000005999999,     true",
             "1000005000009,     true",
             "1000006000000,     false",

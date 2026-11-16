@@ -359,7 +359,7 @@ class PinotClientDeviceRepositoryTest {
         }
 
         @Test
-        void getClientOutdatedFilterOptions_anySelection_countsBothSidesUnderTheOtherFilters() {
+        void getClientOutdatedFilterOptions_otherFilters_countsBothSidesUnderThem() {
             // setup
             when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
             when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
@@ -368,7 +368,7 @@ class PinotClientDeviceRepositoryTest {
 
             // execution
             Map<String, Integer> result = repository.getClientOutdatedFilterOptions(TENANT_ID, List.of(),
-                    List.of("ONLINE"), Boolean.TRUE, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                    List.of("ONLINE"), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 
             // verifications
             assertEquals(List.of(Map.entry("true", 4), Map.entry("false", 11)), List.copyOf(result.entrySet()));
@@ -391,7 +391,7 @@ class PinotClientDeviceRepositoryTest {
 
             // execution
             Map<String, Integer> result = repository.getClientOutdatedFilterOptions(TENANT_ID, List.of(), List.of(),
-                    null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                    List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 
             // verifications
             assertEquals(List.of(Map.entry("true", 0), Map.entry("false", 0)), List.copyOf(result.entrySet()));
@@ -401,7 +401,7 @@ class PinotClientDeviceRepositoryTest {
         void getClientOutdatedFilterOptions_blankTenant_throws() {
             // execution
             PinotQueryException ex = assertThrows(PinotQueryException.class, () ->
-                    repository.getClientOutdatedFilterOptions(" ", List.of(), List.of(), null, List.of(), List.of(),
+                    repository.getClientOutdatedFilterOptions(" ", List.of(), List.of(), List.of(), List.of(),
                             List.of(), List.of(), List.of(), List.of(), List.of()));
 
             // verifications

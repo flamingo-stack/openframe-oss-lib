@@ -38,7 +38,6 @@ public interface PinotDeviceRepository {
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
-            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,

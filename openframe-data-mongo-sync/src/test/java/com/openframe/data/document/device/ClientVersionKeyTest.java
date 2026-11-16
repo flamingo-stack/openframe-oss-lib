@@ -15,7 +15,6 @@ class ClientVersionKeyTest {
             "1.6.0,          1000006000000",
             "1.6,            1000006000000",
             "1,              1000000000000",
-            "0.0.0,          0",
             "0.0.1,          1",
             "1.5.999999,     1000005999999",
             "1.6.23,         1000006000023",
@@ -47,6 +46,16 @@ class ClientVersionKeyTest {
     @NullSource
     @ValueSource(strings = {"", " ", "v", "beta", "latest", "-1.6.0", ".6.0", "x1.6.0", "version 1.6.0", "vv1.6.0"})
     void parse_noLeadingNumber_null(String version) {
+        // execution
+        Long key = ClientVersionKey.parse(version);
+
+        // verifications
+        assertThat(key).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0.0.0", "0.0.0-dev", "v0.0.0", "0", "0.0", "00.00.00"})
+    void parse_devBuildZeroVersion_null(String version) {
         // execution
         Long key = ClientVersionKey.parse(version);
 

@@ -152,13 +152,13 @@ class InstalledAgentServiceTest {
     }
 
     @Test
-    void addInstalledAgent_unparseableClientVersion_versionWrittenWithoutKey() {
+    void addInstalledAgent_devBuildClientVersion_versionWrittenWithoutKey() {
         // setup
         stubKnownMachine();
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machineRunning(OLD_VERSION, OLD_VERSION_KEY)));
 
         // execution
-        service.addInstalledAgent(MACHINE_ID, AGENT_TYPE, "nightly", false);
+        service.addInstalledAgent(MACHINE_ID, AGENT_TYPE, "0.0.0-dev", false);
 
         // verifications
         verify(machineWriter).update(eq(MACHINE_ID), machineUpdateCaptor.capture());
@@ -166,7 +166,7 @@ class InstalledAgentServiceTest {
         machineUpdateCaptor.getValue().applyTo(written);
         assertThat(written)
                 .extracting(Machine::getAgentVersion, Machine::getAgentVersionKey)
-                .containsExactly("nightly", null);
+                .containsExactly("0.0.0-dev", null);
     }
 
     @ParameterizedTest

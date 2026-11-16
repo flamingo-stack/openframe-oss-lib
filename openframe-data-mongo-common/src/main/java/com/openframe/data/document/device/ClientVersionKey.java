@@ -3,7 +3,8 @@ package com.openframe.data.document.device;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// major.minor.patch as one comparable number: major * 10^12 + minor * 10^6 + patch; whatever follows the triple is ignored
+// major.minor.patch as one comparable number: major * 10^12 + minor * 10^6 + patch; whatever follows the triple is
+// ignored, and 0.0.0 (the client's dev build, "0.0.0-dev") is no real version, so it parses as unknown
 public final class ClientVersionKey {
 
     private static final Pattern NUMERIC_TRIPLE = Pattern.compile("^[vV]?(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?");
@@ -13,6 +14,7 @@ public final class ClientVersionKey {
     private static final int MAJOR_GROUP = 1;
     private static final int MINOR_GROUP = 2;
     private static final int PATCH_GROUP = 3;
+    private static final long DEV_BUILD_KEY = 0L;
 
     private ClientVersionKey() {
     }
@@ -29,7 +31,8 @@ public final class ClientVersionKey {
         long major = part(matcher, MAJOR_GROUP);
         long minor = part(matcher, MINOR_GROUP);
         long patch = part(matcher, PATCH_GROUP);
-        return major * MAJOR_FACTOR + minor * MINOR_FACTOR + patch;
+        long key = major * MAJOR_FACTOR + minor * MINOR_FACTOR + patch;
+        return key == DEV_BUILD_KEY ? null : key;
     }
 
     // A part of seven digits or more would spill into the next part's range

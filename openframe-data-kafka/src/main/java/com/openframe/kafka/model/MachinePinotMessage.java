@@ -23,7 +23,7 @@ public class MachinePinotMessage implements KafkaMessage {
     private String deviceType;
     private String status;
     private String connectivity;
-    private Long agentVersionKey;           // ClientVersionKey of the client version; null reads as the column default -1
+    private Long agentVersionKey;           // ClientVersionKey of the client version; null reads as the column default -1 (0 is never a real key)
     private String osType;
     private List<String> tags;              // tag key names for Pinot MV column
     private List<String> tagKeyValues;      // "key:value" pairs for Pinot indexing

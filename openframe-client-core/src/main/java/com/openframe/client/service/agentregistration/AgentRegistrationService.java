@@ -32,7 +32,7 @@ import java.util.Set;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
-import static com.openframe.client.service.InstalledAgentService.OPENFRAME_CLIENT_AGENT_TYPE;
+import static com.openframe.data.service.machine.AgentVersionService.OPENFRAME_CLIENT_AGENT_TYPE;
 import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION;
 import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION_KEY;
 import static com.openframe.data.service.machine.MachineFields.HOSTNAME;

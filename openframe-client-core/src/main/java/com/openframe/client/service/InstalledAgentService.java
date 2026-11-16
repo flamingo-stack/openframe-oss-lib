@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
+import static com.openframe.data.service.machine.AgentVersionService.OPENFRAME_CLIENT_AGENT_TYPE;
 import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION;
 import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION_KEY;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
@@ -28,8 +29,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @RequiredArgsConstructor
 @Slf4j
 public class InstalledAgentService {
-
-    public static final String OPENFRAME_CLIENT_AGENT_TYPE = "openframe-client";
 
     private final InstalledAgentRepository installedAgentRepository;
     private final MachineRepository machineRepository;

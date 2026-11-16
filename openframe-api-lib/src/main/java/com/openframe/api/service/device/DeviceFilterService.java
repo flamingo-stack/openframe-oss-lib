@@ -112,7 +112,7 @@ public class DeviceFilterService {
         CompletableFuture<Map<String, Integer>> connectivityFuture = facetQuery(facets, CONNECTIVITY, () ->
                 pinotDeviceRepository.getConnectivityFilterOptions(tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> clientOutdatedFuture = facetQuery(facets, CLIENT_OUTDATED, () ->
-                pinotDeviceRepository.getClientOutdatedFilterOptions(tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getClientOutdatedFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> deviceTypesFuture = facetQuery(facets, DEVICE_TYPES, () ->
                 pinotDeviceRepository.getDeviceTypeFilterOptions(tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> osTypesFuture = facetQuery(facets, OS_TYPES, () ->

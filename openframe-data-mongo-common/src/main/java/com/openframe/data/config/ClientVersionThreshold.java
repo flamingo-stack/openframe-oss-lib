@@ -3,10 +3,8 @@ package com.openframe.data.config;
 import com.openframe.data.document.device.ClientVersionKey;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
-// An unknown client version (null key) is never outdated, so a device without a reported version raises no banner
-@Component
+// An unknown client version (null key) is never outdated. Imported by the Mongo sync configs, not scanned.
 public class ClientVersionThreshold {
 
     @Getter

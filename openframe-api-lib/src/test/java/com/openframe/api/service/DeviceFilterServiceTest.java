@@ -176,7 +176,7 @@ class DeviceFilterServiceTest {
         Map<String, Integer> counts = new LinkedHashMap<>();
         counts.put("true", 3);
         counts.put("false", 9);
-        when(pinotDeviceRepository.getClientOutdatedFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getClientOutdatedFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(counts);
 
         // execution
@@ -188,7 +188,7 @@ class DeviceFilterServiceTest {
         assertThat(result.getClientOutdated())
                 .extracting(DeviceFilterOption::getValue, DeviceFilterOption::getLabel, DeviceFilterOption::getCount)
                 .containsExactly(tuple("true", "true", 3), tuple("false", "false", 9));
-        verify(pinotDeviceRepository).getClientOutdatedFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getClientOutdatedFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verifyNoMoreInteractions(pinotDeviceRepository);
     }
 
