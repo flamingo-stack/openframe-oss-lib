@@ -16,6 +16,9 @@ public interface PackageCatalogRepository extends MongoRepository<PackageCatalog
 
     List<PackageCatalogEntry> findByManagerAndPackageIdIn(PackageManagerType manager, Collection<String> packageIds);
 
+    // partial entries, every other field is null: add a field here before reading it from a matched cask
+    @Query(fields = "{ 'manager': 1, 'packageId': 1, 'name': 1, 'version': 1, 'brewType': 1, 'popularity': 1,"
+            + " 'aliases': 1, 'appNames': 1, 'weakAppNames': 1, 'bundleIds': 1, 'bundleIdPrefixes': 1 }")
     List<PackageCatalogEntry> findByManagerAndBrewType(PackageManagerType manager, BrewPackageType brewType);
 
     @Query("{ 'manager': ?0, '$or': [ { 'productCodes': { '$in': ?1 } }, { 'upgradeCodes': { '$in': ?2 } },"
