@@ -11,6 +11,7 @@ export type PlatformName =
   | 'revenue-hub'
   | 'people-hub'
   | 'coding-hub'
+  | 'security-hub'
   | 'openframe'
   | 'company-hub'
   | 'mlg';
