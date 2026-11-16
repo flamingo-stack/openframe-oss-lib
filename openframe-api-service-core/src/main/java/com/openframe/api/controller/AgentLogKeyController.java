@@ -16,7 +16,7 @@ public class AgentLogKeyController {
 
     @GetMapping
     public AgentKeyResponse getLogKey() {
-        return logKeyService.getLogKey();
+        return logKeyService.current();
     }
 
 }

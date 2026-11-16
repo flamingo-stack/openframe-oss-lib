@@ -33,7 +33,11 @@ public class AgentLogKeyService implements AgentKeyProvider {
 
     @Override
     public AgentKeyResponse current() {
-        return getLogKey();
+        return logKeyRepository.findFirstByOrderByCreatedAtDesc()
+                .map(logKey -> new AgentKeyResponse(
+                        encryptionService.decrypt(logKey.getEncryptedKey()),
+                        logKey.getCreatedAt()))
+                .orElseThrow(AgentLogKeyNotFoundException::new);
     }
 
     @Override
@@ -42,14 +46,6 @@ public class AgentLogKeyService implements AgentKeyProvider {
         AgentLogKey savedKey = saveNewKey(plainKey);
         log.info("Rotated agent log key, new key ID: {}", savedKey.getId());
         return new AgentKeyResponse(plainKey, savedKey.getCreatedAt());
-    }
-
-    public AgentKeyResponse getLogKey() {
-        return logKeyRepository.findFirstByOrderByCreatedAtDesc()
-                .map(logKey -> new AgentKeyResponse(
-                        encryptionService.decrypt(logKey.getEncryptedKey()),
-                        logKey.getCreatedAt()))
-                .orElseThrow(AgentLogKeyNotFoundException::new);
     }
 
     public void createIfMissing() {
