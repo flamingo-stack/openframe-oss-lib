@@ -40,11 +40,12 @@ class GatewayTrafficMetricsTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
 
-        metrics.recordSessionClosed("meshcentral-server", 1002, 0);
-        metrics.recordSessionClosed("meshcentral-server", 1002, 0);
+        metrics.recordSessionClosed("meshcentral-server", true, 1002, 0);
+        metrics.recordSessionClosed("meshcentral-server", true, 1002, 0);
 
         double count = registry.get("openframe.tenant.gateway.websocket.sessions.closed")
                 .tag("tool", "meshcentral-server")
+                .tag("relay", "true")
                 .tag("code", "1002")
                 .tag("lifetime", "0s")
                 .counter().count();

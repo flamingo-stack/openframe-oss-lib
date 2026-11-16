@@ -79,13 +79,15 @@ public class WebSocketGatewayConfig {
             GatewayTrafficMetrics gatewayTrafficMetrics,
             WebSocketLoggingProperties webSocketLoggingProperties,
             MeshControlCommandProperties meshControlCommandProperties,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            RelayAccessWatcher relayAccessWatcher
     ) {
         log.info("MeshCentral control command allowlist: enabled={} enforce={} actions={}",
                 meshControlCommandProperties.isEnabled(), meshControlCommandProperties.isEnforce(),
                 meshControlCommandProperties.getAllowedActions());
         return new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtClaimsReader,
-                gatewayTrafficMetrics, webSocketLoggingProperties, meshControlCommandProperties, objectMapper);
+                gatewayTrafficMetrics, webSocketLoggingProperties, meshControlCommandProperties, objectMapper,
+                relayAccessWatcher);
     }
 
 

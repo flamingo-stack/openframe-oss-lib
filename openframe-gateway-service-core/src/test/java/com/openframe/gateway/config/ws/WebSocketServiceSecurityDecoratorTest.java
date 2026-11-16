@@ -124,7 +124,7 @@ class WebSocketServiceSecurityDecoratorTest {
         // Command filtering off: these cases cover the logging tap, not the allowlist.
         WebSocketServiceSecurityDecorator decorator =
                 new WebSocketServiceSecurityDecorator(defaultService, jwtReader, metrics, props,
-                        meshProps, new tools.jackson.databind.ObjectMapper());
+                        meshProps, new tools.jackson.databind.ObjectMapper(), mock(RelayAccessWatcher.class));
 
         ServerWebExchange exchange = exchangeWithPath(requestPath);
         when(jwtReader.getSubject(exchange)).thenReturn(Optional.of("agent_x"));
