@@ -94,17 +94,33 @@ class ProgramPackageCorrelatorTest {
     @Test
     void correlate_nameWithArchitecture_architectureSearchFirst() {
         // setup
-        InstalledProgram firefox = program("Mozilla Firefox (x64 en-US)", "Mozilla", null, null);
-        PackageCatalogEntry mozilla = wingetPackage("Mozilla.Firefox", List.of("mozillafirefox(X64)", "mozillafirefox"),
-                List.of("mozilla"));
-        PackageCatalogEntry afrikaans = wingetPackage("Mozilla.Firefox.af", List.of("mozillafirefox"), List.of("mozilla"));
-        stubCatalog(mozilla, afrikaans);
+        InstalledProgram teraTerm = program("Tera Term 5.3 (x64)", "TeraTerm Project", null, null);
+        PackageCatalogEntry teraTerm5 = wingetPackage("TeraTermProject.teraterm5", List.of("teraterm(X64)", "teraterm"),
+                List.of("teratermproject"));
+        PackageCatalogEntry teraTerm4 = wingetPackage("TeraTermProject.teraterm", List.of("teraterm"),
+                List.of("teratermproject"));
+        stubCatalog(teraTerm5, teraTerm4);
 
         // execution
-        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(firefox));
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(teraTerm));
 
         // verifications
-        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(mozilla);
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(teraTerm5);
+    }
+
+    @Test
+    void correlate_programWithoutAName_thePackageOfItsCode() {
+        // setup
+        InstalledProgram nameless = program(null, null, ACROBAT_UPGRADE_CODE, null);
+        PackageCatalogEntry reader = wingetPackage("Adobe.Acrobat.Reader.64-bit", List.of(), List.of());
+        reader.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
+        stubCatalog(reader);
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(nameless));
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(reader);
     }
 
     @Test
@@ -160,17 +176,17 @@ class ProgramPackageCorrelatorTest {
     @Test
     void correlate_severalPackagesEquallyInstalled_bestCandidateHasTheShortestId() {
         // setup
-        InstalledProgram chromium = program("Chromium", "The Chromium Authors", null, null);
-        PackageCatalogEntry ungoogled =
-                wingetPackage("eloston.ungoogled-chromium", List.of("chromium"), List.of("thechromiumauthors"));
-        PackageCatalogEntry hibbiki = wingetPackage("Hibbiki.Chromium", List.of("chromium"), List.of("thechromiumauthors"));
-        stubCatalog(ungoogled, hibbiki);
+        InstalledProgram syncTrayzor = program("SyncTrayzor", "SyncTrayzor", null, null);
+        PackageCatalogEntry firstByName =
+                wingetPackage("GermanCoding.SyncTrayzor", List.of("synctrayzor"), List.of("synctrayzor"));
+        PackageCatalogEntry shortest = wingetPackage("SyncTrayzor.SyncTrayzor", List.of("synctrayzor"), List.of("synctrayzor"));
+        stubCatalog(firstByName, shortest);
 
         // execution
-        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(chromium));
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(syncTrayzor));
 
         // verifications
-        assertThat(matches.getFirst().getBestCandidate()).isSameAs(hibbiki);
+        assertThat(matches).extracting(PackageMatch::getBestCandidate).containsExactly(shortest);
     }
 
     @Test
