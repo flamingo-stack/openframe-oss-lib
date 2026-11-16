@@ -14,6 +14,7 @@ import java.util.List;
 public class DeviceFilters {
     private List<DeviceFilterOption> statuses;
     private List<DeviceFilterOption> connectivity;
+    private List<DeviceFilterOption> clientOutdated;
     private List<DeviceFilterOption> deviceTypes;
     private List<DeviceFilterOption> osTypes;
     private List<DeviceFilterOption> organizationIds;
