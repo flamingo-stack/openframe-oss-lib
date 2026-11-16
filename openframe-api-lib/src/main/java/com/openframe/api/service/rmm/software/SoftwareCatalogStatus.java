@@ -77,7 +77,9 @@ public class SoftwareCatalogStatus {
         List<InstalledProgram> programs = List.copyOf(rowByProgram.keySet());
         Map<InstalledProgram, PackageMatch> matches = packageMatcher.match(programs);
         Map<InstalledProgram, PackageMatch> adoptionMatches = packageMatcher.matchForAdoption(programs);
-        rowByProgram.forEach((program, row) -> {
+        for (Map.Entry<InstalledProgram, SoftwareResponse> rowOfProgram : rowByProgram.entrySet()) {
+            InstalledProgram program = rowOfProgram.getKey();
+            SoftwareResponse row = rowOfProgram.getValue();
             PackageMatch match = matches.get(program);
             PackageMatch adoptionMatch = adoptionMatches.get(program);
             PackageCatalogEntry managing = entryOf(match, manages);
@@ -85,7 +87,7 @@ public class SoftwareCatalogStatus {
             // a Mac app is taken by no managing matcher: what is known about its package is the adoption match
             PackageMatch known = match != null ? match : adoptionMatch;
             apply(row, brewPackages, known, managing, adoption);
-        });
+        }
     }
 
     private static PackageCatalogEntry entryOf(PackageMatch match, Predicate<PackageManagerType> counts) {
