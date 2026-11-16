@@ -474,6 +474,53 @@ class BrewAppMatcherTest {
     }
 
     @Test
+    void match_nameOnlySeveralCasksAllNamingOtherBundleIds_noPackage() {
+        // setup
+        PackageCatalogEntry office = cask("microsoft-office", "Microsoft Office")
+                .weakAppNames(List.of("microsoft defender")).bundleIds(List.of("com.microsoft.word")).build();
+        PackageCatalogEntry officeBusinessPro = cask("microsoft-office-businesspro", "Microsoft Office BusinessPro")
+                .weakAppNames(List.of("microsoft defender")).bundleIdPrefixes(List.of("com.microsoft.office")).build();
+        stubCatalog(office, officeBusinessPro);
+        List<InstalledProgram> apps = List.of(app("Microsoft Defender", "com.example.wdav"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).containsExactly(PackageMatch.noPackage());
+    }
+
+    @Test
+    void match_nameOnlySeveralCasksAndOneNamesOtherBundleIds_theOtherCask() {
+        // setup
+        PackageCatalogEntry amethystNostr = cask("amethyst-nostr", "Amethyst").appNames(List.of("amethyst")).build();
+        stubCatalog(cask("amethyst", "Amethyst").appNames(List.of("amethyst")).popularity(900)
+                .bundleIds(List.of("com.amethyst.amethyst")).build(), amethystNostr);
+        List<InstalledProgram> apps = List.of(app("Amethyst", "com.example.unknown"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(amethystNostr);
+    }
+
+    @Test
+    void match_nameOnlySeveralCasksByAWeakNameAndOneIsAVariant_theOtherCask() {
+        // setup
+        PackageCatalogEntry mailTool = cask("mail-tool", "Mail Tool").weakAppNames(List.of("em client")).build();
+        stubCatalog(cask("emclient@beta", "eM Client Beta").weakAppNames(List.of("em client")).popularity(900).build(),
+                mailTool);
+        List<InstalledProgram> apps = List.of(app("eM Client", null));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(mailTool);
+    }
+
+    @Test
     void match_nameOnlyFamily_theBaseCask() {
         // setup
         PackageCatalogEntry iterm = cask("iterm2", "iTerm2").appNames(List.of("iterm")).build();

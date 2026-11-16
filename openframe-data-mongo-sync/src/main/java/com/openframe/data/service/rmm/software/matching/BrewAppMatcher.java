@@ -123,24 +123,21 @@ public class BrewAppMatcher implements PackageMatcher {
         return StringUtils.strip(token, TOKEN_SEPARATOR);
     }
 
+    // a cask that alone is refused must not win among several either
     private static PackageMatch matchByNameOnly(String bundleId, Set<String> strongNameCasks, Set<String> weakNameCasks,
                                                 BrewCaskIndex index) {
         boolean byWeakName = strongNameCasks.isEmpty();
-        Set<String> candidates = withoutVariantsOfTheirBase(byWeakName ? weakNameCasks : strongNameCasks);
-        if (candidates.isEmpty()) {
-            return PackageMatch.noPackage();
-        }
-        if (candidates.size() > 1) {
-            return oneOf(candidates, index);
-        }
-        String token = candidates.iterator().next();
+        Set<String> named = withoutVariantsOfTheirBase(byWeakName ? weakNameCasks : strongNameCasks);
+        Set<String> candidates = named.stream()
+                .filter(token -> !isRefusedByNameOnly(token, byWeakName, bundleId, index))
+                .collect(toSet());
+        return candidates.isEmpty() ? PackageMatch.noPackage() : oneOf(candidates, index);
+    }
+
+    private static boolean isRefusedByNameOnly(String token, boolean byWeakName, String bundleId, BrewCaskIndex index) {
         boolean variantByWeakName = byWeakName && token.contains(VARIANT_SEPARATOR);
         boolean caskOfAnotherBundleId = !bundleId.isEmpty() && index.namesBundleIds(token);
-        if (variantByWeakName || caskOfAnotherBundleId) {
-            return PackageMatch.noPackage();
-        }
-        PackageCatalogEntry cask = index.caskOf(token);
-        return PackageMatch.of(cask);
+        return variantByWeakName || caskOfAnotherBundleId;
     }
 
     // casks an exact id and the name agree on are editions of one app (zoom, zoom-for-it-admins): the base is offered
