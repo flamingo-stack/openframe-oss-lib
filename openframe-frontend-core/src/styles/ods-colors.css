@@ -95,6 +95,14 @@
   --ods-flamingo-pink-secondary-hover: #40102f;
   --ods-flamingo-pink-secondary-action: #360625;
 
+  /* Flamingo Orange (the Security Hub's accent) */
+  --ods-flamingo-orange-base: #ff8a3d;
+  --ods-flamingo-orange-hover: #f58033;
+  --ods-flamingo-orange-action: #eb7629;
+  --ods-flamingo-orange-secondary: #4a2a15;
+  --ods-flamingo-orange-secondary-hover: #54341f;
+  --ods-flamingo-orange-secondary-action: #5e3e29;
+
   /* Open Yellow */
   --ods-open-yellow-base: #ffc008;
   --ods-open-yellow-hover: #f5b600;
@@ -212,6 +220,14 @@
   --ods-flamingo-pink-secondary: #ffc4ea;
   --ods-flamingo-pink-secondary-hover: #f5bae0;
   --ods-flamingo-pink-secondary-action: #ebb0d6;
+
+  /* Flamingo Orange (the Security Hub's accent) */
+  --ods-flamingo-orange-base: #d9661a;
+  --ods-flamingo-orange-hover: #cf5c10;
+  --ods-flamingo-orange-action: #c55206;
+  --ods-flamingo-orange-secondary: #ffd8bf;
+  --ods-flamingo-orange-secondary-hover: #f5ceb5;
+  --ods-flamingo-orange-secondary-action: #ebc4ab;
 
   /* Open Yellow */
   --ods-open-yellow-base: #e4aa00;
@@ -681,6 +697,22 @@
   --color-link-hover: var(--ods-system-greys-white-hover);
   --ods-current: var(--ods-system-greys-white);
   --ods-accent: var(--ods-system-greys-white);
+}
+
+[data-app-type='security-hub'] {
+  --color-accent-primary: var(--ods-flamingo-orange-base);
+  --color-accent-hover: var(--ods-flamingo-orange-hover);
+  --color-accent-active: var(--ods-flamingo-orange-action);
+  --color-accent-secondary: var(--ods-flamingo-orange-secondary);
+  --color-accent-secondary-hover: var(--ods-flamingo-orange-secondary-hover);
+  --color-accent-secondary-active: var(--ods-flamingo-orange-secondary-action);
+  --color-accent-focus: var(--ods-flamingo-orange-base);
+  --color-focus-ring: var(--ods-flamingo-orange-base);
+  --color-focus-visible: var(--ods-flamingo-orange-base);
+  --color-link: var(--ods-flamingo-orange-base);
+  --color-link-hover: var(--ods-flamingo-orange-hover);
+  --ods-current: var(--ods-flamingo-orange-base);
+  --ods-accent: var(--ods-flamingo-orange-base);
 }
 
 [data-app-type='company-hub'] {
