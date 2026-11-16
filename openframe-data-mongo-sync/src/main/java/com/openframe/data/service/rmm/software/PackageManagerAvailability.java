@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.toSet;
 import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Slf4j
@@ -66,6 +67,21 @@ public class PackageManagerAvailability {
         return isEmpty(reported) || PackageManagerState.MANAGEABLE.contains(reported.get(manager));
     }
 
+    // an order of a manager the device cannot run would only fail there; MISSING and UNKNOWN change over time
+    public static boolean isSupportedOn(Machine machine, PackageManagerType manager) {
+        Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
+        return reported == null || reported.get(manager) != PackageManagerState.UNSUPPORTED;
+    }
+
+    // in the order of machineIds; a machine that is not found is left out
+    public List<String> supporting(Collection<String> machineIds, PackageManagerType manager) {
+        Set<String> supporting = machines(machineIds).stream()
+                .filter(machine -> isSupportedOn(machine, manager))
+                .map(Machine::getMachineId)
+                .collect(toSet());
+        return machineIds.stream().filter(supporting::contains).toList();
+    }
+
     public void requireSoftwareManageable(Collection<String> machineIds, Collection<PackageManagerType> packageManagers) {
         List<Machine> machines = machines(machineIds);
         List<String> unmanageable = machines.stream()
@@ -76,6 +92,14 @@ public class PackageManagerAvailability {
             throw new BadRequestException("These devices have no supported package manager: " + unmanageable
                     + ". Remove the devices.");
         }
+        List<String> unsupporting = machines.stream()
+                .filter(machine -> supportsNone(machine, packageManagers))
+                .map(Machine::getMachineId)
+                .toList();
+        if (!unsupporting.isEmpty()) {
+            throw new BadRequestException("These devices support none of the requested package managers: " + unsupporting
+                    + ". Remove the devices.");
+        }
         List<String> notYetUsable = machines.stream()
                 .flatMap(machine -> notYetUsable(machine, packageManagers))
                 .toList();
@@ -84,6 +108,11 @@ public class PackageManagerAvailability {
         if (!notYetUsable.isEmpty()) {
             log.info("Package manager not yet usable on these devices, accepting anyway: {}", notYetUsable);
         }
+    }
+
+    private static boolean supportsNone(Machine machine, Collection<PackageManagerType> packageManagers) {
+        return !isEmpty(packageManagers)
+                && packageManagers.stream().noneMatch(manager -> isSupportedOn(machine, manager));
     }
 
     private static Stream<String> notYetUsable(Machine machine, Collection<PackageManagerType> packageManagers) {

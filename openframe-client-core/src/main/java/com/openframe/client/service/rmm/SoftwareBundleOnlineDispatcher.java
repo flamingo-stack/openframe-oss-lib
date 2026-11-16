@@ -74,6 +74,11 @@ public class SoftwareBundleOnlineDispatcher {
         }
         Script script = found.get();
 
+        if (!PackageManagerAvailability.isSupportedOn(machine, pkg.getPackageManager())) {
+            log.debug("Skipping package {}/{} for machine {} — the device does not support {}",
+                    pkg.getPackageManager(), pkg.getPackageName(), machineId, pkg.getPackageManager());
+            return;
+        }
         OsType osType = machine.getOsType();
         if (osType == null || script.getSupportedPlatforms() == null
                 || !script.getSupportedPlatforms().contains(osType)) {

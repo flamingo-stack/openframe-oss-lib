@@ -218,6 +218,51 @@ class PackageManagerAvailabilityTest {
         assertThatCode(() -> availability.requireSoftwareManageable(machineIds, managers)).doesNotThrowAnyException();
     }
 
+    @Test
+    void requireSoftwareManageable_deviceSupportsNoneOfTheRequestedManagers_badRequestNamesOnlyIt() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine server = machine("m-server", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT));
+        Machine desktop = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, MISSING));
+        stubMachines(Set.of("m-server", "m-win"), server, desktop);
+        List<String> machineIds = List.of("m-server", "m-win");
+        List<PackageManagerType> managers = List.of(WINGET);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> availability.requireSoftwareManageable(machineIds, managers));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m-server").hasMessageNotContaining("m-win");
+    }
+
+    @Test
+    void supporting_devicesThatCannotRunTheManager_leftOutInTheOrderAsked() {
+        // setup
+        Machine server = machine("m-server", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT));
+        Machine desktop = machine("m-win", Map.of(WINGET, PRESENT));
+        Machine notYet = machine("m-new", Map.of(WINGET, MISSING));
+        Machine oldAgent = machine("m-old-agent", null);
+        stubMachines(Set.of("m-old-agent", "m-server", "m-new", "m-win"), desktop, server, oldAgent, notYet);
+        List<String> machineIds = List.of("m-old-agent", "m-server", "m-new", "m-win");
+
+        // execution
+        List<String> result = availability.supporting(machineIds, WINGET);
+
+        // verifications
+        assertThat(result).containsExactly("m-old-agent", "m-new", "m-win");
+    }
+
+    @Test
+    void supporting_noMachines_emptyWithoutAQuery() {
+        // execution
+        List<String> result = availability.supporting(List.of(), WINGET);
+
+        // verifications
+        assertThat(result).isEmpty();
+        verifyNoInteractions(machineRepository);
+    }
+
     private void stubMachines(Set<String> machineIds, Machine... machines) {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.findByTenantIdAndMachineIdIn(TENANT_ID, machineIds)).thenReturn(List.of(machines));
