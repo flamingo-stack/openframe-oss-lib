@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -62,12 +61,11 @@ public class SoftwareCatalogStatus {
     // a manager counts on a device only where it runs: there winget's package gives way to the one to adopt into
     public void applyOnDevice(String machineId, List<SoftwareResponse> rows) {
         String tenantId = tenantIdProvider.getTenantId();
-        Optional<Machine> found = machineRepository.findByTenantIdAndMachineId(tenantId, machineId);
-        if (found.isEmpty()) {
-            apply(rows);
-            return;
-        }
-        Machine device = found.get();
+        machineRepository.findByTenantIdAndMachineId(tenantId, machineId)
+                .ifPresentOrElse(device -> applyOn(device, rows), () -> apply(rows));
+    }
+
+    private void applyOn(Machine device, List<SoftwareResponse> rows) {
         apply(rows, manager -> PackageManagerAvailability.isPresentOn(device, manager),
                 manager -> packageManagerAvailability.isAdoptableOn(device, manager));
     }
