@@ -20,3 +20,19 @@ fn encrypts_to_base64_of_nonce_ciphertext_and_tag() {
     assert_eq!(raw.len(), NONCE_LEN + plaintext.len() + 16);
     assert_eq!(decrypt(KEY.as_bytes(), &encrypted).unwrap(), plaintext);
 }
+
+#[test]
+fn decrypt_rejects_another_key() {
+    assert!(decrypt(&[7u8; 32], DEPLOYED_FORMAT_CIPHERTEXT).is_err());
+}
+
+#[test]
+fn decrypt_rejects_input_shorter_than_the_nonce() {
+    let short = general_purpose::STANDARD.encode([0u8; NONCE_LEN - 1]);
+    assert!(decrypt(KEY.as_bytes(), &short).is_err());
+}
+
+#[test]
+fn decrypt_rejects_text_that_is_not_base64() {
+    assert!(decrypt(KEY.as_bytes(), "not base64!").is_err());
+}
