@@ -1321,3 +1321,77 @@ async fn an_update_to_the_installed_version_reports_it_again() {
         ("openframe-chat".to_string(), "1.6.10".to_string())
     );
 }
+
+#[cfg(target_os = "windows")]
+#[tokio::test]
+async fn an_update_whose_old_binary_is_still_running_fails_and_keeps_the_recorded_version() {
+    use std::io::Write;
+    use std::os::windows::fs::OpenOptionsExt;
+
+    const TOOL: &str = "it-locked-tool";
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            TOOL,
+            "0.4.16",
+            ToolRecordState::Installed,
+            Vec::new(),
+        ))
+        .await;
+    let binary = agent.directories.get_tool_executable_path(TOOL, None);
+    let aside = crate::platform::binary_writer::aside_path(&binary);
+    std::fs::write(&aside, b"agent").unwrap();
+    let _running = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&aside)
+        .unwrap();
+
+    let new_agent = vec![7u8; 200 * 1024];
+    let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    archive
+        .start_file(
+            "agent.exe",
+            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored),
+        )
+        .unwrap();
+    archive.write_all(&new_agent).unwrap();
+    let release =
+        crate::test_support::mock_server_with_body(&[200], archive.finish().unwrap().into_inner())
+            .await;
+
+    let handler = ToolUpdateHandler::new(
+        agent.tool_update_service(),
+        ToolOps::default(),
+        agent.tool_run_manager.client_update_pending(),
+    );
+    agent.launch_command(handler).await;
+    let mut update = tool_update("t1", 1, TOOL, "0.4.18");
+    update["downloadConfigurations"] = json!([{
+        "os": "windows",
+        "fileName": "agent.zip",
+        "agentFileName": "agent.exe",
+        "link": format!("{}/agent.zip", release.url),
+        "installationType": "STANDARD",
+    }]);
+    agent
+        .send_to(ToolUpdateHandler::subject(MACHINE), update)
+        .await;
+
+    agent.expect("t1", DeliveryResult::Acked).await;
+    let failed = agent.expect("t1", DeliveryResult::Failed).await;
+    assert!(
+        failed.error.as_deref().unwrap().contains("still holds"),
+        "{failed:?}"
+    );
+    assert_eq!(std::fs::read(&binary).unwrap(), new_agent);
+    let recorded = InstalledToolsService::new(agent.directories.clone())
+        .unwrap()
+        .get_by_tool_agent_id(TOOL)
+        .await
+        .unwrap()
+        .expect("record kept");
+    assert_eq!(recorded.version, "0.4.16");
+}

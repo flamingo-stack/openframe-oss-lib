@@ -369,10 +369,12 @@ impl ToolAgentUpdateService {
             .directory_manager
             .get_tool_executable_path(tool_agent_id, installed_tool.installation.executable_path());
         if !clear_aside_binary(&exec_path, tool_agent_id).await {
-            error!(tool_id = %tool_agent_id,
-                   "Pre-update process still holds {}: keeping recorded version {} instead of {} — the new binary is on disk but not running",
-                   exec_path.display(), installed_tool.version, new_version);
-            return Ok(());
+            anyhow::bail!(
+                "Pre-update process still holds {}: keeping recorded version {} instead of {} — the new binary is on disk but not running, will retry",
+                exec_path.display(),
+                installed_tool.version,
+                new_version
+            );
         }
 
         installed_tool.version = new_version.to_string();
