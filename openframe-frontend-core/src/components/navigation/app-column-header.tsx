@@ -19,7 +19,10 @@ export type AppColumnHeaderLayoutAction = 'fullscreen' | 'restore-split';
 export interface AppColumnHeaderProps {
   /** The column's title (a chat's name, a page's name). Truncated to one line. */
   title: ReactNode;
-  /** Before the title, e.g. a Back button on a details page. */
+  /**
+   * Before the title, e.g. a Back button on a details page (`useColumnBack()`). Kept while
+   * the column is squeezed: a page's Back is its way out, not an extra.
+   */
   leading?: ReactNode;
   /**
    * Cells after the title and before the layout and close buttons (an avatar, a ⋯ menu).
@@ -75,7 +78,16 @@ export function AppColumnHeader({
       data-column-header=""
     >
       {leading && (
-        <div className={cn('flex shrink-0 items-center pl-[var(--spacing-system-sf)]', SQUEEZED_HIDDEN)}>{leading}</div>
+        // Kept while squeezed and shrinking with the layout and close cells, so the three share the floor
+        // instead of the Back keeping its width and folding the other two to slivers.
+        <div
+          className={cn(
+            'flex shrink-0 items-center pl-[var(--spacing-system-sf)] [&>*]:min-w-0 [&>*]:shrink',
+            SQUEEZED_KEPT_CELL,
+          )}
+        >
+          {leading}
+        </div>
       )}
       <div
         className={cn(
