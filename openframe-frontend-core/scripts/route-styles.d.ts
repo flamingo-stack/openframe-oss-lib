@@ -6,6 +6,9 @@ import type { ReactElement } from 'react';
  * build.
  */
 export function RouteStyles(props?: {
-  /** The page's markup depends on the visitor (a signed-in hub): carry the complete sheet. */
-  complete?: boolean;
+  /**
+   * The page's markup depends on the visitor, so no build can sample it: carry the complete sheet. `true` for every
+   * page (a signed-in hub), or the path prefixes whose pages do (`['/admin']`: the staff screens of a public site).
+   */
+  complete?: boolean | readonly string[];
 }): ReactElement | null;
