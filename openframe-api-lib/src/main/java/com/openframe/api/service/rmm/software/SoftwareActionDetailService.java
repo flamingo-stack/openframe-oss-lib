@@ -216,9 +216,10 @@ public class SoftwareActionDetailService {
     }
 
     private static SoftwareActionDeviceResponse fromLeaf(ScriptExecution leaf) {
+        SoftwareActionKind kind = kindOf(leaf);
         return SoftwareActionDeviceResponse.builder()
                 .machineId(leaf.getMachineId())
-                .kind(kindOf(leaf))
+                .kind(kind)
                 .status(deviceStatus(leaf.getStatus()))
                 .exitCode(leaf.getExitCode())
                 .stdout(leaf.getStdout())

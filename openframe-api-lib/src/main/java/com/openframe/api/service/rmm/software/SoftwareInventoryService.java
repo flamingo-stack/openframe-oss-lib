@@ -255,7 +255,7 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> withDevices = all.stream()
                 .filter(row -> deviceCount(row) > 0)
                 .toList();
-        boolean statusesOnEveryRow = readsStatuses(filter);
+        boolean statusesOnEveryRow = hasStatusFilter(filter);
         if (statusesOnEveryRow) {
             // the filter reads the source and the auto-update the statuses set, so they go on every row before the
             // page is cut
@@ -271,7 +271,7 @@ public class SoftwareInventoryService {
         return statusesOnEveryRow ? result : withStatuses(result);
     }
 
-    private static boolean readsStatuses(SoftwareFilterInput filter) {
+    private static boolean hasStatusFilter(SoftwareFilterInput filter) {
         return filter != null && (filter.getManageable() != null || !isEmpty(filter.getSources())
                 || !isEmpty(filter.getAutoUpdateStatuses()));
     }
