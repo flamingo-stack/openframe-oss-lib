@@ -1,7 +1,9 @@
 package com.openframe.client.listener.packageupdate;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Orchestrates one package-update status event: load state, drop duplicates/stale events,
@@ -79,6 +82,7 @@ public class PackageUpdateStatusProcessor {
         Instant deadlineBefore = state.getDeadlineAt();
         PackageUpdateDeviceStateReducer.apply(state, request, event);
         timeNextPrompt(state, event);
+        driveNextPrompt(state, request, machineId);
         driveDeadlineForce(state, request, deadlineBefore, machineId);
         autoUpdateRetry.scheduleIfDue(state, request);
         autoUpdateRetry.turnOffIfPackageRemoved(state, request);
@@ -136,13 +140,41 @@ public class PackageUpdateStatusProcessor {
         }
     }
 
+    // the agent asks again when the same WAIT order reaches it under a newer sequence. Once the update is over it
+    // takes that order as a new one, so a prompt still held for its moment is withdrawn then
+    private void driveNextPrompt(PackageUpdateDeviceState state, PackageUpdateRequest request, String machineId) {
+        String requestId = state.getRequestId();
+        Instant askAgainAt = state.getAskAgainAt();
+        if (askAgainAt != null && request != null) {
+            PackageUpdateDeliverySeed prompt = PackageUpdateWire.seed(machineId, request);
+            deliveryDispatcher.schedule(prompt, askAgainAt);
+            log.info("[package-update] next prompt scheduled requestId={} machineId={} askAgainAt={}",
+                    requestId, machineId, askAgainAt);
+            return;
+        }
+        if (!isTerminal(state)) {
+            return;
+        }
+        Optional<MachineDelivery> order = deliveryTracker.find(DeliveryType.PACKAGE_UPDATE, requestId, machineId);
+        boolean held = order.map(MachineDelivery::getStatus).filter(DeliveryStatus.PENDING::equals).isPresent();
+        if (held) {
+            deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, requestId, machineId,
+                    "update finished before the next prompt");
+            log.info("[package-update] next prompt withdrawn requestId={} machineId={} status={}",
+                    requestId, machineId, state.getStatus());
+        }
+    }
+
     private void driveDeadlineForce(PackageUpdateDeviceState state, PackageUpdateRequest request, Instant deadlineBefore, String machineId) {
         Instant deadlineAt = state.getDeadlineAt();
         if (deadlineAt == null) {
             return;
         }
         String requestId = state.getRequestId();
-        if (!deadlineAt.equals(deadlineBefore)) {
+        // the agent drops an order older than the one it holds: the prompt scheduled by this status would outrank
+        // the force recorded before it, so the force is recorded again
+        boolean promptScheduled = state.getAskAgainAt() != null && request != null;
+        if (!deadlineAt.equals(deadlineBefore) || promptScheduled) {
             boolean approved = Waiting.Phase.APPROVED.name().equals(state.getWaitingPhase());
             PackageUpdateDeliverySeed force = approved
                     ? PackageUpdateWire.approvedForce(machineId, request)
