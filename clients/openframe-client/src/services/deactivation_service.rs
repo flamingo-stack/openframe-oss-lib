@@ -142,7 +142,7 @@ impl DeactivationService {
     }
 
     /// The probe delay the next [`Self::next_probe_delay`] returns, or `None` while the state is locked.
-    #[cfg(test)]
+    #[cfg(all(test, any(target_os = "macos", target_os = "windows")))]
     pub(crate) fn probe_backoff(&self) -> Option<Duration> {
         self.state.try_lock().ok().map(|st| st.probe_backoff)
     }
@@ -203,7 +203,7 @@ impl DeactivationService {
                 warn!(
                     target: "deactivation",
                     reason = "backoff_started",
-                    "First 410 Gone from gateway (tenant may be deleted); will stop tools after {} consecutive",
+                    "First 410 Gone from gateway (tenant may be deleted); confirmed after {} consecutive",
                     STOP_TOOLS_AFTER_CONSECUTIVE
                 );
             }
@@ -217,6 +217,13 @@ impl DeactivationService {
                     "Tenant gone confirmed; stopping all tools and gating outbound calls to a single backoff probe"
                 );
                 self.suspend(&mut st);
+            } else if st.consecutive_gone == STOP_TOOLS_AFTER_CONSECUTIVE {
+                warn!(
+                    target: "deactivation",
+                    reason = "calls_stopped",
+                    consecutive = st.consecutive_gone,
+                    "Tenant gone confirmed while calls were already paused"
+                );
             }
 
             Self::uninstall_due(&st, now)
