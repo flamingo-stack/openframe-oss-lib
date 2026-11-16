@@ -9,6 +9,11 @@ public interface PackageMatcher {
 
     FleetSource getFleetSource();
 
+    // true for a manager that updates only what it installed itself: its match is the package to adopt the program into
+    default boolean isForAdoption() {
+        return false;
+    }
+
     // one result per program, in the order of the programs
     List<PackageMatch> match(List<InstalledProgram> programs);
 }

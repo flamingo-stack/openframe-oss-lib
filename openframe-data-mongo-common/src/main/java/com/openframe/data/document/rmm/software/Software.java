@@ -49,6 +49,8 @@ public class Software implements TenantScoped {
     private List<String> wingetIds;
     // null until the projector matched the title, or when no matcher handles its source
     private SoftwarePackageMatch packageMatch;
+    // the package the title can be adopted into; never the answer on a device where packageMatch's manager runs
+    private SoftwarePackageMatch adoptionMatch;
 
     private String latestVersion;
 

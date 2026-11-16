@@ -27,4 +27,5 @@ public class InstalledProgram {
     private final List<String> wingetIds = List.of();
     // what the read model stored for the program when it was projected; null when it was never matched
     private final SoftwarePackageMatch storedMatch;
+    private final SoftwarePackageMatch storedAdoptionMatch;
 }

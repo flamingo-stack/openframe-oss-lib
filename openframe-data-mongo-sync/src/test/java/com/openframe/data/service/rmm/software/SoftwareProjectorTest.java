@@ -255,6 +255,51 @@ class SoftwareProjectorTest {
     }
 
     @Test
+    void project_windowsProgram_storesThePackageToAdoptItInto() {
+        // setup
+        PackageCatalogEntry choco7zip = PackageCatalogEntry.builder().manager(PackageManagerType.CHOCO).packageId("7zip").build();
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup().build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.empty());
+        stubMatch(PackageMatch.noPackage());
+        when(packageMatcher.matchForAdoption(anyList())).thenAnswer(invocation -> {
+            List<InstalledProgram> programs = invocation.getArgument(0);
+            Map<InstalledProgram, PackageMatch> matches = new IdentityHashMap<>();
+            matches.put(programs.getFirst(), PackageMatch.of(choco7zip));
+            return matches;
+        });
+
+        // execution
+        projector.project("t1", 7L);
+
+        // verifications
+        ArgumentCaptor<Software> captor = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(captor.capture());
+        Software saved = captor.getValue();
+        assertThat(saved.getPackageMatch().getState()).isEqualTo(PackageMatchState.NO_PACKAGE);
+        assertThat(saved.getAdoptionMatch().getState()).isEqualTo(PackageMatchState.MATCHED);
+        assertThat(saved.getAdoptionMatch().getManager()).isEqualTo(PackageManagerType.CHOCO);
+        assertThat(saved.getAdoptionMatch().getPackageId()).isEqualTo("7zip");
+        assertThat(saved.getAdoptionMatch().getMatchedAt()).isEqualTo(saved.getPackageMatch().getMatchedAt());
+    }
+
+    @Test
+    void project_onlyTheAdoptionMatchIsFresh_keepsBothWithoutAsking() {
+        // setup
+        Instant fresh = Instant.now().minus(Duration.ofHours(1));
+        Software stored = chromeProjected(null);
+        stored.setPackageMatch(null);
+        stored.setAdoptionMatch(new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.CHOCO, "googlechrome", fresh));
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup().build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.of(stored));
+
+        // execution
+        projector.project("t1", 7L);
+
+        // verifications
+        verifyNoInteractions(packageMatcher);
+    }
+
+    @Test
     void project_sameKeysButStaleMatch_matchesAgain() {
         Software stored = chromeProjected(Instant.now().minus(SoftwareProjector.MATCH_TTL).minus(Duration.ofMinutes(1)));
         when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup().build()));

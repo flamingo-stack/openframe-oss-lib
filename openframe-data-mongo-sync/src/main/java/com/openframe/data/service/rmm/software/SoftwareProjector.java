@@ -58,8 +58,8 @@ public class SoftwareProjector {
         applyName(software, rollup);
         applyProgram(software, program);
         software.setInstallerTypes(rollup.installerTypes());
-        if (keysChanged || isStale(software.getPackageMatch())) {
-            software.setPackageMatch(matchOf(program));
+        if (keysChanged || isStale(software)) {
+            applyMatches(software, program);
         }
         String latestVersion = latestVersion(rollup.versions());
         software.setLatestVersion(latestVersion);
@@ -116,14 +116,23 @@ public class SoftwareProjector {
                 && Boolean.TRUE.equals(software.getSystemComponent()) == program.isSystemComponent();
     }
 
+    // either match dates the title: a source only one of the two matchers takes is not matched again on every event
+    private static boolean isStale(Software software) {
+        return isStale(software.getPackageMatch()) && isStale(software.getAdoptionMatch());
+    }
+
     private static boolean isStale(SoftwarePackageMatch match) {
         return match == null || match.getMatchedAt() == null
                 || match.getMatchedAt().isBefore(Instant.now().minus(MATCH_TTL));
     }
 
-    private SoftwarePackageMatch matchOf(InstalledProgram program) {
-        PackageMatch match = packageMatcher.match(List.of(program)).get(program);
-        return match == null ? null : match.toStored(Instant.now());
+    private void applyMatches(Software software, InstalledProgram program) {
+        Instant matchedAt = Instant.now();
+        List<InstalledProgram> programs = List.of(program);
+        PackageMatch match = packageMatcher.match(programs).get(program);
+        PackageMatch adoptionMatch = packageMatcher.matchForAdoption(programs).get(program);
+        software.setPackageMatch(match == null ? null : match.toStored(matchedAt));
+        software.setAdoptionMatch(adoptionMatch == null ? null : adoptionMatch.toStored(matchedAt));
     }
 
     private static List<String> orEmpty(List<String> values) {
