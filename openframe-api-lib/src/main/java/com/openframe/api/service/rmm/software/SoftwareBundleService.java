@@ -12,6 +12,7 @@ import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
@@ -33,6 +34,7 @@ import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +51,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Service
@@ -67,6 +71,7 @@ public class SoftwareBundleService {
     private final PackageManagerAvailability packageManagerAvailability;
     private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
     private final SoftwareInventoryService softwareInventoryService;
+    private final PackageCatalogVersions packageCatalogVersions;
 
     @Value("${openframe.rmm.software.bundle.pending-ttl}")
     private Duration pendingTtl;
@@ -154,6 +159,7 @@ public class SoftwareBundleService {
             submitScheduled(entity, input, actor);
         } else {
             entity.setMode(SoftwareBundleMode.NOW);
+            packages.forEach(this::fillLatestVersion);
             armOnlineDispatch(entity, now);
             entity.setExecutionIds(executionIds(entity));
         }
@@ -210,6 +216,19 @@ public class SoftwareBundleService {
         Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         rejectDevicesWithoutCompatiblePackage(machineIds, packages, deviceOsTypes);
         return deviceOsTypes;
+    }
+
+    // only an action that runs now: a scheduled run installs the latest version of its own day
+    private void fillLatestVersion(SoftwareBundlePackage pkg) {
+        String version = pkg.getVersion();
+        PackageManagerType packageManager = pkg.getPackageManager();
+        String packageName = pkg.getPackageName();
+        BrewPackageType brewPackageType = pkg.getBrewPackageType();
+        if (hasText(version) || !packageCatalogVersions.hasShownLatest(packageManager, packageName, brewPackageType)) {
+            return;
+        }
+        String latestVersion = packageCatalogVersions.shownLatest(packageManager, packageName, brewPackageType);
+        pkg.setVersion(latestVersion);
     }
 
     private void writeActionResults(SoftwareBundle bundle, List<SoftwareBundlePackage> packages,
