@@ -24,6 +24,9 @@ export interface PlatformDomainEntry {
   key: PlatformDomainKey;
   /** Canonical production URL — the LOAD-BEARING source of truth (today's hardcoded fallbacks). */
   defaultUrl: string;
+  /** Where the platform's PAGES live, when that is not `defaultUrl`: openframe's `defaultUrl` is the product app,
+   *  its website is another host. What a stored link to one of its pages names (`getPlatformCanonicalUrl`). */
+  siteUrl?: string;
   /** `NEXT_PUBLIC_*_URL` per-deploy OVERRIDE. The `defaultUrl` covers it when unset. */
   envVar: string;
   /** Legacy/secondary hosts that REVERSE-map to this key (no env var exists — NOT canonical). */
@@ -39,6 +42,7 @@ export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
   { key: 'revenue-hub', defaultUrl: 'https://revenue-hub.flamingo.so', envVar: 'NEXT_PUBLIC_REVENUE_HUB_URL' },
   { key: 'people-hub', defaultUrl: 'https://people-hub.flamingo.so', envVar: 'NEXT_PUBLIC_PEOPLE_HUB_URL' },
   { key: 'coding-hub', defaultUrl: 'https://coding-hub.flamingo.so', envVar: 'NEXT_PUBLIC_CODING_HUB_URL' },
+  { key: 'security-hub', defaultUrl: 'https://security-hub.flamingo.so', envVar: 'NEXT_PUBLIC_SECURITY_HUB_URL' },
   { key: 'openmsp', defaultUrl: 'https://www.openmsp.ai', envVar: 'NEXT_PUBLIC_OPENMSP_URL' },
   // ORDERING INVARIANT (first-wins, load-bearing): `flamingo` MUST precede `universal`.
   // Both resolve to www.flamingo.run; the reverse index is first-wins → flamingo claims the shared host,
@@ -55,6 +59,7 @@ export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
   {
     key: 'openframe',
     defaultUrl: 'https://openframe.ai',
+    siteUrl: 'https://hub.openframe.ai',
     envVar: 'NEXT_PUBLIC_OPENFRAME_URL',
     aliasHostnames: ['openframe.ai', 'www.openframe.ai', 'hub.openframe.ai'],
   },
@@ -139,6 +144,18 @@ export function getPlatformProductionUrl(platform: string): string {
   const resolved =
     envOverrideFor(platform) ?? byKey(platform)?.defaultUrl ?? envOverrideFor('flamingo') ?? 'https://www.flamingo.run';
   return ensureScheme(resolved);
+}
+
+/**
+ * The origin a record's address is stored and served on: the registry's `siteUrl ?? defaultUrl`, whatever the
+ * environment. Deliberately env-free: `getPlatformUrl` answers localhost outside a production build and
+ * `NEXT_PUBLIC_*_URL` is repointed per preview, and an address written to the database or sent to another service
+ * must name the place the record lives in production. A preview stays on itself through its host's composer, never
+ * through what is stored. Unknown-key fallback is flamingo's URL, like `getPlatformProductionUrl`.
+ */
+export function getPlatformCanonicalUrl(platform: string): string {
+  const entry = byKey(platform) ?? byKey('flamingo');
+  return (entry?.siteUrl ?? entry?.defaultUrl ?? 'https://www.flamingo.run').replace(/\/+$/, '');
 }
 
 /**
@@ -268,10 +285,15 @@ export function aliasHostsOf(key: string): string[] {
   return byKey(key)?.aliasHostnames ?? [];
 }
 
-/** All hosts an entry contributes to the reverse index (resolved host + optional aliases). */
+/**
+ * All hosts an entry contributes to the reverse index: the resolved host, the canonical ones (so a stored address
+ * resolves in every environment, a per-deploy override included) and optional aliases.
+ */
 function hostsForEntry(entry: PlatformDomainEntry, opts: { includeAliases: boolean }): string[] {
-  const resolved = hostOf(getPlatformProductionUrl(entry.key));
-  const hosts = resolved ? expandWwwApex(resolved) : [];
+  const hosts = [getPlatformProductionUrl(entry.key), entry.defaultUrl, entry.siteUrl].flatMap(url => {
+    const host = hostOf(url);
+    return host ? expandWwwApex(host) : [];
+  });
   if (opts.includeAliases) hosts.push(...aliasHostsOf(entry.key));
   return hosts;
 }
@@ -288,6 +310,17 @@ export function getPlatformByHostname(hostname: string): PlatformDomainKey | nul
     if (hostsForEntry(entry, { includeAliases: true }).includes(host)) return entry.key;
   }
   return null;
+}
+
+/**
+ * The platform an absolute URL lives on: a thin read of `getPlatformByHostname`. Null for a third party, for anything
+ * that is not an absolute URL, and for the local machine (where every platform shares one host, so the host says
+ * nothing). The call sites feeding the navigation functions derive `targetPlatform` from a stored address with it.
+ */
+export function platformOfUrl(url: string | null | undefined): PlatformDomainKey | null {
+  if (!url || isLocalUrl(url)) return null;
+  const host = hostOf(url);
+  return host ? getPlatformByHostname(host) : null;
 }
 
 // ── Preview detection (two distinct predicates — env-form vs host-form) ──

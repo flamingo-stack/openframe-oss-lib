@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Slack Message Card — unified visual for slack-messages markers.
+ * Slack Message Card — unified visual for a Slack message record.
  *
  * PURE PRESENTATION (no internal nav). The card receives the structured
  * `<Link>` prop bundle via `anchorProps` (composed by the caller from a

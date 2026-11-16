@@ -79,9 +79,12 @@ export {
   WORK_AREA_MIN_COLUMN_WIDTH,
   WorkAreaColumnContext,
 } from './app-layout-work-area';
+export { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from '../../utils/work-area-share';
 export type { AppLayoutWorkAreaMode, AppLayoutWorkAreaProps, WorkAreaColumnState } from './app-layout-work-area';
 export { AppColumnHeader } from './app-column-header';
 export type { AppColumnHeaderLayoutAction, AppColumnHeaderProps } from './app-column-header';
+export { ColumnBackSlot, ColumnBackSlotReset, useColumnBack } from '../layout/column-back-slot';
+export type { ColumnBack } from '../layout/column-back-slot';
 
 export {
   AppLayoutDrawer,
@@ -98,6 +101,8 @@ export type { AppLayoutDrawerContentProps } from './app-layout-drawer';
 
 export { MobileBurgerMenu } from './mobile-burger-menu';
 export type { MobileBurgerMenuProps } from './mobile-burger-menu';
+export { MOBILE_SIDE_PANEL_SWIPE_CLOSE_PX, MobileSidePanel } from './mobile-side-panel';
+export type { MobileSidePanelProps } from './mobile-side-panel';
 
 export { HeaderButton } from './header-button';
 export type { HeaderButtonProps } from './header-button';

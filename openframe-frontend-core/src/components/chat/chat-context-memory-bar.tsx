@@ -33,9 +33,13 @@ import type { ChatContextItem } from './types/context-item.types';
 
 const itemKey = (item: { type: string; id: string }) => `${item.type}:${item.id}`;
 
-/** The strip's box, loaded and loading. */
+/**
+ * The strip's box, loaded and loading. Its ground is Figma's backgrounds/openframe-background
+ * (`bg-ods-bg-base`), not the page's `bg-ods-bg`: Mingo's dock sets `data-surface="mingo"`,
+ * which tints `--color-bg` cyan, and the strip must not take it.
+ */
 const MEMORY_STRIP_CLASS =
-  'relative flex items-center gap-[var(--spacing-system-xs)] border-b border-ods-border bg-ods-bg p-[var(--spacing-system-xs)]';
+  'relative flex items-center gap-[var(--spacing-system-xs)] border-b border-ods-border bg-ods-bg-base p-[var(--spacing-system-xs)]';
 
 export interface ChatContextMemoryBarProps {
   /** Remembered entities, most-recent-first. Empty → the bar renders nothing. */
@@ -109,7 +113,7 @@ export function ChatContextMemoryBar({
   if (!hasItems && !leading) {
     // The loading form: the strip's own box, its count line a bar and its trigger's place kept.
     return (
-      <div aria-hidden className={cn(MEMORY_STRIP_CLASS, className)}>
+      <div aria-hidden data-testid="chat-context-memory-strip" className={cn(MEMORY_STRIP_CLASS, className)}>
         <p className="min-w-0 flex-1 truncate text-ods-text-secondary text-h6">
           <TextLineSkeleton type="inherit" as="span" className="w-48 max-w-full" />
         </p>
@@ -125,6 +129,7 @@ export function ChatContextMemoryBar({
     // above, matching the context picker's placement over the input.
     <div
       ref={rootRef}
+      data-testid="chat-context-memory-strip"
       className={cn(MEMORY_STRIP_CLASS, className)}
       onKeyDown={e => {
         if (e.key === 'Escape' && open) {

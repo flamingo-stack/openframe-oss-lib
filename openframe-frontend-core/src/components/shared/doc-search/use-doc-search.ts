@@ -18,8 +18,7 @@
  *     `onInPageSwap?: (path: string) => boolean` config callback. When
  *     present and returns true, the hook treats a same-origin result
  *     click as "handled in-page"; when absent or returns false, the
- *     hook falls back to `onNavigate(path)` (`router.push` on hub,
- *     `window.location.assign` on bare embedders).
+ *     click goes through the one navigation executor.
  *   - `traceCompose` (hub-only telemetry) → dropped. The lib has no
  *     equivalent runtime-context yet; bring it back when there is one.
  *
@@ -29,16 +28,18 @@
  *
  * ## Result hrefs go through the content-href seam
  *
- * A row's href is NOT the RAG `externalUrl` verbatim any more: when the
+ * A row's href is NOT the server's `url` verbatim: when the
  * host wires `runtime.composeContentUrl` (or passes `composeContentUrl`
  * here), the row is re-resolved through it — the SAME seam the catalog
  * cards and the chat entity cards use. So a host that serves onboarding
  * guides at `/help-center/onboarding-guides/<slug>` gets that path from
  * the dropdown too, instead of bouncing the user to the canonical hub
- * URL. Unwired hosts keep the verbatim-`externalUrl` behavior.
+ * URL. Unwired hosts use the url as given.
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import type { DocSearchResult } from '../../../chat-protocol/doc-search';
+import { docSearchFieldsOf } from '../../../chat-protocol/message-decoder';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
 import { useDebounce } from '../../../hooks/ui/use-debounce';
 import type { ComposeContentUrl } from '../../../utils/content-href';
@@ -48,7 +49,6 @@ import { executeNavigationImperative, executeNewTabNavigation } from '../../chat
 import type { SearchResult } from '../../ui/search-input';
 import { mapDocSearchResults } from './map-doc-search-results';
 import { resolveSearchResultAction } from './resolve-search-result-action';
-import type { DocSearchResult } from './types';
 
 export interface UseDocSearchConfig {
   /** Discriminator passed to `/api/docs/search?source=` (e.g.
@@ -60,10 +60,6 @@ export interface UseDocSearchConfig {
    *  attempts the optional in-page swap path before falling through
    *  to a full nav. */
   baseRoute: string;
-  /** Imperative navigation fallback. Called when no override
-   *  (in-page swap, new-tab) applies. Hub callers pass
-   *  `(path) => router.push(path)`; embedders pass an equivalent. */
-  onNavigate: (path: string) => void;
   /** Optional `RagTableConfig.id` list to narrow the search to specific
    *  tables (e.g. `['onboarding-guides']`). Forwarded to
    *  `/api/docs/search?tableIds=…` which intersects with the source's
@@ -109,10 +105,9 @@ function readString(source: Record<string, unknown>, key: string): string | unde
  *
  * `Response.json()` is typed `any`, so the rows used to reach
  * `mapDocSearchResults` through an `as DocSearchResult[]` that asserted a
- * shape nothing had checked. `path` and `name` are the two that bite: the
- * mapper uses `path` as the row's React `id` and `name` as its title, so a row
- * missing either renders as a blank, key-colliding entry in the dropdown.
- * Such rows are dropped; the rest of the result set still lists.
+ * shape nothing had checked. `title` is the one that bites: a row with none
+ * renders as a blank entry in the dropdown. Such rows are dropped; the rest of
+ * the result set still lists.
  *
  * Returns null when the envelope itself is not a successful result set.
  */
@@ -122,30 +117,22 @@ function toDocSearchResults(payload: unknown): DocSearchResult[] | null {
   const rows: DocSearchResult[] = [];
   for (const entry of payload.data) {
     if (!isRecord(entry)) continue;
-    const path = readString(entry, 'path');
-    const name = readString(entry, 'name');
-    const type = entry.type;
-    if (path === undefined || name === undefined) continue;
-
-    const targetPlatform = entry.targetPlatform;
+    const { sourceId, title, url } = docSearchFieldsOf(entry);
+    if (!title) continue;
     rows.push({
-      path,
-      name,
-      type: type === 'folder' ? 'folder' : 'file',
+      sourceId,
+      title,
+      ...(url ? { url } : {}),
+      type: entry.type === 'folder' ? 'folder' : 'file',
       snippet: readString(entry, 'snippet') ?? '',
       matchType: entry.matchType === 'title' ? 'title' : 'content',
-      documentType: readString(entry, 'documentType'),
-      externalUrl: readString(entry, 'externalUrl'),
-      targetPlatform: typeof targetPlatform === 'string' ? targetPlatform : null,
-      sourceRepo: readString(entry, 'sourceRepo'),
-      entityId: readString(entry, 'entityId'),
     });
   }
   return rows;
 }
 
 export function useDocSearch(config: UseDocSearchConfig) {
-  const { source, baseRoute, onNavigate, tableIds, onInPageSwap, searchEndpoint, composeContentUrl } = config;
+  const { source, baseRoute, tableIds, onInPageSwap, searchEndpoint, composeContentUrl } = config;
   const tableIdsKey = tableIds && tableIds.length > 0 ? tableIds.join(',') : '';
 
   // Optional chat-runtime read — when present and mode='embed' the
@@ -298,17 +285,11 @@ export function useDocSearch(config: UseDocSearchConfig) {
           setKeepOpen(false);
           window.dispatchEvent(new CustomEvent(ASK_AI_OPEN_WITH_REF_EVENT, { detail: action.detail }));
           return;
-        case 'route':
-          // Final fallback: legacy navigation by path. Hits when a row
-          // has neither URL nor pk metadata — a mapper/API regression.
-          setKeepOpen(false);
-          onNavigate(action.path);
-          return;
         case 'noop':
           return;
       }
     },
-    [onNavigate, source, baseRoute, onInPageSwap, runtime, resolvedComposeContentUrl],
+    [source, baseRoute, onInPageSwap, runtime, resolvedComposeContentUrl],
   );
 
   // Reset keepOpen when query changes. Adjusted while rendering, not from an

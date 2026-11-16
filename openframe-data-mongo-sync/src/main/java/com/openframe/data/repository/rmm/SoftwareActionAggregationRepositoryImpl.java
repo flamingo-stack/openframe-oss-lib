@@ -35,7 +35,9 @@ import java.util.regex.Pattern;
 public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAggregationRepository {
 
     private static final String SCRIPT_EXECUTIONS = "script_executions";
-    private static final List<String> TERMINAL = List.of(ExecutionStatus.SUCCESS.name(), ExecutionStatus.FAILED.name());
+    private static final List<String> TERMINAL = List.of(
+            ExecutionStatus.SUCCESS.name(), ExecutionStatus.SCRIPT_ERROR.name(), ExecutionStatus.FAILED.name());
+    private static final List<String> UNSUCCESSFUL = List.of(ExecutionStatus.SCRIPT_ERROR.name(), ExecutionStatus.FAILED.name());
     private static final List<String> IN_PROGRESS = List.of(ExecutionStatus.QUEUED.name(), ExecutionStatus.RUNNING.name());
     private static final List<String> FINISHED = List.of(SoftwareActionStatus.COMPLETED.name(), SoftwareActionStatus.FAILED.name());
     private static final String DEFAULT_SORT = "dispatchedAt";
@@ -151,8 +153,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                         .append("responded", new Document("$addToSet", cond(inArr("$status", TERMINAL), "$machineId", null)))
                         .append("waiting", new Document("$addToSet", cond(isWaiting(), "$machineId", null)))
                         .append("hasInProgress", new Document("$max", cond(inArr("$status", IN_PROGRESS), 1, 0)))
-                        .append("failed", new Document("$max",
-                                cond(new Document("$eq", Arrays.asList("$status", ExecutionStatus.FAILED.name())), 1, 0)))
+                        .append("failed", new Document("$max", cond(inArr("$status", UNSUCCESSFUL), 1, 0)))
                         .append("firstDispatchedAt", new Document("$min", "$dispatchedAt"))
                         .append("lastFinishedAt", new Document("$max", "$finishedAt"))
                         .append("execCount", new Document("$sum", 1))));

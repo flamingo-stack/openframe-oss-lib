@@ -227,7 +227,7 @@ describe('NavigationSidebar slot toggle', () => {
 
 describe("NavigationSidebar overlay 'drawer'", () => {
   const sidebar = () => screen.getByRole('complementary', { name: 'Main navigation sidebar', hidden: true });
-  function Host({ path = '/a' }: { path?: string }) {
+  function Host({ path = '/a', drawerWidth }: { path?: string; drawerWidth?: number }) {
     const [reveal, setReveal] = useState(0);
     const [dismiss, setDismiss] = useState(0);
     return (
@@ -246,6 +246,7 @@ describe("NavigationSidebar overlay 'drawer'", () => {
             collapsed: false,
             onCollapsedChange: vi.fn(),
             overlay: 'drawer',
+            drawerWidth,
             revealSignal: reveal,
             dismissSignal: dismiss,
             currentPath: path,
@@ -270,6 +271,49 @@ describe("NavigationSidebar overlay 'drawer'", () => {
     fireEvent.click(screen.getByRole('button', { name: 'open' }));
     rerender(<Host path="/b" />);
     expect(sidebar()).toHaveClass('md:hidden');
+  });
+});
+
+describe("NavigationSidebar overlay 'drawer': its row and its width", () => {
+  const sidebar = () => screen.getByRole('complementary', { name: 'Main navigation sidebar', hidden: true });
+  function Host({ drawerWidth }: { drawerWidth?: number }) {
+    const [reveal, setReveal] = useState(0);
+    return (
+      <>
+        <button type="button" onClick={() => setReveal(n => n + 1)}>
+          open
+        </button>
+        <NavigationSidebar
+          config={{
+            variant: 'grouped',
+            items: [],
+            footerSlot: footer,
+            collapsed: false,
+            onCollapsedChange: vi.fn(),
+            overlay: 'drawer',
+            drawerWidth,
+            revealSignal: reveal,
+          }}
+        />
+      </>
+    );
+  }
+
+  it('dims its own row only, under the top bar, not the whole window', () => {
+    viewport('tablet');
+    render(<Host />);
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    const scrim = screen.getByTestId('navigation-sidebar-scrim');
+    expect(scrim).toHaveClass('absolute', 'inset-0');
+    expect(scrim).not.toHaveClass('fixed');
+  });
+
+  it('opens at its drawerWidth', () => {
+    viewport('tablet');
+    render(<Host drawerWidth={300} />);
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    expect(sidebar().style.getPropertyValue('--of-navigation-sidebar-expanded-width')).toBe('300px');
+    expect(sidebar()).toHaveClass('md:w-[var(--of-navigation-sidebar-expanded-width)]');
   });
 });
 

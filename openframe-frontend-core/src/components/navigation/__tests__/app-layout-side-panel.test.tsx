@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ActionsMenuDropdown } from '../../ui/actions-menu';
 import { AppLayout } from '../app-layout';
 
 // jsdom lays nothing out: give every element the same width so the row the
@@ -307,6 +308,45 @@ describe('AppLayout side panel', () => {
 
     fireEvent.keyDown(screen.getByRole('complementary', { name: 'Mingo' }), { key: 'Escape' });
     expect(screen.queryByText(/panel/)).not.toBeInTheDocument();
+  });
+
+  it('Escape on a menu in the panel closes the menu, and the next closes the panel', async () => {
+    setLayoutWidth(648);
+    render(
+      <AppLayout
+        sidebarConfig={{ items: [], onNavigate: () => undefined }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        sidePanel={{
+          label: 'Mingo',
+          minWidth: 296,
+          storageKey: 'test:side-panel',
+          children: () => (
+            <>
+              <p>panel body</p>
+              <ActionsMenuDropdown
+                triggerAriaLabel="Record actions"
+                // What the chat's chip and card menus ask for: no focus on the button after a pointer close.
+                onCloseAutoFocus={event => event.preventDefault()}
+                groups={[{ items: [{ id: 'ask', label: 'Ask Mingo', onClick: () => undefined }] }]}
+              />
+            </>
+          ),
+        }}
+      >
+        <h1>Page</h1>
+      </AppLayout>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Mingo AI' }));
+    const trigger = screen.getByRole('button', { name: 'Record actions' });
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+    await screen.findByRole('menu');
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    expect(screen.getByText('panel body')).toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(screen.queryByText('panel body')).not.toBeInTheDocument();
   });
 
   it('starts at the minimum on a collapsed page without forgetting the stored width', () => {

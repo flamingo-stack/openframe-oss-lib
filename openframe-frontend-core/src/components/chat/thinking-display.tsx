@@ -2,7 +2,6 @@
 
 import { forwardRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { escapeThinkingTags } from '../../chat-protocol/leading-frames';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon } from '../icons-v2-generated';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
@@ -10,6 +9,14 @@ import { CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
 import type { ThinkingDisplayProps } from './types';
+
+/**
+ * Escape `<` so a markdown renderer that passes HTML through (rehypeRaw) doesn't treat an XML-like token in Claude's
+ * thinking output as an element. `<` → `&lt;` keeps the visible character without breaking blockquote `>` markers.
+ */
+function escapeThinkingTags(text: string): string {
+  return text.replace(/</g, '&lt;');
+}
 
 // Tame SimpleMarkdownRenderer for the muted "thought" aesthetic:
 //  - all text in secondary tone with small size

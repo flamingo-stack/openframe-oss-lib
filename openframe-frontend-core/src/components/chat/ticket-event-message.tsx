@@ -3,7 +3,7 @@
 import { forwardRef, type HTMLAttributes } from 'react';
 import { CheckCircleIcon, InfoCircleIcon } from '../icons-v2-generated';
 import { AiAssistantInfo } from './ai-assistant-info';
-import { TICKET_EVENT_KIND, type TicketEventSegment } from './types/message.types';
+import { TICKET_EVENT_KIND, type TicketEventData } from './types/message.types';
 
 /** Actor types the backend uses for the AI agent. Open set on the wire —
  *  compared case-insensitively; anything else is treated as a human. */
@@ -24,7 +24,7 @@ function humanizeKind(kind: string): string {
 }
 
 export interface TicketEventMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: TicketEventSegment['data'];
+  data: TicketEventData;
   /** Timestamp of the message row this block came in on. */
   timestamp?: Date;
 }

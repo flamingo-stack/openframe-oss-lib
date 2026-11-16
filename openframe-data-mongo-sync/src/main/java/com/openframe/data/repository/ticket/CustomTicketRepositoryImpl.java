@@ -5,6 +5,7 @@ import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
 import com.openframe.data.document.ticket.filter.TicketActivityFilter;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
@@ -26,7 +27,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -55,6 +56,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_DEVICE_ID = "deviceId";
     private static final String FIELD_CREATION_SOURCE = "creationSource";
     private static final String FIELD_OWNER_MACHINE_ID = "owner.machineId";
+    private static final String FIELD_OWNER_ORGANIZATION_ID = "owner.organizationId";
     private static final String FIELD_TITLE = "title";
     private static final String FIELD_DEVICE_HOSTNAME = "deviceHostname";
     private static final String FIELD_ORGANIZATION_NAME = "organizationName";
@@ -104,7 +106,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
     @Override
     public Query buildTicketQuery(TicketQueryFilter filter, String search,
-                                   List<String> restrictToTicketIds, String ownerMachineId) {
+                                   List<String> restrictToTicketIds, ClientOwnerScope ownerScope) {
         Query query = new Query();
 
         if (filter != null) {
@@ -115,7 +117,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             addCriteriaIfNotEmpty(query, FIELD_ASSIGNED_TO, filter.getAssigneeIds());
             addCriteriaIfNotEmpty(query, FIELD_DEVICE_ID, filter.getDeviceIds());
             addCriteriaIfNotEmpty(query, FIELD_CREATION_SOURCE, filter.getCreationSources());
-            applyCreatedAtRange(query, filter.getCreatedAtFrom(), filter.getCreatedAtTo());
             applyActivityCriteria(query, filter.getActivity());
             applyFlag(query, FIELD_ESCALATED_BY_USER, filter.getEscalatedByUser());
             applyFlag(query, FIELD_HAS_PENDING_APPROVAL, filter.getHasPendingApproval());
@@ -123,12 +124,32 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
         applyIdRestriction(query, restrictToTicketIds);
 
-        if (ownerMachineId != null) {
-            query.addCriteria(Criteria.where(FIELD_OWNER_MACHINE_ID).is(ownerMachineId));
-        }
-
+        applyOwnerScope(query, ownerScope);
+        applyCreatedAtRange(query, createdAtFrom(filter, ownerScope), filter == null ? null : filter.getCreatedAtTo());
         applySearchCriteria(query, search);
         return query;
+    }
+
+    private static Instant createdAtFrom(TicketQueryFilter filter, ClientOwnerScope ownerScope) {
+        Instant from = filter == null ? null : filter.getCreatedAtFrom();
+        Instant cutOff = ownerScope == null ? null : ownerScope.getOrganizationAssignedAt();
+        if (from == null || cutOff == null) {
+            return from == null ? cutOff : from;
+        }
+        return from.isAfter(cutOff) ? from : cutOff;
+    }
+
+    // A null snapshot (written before the backfill) stays visible: $in with null matches a missing field too.
+    // Not an $or: the search clause already owns the top-level $or key of this query.
+    private void applyOwnerScope(Query query, ClientOwnerScope ownerScope) {
+        if (ownerScope == null) {
+            return;
+        }
+        query.addCriteria(Criteria.where(FIELD_OWNER_MACHINE_ID).is(ownerScope.getMachineId()));
+        if (ownerScope.getOrganizationId() != null) {
+            query.addCriteria(Criteria.where(FIELD_OWNER_ORGANIZATION_ID)
+                    .in(Arrays.asList(ownerScope.getOrganizationId(), null)));
+        }
     }
 
 

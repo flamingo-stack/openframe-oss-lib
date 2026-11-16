@@ -1,5 +1,6 @@
 package com.openframe.data.pinot.repository;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ResultSet;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,11 +42,14 @@ class PinotClientDeviceRepositoryTest {
     @Mock
     private ResultSet resultSet;
 
+    @Captor
+    private ArgumentCaptor<String> queryCaptor;
+
     private PinotClientDeviceRepository repository;
 
     @BeforeEach
     void setUp() throws Exception {
-        repository = new PinotClientDeviceRepository(pinotConnection);
+        repository = new PinotClientDeviceRepository(pinotConnection, new ClientVersionThreshold("1.6.0"));
         setField(repository, "devicesTable", "devices");
     }
 
@@ -55,7 +61,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("getStatusFilterOptions throws when tenantId is null")
         void throwsOnNullTenant() {
             assertThrows(PinotQueryException.class, () ->
-                    repository.getStatusFilterOptions(null, List.of(), List.of(), List.of(), List.of(),
+                    repository.getStatusFilterOptions(null, List.of(), List.of(), null, List.of(), List.of(),
                             List.of(), List.of(), List.of(), List.of(), List.of()));
         }
 
@@ -63,7 +69,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("getFilteredDeviceCount throws when tenantId is blank")
         void countThrowsOnBlankTenant() {
             assertThrows(PinotQueryException.class, () ->
-                    repository.getFilteredDeviceCount("  ", List.of(), List.of(), List.of(), List.of(),
+                    repository.getFilteredDeviceCount("  ", List.of(), List.of(), null, List.of(), List.of(),
                             List.of(), List.of(), List.of(), List.of(), List.of()));
         }
 
@@ -72,14 +78,14 @@ class PinotClientDeviceRepositoryTest {
         void allFacetQueriesIncludeTenant() {
             whenQueryReturnsEmptyRows();
 
-            repository.getStatusFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            repository.getDeviceTypeFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            repository.getOsTypeFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            repository.getOrganizationFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            repository.getTagKeyFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            repository.getDirectorySourceFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            repository.getUserLinkFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
-            repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            repository.getStatusFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            repository.getDeviceTypeFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            repository.getOsTypeFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            repository.getOrganizationFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            repository.getTagKeyFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            repository.getDirectorySourceFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            repository.getUserLinkFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 
             ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
             verify(pinotConnection, org.mockito.Mockito.times(8)).execute(captor.capture());
@@ -98,7 +104,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("getStatusFilterOptions groups by status and orders by count desc")
         void statusFacetStructure() {
             whenQueryReturnsEmptyRows();
-            repository.getStatusFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(),
+            repository.getStatusFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(),
                     List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("SELECT status, COUNT(*) as count"), "was: " + query);
@@ -110,7 +116,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("getOrganizationFilterOptions groups by organizationId")
         void organizationFacetStructure() {
             whenQueryReturnsEmptyRows();
-            repository.getOrganizationFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(),
+            repository.getOrganizationFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(),
                     List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("SELECT organizationId, COUNT(*) as count"));
@@ -121,7 +127,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("all facet queries exclude DELETED devices")
         void excludesDeletedDevices() {
             whenQueryReturnsEmptyRows();
-            repository.getStatusFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(),
+            repository.getStatusFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(),
                     List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("status != 'DELETED'"), "was: " + query);
@@ -137,6 +143,7 @@ class PinotClientDeviceRepositoryTest {
         void statusFacetSkipsStatusFilter() {
             whenQueryReturnsEmptyRows();
             repository.getStatusFilterOptions(TENANT_ID, List.of("ACTIVE"), List.of(),
+                    null,
                     List.of("LAPTOP"), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             // deviceType filter should be applied
@@ -151,6 +158,7 @@ class PinotClientDeviceRepositoryTest {
         void deviceTypeFacetSkipsDeviceTypeFilter() {
             whenQueryReturnsEmptyRows();
             repository.getDeviceTypeFilterOptions(TENANT_ID, List.of(), List.of(),
+                    null,
                     List.of("LAPTOP"), List.of("WINDOWS"), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             // osType filter applied
@@ -165,6 +173,7 @@ class PinotClientDeviceRepositoryTest {
         void statusFilterWithDeletedLiftsBaseGuard() {
             whenQueryReturnsEmptyRows();
             repository.getDeviceTypeFilterOptions(TENANT_ID, List.of("ACTIVE", "DELETED"), List.of(),
+                    null,
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             // The user's selection is applied verbatim (no status is silently dropped)...
@@ -179,6 +188,7 @@ class PinotClientDeviceRepositoryTest {
         void statusFilterDeletedOnly() {
             whenQueryReturnsEmptyRows();
             repository.getDeviceTypeFilterOptions(TENANT_ID, List.of("DELETED"), List.of(),
+                    null,
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(!query.contains("status != 'DELETED'"), "base guard should be lifted: " + query);
@@ -194,7 +204,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("getConnectivityFilterOptions groups by connectivity and keeps the DELETED guard")
         void connectivityFacetStructure() {
             whenQueryReturnsEmptyRows();
-            repository.getConnectivityFilterOptions(TENANT_ID, List.of(), List.of(), List.of(),
+            repository.getConnectivityFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(),
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("SELECT connectivity, COUNT(*) as count"), "was: " + query);
@@ -207,6 +217,7 @@ class PinotClientDeviceRepositoryTest {
         void connectivityFacetSkipsConnectivityFilter() {
             whenQueryReturnsEmptyRows();
             repository.getConnectivityFilterOptions(TENANT_ID, List.of("ACTIVE"), List.of("ONLINE"),
+                    null,
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("status = 'ACTIVE'"), "status missing: " + query);
@@ -218,6 +229,7 @@ class PinotClientDeviceRepositoryTest {
         void connectivityFilterAppliedElsewhere() {
             whenQueryReturnsEmptyRows();
             repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of("ONLINE", "OFFLINE"),
+                    null,
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("(connectivity = 'ONLINE' OR connectivity = 'OFFLINE')"), "was: " + query);
@@ -228,6 +240,7 @@ class PinotClientDeviceRepositoryTest {
         void connectivityFilterAppliedOnActiveFacet() {
             whenQueryReturnsEmptyRows();
             repository.getOrganizationFilterOptions(TENANT_ID, List.of(), List.of("ONLINE"),
+                    null,
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("connectivity = 'ONLINE'"), "was: " + query);
@@ -245,6 +258,7 @@ class PinotClientDeviceRepositoryTest {
             when(resultSet.getLong(1, 1)).thenReturn(2L);
 
             Map<String, Integer> result = repository.getConnectivityFilterOptions(TENANT_ID, List.of(), List.of(),
+                    null,
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 
             assertEquals(Map.of("OFFLINE", 2), result);
@@ -255,9 +269,143 @@ class PinotClientDeviceRepositoryTest {
         void nullConnectivityIgnored() {
             whenQueryReturnsEmptyRows();
             repository.getFilteredDeviceCount(TENANT_ID, List.of(), null,
+                    null,
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(!query.contains("connectivity"), "was: " + query);
+        }
+    }
+
+    @Nested
+    @DisplayName("clientOutdated filter and facet")
+    class ClientOutdated {
+
+        private static final String OUTDATED = "(agentVersionKey >= 0 AND agentVersionKey < 1000006000000)";
+        private static final String NOT_OUTDATED =
+                "(agentVersionKey < 0 OR agentVersionKey >= 1000006000000 OR agentVersionKey IS NULL)";
+
+        @Test
+        void getFilteredDeviceCount_clientOutdatedTrue_keysBelowThresholdOnly() {
+            // setup
+            whenQueryReturnsEmptyRows();
+
+            // execution
+            repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), Boolean.TRUE, List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(), List.of());
+
+            // verifications
+            String query = captureQuery();
+            assertTrue(query.contains(OUTDATED), "was: " + query);
+            assertFalse(query.contains(NOT_OUTDATED), "was: " + query);
+        }
+
+        @Test
+        void getFilteredDeviceCount_clientOutdatedFalse_supportedAndUnknownKeys() {
+            // setup
+            whenQueryReturnsEmptyRows();
+
+            // execution
+            repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), Boolean.FALSE, List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(), List.of());
+
+            // verifications
+            String query = captureQuery();
+            assertTrue(query.contains(NOT_OUTDATED), "was: " + query);
+            assertFalse(query.contains(OUTDATED), "was: " + query);
+        }
+
+        @Test
+        void getFilteredDeviceCount_clientOutdatedNull_noVersionCondition() {
+            // setup
+            whenQueryReturnsEmptyRows();
+
+            // execution
+            repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(), List.of());
+
+            // verifications
+            String query = captureQuery();
+            assertFalse(query.contains("agentVersionKey"), "was: " + query);
+        }
+
+        @Test
+        void getStatusFilterOptions_clientOutdatedTrue_otherFacetsApplyIt() {
+            // setup
+            whenQueryReturnsEmptyRows();
+
+            // execution
+            repository.getStatusFilterOptions(TENANT_ID, List.of(), List.of(), Boolean.TRUE, List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(), List.of());
+
+            // verifications
+            String query = captureQuery();
+            assertTrue(query.contains(OUTDATED), "was: " + query);
+            assertTrue(query.contains("GROUP BY status"), "was: " + query);
+        }
+
+        @Test
+        void getOrganizationFilterOptions_clientOutdatedTrue_activeFacetAppliesIt() {
+            // setup
+            whenQueryReturnsEmptyRows();
+
+            // execution
+            repository.getOrganizationFilterOptions(TENANT_ID, List.of(), List.of(), Boolean.TRUE, List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(), List.of());
+
+            // verifications
+            String query = captureQuery();
+            assertTrue(query.contains(OUTDATED), "was: " + query);
+            assertTrue(query.contains("status IN ('ONLINE', 'OFFLINE')"), "was: " + query);
+        }
+
+        @Test
+        void getClientOutdatedFilterOptions_otherFilters_countsBothSidesUnderThem() {
+            // setup
+            when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
+            when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
+            when(resultSet.getRowCount()).thenReturn(1);
+            when(resultSet.getLong(0, 0)).thenReturn(4L, 11L);
+
+            // execution
+            Map<String, Integer> result = repository.getClientOutdatedFilterOptions(TENANT_ID, List.of(),
+                    List.of("ONLINE"), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+            // verifications
+            assertEquals(List.of(Map.entry("true", 4), Map.entry("false", 11)), List.copyOf(result.entrySet()));
+            verify(pinotConnection, times(2)).execute(queryCaptor.capture());
+            List<String> queries = queryCaptor.getAllValues();
+            assertTrue(queries.stream().allMatch(query -> query.startsWith("SELECT COUNT(*)")
+                    && query.contains("connectivity = 'ONLINE'")
+                    && query.contains("status != 'DELETED'")
+                    && query.contains("tenantId = '" + TENANT_ID + "'")), "was: " + queries);
+            String outdatedQuery = queries.getFirst();
+            String notOutdatedQuery = queries.getLast();
+            assertTrue(outdatedQuery.contains(OUTDATED) && !outdatedQuery.contains(NOT_OUTDATED), "was: " + outdatedQuery);
+            assertTrue(notOutdatedQuery.contains(NOT_OUTDATED) && !notOutdatedQuery.contains(OUTDATED), "was: " + notOutdatedQuery);
+        }
+
+        @Test
+        void getClientOutdatedFilterOptions_noDevices_bothBucketsWithZero() {
+            // setup
+            whenQueryReturnsEmptyRows();
+
+            // execution
+            Map<String, Integer> result = repository.getClientOutdatedFilterOptions(TENANT_ID, List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+            // verifications
+            assertEquals(List.of(Map.entry("true", 0), Map.entry("false", 0)), List.copyOf(result.entrySet()));
+        }
+
+        @Test
+        void getClientOutdatedFilterOptions_blankTenant_throws() {
+            // execution
+            PinotQueryException ex = assertThrows(PinotQueryException.class, () ->
+                    repository.getClientOutdatedFilterOptions(" ", List.of(), List.of(), List.of(), List.of(),
+                            List.of(), List.of(), List.of(), List.of(), List.of()));
+
+            // verifications
+            assertTrue(ex.getMessage().contains("tenantId is required"), "was: " + ex.getMessage());
         }
     }
 
@@ -273,7 +421,7 @@ class PinotClientDeviceRepositoryTest {
             when(resultSet.getRowCount()).thenReturn(1);
             when(resultSet.getLong(0, 0)).thenReturn(42L);
 
-            int count = repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), List.of(), List.of(),
+            int count = repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(),
                     List.of(), List.of(), List.of(), List.of(), List.of());
             assertEquals(42, count);
         }
@@ -290,7 +438,7 @@ class PinotClientDeviceRepositoryTest {
             when(resultSet.getLong(1, 1)).thenReturn(5L);
 
             Map<String, Integer> result = repository.getStatusFilterOptions(
-                    TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                    TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 
             assertEquals(2, result.size());
             assertEquals(10, result.get("ACTIVE"));
@@ -304,7 +452,7 @@ class PinotClientDeviceRepositoryTest {
             when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
             when(resultSet.getRowCount()).thenReturn(0);
 
-            int count = repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), List.of(), List.of(),
+            int count = repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(),
                     List.of(), List.of(), List.of(), List.of(), List.of());
             assertEquals(0, count);
         }
@@ -319,7 +467,7 @@ class PinotClientDeviceRepositoryTest {
         void tenantIdEscaped() {
             whenQueryReturnsEmptyRows();
             repository.getFilteredDeviceCount("evil'; DROP TABLE devices;--",
-                    List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                    List.of(), List.of(), null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("tenantId = 'evil''; DROP TABLE devices;--'"),
                     "Quotes not escaped: " + query);
@@ -334,7 +482,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("getDirectorySourceFilterOptions groups by the multi-value directorySources column")
         void directorySourceFacetStructure() {
             whenQueryReturnsEmptyRows();
-            repository.getDirectorySourceFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(),
+            repository.getDirectorySourceFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(),
                     List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("SELECT directorySources, COUNT(*) as count"), "was: " + query);
@@ -346,7 +494,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("getUserLinkFilterOptions groups by directoryUserLink")
         void userLinkFacetStructure() {
             whenQueryReturnsEmptyRows();
-            repository.getUserLinkFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(),
+            repository.getUserLinkFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(),
                     List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("SELECT directoryUserLink, COUNT(*) as count"), "was: " + query);
@@ -357,7 +505,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("the filtered count applies both directory filters")
         void countAppliesDirectoryFilters() {
             whenQueryReturnsEmptyRows();
-            repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(),
+            repository.getFilteredDeviceCount(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(),
                     List.of(), List.of(), List.of("MICROSOFT_365"), List.of("PRIMARY", "NONE"));
             String query = captureQuery();
             assertTrue(query.contains("(directorySources = 'MICROSOFT_365')"), "was: " + query);
@@ -369,7 +517,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("the USER facet skips its own filter and keeps the SOURCES one")
         void userLinkFacetSkipsItsOwnFilter() {
             whenQueryReturnsEmptyRows();
-            repository.getUserLinkFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(),
+            repository.getUserLinkFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(),
                     List.of(), List.of(), List.of("MICROSOFT_365"), List.of("PRIMARY"));
             String query = captureQuery();
             assertTrue(query.contains("directorySources = 'MICROSOFT_365'"), "was: " + query);
@@ -380,7 +528,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("the SOURCES facet skips its own filter and keeps the USER one")
         void directorySourceFacetSkipsItsOwnFilter() {
             whenQueryReturnsEmptyRows();
-            repository.getDirectorySourceFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(),
+            repository.getDirectorySourceFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(),
                     List.of(), List.of(), List.of("MICROSOFT_365"), List.of("SHARED"));
             String query = captureQuery();
             assertTrue(query.contains("directoryUserLink = 'SHARED'"), "was: " + query);
@@ -391,7 +539,7 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("the other facets honour both directory filters, the active-only organization facet included")
         void otherFacetsApplyDirectoryFilters() {
             whenQueryReturnsEmptyRows();
-            repository.getOrganizationFilterOptions(TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(),
+            repository.getOrganizationFilterOptions(TENANT_ID, List.of(), List.of(), null, List.of(), List.of(), List.of(),
                     List.of(), List.of(), List.of("MICROSOFT_365"), List.of("SHARED"));
             String query = captureQuery();
             assertTrue(query.contains("directorySources = 'MICROSOFT_365'"), "was: " + query);

@@ -24,12 +24,12 @@ vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
 
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -42,8 +42,8 @@ const runtime: ChatRuntime = {
 const MESSAGE: UnifiedChatState['messages'][number] = {
   id: 'm-1',
   role: 'user',
-  content: 'hello',
-  timestamp: new Date('2026-01-01T00:00:00Z'),
+  metadata: { createdAt: '2026-01-01T00:00:00.000Z' },
+  parts: [{ type: 'text', text: 'hello' }],
 };
 
 function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
@@ -80,10 +80,11 @@ function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
+    // An engine's panel owns a list.
+    dialogCapabilities: {},
     ...overrides,
   };
 }
@@ -94,15 +95,16 @@ function renderPanel(state: UnifiedChatState, aboveComposer?: ReactNode, threadC
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
         <DialogPrimitive.Root open>
-          <EmbeddableChat
-            shell="none"
-            defaultOpen
-            defaultActiveMode="mingo"
-            showInternalTrigger={false}
-            mingoState={state}
-            aboveComposer={aboveComposer}
-            threadContainer={threadContainer}
-          />
+          <ChatEngineProvider engine={state}>
+            <EmbeddableChat
+              shell="none"
+              defaultOpen
+              defaultActiveMode="mingo"
+              showInternalTrigger={false}
+              aboveComposer={aboveComposer}
+              threadContainer={threadContainer}
+            />
+          </ChatEngineProvider>
         </DialogPrimitive.Root>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,

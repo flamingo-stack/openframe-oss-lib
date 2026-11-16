@@ -204,10 +204,11 @@ describe('coupled-allowlist invariant', () => {
     expect(schema.clobberPrefix).toBe('');
   });
 
-  it('card/mention protocols are registered for href', () => {
+  it('the record protocol is registered for href, and no retired one', () => {
     const schema = buildSanitizeSchema();
-    expect(schema.protocols?.href).toContain('card');
-    expect(schema.protocols?.href).toContain('mention');
+    expect(schema.protocols?.href).toContain('record');
+    expect(schema.protocols?.href).not.toContain('card');
+    expect(schema.protocols?.href).not.toContain('mention');
   });
 
   it('SAFE_HTML_TAGS still excludes video (chat baseline)', () => {

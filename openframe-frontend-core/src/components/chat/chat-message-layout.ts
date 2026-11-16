@@ -9,11 +9,11 @@ export const CHAT_MESSAGE_ROW_PADDING_CLASS = {
   [CHAT_APPEARANCE.CLASSIC]: 'py-[var(--spacing-system-s)]',
   [CHAT_APPEARANCE.V2]: 'py-[calc(var(--spacing-system-m)/2)]',
 } as const;
-/** The row's single column: the face line, then the segments. */
+/** The row's single column: the face line, then the parts. */
 export const CHAT_MESSAGE_STACK_CLASS = 'grid min-w-0 grid-cols-1 gap-[var(--spacing-system-xxs)]';
 /** The face line above a message (the face, the name and time where they are written). */
 export const CHAT_MESSAGE_HEADER_CLASS = 'flex items-center gap-[var(--spacing-system-xs)]';
-/** The segments of a message. */
+/** The parts of a message. */
 export const CHAT_MESSAGE_SEGMENTS_CLASS = 'grid grid-cols-1 gap-2';
 /** The row holding the user's own bubble, at the right. */
 export const CHAT_MESSAGE_USER_ROW_CLASS = 'flex min-w-0 justify-end';
@@ -30,10 +30,16 @@ export const CHAT_MESSAGE_LIST_SCROLLER_CLASS = 'flex h-full w-full flex-1 flex-
 /** The thread's thin scrollbar. */
 export const CHAT_MESSAGE_LIST_SCROLLBAR_CLASS =
   'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30';
-/** The thread's column: the panel's full width (`full`) or the centred narrow column (`narrow`). */
+/**
+ * The thread's column: the panel's full width (`full`) or the centred narrow column (`narrow`). `shrink-0`: the
+ * column is a flex item of the scroller with `min-height: 100%`, and a flex item that may shrink stops at that
+ * height while its messages overflow it, so its bottom padding (the `fadeEnd` inset that keeps the last message
+ * clear of the fade into the composer) lands inside the box, under the messages, and the last line ends on the
+ * scroller's edge.
+ */
 export const CHAT_MESSAGE_LIST_COLUMN_CLASS = {
-  full: 'flex w-full min-w-0 flex-col pb-[var(--spacing-system-xs)]',
-  narrow: 'mx-auto flex w-full min-w-0 max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)]',
+  full: 'flex w-full min-w-0 shrink-0 flex-col pb-[var(--spacing-system-xs)]',
+  narrow: 'mx-auto flex w-full min-w-0 max-w-ods-content-narrow shrink-0 flex-col pb-[var(--spacing-system-xs)]',
 } as const;
 /** The column's side padding when the host gives none. */
 export const CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS = 'px-[var(--spacing-system-m)]';

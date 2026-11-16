@@ -51,7 +51,7 @@ const TIME_BAR_CLASS = 'w-14 shrink-0';
 
 /**
  * One message row while it is read: `ChatMessageEnhanced`'s own layout from its own class constants (the row's
- * padding per appearance, the face line, the segments), the face a 20px round box, and the message as text-h4 lines
+ * padding per appearance, the face line, the parts), the face a 20px round box, and the message as text-h4 lines
  * (a bubble at the right for the user's own turn, plain text across the width for anyone else).
  */
 export function ChatMessageSkeleton({

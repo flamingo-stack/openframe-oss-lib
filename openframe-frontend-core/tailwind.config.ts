@@ -222,6 +222,8 @@ const config: Config = {
           divider: 'var(--color-divider)',
           // The three-column shell's sidebars (ODS v2 backgrounds/panel).
           panel: 'var(--color-bg-panel)',
+          // The deepest ground (ODS v2 backgrounds/openframe-background), never tinted by a surface.
+          'bg-base': 'var(--color-bg-base)',
           // A floating menu's ground and its hovered row (ODS v2 backgrounds/overlay).
           menu: 'var(--color-bg-menu)',
           'menu-hover': 'var(--color-bg-menu-hover)',
@@ -328,6 +330,13 @@ const config: Config = {
               secondary: 'var(--ods-flamingo-cyan-secondary)',
               'secondary-hover': 'var(--ods-flamingo-cyan-secondary-hover)',
               'secondary-active': 'var(--ods-flamingo-cyan-secondary-action)',
+            },
+            orange: {
+              DEFAULT: 'var(--ods-flamingo-orange-base)',
+              hover: 'var(--ods-flamingo-orange-hover)',
+              secondary: 'var(--ods-flamingo-orange-secondary)',
+              'secondary-hover': 'var(--ods-flamingo-orange-secondary-hover)',
+              'secondary-active': 'var(--ods-flamingo-orange-secondary-action)',
             },
           },
           'open-yellow': {

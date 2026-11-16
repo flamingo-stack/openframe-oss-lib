@@ -28,4 +28,8 @@ public interface ScheduleScriptExecutionRepository
     @Query("{ 'tenantId': ?0, 'executionId': ?1, 'status': 'RUNNING' }")
     @Update("{ '$set': { 'status': ?2, 'finishedAt': ?3 } }")
     long transitionIfRunning(String tenantId, String executionId, ExecutionStatus finalStatus, Instant finishedAt);
+
+    @Query("{ 'tenantId': ?0, 'executionId': ?1, 'status': { '$in': ['SUCCESS', 'SCRIPT_ERROR', 'FAILED'] } }")
+    @Update("{ '$set': { 'status': ?2 } }")
+    long reviseSettledStatus(String tenantId, String executionId, ExecutionStatus settledStatus);
 }

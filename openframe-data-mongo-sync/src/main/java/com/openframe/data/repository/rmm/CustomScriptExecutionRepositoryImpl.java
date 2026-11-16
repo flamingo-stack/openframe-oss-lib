@@ -180,12 +180,13 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     @Override
     public LeafStatusCounts countLeavesByStatus(String tenantId, String executionId) {
         if (tenantId == null || executionId == null) {
-            return new LeafStatusCounts(0, 0);
+            return new LeafStatusCounts(0, 0, 0);
         }
         long inProgress = countLeavesInStatus(tenantId, executionId, ExecutionStatus.QUEUED)
                 + countLeavesInStatus(tenantId, executionId, ExecutionStatus.RUNNING);
         long failed = countLeavesInStatus(tenantId, executionId, ExecutionStatus.FAILED);
-        return new LeafStatusCounts(inProgress, failed);
+        long scriptErrors = countLeavesInStatus(tenantId, executionId, ExecutionStatus.SCRIPT_ERROR);
+        return new LeafStatusCounts(inProgress, failed, scriptErrors);
     }
 
     private long countLeavesInStatus(String tenantId, String executionId, ExecutionStatus status) {

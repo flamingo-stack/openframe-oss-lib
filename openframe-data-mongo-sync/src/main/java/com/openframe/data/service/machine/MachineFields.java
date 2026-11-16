@@ -26,10 +26,12 @@ public final class MachineFields {
     public static final MachineField<TelemetryStatus> TELEMETRY_STATUS =
             field("telemetryStatus", Machine::setTelemetryStatus);
     public static final MachineField<Instant> FIRST_CONNECTED_AT = field("firstConnectedAt", Machine::setFirstConnectedAt);
+    public static final MachineField<Instant> ORGANIZATION_ASSIGNED_AT = field("organizationAssignedAt", Machine::setOrganizationAssignedAt);
     public static final MachineField<DeviceType> TYPE = field("type", Machine::setType);
     public static final MachineField<Instant> LAST_SEEN = field("lastSeen", Machine::setLastSeen);
     public static final MachineField<String> ORGANIZATION_ID = field("organizationId", Machine::setOrganizationId);
     public static final MachineField<String> AGENT_VERSION = field("agentVersion", Machine::setAgentVersion);
+    public static final MachineField<Long> AGENT_VERSION_KEY = field("agentVersionKey", Machine::setAgentVersionKey);
     public static final MachineField<OsType> OS_TYPE = field("osType", Machine::setOsType);
     public static final MachineField<String> USER_ID = field("userId", Machine::setUserId);
     public static final MachineField<String> TIMEZONE = field("timezone", Machine::setTimezone);

@@ -25,7 +25,7 @@
  * plain anchor attributes (`aria-*`, `title`, `data-*`, `style`, `rel`).
  */
 
-import { type AnchorHTMLAttributes, type MouseEvent, type ReactNode, useCallback } from 'react';
+import { type AnchorHTMLAttributes, type MouseEvent, type ReactNode, forwardRef, useCallback } from 'react';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useChatPanel } from './chat-panel-context';
 import { isModifierClick } from './utils/chat-nav-resolution';
@@ -146,20 +146,15 @@ export function useNavigateViaRuntime(): (input: NavigateViaRuntimeInput) => voi
   );
 }
 
-export function NavLinkAnchorViaRuntime({
-  href,
-  path,
-  targetPlatform,
-  openIn,
-  className,
-  children,
-  onClick,
-  ...anchorAttrs
-}: NavLinkAnchorViaRuntimeProps) {
-  const linkProps = useNavLinkViaRuntime({ href, path, targetPlatform, openIn, onClick });
-  return (
-    <a {...linkProps} {...anchorAttrs} className={className}>
-      {children}
-    </a>
-  );
-}
+// Forwards its ref to the anchor, so a primitive that needs the element can wrap it (a menu row's `asChild`).
+export const NavLinkAnchorViaRuntime = forwardRef<HTMLAnchorElement, NavLinkAnchorViaRuntimeProps>(
+  function NavLinkAnchor({ href, path, targetPlatform, openIn, className, children, onClick, ...anchorAttrs }, ref) {
+    const linkProps = useNavLinkViaRuntime({ href, path, targetPlatform, openIn, onClick });
+    return (
+      <a ref={ref} {...linkProps} {...anchorAttrs} className={className}>
+        {children}
+      </a>
+    );
+  },
+);
+NavLinkAnchorViaRuntime.displayName = 'NavLinkAnchorViaRuntime';

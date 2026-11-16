@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { AnnouncementBar, useLegalDocuments } from '@flamingo-stack/openframe-frontend-core/components'
 import {
   SiteHeader,
@@ -51,7 +51,6 @@ function siteNav(legal: ReadonlyArray<{ docType: string; title: string }>): Site
 
 export function AppShell() {
   const { pathname } = useLocation()
-  const navigate = useNavigate()
   // The launcher shows the SERVER's identity (name and glyph), the same one the
   // FAQ's ask card uses; with none configured, the lib's own defaults.
   const assistant = useAssistantIdentity()
@@ -73,11 +72,10 @@ export function AppShell() {
       // the app-wide <TicketLiveProvider> in app-providers.tsx.
       <TicketAlertsButton
         href="/tickets"
-        onNavigate={(href) => navigate(href)}
         className="border-l border-ods-border"
       />
     ),
-    [navigate],
+    [],
   )
 
   return (

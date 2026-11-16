@@ -4,5 +4,17 @@ public enum ExecutionStatus {
     QUEUED,
     RUNNING,
     SUCCESS,
-    FAILED
+    SCRIPT_ERROR,
+    FAILED;
+
+    public boolean isTerminal() {
+        return this == SUCCESS || this == SCRIPT_ERROR || this == FAILED;
+    }
+
+    public boolean isFinal(ExecutionFailureReason failureReason) {
+        if (!isTerminal()) {
+            return false;
+        }
+        return this != FAILED || failureReason == null || !failureReason.isWatchdogVerdict();
+    }
 }

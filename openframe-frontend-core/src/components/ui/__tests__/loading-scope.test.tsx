@@ -196,7 +196,7 @@ describe('a component in a scope draws its own skeleton', () => {
     ],
     [
       'ChatMessageList',
-      <ChatMessageList key="a" messages={[{ id: '1', role: 'user', content: READ, timestamp: new Date() }]} />,
+      <ChatMessageList key="a" messages={[{ id: '1', role: 'user', parts: [{ type: 'text', text: READ }] }]} />,
       [],
     ],
     [

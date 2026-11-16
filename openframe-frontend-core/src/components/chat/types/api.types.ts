@@ -4,8 +4,7 @@
  */
 
 import type { NatsBeforeReconnect } from '../../../nats';
-import type { ChatType, ChatApprovalStatus } from './chat.types';
-import type { MessageSegment, TokenUsageData, ToolExecutionSegment } from './message.types';
+import type { ChatType } from './chat.types';
 import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types';
 
 // ========== Hook Options ==========
@@ -187,114 +186,6 @@ export interface UseJetStreamDialogSubscriptionReturn {
   /** Highest JetStream stream sequence observed so far (null before first delivery). */
   currentStreamSeq: number | null;
 }
-
-export interface SegmentsUpdateMetadata {
-  /** Segments should be appended to the last assistant message */
-  append?: boolean;
-  /** The update was triggered by context compaction */
-  isCompacting?: boolean;
-  /** streamSeq of the content chunk that produced this update, when the
-   *  transport carries one (JetStream). Hosts stamp it onto the streaming
-   *  message so `mergeHistoryWithRealtime` can dedup per-message against
-   *  persisted history. Undefined for legacy NATS chunks. */
-  streamSeq?: number;
-}
-
-export interface RealtimeChunkCallbacks {
-  /** Called when MESSAGE_START is received */
-  onStreamStart?: () => void;
-  /** Called when MESSAGE_END is received */
-  onStreamEnd?: () => void;
-  /** Called when AI_METADATA is received */
-  onMetadata?: (metadata: {
-    modelDisplayName: string;
-    modelName: string;
-    providerName: string;
-    contextWindow: number;
-  }) => void;
-  /** Called when segments are updated */
-  onSegmentsUpdate?: (segments: MessageSegment[], metadata?: SegmentsUpdateMetadata) => void;
-  /** Called when an error is received */
-  onError?: (error: string, details?: string) => void;
-  /** Called when a user message request is received (echo). `streamSeq` (when
-   *  the transport carries one) lets hosts stamp the synthetic so the history
-   *  merge can dedup it against its persisted twin by sequence. */
-  onUserMessage?: (
-    text: string,
-    metadata?: {
-      ownerType?: string;
-      displayName?: string;
-      userId?: string;
-      streamSeq?: number;
-      contextItems?: Array<{ type: string; id: string }>;
-    },
-  ) => void;
-  /** Called when TOKEN_USAGE chunk is received with token stats */
-  onTokenUsage?: (data: TokenUsageData) => void;
-  /** Called when a direct message is received (immediately displayed). Carries
-   *  `streamSeq` for the same per-message dedup as `onUserMessage`. */
-  onDirectMessage?: (
-    text: string,
-    metadata?: { ownerType?: string; displayName?: string; userId?: string; streamSeq?: number },
-  ) => void;
-  /** Called when a system message is received (e.g. "User joined the chat"). */
-  onSystemMessage?: (text: string, metadata?: { streamSeq?: number }) => void;
-  /** Callback for approval actions */
-  onApprove?: (requestId?: string) => Promise<void> | void;
-  /** Callback for rejection actions */
-  onReject?: (requestId?: string) => Promise<void> | void;
-  /** Called when a non-client approval request is received (for escalation) */
-  onEscalatedApproval?: (
-    requestId: string,
-    data: { command: string; explanation?: string; approvalType: string },
-  ) => void;
-  /** Called when an escalated approval result is received */
-  onEscalatedApprovalResult?: (
-    requestId: string,
-    approved: boolean,
-    data: { command: string; explanation?: string; approvalType: string },
-  ) => void;
-  /**
-   * Called whenever an `APPROVAL_RESULT` chunk is processed. Fires in addition
-   * to the accumulator's in-message status flip so consumers can find the
-   * matching `approval_request` / `approval_batch` segment in an *earlier*
-   * message bubble (e.g. when a user-interrupted approval is resolved while
-   * a new assistant message is streaming). Idempotent — safe to no-op if no
-   * matching segment is found dialog-wide.
-   */
-  onApprovalResolved?: (
-    requestId: string,
-    status: ChatApprovalStatus,
-    approvalType: string,
-    resolvedByName?: string | null,
-  ) => void;
-  /**
-   * Called whenever an `EXECUTED_TOOL` chunk is processed. Lets consumers
-   * merge the result into the originating `EXECUTING_TOOL` (or batch
-   * `executions[execId]`) segment in an earlier message bubble when the tool
-   * outlived its message scope. Idempotent.
-   */
-  onToolExecuted?: (segment: ToolExecutionSegment) => void;
-  /**
-   * Called when a chunk implies the agent is actively working OUTSIDE an open
-   * MESSAGE_START/MESSAGE_END window: an `EXECUTING_TOOL` chunk, or an
-   * `APPROVAL_RESULT` that approved execution. Approved commands run between
-   * the approval bubble's MESSAGE_END and the continuation stream, so without
-   * this signal a phase keyed on stream boundaries reads as idle while tools
-   * execute. The busy window is closed by the continuation's MESSAGE_END, an
-   * ERROR chunk, or a user stop.
-   */
-  onAgentBusy?: () => void;
-  /** Called when a DIALOG_CLOSED chunk is received */
-  onDialogClosed?: () => void;
-}
-
-// NOTE: `UseRealtimeChunkProcessorOptions` / `UseRealtimeChunkProcessorReturn`
-// were DELETED along with the `useRealtimeChunkProcessor` compat hook. The
-// equivalents are `ChatStreamReducerOptions` + `ChatStreamReducer` in
-// `../stream/chat-stream-reducer`. `RealtimeChunkCallbacks` above SURVIVES:
-// it is still the canonical description of the effect names/args the reducer
-// emits via `ChatReducerEffect`.
 
 // ========== API Request Types ==========
 

@@ -1,13 +1,20 @@
-import type { MessageContent } from '../types';
+import {
+  approvalBatchIdOf,
+  isSourcePart,
+  isToolPart,
+  textOfParts,
+  type ChatMessage,
+  type ChatPart,
+} from '../../../chat-protocol/chat-message';
 
 /**
  * Reconciliation between persisted dialog history (processed GraphQL pages)
  * and the realtime messages a chat client accumulated from streaming chunks.
  *
  * This is the missing middle piece of the chat pipeline this lib already
- * owns: `processHistoricalMessages*` produces one stream, the realtime chunk
- * processor / segment accumulator produces the other, and every host (Mingo,
- * tickets, openframe-chat) needs to merge them whenever history is (re)fetched.
+ * owns: `processHistoricalMessages` produces one stream, the realtime chunks
+ * produce the other, and every host (Mingo, tickets, openframe-chat) needs to
+ * merge them whenever history is (re)fetched.
  * Hand-rolled versions of this merge have produced both duplicated turns
  * (synthetic kept alongside its persisted twin) and lost turns (synthetic
  * trimmed against a stale snapshot that didn't contain its persisted twin
@@ -17,43 +24,30 @@ import type { MessageContent } from '../types';
  * writes), this module owns HOW.
  */
 
-/** Minimal structural shape the merge needs — hosts pass their own message
- *  type and get it back. */
-export interface MergeableChatMessage {
-  id: string;
-  role: string;
-  content: MessageContent;
-  timestamp?: Date;
-  /** Who authored a `user`-role row: the host's own user (`'user'` / unset),
-   *  a technician (`'admin'`) or the system (`'system'`). Every host renders
-   *  technician and system lines under role `user`, so a user row's twin must
-   *  match on this as well as on text - otherwise the end user's "?" is taken
-   *  for the twin of the technician's "?" and dropped from the thread. */
-  authorType?: string;
-  /** Highest CONTENT chunk streamSeq that composed this message (text / tool /
-   *  approval / error / compaction — never the non-persisted MESSAGE_END /
-   *  TOKEN_USAGE control chunks). Hosts stamp it on realtime synthetics so the
-   *  merge can decide coverage per-message: a synthetic is in history once a
-   *  persisted row of the SAME role reaches its seq. (Regular `user-`
-   *  MESSAGE_REQUEST synthetics are the exception — the backend persists their
-   *  rows without a seq, so they are deduped by content, not seq; see the merge.)
-   *
-   *  Stamp it on HISTORY rows too (from the persisted `lastChunkStreamSeq`)
-   *  when available: the merge then computes a PER-ROLE max from history and a
-   *  synthetic is "covered" only when a persisted row of its own role actually
-   *  reached its seq. Without per-row history seqs the merge falls back to the
-   *  single global `historyMaxStreamSeq`, which a later/other-role row can push
-   *  past a synthetic whose turn is NOT in the snapshot (interrupted /
-   *  async-persisted) — dropping a message the user saw with no replay to
-   *  restore it. Optional — absent on hosts that don't stamp it (those keep the
-   *  global-seq / wall-clock behaviour). */
-  streamSeq?: number;
+/**
+ * The time a row was written, in ms. `metadata.streamSeq` is the highest CONTENT chunk seq that composed a row (text /
+ * tool / approval / error / compaction, never the non-persisted MESSAGE_END / TOKEN_USAGE control chunks): the reducer
+ * stamps it on realtime synthetics so the merge can decide coverage per-message: a synthetic is in history once a persisted
+ * row of the SAME role reaches its seq. (Regular `user-` MESSAGE_REQUEST synthetics are the exception: the backend persists
+ * their rows without a seq, so they are deduped by content, not seq; see the merge.)
+ *
+ * `processHistoricalMessages` stamps it on HISTORY rows too (from the persisted `lastChunkStreamSeq`): the merge then
+ * computes a PER-ROLE max from history and a synthetic is "covered" only when a persisted row of its own role actually
+ * reached its seq. Without per-row history seqs the merge falls back to the single global `historyMaxStreamSeq`, which a
+ * later/other-role row can push past a synthetic whose turn is NOT in the snapshot (interrupted / async-persisted),
+ * dropping a message the user saw with no replay to restore it.
+ */
+function timeOf(m: ChatMessage): number | undefined {
+  const createdAt = m.metadata?.createdAt;
+  if (createdAt === undefined) return undefined;
+  const time = Date.parse(createdAt);
+  return Number.isNaN(time) ? undefined : time;
 }
 
 /** Ids minted client-side by realtime chunk processors
- *  (`assistant-<ts>-…` placeholder bubbles, `user-<ts>-…` peer messages,
- *  `direct-<ts>-…` technician direct messages, `system-<ts>-…` system notices,
- *  `error-<ts>` stream errors). They never match the Mongo ObjectIds history
+ *  (`assistant-<ts>-…` placeholder bubbles, `stream-<seq>` a turn's own bubble,
+ *  `user-<ts>-…` peer messages, `direct-<ts>-…` technician direct messages,
+ *  `system-<ts>-…` system notices). They never match the Mongo ObjectIds history
  *  returns for the same turns. This is the cross-host contract every minting
  *  site (lib `use-chat`, Mingo / tickets chunk processors, openframe-chat)
  *  must keep matching — exported so it lives in exactly one place.
@@ -63,7 +57,7 @@ export interface MergeableChatMessage {
  *  `welcome-` and `optimistic-` ids are intentionally NOT listed: welcome
  *  bubbles are never persisted server-side, and optimistic user messages are
  *  deduped by content below. */
-export const SYNTHETIC_REALTIME_ID_PREFIXES = ['assistant-', 'user-', 'direct-', 'system-', 'error-'] as const;
+export const SYNTHETIC_REALTIME_ID_PREFIXES = ['assistant-', 'stream-', 'user-', 'direct-', 'system-'] as const;
 
 function isSyntheticRealtimeId(id: string): boolean {
   return SYNTHETIC_REALTIME_ID_PREFIXES.some(prefix => id.startsWith(prefix));
@@ -96,23 +90,20 @@ function isWelcomeId(id: string): boolean {
   return id.startsWith('welcome-');
 }
 
-/** Rendered answer text of an assistant message (TEXT segments, or a plain string). Used to
- *  recognise a replayed synthetic as the twin of an already-persisted turn when the stream-seq
- *  signal can't prove it (see the trailing-turn fallback below). Empty for tool/approval-only
- *  turns that carry no answer text — callers must treat "" as "no signal", never as a match. */
-function assistantAnswerText(content: MessageContent): string {
-  if (typeof content === 'string') return content.trim();
-  if (!Array.isArray(content)) return '';
-  const parts: string[] = [];
-  for (const seg of content) {
-    if (seg.type === 'text') parts.push(seg.text);
-  }
-  return parts.join('\n').trim();
+/** Rendered answer text of an assistant message. Used to recognise a replayed synthetic as the twin of an
+ *  already-persisted turn when the stream-seq signal can't prove it (see the trailing-turn fallback below). Empty for
+ *  tool/approval-only turns that carry no answer text: callers must treat "" as "no signal", never as a match. */
+function assistantAnswerText(parts: readonly ChatPart[]): string {
+  return textOfParts(parts).trim();
+}
+
+/** What a row draws: its sources are data about it. "Richer" is a question about what the reader sees. */
+function bodySize(parts: readonly ChatPart[]): number {
+  return parts.reduce((size, part) => (isSourcePart(part) ? size : size + 1), 0);
 }
 
 /**
- * Backend request ids carried by a turn's segments — tool-call ids, approval
- * request ids, batch ids.
+ * Backend request ids carried by a turn's parts: tool-call ids, approval ids, batch ids, offer ids.
  *
  * These identify the TURN, which is what lets the merge recognise history's
  * persisted row and a live synthetic as two copies of the same thing when
@@ -121,31 +112,23 @@ function assistantAnswerText(content: MessageContent): string {
  * a refetch that lands mid-stream has no replay, so the live copy keeps the
  * synthetic id the reducer minted.
  *
- * Empty for a turn that has produced only text — callers must treat an empty
+ * Empty for a turn that has produced only text: callers must treat an empty
  * set as "no signal", never as a match.
  */
-function turnRequestKeys(content: MessageContent): Set<string> {
+function turnRequestKeys(parts: readonly ChatPart[]): Set<string> {
   const keys = new Set<string>();
-  if (!Array.isArray(content)) return keys;
-  for (const seg of content) {
-    if (seg.type === 'tool_execution') {
-      const id = seg.data?.toolExecutionRequestId;
-      if (id) keys.add(id);
-    } else if (seg.type === 'approval_request') {
-      const id = seg.data?.requestId;
-      if (id) keys.add(id);
-    } else if (seg.type === 'escalation_offer') {
-      const id = seg.data?.offerId;
-      if (id) keys.add(id);
-      // `ticket_escalated` is deliberately absent: its only id is the ticketId,
+  for (const part of parts) {
+    if (isToolPart(part)) {
+      keys.add(part.toolCallId);
+      const approvalId = 'approval' in part ? part.approval?.id : undefined;
+      if (approvalId) keys.add(approvalId);
+      const batchId = approvalBatchIdOf(part);
+      if (batchId) keys.add(batchId);
+    } else if (part.type === 'data-escalation-offer') {
+      keys.add(part.id);
+      // `data-ticket-escalated` is deliberately absent: its only id is the ticketId,
       // which is dialog-scoped, so a re-escalated dialog would false-match an
       // older bubble and slice the newest persisted turn out of the thread.
-    } else if (seg.type === 'approval_batch') {
-      const data = seg.data;
-      if (data?.approvalRequestId) keys.add(data.approvalRequestId);
-      for (const call of data?.toolCalls ?? []) {
-        if (call?.toolExecutionRequestId) keys.add(call.toolExecutionRequestId);
-      }
     }
   }
   return keys;
@@ -161,14 +144,13 @@ function sharesRequestKey(keys: ReadonlySet<string>, others: ReadonlySet<string>
 }
 
 /** Stream seqs of the ticket lifecycle receipts a set of rows renders. A
- *  `TICKET_EVENT` is persisted as its own row, so history stamps the row's seq
- *  onto the segment and it is the receipt's exact identity. */
-function ticketEventSeqs(messages: readonly MergeableChatMessage[]): Set<number> {
-  const seqs = new Set<number>();
+ *  `TICKET_EVENT` is persisted as its own row, so history puts the row's seq
+ *  on the part and it is the receipt's exact identity. */
+function ticketEventSeqs(messages: readonly ChatMessage[]): Set<string> {
+  const seqs = new Set<string>();
   for (const m of messages) {
-    if (!Array.isArray(m.content)) continue;
-    for (const seg of m.content) {
-      if (seg.type === 'ticket_event' && typeof seg.streamSeq === 'number') seqs.add(seg.streamSeq);
+    for (const part of m.parts) {
+      if (part.type === 'data-ticket-event' && part.id !== undefined) seqs.add(part.id);
     }
   }
   return seqs;
@@ -178,59 +160,61 @@ function ticketEventSeqs(messages: readonly MergeableChatMessage[]): Set<number>
  * A kept realtime row without the ticket receipts the window already renders.
  *
  * Receipts arrive standalone, so a live bubble made of them grows with every
- * status change while its `streamSeq` follows the newest one - and coverage
+ * status change while its `streamSeq` follows the newest one, and coverage
  * keeps or drops a row WHOLE. Once history persisted the older receipts but
  * not the newest, the bubble was kept and its older cards rendered a second
  * time beside their persisted twins (resolve → reopen in a dialog Fae never
  * answered this session). Returns `null` for a row left with nothing to show;
  * the streaming row is never removed, it is the bubble chunks are landing in.
  */
-function withoutPersistedTicketEvents<M extends MergeableChatMessage>(
-  m: M,
-  persistedSeqs: ReadonlySet<number>,
+function withoutPersistedTicketEvents(
+  m: ChatMessage,
+  persistedSeqs: ReadonlySet<string>,
   streamingMessageId: string | null,
-): M | null {
-  if (persistedSeqs.size === 0 || !Array.isArray(m.content)) return m;
-  const content = m.content.filter(
-    seg => !(seg.type === 'ticket_event' && typeof seg.streamSeq === 'number' && persistedSeqs.has(seg.streamSeq)),
+): ChatMessage | null {
+  if (persistedSeqs.size === 0) return m;
+  const parts = m.parts.filter(
+    part => !(part.type === 'data-ticket-event' && part.id !== undefined && persistedSeqs.has(part.id)),
   );
-  if (content.length === m.content.length) return m;
-  if (content.length === 0 && m.id !== streamingMessageId) return null;
-  return { ...m, content };
+  if (parts.length === m.parts.length) return m;
+  if (parts.length === 0 && m.id !== streamingMessageId) return null;
+  return { ...m, parts };
 }
 
 /** A user row's identity is its text under its author kind; empty text is no
- *  identity (system rows persist with `content: ''`). `''` for any other row.
+ *  identity. `''` for any other row.
  *  The kind is part of the key because technician (`authorType: 'admin'`) and
  *  system rows share role `user` with the host's own sends: without it a
  *  technician who typed the same text is the own bubble's "twin", and the own
  *  bubble is dropped while its row is not in the snapshot yet. An unset
  *  authorType is the own user (hosts stamp `'admin'` on their own sends where
  *  the operator IS the admin, so the rule stays symmetric per host). */
-function userTwinKey(m: MergeableChatMessage): string {
-  if (m.role !== 'user' || typeof m.content !== 'string' || m.content === '') return '';
-  return `${m.authorType ?? 'user'}\u0000${m.content}`;
+function userTwinKey(m: ChatMessage): string {
+  if (m.role !== 'user') return '';
+  const text = textOfParts(m.parts);
+  if (text === '') return '';
+  return `${m.metadata?.author?.authorType ?? 'user'}\u0000${text}`;
 }
 
 /** What a set of rows says about the turns they render, so another copy of one
  *  of those turns can be recognised under a DIFFERENT id: the backend request
- *  ids their segments carry, their answer texts and their user texts. The text
+ *  ids their parts carry, their answer texts and their user texts. The text
  *  maps count occurrences for the callers that pair copies positionally (a
  *  repeated prompt twins the NEWEST unclaimed same-text row); `twinVerdict`
- *  itself reads them as presence. Empty user text carries no identity (system
- *  rows persist with `content: ''`) and is left out. */
+ *  itself reads them as presence. Empty user text carries no identity and is
+ *  left out. */
 interface TwinSignals {
   requestKeys: Set<string>;
   assistantTexts: Map<string, number>;
   userContents: Map<string, number>;
 }
 
-function collectTwinSignals(rows: readonly MergeableChatMessage[]): TwinSignals {
+function collectTwinSignals(rows: readonly ChatMessage[]): TwinSignals {
   const signals: TwinSignals = { requestKeys: new Set(), assistantTexts: new Map(), userContents: new Map() };
   for (const row of rows) {
-    for (const key of turnRequestKeys(row.content)) signals.requestKeys.add(key);
+    for (const key of turnRequestKeys(row.parts)) signals.requestKeys.add(key);
     if (row.role === 'assistant') {
-      const text = assistantAnswerText(row.content);
+      const text = assistantAnswerText(row.parts);
       if (text !== '') signals.assistantTexts.set(text, (signals.assistantTexts.get(text) ?? 0) + 1);
       continue;
     }
@@ -248,15 +232,15 @@ type TwinVerdict = 'twin' | 'distinct' | 'unknown';
  *  persisted row still being written, is a prefix of the full one. 'unknown':
  *  the row carries nothing a twin could be recognised by (no user text, no
  *  request id, no answer text), so "no match" says nothing about it. */
-function twinVerdict(signals: TwinSignals, m: MergeableChatMessage): TwinVerdict {
+function twinVerdict(signals: TwinSignals, m: ChatMessage): TwinVerdict {
   if (m.role !== 'assistant') {
     const key = userTwinKey(m);
     if (key === '') return 'unknown';
     return signals.userContents.has(key) ? 'twin' : 'distinct';
   }
-  const keys = turnRequestKeys(m.content);
+  const keys = turnRequestKeys(m.parts);
   if (keys.size > 0) return sharesRequestKey(keys, signals.requestKeys) ? 'twin' : 'distinct';
-  const text = assistantAnswerText(m.content);
+  const text = assistantAnswerText(m.parts);
   if (text === '') return 'unknown';
   for (const other of signals.assistantTexts.keys()) {
     if (other.startsWith(text) || text.startsWith(other)) return 'twin';
@@ -288,15 +272,15 @@ export function maxPersistedStreamSeq(
   return max;
 }
 
-export interface HistoryMergeInput<M extends MergeableChatMessage> {
+export interface HistoryMergeInput {
   /** Processed history in chronological order (all fetched pages). */
-  processedHistory: M[];
+  processedHistory: ChatMessage[];
   /** Raw history message ids across all fetched pages, when they can differ
    *  from processed ids (processing may merge/rename). Optional — pass when
    *  available so raw-id duplicates are filtered too. */
   rawHistoryIds?: ReadonlySet<string>;
   /** Messages currently in the host store for this dialog (realtime + prior merges). */
-  existingMessages: M[];
+  existingMessages: ChatMessage[];
   /** Id of the in-flight streaming synthetic, if any. Never dropped.
    *  IMPORTANT: hosts must not pass a STALE id here (e.g. a streaming entry
    *  left behind by unmounting mid-stream) — gate it on the server-side
@@ -319,7 +303,7 @@ export interface HistoryMergeInput<M extends MergeableChatMessage> {
   realtimeSeenStreamSeq?: number;
 }
 
-export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: HistoryMergeInput<M>): M[] {
+export function mergeHistoryWithRealtime(input: HistoryMergeInput): ChatMessage[] {
   const {
     processedHistory,
     rawHistoryIds,
@@ -348,7 +332,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   const historyCoversRealtime = seqCoverageKnown ? historyMaxStreamSeq >= realtimeSeenStreamSeq : null;
 
   // Per-role max persisted streamSeq, computed from history rows that carry a
-  // per-row `streamSeq` (hosts stamp it from `lastChunkStreamSeq`). The single
+  // per-row `streamSeq` (stamped from `lastChunkStreamSeq`). The single
   // global `historyMaxStreamSeq` is a MAX over ALL rows, so a later turn or an
   // other-role row (e.g. a user MESSAGE_REQUEST) can push it past a synthetic
   // whose OWN turn is not in the snapshot yet — the merge then "covers" and
@@ -361,29 +345,33 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   const historyMaxSeqByRole = new Map<string, number>();
   let anyHistoryRowSeq = false;
   for (const pm of processedHistory) {
-    if (typeof pm.streamSeq === 'number') {
+    const seq = pm.metadata?.streamSeq;
+    if (typeof seq === 'number') {
       anyHistoryRowSeq = true;
       const prev = historyMaxSeqByRole.get(pm.role) ?? 0;
-      if (pm.streamSeq > prev) historyMaxSeqByRole.set(pm.role, pm.streamSeq);
+      if (seq > prev) historyMaxSeqByRole.set(pm.role, seq);
     }
   }
 
   // Persistence is asynchronous per-chunk: an assistant turn ending in an
   // approval can have its APPROVAL_REQUEST document persisted before the
   // leading THINKING/TEXT documents, so history can return a partial trailing
-  // assistant (just `[approval_batch]`) while the realtime store already has
-  // the full `[thinking, text, approval_batch]` synthetic. Resolve by
-  // `approval_batch.approvalRequestId`:
-  //   - if the existing twin is the LIVE streaming message, or has more
-  //     segments — drop the history assistant and pin the twin (realtime is
+  // assistant (just the batch's rows) while the realtime store already has the
+  // full `[reasoning, text, ...the batch's rows]` synthetic. Resolve by the batch id:
+  //   - if the existing twin is the LIVE streaming message, or draws more
+  //     parts: drop the history assistant and pin the twin (realtime is
   //     the more complete / still-growing copy).
-  //   - else (history is at least as complete) — drop the twin.
+  //   - else (history is at least as complete): drop the twin.
   const trailing = processedHistory[processedHistory.length - 1];
   const historyTrailingAssistant = trailing?.role === 'assistant' ? trailing : null;
-  const historyBatchId =
-    historyTrailingAssistant && Array.isArray(historyTrailingAssistant.content)
-      ? (historyTrailingAssistant.content.find(s => s.type === 'approval_batch')?.data?.approvalRequestId ?? null)
-      : null;
+  const batchIdOf = (m: ChatMessage): string | undefined => {
+    for (const part of m.parts) {
+      const batchId = isToolPart(part) ? approvalBatchIdOf(part) : undefined;
+      if (batchId !== undefined) return batchId;
+    }
+    return undefined;
+  };
+  const historyBatchId = historyTrailingAssistant ? (batchIdOf(historyTrailingAssistant) ?? null) : null;
 
   let processedToUse = processedHistory;
   const pinnedSyntheticIds = new Set<string>();
@@ -392,17 +380,15 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   if (historyBatchId) {
     const batchTwins = existingMessages.filter(
       m =>
-        m.role === 'assistant' &&
-        Array.isArray(m.content) &&
-        m.content.some(s => s.type === 'approval_batch' && s.data?.approvalRequestId === historyBatchId),
+        m.role === 'assistant' && m.parts.some(part => isToolPart(part) && approvalBatchIdOf(part) === historyBatchId),
     );
     // Prefer the live streaming twin; otherwise the most recent one (a stale
     // replay-minted duplicate may precede it).
     const existingWithSameBatch =
       batchTwins.find(m => m.id === streamingMessageId) ?? batchTwins[batchTwins.length - 1];
-    if (existingWithSameBatch && Array.isArray(existingWithSameBatch.content)) {
-      const histSize = Array.isArray(historyTrailingAssistant?.content) ? historyTrailingAssistant.content.length : 0;
-      const realtimeSize = existingWithSameBatch.content.length;
+    if (existingWithSameBatch) {
+      const histSize = historyTrailingAssistant ? bodySize(historyTrailingAssistant.parts) : 0;
+      const realtimeSize = bodySize(existingWithSameBatch.parts);
       if (existingWithSameBatch.id === streamingMessageId || realtimeSize > histSize) {
         processedToUse = processedHistory.slice(0, -1);
         pinnedSyntheticIds.add(existingWithSameBatch.id);
@@ -418,10 +404,10 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   // copy keeps that Mongo id but accumulates MORE than history has persisted yet
   // (a later tool, a tool's terminal state). `processedIds` would then drop that
   // richer realtime copy as an id-duplicate and revert the bubble to history's
-  // stale segments — the reported "3 tools collapse to 2, one stuck pending
+  // stale parts: the reported "3 tools collapse to 2, one stuck pending
   // instead of failed" after reload + stop. When a same-id realtime twin is
-  // strictly richer than the persisted trailing (more segments, or an equal
-  // count but a higher consumed `streamSeq`), pin it and drop history's copy —
+  // strictly richer than the persisted trailing (more parts, or an equal
+  // count but a higher consumed `streamSeq`), pin it and drop history's copy:
   // the same rule the approval-batch branch above applies, for any trailing
   // assistant. Skipped when that branch already claimed the trailing turn (its
   // slice moved the last element) or the trailing isn't an assistant. Once the
@@ -429,12 +415,11 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   // twin is no longer richer, and the persisted copy wins again (self-heals).
   if (
     historyTrailingAssistant &&
-    Array.isArray(historyTrailingAssistant.content) &&
     processedToUse[processedToUse.length - 1] === historyTrailingAssistant &&
     !pinnedSyntheticIds.has(historyTrailingAssistant.id)
   ) {
-    const persistedSize = historyTrailingAssistant.content.length;
-    const persistedSeq = historyTrailingAssistant.streamSeq ?? 0;
+    const persistedSize = bodySize(historyTrailingAssistant.parts);
+    const persistedSeq = historyTrailingAssistant.metadata?.streamSeq ?? 0;
     // Turn identity for a twin that has NOT adopted the persisted id. Adoption
     // only happens on a REPLAY (a reload re-streams the turn from its
     // MESSAGE_START into the persisted row); a refetch that lands while the
@@ -443,14 +428,13 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     // Both copies do carry the backend's per-call request ids, which identify
     // the TURN — the same trick the approval-batch branch plays with
     // `approvalRequestId`, widened to tool calls.
-    const trailingKeys = turnRequestKeys(historyTrailingAssistant.content);
-    const isSameTurn = (m: M): boolean =>
-      m.id === historyTrailingAssistant.id || sharesRequestKey(turnRequestKeys(m.content), trailingKeys);
+    const trailingKeys = turnRequestKeys(historyTrailingAssistant.parts);
+    const isSameTurn = (m: ChatMessage): boolean =>
+      m.id === historyTrailingAssistant.id || sharesRequestKey(turnRequestKeys(m.parts), trailingKeys);
     const richerTwin = existingMessages.find(
       m =>
         m !== historyTrailingAssistant &&
         m.role === 'assistant' &&
-        Array.isArray(m.content) &&
         isSameTurn(m) &&
         // A STILL-STREAMING twin wins outright: it is the copy the chunks are
         // landing in, so "richer" is a property it is about to have anyway,
@@ -459,8 +443,10 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
         // beside the live one, their tool rows disagreeing (one pending, one
         // failed) because each stopped at a different chunk.
         (m.id === streamingMessageId ||
-          m.content.length > persistedSize ||
-          (m.content.length === persistedSize && typeof m.streamSeq === 'number' && m.streamSeq > persistedSeq)),
+          bodySize(m.parts) > persistedSize ||
+          (bodySize(m.parts) === persistedSize &&
+            typeof m.metadata?.streamSeq === 'number' &&
+            m.metadata.streamSeq > persistedSeq)),
     );
     if (richerTwin) {
       processedToUse = processedToUse.slice(0, -1);
@@ -474,7 +460,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   // next to its persisted twin. Recognise the twin by its rendered answer text.
   const lastProcessed = processedToUse[processedToUse.length - 1];
   const trailingAssistantText =
-    lastProcessed && lastProcessed.role === 'assistant' ? assistantAnswerText(lastProcessed.content) : '';
+    lastProcessed && lastProcessed.role === 'assistant' ? assistantAnswerText(lastProcessed.parts) : '';
 
   // Content identity of the window, for recognising copies of its turns under
   // other ids; its `userContents` multiset is also what the `user-` branch of
@@ -526,10 +512,9 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   //     oldest row (server clock — a client clock behind the server can still
   //     misread a pre-fetch row, hence the verdict too) and 'distinct'.
   //     Replay-minted synthetics carry fresh timestamps and never qualify.
-  const isInWindow = (m: M): boolean => processedIds.has(m.id) || (rawHistoryIds?.has(m.id) ?? false);
+  const isInWindow = (m: ChatMessage): boolean => processedIds.has(m.id) || (rawHistoryIds?.has(m.id) ?? false);
   const firstWindowIndex = existingMessages.findIndex(isInWindow);
-  const isPersistedOlder = (m: M): boolean =>
-    !isClientMintedId(m.id) && (m.timestamp?.getTime() ?? 0) <= historyFetchedAt;
+  const isPersistedOlder = (m: ChatMessage): boolean => !isClientMintedId(m.id) && (timeOf(m) ?? 0) <= historyFetchedAt;
   let lastOlderPersistedIndex = -1;
   if (firstWindowIndex < 0) {
     for (const [index, m] of existingMessages.entries()) {
@@ -542,45 +527,47 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   let windowMinTime = Number.POSITIVE_INFINITY;
   let windowHasUnstampedAssistant = false;
   for (const pm of processedToUse) {
-    if (typeof pm.streamSeq === 'number') {
-      if (pm.streamSeq < windowMinSeq) windowMinSeq = pm.streamSeq;
+    const seq = pm.metadata?.streamSeq;
+    if (typeof seq === 'number') {
+      if (seq < windowMinSeq) windowMinSeq = seq;
     } else if (pm.role === 'assistant') {
       windowHasUnstampedAssistant = true;
     }
-    const time = pm.timestamp?.getTime();
+    const time = timeOf(pm);
     if (typeof time === 'number' && time < windowMinTime) windowMinTime = time;
   }
   const threadHasClientMintedRow = existingMessages.some(m => isClientMintedId(m.id));
-  const seqCanMislead = (m: M): boolean =>
+  const seqCanMislead = (m: ChatMessage): boolean =>
     m.role === 'assistant' ? windowHasUnstampedAssistant : isUserRequestSyntheticId(m.id) || isOptimisticId(m.id);
-  const isOlderThanWindow = (m: M, index: number): boolean => {
+  const isOlderThanWindow = (m: ChatMessage, index: number): boolean => {
     if (m.id === streamingMessageId) return false;
     if (firstWindowIndex >= 0) {
       if (index >= firstWindowIndex) return false;
-      return !(isClientMintedId(m.id) && sharesRequestKey(turnRequestKeys(m.content), windowSignals.requestKeys));
+      return !(isClientMintedId(m.id) && sharesRequestKey(turnRequestKeys(m.parts), windowSignals.requestKeys));
     }
     if (index < lastOlderPersistedIndex) return true;
     if (!isClientMintedId(m.id)) return isPersistedOlder(m);
-    if (typeof m.streamSeq === 'number') {
-      if (!Number.isFinite(windowMinSeq) || m.streamSeq >= windowMinSeq) return false;
+    const seq = m.metadata?.streamSeq;
+    if (typeof seq === 'number') {
+      if (!Number.isFinite(windowMinSeq) || seq >= windowMinSeq) return false;
       const verdict = twinVerdict(windowSignals, m);
       return verdict === 'unknown' ? !seqCanMislead(m) : verdict === 'distinct';
     }
-    const time = m.timestamp?.getTime();
+    const time = timeOf(m);
     if (typeof time !== 'number' || time > historyFetchedAt) return false;
     if (!Number.isFinite(windowMinTime) || time >= windowMinTime) return false;
     return twinVerdict(windowSignals, m) === 'distinct';
   };
 
   // The dedup rules for a row at or after the window boundary.
-  const keepRealtime = (m: M): boolean => {
-    if (m.role === 'user' && isOptimisticId(m.id) && typeof m.content === 'string') {
+  const keepRealtime = (m: ChatMessage): boolean => {
+    if (m.role === 'user' && isOptimisticId(m.id)) {
       // Content-dedup only when the message predates the snapshot — a
       // just-sent message whose text repeats an earlier turn ("yes", "ok")
       // must not vanish against stale history. Wall-clock, not seq coverage:
       // optimistic messages are minted on send, never by chunk replay, so
       // their timestamps are trustworthy.
-      const canBeInSnapshot = (m.timestamp?.getTime() ?? 0) <= historyFetchedAt;
+      const canBeInSnapshot = (timeOf(m) ?? 0) <= historyFetchedAt;
       return !(canBeInSnapshot && windowSignals.userContents.has(userTwinKey(m)));
     }
     // Freshness rule: a synthetic whose turn is represented in the snapshot
@@ -593,7 +580,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     if (isSyntheticRealtimeId(m.id) && m.id !== streamingMessageId) {
       // A non-streaming synthetic that re-renders the trailing persisted assistant verbatim is its
       // twin no matter what the seq signal says — drop it (covers the persistence-lag gap).
-      if (m.role === 'assistant' && trailingAssistantText && assistantAnswerText(m.content) === trailingAssistantText) {
+      if (m.role === 'assistant' && trailingAssistantText && assistantAnswerText(m.parts) === trailingAssistantText) {
         return false;
       }
       // Regular user MESSAGE_REQUEST synthetics (`user-`): the backend persists
@@ -611,7 +598,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       // `lastChunkStreamSeq`; the durable fix is the backend stamping it (as it
       // already does for DIRECT/SYSTEM), which also stops the replay at the
       // source via a correct `optStartSeq`.
-      if (m.role === 'user' && isUserRequestSyntheticId(m.id) && typeof m.content === 'string') {
+      if (m.role === 'user' && isUserRequestSyntheticId(m.id)) {
         const twinKey = userTwinKey(m);
         const seen = (seenUserSyntheticByContent.get(twinKey) ?? 0) + 1;
         seenUserSyntheticByContent.set(twinKey, seen);
@@ -632,8 +619,9 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
         //   - else history is BEHIND this fresh seq and the twin is an older
         //     completed turn → NEW repeat → keep.
         // No seq signal (legacy transport) → positional-only dedup (drop).
-        if (typeof m.streamSeq !== 'number' || historyMaxStreamSeq <= 0) return false;
-        if (historyMaxStreamSeq >= m.streamSeq) return false;
+        const ownSeq = m.metadata?.streamSeq;
+        if (typeof ownSeq !== 'number' || historyMaxStreamSeq <= 0) return false;
+        if (historyMaxStreamSeq >= ownSeq) return false;
         const lastPersisted = processedToUse[processedToUse.length - 1];
         if (lastPersisted && userTwinKey(lastPersisted) === twinKey) return false;
         return true;
@@ -655,10 +643,11 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       // message-loss bug. Only when NO history row is seq-stamped (legacy hosts /
       // unstamped history) do we use the global seq, then wall-clock.
       let covered: boolean;
-      if (typeof m.streamSeq === 'number' && anyHistoryRowSeq) {
+      const seq = m.metadata?.streamSeq;
+      if (typeof seq === 'number' && anyHistoryRowSeq) {
         const roleMax = historyMaxSeqByRole.get(m.role) ?? 0;
-        covered = roleMax > 0 && roleMax >= m.streamSeq;
-      } else if (typeof m.streamSeq === 'number') {
+        covered = roleMax > 0 && roleMax >= seq;
+      } else if (typeof seq === 'number') {
         // This synthetic carries its own seq, but no history row does. Decide
         // against the global when it exists — and when it does NOT
         // (`historyMaxStreamSeq === 0`), that is not "unknown, guess by clock":
@@ -671,18 +660,17 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
         // wall-clock there judged every one of them "older than the fetch
         // instant, therefore persisted" and dropped all but the single
         // `streamingMessageId` — the thread collapsed to the user's prompt.
-        covered = historyMaxStreamSeq > 0 && historyMaxStreamSeq >= m.streamSeq;
+        covered = historyMaxStreamSeq > 0 && historyMaxStreamSeq >= seq;
       } else {
-        covered =
-          historyCoversRealtime !== null ? historyCoversRealtime : (m.timestamp?.getTime() ?? 0) <= historyFetchedAt;
+        covered = historyCoversRealtime !== null ? historyCoversRealtime : (timeOf(m) ?? 0) <= historyFetchedAt;
       }
       if (covered) return false;
     }
     return true;
   };
 
-  const olderThanWindowMessages: M[] = [];
-  const realtimeMessages: M[] = [];
+  const olderThanWindowMessages: ChatMessage[] = [];
+  const realtimeMessages: ChatMessage[] = [];
   for (const [index, m] of existingMessages.entries()) {
     // Pin wins over everything: the twin may carry a persisted Mongo id (the
     // chunk processors ADOPT an in-progress trailing assistant after a prior
@@ -713,10 +701,21 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
   return [...olderThanWindowMessages, ...processedToUse, ...dedupedRealtimeMessages];
 }
 
-export interface HistoryPrependResult<M extends MergeableChatMessage> {
-  newMessages: M[];
+export interface HistoryPrependResult {
+  newMessages: ChatMessage[];
   boundaryMessageId?: string;
-  boundaryUpdates?: { content: MessageContent };
+  boundaryUpdates?: { parts: ChatPart[] };
+}
+
+/** What two copies of a row say: `state` is how far a stream had got, and a persisted copy has none. */
+function partsContent(parts: readonly ChatPart[]): string {
+  return JSON.stringify(
+    parts.map(part => {
+      if (part.type !== 'text' && part.type !== 'reasoning') return part;
+      const { state: _state, ...content } = part;
+      return content;
+    }),
+  );
 }
 
 /** Pagination path (an older page arrived via fetchNextPage): everything on
@@ -725,10 +724,10 @@ export interface HistoryPrependResult<M extends MergeableChatMessage> {
  *  twins of client-minted rows the thread still shows above that boundary are
  *  left out (see the note in the body). Returns null when there is nothing to
  *  apply. */
-export function computeHistoryPrepend<M extends MergeableChatMessage>(
-  processedHistory: M[],
-  existingMessages: M[],
-): HistoryPrependResult<M> | null {
+export function computeHistoryPrepend(
+  processedHistory: ChatMessage[],
+  existingMessages: ChatMessage[],
+): HistoryPrependResult | null {
   const existingIds = new Set(existingMessages.map(m => m.id));
   const boundaryMessageIndex = processedHistory.findIndex(m => existingIds.has(m.id));
   const newEnd = boundaryMessageIndex >= 0 ? boundaryMessageIndex : processedHistory.length;
@@ -766,12 +765,12 @@ export function computeHistoryPrepend<M extends MergeableChatMessage>(
         userTwinsLeft.set(key, left - 1);
         twinIndices.add(i);
       } else if (pm.role === 'assistant') {
-        const keys = turnRequestKeys(pm.content);
+        const keys = turnRequestKeys(pm.parts);
         if (keys.size > 0) {
           if (sharesRequestKey(keys, liveSignals.requestKeys)) twinIndices.add(i);
           continue;
         }
-        const text = assistantAnswerText(pm.content);
+        const text = assistantAnswerText(pm.parts);
         if (text === '') continue;
         for (const [liveText, left] of assistantTwinsLeft) {
           if (left === 0 || !text.startsWith(liveText)) continue;
@@ -785,17 +784,14 @@ export function computeHistoryPrepend<M extends MergeableChatMessage>(
   const newMessages = processedHistory.slice(0, newEnd).filter((_, i) => !twinIndices.has(i));
 
   let boundaryMessageId: string | undefined;
-  let boundaryUpdates: { content: MessageContent } | undefined;
+  let boundaryUpdates: { parts: ChatPart[] } | undefined;
 
   if (boundaryIndexInExisting >= 0) {
     const boundaryMessage = processedHistory[boundaryMessageIndex];
     const existingBoundary = existingMessages[boundaryIndexInExisting];
-    const existingContent = JSON.stringify(existingBoundary.content);
-    const newContent = JSON.stringify(boundaryMessage.content);
-
-    if (existingContent !== newContent) {
+    if (partsContent(existingBoundary.parts) !== partsContent(boundaryMessage.parts)) {
       boundaryMessageId = boundaryMessage.id;
-      boundaryUpdates = { content: boundaryMessage.content };
+      boundaryUpdates = { parts: boundaryMessage.parts };
     }
   }
 

@@ -668,6 +668,78 @@
         "com.figma.variableId": "VariableID:1:204",
         "com.figma.scopes": ["ALL_SCOPES"]
       }
+    },
+    "orange": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.8509803921568627, 0.4, 0.10196078431372549],
+        "alpha": 1,
+        "hex": "#D9661A"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange (hover)": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.8117647058823529, 0.3607843137254902, 0.06274509803921569],
+        "alpha": 1,
+        "hex": "#CF5C10"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange (action)": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.7725490196078432, 0.3215686274509804, 0.023529411764705882],
+        "alpha": 1,
+        "hex": "#C55206"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange sec": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [1.0, 0.8470588235294118, 0.7490196078431373],
+        "alpha": 1,
+        "hex": "#FFD8BF"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange sec (hover)": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.9607843137254902, 0.807843137254902, 0.7098039215686275],
+        "alpha": 1,
+        "hex": "#F5CEB5"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange sec (action)": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.9215686274509803, 0.7686274509803922, 0.6705882352941176],
+        "alpha": 1,
+        "hex": "#EBC4AB"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
     }
   },
   "$extensions": {

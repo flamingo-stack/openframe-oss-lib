@@ -40,7 +40,7 @@ describe('ChatComposer inset', () => {
 });
 
 describe('ChatMessageList fadeEnd', () => {
-  const message = { id: 'm1', role: 'user' as const, content: 'hello', name: 'Ada', timestamp: new Date() };
+  const message = { id: 'm1', role: 'user' as const, parts: [{ type: 'text' as const, text: 'hello' }] };
 
   it('masks the scroller end and pads the content past it', () => {
     render(<ChatMessageList messages={[message]} fadeEnd />);

@@ -1,7 +1,7 @@
 /**
  * Narrowing primitives for untrusted hub JSON — ONE owner, shared by every
  * client that talks to a hub route (`use-chat-history-hydration`, the
- * conversation-list client, the NATS decoder).
+ * conversation-list client, the stream and row decoders).
  *
  * `unwrapEnvelope` encodes the response contract in one place. The hub's
  * route-base `successResponse` is `NextResponse.json(data)` — a RAW body, which

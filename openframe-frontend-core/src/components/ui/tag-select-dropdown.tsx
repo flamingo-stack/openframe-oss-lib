@@ -119,6 +119,8 @@ export function TagSelectDropdown({
           // The search field below raises the software keyboard the moment this
           // opens — see useViewportCollisionPadding.
           collisionPadding={viewportPadding}
+          // Every frame: iOS scrolls the field into view as the keyboard rises, and the list must follow it.
+          updatePositionStrategy="always"
           className={cn(
             'z-50 w-72 overflow-hidden rounded-[6px] border border-ods-border bg-ods-card shadow-lg',
             'flex max-h-[var(--radix-popper-available-height)] flex-col',

@@ -259,6 +259,8 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
           // opens — see useViewportCollisionPadding for why neither the collision
           // viewport nor the available height knows about it otherwise.
           collisionPadding={viewportPadding}
+          // Every frame: iOS scrolls the field into view as the keyboard rises, and the list must follow it.
+          updatePositionStrategy="always"
           className={cn(
             'z-50 min-w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-md border border-ods-border bg-ods-card shadow-lg',
             'flex max-h-[var(--radix-popper-available-height)] flex-col',

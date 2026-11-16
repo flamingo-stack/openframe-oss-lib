@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ComposeContentUrl } from '../../../../utils/content-href';
-import { makeComposeContentUrl } from '../../../../utils/content-href';
+import { makeEmbedderComposeContentUrl } from '../../../../utils/content-href';
 import { resolveSourceRowCTA } from '../source-row-cta';
 
 /**
@@ -57,10 +57,9 @@ describe('resolveSourceRowCTA: one address rule, the host composer', () => {
   });
 
   it('an embedder that hosts a doc type links it in-app, by the same rule as its hosted content', () => {
-    const composeContentUrl = makeComposeContentUrl({
-      hostedTypes: new Set(['markdown']),
+    const composeContentUrl = makeEmbedderComposeContentUrl({
       contentOrigin: 'https://hub.example',
-      suffixes: { markdown: 'help-center/knowledge-base' },
+      routes: { knowledgeBase: '/help-center/knowledge-base' },
     });
     const md = resolveSourceRowCTA(markdownRow, { composeContentUrl });
     expect(md.href).toBe('/help-center/knowledge-base/getting-started/install');

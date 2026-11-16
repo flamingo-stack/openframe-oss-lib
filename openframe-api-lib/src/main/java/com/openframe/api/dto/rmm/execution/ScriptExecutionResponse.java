@@ -1,6 +1,7 @@
 package com.openframe.api.dto.rmm.execution;
 
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -26,6 +27,7 @@ public class ScriptExecutionResponse {
     private String initiatedBy;
     private ExecutionSource source;
     private ExecutionStatus status;
+    private ExecutionFailureReason failureReason;
 
     private Instant dispatchedAt;
     private Instant statusChangedAt;

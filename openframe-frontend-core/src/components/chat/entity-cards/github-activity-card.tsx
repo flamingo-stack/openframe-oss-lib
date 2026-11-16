@@ -10,7 +10,7 @@
  *
  * Two consumers share this component:
  *   1. Activity-list row (employee detail / similar) — pass `variant="row"`.
- *   2. Chat-inline `[card://github_commit:<sha>]` markers — `variant="compact"`.
+ *   2. Chat-inline record links (`record://github_commit/<sha>`) — `variant="compact"`.
  *
  * Unified data shape `GitHubActivityItem` covers all three GitHub types
  * (commit / PR / review).

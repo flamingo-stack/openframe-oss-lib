@@ -22,6 +22,7 @@ import { NavigationSidebarItemButton } from './navigation-sidebar-item';
 import { resolveNavigationActive } from './navigation-sidebar-match';
 import {
   NavigationSidebarSectionedEntries,
+  NavigationSidebarSectionedSkeleton,
   SECTIONED_PRIMARY_NAV_CLASSES,
   useFoldedNavigationSections,
 } from './navigation-sidebar-sectioned';
@@ -407,7 +408,11 @@ export function NavigationSidebar({
   // Until then the config width stands, as for a sidebar that is not resizable;
   // on desktop the seeded width shows throughout, so nothing moves.
   const markupExpandedWidth = hydrated ? chosenExpandedWidth : (configExpandedWidth ?? EXPANDED_WIDTH);
-  const customExpandedWidth = resize !== undefined ? markupExpandedWidth : configExpandedWidth;
+  // An open drawer floats over the content: its own width (`drawerWidth`), not the desktop one, which the resize
+  // clamp narrows to keep room for the content beside it.
+  const drawerWidth = drawer ? config.drawerWidth : undefined;
+  const customExpandedWidth =
+    drawerWidth !== undefined ? drawerWidth : resize !== undefined ? markupExpandedWidth : configExpandedWidth;
   const expandedWidthStyle =
     customExpandedWidth === null ? undefined : ({ [EXPANDED_WIDTH_VAR]: `${customExpandedWidth}px` } as CSSProperties);
 
@@ -651,9 +656,21 @@ export function NavigationSidebar({
   // One `<nav>` block's rows: placeholders while loading, else the entries in
   // the variant's geometry.
   const renderEntries = (placeholders: string[] | null, items: NavigationSidebarItem[]): ReactNode => {
+    if (placeholders && sectioned) {
+      // The sections' own shape: the primary block as the host states it, the secondary one
+      // (and a host with no sections) as one section of entry rows.
+      const sections = placeholders === loadingRows?.primary ? config.loadingRows?.sections : undefined;
+      return (
+        <NavigationSidebarSectionedSkeleton
+          sections={sections}
+          leaves={placeholders.length}
+          foldedIds={foldedSectionIds}
+        />
+      );
+    }
     if (placeholders) {
       return placeholders.map(key =>
-        grouped || sectioned ? (
+        grouped ? (
           <NavigationSidebarGroupedSkeleton key={key} />
         ) : (
           <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
@@ -705,15 +722,18 @@ export function NavigationSidebar({
   return (
     <>
       {/* Backdrop scrim — only visible on tablet while the overlay is open */}
+      {/* A drawer's scrim covers its own row only, under the host's top bar (the burger menu's way): the top bar and
+          what stands above it stay visible and usable while it is open. */}
       <div
         className={cn(
-          'fixed inset-0 z-[40] bg-ods-overlay',
+          drawer ? 'absolute inset-0 z-[40] bg-ods-overlay' : 'fixed inset-0 z-[40] bg-ods-overlay',
           forcedOverlay ? 'hidden md:block' : desktopFromMd ? 'hidden' : 'hidden md:block lg:hidden',
           'transition-opacity duration-300',
           isOverlayOpen && !pushOnTablet ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         onClick={closeOverlay}
         aria-hidden="true"
+        data-testid="navigation-sidebar-scrim"
       />
 
       {/* Flex-flow placeholder — reserves the collapsed 56px slot on tablet so

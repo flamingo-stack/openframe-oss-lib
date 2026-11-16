@@ -199,7 +199,6 @@ export function OnboardingGuidesCatalogView({
   const docSearch = useDocSearch({
     source,
     baseRoute: basePath,
-    onNavigate: path => router.push(path),
     tableIds: ['onboarding-guides'],
   });
 
@@ -210,6 +209,7 @@ export function OnboardingGuidesCatalogView({
       slug: guide.slug,
       basePath,
       platforms: guide.onboarding_guide_platforms,
+      url: guide.url,
     });
     return <OnboardingGuideCard guide={guide} href={cta.href} targetPlatform={cta.targetPlatform} size="catalog" />;
   };

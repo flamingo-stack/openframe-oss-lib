@@ -16,12 +16,6 @@ export * from './use-chat-card-item';
 export * from './use-close-on-navigation';
 export * from './use-what-to-ask';
 
-// useChat + useSSE — ported from hub `hooks/useChat.ts` + `hooks/useSSE.ts`
-// minus the MockChatService + useChatConfig dependencies (which stay in
-// hub-only code).
-export * from './use-chat';
-export * from './use-sse';
-
 // Unified chat surface — single public hook + two transport adapters.
 // Consumers typically use `useUnifiedChat({ modes, activeMode })`; the
 // adapter hooks are exposed for advanced cases where direct transport
@@ -53,13 +47,5 @@ export {
   type UseAskSurfaceResult,
 } from './use-ask-prompts';
 export type { SlashCommandActionId, SlashCommandSummaryAction, SlashCommandSummary } from '../types/component.types';
-export type { Message } from '../types/message.types';
-export {
-  appendToTrailingAssistant,
-  applyToolExecutionToMessages,
-  upsertTrailingCompaction,
-} from '../stream/message-mutations';
 export type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
-export type { ChatTurnMeta } from '../stream/chat-stream-reducer';
-export type { ChatSource } from '../types/message.types';
 export type { StreamingPhase } from '../types/unified-chat-state.types';

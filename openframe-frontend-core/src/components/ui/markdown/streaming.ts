@@ -5,9 +5,6 @@
  * - Markdown is NOT context-free across blocks. The splitter only cuts at
  *   boundaries it can PROVE are atomic; when atomicity is unprovable the
  *   content is left in one unit (unmemoized) — correctness beats cache hits.
- * - Blocks containing `card://` / `mention://` markers are never memoized:
- *   their text is identical before/after the entity ref resolves, so a
- *   text-keyed cache would serve the stale unresolved card mid-stream.
  * - On stream completion the engine discards all of this and does ONE
  *   authoritative whole-document parse — streaming can never permanently
  *   diverge (late reference defs, footnotes, list renumbering self-heal).
@@ -34,14 +31,13 @@ export interface StreamingBlock {
   /**
    * True when this unit may be render-cached: it is complete (not the
    * trailing unit), atomic, and free of cross-block / late-resolving
-   * constructs (card/mention markers, reference definitions/uses,
-   * footnotes).
+   * constructs (reference definitions/uses, footnotes).
    */
   memoizable: boolean;
 }
 
 /** Constructs that resolve across blocks or after the text settles. */
-const NON_MEMOIZABLE_RE = /card:\/\/|mention:\/\/|^\s*\[[^\]]*\]:\s|\]\[|\[\^/m;
+const NON_MEMOIZABLE_RE = /^\s*\[[^\]]*\]:\s|\]\[|\[\^/m;
 
 /**
  * Raw HTML block-level containers. A blank line inside an OPEN one of these

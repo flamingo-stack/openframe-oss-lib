@@ -3,26 +3,13 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
-import type {
-  ApprovalBlockVariant,
-  AssistantType,
-  AuthorType,
-  ChatAppearance,
-  ChatApprovalStatus,
-  ConnectionStatus,
-} from './chat.types';
+import type { ApprovalBlockVariant, AssistantType, AuthorType, ChatAppearance, ConnectionStatus } from './chat.types';
 import type { ChatContextItem } from './context-item.types';
-import type {
-  ApprovalRequestData,
-  AskSegment,
-  Message,
-  MessageSegment,
-  ToolExecutionData,
-  ApprovalResolutionHandler,
-} from './message.types';
+import type { AskOptionData, ChatMessageActions, ToolExecutionData } from './message.types';
 
 /**
  * Anchor component supplied by the host (or the lib's
@@ -132,9 +119,10 @@ export interface ConnectionIndicatorProps {
 
 // ========== Chat Message Enhanced Props ==========
 
-export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivElement>, 'content'> {
-  role: 'user' | 'assistant' | 'error';
-  content: string | MessageSegment[];
+export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement> {
+  role: ChatMessage['role'];
+  /** The message: its ordered parts. The memo compares this array by reference. */
+  parts: ChatPart[];
   name?: string;
   assistantType?: AssistantType;
   authorType?: AuthorType;
@@ -145,10 +133,10 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   /** Write the speaker's name on the agent's turn and the viewer's own bubble
    *  too (`ChatMessageList.nameEveryTurn`). Default false. */
   nameEveryTurn?: boolean;
-  /** Viewer variant for approval blocks in this message's segments.
+  /** Viewer variant for approval blocks in this message's parts.
    *  `'admin'` (default) = full command block; `'client'` = end-client
    *  (Fae desktop app) title-only card. Forwarded to
-   *  ApprovalRequestMessage / ApprovalBatchMessage. */
+   *  the one approval card, ApprovalBatchMessage. */
   approvalVariant?: ApprovalBlockVariant;
   /** Visual generation of the row. Omit to inherit the thread's
    *  (`ChatMessageList.appearance`); `classic` outside a list. */
@@ -158,12 +146,19 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   timestamp?: Date;
   showAvatar?: boolean;
   isTyping?: boolean;
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
+  /** What this message's controls do. Parts hold no callbacks. A stable object: the message memo compares it by
+   *  reference. Omit to draw its cards read-only. */
+  actions?: ChatMessageActions;
+  /** The approval tiers drawn while pending (`approvalDisplaysInline`). `undefined` draws every tier. */
+  displayApprovalTypes?: readonly string[];
+  /** The stages of the turn (`metadata.progress`), drawn as one-line rows above its parts. */
+  progress?: ChatMessageMetadata['progress'];
+  /** The stream ended with no completion signal (`metadata.finishReason`): what it said stays, over a notice. */
+  interrupted?: boolean;
   /**
    * Entity-context items attached to this (user) message. When present the
    * bubble renders a read-only chip strip beneath its text (Figma node
-   * 31:28709). Resolved from `UnifiedChatMessage.contextItems` by the host.
+   * 31:28709). Resolved from `metadata.contextItems` by the host.
    */
   contextItems?: ChatContextItem[];
   /**
@@ -174,28 +169,23 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   /**
    * Host renderer that REPLACES the default label-only context chip for an
    * attached item with a self-fetching entity chip — so a user's manually
-   * attached context renders IDENTICALLY to an inline `@marker:id` mention
-   * (same live name resolution, same link). Mirror of `renderMention`, but for
-   * the `contextItems` strip instead of inline tokens. Return `null` for an
+   * attached context renders IDENTICALLY to an inline record link
+   * (same live name resolution, same link). Mirror of `renderRecordChip`, but
+   * for the `contextItems` strip instead of inline links. Return `null` for an
    * item the host can't render → the lib falls back to the label pill. Keep the
    * function identity stable (module const / `useCallback`) so the message memo
    * holds across streaming chunks.
    */
   renderContextItem?: (item: ChatContextItem) => ReactNode;
   /**
-   * Host renderer for inline AI mentions `@marker:id` — the ASSISTANT echoing
-   * `@device:<machineId>` (etc.) in its reply. DIRECT MIRROR of
-   * `renderEntityCard` for the `[card://]` grammar: the lib detects the token
-   * (via `remark-mention-chips`), parses `{marker, id}`, and renders whatever
-   * node the host returns — typically a SELF-FETCHING chip (each entity type
-   * has its own fetcher) that resolves its own display name by id. The lib
-   * stays data-agnostic: it knows nothing about entity types or how to fetch
-   * them. Return null/undefined for a marker the host can't render → the lib
-   * falls back to the bare token text. SEPARATE from `contextItems` (the user's
-   * own attachments). Keep the function identity stable (e.g. a module const or
-   * `useCallback`) so the message memo holds across streaming chunks.
+   * Host renderer for the chip of a record link in a message (`[Patch script](record://script/<id>)`,
+   * `chat-protocol/record-link.ts`): given the record's type and id and `label`, the name the link shows, return the
+   * host's chip for that type, typically a SELF-FETCHING one with a link to the record. The lib stays data-agnostic:
+   * it knows nothing about entity types or how to fetch them. Return null/undefined for a type the host has no chip
+   * for → the lib draws its own (`RecordChip`). SEPARATE from `contextItems` (the user's own attachments). Keep the
+   * function identity stable (e.g. a module const or `useCallback`) so the message memo holds across streaming chunks.
    */
-  renderMention?: (reference: { marker: string; id: string }) => ReactNode;
+  renderRecordChip?: (record: { type: string; id: string; label: string }) => ReactNode;
   /**
    * Host-provided renderer for inline entity cards (v6.1 §B.2.7 — DRY
    * duplications #2). The OSS-lib delegates all entity-specific rendering
@@ -207,20 +197,6 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * back to plain text title-only.
    */
   renderEntityCard?: (reference: ChatRef) => ReactNode;
-  /**
-   * References this answer's metadata described, used to expand the
-   * `[card://type:id]` markers in its body.
-   *
-   * A marker on the wire carries only a type and an id, so without these a card
-   * has to be hydrated by id through a per-entity API — which the host may not
-   * have for entities that live on another platform. Supplying the reference
-   * here is what lets such a card render with a real title and link instead of
-   * falling back to its raw id.
-   *
-   * Presence is NOT a render list: only markers actually written into the body
-   * render, and the metadata routinely describes more than the model cited.
-   */
-  refs?: ChatRef[];
   /**
    * Host-provided anchor component for markdown links. When supplied, the
    * `<a>` override in the markdown renderer delegates to this component
@@ -235,7 +211,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * cross-origin) — duplicated logic, kept for back-compat with hosts
    * that haven't migrated to the prop yet.
    *
-   * `card://` markers are still intercepted by the override BEFORE this
+   * record links are still intercepted by the override BEFORE this
    * component runs, so the host need not handle them.
    *
    * Implementations MAY declare additional optional props (e.g.
@@ -244,21 +220,12 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * simply default to undefined on the receiver.
    */
   NavLinkAnchor?: NavLinkAnchorComponent;
-  /**
-   * Picks an option on an `ask` (clarification) card in this message. Receives
-   * the option's label VERBATIM — the host sends it as the user's next message
-   * and the backend resolves the reply against the labels it offered.
-   *
-   * Omit to render ask cards read-only. Keep the identity stable
-   * (`useCallback` / module const): the message memo compares it by reference.
-   */
-  onAskSelect?: (label: string) => void;
 }
 
 // ========== Chat Message List Props ==========
 
 export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
-  messages: Message[];
+  messages: ChatMessage[];
   dialogId?: string;
   /** The thread is still loading: the list draws its own loading state. Inside a `LoadingScope` it does so whatever
    *  this says. */
@@ -270,6 +237,9 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  loading" and never grows a scrollbar. Default `false` (rows bottom-anchored like the loaded thread). */
   fill?: boolean;
   isTyping?: boolean;
+  /** The message `isTyping` is about, when the transport names it: a card's answer continues the card's message, which a
+   *  newer answer may have followed. Unset or null, the last message. */
+  writingMessageId?: string | null;
   /** The line shown beside the pending-turn loader: what the turn is doing right
    *  now ("Searching 28 sources"). Omitted, the loader cycles its generic phrases. */
   typingMessage?: string;
@@ -333,9 +303,10 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  `classic`; the Fae client passes `v2`. See `ChatAppearance`. */
   appearance?: ChatAppearance;
   assistantIcon?: ReactNode;
-  pendingApprovals?: MessageSegment[];
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
+  /** What the messages' controls do. Forwarded verbatim to every message's ChatMessageEnhanced. */
+  actions?: ChatMessageActions;
+  /** The approval tiers drawn while pending. Forwarded verbatim to every message's ChatMessageEnhanced. */
+  displayApprovalTypes?: readonly string[];
   // Infinite scroll for loading older messages
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
@@ -347,10 +318,9 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  entity chip (so attached context renders like an inline mention).
    *  Forwarded verbatim to every message's ChatMessageEnhanced. */
   renderContextItem?: (item: ChatContextItem) => ReactNode;
-  /** Host renderer for inline AI mentions `@marker:id` (mirror of
-   *  `renderEntityCard`). Forwarded verbatim to every message's
-   *  ChatMessageEnhanced; returns a self-fetching chip per entity type. */
-  renderMention?: (reference: { marker: string; id: string }) => ReactNode;
+  /** Host renderer for the chip of a record link. Forwarded verbatim to every
+   *  message's ChatMessageEnhanced; returns a self-fetching chip per type. */
+  renderRecordChip?: (record: { type: string; id: string; label: string }) => ReactNode;
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
   renderEntityCard?: (reference: ChatRef) => ReactNode;
@@ -366,15 +336,11 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    * Return `null` for messages that own nothing. Hidden and pending-placeholder
    * messages never reach it — they do not render at all.
    */
-  renderAfterMessage?: (message: Message, index: number) => ReactNode;
+  renderAfterMessage?: (message: ChatMessage, index: number) => ReactNode;
   /** Host-provided anchor for markdown links. Forwarded verbatim to every
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
   NavLinkAnchor?: NavLinkAnchorComponent;
-  /** Ask-card option pick. Forwarded verbatim to every message's
-   *  ChatMessageEnhanced; the host sends the received label as the user's next
-   *  message. Omit to render ask cards read-only. */
-  onAskSelect?: (label: string) => void;
 }
 
 export interface ChatMessageListRef {
@@ -625,30 +591,6 @@ export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement
   variant?: ApprovalBlockVariant;
 }
 
-// ========== Approval Request Message Props ==========
-
-export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: ApprovalRequestData;
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
-  status?: ChatApprovalStatus;
-  disabled?: boolean;
-  /** Chat identity. Accepted for parity with the batch card; does NOT drive
-   *  the styling — use `variant`. */
-  assistantType?: AssistantType;
-  /** Viewer variant. `'admin'` (default) = full card with the raw command;
-   *  `'client'` = end-client (Fae desktop app) card with only the
-   *  BE-generated title (`explanation`) + actions/status pill. */
-  variant?: ApprovalBlockVariant;
-  /** Render the footer Approve/Reject row (or the resolved-status tag).
-   *  Turn off when the viewer cannot resolve this card — matches
-   *  `ApprovalBatchMessageProps.showFooterActions`. Default true. */
-  showFooterActions?: boolean;
-  /** Display name of the user who resolved the request; baked into the
-   *  client variant's full-text status pill ("Approved by {name}"). */
-  resolvedByName?: string | null;
-}
-
 // ========== Error Message Display Props ==========
 
 export interface ErrorMessageDisplayProps extends HTMLAttributes<HTMLDivElement> {
@@ -674,10 +616,10 @@ export interface ThinkingDisplayProps extends HTMLAttributes<HTMLDivElement> {
 // ========== Ask Display Props ==========
 
 export interface AskDisplayProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onSelect'> {
-  /** The clarification cards to show. One entry per `ask` segment; a run of
-   *  consecutive segments is passed as ONE card with a pager, so a multi-question
+  /** The clarification cards to show. One entry per `data-ask` part; a run of
+   *  consecutive parts is passed as ONE card with a pager, so a multi-question
    *  turn reads as a single block instead of a stack of near-identical cards. */
-  cards: AskSegment[];
+  cards: Array<{ question: string; options: AskOptionData[] }>;
   /** Picks an option. Receives the option's `label` VERBATIM — that string is
    *  sent as the user's next message and the backend's classifier resolves it
    *  against the labels it offered, so it must not be reworded. Omit to render
@@ -767,6 +709,8 @@ export interface DialogItem {
    *  `UnifiedChatState.activeDialog`, the host's own record of the open
    *  conversation; rows of the active list never carry it. */
   archived?: boolean;
+  /** The backend has not generated its title yet and will soon: a chat that refreshes reads it again sooner. */
+  awaitsTitle?: boolean;
 }
 
 // ========== Chat Sidebar Props ==========

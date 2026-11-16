@@ -14,6 +14,7 @@ import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.service.rmm.ExecutionOutcomeClassifier;
 import com.openframe.stream.deserializer.CommandResultDeserializer;
 import com.openframe.stream.deserializer.ScriptResultDeserializer;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
@@ -83,7 +84,8 @@ class ScriptExecutedEnrichmentIntegrationTest {
         // Repository mocks — this test focuses on agentId extraction + enrichment,
         // not on getMessage name formatting; the deserializer is invoked with mocks present.
         ScriptResultDeserializer deserializer =
-                new ScriptResultDeserializer(mapper, scriptExecutionRepository, scriptRepository);
+                new ScriptResultDeserializer(mapper, scriptExecutionRepository, scriptRepository,
+                        new ExecutionOutcomeClassifier(true));
         DeserializedDebeziumMessage deserialized = deserializer.deserialize(inbound, MessageType.SCRIPT_EXECUTED);
         assertThat(deserialized.getAgentId())
                 .as("ScriptResultDeserializer must use machineId as agentId — that's the key the new enrichment looks up")

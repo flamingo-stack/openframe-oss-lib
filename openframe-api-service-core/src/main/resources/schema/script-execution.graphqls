@@ -79,7 +79,30 @@ enum ScriptExecutionStatus {
     QUEUED
     RUNNING
     SUCCESS
+    "The script ran to completion and exited with a non-zero code: the script's own outcome, not a platform failure."
+    SCRIPT_ERROR
+    "OpenFrame could not run the script to completion; failureReason says why."
     FAILED
+}
+
+"Why OpenFrame could not run a script to completion. Set only when the status is FAILED."
+enum ExecutionFailureReason {
+    "The agent never acknowledged the script: the device was offline or delivery retries ran out."
+    NO_ACK
+    "The agent acknowledged the script, but no result arrived within the timeout plus the grace period."
+    NO_AGENT_RESULT
+    "The agent stopped the script after it exceeded its timeout."
+    AGENT_TIMED_OUT
+    "The script needs a logged-on user, and no interactive user was logged on."
+    NO_USER_SESSION
+    "The agent could not launch or supervise the script process."
+    COULD_NOT_LAUNCH
+    "The agent restarted while the script was pending or running."
+    INTERRUPTED
+    "An OpenFrame-owned script (bootstrap, software install or update) exited with a non-zero code."
+    SYSTEM_SCRIPT_ERROR
+    "The agent reported a reason this backend version does not recognise."
+    UNKNOWN
 }
 
 """Where the execution was triggered from. Stamped server-side at dispatch — the client can't
@@ -124,6 +147,7 @@ type ScriptExecution implements Node {
     initiator: User
     source: ExecutionSource!
     status: ScriptExecutionStatus!
+    failureReason: ExecutionFailureReason
     dispatchedAt: Instant!
     statusChangedAt: Instant
     finishedAt: Instant
