@@ -12,7 +12,7 @@ use tracing::{error, info, warn};
 use crate::platform::DirectoryManager;
 use crate::services::tool_run_manager::ToolRunManager;
 
-/// `410 Gone`s, or `403 Forbidden`s, with no 2xx between them before we stop tools and gate outbound calls.
+/// Five `410 Gone`s, or five `403 Forbidden`s (each status counted on its own), with no 2xx between them before we stop tools and gate outbound calls.
 const STOP_TOOLS_AFTER_CONSECUTIVE: u32 = 5;
 /// First delay between probes once suspended.
 const PROBE_BACKOFF_INITIAL: Duration = Duration::from_secs(60);
