@@ -51,10 +51,13 @@ public class PackageUpdateWire {
                 .build();
     }
 
-    // the device user chose Update Now: the same forced order as at the deadline, with no countdown left to wait
+    // the agent keeps a zero countdown only for an order the device user started: any other origin is raised to its minimum
     public PackageUpdateDeliverySeed approvedForce(String machineId, PackageUpdateRequest request) {
-        return deadlineForce(machineId, request)
-                .toBuilder()
+        PackageUpdateDeliverySeed force = deadlineForce(machineId, request);
+        UpdateSource.Kind kind = force.getSource().getKind();
+        UpdateSource approvedByUser = UpdateSource.builder().kind(kind).origin(UpdateSource.Origin.USER).build();
+        return force.toBuilder()
+                .source(approvedByUser)
                 .countdownSeconds(0)
                 .build();
     }

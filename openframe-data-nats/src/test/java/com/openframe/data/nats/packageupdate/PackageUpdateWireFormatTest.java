@@ -7,6 +7,7 @@ import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
+import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
 import com.openframe.data.nats.delivery.PackageUpdateDeliverySpec;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -169,6 +170,34 @@ class PackageUpdateWireFormatTest {
         assertThat(force.getPayload().getRequestId()).isEqualTo("req-1");
         assertThat(force.getPayload().getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(force.getPayload().getCountdownSeconds()).isZero();
+        assertThat(force.getPayload().getSource().getKind()).isEqualTo(UpdateSource.Kind.AUTO);
+        assertThat(force.getPayload().getSource().getOrigin()).isEqualTo(UpdateSource.Origin.USER);
+    }
+
+    @Test
+    void approvedForce_ofAnAdminRequest_keepsTheKindAndNamesTheUser() {
+        PackageUpdateRequest request = PackageUpdateRequest.builder()
+                .requestId("req-1").source(PackageUpdateSource.ADMIN)
+                .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome")
+                .forceCountdownSeconds(300).build();
+
+        PackageUpdateDeliverySeed force = PackageUpdateWire.approvedForce("m1", request);
+
+        assertThat(force.getSource().getKind()).isEqualTo(UpdateSource.Kind.MANUAL);
+        assertThat(force.getSource().getOrigin()).isEqualTo(UpdateSource.Origin.USER);
+    }
+
+    @Test
+    void deadlineForce_keepsTheOriginOfTheRequest() {
+        PackageUpdateRequest request = PackageUpdateRequest.builder()
+                .requestId("req-1").source(PackageUpdateSource.ADMIN)
+                .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome")
+                .forceCountdownSeconds(300).build();
+
+        PackageUpdateDeliverySeed force = PackageUpdateWire.deadlineForce("m1", request);
+
+        assertThat(force.getSource().getOrigin()).isEqualTo(UpdateSource.Origin.ADMIN);
+        assertThat(force.getCountdownSeconds()).isEqualTo(300);
     }
 
     @Test
