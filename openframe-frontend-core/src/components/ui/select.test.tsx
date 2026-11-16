@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 
 let container: HTMLDivElement;
@@ -202,5 +202,98 @@ describe('SelectContent scroll arrows', () => {
   it('caps the list at 24rem of rows inside its border', async () => {
     await mountLongList();
     expect(viewportEl()?.parentElement?.className).toContain('max-h-[min(calc(24rem+2px)');
+  });
+
+  describe('auto-scroll while the pointer rests on an arrow', () => {
+    const ROW_HEIGHT = 48;
+    const realOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    const realScrollBy = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollBy');
+    let steps: number[] = [];
+
+    beforeEach(() => {
+      steps = [];
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+        configurable: true,
+        get(this: HTMLElement) {
+          return this.getAttribute('role') === 'option' ? ROW_HEIGHT : 0;
+        },
+      });
+      Object.defineProperty(Element.prototype, 'scrollBy', {
+        configurable: true,
+        value(this: Element, _x: number, y: number) {
+          steps.push(y);
+        },
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      if (realOffsetHeight) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', realOffsetHeight);
+      else Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight');
+      if (realScrollBy) Object.defineProperty(Element.prototype, 'scrollBy', realScrollBy);
+      else Reflect.deleteProperty(Element.prototype, 'scrollBy');
+    });
+
+    const arrow = (direction: 'up' | 'down') => {
+      const el = document.querySelector<HTMLElement>(`[data-select-scroll-arrow="${direction}"]`);
+      if (!el) throw new Error(`no ${direction} arrow`);
+      return el;
+    };
+    const pointer = (el: HTMLElement, type: string) => {
+      act(() => {
+        // React derives onPointerLeave from a pointerout whose relatedTarget lies outside the element.
+        const event =
+          type === 'pointerleave'
+            ? new MouseEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+            : new MouseEvent(type, { bubbles: true });
+        el.dispatchEvent(event);
+      });
+    };
+
+    async function hoverDownArrow() {
+      await mountLongList();
+      await scrollTo(40);
+      vi.useFakeTimers();
+      const down = arrow('down');
+      pointer(down, 'pointermove');
+      vi.advanceTimersByTime(120);
+      return down;
+    }
+
+    it('scrolls by one row every tick, down on the down arrow and up on the up arrow', async () => {
+      await hoverDownArrow();
+      expect(steps).toEqual([ROW_HEIGHT, ROW_HEIGHT]);
+      steps = [];
+      pointer(arrow('down'), 'pointerleave');
+      pointer(arrow('up'), 'pointermove');
+      vi.advanceTimersByTime(60);
+      expect(steps).toEqual([-ROW_HEIGHT]);
+    });
+
+    it('starts one timer however often the pointer moves on the arrow', async () => {
+      const down = await hoverDownArrow();
+      pointer(down, 'pointermove');
+      pointer(down, 'pointerdown');
+      steps = [];
+      vi.advanceTimersByTime(60);
+      expect(steps).toEqual([ROW_HEIGHT]);
+    });
+
+    it.each(['pointerleave', 'pointerup', 'pointercancel'])('stops on %s', async type => {
+      const down = await hoverDownArrow();
+      pointer(down, type);
+      steps = [];
+      vi.advanceTimersByTime(200);
+      expect(steps).toEqual([]);
+    });
+
+    it('stops when the arrow goes away under the pointer', async () => {
+      await hoverDownArrow();
+      flushSync(() => root.unmount());
+      root = createRoot(container);
+      steps = [];
+      vi.advanceTimersByTime(200);
+      expect(steps).toEqual([]);
+    });
   });
 });

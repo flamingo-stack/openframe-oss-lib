@@ -199,6 +199,10 @@ function SelectScrollArrow({ direction, viewport }: { direction: 'up' | 'down'; 
       )}
       onPointerDown={start}
       onPointerMove={start}
+      // A touch ends with pointerup (or pointercancel when the browser takes the gesture over), and a mouse button
+      // released on the arrow should stop it too: leaving is not the only way a press ends.
+      onPointerUp={stop}
+      onPointerCancel={stop}
       onPointerLeave={stop}
     >
       {direction === 'up' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
