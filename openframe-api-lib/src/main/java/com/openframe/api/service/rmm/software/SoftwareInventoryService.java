@@ -40,6 +40,7 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -490,7 +491,15 @@ public class SoftwareInventoryService {
                 ? readModelDevicesForSoftware(softwareId, search)
                 : allDevicesForSoftware(softwareId, search);
         autoUpdateService.applyToDevices(softwareId, rows);
+        rows.stream()
+                .filter(SoftwareInventoryService::isManagedWithoutPolicy)
+                .forEach(row -> row.setAutoUpdate(SoftwareAutoUpdateStatus.OFF));
         return rows;
+    }
+
+    private static boolean isManagedWithoutPolicy(SoftwareOnDeviceResponse row) {
+        SoftwareSource installedBy = row.getInstalledBy();
+        return row.getAutoUpdate() == null && installedBy != null && installedBy != SoftwareSource.UNMANAGED;
     }
 
     private List<SoftwareOnDeviceResponse> readModelDevicesForSoftware(String softwareId, String search) {
