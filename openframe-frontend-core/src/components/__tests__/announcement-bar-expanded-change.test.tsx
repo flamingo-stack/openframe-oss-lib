@@ -41,4 +41,14 @@ describe('AnnouncementBar onExpandedChange', () => {
     );
     expect(onExpandedChange).toHaveBeenLastCalledWith(false);
   });
+
+  it('is not called again when the host re-renders with a new inline callback and nothing changed', () => {
+    const calls: boolean[] = [];
+    const { rerender } = render(
+      <AnnouncementBar initialAnnouncement={null} onExpandedChange={expanded => calls.push(expanded)} />,
+    );
+    rerender(<AnnouncementBar initialAnnouncement={null} onExpandedChange={expanded => calls.push(expanded)} />);
+    rerender(<AnnouncementBar initialAnnouncement={null} onExpandedChange={expanded => calls.push(expanded)} />);
+    expect(calls).toEqual([false]);
+  });
 });
