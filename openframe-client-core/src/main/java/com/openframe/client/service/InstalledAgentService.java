@@ -6,13 +6,20 @@ import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.installedagents.InstalledAgentRepository;
+import com.openframe.data.service.machine.MachineUpdate;
+import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+
+import static com.openframe.data.service.machine.AgentVersionService.OPENFRAME_CLIENT_AGENT_TYPE;
+import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +28,7 @@ public class InstalledAgentService {
 
     private final InstalledAgentRepository installedAgentRepository;
     private final MachineRepository machineRepository;
+    private final MachineWriter machineWriter;
 
     @Transactional
     public void addInstalledAgent(String machineId, String agentType, String version, boolean lastAttempt) {
@@ -36,6 +44,16 @@ public class InstalledAgentService {
                         installedAgent -> updateExistingInstalledAgent(installedAgent, version, machineId, agentType),
                         () -> addNewInstalledAgent(machineId, agentType, version)
                 );
+        if (OPENFRAME_CLIENT_AGENT_TYPE.equals(agentType)) {
+            updateMachineAgentVersion(machineId, version);
+        }
+    }
+
+    private void updateMachineAgentVersion(String machineId, String version) {
+        String agentVersionPath = AGENT_VERSION.path();
+        Criteria versionChanged = Criteria.where(agentVersionPath).ne(version);
+        MachineUpdate update = machineUpdate().set(AGENT_VERSION, version);
+        machineWriter.update(machineId, versionChanged, update);
     }
 
     @Transactional
