@@ -41,6 +41,7 @@ class MachineOnClientTicketsProjectionTest {
     @Test
     void anEvent_archivesTheClientTicketsOpenedUnderAnotherCustomer_intoTheTenantsArchivedStatus() {
         // setup
+        stubCurrentCustomer("org-b");
         when(ticketProjectionRepository.findStatusId("tenant-a", TicketStatusKind.ARCHIVED))
                 .thenReturn(Optional.of(ARCHIVED_STATUS_ID));
 
@@ -53,18 +54,68 @@ class MachineOnClientTicketsProjectionTest {
     }
 
     @Test
-    void aMachineWithoutAnOrganization_archivesNothing() {
+    void aStaleEventOfAPreviousCustomer_archivesAgainstTheMachinesCurrentCustomer() {
+        // setup
+        stubCurrentCustomer("org-b");
+        when(ticketProjectionRepository.findStatusId("tenant-a", TicketStatusKind.ARCHIVED))
+                .thenReturn(Optional.of(ARCHIVED_STATUS_ID));
+
         // execution
-        projection.apply(buildRecord("tenant-a", "machine-1", null));
+        projection.apply(buildRecord("tenant-a", "machine-1", "org-a"));
+
+        // verifications
+        verify(ticketProjectionRepository).archiveClientTicketsOfOtherOrganizations("tenant-a", "machine-1", "org-b",
+                ARCHIVED_STATUS_ID);
+    }
+
+    @Test
+    void aStaleEventOfAPreviousCustomer_countsAndBatchesAgainstTheMachinesCurrentCustomer() {
+        // setup
+        PublishedRecord<MachineEvent> staleRecord = buildRecord("tenant-a", "machine-1", "org-a");
+        stubCurrentCustomer("org-b");
+        when(ticketProjectionRepository.findStatusId("tenant-a", TicketStatusKind.ARCHIVED))
+                .thenReturn(Optional.of(ARCHIVED_STATUS_ID));
+        when(ticketProjectionRepository.countClientTicketsOfOtherOrganizations("tenant-a", "machine-1", "org-b", 5000))
+                .thenReturn(5000L);
+        when(ticketProjectionRepository.archiveClientTicketsOfOtherOrganizationsBatch("tenant-a", "machine-1", "org-b",
+                ARCHIVED_STATUS_ID, null, 1000)).thenReturn("t9");
+
+        // execution and verifications
+        assertThat(projection.countChanges(staleRecord, 5000)).isEqualTo(5000L);
+        assertThat(projection.applyBatch(staleRecord, null, 1000)).isEqualTo("t9");
+    }
+
+    @Test
+    void aMachineThatIsGone_archivesNothing() {
+        // setup
+        when(ticketProjectionRepository.findMachineOrganizationId("tenant-a", "machine-1")).thenReturn(Optional.empty());
+
+        // execution
+        projection.apply(buildRecord("tenant-a", "machine-1", "org-b"));
 
         // verifications
         verify(ticketProjectionRepository, never()).archiveClientTicketsOfOtherOrganizations(any(), any(), any(), any());
-        assertThat(projection.countChanges(buildRecord("tenant-a", "machine-1", null), 100)).isZero();
+        assertThat(projection.countChanges(buildRecord("tenant-a", "machine-1", "org-b"), 100)).isZero();
+        assertThat(projection.applyBatch(buildRecord("tenant-a", "machine-1", "org-b"), null, 100)).isNull();
+    }
+
+    @Test
+    void aMachineWithoutAnOrganization_archivesNothing() {
+        // setup
+        stubCurrentCustomer(null);
+
+        // execution
+        projection.apply(buildRecord("tenant-a", "machine-1", "org-b"));
+
+        // verifications
+        verify(ticketProjectionRepository, never()).archiveClientTicketsOfOtherOrganizations(any(), any(), any(), any());
+        assertThat(projection.countChanges(buildRecord("tenant-a", "machine-1", "org-b"), 100)).isZero();
     }
 
     @Test
     void aTenantWithoutAnArchivedStatus_archivesNothing() {
         // setup
+        stubCurrentCustomer("org-b");
         when(ticketProjectionRepository.findStatusId("tenant-a", TicketStatusKind.ARCHIVED)).thenReturn(Optional.empty());
 
         // execution
@@ -79,6 +130,7 @@ class MachineOnClientTicketsProjectionTest {
     void theChanges_areCounted_andWrittenInBatches() {
         // setup
         PublishedRecord<MachineEvent> record = buildRecord("tenant-a", "machine-1", "org-b");
+        stubCurrentCustomer("org-b");
         when(ticketProjectionRepository.findStatusId("tenant-a", TicketStatusKind.ARCHIVED))
                 .thenReturn(Optional.of(ARCHIVED_STATUS_ID));
         when(ticketProjectionRepository.countClientTicketsOfOtherOrganizations("tenant-a", "machine-1", "org-b", 5000))
@@ -157,6 +209,11 @@ class MachineOnClientTicketsProjectionTest {
             assertThat(ticketProperty).as(name).isNotNull();
             assertThat(viewProperty.getFieldName()).isEqualTo(ticketProperty.getFieldName());
         });
+    }
+
+    private void stubCurrentCustomer(String organizationId) {
+        when(ticketProjectionRepository.findMachineOrganizationId("tenant-a", "machine-1"))
+                .thenReturn(Optional.ofNullable(organizationId));
     }
 
     private static TicketClientOwnerView view(String id, TicketStatusKind kind, TicketOwner owner) {

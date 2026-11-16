@@ -11,6 +11,8 @@ import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.model.ReconciliationResult.Mismatch;
 import com.openframe.publishing.api.model.TenantScopedId;
 import com.openframe.publishing.api.spec.Projection;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,38 +46,37 @@ public class MachineOnClientTicketsProjection implements Projection<MachineEvent
     @Override
     public void apply(PublishedRecord<MachineEvent> record) {
         String tenantId = record.getTenantId();
-        MachineEvent event = record.getEvent();
-        Optional<String> archivedStatusId = archivedStatusId(tenantId, event);
-        if (archivedStatusId.isEmpty()) {
+        String machineId = record.getEvent().getMachineId();
+        Optional<ArchiveTarget> target = archiveTarget(tenantId, machineId);
+        if (target.isEmpty()) {
             return;
         }
         long archived = ticketProjectionRepository.archiveClientTicketsOfOtherOrganizations(
-                tenantId, event.getMachineId(), event.getOrganizationId(), archivedStatusId.get());
+                tenantId, machineId, target.get().getOrganizationId(), target.get().getArchivedStatusId());
         log.debug("{} archived {} ticket(s) of machine {} opened under a previous customer of tenant {}",
-                NAME, archived, event.getMachineId(), tenantId);
+                NAME, archived, machineId, tenantId);
     }
 
     @Override
     public long countChanges(PublishedRecord<MachineEvent> record, int limit) {
         String tenantId = record.getTenantId();
-        MachineEvent event = record.getEvent();
-        if (archivedStatusId(tenantId, event).isEmpty()) {
-            return 0;
-        }
-        return ticketProjectionRepository.countClientTicketsOfOtherOrganizations(
-                tenantId, event.getMachineId(), event.getOrganizationId(), limit);
+        String machineId = record.getEvent().getMachineId();
+        return archiveTarget(tenantId, machineId)
+                .map(target -> ticketProjectionRepository.countClientTicketsOfOtherOrganizations(
+                        tenantId, machineId, target.getOrganizationId(), limit))
+                .orElse(0L);
     }
 
     @Override
     public String applyBatch(PublishedRecord<MachineEvent> record, String lastId, int batchSize) {
         String tenantId = record.getTenantId();
-        MachineEvent event = record.getEvent();
-        Optional<String> archivedStatusId = archivedStatusId(tenantId, event);
-        if (archivedStatusId.isEmpty()) {
+        String machineId = record.getEvent().getMachineId();
+        Optional<ArchiveTarget> target = archiveTarget(tenantId, machineId);
+        if (target.isEmpty()) {
             return null;
         }
         return ticketProjectionRepository.archiveClientTicketsOfOtherOrganizationsBatch(
-                tenantId, event.getMachineId(), event.getOrganizationId(), archivedStatusId.get(), lastId, batchSize);
+                tenantId, machineId, target.get().getOrganizationId(), target.get().getArchivedStatusId(), lastId, batchSize);
     }
 
     @Override
@@ -115,16 +116,25 @@ public class MachineOnClientTicketsProjection implements Projection<MachineEvent
         return new ReconciliationResult(mismatches);
     }
 
-    // A machine without an organization archives nothing, and neither does a tenant without an ARCHIVED status.
-    private Optional<String> archivedStatusId(String tenantId, MachineEvent event) {
-        if (event.getOrganizationId() == null) {
+    // The machine's current customer, never the event's: an event processed after the device moved on must not archive
+    // the new customer's tickets. A gone machine, one without an organization or a tenant without ARCHIVED archives nothing.
+    private Optional<ArchiveTarget> archiveTarget(String tenantId, String machineId) {
+        Optional<String> organizationId = ticketProjectionRepository.findMachineOrganizationId(tenantId, machineId);
+        if (organizationId.isEmpty()) {
             return Optional.empty();
         }
         Optional<String> statusId = ticketProjectionRepository.findStatusId(tenantId, TicketStatusKind.ARCHIVED);
         if (statusId.isEmpty()) {
-            log.warn("{} skipped machine {}: tenant {} has no ARCHIVED ticket status", NAME, event.getMachineId(), tenantId);
+            log.warn("{} skipped machine {}: tenant {} has no ARCHIVED ticket status", NAME, machineId, tenantId);
         }
-        return statusId;
+        return statusId.map(archivedStatusId -> new ArchiveTarget(organizationId.get(), archivedStatusId));
+    }
+
+    @Getter
+    @AllArgsConstructor
+    private static class ArchiveTarget {
+        private final String organizationId;
+        private final String archivedStatusId;
     }
 
     private static boolean isOpenClientTicketWithSnapshot(TicketClientOwnerView ticket) {
