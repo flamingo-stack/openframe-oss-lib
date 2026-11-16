@@ -16,10 +16,8 @@ use crate::services::tool_run_manager::ToolRunManager;
 const STOP_TOOLS_AFTER_CONSECUTIVE: u32 = 5;
 /// First delay between probes once suspended.
 const PROBE_BACKOFF_INITIAL: Duration = Duration::from_secs(60);
-/// Cap on the exponential probe backoff once a 410 was seen.
-const PROBE_BACKOFF_MAX: Duration = Duration::from_secs(30 * 60);
-/// Cap on the probe backoff while only 403s were seen.
-const FORBIDDEN_PROBE_BACKOFF_MAX: Duration = Duration::from_secs(10 * 60);
+/// Cap on the exponential probe backoff.
+const PROBE_BACKOFF_MAX: Duration = Duration::from_secs(10 * 60);
 /// Total time the tenant must stay gone (since the first 410) before self-uninstall.
 const UNINSTALL_AFTER: Duration = Duration::from_secs(2 * 60 * 60);
 /// After any (re)start, require this much fresh confirmation before uninstalling, so a
@@ -128,16 +126,11 @@ impl DeactivationService {
         }
     }
 
-    /// Delay before the next suspension probe, doubling up to the cap of the current pause.
+    /// Delay before the next suspension probe, doubling up to [`PROBE_BACKOFF_MAX`].
     pub async fn next_probe_delay(&self) -> Duration {
         let mut st = self.state.lock().await;
-        let max = if st.consecutive_gone > 0 {
-            PROBE_BACKOFF_MAX
-        } else {
-            FORBIDDEN_PROBE_BACKOFF_MAX
-        };
         let delay = st.probe_backoff;
-        st.probe_backoff = (st.probe_backoff * 2).min(max);
+        st.probe_backoff = (st.probe_backoff * 2).min(PROBE_BACKOFF_MAX);
         delay
     }
 

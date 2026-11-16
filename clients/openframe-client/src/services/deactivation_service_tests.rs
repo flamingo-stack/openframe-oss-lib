@@ -97,25 +97,22 @@ async fn first_success_ends_a_403_pause_and_restarts_the_tools() {
 }
 
 #[tokio::test]
-async fn a_403_pause_probes_back_off_up_to_ten_minutes() {
-    let fx = Fixture::new();
-    fx.feed(StatusCode::FORBIDDEN, 5).await;
-    assert_eq!(
-        fx.probe_delays_secs(7).await,
-        [60, 120, 240, 480, 600, 600, 600]
-    );
-}
-
-#[tokio::test]
-async fn gone_pause_keeps_its_marker_and_thirty_minute_cap() {
-    let fx = Fixture::new();
-    fx.feed(StatusCode::GONE, 5).await;
-    assert!(fx.service.is_suspended());
-    assert!(fx.marker.exists());
-    assert_eq!(
-        fx.probe_delays_secs(7).await,
-        [60, 120, 240, 480, 960, 1800, 1800]
-    );
+async fn a_pause_probes_back_off_up_to_ten_minutes() {
+    for status in [StatusCode::FORBIDDEN, StatusCode::GONE] {
+        let fx = Fixture::new();
+        fx.feed(status, 5).await;
+        assert!(fx.service.is_suspended(), "{status}");
+        assert_eq!(
+            fx.marker.exists(),
+            status == StatusCode::GONE,
+            "{status}: tenant-gone marker"
+        );
+        assert_eq!(
+            fx.probe_delays_secs(7).await,
+            [60, 120, 240, 480, 600, 600, 600],
+            "{status}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -124,10 +121,6 @@ async fn a_410_during_a_403_pause_starts_the_gone_clock() {
     fx.feed(StatusCode::FORBIDDEN, 5).await;
     fx.feed(StatusCode::GONE, 1).await;
     assert!(fx.marker.exists());
-    assert_eq!(
-        fx.probe_delays_secs(7).await,
-        [60, 120, 240, 480, 960, 1800, 1800]
-    );
 }
 
 #[tokio::test]
@@ -153,15 +146,4 @@ async fn a_403_pause_needs_five_410s_to_uninstall_past_the_gone_deadline() {
 
     fx.feed(StatusCode::GONE, 4).await;
     assert_eq!(fx.sent(), [DeactivationCommand::Uninstall]);
-}
-
-#[tokio::test]
-async fn a_403_pause_keeps_the_ten_minute_cap_with_a_gone_marker_from_an_earlier_run() {
-    let fx = Fixture::new();
-    fx.service.state.lock().await.gone_since = Some(Utc::now());
-    fx.feed(StatusCode::FORBIDDEN, 5).await;
-    assert_eq!(
-        fx.probe_delays_secs(7).await,
-        [60, 120, 240, 480, 600, 600, 600]
-    );
 }
