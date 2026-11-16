@@ -8,6 +8,7 @@ import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.ToolConnectionService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
+import com.openframe.data.document.device.ClientVersionKey;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
@@ -31,7 +32,9 @@ import java.util.Set;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
+import static com.openframe.client.service.InstalledAgentService.OPENFRAME_CLIENT_AGENT_TYPE;
 import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION;
+import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION_KEY;
 import static com.openframe.data.service.machine.MachineFields.HOSTNAME;
 import static com.openframe.data.service.machine.MachineFields.LAST_SEEN;
 import static com.openframe.data.service.machine.MachineFields.MANUFACTURER;
@@ -55,7 +58,6 @@ public class AgentRegistrationService {
 
     private static final String AGENT_ROLE = "AGENT";
     private static final String CLIENT_ID_TEMPLATE = "agent_%s";
-    private static final String OPENFRAME_CLIENT_AGENT_TYPE = "openframe-client";
     private static final Set<String> AVAILABLE_ZONES = ZoneId.getAvailableZoneIds();
 
     private final OAuthClientRepository oauthClientRepository;
@@ -212,10 +214,13 @@ public class AgentRegistrationService {
     }
 
     private MachineUpdate registrationRequestFields(AgentRegistrationRequest request) {
+        String agentVersion = request.getAgentVersion();
+        Long agentVersionKey = ClientVersionKey.parse(agentVersion);
         MachineUpdate update = machineUpdate()
                 .set(HOSTNAME, request.getHostname())
                 .set(OS_TYPE, normalizeOsType(request.getOsType()))
-                .set(AGENT_VERSION, request.getAgentVersion())
+                .set(AGENT_VERSION, agentVersion)
+                .set(AGENT_VERSION_KEY, agentVersionKey)
                 .set(LAST_SEEN, Instant.now());
         // Optional; keep the existing value on reinstall when the agent doesn't send it
         setIfNotBlank(update, USER_ID, request.getUserId());
