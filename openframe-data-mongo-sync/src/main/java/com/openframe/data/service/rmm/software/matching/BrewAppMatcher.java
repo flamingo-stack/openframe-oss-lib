@@ -54,7 +54,8 @@ public class BrewAppMatcher implements PackageMatcher {
     private static PackageMatch matchOf(InstalledProgram app, BrewCaskIndex index) {
         String writtenBundleId = StringUtils.stripToEmpty(app.getBundleIdentifier());
         String bundleId = writtenBundleId.toLowerCase(Locale.ROOT);
-        if (isNeverMatched(app, bundleId) || isOtherEdition(writtenBundleId)) {
+        // an app without a bundle id cannot be told from an Apple app of the same name
+        if (bundleId.isEmpty() || isNeverMatched(app, bundleId) || isOtherEdition(writtenBundleId)) {
             return PackageMatch.noPackage();
         }
         Set<String> names = namesOf(app);
@@ -77,7 +78,7 @@ public class BrewAppMatcher implements PackageMatcher {
         if (!prefixIdCasks.isEmpty()) {
             return PackageMatch.noPackage();
         }
-        return matchByNameOnly(bundleId, strongNameCasks, weakNameCasks, index);
+        return matchByNameOnly(strongNameCasks, weakNameCasks, index);
     }
 
     // topLevelApp is null when Fleet sent no path: unknown is allowed, only a known nested app is refused
@@ -124,19 +125,19 @@ public class BrewAppMatcher implements PackageMatcher {
     }
 
     // a cask that alone is refused must not win among several either
-    private static PackageMatch matchByNameOnly(String bundleId, Set<String> strongNameCasks, Set<String> weakNameCasks,
+    private static PackageMatch matchByNameOnly(Set<String> strongNameCasks, Set<String> weakNameCasks,
                                                 BrewCaskIndex index) {
         boolean byWeakName = strongNameCasks.isEmpty();
         Set<String> named = withoutVariantsOfTheirBase(byWeakName ? weakNameCasks : strongNameCasks);
         Set<String> candidates = named.stream()
-                .filter(token -> !isRefusedByNameOnly(token, byWeakName, bundleId, index))
+                .filter(token -> !isRefusedByNameOnly(token, byWeakName, index))
                 .collect(toSet());
         return candidates.isEmpty() ? PackageMatch.noPackage() : oneOf(candidates, index);
     }
 
-    private static boolean isRefusedByNameOnly(String token, boolean byWeakName, String bundleId, BrewCaskIndex index) {
+    private static boolean isRefusedByNameOnly(String token, boolean byWeakName, BrewCaskIndex index) {
         boolean variantByWeakName = byWeakName && token.contains(VARIANT_SEPARATOR);
-        boolean caskOfAnotherBundleId = !bundleId.isEmpty() && index.namesBundleIds(token);
+        boolean caskOfAnotherBundleId = index.namesBundleIds(token);
         return variantByWeakName || caskOfAnotherBundleId;
     }
 

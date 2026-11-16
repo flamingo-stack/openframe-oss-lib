@@ -187,7 +187,8 @@ class SoftwarePackageMatcherTest {
         when(brewCaskIndexCache.getBrewCaskIndex()).thenReturn(brewCaskIndex);
         BrewAppMatcher brewAppMatcher = new BrewAppMatcher(brewCaskIndexCache);
         SoftwarePackageMatcher softwarePackageMatcher = matcher(brewAppMatcher);
-        InstalledProgram slack = program("Slack", FleetSource.APPS);
+        InstalledProgram slack = InstalledProgram.builder().fleetSource(FleetSource.APPS).name("Slack")
+                .bundleIdentifier("com.tinyspeck.slackmacgap").build();
 
         // execution
         Map<InstalledProgram, PackageMatch> adoptionMatches = softwarePackageMatcher.matchForAdoption(List.of(slack));
