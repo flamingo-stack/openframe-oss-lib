@@ -25,6 +25,7 @@ import static org.springframework.util.StringUtils.hasText;
 public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
 
     private static final String SOURCE = "source";
+    private static final String MATCH = "packageMatch";
     private static final String MATCH_STATE = "packageMatch.state";
     private static final String MATCH_MANAGER = "packageMatch.manager";
     private static final String ADOPTION_STATE = "adoptionMatch.state";
@@ -119,12 +120,20 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
                             Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED),
                             Criteria.where(SOURCE).is(BREW_SOURCE).and(MATCH_STATE).ne(PackageMatchState.NO_PACKAGE)));
             case NO_PACKAGE -> new Criteria().andOperator(
-                    withoutPolicy(titles).and(MATCH_STATE).is(PackageMatchState.NO_PACKAGE),
+                    withoutPolicy(titles),
+                    withoutPackage(),
                     new Criteria().norOperator(adoptable(titles)));
             case NEEDS_ADOPTION -> new Criteria().andOperator(
                     withoutPolicy(titles).and(MATCH_STATE).ne(PackageMatchState.MATCHED),
                     adoptable(titles));
         };
+    }
+
+    // no matcher of a managing package takes a Mac app: without a packageMatch its adoption match is the answer
+    private static Criteria withoutPackage() {
+        return new Criteria().orOperator(
+                Criteria.where(MATCH_STATE).is(PackageMatchState.NO_PACKAGE),
+                Criteria.where(MATCH).isNull().and(ADOPTION_STATE).is(PackageMatchState.NO_PACKAGE));
     }
 
     private static Criteria adoptable(SoftwareTitleQuery titles) {

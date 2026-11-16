@@ -183,6 +183,26 @@ class SoftwareRepositoryIT extends BaseMongoIntegrationTest {
                 .containsExactlyInAnyOrder("Contoso Tool", "7-Zip");
     }
 
+    @Test
+    @DisplayName("a Mac app has only an adoption match: a cask to adopt into is NEEDS_ADOPTION and not NO_PACKAGE, no cask is NO_PACKAGE, no match at all is neither")
+    void findTitles_macAppsWithoutAPackageMatch_followTheirAdoptionMatch() {
+        // setup
+        Software slack = title(TENANT, 8L, "Slack", "apps", null, 1, 0);
+        Software macTool = title(TENANT, 9L, "Mac Tool", "apps", null, 1, 0);
+        slack.setAdoptionMatch(brewMatch(PackageMatchState.MATCHED));
+        macTool.setAdoptionMatch(brewMatch(PackageMatchState.NO_PACKAGE));
+        repository.saveAll(List.of(slack, macTool));
+        List<PackageManagerType> brewOn = List.of(PackageManagerType.BREW);
+
+        // execution
+        List<String> needsAdoption = names(noPolicy(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, brewOn));
+        List<String> noPackage = names(noPolicy(SoftwareAutoUpdateStatus.NO_PACKAGE, brewOn));
+
+        // verifications
+        assertThat(needsAdoption).containsExactly("Slack");
+        assertThat(noPackage).containsExactlyInAnyOrder("Contoso Tool", "Mac Tool");
+    }
+
     private static SoftwareTitleQuery noPolicy(SoftwareAutoUpdateStatus status, List<PackageManagerType> adoptionManagers) {
         return titles().autoUpdateStatuses(List.of(status))
                 .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).adoptionManagers(adoptionManagers).build();

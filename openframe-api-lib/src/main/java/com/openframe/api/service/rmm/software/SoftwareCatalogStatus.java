@@ -87,9 +87,12 @@ public class SoftwareCatalogStatus {
         Map<InstalledProgram, PackageMatch> adoptionMatches = packageMatcher.matchForAdoption(programs);
         rowByProgram.forEach((program, row) -> {
             PackageMatch match = matches.get(program);
+            PackageMatch adoptionMatch = adoptionMatches.get(program);
             PackageCatalogEntry managing = entryOf(match, manages);
-            PackageCatalogEntry adoption = entryOf(adoptionMatches.get(program), adopts);
-            apply(row, brewPackages, match, managing, adoption);
+            PackageCatalogEntry adoption = entryOf(adoptionMatch, adopts);
+            // a Mac app is taken by no managing matcher: what is known about its package is the adoption match
+            PackageMatch known = match != null ? match : adoptionMatch;
+            apply(row, brewPackages, known, managing, adoption);
         });
     }
 
@@ -156,7 +159,7 @@ public class SoftwareCatalogStatus {
 
     // the package's manager updates only what it installed: nothing manages the program until it is adopted
     private static void applyAdoptionPackage(SoftwareResponse row, PackageCatalogEntry entry) {
-        String latest = versionOf(entry);
+        String latest = latestOf(entry);
         applyLatest(row, latest);
         SoftwareBundlePackage adoptionPackage = SoftwareBundlePackage.builder()
                 .packageManager(entry.getManager())
@@ -173,7 +176,7 @@ public class SoftwareCatalogStatus {
     // a package whose manager does not count here still tells the latest version; several packages leave it unknown
     private static void applyNoPackage(SoftwareResponse row, PackageMatch match) {
         boolean matched = match != null && match.isMatched();
-        String latest = matched ? versionOf(match.getEntry()) : null;
+        String latest = matched ? latestOf(match.getEntry()) : null;
         applyLatest(row, latest);
         boolean noPackage = match != null && (matched || match.hasNoPackage());
         if (row.getAutoUpdate() == null && noPackage) {
@@ -220,6 +223,10 @@ public class SoftwareCatalogStatus {
                 .collect(toMap(Map.Entry::getKey, e -> e.getValue().stream().min(FORMULA_FIRST).orElseThrow()));
     }
 
+    private static String latestOf(PackageCatalogEntry entry) {
+        return entry.getManager() == PackageManagerType.BREW ? brewVersionOf(entry) : versionOf(entry);
+    }
+
     private static String versionOf(PackageCatalogEntry entry) {
         return hasText(entry.getDisplayVersion()) ? entry.getDisplayVersion() : entry.getVersion();
     }
@@ -227,7 +234,7 @@ public class SoftwareCatalogStatus {
     // a cask version may end in a build after a comma (3.3.3,5004) that the app does not report, or be "latest"
     private static String brewVersionOf(PackageCatalogEntry entry) {
         String version = entry.getVersion();
-        if (UNVERSIONED_CASK.equals(version)) {
+        if (version == null || UNVERSIONED_CASK.equals(version)) {
             return null;
         }
         int build = version.indexOf(CASK_BUILD_SEPARATOR);

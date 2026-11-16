@@ -17,9 +17,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -134,17 +136,54 @@ class BrewAppMatcherTest {
     }
 
     @Test
-    void match_variantsWithoutTheirBase_ambiguous() {
+    void match_variantsWithoutTheirBase_ambiguousAndTheBestIsTheFirstByToken() {
         // setup
-        stubCatalog(firefox("firefox@beta", "Mozilla Firefox Beta").build(),
-                firefox("firefox@esr", "Mozilla Firefox ESR").build());
+        PackageCatalogEntry beta = firefox("firefox@beta", "Mozilla Firefox Beta").build();
+        PackageCatalogEntry esr = firefox("firefox@esr", "Mozilla Firefox ESR").build();
+        stubCatalog(esr, beta);
         List<InstalledProgram> apps = List.of(app("Firefox", "org.mozilla.firefox"));
 
         // execution
         List<PackageMatch> matches = matcher.match(apps);
 
         // verifications
-        assertThat(matches).containsExactly(PackageMatch.ambiguous());
+        assertThat(matches).extracting(PackageMatch::getEntry, PackageMatch::getBestCandidate)
+                .containsExactly(tuple(null, beta));
+    }
+
+    @Test
+    void match_severalCasksAndAVariantIsTheMostInstalled_theBestIsABaseCask() {
+        // setup
+        PackageCatalogEntry figma = figma("figma").popularity(10).build();
+        PackageCatalogEntry figmaBeta = figma("figma@beta").popularity(900).build();
+        PackageCatalogEntry figmaAgent = figma("figma-agent").popularity(5).build();
+        stubCatalog(figmaAgent, figmaBeta, figma);
+        List<InstalledProgram> apps = List.of(app("Figma Desktop", "com.figma.desktop"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry, PackageMatch::getBestCandidate)
+                .containsExactly(tuple(null, figma));
+    }
+
+    @Test
+    void match_idAndNameAgreeOnTwoCasksAndAMoreInstalledOneOnlyKnowsTheId_theBestIsOneOfTheAgreed() {
+        // setup
+        PackageCatalogEntry ce = intellijIdea("intellij-idea-ce").build();
+        PackageCatalogEntry oss = intellijIdea("intellij-idea-oss").build();
+        PackageCatalogEntry toolbox = cask("jetbrains-toolbox", "JetBrains Toolbox").popularity(9000)
+                .bundleIds(List.of("com.jetbrains.intellij.ce")).build();
+        stubCatalog(toolbox, oss, ce);
+        List<InstalledProgram> apps = List.of(app("IntelliJ IDEA", "com.jetbrains.intellij.ce"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry, PackageMatch::getBestCandidate)
+                .containsExactly(tuple(null, ce));
     }
 
     @Test
@@ -202,12 +241,29 @@ class BrewAppMatcherTest {
     }
 
     @Test
-    void match_twoCasksKnowTheIdAndRemoveTheApp_ambiguous() {
+    void match_idAndNameAgreeOnACaskAndItsEdition_theBaseCask() {
         // setup
         PackageCatalogEntry zoom = cask("zoom", "Zoom").weakAppNames(List.of("zoom.us"))
                 .bundleIds(List.of("us.zoom.xos")).bundleIdPrefixes(List.of("us.zoom.")).build();
         PackageCatalogEntry zoomForItAdmins = cask("zoom-for-it-admins", "Zoom for IT Admins")
                 .weakAppNames(List.of("zoom.us")).bundleIds(List.of("us.zoom.xos")).build();
+        stubCatalog(zoomForItAdmins, zoom);
+        List<InstalledProgram> apps = List.of(app("zoom.us", "us.zoom.xos"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(zoom);
+    }
+
+    @Test
+    void match_idAndNameAgreeButTheEditionKnowsOnlyAPrefixOfTheId_ambiguousNotTheBase() {
+        // setup
+        PackageCatalogEntry zoom = cask("zoom", "Zoom").appNames(List.of("zoom.us"))
+                .bundleIdPrefixes(List.of("us.zoom.")).build();
+        PackageCatalogEntry zoomForItAdmins = cask("zoom-for-it-admins", "Zoom for IT Admins")
+                .appNames(List.of("zoom.us")).bundleIds(List.of("us.zoom.xos")).build();
         stubCatalog(zoom, zoomForItAdmins);
         List<InstalledProgram> apps = List.of(app("zoom.us", "us.zoom.xos"));
 
@@ -215,15 +271,68 @@ class BrewAppMatcherTest {
         List<PackageMatch> matches = matcher.match(apps);
 
         // verifications
-        assertThat(matches).containsExactly(PackageMatch.ambiguous());
+        assertThat(matches).extracting(PackageMatch::getEntry, PackageMatch::getBestCandidate)
+                .containsExactly(tuple(null, zoom));
     }
 
     @Test
-    void match_exactBundleIdUnderAnotherName_theCaskOfTheId() {
+    void match_idAndNameAgreeOnCasksWithoutACommonBase_ambiguous() {
+        // setup
+        PackageCatalogEntry ce = intellijIdea("intellij-idea-ce").build();
+        PackageCatalogEntry oss = intellijIdea("intellij-idea-oss").build();
+        stubCatalog(oss, ce);
+        List<InstalledProgram> apps = List.of(app("IntelliJ IDEA", "com.jetbrains.intellij.ce"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry, PackageMatch::getBestCandidate)
+                .containsExactly(tuple(null, ce));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "com.parallels.desktop.appstore", "com.cleverfiles.DiskDrill-setapp", "com.globaldelight.CaptoMAS",
+            "com.example.slack.mas", "com.example.slack-mas", "com.example.slack_mas2", "com.example.slack.iOS"
+    })
+    void match_bundleIdOfAnAppStoreSetappOrIosEdition_noPackageThoughIdAndNameFit(String bundleId) {
+        // setup
+        String lowerCaseBundleId = bundleId.toLowerCase(Locale.ROOT);
+        stubCatalog(cask("slack", "Slack").appNames(List.of("slack")).bundleIds(List.of(lowerCaseBundleId)).build());
+        List<InstalledProgram> apps = List.of(app("Slack", bundleId));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).containsExactly(PackageMatch.noPackage());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"com.example.christmas", "com.example.XMAS", "com.example.NoMAS", "com.example.NotMAS"})
+    void match_bundleIdThatOnlyLooksLikeAnEdition_matched(String bundleId) {
+        // setup
+        String lowerCaseBundleId = bundleId.toLowerCase(Locale.ROOT);
+        PackageCatalogEntry slack = cask("slack", "Slack").appNames(List.of("slack"))
+                .bundleIds(List.of(lowerCaseBundleId)).build();
+        stubCatalog(slack);
+        List<InstalledProgram> apps = List.of(app("Slack", bundleId));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(slack);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Code", "VSCode", "Studio Helper"})
+    void match_exactBundleIdUnderAnotherNameSharingAWord_theCaskOfTheId(String name) {
         // setup
         PackageCatalogEntry code = vsCode().build();
         stubCatalog(code, slack().build());
-        List<InstalledProgram> apps = List.of(app("Code", "com.microsoft.VSCode"));
+        List<InstalledProgram> apps = List.of(app(name, "com.microsoft.VSCode"));
 
         // execution
         List<PackageMatch> matches = matcher.match(apps);
@@ -233,17 +342,51 @@ class BrewAppMatcherTest {
     }
 
     @Test
-    void match_exactBundleIdOfTwoUnrelatedCasksUnderAnotherName_ambiguous() {
+    void match_exactBundleIdOfACaskSharingNoWordWithTheApp_noPackage() {
         // setup
-        stubCatalog(cask("libreoffice", "LibreOffice").bundleIds(List.of("org.libreoffice.script")).build(),
-                cask("libreoffice-still", "LibreOffice Still").bundleIds(List.of("org.libreoffice.script")).build());
+        stubCatalog(cask("wechatwebdevtools", "Wechat Web DevTools").appNames(List.of("wechatwebdevtools"))
+                .bundleIds(List.of("com.github.electron")).build());
+        List<InstalledProgram> apps = List.of(app("Electron", "com.github.Electron"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).containsExactly(PackageMatch.noPackage());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"VU", "Pro Helper", "The Desktop App for macOS"})
+    void match_exactBundleIdAndOnlyShortWordsOrWordsOfAnyAppShared_noPackage(String name) {
+        // setup
+        stubCatalog(cask("vu-pro", "VU Pro for Mac").appNames(List.of("vu pro"))
+                .bundleIds(List.of("com.example.vu")).build());
+        List<InstalledProgram> apps = List.of(app(name, "com.example.vu"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).containsExactly(PackageMatch.noPackage());
+    }
+
+    @Test
+    void match_exactBundleIdOfACaskAndItsEditionUnderAnotherName_ambiguousNotTheBase() {
+        // setup
+        PackageCatalogEntry libreOffice = cask("libreoffice", "LibreOffice")
+                .bundleIds(List.of("org.libreoffice.script")).build();
+        PackageCatalogEntry libreOfficeStill = cask("libreoffice-still", "LibreOffice Still")
+                .bundleIds(List.of("org.libreoffice.script")).build();
+        stubCatalog(libreOfficeStill, libreOffice);
         List<InstalledProgram> apps = List.of(app("Office Suite", "org.libreoffice.script"));
 
         // execution
         List<PackageMatch> matches = matcher.match(apps);
 
         // verifications
-        assertThat(matches).containsExactly(PackageMatch.ambiguous());
+        assertThat(matches).extracting(PackageMatch::getEntry, PackageMatch::getBestCandidate)
+                .containsExactly(tuple(null, libreOffice));
     }
 
     @ParameterizedTest
@@ -307,18 +450,27 @@ class BrewAppMatcherTest {
         assertThat(matches).containsExactly(PackageMatch.noPackage());
     }
 
-    @Test
-    void match_nameOnlyTwoDifferentCasksInstallTheApp_ambiguous() {
+    @ParameterizedTest
+    @CsvSource({
+            "900, 20, zoom",
+            "20, 900, zoom-for-it-admins",
+            ", 20, zoom-for-it-admins",
+            ", , zoom"
+    })
+    void match_nameOnlyTwoCasksInstallTheApp_ambiguousAndTheBestIsTheMostInstalled(
+            Integer zoomInstalls, Integer zoomForItAdminsInstalls, String bestToken) {
         // setup
-        stubCatalog(cask("amethyst", "Amethyst").appNames(List.of("amethyst")).build(),
-                cask("amethyst-nostr", "Amethyst").appNames(List.of("amethyst")).build());
-        List<InstalledProgram> apps = List.of(app("Amethyst", "com.example.unknown"));
+        stubCatalog(cask("zoom", "Zoom").appNames(List.of("zoom.us")).popularity(zoomInstalls).build(),
+                cask("zoom-for-it-admins", "Zoom for IT Admins").appNames(List.of("zoom.us"))
+                        .popularity(zoomForItAdminsInstalls).build());
+        List<InstalledProgram> apps = List.of(app("zoom.us", "com.example.unknown"));
 
         // execution
         List<PackageMatch> matches = matcher.match(apps);
 
         // verifications
-        assertThat(matches).containsExactly(PackageMatch.ambiguous());
+        assertThat(matches).extracting(PackageMatch::getBestCandidate).extracting(PackageCatalogEntry::getPackageId)
+                .containsExactly(bestToken);
     }
 
     @Test
@@ -500,6 +652,15 @@ class BrewAppMatcherTest {
     private static PackageCatalogEntryBuilder vsCode() {
         return cask("visual-studio-code", "Microsoft Visual Studio Code").appNames(List.of("visual studio code"))
                 .bundleIds(List.of("com.microsoft.vscode"));
+    }
+
+    private static PackageCatalogEntryBuilder figma(String token) {
+        return cask(token, "Figma").bundleIds(List.of("com.figma.desktop"));
+    }
+
+    private static PackageCatalogEntryBuilder intellijIdea(String token) {
+        return cask(token, "IntelliJ IDEA").appNames(List.of("intellij idea"))
+                .bundleIds(List.of("com.jetbrains.intellij.ce"));
     }
 
     private static PackageCatalogEntryBuilder firefox(String token, String displayName) {

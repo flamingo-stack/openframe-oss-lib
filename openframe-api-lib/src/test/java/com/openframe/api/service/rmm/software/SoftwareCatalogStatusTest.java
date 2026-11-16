@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -578,8 +579,7 @@ class SoftwareCatalogStatusTest {
     void apply_macAppWithACaskToAdoptInto_needsAdoptionWithTheCask() {
         // setup
         SoftwareResponse slack = macApp("Slack", "4.40");
-        PackageCatalogEntry slackCask = brewCask("slack", "4.41");
-        stubAdoptionMatch(slack, PackageMatch.of(slackCask));
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
         when(packageManagerAvailability.isEnabled(PackageManagerType.BREW)).thenReturn(true);
 
         // execution
@@ -589,16 +589,68 @@ class SoftwareCatalogStatusTest {
         assertThat(slack)
                 .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
                         SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
-                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, slackCask);
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null,
+                        adoptionIntoCask("slack", "4.41"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'3.3.3,5004', 3.3.3",
+            "latest, ",
+            ", "
+    })
+    void apply_macAppAndACaskVersionWithABuildOrWithoutANumber_latestAsAnAppReportsIt(String caskVersion,
+                                                                                     String latest) {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "3.3.2");
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", caskVersion)));
+        when(packageManagerAvailability.isEnabled(PackageManagerType.BREW)).thenReturn(true);
+
+        // execution
+        status().apply(List.of(slack));
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getLatestVersion, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(latest, adoptionIntoCask("slack", latest));
+    }
+
+    @Test
+    void apply_macAppNoCaskFits_noPackage() {
+        // setup
+        SoftwareResponse tool = macApp("Contoso Tool", "1.0");
+        stubAdoptionMatch(tool, PackageMatch.noPackage());
+
+        // execution
+        status().apply(List.of(tool));
+
+        // verifications
+        assertThat(tool)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareAutoUpdateStatus.NO_PACKAGE, null);
+    }
+
+    @Test
+    void apply_macAppWithSeveralCasksAndNoBestOne_leftUnknown() {
+        // setup
+        SoftwareResponse tool = macApp("Contoso Tool", "1.0");
+        stubAdoptionMatch(tool, PackageMatch.ambiguous());
+
+        // execution
+        status().apply(List.of(tool));
+
+        // verifications
+        assertThat(tool)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(null, null);
     }
 
     @Test
     void applyOnDevice_macAppOnADeviceThatCanRunBrew_needsAdoptionWithTheCask() {
         // setup
         SoftwareResponse slack = macApp("Slack", "4.40");
-        PackageCatalogEntry slackCask = brewCask("slack", "4.41");
         Machine mac = stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.MISSING));
-        stubAdoptionMatch(slack, PackageMatch.of(slackCask));
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
         when(packageManagerAvailability.isAdoptableOn(mac, PackageManagerType.BREW)).thenReturn(true);
 
         // execution
@@ -608,13 +660,63 @@ class SoftwareCatalogStatusTest {
         assertThat(slack)
                 .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getManagingPackage,
                         SoftwareResponse::getAdoptionPackage)
-                .containsExactly(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, slackCask);
+                .containsExactly(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, adoptionIntoCask("slack", "4.41"));
+    }
+
+    @Test
+    void applyOnDevice_macAppOnADeviceWhereBrewIsUnsupported_noPackage() {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "4.40");
+        Machine mac = stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.UNSUPPORTED));
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
+        when(packageManagerAvailability.isAdoptableOn(mac, PackageManagerType.BREW)).thenReturn(false);
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(slack));
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getManagingPackage,
+                        SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareAutoUpdateStatus.NO_PACKAGE, null, null);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'3.3.3,5004', 3.3.3",
+            "latest, ",
+            ", "
+    })
+    void applyOnDevice_brewUnsupportedAndACaskVersionWithABuildOrWithoutANumber_latestAsAnAppReportsIt(
+            String caskVersion, String latest) {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "3.3.2");
+        Machine mac = stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.UNSUPPORTED));
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", caskVersion)));
+        when(packageManagerAvailability.isAdoptableOn(mac, PackageManagerType.BREW)).thenReturn(false);
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(slack));
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getLatestVersion, SoftwareResponse::getAutoUpdate)
+                .containsExactly(latest, SoftwareAutoUpdateStatus.NO_PACKAGE);
     }
 
     private static SoftwareResponse macApp(String name, String currentVersion) {
         SoftwareResponse app = row(name, SoftwareSource.UNMANAGED, currentVersion, 0);
         app.setFleetSource(FleetSource.APPS);
         return app;
+    }
+
+    private static SoftwareBundlePackage adoptionIntoCask(String token, String version) {
+        return SoftwareBundlePackage.builder()
+                .packageManager(PackageManagerType.BREW)
+                .packageName(token)
+                .brewPackageType(BrewPackageType.CASK)
+                .version(version)
+                .build();
     }
 
     private static PackageCatalogEntry brewCask(String token, String version) {
