@@ -159,6 +159,36 @@ class BrewCaskKeysTest {
         assertThat(keys.getBundleIds()).isEmpty();
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "~/Library/Caches/us.zoom.*, us.zoom.",
+            "~/Library/Caches/com.abcd*, com.abcd"
+    })
+    void of_globBundleIdOfEightCharactersOrMore_prefixKept(String removedPath, String prefix) {
+        // setup
+        BrewCaskJson cask = cask("[{\"app\": [\"App.app\"]}, {\"zap\": [{\"trash\": [\"" + removedPath + "\"]}]}]");
+
+        // execution
+        BrewCaskKeys keys = BrewCaskKeys.of(cask);
+
+        // verifications
+        assertThat(keys.getBundleIdPrefixes()).containsExactly(prefix);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"~/Library/Caches/com.abc*", "~/Library/Containers/io.ab.*", "~/Library/WebKit/com.a*"})
+    void of_globBundleIdShorterThanEightCharacters_noPrefix(String removedPath) {
+        // setup
+        BrewCaskJson cask = cask("[{\"app\": [\"App.app\"]}, {\"zap\": [{\"trash\": [\"" + removedPath + "\"]}]}]");
+
+        // execution
+        BrewCaskKeys keys = BrewCaskKeys.of(cask);
+
+        // verifications
+        assertThat(keys.getBundleIdPrefixes()).isEmpty();
+        assertThat(keys.getBundleIds()).isEmpty();
+    }
+
     @Test
     void of_quitAndLaunchctlIds_ignored() {
         // setup

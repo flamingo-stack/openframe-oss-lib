@@ -33,6 +33,8 @@ final class BrewCaskKeys {
     private static final String REVERSE_DNS = "[A-Za-z0-9-]+(?:\\.[A-Za-z0-9_-]+)+";
     private static final Pattern BUNDLE_ID = Pattern.compile("(" + REVERSE_DNS + ")");
     private static final Pattern BUNDLE_ID_GLOB = Pattern.compile("(" + REVERSE_DNS + "\\.?)\\*");
+    // a shorter prefix (com.a*) would claim the apps of other vendors
+    private static final int MIN_BUNDLE_ID_PREFIX_LENGTH = 8;
 
     private final List<String> appNames;
     private final List<String> weakAppNames;
@@ -52,7 +54,9 @@ final class BrewCaskKeys {
                 .flatMap(path -> groupOf(APP_FILE, path));
         Stream<String> removedApps = removedPaths.stream().flatMap(path -> groupOf(REMOVED_APP, path));
         Stream<String> exactIds = removedIds.stream().flatMap(id -> groupOf(BUNDLE_ID, id));
-        Stream<String> idPrefixes = removedIds.stream().flatMap(id -> groupOf(BUNDLE_ID_GLOB, id));
+        Stream<String> idPrefixes = removedIds.stream()
+                .flatMap(id -> groupOf(BUNDLE_ID_GLOB, id))
+                .filter(prefix -> prefix.length() >= MIN_BUNDLE_ID_PREFIX_LENGTH);
 
         List<String> appNames = keysOf(installedApps);
         List<String> weakAppNames = keysOf(removedApps).stream().filter(name -> !appNames.contains(name)).toList();
