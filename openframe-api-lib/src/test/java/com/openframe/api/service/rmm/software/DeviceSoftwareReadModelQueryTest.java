@@ -8,6 +8,7 @@ import com.openframe.api.dto.rmm.software.SoftwareType;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageMatchState;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
 import org.junit.jupiter.api.Test;
@@ -111,6 +112,9 @@ class DeviceSoftwareReadModelQueryTest {
         chrome.setPackageFamilyNames(List.of("google.chrome_x"));
         chrome.setSystemComponent(false);
         chrome.setPackageMatch(new SoftwarePackageMatch(PackageMatchState.NO_PACKAGE, null, null, null));
+        SoftwarePackageMatch storedAdoption =
+                new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.CHOCO, "googlechrome", null);
+        chrome.setAdoptionMatch(storedAdoption);
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(onM1(3L, "130.0").build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleIdIn("t1", List.of(3L))).thenReturn(List.of(chrome));
 
@@ -123,6 +127,7 @@ class DeviceSoftwareReadModelQueryTest {
         assertThat(row.getPackageFamilyNames()).containsExactly("google.chrome_x");
         assertThat(row.getSystemComponent()).isFalse();
         assertThat(row.getPackageMatch().getState()).isEqualTo(PackageMatchState.NO_PACKAGE);
+        assertThat(row.getAdoptionMatch()).isEqualTo(storedAdoption);
     }
 
     @Test

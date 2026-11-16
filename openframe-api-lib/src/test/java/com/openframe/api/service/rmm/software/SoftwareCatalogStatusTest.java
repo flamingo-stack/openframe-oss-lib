@@ -452,6 +452,26 @@ class SoftwareCatalogStatusTest {
     }
 
     @Test
+    void applyOnDevice_wingetDoesNotRunAndChocoCannotBeAdoptedIntoThere_noPackageButTheLatestVersionIsKnown() {
+        // setup
+        SoftwareResponse sevenZip = program("7-Zip", "24.08");
+        Machine server = stubDevice(Map.of(PackageManagerType.WINGET, PackageManagerState.UNSUPPORTED,
+                PackageManagerType.CHOCO, PackageManagerState.UNSUPPORTED));
+        stubMatch(sevenZip, PackageMatch.of(wingetPackage("7zip.7zip", "24.09")));
+        stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+        when(packageManagerAvailability.isAdoptableOn(server, PackageManagerType.CHOCO)).thenReturn(false);
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getManagingPackage,
+                        SoftwareResponse::getAdoptionPackage, SoftwareResponse::getLatestVersion)
+                .containsExactly(SoftwareAutoUpdateStatus.NO_PACKAGE, null, null, "24.09");
+    }
+
+    @Test
     void applyOnDevice_wingetDoesNotRunAndNothingToAdoptInto_noPackageButTheLatestVersionIsKnown() {
         // setup
         SoftwareResponse chrome = program("Google Chrome", "141.0");

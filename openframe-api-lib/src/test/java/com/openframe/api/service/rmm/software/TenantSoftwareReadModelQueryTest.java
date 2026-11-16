@@ -415,10 +415,12 @@ class TenantSoftwareReadModelQueryTest {
     @Test
     void get_carriesTheProgramKeysAndTheStoredMatch() {
         SoftwarePackageMatch stored = new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.WINGET, "Google.Chrome", null);
+        SoftwarePackageMatch storedAdoption =
+                new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.CHOCO, "googlechrome", null);
         Software chrome = Software.builder().tenantId(TENANT).softwareTitleId(7L).name("Google Chrome").source("programs")
                 .vendor("Google LLC").upgradeCode("{UPGRADE}").arpKeys(List.of("Google Chrome"))
                 .packageFamilyNames(List.of("google.chrome_x")).systemComponent(false)
-                .packageMatch(stored).build();
+                .packageMatch(stored).adoptionMatch(storedAdoption).build();
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 7L)).thenReturn(Optional.of(chrome));
 
         SoftwareResponse row = query.get(TENANT, "7");
@@ -430,6 +432,7 @@ class TenantSoftwareReadModelQueryTest {
         assertThat(row.getPackageFamilyNames()).containsExactly("google.chrome_x");
         assertThat(row.getSystemComponent()).isFalse();
         assertThat(row.getPackageMatch()).isEqualTo(stored);
+        assertThat(row.getAdoptionMatch()).isEqualTo(storedAdoption);
     }
 
     @Test
