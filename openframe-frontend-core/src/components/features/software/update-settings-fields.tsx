@@ -75,34 +75,6 @@ export function defaultSoftwareUpdateSettings(userNotifications: boolean): Softw
   return { ...DEFAULT_SOFTWARE_UPDATE_SETTINGS, policy: FORCE_UPDATE_POLICY, autoUpdatePolicy: FORCE_UPDATE_POLICY };
 }
 
-/**
- * What each choice does on the device, worded for a client that cannot notify the user. The agent shows nothing on the
- * device (no prompt, no countdown on screen; there is no end-user UI yet), so the line under the deadline says what
- * happens:
- * - Update when app closes (WAIT, no deadline): the agent reports Waiting and installs once the app is closed.
- * - A deadline (WAIT + `deadlineSeconds`): counted from the first time the agent finds the app running; at the deadline
- *   the backend sends the update again as FORCE (`armDeadline` / `driveDeadlineForce` in openframe-client-core), and
- *   withdraws that if the update finished first.
- * - Force update right away (FORCE): the agent waits `countdownSeconds` (clamped to 60–1800 s), asks the app to close,
- *   stops it after a 10 s grace and installs (`run.rs` / `close.rs` in openframe-client). The wait is silent, so it is
- *   not offered as a control; the line states it, since the app is not closed at once.
- * With user notifications the countdown is a control of its own and the design has no line under the deadline.
- */
-function silentOutcome(policy: SoftwareUpdatePolicy): string {
-  const delay = closeDelay(policy.countdownSeconds);
-  if (policy.mode === 'FORCE') return `The app is closed without warning ${delay} later, then updated.`;
-  if (!policy.deadlineEnabled) return 'The update waits until the user closes the app.';
-  return `If the app is still open by the deadline, it is closed without warning ${delay} later, then updated.`;
-}
-
-/** "5 minutes": the silent wait before a forced close, worded as the countdown options word it. */
-function closeDelay(countdownSeconds: number): string {
-  const option = SOFTWARE_UPDATE_COUNTDOWN_OPTIONS.find(candidate => candidate.seconds === countdownSeconds);
-  if (option) return option.label;
-  const minutes = Math.max(1, Math.round(countdownSeconds / 60));
-  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
-}
-
 /** The "Deadline if app is open" choices that are not a deadline. */
 const FORCE_NOW = 'FORCE';
 const WHEN_APP_CLOSES = 'WHEN_APP_CLOSES';
@@ -185,48 +157,37 @@ export interface SoftwareUpdatePolicyFieldsProps {
   /** Prefixes the fields' ids: two policies on one page must not share them. */
   name: string;
   policy: SoftwareUpdatePolicy;
-  /**
-   * The devices can notify the user: the countdown before closing is a choice of its own. Off, there is no countdown to
-   * set (the user would not see it) and a line under the deadline says what the device does with nobody told.
-   */
-  userNotifications?: boolean;
   onChange: (policy: SoftwareUpdatePolicy) => void;
 }
 
 /**
  * "Deadline if app is open" and "Countdown before closing" (design 1572:2004, its dropdowns 1572:3193 / 1572:4431):
  * what one update does on a device where the app is running. Also the whole of the Auto-update settings page's update
- * rules (1569:1890).
+ * rules (1569:1890). The same with or without user notifications, as the design draws them: the agent shows nothing on
+ * the device yet, so the countdown is a wait before the app is closed (`run.rs` / `close.rs` in openframe-client), and a
+ * deadline ends in the backend sending the update again as Force (`armDeadline` in openframe-client-core).
  */
-export function SoftwareUpdatePolicyFields({
-  name,
-  policy,
-  userNotifications = false,
-  onChange,
-}: SoftwareUpdatePolicyFieldsProps) {
+export function SoftwareUpdatePolicyFields({ name, policy, onChange }: SoftwareUpdatePolicyFieldsProps) {
   // Waiting for the app to close never closes it, so there is nothing to count down to.
   const closesApp = policy.mode === 'FORCE' || policy.deadlineEnabled;
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
-      <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3 content-md:items-start">
+    <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3 content-md:items-start">
+      <SettingSelect
+        id={`${name}-deadline`}
+        label="Deadline if app is open"
+        value={deadlineValue(policy)}
+        options={DEADLINE_CHOICES}
+        onChange={value => onChange(withDeadline(policy, value))}
+      />
+      {closesApp && (
         <SettingSelect
-          id={`${name}-deadline`}
-          label="Deadline if app is open"
-          value={deadlineValue(policy)}
-          options={DEADLINE_CHOICES}
-          onChange={value => onChange(withDeadline(policy, value))}
+          id={`${name}-countdown`}
+          label="Countdown before closing"
+          value={String(policy.countdownSeconds)}
+          options={COUNTDOWN_CHOICES}
+          onChange={value => onChange({ ...policy, countdownSeconds: Number(value) })}
         />
-        {userNotifications && closesApp && (
-          <SettingSelect
-            id={`${name}-countdown`}
-            label="Countdown before closing"
-            value={String(policy.countdownSeconds)}
-            options={COUNTDOWN_CHOICES}
-            onChange={value => onChange({ ...policy, countdownSeconds: Number(value) })}
-          />
-        )}
-      </div>
-      {!userNotifications && <p className="text-ods-text-secondary text-h6">{silentOutcome(policy)}</p>}
+      )}
     </div>
   );
 }
@@ -234,11 +195,6 @@ export function SoftwareUpdatePolicyFields({
 export interface SoftwareUpdateSettingsFieldsProps {
   value: SoftwareUpdateSettingsValues;
   onChange: (value: SoftwareUpdateSettingsValues) => void;
-  /**
-   * The devices can notify the user: the countdown before closing is offered. Default false, as today, when the client
-   * has no notifications: the deadline alone, with a line saying the app is closed without warning.
-   */
-  userNotifications?: boolean;
   /**
    * "Keep it auto-updated" under the update rules. Default true; a host that keeps auto-update on a page of its own
    * (the software's Auto-update settings, design 1569:1890) passes false, and the form then submits it off.
@@ -254,7 +210,6 @@ export interface SoftwareUpdateSettingsFieldsProps {
 export function SoftwareUpdateSettingsFields({
   value,
   onChange,
-  userNotifications = false,
   showAutoUpdate = true,
 }: SoftwareUpdateSettingsFieldsProps) {
   return (
@@ -262,7 +217,6 @@ export function SoftwareUpdateSettingsFields({
       <SoftwareUpdatePolicyFields
         name="updatePolicy"
         policy={value.policy}
-        userNotifications={userNotifications}
         onChange={policy => onChange({ ...value, policy })}
       />
 
@@ -292,7 +246,6 @@ export function SoftwareUpdateSettingsFields({
                     <SoftwareUpdatePolicyFields
                       name="autoUpdatePolicy"
                       policy={value.autoUpdatePolicy}
-                      userNotifications={userNotifications}
                       onChange={autoUpdatePolicy => onChange({ ...value, autoUpdatePolicy })}
                     />
                   </div>

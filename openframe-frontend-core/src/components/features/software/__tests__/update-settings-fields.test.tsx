@@ -1,6 +1,6 @@
 /**
- * Update settings: what "Deadline if app is open" and "Countdown before closing" offer with and without user
- * notifications, and that the form hands the settings to its submit for UPDATE only.
+ * Update settings: what "Deadline if app is open" and "Countdown before closing" offer (the same with or without user
+ * notifications, which pick only the defaults), and that the form hands the settings to its submit for UPDATE only.
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -30,12 +30,10 @@ beforeAll(() => {
 
 function Harness({
   initial = DEFAULT_SOFTWARE_UPDATE_SETTINGS,
-  userNotifications,
   showAutoUpdate,
   onValue,
 }: {
   initial?: SoftwareUpdateSettingsValues;
-  userNotifications?: boolean;
   showAutoUpdate?: boolean;
   onValue?: (value: SoftwareUpdateSettingsValues) => void;
 }) {
@@ -47,7 +45,6 @@ function Harness({
         setValue(next);
         onValue?.(next);
       }}
-      userNotifications={userNotifications}
       showAutoUpdate={showAutoUpdate}
     />
   );
@@ -87,40 +84,24 @@ const FORCE_SETTINGS: SoftwareUpdateSettingsValues = {
 };
 
 describe('SoftwareUpdateSettingsFields without user notifications', () => {
-  it('opens on Force update right away, says the app closes unannounced, and has no countdown', () => {
+  it('opens on Force update right away with its countdown, as the design draws it (1577:3)', () => {
     render(<Harness initial={defaultSoftwareUpdateSettings(false)} />);
     expect(field(DEADLINE)[0].textContent).toBe('Force update right away');
-    expect(field(COUNTDOWN)).toHaveLength(0);
-    // Force is not instant: the agent waits the (silent) countdown before it closes the app.
-    expect(screen.getByText('The app is closed without warning 5 minutes later, then updated.')).toBeTruthy();
-    expect(screen.queryByText(/notify|Ask Later/i)).toBeNull();
+    expect(field(COUNTDOWN)[0].textContent).toBe('5 minutes');
+    expect(screen.queryByText(/without warning|notify|Ask Later/i)).toBeNull();
   });
 
-  it('offers every deadline, each saying what the device does with nobody told', () => {
+  it('offers every deadline and countdown', () => {
     const onValue = vi.fn<(value: SoftwareUpdateSettingsValues) => void>();
     render(<Harness initial={defaultSoftwareUpdateSettings(false)} onValue={onValue} />);
     expect(openOptions(DEADLINE)).toEqual(ALL_DEADLINES);
-    fireEvent.click(screen.getByRole('option', { name: 'Update when app closes' }));
-    expect(screen.getByText('The update waits until the user closes the app.')).toBeTruthy();
-    expect(onValue.mock.lastCall?.[0].policy).toMatchObject({ mode: 'WAIT', deadlineEnabled: false });
-
-    pick(DEADLINE, '14 days after the first try');
-    expect(
-      screen.getByText(
-        'If the app is still open by the deadline, it is closed without warning 5 minutes later, then updated.',
-      ),
-    ).toBeTruthy();
-    expect(field(COUNTDOWN)).toHaveLength(0);
+    fireEvent.click(screen.getByRole('option', { name: '14 days after the first try' }));
     expect(onValue.mock.lastCall?.[0].policy).toMatchObject({
       mode: 'WAIT',
       deadlineEnabled: true,
       deadlineSeconds: 14 * 86_400,
     });
-  });
-
-  it('says how long the silent wait before a forced close is, from the policy it draws', () => {
-    render(<Harness initial={{ ...FORCE_SETTINGS, policy: { ...FORCE_SETTINGS.policy, countdownSeconds: 900 } }} />);
-    expect(screen.getByText('The app is closed without warning 15 minutes later, then updated.')).toBeTruthy();
+    expect(openOptions(COUNTDOWN)).toEqual(['1 minute', '5 minutes', '15 minutes', '30 minutes']);
   });
 
   it('auto-update says that leaving it off does not stop an auto-update already on', () => {
@@ -128,12 +109,12 @@ describe('SoftwareUpdateSettingsFields without user notifications', () => {
     expect(screen.getByText(/Leaving it off does not turn off auto-update that is already on there\./)).toBeTruthy();
   });
 
-  it('separate auto-update settings get a deadline of their own', () => {
+  it('separate auto-update settings get a deadline and a countdown of their own', () => {
     render(<Harness initial={defaultSoftwareUpdateSettings(false)} />);
     fireEvent.click(screen.getByRole('checkbox', { name: /Same settings for auto-update/ }));
     expect(screen.getByText('For auto-updates')).toBeTruthy();
     expect(field(DEADLINE)).toHaveLength(2);
-    expect(field(COUNTDOWN)).toHaveLength(0);
+    expect(field(COUNTDOWN)).toHaveLength(2);
   });
 });
 
@@ -144,9 +125,9 @@ describe('defaultSoftwareUpdateSettings', () => {
   });
 });
 
-describe('SoftwareUpdateSettingsFields with user notifications', () => {
+describe('SoftwareUpdateSettingsFields on the server defaults', () => {
   it('opens on the design defaults: 7 days and 5 minutes, auto-updated with the same settings', () => {
-    render(<Harness userNotifications />);
+    render(<Harness />);
     expect(field(DEADLINE)[0].textContent).toBe('7 days after the first try');
     expect(field(COUNTDOWN)[0].textContent).toBe('5 minutes');
     expect(screen.queryByText(/without warning/)).toBeNull();
@@ -155,18 +136,18 @@ describe('SoftwareUpdateSettingsFields with user notifications', () => {
   });
 
   it('offers every deadline', () => {
-    render(<Harness userNotifications />);
+    render(<Harness />);
     expect(openOptions(DEADLINE)).toEqual(ALL_DEADLINES);
   });
 
   it('offers every countdown', () => {
-    render(<Harness userNotifications />);
+    render(<Harness />);
     expect(openOptions(COUNTDOWN)).toEqual(['1 minute', '5 minutes', '15 minutes', '30 minutes']);
   });
 
   it('Force keeps the countdown and says later releases are forced too; waiting for the app to close has none', () => {
     const onValue = vi.fn<(value: SoftwareUpdateSettingsValues) => void>();
-    render(<Harness userNotifications onValue={onValue} />);
+    render(<Harness onValue={onValue} />);
     pick(DEADLINE, 'Force update right away');
     expect(field(COUNTDOWN)).toHaveLength(1);
     expect(screen.getByText('Later releases will also be force-updated.')).toBeTruthy();
@@ -177,19 +158,19 @@ describe('SoftwareUpdateSettingsFields with user notifications', () => {
   });
 
   it('auto-update off hides its settings', () => {
-    render(<Harness userNotifications />);
+    render(<Harness />);
     fireEvent.click(screen.getByRole('checkbox', { name: /Keep it auto-updated/ }));
     expect(screen.queryByRole('checkbox', { name: /Same settings for auto-update/ })).toBeNull();
   });
 
   it('showAutoUpdate={false} leaves the update rules alone', () => {
-    render(<Harness userNotifications showAutoUpdate={false} />);
+    render(<Harness showAutoUpdate={false} />);
     expect(field(DEADLINE)).toHaveLength(1);
     expect(screen.queryByRole('checkbox', { name: /Keep it auto-updated/ })).toBeNull();
   });
 
   it('promises no reinstall of apps installed by hand: the agent leaves them alone', () => {
-    render(<Harness userNotifications />);
+    render(<Harness />);
     expect(screen.queryByText(/reinstall/i)).toBeNull();
   });
 });
@@ -201,7 +182,6 @@ describe('SoftwareUpdatePolicyFields', () => {
       <SoftwareUpdatePolicyFields
         name="policy"
         policy={policy}
-        userNotifications
         onChange={next => {
           setPolicy(next);
           onValue(next);

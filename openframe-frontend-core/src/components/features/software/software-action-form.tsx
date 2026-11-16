@@ -89,9 +89,8 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
    */
   showUpdateSettings?: boolean;
   /**
-   * "Update Settings" offer Wait & notify and the countdowns, which need the devices to notify the user. Default false:
-   * Wait (with an optional deadline that closes the app without warning) or Force Update, opening on Force Update, and
-   * no countdown.
+   * The devices can notify the user: "Update Settings" open on the server's defaults (a 7-day deadline). Default false:
+   * they open on Force update right away, so no app is closed a week later with nobody told. The choices are the same.
    */
   updateUserNotifications?: boolean;
   /**
@@ -254,7 +253,6 @@ export function SoftwareActionForm<TRef extends string = string>({
         <SoftwareUpdateSettingsFields
           value={updateSettings}
           onChange={setUpdateSettings}
-          userNotifications={updateUserNotifications}
           showAutoUpdate={showAutoUpdate}
         />
       )}
