@@ -12,6 +12,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.repository.device.MachineRepository;
@@ -32,7 +33,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 @Service
@@ -42,10 +42,6 @@ public class SoftwareCatalogStatus {
 
     private static final Map<PackageManagerType, SoftwareSource> SOURCE_BY_MANAGER =
             Map.of(PackageManagerType.WINGET, SoftwareSource.WINGET);
-
-    // a formula and a cask can share a token: the title is taken as the formula then
-    private static final Comparator<PackageCatalogEntry> FORMULA_FIRST =
-            Comparator.comparing(entry -> entry.getBrewType() != BrewPackageType.FORMULA);
 
     private final PackageCatalogRepository catalogRepository;
     private final SoftwarePackageMatcher packageMatcher;
@@ -75,7 +71,7 @@ public class SoftwareCatalogStatus {
         if (rows == null || rows.isEmpty()) {
             return;
         }
-        Map<String, PackageCatalogEntry> brewPackages = brewPackagesByToken(rows);
+        Map<String, List<PackageCatalogEntry>> brewPackages = brewPackagesByToken(rows);
         Map<InstalledProgram, SoftwareResponse> rowByProgram = new IdentityHashMap<>();
         rows.forEach(row -> rowByProgram.put(programOf(row), row));
         List<InstalledProgram> programs = List.copyOf(rowByProgram.keySet());
@@ -117,8 +113,8 @@ public class SoftwareCatalogStatus {
                 .build();
     }
 
-    private static void apply(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages, PackageMatch match,
-                              PackageCatalogEntry managing, PackageCatalogEntry adoption) {
+    private static void apply(SoftwareResponse row, Map<String, List<PackageCatalogEntry>> brewPackages,
+                              PackageMatch match, PackageCatalogEntry managing, PackageCatalogEntry adoption) {
         if (isBrewPackage(row)) {
             applyBrewPackage(row, brewPackages);
         } else if (managing != null) {
@@ -130,9 +126,8 @@ public class SoftwareCatalogStatus {
         }
     }
 
-    private static void applyBrewPackage(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages) {
-        String token = brewTokenOf(row);
-        PackageCatalogEntry entry = token == null ? null : brewPackages.get(token);
+    private static void applyBrewPackage(SoftwareResponse row, Map<String, List<PackageCatalogEntry>> brewPackages) {
+        PackageCatalogEntry entry = brewEntryOf(row, brewPackages);
         String latest = entry == null ? null : PackageCatalogVersions.shownVersionOf(entry);
         applyLatest(row, latest);
         row.setManagingPackage(entry);
@@ -203,7 +198,22 @@ public class SoftwareCatalogStatus {
                 ? SoftwareVersionStatus.UP_TO_DATE : SoftwareVersionStatus.OUTDATED;
     }
 
-    private Map<String, PackageCatalogEntry> brewPackagesByToken(List<SoftwareResponse> rows) {
+    // a formula and a cask can share a token: the type brew reported the title under decides
+    private static PackageCatalogEntry brewEntryOf(SoftwareResponse row,
+                                                   Map<String, List<PackageCatalogEntry>> brewPackages) {
+        String token = brewTokenOf(row);
+        List<PackageCatalogEntry> entries = token == null ? null : brewPackages.get(token);
+        if (entries == null) {
+            return null;
+        }
+        boolean cask = row.getFleetSource() == FleetSource.HOMEBREW_CASKS;
+        BrewPackageType reportedType = cask ? BrewPackageType.CASK : BrewPackageType.FORMULA;
+        Comparator<PackageCatalogEntry> reportedTypeFirst =
+                Comparator.comparing(entry -> entry.getBrewType() != reportedType);
+        return entries.stream().min(reportedTypeFirst).orElseThrow();
+    }
+
+    private Map<String, List<PackageCatalogEntry>> brewPackagesByToken(List<SoftwareResponse> rows) {
         Set<String> tokens = rows.stream()
                 .filter(SoftwareCatalogStatus::isBrewPackage)
                 .map(SoftwareCatalogStatus::brewTokenOf)
@@ -214,9 +224,7 @@ public class SoftwareCatalogStatus {
         }
         return catalogRepository.findByManagerAndPackageIdIn(PackageManagerType.BREW, tokens).stream()
                 .filter(entry -> entry.getPackageId() != null && entry.getVersion() != null)
-                .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)))
-                .entrySet().stream()
-                .collect(toMap(Map.Entry::getKey, e -> e.getValue().stream().min(FORMULA_FIRST).orElseThrow()));
+                .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)));
     }
 
     private static boolean isBrewPackage(SoftwareResponse row) {

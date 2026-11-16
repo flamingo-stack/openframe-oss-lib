@@ -31,7 +31,8 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
     private static final String ADOPTION_STATE = "adoptionMatch.state";
     private static final String ADOPTION_MANAGER = "adoptionMatch.manager";
     private static final String TITLE_ID = "softwareTitleId";
-    private static final String BREW_SOURCE = FleetSource.HOMEBREW_PACKAGES.getFleetName();
+    private static final List<String> BREW_SOURCES =
+            List.of(FleetSource.HOMEBREW_PACKAGES.getFleetName(), FleetSource.HOMEBREW_CASKS.getFleetName());
 
     private final MongoTemplate mongoTemplate;
 
@@ -118,7 +119,7 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
                     Criteria.where(TITLE_ID).in(titles.getPolicyTitleIds()).nin(titles.getEnabledPolicyTitleIds()),
                     withoutPolicy(titles).orOperator(
                             Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED),
-                            Criteria.where(SOURCE).is(BREW_SOURCE).and(MATCH_STATE).ne(PackageMatchState.NO_PACKAGE)));
+                            Criteria.where(SOURCE).in(BREW_SOURCES).and(MATCH_STATE).ne(PackageMatchState.NO_PACKAGE)));
             case NO_PACKAGE -> new Criteria().andOperator(
                     withoutPolicy(titles),
                     withoutPackage(),

@@ -62,7 +62,8 @@ import static org.mockito.Mockito.when;
 class TenantSoftwareReadModelQueryTest {
 
     private static final String TENANT = "t1";
-    private static final Set<String> MANAGER_SOURCES = Set.of("homebrew_packages", "chocolatey_packages", "winget_packages");
+    private static final Set<String> MANAGER_SOURCES =
+            Set.of("homebrew_packages", "homebrew_casks", "chocolatey_packages", "winget_packages");
 
     private static final List<PackageManagerType> ENABLED_MANAGERS =
             List.of(PackageManagerType.WINGET, PackageManagerType.CHOCO);
@@ -372,7 +373,7 @@ class TenantSoftwareReadModelQueryTest {
         filter.setAutoUpdateStatuses(statuses);
         SoftwareTitleQuery expected = titles().manageable(false)
                 .installerSources(Set.of()).unmanagedChosen(true)
-                .osSources(Set.of("apps", "homebrew_packages", "safari_extensions", "pkg_packages"))
+                .osSources(Set.of("apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages"))
                 .autoUpdateStatuses(statuses).enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of(9L))
                 .adoptionManagers(ENABLED_MANAGERS).build();
 
@@ -454,18 +455,18 @@ class TenantSoftwareReadModelQueryTest {
     private static Stream<Arguments> sourcesAndTheirQuery() {
         return Stream.of(
                 Arguments.of(List.of(SoftwareSource.WINGET), Set.of("winget_packages"), true, false),
-                Arguments.of(List.of(SoftwareSource.BREW), Set.of("homebrew_packages"), false, false),
+                Arguments.of(List.of(SoftwareSource.BREW), Set.of("homebrew_packages", "homebrew_casks"), false, false),
                 Arguments.of(List.of(SoftwareSource.CHOCOLATEY), Set.of("chocolatey_packages"), false, false),
                 Arguments.of(List.of(SoftwareSource.UNMANAGED), Set.of(), false, true),
                 Arguments.of(List.of(SoftwareSource.WINGET, SoftwareSource.BREW, SoftwareSource.UNMANAGED),
-                        Set.of("winget_packages", "homebrew_packages"), true, true));
+                        Set.of("winget_packages", "homebrew_packages", "homebrew_casks"), true, true));
     }
 
     private static Stream<Arguments> osTypesAndTheirSources() {
         Set<String> windows = Set.of("programs", "chocolatey_packages", "winget_packages", "ie_extensions");
-        Set<String> macOs = Set.of("apps", "homebrew_packages", "safari_extensions", "pkg_packages");
+        Set<String> macOs = Set.of("apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages");
         Set<String> both = Set.of("programs", "chocolatey_packages", "winget_packages", "ie_extensions",
-                "apps", "homebrew_packages", "safari_extensions", "pkg_packages");
+                "apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages");
         return Stream.of(
                 Arguments.of(List.of(OsType.WINDOWS), windows),
                 Arguments.of(List.of(OsType.MAC_OS), macOs),

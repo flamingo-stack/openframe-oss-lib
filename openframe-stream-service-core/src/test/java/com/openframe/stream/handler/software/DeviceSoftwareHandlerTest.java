@@ -307,12 +307,13 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getWingetId()).isNull();
     }
 
-    @Test
-    void handle_homebrewFormulaWithOldVersionsInTheCellar_onlyTheNewestVersionKept() {
+    @ParameterizedTest
+    @ValueSource(strings = {"homebrew_packages", "homebrew_casks"})
+    void handle_homebrewPackageWithOldVersionsLeftByBrew_onlyTheNewestVersionKept(String source) {
         // setup
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        HostSoftwareTitle libnghttp2 = title(44L, "libnghttp2", "homebrew_packages", "1.70.0", "1.68.0", "1.71.0");
+        HostSoftwareTitle libnghttp2 = title(44L, "libnghttp2", source, "1.70.0", "1.68.0", "1.71.0");
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(libnghttp2));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 44L))
                 .thenReturn(Optional.empty());

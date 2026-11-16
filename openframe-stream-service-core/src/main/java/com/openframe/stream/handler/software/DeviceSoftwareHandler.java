@@ -192,8 +192,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        String source = title.getSource();
-        boolean homebrew = FleetSource.of(source) == FleetSource.HOMEBREW_PACKAGES;
+        FleetSource fleetSource = FleetSource.of(title.getSource());
+        boolean homebrew = fleetSource == FleetSource.HOMEBREW_PACKAGES || fleetSource == FleetSource.HOMEBREW_CASKS;
         return homebrew ? newestOf(versions) : versions;
     }
 

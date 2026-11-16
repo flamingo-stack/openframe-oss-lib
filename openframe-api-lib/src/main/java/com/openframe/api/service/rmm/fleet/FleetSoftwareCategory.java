@@ -10,7 +10,7 @@ import static java.util.stream.Collectors.toUnmodifiableSet;
 public enum FleetSoftwareCategory {
 
     CHOCOLATEY(SoftwareSource.CHOCOLATEY, "chocolatey_packages"),
-    HOMEBREW(SoftwareSource.BREW, "homebrew_packages"),
+    HOMEBREW(SoftwareSource.BREW, "homebrew_packages", "homebrew_casks"),
     WINGET(SoftwareSource.WINGET, "winget_packages"),
     OTHER(SoftwareSource.UNMANAGED);
 

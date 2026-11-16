@@ -165,6 +165,18 @@ class SoftwareRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("cask titles: OFF like any brew title, also before their first match; one the catalog lacks is not")
+    void findTitles_caskTitles_offUnlessTheCatalogLacksTheCask() {
+        repository.saveAll(List.of(
+                title(TENANT, 10L, "slack", "homebrew_casks", null, 1, 0),
+                title(TENANT, 11L, "tapped-app", "homebrew_casks", brewMatch(PackageMatchState.NO_PACKAGE), 1, 0)));
+        SoftwareTitleQuery off = titles().autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.OFF))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+
+        assertThat(names(off)).containsExactlyInAnyOrder("Google Chrome", "node", "slack");
+    }
+
+    @Test
     @DisplayName("auto-update NEEDS_ADOPTION: no policy, no package that manages the title, and a package of an adoption manager; such a title is not NO_PACKAGE")
     void findTitles_autoUpdateNeedsAdoption_aPackageToAdoptIntoAndNoneThatManages() {
         Software sevenZip = title(TENANT, 8L, "7-Zip", "programs", match(PackageMatchState.NO_PACKAGE), 1, 0);

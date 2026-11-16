@@ -337,6 +337,23 @@ class SoftwareCatalogStatusTest {
                 .thenReturn(List.of(entries));
     }
 
+    @Test
+    void apply_caskRowSharingATokenWithAFormula_theCaskWins() {
+        // setup
+        SoftwareResponse docker = row("docker", SoftwareSource.BREW, "4.39.0", 0);
+        docker.setFleetSource(FleetSource.HOMEBREW_CASKS);
+        PackageCatalogEntry cask = entry("docker", "4.40.0", BrewPackageType.CASK);
+        catalog(entry("docker", "28.1.0", BrewPackageType.FORMULA), cask);
+
+        // execution
+        status().apply(List.of(docker));
+
+        // verifications
+        assertThat(docker.getManagingPackage()).isSameAs(cask);
+        assertThat(docker.getLatestVersion()).isEqualTo("4.40.0");
+        assertThat(docker.getAutoUpdate()).isEqualTo(SoftwareAutoUpdateStatus.OFF);
+    }
+
     private static PackageCatalogEntry entry(String token, String version, BrewPackageType type) {
         return PackageCatalogEntry.builder()
                 .manager(PackageManagerType.BREW)
