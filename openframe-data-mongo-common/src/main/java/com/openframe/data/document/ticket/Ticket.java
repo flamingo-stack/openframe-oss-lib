@@ -57,8 +57,6 @@ public class Ticket implements TenantScoped {
     private String assignedTo;
     private String assignedName;
     private Boolean escalatedByUser;
-    // Denormalized from the linked chat's approval requests; null reads as false.
-    private Boolean hasPendingApproval;
     private String order;
     @CreatedDate
     private Instant createdAt;

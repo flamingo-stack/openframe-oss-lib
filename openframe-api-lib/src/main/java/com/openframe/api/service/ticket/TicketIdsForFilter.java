@@ -1,6 +1,7 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.dto.ticket.TicketFilterInput;
+import com.openframe.api.service.ticket.spi.TicketPendingApprovalProvider;
 import com.openframe.api.service.ticket.spi.TicketUnreadMessagesProvider;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
@@ -28,6 +29,7 @@ public class TicketIdsForFilter {
     private final NotificationReadStateRepository readStateRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ObjectProvider<TicketUnreadMessagesProvider> unreadMessagesProvider;
+    private final ObjectProvider<TicketPendingApprovalProvider> pendingApprovalProvider;
 
     // null means "no restriction at all"; an empty list means "nothing matches" — the two are opposite
     // outcomes downstream, so a filter that applied and found nothing must not collapse to null.
@@ -40,7 +42,23 @@ public class TicketIdsForFilter {
             List<String> unread = unreadTicketIds(principal);
             restricted = restricted == null ? unread : intersect(restricted, unread);
         }
+        if (isPendingApprovalOnly(filter)) {
+            List<String> pending = pendingApprovalTicketIds();
+            restricted = restricted == null ? pending : intersect(restricted, pending);
+        }
         return restricted;
+    }
+
+    // The tickets a hasPendingApproval:false filter leaves out; null when the filter does not exclude any.
+    public List<String> excludedTicketIds(TicketFilterInput filter) {
+        if (filter == null) {
+            return null;
+        }
+        Boolean hasPendingApproval = filter.getHasPendingApproval();
+        if (!Boolean.FALSE.equals(hasPendingApproval)) {
+            return null;
+        }
+        return pendingApprovalTicketIds();
     }
 
     private boolean hasTagFilter(TicketFilterInput filter) {
@@ -57,6 +75,23 @@ public class TicketIdsForFilter {
         }
         Boolean hasUnread = filter.getHasUnreadNotifications();
         return Boolean.TRUE.equals(hasUnread);
+    }
+
+    private boolean isPendingApprovalOnly(TicketFilterInput filter) {
+        if (filter == null) {
+            return false;
+        }
+        Boolean hasPendingApproval = filter.getHasPendingApproval();
+        return Boolean.TRUE.equals(hasPendingApproval);
+    }
+
+    // Read from the approval requests on every query: a flag stored on the ticket could go stale.
+    private List<String> pendingApprovalTicketIds() {
+        TicketPendingApprovalProvider provider = pendingApprovalProvider.getIfAvailable();
+        if (provider == null) {
+            return List.of();
+        }
+        return provider.ticketIdsWithPendingApproval();
     }
 
     private List<String> taggedTicketIds(TicketFilterInput filter) {

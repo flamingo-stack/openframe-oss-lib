@@ -6,16 +6,10 @@ import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
 import com.openframe.publishing.api.OutboxPublisher;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import com.openframe.data.document.ticket.Ticket;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -32,13 +26,12 @@ class CustomTicketRepositoryFilterTest {
     private static final Instant CUT_OFF = Instant.parse("2026-10-20T10:00:00Z");
 
     private static final String ESCALATED_BY_USER = "escalatedByUser";
-    private static final String HAS_PENDING_APPROVAL = "hasPendingApproval";
+    private static final String NOR = "$nor";
+    private static final String PENDING_TICKET_ID = "6740a1b2c3d4e5f601234567";
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
     @Mock private ObjectProvider<OutboxPublisher> outboxPublisher;
     @Mock private ObjectProvider<TicketAggregateSpec> ticketSpec;
-    @Captor private ArgumentCaptor<Query> queryCaptor;
-    @Captor private ArgumentCaptor<Update> updateCaptor;
 
     private CustomTicketRepositoryImpl repository;
 
@@ -73,28 +66,57 @@ class CustomTicketRepositoryFilterTest {
     }
 
     @Test
-    void buildTicketQuery_hasPendingApprovalTrue_onlyFlaggedTickets() {
+    void buildTicketQuery_excludedTicketIds_leftOutUnderNor() {
         // setup
-        TicketQueryFilter filter = TicketQueryFilter.builder().hasPendingApproval(true).build();
+        TicketQueryFilter filter = TicketQueryFilter.builder().excludedTicketIds(List.of(PENDING_TICKET_ID)).build();
 
         // execution
         Document query = repository.buildTicketQuery(filter, null, null, null).getQueryObject();
 
         // verifications
-        assertThat(query).containsEntry(HAS_PENDING_APPROVAL, true);
+        assertThat(query.getList(NOR, Document.class))
+                .containsExactly(new Document("_id", new Document("$in", List.of(new ObjectId(PENDING_TICKET_ID)))));
+        assertThat(query).doesNotContainKey("_id");
     }
 
-    // Tickets created before the flag existed carry no value, and they are "not waiting" too.
+    // A tag or unread filter restricts '_id' as well; both have to apply without a second '_id' criterion.
     @Test
-    void buildTicketQuery_hasPendingApprovalFalse_ticketsWithoutTheValueIncluded() {
+    void buildTicketQuery_excludedIdsBesideIdRestriction_bothApply() {
         // setup
-        TicketQueryFilter filter = TicketQueryFilter.builder().hasPendingApproval(false).build();
+        TicketQueryFilter filter = TicketQueryFilter.builder().excludedTicketIds(List.of(PENDING_TICKET_ID)).build();
+
+        // execution
+        Document query = repository.buildTicketQuery(filter, null, List.of("tagged-1"), null).getQueryObject();
+
+        // verifications
+        assertThat(query.get("_id", Document.class)).containsEntry("$in", List.of("tagged-1"));
+        assertThat(query).containsKey(NOR);
+    }
+
+    @Test
+    void buildTicketQuery_excludedIdNotAnObjectId_matchedAsText() {
+        // setup
+        TicketQueryFilter filter = TicketQueryFilter.builder().excludedTicketIds(List.of("legacy-1")).build();
 
         // execution
         Document query = repository.buildTicketQuery(filter, null, null, null).getQueryObject();
 
         // verifications
-        assertThat(query.get(HAS_PENDING_APPROVAL, Document.class)).containsEntry("$ne", true);
+        assertThat(query.getList(NOR, Document.class))
+                .containsExactly(new Document("_id", new Document("$in", List.of("legacy-1"))));
+    }
+
+    // Nothing pending: hasPendingApproval:false keeps every ticket.
+    @Test
+    void buildTicketQuery_noExcludedIds_noNarrowing() {
+        // setup
+        TicketQueryFilter filter = TicketQueryFilter.builder().excludedTicketIds(List.of()).build();
+
+        // execution
+        Document query = repository.buildTicketQuery(filter, null, null, null).getQueryObject();
+
+        // verifications
+        assertThat(query).doesNotContainKey(NOR);
     }
 
     @Test
@@ -107,31 +129,6 @@ class CustomTicketRepositoryFilterTest {
 
         // verifications
         assertThat(query).containsEntry("_id", null);
-    }
-
-    @Test
-    void updatePendingApproval_flagSet_singleFieldUpdate() {
-        // execution
-        repository.updatePendingApproval("t-1", true);
-
-        // verifications
-        verify(mongoTemplate).updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(Ticket.class));
-        assertThat(queryCaptor.getValue().getQueryObject()).containsEntry("_id", "t-1");
-        assertThat(updateCaptor.getValue().getUpdateObject().get("$set", Document.class))
-                .containsEntry(HAS_PENDING_APPROVAL, true)
-                .hasSize(1);
-    }
-
-    // Spring adds $inc version +1 to an update unless the update already names the version.
-    @Test
-    void updatePendingApproval_keepsTheTicketVersion() {
-        // execution
-        repository.updatePendingApproval("t-1", false);
-
-        // verifications
-        verify(mongoTemplate).updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(Ticket.class));
-        assertThat(updateCaptor.getValue().getUpdateObject().get("$inc", Document.class))
-                .containsEntry("version", 0);
     }
 
     @Test

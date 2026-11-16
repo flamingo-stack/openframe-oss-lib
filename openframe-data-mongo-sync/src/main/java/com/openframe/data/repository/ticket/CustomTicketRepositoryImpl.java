@@ -71,7 +71,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_AWAITING_CLIENT_SINCE = "awaitingClientSince";
     private static final String FIELD_VERSION = "version";
     private static final String FIELD_ESCALATED_BY_USER = "escalatedByUser";
-    private static final String FIELD_HAS_PENDING_APPROVAL = "hasPendingApproval";
 
     private static final String CASE_INSENSITIVE = "i";
 
@@ -119,7 +118,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             addCriteriaIfNotEmpty(query, FIELD_CREATION_SOURCE, filter.getCreationSources());
             applyActivityCriteria(query, filter.getActivity());
             applyFlag(query, FIELD_ESCALATED_BY_USER, filter.getEscalatedByUser());
-            applyFlag(query, FIELD_HAS_PENDING_APPROVAL, filter.getHasPendingApproval());
+            applyExclusion(query, filter.getExcludedTicketIds());
         }
 
         applyIdRestriction(query, restrictToTicketIds);
@@ -163,6 +162,20 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 ? Criteria.where(field).is(true)
                 : Criteria.where(field).ne(true);
         query.addCriteria(criteria);
+    }
+
+    // Under $nor, not on '_id': the id restriction (tags, unread, pending approval) may already sit on that key.
+    private void applyExclusion(Query query, List<String> excludedIds) {
+        if (excludedIds == null || excludedIds.isEmpty()) {
+            return;
+        }
+        List<Object> keys = excludedIds.stream().map(CustomTicketRepositoryImpl::idKey).toList();
+        Criteria excluded = Criteria.where(ID_FIELD).in(keys);
+        query.addCriteria(new Criteria().norOperator(excluded));
+    }
+
+    private static Object idKey(String id) {
+        return ObjectId.isValid(id) ? new ObjectId(id) : id;
     }
 
     private void applySearchCriteria(Query query, String search) {
@@ -478,13 +491,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         return (int) modifiedCount;
     }
 
-    @Override
-    public void updatePendingApproval(String ticketId, boolean pending) {
-        Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
-        // $inc by 0 keeps the version: the flag is derived on every save, so it must not make a concurrent save of the ticket conflict.
-        Update update = new Update().set(FIELD_HAS_PENDING_APPROVAL, pending).inc(FIELD_VERSION, 0);
-        mongoTemplate.updateFirst(query, update, Ticket.class);
-    }
 
     @Override
     public void updateTitle(String ticketId, String title) {

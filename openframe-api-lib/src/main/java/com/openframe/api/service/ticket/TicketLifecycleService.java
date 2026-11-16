@@ -393,11 +393,12 @@ public class TicketLifecycleService {
         TicketQueryFilter.TicketQueryFilterBuilder builder = TicketQueryFilter.builder()
                 .statusIds(List.of(resolvedStatusId));
         if (filterInput != null) {
+            List<String> excludedTicketIds = ticketIdsForFilter.excludedTicketIds(filterInput);
             builder.organizationIds(filterInput.getOrganizationIds())
                     .deviceIds(filterInput.getDeviceIds())
                     .assigneeIds(filterInput.getAssigneeIds())
                     .escalatedByUser(filterInput.getEscalatedByUser())
-                    .hasPendingApproval(filterInput.getHasPendingApproval());
+                    .excludedTicketIds(excludedTicketIds);
         }
         return builder.build();
     }
