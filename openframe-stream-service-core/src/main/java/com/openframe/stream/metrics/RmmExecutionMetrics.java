@@ -2,7 +2,7 @@ package com.openframe.stream.metrics;
 
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
-import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.stream.service.rmm.ExecutionOutcome;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
@@ -28,8 +28,9 @@ public class RmmExecutionMetrics {
     private static final String TAG_STATUS = "status";
     private static final String TAG_SOURCE = "source";
     private static final String TAG_MANAGER = "manager";
-    private static final String STATUS_UNKNOWN = "UNKNOWN";
+    private static final String TAG_REASON = "reason";
     private static final String MANAGER_NONE = "NONE";
+    private static final String REASON_NONE = "NONE";
 
     private final MeterRegistry registry;
 
@@ -37,23 +38,24 @@ public class RmmExecutionMetrics {
         this.registry = registry;
     }
 
-    public void recordScriptCompleted(ExecutionStatus status, ExecutionSource source, PackageManagerType packageManager,
+    public void recordScriptCompleted(ExecutionOutcome outcome, ExecutionSource source, PackageManagerType packageManager,
                                       Instant dispatchedAt, Instant finishedAt) {
         String sourceTag = sourceTag(source);
         String managerTag = managerTag(packageManager);
-        recordCompleted(KIND_SCRIPT, status, sourceTag, managerTag, dispatchedAt, finishedAt);
+        recordCompleted(KIND_SCRIPT, outcome, sourceTag, managerTag, dispatchedAt, finishedAt);
     }
 
-    public void recordCommandCompleted(ExecutionStatus status, Instant dispatchedAt, Instant finishedAt) {
+    public void recordCommandCompleted(ExecutionOutcome outcome, Instant dispatchedAt, Instant finishedAt) {
         String sourceTag = ExecutionSource.MANUAL.name();
-        recordCompleted(KIND_COMMAND, status, sourceTag, MANAGER_NONE, dispatchedAt, finishedAt);
+        recordCompleted(KIND_COMMAND, outcome, sourceTag, MANAGER_NONE, dispatchedAt, finishedAt);
     }
 
-    private void recordCompleted(String kind, ExecutionStatus status, String sourceTag, String managerTag,
+    private void recordCompleted(String kind, ExecutionOutcome outcome, String sourceTag, String managerTag,
                                  Instant dispatchedAt, Instant finishedAt) {
-        String statusTag = status != null ? status.name() : STATUS_UNKNOWN;
-        Tags tags = Tags.of(TAG_KIND, kind, TAG_STATUS, statusTag, TAG_SOURCE, sourceTag, TAG_MANAGER, managerTag);
-        registry.counter(COMPLETED_COUNTER, tags).increment();
+        Tags tags = Tags.of(TAG_KIND, kind, TAG_STATUS, outcome.status().name(), TAG_SOURCE, sourceTag,
+                TAG_MANAGER, managerTag);
+        String reasonTag = outcome.failureReason() != null ? outcome.failureReason().name() : REASON_NONE;
+        registry.counter(COMPLETED_COUNTER, tags.and(TAG_REASON, reasonTag)).increment();
 
         if (dispatchedAt != null && finishedAt != null) {
             Timer.builder(LATENCY_TIMER)

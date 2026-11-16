@@ -15,6 +15,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -114,6 +115,7 @@ class ScriptDeliveryRetryServiceTest {
         verify(repository).saveAll(captor.capture());
         assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.FAILED);
         assertThat(captor.getValue()).allMatch(r -> r.getError().equals("Agent could not receive the script after 7 delivery attempt(s)"));
+        assertThat(captor.getValue()).allMatch(r -> r.getFailureReason() == ExecutionFailureReason.NO_ACK);
         verify(retryStore).evict("exec-1", "m-1");
         verify(headerWatchdogService).finalizeAffectedHeaders(captor.getValue());
     }
@@ -210,6 +212,7 @@ class ScriptDeliveryRetryServiceTest {
         verify(repository).saveAll(captor.capture());
         assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.FAILED);
         assertThat(captor.getValue()).allMatch(r -> r.getError() != null && r.getError().contains("could not receive"));
+        assertThat(captor.getValue()).allMatch(r -> r.getFailureReason() == ExecutionFailureReason.NO_ACK);
         verify(retryStore).evict("exec-1", "m-1");
         verify(headerWatchdogService).finalizeAffectedHeaders(captor.getValue());
     }

@@ -22,6 +22,7 @@ public class ScriptExecutionMapper {
                 .initiatedBy(entity.getInitiatedBy())
                 .source(entity.getSource() != null ? entity.getSource() : ExecutionSource.MANUAL)
                 .status(entity.getStatus())
+                .failureReason(entity.getFailureReason())
                 .dispatchedAt(entity.getDispatchedAt())
                 .statusChangedAt(entity.getStatusChangedAt())
                 .finishedAt(entity.getFinishedAt())

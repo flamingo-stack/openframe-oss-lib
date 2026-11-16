@@ -1,8 +1,9 @@
 package com.openframe.client.service.rmm.watchdog;
 
 import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
-import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +62,7 @@ public class ScriptExecutionWatchdogService {
         long thresholdSeconds = thresholdSecondsFor(row);
         Instant runningSince = row.getStatusChangedAt();
         row.setStatus(ExecutionStatus.FAILED);
+        row.setFailureReason(ExecutionFailureReason.NO_AGENT_RESULT);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
         row.setTimedOut(Boolean.TRUE);

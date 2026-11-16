@@ -44,7 +44,7 @@ class ScheduleJobExecutionWatchdogServiceTest {
     @DisplayName("any leaf still RUNNING → header left alone (no transition)")
     void anyLeafRunning_noTransition() {
         when(scriptExecutionRepository.countLeavesByStatus(TENANT, EXEC))
-                .thenReturn(new LeafStatusCounts(1, 0));   // 1 running
+                .thenReturn(new LeafStatusCounts(1, 0, 0));   // 1 running
 
         assertThat(service.finalizeIfSettled(TENANT, EXEC)).isFalse();
         verify(scheduleScriptExecutionRepository, never()).transitionIfRunning(any(), any(), any(), any());
@@ -54,7 +54,7 @@ class ScheduleJobExecutionWatchdogServiceTest {
     @DisplayName("all leaves terminal with ≥1 failed → header FAILED")
     void anyLeafFailed_headerFailed() {
         when(scriptExecutionRepository.countLeavesByStatus(TENANT, EXEC))
-                .thenReturn(new LeafStatusCounts(0, 2));   // 0 running, 2 failed
+                .thenReturn(new LeafStatusCounts(0, 2, 0));   // 0 running, 2 failed
         when(scheduleScriptExecutionRepository.transitionIfRunning(eq(TENANT), eq(EXEC), eq(ExecutionStatus.FAILED), any()))
                 .thenReturn(1L);
 
@@ -63,10 +63,22 @@ class ScheduleJobExecutionWatchdogServiceTest {
     }
 
     @Test
+    @DisplayName("all leaves terminal, none failed, ≥1 SCRIPT_ERROR → header SCRIPT_ERROR")
+    void scriptErrorNoFailed_headerScriptError() {
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT, EXEC))
+                .thenReturn(new LeafStatusCounts(0, 0, 1));
+        when(scheduleScriptExecutionRepository.transitionIfRunning(eq(TENANT), eq(EXEC), eq(ExecutionStatus.SCRIPT_ERROR), any()))
+                .thenReturn(1L);
+
+        assertThat(service.finalizeIfSettled(TENANT, EXEC)).isTrue();
+        verify(scheduleScriptExecutionRepository).transitionIfRunning(eq(TENANT), eq(EXEC), eq(ExecutionStatus.SCRIPT_ERROR), any());
+    }
+
+    @Test
     @DisplayName("all leaves terminal, none failed, leaves exist → header SUCCESS")
     void allSucceeded_headerSuccess() {
         when(scriptExecutionRepository.countLeavesByStatus(TENANT, EXEC))
-                .thenReturn(new LeafStatusCounts(0, 0));   // 0 running, 0 failed
+                .thenReturn(new LeafStatusCounts(0, 0, 0));   // 0 running, 0 failed
         when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT, EXEC))
                 .thenReturn(Optional.of(new ScriptExecution()));   // at least one leaf exists
         when(scheduleScriptExecutionRepository.transitionIfRunning(eq(TENANT), eq(EXEC), eq(ExecutionStatus.SUCCESS), any()))
@@ -80,7 +92,7 @@ class ScheduleJobExecutionWatchdogServiceTest {
     @DisplayName("no running, no failed, and NO leaves at all → header FAILED (nothing ran, not a misleading SUCCESS)")
     void noLeavesAtAll_headerFailed() {
         when(scriptExecutionRepository.countLeavesByStatus(TENANT, EXEC))
-                .thenReturn(new LeafStatusCounts(0, 0));
+                .thenReturn(new LeafStatusCounts(0, 0, 0));
         when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT, EXEC))
                 .thenReturn(Optional.empty());   // zero leaves
         when(scheduleScriptExecutionRepository.transitionIfRunning(eq(TENANT), eq(EXEC), eq(ExecutionStatus.FAILED), any()))
@@ -99,7 +111,7 @@ class ScheduleJobExecutionWatchdogServiceTest {
                 .thenReturn(List.of(h1, h2));
         // both settled with a failure → both flip
         when(scriptExecutionRepository.countLeavesByStatus(eq(TENANT), any()))
-                .thenReturn(new LeafStatusCounts(0, 1));
+                .thenReturn(new LeafStatusCounts(0, 1, 0));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), eq(ExecutionStatus.FAILED), any()))
                 .thenReturn(1L);
 
@@ -116,7 +128,7 @@ class ScheduleJobExecutionWatchdogServiceTest {
         ScriptExecution fireB = leaf(TENANT, "sch-1", EXEC, "m-2");
         ScriptExecution adhoc = leaf(TENANT, null, "exec-adhoc", "m-3");
         when(scriptExecutionRepository.countLeavesByStatus(TENANT, EXEC))
-                .thenReturn(new LeafStatusCounts(1, 0));
+                .thenReturn(new LeafStatusCounts(1, 0, 0));
 
         service.finalizeAffectedHeaders(List.of(fireA, fireB, adhoc));
 

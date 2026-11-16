@@ -239,7 +239,7 @@ public class SoftwareActionDetailService {
         }
         return switch (status) {
             case SUCCESS -> SoftwareActionStatus.COMPLETED;
-            case FAILED -> SoftwareActionStatus.FAILED;
+            case SCRIPT_ERROR, FAILED -> SoftwareActionStatus.FAILED;
             case QUEUED, RUNNING -> SoftwareActionStatus.IN_PROGRESS;
         };
     }

@@ -10,6 +10,9 @@ import com.openframe.stream.handler.MessageHandler;
 import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.stream.service.rmm.AgentResultReport;
+import com.openframe.stream.service.rmm.ExecutionOutcome;
+import com.openframe.stream.service.rmm.ExecutionOutcomeClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,8 +22,8 @@ import java.time.Instant;
 
 /**
  * Command counterpart of {@code ScriptExecutionStatusUpdateHandler}: transitions the
- * persisted {@link CommandExecution} row from {@code RUNNING} to {@code SUCCESS} /
- * {@code FAILED} from a {@code COMMAND_EXECUTED} result event, writing the agent's
+ * persisted {@link CommandExecution} row from {@code RUNNING} to its terminal status
+ * from a {@code COMMAND_EXECUTED} result event, writing the agent's
  * stdout/stderr/exitCode/etc. in place — the source for {@code getBatchResults}.
  *
  * <p>Registered for {@link Destination#MONGO_COMMAND_HISTORY}, routed only for batch
@@ -42,9 +45,11 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
     private static final String FIELD_STDOUT = "stdout";
     private static final String FIELD_STDERR = "stderr";
     private static final String FIELD_ERROR = "error";
+    private static final String FIELD_FAILURE_REASON = "failureReason";
 
     private final CommandExecutionRepository commandExecutionRepository;
     private final RmmExecutionMetrics executionMetrics;
+    private final ExecutionOutcomeClassifier outcomeClassifier;
 
     @Override
     public EventHandlerType getType() {
@@ -81,7 +86,8 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
     }
 
     private void applyResult(CommandExecution row, JsonNode after) {
-        if (row.getStatus() != ExecutionStatus.RUNNING) {
+        ExecutionStatus previous = row.getStatus();
+        if (!isOpen(row)) {
             // Watchdog (or a duplicate frame) beat us to it — refuse to overwrite a terminal status.
             log.warn("CommandExecution executionId={} machineId={} is already terminal status={} — refusing to overwrite",
                     row.getExecutionId(), row.getMachineId(), row.getStatus());
@@ -94,10 +100,14 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
         String stdout = stringOrNull(after, FIELD_STDOUT);
         String stderr = stringOrNull(after, FIELD_STDERR);
         String error = stringOrNull(after, FIELD_ERROR);
+        String agentFailureReason = stringOrNull(after, FIELD_FAILURE_REASON);
 
         Instant now = Instant.now();
-        ExecutionStatus newStatus = decideStatus(exitCode, timedOut, error);
+        ExecutionOutcome outcome = outcomeClassifier.classify(
+                new AgentResultReport(exitCode, timedOut, error, agentFailureReason), false);
+        ExecutionStatus newStatus = outcome.status();
         row.setStatus(newStatus);
+        row.setFailureReason(outcome.failureReason());
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
         row.setExitCode(exitCode);
@@ -113,16 +123,17 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
         row.setStderrTruncated(truncStderr.truncated);
 
         commandExecutionRepository.save(row);
-        executionMetrics.recordCommandCompleted(newStatus, row.getDispatchedAt(), now);
-        log.info("Transitioned CommandExecution row: executionId={} machineId={} status=RUNNING→{} exitCode={} timedOut={}",
-                row.getExecutionId(), row.getMachineId(), newStatus, exitCode, timedOut);
+        executionMetrics.recordCommandCompleted(outcome, row.getDispatchedAt(), now);
+        log.info("Transitioned CommandExecution row: executionId={} machineId={} status={}→{} failureReason={} exitCode={} timedOut={}",
+                row.getExecutionId(), row.getMachineId(), previous, newStatus, outcome.failureReason(), exitCode, timedOut);
     }
 
-    private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
-        boolean failed = Boolean.TRUE.equals(timedOut)
-                || (exitCode != null && exitCode != 0)
-                || (error != null && !error.isBlank());
-        return failed ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
+    private static boolean isOpen(CommandExecution row) {
+        ExecutionStatus status = row.getStatus();
+        if (status == ExecutionStatus.RUNNING) {
+            return true;
+        }
+        return status != null && status.isTerminal() && !status.isFinal(row.getFailureReason());
     }
 
     /** Truncate to {@link CommandExecution#MAX_OUTPUT_BYTES} on UTF-8 codepoint boundaries. */

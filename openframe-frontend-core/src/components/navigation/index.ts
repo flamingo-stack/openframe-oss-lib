@@ -79,6 +79,7 @@ export {
   WORK_AREA_MIN_COLUMN_WIDTH,
   WorkAreaColumnContext,
 } from './app-layout-work-area';
+export { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from '../../utils/work-area-share';
 export type { AppLayoutWorkAreaMode, AppLayoutWorkAreaProps, WorkAreaColumnState } from './app-layout-work-area';
 export { AppColumnHeader } from './app-column-header';
 export type { AppColumnHeaderLayoutAction, AppColumnHeaderProps } from './app-column-header';

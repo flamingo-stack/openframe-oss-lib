@@ -1,12 +1,14 @@
 package com.openframe.client.listener.packageupdate;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Done;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
+import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.State;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,22 +37,14 @@ public class PackageUpdateExecutionRecorder {
         if (row == null) {
             return;
         }
+        if (event.getState() == State.WAITING && isWaiting(row)) {
+            return;
+        }
         Instant now = Instant.now();
         switch (event.getState()) {
-            case WAITING -> {
-                if (row.getStatus() == ExecutionStatus.RUNNING && Boolean.TRUE.equals(row.getWaiting())) {
-                    return;
-                }
-                if (row.getStatus() != ExecutionStatus.RUNNING) {
-                    update(row, ExecutionStatus.RUNNING, null, null, null, null);
-                }
-                row.setWaiting(true);
-            }
-            case DONE -> update(row, ExecutionStatus.SUCCESS, now, null, summary(event), null);
-            case FAILED -> {
-                Failed failed = event.getFailed();
-                update(row, ExecutionStatus.FAILED, now, exitCode(failed), null, error(failed));
-            }
+            case WAITING -> markWaiting(row);
+            case DONE -> update(row, ExecutionStatus.SUCCESS, null, now, null, summary(event), null);
+            case FAILED -> markFailed(row, event.getFailed(), now);
         }
         row.setStatusChangedAt(now);
         scriptExecutionRepository.save(row);
@@ -62,7 +56,8 @@ public class PackageUpdateExecutionRecorder {
             return;
         }
         Instant now = Instant.now();
-        update(row, ExecutionStatus.FAILED, now, null, null, UNDELIVERED_ERROR + " (" + failure + ")");
+        update(row, ExecutionStatus.FAILED, ExecutionFailureReason.NO_ACK, now, null, null,
+                UNDELIVERED_ERROR + " (" + failure + ")");
         row.setStatusChangedAt(now);
         scriptExecutionRepository.save(row);
     }
@@ -81,9 +76,28 @@ public class PackageUpdateExecutionRecorder {
         return row;
     }
 
-    private static void update(ScriptExecution row, ExecutionStatus status, Instant finishedAt, Integer exitCode,
-                               String stdout, String error) {
+    private static boolean isWaiting(ScriptExecution row) {
+        return row.getStatus() == ExecutionStatus.RUNNING && Boolean.TRUE.equals(row.getWaiting());
+    }
+
+    private static void markWaiting(ScriptExecution row) {
+        if (row.getStatus() != ExecutionStatus.RUNNING) {
+            update(row, ExecutionStatus.RUNNING, null, null, null, null, null);
+        }
+        row.setWaiting(true);
+    }
+
+    private static void markFailed(ScriptExecution row, Failed failed, Instant now) {
+        ExecutionFailureReason failureReason = failureReason(failed);
+        Integer exitCode = exitCode(failed);
+        String error = error(failed);
+        update(row, ExecutionStatus.FAILED, failureReason, now, exitCode, null, error);
+    }
+
+    private static void update(ScriptExecution row, ExecutionStatus status, ExecutionFailureReason failureReason,
+                               Instant finishedAt, Integer exitCode, String stdout, String error) {
         row.setStatus(status);
+        row.setFailureReason(failureReason);
         row.setWaiting(null);
         row.setFinishedAt(finishedAt);
         row.setExitCode(exitCode);
@@ -113,6 +127,18 @@ public class PackageUpdateExecutionRecorder {
         }
         String reason = failed.getReason() == null ? FAILED_ERROR : failed.getReason().name();
         return hasText(failed.getMessage()) ? reason + ": " + failed.getMessage() : reason;
+    }
+
+    private static ExecutionFailureReason failureReason(Failed failed) {
+        if (failed == null || failed.getReason() == null) {
+            return ExecutionFailureReason.SYSTEM_SCRIPT_ERROR;
+        }
+        return switch (failed.getReason()) {
+            case TIMEOUT -> ExecutionFailureReason.AGENT_TIMED_OUT;
+            case MANAGER_MISSING, NOT_SUPPORTED -> ExecutionFailureReason.COULD_NOT_LAUNCH;
+            case SUPERSEDED -> null;
+            case MANAGER_ERROR, CLOSE_FAILED, NOT_INSTALLED, NOT_UPGRADABLE -> ExecutionFailureReason.SYSTEM_SCRIPT_ERROR;
+        };
     }
 
     private static Integer exitCode(Failed failed) {

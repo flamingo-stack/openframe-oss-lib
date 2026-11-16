@@ -102,6 +102,41 @@ class RmmResultServiceTest {
     }
 
     @Test
+    @DisplayName("processResult(ScriptResultMessage): the agent's failure_reason reaches payload.after as failureReason")
+    void processResult_scriptResult_carriesFailureReason() {
+        ScriptResultMessage message = ScriptResultMessage.builder()
+                .executionId("exec-5")
+                .exitCode(85)
+                .failureReason("NO_USER_SESSION")
+                .build();
+
+        rmmResultService.processResult(MACHINE_ID, message);
+
+        ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
+        verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), any());
+        JsonNode after = envelope.getValue().getPayload().getAfter();
+        assertThat(after.get("failureReason").asString()).isEqualTo("NO_USER_SESSION");
+    }
+
+    @Test
+    @DisplayName("processResult(CommandResultMessage): the agent's failure_reason reaches payload.after as failureReason")
+    void processResult_commandResult_carriesFailureReason() {
+        CommandResultMessage message = CommandResultMessage.builder()
+                .executionId("exec-6")
+                .exitCode(98)
+                .timedOut(true)
+                .failureReason("AGENT_TIMED_OUT")
+                .build();
+
+        rmmResultService.processResult(MACHINE_ID, message);
+
+        ArgumentCaptor<CommonDebeziumMessage> envelope = ArgumentCaptor.forClass(CommonDebeziumMessage.class);
+        verify(eventLogsPublisher).publish(eq(MACHINE_ID), envelope.capture(), any());
+        JsonNode after = envelope.getValue().getPayload().getAfter();
+        assertThat(after.get("failureReason").asString()).isEqualTo("AGENT_TIMED_OUT");
+    }
+
+    @Test
     @DisplayName("processResult(ScriptResultMessage): the agent-echoed scriptId/scheduleId reach payload.after — scriptId is what pins a shared-executionId schedule result to its row")
     void processResult_scriptResult_carriesScriptAndScheduleIds() {
         ScriptResultMessage message = ScriptResultMessage.builder()

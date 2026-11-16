@@ -7,5 +7,10 @@ public enum ExecutionSource {
     SYSTEM_BOOTSTRAP,
     PACKAGE_INSTALLATION,
     PACKAGE_UPDATE,
-    PACKAGE_AUTO_UPDATE
+    PACKAGE_AUTO_UPDATE;
+
+    public boolean isSystemOwned() {
+        return this == SYSTEM_BOOTSTRAP || this == PACKAGE_INSTALLATION
+                || this == PACKAGE_UPDATE || this == PACKAGE_AUTO_UPDATE;
+    }
 }
