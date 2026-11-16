@@ -28,6 +28,11 @@ public class WingetInstalledPackageMatcher implements PackageMatcher {
     }
 
     @Override
+    public boolean isForAdoption() {
+        return false;
+    }
+
+    @Override
     public List<PackageMatch> match(List<InstalledProgram> programs) {
         Set<String> ids = programs.stream()
                 .flatMap(program -> program.getWingetIds().stream())

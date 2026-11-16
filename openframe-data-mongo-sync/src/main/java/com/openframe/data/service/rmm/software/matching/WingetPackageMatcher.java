@@ -19,6 +19,11 @@ public class WingetPackageMatcher implements PackageMatcher {
     }
 
     @Override
+    public boolean isForAdoption() {
+        return false;
+    }
+
+    @Override
     public List<PackageMatch> match(List<InstalledProgram> programs) {
         return programPackageCorrelator.correlate(PackageManagerType.WINGET, programs);
     }
