@@ -53,14 +53,14 @@ export const EmptyInstall: Story = {
 };
 
 /**
- * Update Software as it opens while the devices cannot notify the user: Force Update, or Wait (with a deadline that
- * closes the app without warning), and no countdown.
+ * Update Software as it opens while the devices cannot notify the user: Force update right away, any deadline (which
+ * closes the app without warning), or waiting for the app to close, and no countdown.
  */
 export const EmptyUpdate: Story = {
   args: { ...EmptyInstall.args, action: 'UPDATE', showUpdateSettings: true },
 };
 
-/** With user notifications: Wait & notify, its deadline and the countdowns, on the server's defaults. */
+/** With user notifications (design 1572:2004): the deadline and the countdown before closing, on the server's defaults. */
 export const EmptyUpdateWithNotifications: Story = {
   args: { ...EmptyUpdate.args, updateUserNotifications: true },
 };
@@ -77,5 +77,18 @@ export const UpdateSettingsSeparateAutoUpdate: Story = {
         <SoftwareUpdateSettingsFields value={value} onChange={setValue} userNotifications />
       </div>
     );
+  },
+};
+
+/** Update <software> from the software's page (design 1577:3): the title's card instead of package rows, no auto-update. */
+export const UpdateOneTitle: Story = {
+  args: {
+    ...EmptyUpdateWithNotifications.args,
+    showAutoUpdate: false,
+    software: {
+      name: 'Google Chrome',
+      osTypes: ['WINDOWS'],
+      summary: <p className="text-ods-text-secondary text-h4">The host's summary card goes here.</p>,
+    },
   },
 };

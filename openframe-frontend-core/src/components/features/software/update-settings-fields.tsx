@@ -1,24 +1,14 @@
 'use client';
 
-import {
-  CheckboxBlock,
-  Label,
-  RadioGroupBlock,
-  type RadioGroupBlockOption,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../ui';
+import { CheckboxBlock, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui';
 
 /** What an update does on a device where the app is running. */
 export type SoftwareUpdateMode = 'WAIT' | 'FORCE';
 
-/** "If the app is running": one update's behaviour on a device where the app is open. */
+/** "Deadline if app is open": one update's behaviour on a device where the app is open. */
 export interface SoftwareUpdatePolicy {
   mode: SoftwareUpdateMode;
-  /** WAIT only: "Countdown after the deadline". Off, the update waits for the user however long it takes. */
+  /** WAIT only: a deadline after the first try. Off, the update waits until the app closes, however long it takes. */
   deadlineEnabled: boolean;
   /** WAIT only: seconds after the first try before the countdown starts. */
   deadlineSeconds: number;
@@ -86,21 +76,23 @@ export function defaultSoftwareUpdateSettings(userNotifications: boolean): Softw
 }
 
 /**
- * The two modes and their deadline, worded by what the device does. With user notifications the user is asked and
- * warned. Without them the agent shows nothing on the device (no prompt, no countdown on screen; there is no end-user
- * UI anywhere yet), so the copy says only what happens:
- * - Wait (WAIT, no deadline): the agent reports Waiting and installs once the app is closed.
+ * What each choice does on the device, worded for a client that cannot notify the user. The agent shows nothing on the
+ * device (no prompt, no countdown on screen; there is no end-user UI yet), so the line under the deadline says what
+ * happens:
+ * - Update when app closes (WAIT, no deadline): the agent reports Waiting and installs once the app is closed.
  * - A deadline (WAIT + `deadlineSeconds`): counted from the first time the agent finds the app running; at the deadline
  *   the backend sends the update again as FORCE (`armDeadline` / `driveDeadlineForce` in openframe-client-core), and
  *   withdraws that if the update finished first.
- * - Force (FORCE): the agent waits `countdownSeconds` (clamped to 60–1800 s), asks the app to close, stops it after a
- *   10 s grace and installs (`run.rs` / `close.rs` in openframe-client). The wait is silent, so it is not offered as a
- *   control; the copy states it, since the app is not closed at once.
+ * - Force update right away (FORCE): the agent waits `countdownSeconds` (clamped to 60–1800 s), asks the app to close,
+ *   stops it after a 10 s grace and installs (`run.rs` / `close.rs` in openframe-client). The wait is silent, so it is
+ *   not offered as a control; the line states it, since the app is not closed at once.
+ * With user notifications the countdown is a control of its own and the design has no line under the deadline.
  */
-interface ModeCopy {
-  wait: RadioGroupBlockOption;
-  force: RadioGroupBlockOption;
-  deadline: { label: string; description: string };
+function silentOutcome(policy: SoftwareUpdatePolicy): string {
+  const delay = closeDelay(policy.countdownSeconds);
+  if (policy.mode === 'FORCE') return `The app is closed without warning ${delay} later, then updated.`;
+  if (!policy.deadlineEnabled) return 'The update waits until the user closes the app.';
+  return `If the app is still open by the deadline, it is closed without warning ${delay} later, then updated.`;
 }
 
 /** "5 minutes": the silent wait before a forced close, worded as the countdown options word it. */
@@ -111,41 +103,36 @@ function closeDelay(countdownSeconds: number): string {
   return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 }
 
-const NOTIFIED_COPY: ModeCopy = {
-  wait: {
-    value: 'WAIT',
-    label: 'Wait & notify',
-    description: 'The user gets Update now or Ask Later. If they close the app, it updates then.',
-  },
-  force: {
-    value: 'FORCE',
-    label: 'Force Update',
-    description: 'The user gets a short countdown, then the app closes and updates.',
-  },
-  deadline: {
-    label: 'Countdown after the deadline',
-    description: 'If the update still isn’t installed by the deadline, the user gets a countdown and then it installs.',
-  },
-};
+/** The "Deadline if app is open" choices that are not a deadline. */
+const FORCE_NOW = 'FORCE';
+const WHEN_APP_CLOSES = 'WHEN_APP_CLOSES';
 
-function silentCopy(countdownSeconds: number): ModeCopy {
-  const delay = closeDelay(countdownSeconds);
-  return {
-    wait: { value: 'WAIT', label: 'Wait', description: 'The update waits until the user closes the app.' },
-    force: {
-      value: 'FORCE',
-      label: 'Force Update',
-      description: `The app is closed without warning ${delay} later, then updated.`,
-    },
-    deadline: {
-      label: 'Close the app after a deadline',
-      description: `If the app is still open by the deadline, it is closed without warning ${delay} later, then updated.`,
-    },
-  };
+/** "Deadline if app is open" as one value: Force now, a deadline (its seconds), or waiting for the app to close. */
+function deadlineValue(policy: SoftwareUpdatePolicy): string {
+  if (policy.mode === 'FORCE') return FORCE_NOW;
+  return policy.deadlineEnabled ? String(policy.deadlineSeconds) : WHEN_APP_CLOSES;
 }
 
+function withDeadline(policy: SoftwareUpdatePolicy, value: string): SoftwareUpdatePolicy {
+  if (value === FORCE_NOW) return { ...policy, mode: 'FORCE', deadlineEnabled: false };
+  if (value === WHEN_APP_CLOSES) return { ...policy, mode: 'WAIT', deadlineEnabled: false };
+  return { ...policy, mode: 'WAIT', deadlineEnabled: true, deadlineSeconds: Number(value) };
+}
+
+/** The deadlines in the order the design lists them (1572:3193): right away, after the first try, the app closing. */
+const DEADLINE_CHOICES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: FORCE_NOW, label: 'Force update right away' },
+  ...SOFTWARE_UPDATE_DEADLINE_OPTIONS.map(option => ({ value: String(option.seconds), label: option.label })),
+  { value: WHEN_APP_CLOSES, label: 'Update when app closes' },
+];
+
+const COUNTDOWN_CHOICES = SOFTWARE_UPDATE_COUNTDOWN_OPTIONS.map(option => ({
+  value: String(option.seconds),
+  label: option.label,
+}));
+
 const SAME_SETTINGS_DESCRIPTION: Record<SoftwareUpdateMode, string> = {
-  WAIT: 'Auto-updates follow "If the app is running" above. Uncheck to set them separately.',
+  WAIT: 'Auto-updates follow "Deadline if app is open" above. Uncheck to set them separately.',
   FORCE: 'Later releases will also be force-updated.',
 };
 
@@ -160,27 +147,31 @@ const AUTO_UPDATE_DESCRIPTION =
 
 const groupLabelClass = 'text-h5 text-ods-text-secondary';
 
-function SecondsSelect({
+function SettingSelect({
+  id,
   label,
   value,
   options,
   onChange,
 }: {
+  id: string;
   label: string;
-  value: number;
-  options: ReadonlyArray<{ seconds: number; label: string }>;
-  onChange: (seconds: number) => void;
+  value: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  onChange: (value: string) => void;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-      <Label className="text-h4">{label}</Label>
-      <Select value={String(value)} onValueChange={next => onChange(Number(next))}>
-        <SelectTrigger aria-label={label}>
+      <Label htmlFor={id} className="text-h4">
+        {label}
+      </Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={id} aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {options.map(option => (
-            <SelectItem key={option.seconds} value={String(option.seconds)}>
+            <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
           ))}
@@ -190,73 +181,52 @@ function SecondsSelect({
   );
 }
 
-/** "If the app is running" with its deadline and countdown. */
-function UpdatePolicyFields({
-  name,
-  label,
-  policy,
-  userNotifications,
-  onChange,
-}: {
-  /** The radio group's name: two policies on one page must not share it. */
+export interface SoftwareUpdatePolicyFieldsProps {
+  /** Prefixes the fields' ids: two policies on one page must not share them. */
   name: string;
-  label: string;
   policy: SoftwareUpdatePolicy;
-  /** Off, the choices say what the device does with nobody told, and there is no countdown to set. */
-  userNotifications: boolean;
+  /**
+   * The devices can notify the user: the countdown before closing is a choice of its own. Off, there is no countdown to
+   * set (the user would not see it) and a line under the deadline says what the device does with nobody told.
+   */
+  userNotifications?: boolean;
   onChange: (policy: SoftwareUpdatePolicy) => void;
-}) {
-  const copy = userNotifications ? NOTIFIED_COPY : silentCopy(policy.countdownSeconds);
-  const waits = policy.mode === 'WAIT';
-  const deadline = waits && policy.deadlineEnabled;
-  const countdown = userNotifications && (
-    <SecondsSelect
-      label="Countdown"
-      value={policy.countdownSeconds}
-      options={SOFTWARE_UPDATE_COUNTDOWN_OPTIONS}
-      onChange={countdownSeconds => onChange({ ...policy, countdownSeconds })}
-    />
-  );
+}
+
+/**
+ * "Deadline if app is open" and "Countdown before closing" (design 1572:2004, its dropdowns 1572:3193 / 1572:4431):
+ * what one update does on a device where the app is running. Also the whole of the Auto-update settings page's update
+ * rules (1569:1890).
+ */
+export function SoftwareUpdatePolicyFields({
+  name,
+  policy,
+  userNotifications = false,
+  onChange,
+}: SoftwareUpdatePolicyFieldsProps) {
+  // Waiting for the app to close never closes it, so there is nothing to count down to.
+  const closesApp = policy.mode === 'FORCE' || policy.deadlineEnabled;
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-m)]">
-      <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-        <span className={groupLabelClass}>{label}</span>
-        <RadioGroupBlock
-          name={name}
-          aria-label={label}
-          variant="grouped"
-          value={policy.mode}
-          onValueChange={mode => onChange({ ...policy, mode: mode as SoftwareUpdateMode })}
-          options={[copy.wait, copy.force]}
-          itemClassName="py-[var(--spacing-system-sf)]"
+    <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
+      <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3 content-md:items-start">
+        <SettingSelect
+          id={`${name}-deadline`}
+          label="Deadline if app is open"
+          value={deadlineValue(policy)}
+          options={DEADLINE_CHOICES}
+          onChange={value => onChange(withDeadline(policy, value))}
         />
-      </div>
-      {waits ? (
-        <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
-          <CheckboxBlock
-            id={`${name}-deadline`}
-            checked={policy.deadlineEnabled}
-            onCheckedChange={deadlineEnabled => onChange({ ...policy, deadlineEnabled })}
-            label={copy.deadline.label}
-            description={copy.deadline.description}
+        {userNotifications && closesApp && (
+          <SettingSelect
+            id={`${name}-countdown`}
+            label="Countdown before closing"
+            value={String(policy.countdownSeconds)}
+            options={COUNTDOWN_CHOICES}
+            onChange={value => onChange({ ...policy, countdownSeconds: Number(value) })}
           />
-          {deadline && (
-            <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3 content-md:items-start">
-              <SecondsSelect
-                label="Deadline"
-                value={policy.deadlineSeconds}
-                options={SOFTWARE_UPDATE_DEADLINE_OPTIONS}
-                onChange={deadlineSeconds => onChange({ ...policy, deadlineSeconds })}
-              />
-              {countdown}
-            </div>
-          )}
-        </div>
-      ) : (
-        userNotifications && (
-          <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3">{countdown}</div>
-        )
-      )}
+        )}
+      </div>
+      {!userNotifications && <p className="text-ods-text-secondary text-h6">{silentOutcome(policy)}</p>}
     </div>
   );
 }
@@ -265,71 +235,73 @@ export interface SoftwareUpdateSettingsFieldsProps {
   value: SoftwareUpdateSettingsValues;
   onChange: (value: SoftwareUpdateSettingsValues) => void;
   /**
-   * The devices can notify the user: Wait & notify, its countdown after the deadline and the countdowns. Default false,
-   * as today, when the client has no notifications: Wait (until the user closes the app, or a deadline closes it without
-   * warning) or Force Update, and no countdown.
+   * The devices can notify the user: the countdown before closing is offered. Default false, as today, when the client
+   * has no notifications: the deadline alone, with a line saying the app is closed without warning.
    */
   userNotifications?: boolean;
+  /**
+   * "Keep it auto-updated" under the update rules. Default true; a host that keeps auto-update on a page of its own
+   * (the software's Auto-update settings, design 1569:1890) passes false, and the form then submits it off.
+   */
+  showAutoUpdate?: boolean;
 }
 
 /**
- * Update Software's "Update Settings" (design 988:21462, the separate auto-update
- * rules 1034:8173): what happens on a device where the app is running, and
- * whether later releases are installed the same way.
+ * Update Software's update settings (design 1572:2004; the separate auto-update rules 1034:8173): what happens on a
+ * device where the app is running, under the timing, and whether later releases are installed the same way. No heading
+ * of their own: the deadline and the countdown read as part of when the update runs.
  */
 export function SoftwareUpdateSettingsFields({
   value,
   onChange,
   userNotifications = false,
+  showAutoUpdate = true,
 }: SoftwareUpdateSettingsFieldsProps) {
   return (
-    <section aria-labelledby="software-update-settings" className="flex flex-col gap-[var(--spacing-system-l)]">
-      <h2 id="software-update-settings" className="pt-[var(--spacing-system-l)] text-ods-text-primary text-h2">
-        Update Settings
-      </h2>
-
-      <UpdatePolicyFields
+    <section aria-label="Update Settings" className="flex flex-col gap-[var(--spacing-system-l)]">
+      <SoftwareUpdatePolicyFields
         name="updatePolicy"
-        label="If the app is running"
         policy={value.policy}
         userNotifications={userNotifications}
         onChange={policy => onChange({ ...value, policy })}
       />
 
-      <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-        <span className={groupLabelClass}>Auto-update</span>
-        <div className="flex flex-col gap-[var(--spacing-system-sf)]">
-          <CheckboxBlock
-            id="software-auto-update"
-            checked={value.autoUpdate}
-            onCheckedChange={autoUpdate => onChange({ ...value, autoUpdate })}
-            label="Keep it auto-updated"
-            description={AUTO_UPDATE_DESCRIPTION}
-          />
-          {value.autoUpdate && (
-            <>
-              <CheckboxBlock
-                id="software-auto-update-same"
-                checked={value.sameForAutoUpdate}
-                onCheckedChange={sameForAutoUpdate => onChange({ ...value, sameForAutoUpdate })}
-                label="Same settings for auto-update"
-                description={SAME_SETTINGS_DESCRIPTION[value.policy.mode]}
-              />
-              {!value.sameForAutoUpdate && (
-                <div className="rounded-[6px] border border-ods-border p-[var(--spacing-system-m)]">
-                  <UpdatePolicyFields
-                    name="autoUpdatePolicy"
-                    label="For auto-updates"
-                    policy={value.autoUpdatePolicy}
-                    userNotifications={userNotifications}
-                    onChange={autoUpdatePolicy => onChange({ ...value, autoUpdatePolicy })}
-                  />
-                </div>
-              )}
-            </>
-          )}
+      {showAutoUpdate && (
+        <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+          <span className={groupLabelClass}>Auto-update</span>
+          <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+            <CheckboxBlock
+              id="software-auto-update"
+              checked={value.autoUpdate}
+              onCheckedChange={autoUpdate => onChange({ ...value, autoUpdate })}
+              label="Keep it auto-updated"
+              description={AUTO_UPDATE_DESCRIPTION}
+            />
+            {value.autoUpdate && (
+              <>
+                <CheckboxBlock
+                  id="software-auto-update-same"
+                  checked={value.sameForAutoUpdate}
+                  onCheckedChange={sameForAutoUpdate => onChange({ ...value, sameForAutoUpdate })}
+                  label="Same settings for auto-update"
+                  description={SAME_SETTINGS_DESCRIPTION[value.policy.mode]}
+                />
+                {!value.sameForAutoUpdate && (
+                  <div className="flex flex-col gap-[var(--spacing-system-xsf)] rounded-[6px] border border-ods-border p-[var(--spacing-system-m)]">
+                    <span className={groupLabelClass}>For auto-updates</span>
+                    <SoftwareUpdatePolicyFields
+                      name="autoUpdatePolicy"
+                      policy={value.autoUpdatePolicy}
+                      userNotifications={userNotifications}
+                      onChange={autoUpdatePolicy => onChange({ ...value, autoUpdatePolicy })}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* No note that apps installed by hand get reinstalled on the first update: the agent does not do that. A copy no
           package manager installed is left alone (brew probes it as not installed, winget as "not installed from a

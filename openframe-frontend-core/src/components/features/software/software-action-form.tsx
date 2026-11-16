@@ -29,6 +29,20 @@ export interface SoftwareActionFormValues<TRef extends string = string> {
   updateSettings?: SoftwareUpdateSettingsValues;
 }
 
+/**
+ * One software title the form runs on, chosen before the form opens (Update <software> from the software's page,
+ * design 1577:3): no package rows, the title's own card in their place, and the server picks the package that manages
+ * the title on each device.
+ */
+export interface SoftwareActionTarget {
+  /** The title, as the page heading names it ("Update Google Chrome"). */
+  name: string;
+  /** The systems it is on: the picker's frame, as the chosen packages' are for a form with rows. */
+  osTypes: readonly string[];
+  /** What is drawn where the rows would be: the title's summary card. */
+  summary?: ReactNode;
+}
+
 /** What the device picker slot is told: which devices the chosen packages can run on. */
 export interface SoftwareDeviceScope {
   /** The OS of every chosen catalog, sorted, e.g. `['MAC_OS', 'WINDOWS']`. */
@@ -57,7 +71,7 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
   timing: SoftwareScheduleTiming<TRef>;
   /** What the form opens with. `timeReference` is required: the form cannot guess the host's default. */
   initialValues: Partial<SoftwareActionFormValues<TRef>> & { timeReference: TRef };
-  /** The "Software Name" field of each row. */
+  /** The "Software Name" field of each row. Not called for a form on one title (`software`). */
   renderPackageSearch: (field: PackageSearchSlotProps) => ReactNode;
   /** "Device Selection": the host's picker for the given scope. */
   renderDevicePicker: (scope: SoftwareDeviceScope) => ReactNode;
@@ -80,6 +94,13 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
    * no countdown.
    */
   updateUserNotifications?: boolean;
+  /**
+   * UPDATE only: "Keep it auto-updated" in the update settings. Default true; a host that keeps auto-update on a page
+   * of its own passes false, and the form submits it off.
+   */
+  showAutoUpdate?: boolean;
+  /** Run on this one title instead of packages picked in rows (`rows` is submitted empty). */
+  software?: SoftwareActionTarget;
   /** The "Device Selection" heading over the picker. Default true; a host that titles the picker itself passes false. */
   showDeviceHeading?: boolean;
   className?: string;
@@ -111,6 +132,8 @@ export function SoftwareActionForm<TRef extends string = string>({
   runModeLayout = 'stacked',
   showUpdateSettings = false,
   updateUserNotifications = false,
+  showAutoUpdate = true,
+  software,
   showDeviceHeading = true,
   className = 'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
 }: SoftwareActionFormProps<TRef>) {
@@ -126,8 +149,11 @@ export function SoftwareActionForm<TRef extends string = string>({
   );
   const withUpdateSettings = action === 'UPDATE' && showUpdateSettings;
 
-  // The picker's frame: devices on the OS the chosen packages install on.
-  const osTypesKey = [...new Set(rows.map(row => PACKAGE_MANAGER_OS[row.packageManager]))].sort().join(',');
+  // The picker's frame: devices on the OS the chosen packages install on, or the title is on.
+  const osTypes = software ? software.osTypes : rows.map(row => PACKAGE_MANAGER_OS[row.packageManager]);
+  const osTypesKey = [...new Set(osTypes)].sort().join(',');
+  // Hidden, auto-update is submitted off: nothing on the form asked for it.
+  const submittedUpdateSettings = showAutoUpdate ? updateSettings : { ...updateSettings, autoUpdate: false };
 
   const actions: PageActionButton[] = [
     ...(onBack ? [{ label: 'Cancel', onClick: onBack, variant: 'outline' as const, showOnlyMobile: true }] : []),
@@ -136,12 +162,12 @@ export function SoftwareActionForm<TRef extends string = string>({
       variant: 'accent',
       onClick: () =>
         onSubmit({
-          rows,
+          rows: software ? [] : rows,
           mode,
           date,
           time,
           timeReference,
-          updateSettings: withUpdateSettings ? updateSettings : undefined,
+          updateSettings: withUpdateSettings ? submittedUpdateSettings : undefined,
         }),
       disabled: submitDisabled,
       loading: submitting,
@@ -179,25 +205,27 @@ export function SoftwareActionForm<TRef extends string = string>({
 
   return (
     <PageLayout
-      title={copy.formTitle}
+      title={software ? `${copy.verb} ${software.name}` : copy.formTitle}
       backButton={onBack ? { label: 'Back', onClick: onBack } : undefined}
       actions={actions}
       actionsVariant="primary-buttons"
       showHeader={showHeader}
       className={className}
     >
-      {rows.map(row => (
-        <SoftwareRowFields
-          key={row.key}
-          row={row}
-          removable={rows.length > 1}
-          onChange={updateRow}
-          onRemove={() => removeRow(row.key)}
-          renderPackageSearch={renderPackageSearch}
-        />
-      ))}
+      {software
+        ? software.summary
+        : rows.map(row => (
+            <SoftwareRowFields
+              key={row.key}
+              row={row}
+              removable={rows.length > 1}
+              onChange={updateRow}
+              onRemove={() => removeRow(row.key)}
+              renderPackageSearch={renderPackageSearch}
+            />
+          ))}
 
-      {addRows && (
+      {addRows && !software && (
         <Button
           type="button"
           variant="outline"
@@ -227,6 +255,7 @@ export function SoftwareActionForm<TRef extends string = string>({
           value={updateSettings}
           onChange={setUpdateSettings}
           userNotifications={updateUserNotifications}
+          showAutoUpdate={showAutoUpdate}
         />
       )}
 
