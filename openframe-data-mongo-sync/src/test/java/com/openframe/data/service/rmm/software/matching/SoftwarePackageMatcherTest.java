@@ -1,6 +1,7 @@
 package com.openframe.data.service.rmm.software.matching;
 
 import com.openframe.data.document.rmm.software.FleetSource;
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageMatchState;
@@ -33,6 +34,7 @@ class SoftwarePackageMatcherTest {
     @Mock private PackageMatcher wingetMatcher;
     @Mock private PackageMatcher chocoMatcher;
     @Mock private PackageCatalogRepository catalogRepository;
+    @Mock private BrewCaskIndexCache brewCaskIndexCache;
 
     @Test
     void match_windowsPrograms_matchedByTheWingetMatcher() {
@@ -172,6 +174,28 @@ class SoftwarePackageMatcherTest {
         // verifications
         assertThat(matches).containsEntry(sevenZip, match);
         verify(chocoMatcher, never()).match(anyList());
+    }
+
+    @Test
+    void matchForAdoption_macApp_inTheAdoptionResultAndNotInTheManagingOne() {
+        // setup
+        PackageCatalogEntry slackCask = PackageCatalogEntry.builder().manager(PackageManagerType.BREW)
+                .brewType(BrewPackageType.CASK).packageId("slack").name("Slack").aliases(List.of())
+                .appNames(List.of("slack")).weakAppNames(List.of()).bundleIds(List.of()).bundleIdPrefixes(List.of())
+                .build();
+        BrewCaskIndex brewCaskIndex = new BrewCaskIndex(List.of(slackCask));
+        when(brewCaskIndexCache.getBrewCaskIndex()).thenReturn(brewCaskIndex);
+        BrewAppMatcher brewAppMatcher = new BrewAppMatcher(brewCaskIndexCache);
+        SoftwarePackageMatcher softwarePackageMatcher = matcher(brewAppMatcher);
+        InstalledProgram slack = program("Slack", FleetSource.APPS);
+
+        // execution
+        Map<InstalledProgram, PackageMatch> adoptionMatches = softwarePackageMatcher.matchForAdoption(List.of(slack));
+        Map<InstalledProgram, PackageMatch> matches = softwarePackageMatcher.match(List.of(slack));
+
+        // verifications
+        assertThat(adoptionMatches).extractingByKey(slack).extracting(PackageMatch::getEntry).isSameAs(slackCask);
+        assertThat(matches).isEmpty();
     }
 
     @Test

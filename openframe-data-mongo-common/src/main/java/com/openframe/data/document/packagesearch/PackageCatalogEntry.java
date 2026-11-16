@@ -53,7 +53,7 @@ public class PackageCatalogEntry {
     private List<String> packageFamilyNames;
     private List<String> normalizedNames;
     private List<String> normalizedPublishers;
-    // brew cask: lower-case keys a Mac app is matched by; null on a cask that installs no app or pkg
+    // brew cask: lower-case keys a Mac app is matched by; null, not empty, marks a cask that installs no app or pkg
     private List<String> appNames;
     private List<String> weakAppNames;
     private List<String> bundleIds;

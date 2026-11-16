@@ -575,6 +575,58 @@ class SoftwareCatalogStatusTest {
     }
 
     @Test
+    void apply_macAppWithACaskToAdoptInto_needsAdoptionWithTheCask() {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "4.40");
+        PackageCatalogEntry slackCask = brewCask("slack", "4.41");
+        stubAdoptionMatch(slack, PackageMatch.of(slackCask));
+        when(packageManagerAvailability.isEnabled(PackageManagerType.BREW)).thenReturn(true);
+
+        // execution
+        status().apply(List.of(slack));
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, slackCask);
+    }
+
+    @Test
+    void applyOnDevice_macAppOnADeviceThatCanRunBrew_needsAdoptionWithTheCask() {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "4.40");
+        PackageCatalogEntry slackCask = brewCask("slack", "4.41");
+        Machine mac = stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.MISSING));
+        stubAdoptionMatch(slack, PackageMatch.of(slackCask));
+        when(packageManagerAvailability.isAdoptableOn(mac, PackageManagerType.BREW)).thenReturn(true);
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(slack));
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getManagingPackage,
+                        SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, slackCask);
+    }
+
+    private static SoftwareResponse macApp(String name, String currentVersion) {
+        SoftwareResponse app = row(name, SoftwareSource.UNMANAGED, currentVersion, 0);
+        app.setFleetSource(FleetSource.APPS);
+        return app;
+    }
+
+    private static PackageCatalogEntry brewCask(String token, String version) {
+        return PackageCatalogEntry.builder()
+                .manager(PackageManagerType.BREW)
+                .brewType(BrewPackageType.CASK)
+                .packageId(token)
+                .version(version)
+                .build();
+    }
+
+    @Test
     void programOf_macApp_carriesItsBundleIdAppFileNamesAndTopLevelFlag() {
         // setup
         SoftwareResponse slack = row("Slack", SoftwareSource.UNMANAGED, "4.4", 0);

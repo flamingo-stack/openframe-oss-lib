@@ -1,5 +1,6 @@
 package com.openframe.data.repository.packagesearch;
 
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -14,6 +15,8 @@ public interface PackageCatalogRepository extends MongoRepository<PackageCatalog
     List<PackageCatalogEntry> findByManagerAndPackageIdIgnoreCase(PackageManagerType manager, String packageId);
 
     List<PackageCatalogEntry> findByManagerAndPackageIdIn(PackageManagerType manager, Collection<String> packageIds);
+
+    List<PackageCatalogEntry> findByManagerAndBrewType(PackageManagerType manager, BrewPackageType brewType);
 
     @Query("{ 'manager': ?0, '$or': [ { 'productCodes': { '$in': ?1 } }, { 'upgradeCodes': { '$in': ?2 } },"
             + " { 'packageFamilyNames': { '$in': ?3 } }, { 'normalizedNames': { '$in': ?4 } } ] }")
