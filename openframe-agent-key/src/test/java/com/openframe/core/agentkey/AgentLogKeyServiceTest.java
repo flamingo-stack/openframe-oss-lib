@@ -47,7 +47,7 @@ class AgentLogKeyServiceTest {
         when(logKeyRepository.findFirstByOrderByCreatedAtDesc()).thenReturn(Optional.of(logKey));
         when(encryptionService.decrypt(ENCRYPTED_KEY)).thenReturn(PLAIN_KEY);
 
-        assertThat(service.getLogKey()).isEqualTo(new AgentLogKeyResponse(PLAIN_KEY, CREATED_AT));
+        assertThat(service.getLogKey()).isEqualTo(new AgentKeyResponse(PLAIN_KEY, CREATED_AT));
     }
 
     @Test

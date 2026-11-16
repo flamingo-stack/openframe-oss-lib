@@ -1,6 +1,6 @@
 package com.openframe.api.controller;
 
-import com.openframe.core.agentkey.AgentLogKeyResponse;
+import com.openframe.core.agentkey.AgentKeyResponse;
 import com.openframe.core.agentkey.AgentLogKeyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +15,7 @@ public class AgentLogKeyController {
     private final AgentLogKeyService logKeyService;
 
     @GetMapping
-    public AgentLogKeyResponse getLogKey() {
+    public AgentKeyResponse getLogKey() {
         return logKeyService.getLogKey();
     }
 
