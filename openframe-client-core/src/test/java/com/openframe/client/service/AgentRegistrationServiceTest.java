@@ -34,6 +34,7 @@ import java.util.List;
 import java.time.Instant;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -391,6 +392,57 @@ class AgentRegistrationServiceTest {
         request.setOsType("WINDOWS");   // agent contract: exact OsType enum name
         request.setAgentVersion("1.0.0");
         return request;
+    }
+
+    @Test
+    void registerAgent_WithAgentVersion_StoresItsComparableKey() {
+        // setup
+        stubNewMachineRegistration();
+        request.setAgentVersion("1.6.2");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getAgentVersion, Machine::getAgentVersionKey)
+                .containsExactly("1.6.2", 1_000_006_000_002L);
+    }
+
+    @Test
+    void registerAgent_WithUnparseableAgentVersion_StoresNoKey() {
+        // setup
+        stubNewMachineRegistration();
+        request.setAgentVersion("dev-build");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getAgentVersion, Machine::getAgentVersionKey)
+                .containsExactly("dev-build", null);
+    }
+
+    @Test
+    void reinstall_WithNewAgentVersion_OverwritesTheStoredKey() {
+        // setup
+        Machine existingMachine = new Machine();
+        existingMachine.setMachineId(MACHINE_ID);
+        existingMachine.setAgentVersion("1.5.9");
+        existingMachine.setAgentVersionKey(1_000_005_000_009L);
+        stubReinstallOf(existingMachine);
+        request.setAgentVersion("1.6.0");
+
+        // execution
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertThat(writtenOver(existingMachine))
+                .extracting(Machine::getAgentVersion, Machine::getAgentVersionKey)
+                .containsExactly("1.6.0", 1_000_006_000_000L);
     }
 
     @Test

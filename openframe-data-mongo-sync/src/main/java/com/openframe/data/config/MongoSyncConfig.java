@@ -4,6 +4,7 @@ import com.openframe.data.repository.TenantAwareRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
@@ -13,5 +14,6 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
     basePackages = "com.openframe.data.repository",
     excludeFilters = @ComponentScan.Filter(type = FilterType.ANNOTATION, classes = TenantAwareRepository.class)
 )
+@Import(ClientVersionThreshold.class)
 public class MongoSyncConfig {
 }
