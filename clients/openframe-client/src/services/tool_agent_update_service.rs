@@ -214,8 +214,14 @@ impl ToolAgentUpdateService {
             }
         }
 
-        // Windows GUI apps aren't run-manager-supervised; relaunch once after a successful update (no-op otherwise).
-        if result.is_ok() && was_gui_before_update {
+        // Windows GUI apps aren't run-manager-supervised; relaunch once after the update, after a failed one only if it isn't running (no-op otherwise).
+        if was_gui_before_update
+            && (result.is_ok()
+                || !self
+                    .tool_kill_service
+                    .is_installed_tool_running(&installed_tool)
+                    .await)
+        {
             self.relaunch_windows_gui_app(&installed_tool);
         }
 
