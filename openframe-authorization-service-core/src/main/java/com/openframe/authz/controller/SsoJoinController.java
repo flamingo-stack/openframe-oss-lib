@@ -9,6 +9,7 @@ import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.InvitationRegistrationService;
+import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.service.validation.InvitationValidator;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.util.SsoAuthentication;
@@ -63,6 +64,7 @@ public class SsoJoinController {
     private final TenantService tenantService;
     private final SessionPrincipalBinder sessionPrincipalBinder;
     private final AppleWebTokenCapture appleWebTokenCapture;
+    private final UserService userService;
 
     public record JoinPendingResponse(String email,
                                       String firstName,
@@ -125,6 +127,8 @@ public class SsoJoinController {
                     payload.invitationId(), names[0], names[1], resolvePictureUrl(user),
                     Boolean.TRUE.equals(payload.switchTenant()));
             AuthUser created = invitationRegistrationService.registerByInvitation(req);
+            // The account exists only now, after AuthSuccessHandler's lastLogin write found nothing.
+            userService.touchLastLogin(created.getEmail(), created.getTenantId());
             sessionPrincipalBinder.bind(authentication, created, request, response);
             appleWebTokenCapture.captureIfApple(request, authentication);
             clearCookie(response, OF_SSO_INVITE);
@@ -138,6 +142,7 @@ public class SsoJoinController {
                     .orElseThrow(this::expired);
             AuthUser provisioned = ssoOidcUserService.autoProvisionByGlobalDomain(provider, user)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "no_auto_provision_tenant"));
+            userService.touchLastLogin(provisioned.getEmail(), provisioned.getTenantId());
             appleWebTokenCapture.captureIfApple(request, authentication);
             clearCookie(response, OF_SSO_LOGIN);
             continueInto(response, provisioned.getTenantId(), payload.redirectTo(), payload.authMobile());

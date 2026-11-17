@@ -140,6 +140,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
         // active). A link written before these checks would outlive a REJECTED login and later
         // count as proof of trust.
         ssoIdentityService.link(provider, user.getClaims(), authUser);
+        // AuthSuccessHandler ran under the onboarding pseudo-tenant, so its lastLogin write matched no user.
+        userService.touchLastLogin(authUser.getEmail(), tenantId);
         // A link-first match may be an account whose email differs from the one the IdP asserts now.
         sessionPrincipalBinder.bind(authentication, authUser, request, response);
 

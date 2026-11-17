@@ -7,6 +7,7 @@ import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.service.user.InvitationRegistrationService;
+import com.openframe.authz.service.user.UserService;
 import com.openframe.core.exception.AuthFlowException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +29,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
     private final SsoCookieCodec ssoCookieCodec;
     private final InvitationRegistrationService invitationRegistrationService;
     private final SessionPrincipalBinder sessionPrincipalBinder;
+    private final UserService userService;
 
     /**
      * Frontend "one last step" consent page. When set, a NEW member joining via SSO is sent here
@@ -76,6 +78,8 @@ public class InviteSsoHandler implements SsoFlowHandler {
 
         var userCreated = invitationRegistrationService.registerByInvitation(req);
         String targetTenantId = userCreated.getTenantId();
+        // The account exists only now, after AuthSuccessHandler's lastLogin write found nothing.
+        userService.touchLastLogin(userCreated.getEmail(), targetTenantId);
         // Sign in as the invited account, which may differ from the IdP email that accepted it.
         sessionPrincipalBinder.bind(authentication, userCreated, request, response);
 
