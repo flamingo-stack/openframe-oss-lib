@@ -46,12 +46,16 @@ class DeviceSoftwareHandlerTest {
     @InjectMocks private DeviceSoftwareHandler handler;
 
     private DeserializedDebeziumMessage msg(String op, JsonNode before, JsonNode after) {
+        return msgAt(op, before, after, COMMIT_TS);
+    }
+
+    private DeserializedDebeziumMessage msgAt(String op, JsonNode before, JsonNode after, long commitTs) {
         DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setOperation(op);
         payload.setBefore(before);
         payload.setAfter(after);
         DebeziumMessage.Payload.Source source = new DebeziumMessage.Payload.Source();
-        source.setTimestamp(COMMIT_TS);
+        source.setTimestamp(commitTs);
         payload.setSource(source);
         DeserializedDebeziumMessage m = new DeserializedDebeziumMessage();
         m.setPayload(payload);
@@ -261,11 +265,90 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
 
         handler.handle(msg("r", null, row().put("host_id", 100)), null);
-        handler.handle(msg("u", row().put("host_id", 100), row().put("host_id", 100)), null);
-        handler.handle(msg("c", null, row().put("host_id", 100)), null);
-        handler.handle(msg("d", row().put("host_id", 100), null), null);
+        handler.handle(msgAt("u", row().put("host_id", 100), row().put("host_id", 100), COMMIT_TS + 1), null);
+        handler.handle(msgAt("c", null, row().put("host_id", 100), COMMIT_TS + 2), null);
+        handler.handle(msgAt("d", row().put("host_id", 100), null, COMMIT_TS + 3), null);
 
-        verify(fleetHostSoftwareCache, times(4)).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS + 1);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS + 2);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS + 3);
+    }
+
+    @Test
+    void handle_changeEventsOfOneCommit_reconcileTheHostOnce() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msg("c", null, row().put("host_id", 100).put("software_id", 1)), null);
+        handler.handle(msg("u", row().put("host_id", 100).put("software_id", 2), row().put("host_id", 100).put("software_id", 2)), null);
+        handler.handle(msg("d", row().put("host_id", 100).put("software_id", 3), null), null);
+        handler.handle(msg("c", null, row().put("host_id", 100).put("software_id", 4)), null);
+
+        verify(fleetHostResolver, times(1)).resolve("100");
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(deviceSoftwareRepository, times(1)).findByTenantIdAndMachineId("t1", "m1");
+        verify(projectionTrigger, times(1)).titlesChanged(eq("t1"), any());
+        verify(projectionTrigger, times(1)).cvesChanged(eq("t1"), any());
+    }
+
+    @Test
+    void handle_oneCommitOnTwoHosts_reconcilesEachHost() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.isResolvable("101")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostResolver.resolve("101")).thenReturn(new FleetHostRef("t1", "m2"));
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+        handler.handle(msg("c", null, row().put("host_id", 101)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 101L, COMMIT_TS);
+    }
+
+    @Test
+    void handle_changeEventThatFailed_isReconciledByTheNextRowOfTheCommit() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS))
+                .thenThrow(new IllegalStateException("Fleet 503"))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> handler.handle(msg("c", null, row().put("host_id", 100)), null))
+                .isInstanceOf(IllegalStateException.class);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        verify(fleetHostSoftwareCache, times(2)).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(projectionTrigger, times(1)).titlesChanged(eq("t1"), any());
+    }
+
+    @Test
+    void handle_changeEventOfAnUnresolvedHost_isResolvedByTheNextRowOfTheCommit() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false, true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        verify(fleetHostResolver, times(2)).isResolvable("100");
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, COMMIT_TS);
+    }
+
+    @Test
+    void handle_changeEventsWithoutACommitTime_alwaysReconcile() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        DeserializedDebeziumMessage first = msg("c", null, row().put("host_id", 100));
+        first.getPayload().setSource(null);
+        DeserializedDebeziumMessage second = msg("c", null, row().put("host_id", 100));
+        second.getPayload().setSource(null);
+
+        handler.handle(first, null);
+        handler.handle(second, null);
+
+        verify(fleetHostSoftwareCache, times(2)).hostSoftware("t1", 100L, 0L);
     }
 
     @Test

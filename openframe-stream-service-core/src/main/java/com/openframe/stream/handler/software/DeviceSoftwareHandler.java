@@ -41,6 +41,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
 
     static final Duration SNAPSHOT_HOST_WINDOW = Duration.ofHours(24);
     static final Duration SNAPSHOT_UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
+    static final Duration RECONCILED_COMMIT_WINDOW = Duration.ofHours(1);
+    static final long RECONCILED_COMMIT_CAPACITY = 100_000;
 
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -52,6 +54,10 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             .build();
     private final Cache<Long, Boolean> snapshotUnresolvedHosts = Caffeine.newBuilder()
             .expireAfterWrite(SNAPSHOT_UNRESOLVED_HOST_WINDOW)
+            .build();
+    private final Cache<HostCommit, Boolean> reconciledCommits = Caffeine.newBuilder()
+            .expireAfterWrite(RECONCILED_COMMIT_WINDOW)
+            .maximumSize(RECONCILED_COMMIT_CAPACITY)
             .build();
 
     @Override
@@ -83,6 +89,11 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
                 || snapshotUnresolvedHosts.getIfPresent(hostId) != null)) {
             return;
         }
+        long commitTs = commitTimestamp(payload);
+        HostCommit hostCommit = snapshotRead || commitTs == 0L ? null : new HostCommit(hostId, commitTs);
+        if (hostCommit != null && reconciledCommits.getIfPresent(hostCommit) != null) {
+            return;
+        }
         String fleetHostId = String.valueOf(hostId);
         if (!fleetHostResolver.isResolvable(fleetHostId)) {
             if (snapshotRead) {
@@ -92,11 +103,16 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
-        long commitTs = commitTimestamp(payload);
         reconcile(host, hostId, commitTs);
         if (snapshotRead) {
             snapshotReconciledHosts.put(hostId, Boolean.TRUE);
         }
+        if (hostCommit != null) {
+            reconciledCommits.put(hostCommit, Boolean.TRUE);
+        }
+    }
+
+    private record HostCommit(long hostId, long commitTs) {
     }
 
     // the source commit time: every row event of one Fleet commit shares it, so a burst re-reads Fleet once,
