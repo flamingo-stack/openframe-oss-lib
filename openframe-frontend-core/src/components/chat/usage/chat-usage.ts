@@ -66,8 +66,9 @@ export function formatTokensFull(count: number): string {
   return Math.round(count).toLocaleString('en-US');
 }
 
+/** One decimal at most, with thousands separators ("100,000", "3.2"). */
 function trimDecimal(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return value.toLocaleString('en-US', { maximumFractionDigits: 1 });
 }
 
 /**
@@ -81,7 +82,7 @@ export function formatTokensShort(count: number): string {
   return String(n);
 }
 
-/** `38.4` → `"$38.40"`. */
+/** `38.4` → `"$38.40"`, `1000000` → `"$1,000,000.00"`. */
 export function formatUsd(amount: number): string {
-  return `$${Math.max(0, amount).toFixed(2)}`;
+  return `$${Math.max(0, amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

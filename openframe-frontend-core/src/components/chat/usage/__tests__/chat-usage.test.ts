@@ -68,10 +68,12 @@ describe('token formats', () => {
     expect(formatTokensShort(30_000)).toBe('30K');
     expect(formatTokensShort(800_000)).toBe('800K');
     expect(formatTokensShort(0)).toBe('0');
+    expect(formatTokensShort(100_000_000_000)).toBe('100,000M');
   });
 
-  it('writes dollars with two decimals', () => {
+  it('writes dollars with two decimals and separators', () => {
     expect(formatUsd(38.4)).toBe('$38.40');
     expect(formatUsd(0)).toBe('$0.00');
+    expect(formatUsd(1_000_000)).toBe('$1,000,000.00');
   });
 });
