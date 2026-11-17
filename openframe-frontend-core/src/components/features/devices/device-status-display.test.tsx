@@ -189,3 +189,39 @@ describe('useTagFilterModal in the legacy display', () => {
     expect(setParams.mock.calls[0][0]).toMatchObject({ statuses: [], connectivity: [] });
   });
 });
+
+describe('an outdated client (clientOutdated)', () => {
+  it('reads OUTDATED in place of the status tag in either display', () => {
+    expect(deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', clientOutdated: true })).toEqual({
+      label: 'OUTDATED',
+      variant: 'warning',
+    });
+    expect(
+      deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', display: 'legacy', clientOutdated: true }),
+    ).toEqual({ label: 'OUTDATED', variant: 'warning' });
+    expect(deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', clientOutdated: false }).label).toBe('MANAGED');
+  });
+
+  it('draws OUTDATED on the tag in the legacy display', () => {
+    render(<DeviceLifecycleTag status="MANAGED" connectivity="ONLINE" clientOutdated />, { wrapper: legacy });
+    expect(screen.getByText('OUTDATED')).toBeInTheDocument();
+    expect(screen.queryByText('ONLINE')).not.toBeInTheDocument();
+  });
+
+  it('offers OUTDATED in STATUS, counted by its own facet, in either display', () => {
+    const facets: DeviceFilters = {
+      ...FACETS,
+      clientOutdated: [
+        { value: 'true', count: 2 },
+        { value: 'false', count: 4 },
+      ],
+    };
+    for (const statusDisplay of ['lifecycle', 'legacy'] as const) {
+      const status = getDeviceFilterColumns(facets, { statusDisplay }).find(column => column.key === 'status');
+      expect(status?.filterOptions?.find(option => option.value === 'OUTDATED')).toMatchObject({
+        label: 'OUTDATED',
+        count: 2,
+      });
+    }
+  });
+});

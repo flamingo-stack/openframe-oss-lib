@@ -31,6 +31,7 @@ public final class MachineFields {
     public static final MachineField<Instant> LAST_SEEN = field("lastSeen", Machine::setLastSeen);
     public static final MachineField<String> ORGANIZATION_ID = field("organizationId", Machine::setOrganizationId);
     public static final MachineField<String> AGENT_VERSION = field("agentVersion", Machine::setAgentVersion);
+    public static final MachineField<Long> AGENT_VERSION_KEY = field("agentVersionKey", Machine::setAgentVersionKey);
     public static final MachineField<OsType> OS_TYPE = field("osType", Machine::setOsType);
     public static final MachineField<String> USER_ID = field("userId", Machine::setUserId);
     public static final MachineField<String> TIMEZONE = field("timezone", Machine::setTimezone);

@@ -478,3 +478,6 @@ export * from './motion-timeline';
 export * from './identity-tint';
 export { createFenceTracker, isBlankLine } from './markdown-fences';
 export type { FenceTracker, FenceLineRole } from './markdown-fences';
+
+// The work area's chat-column share before paint: server-safe, for a host's root-layout seed script.
+export { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from './work-area-share';

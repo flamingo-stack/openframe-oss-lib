@@ -229,7 +229,7 @@ impl Client {
         // Perform initial health check
         directory_manager.perform_health_check()?;
 
-        // Detects the gateway's 410 Gone (tenant deleted) and drives backoff / stop / self-uninstall.
+        // Pauses on the token endpoint's 410 (then self-uninstalls) or 403: backoff / stop / restart.
         let deactivation_service = DeactivationService::new(&directory_manager);
 
         // Initialize initial configuration service
@@ -713,9 +713,7 @@ impl Client {
     pub async fn start(&self) -> Result<()> {
         info!("Starting OpenFrame Client");
 
-        // Tenant-gone supervisor: stops/restarts tools and self-uninstalls off the detection path.
-        // Started first so its commands are consumed even if the startup auth loop (which itself
-        // feeds the 410s) blocks below.
+        // Deactivation supervisor, started first so its commands drain even if the startup auth below blocks.
         self.deactivation_service
             .start(self.tool_run_manager.clone());
 

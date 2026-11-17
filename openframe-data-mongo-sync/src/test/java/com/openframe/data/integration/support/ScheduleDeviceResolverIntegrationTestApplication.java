@@ -1,5 +1,6 @@
 package com.openframe.data.integration.support;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.CustomScriptRepositoryImpl;
@@ -24,6 +25,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @EnableMongoAuditing
 @EnableMongoRepositories(basePackageClasses = {MachineRepository.class, ScriptRepository.class})
 @Import({
+        ClientVersionThreshold.class,
         CustomMachineRepositoryImpl.class,
         CustomScriptRepositoryImpl.class,
         CustomScriptScheduleRepositoryImpl.class,

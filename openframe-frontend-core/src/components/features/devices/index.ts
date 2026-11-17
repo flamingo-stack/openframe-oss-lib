@@ -36,6 +36,7 @@ export {
   getDeviceConnectivityConfig,
   getDeviceLifecycleConfig,
   getDeviceOperatingSystem,
+  getDeviceRowStatusConfig,
   getDeviceStatusConfig,
   getLegacyDeviceStatusConfig,
 } from './device-status';
@@ -49,6 +50,7 @@ export {
   DEVICE_CONNECTIVITY_VALUES,
   DEVICE_ENRICHMENT_FILTER,
   DEVICE_ENRICHMENT_STATUSES,
+  DEVICE_FILTER_OUTDATED,
   DEVICE_STATUS,
   type DeviceConnectivity,
   deviceStatusFilterGroups,

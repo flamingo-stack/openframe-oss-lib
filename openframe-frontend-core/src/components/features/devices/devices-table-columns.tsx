@@ -41,6 +41,7 @@ import {
   DEFAULT_VISIBLE_STATUSES,
   DEVICE_CONNECTIVITY_FILTER_SECTION,
   DEVICE_CONNECTIVITY_VALUES,
+  DEVICE_FILTER_OUTDATED,
   DEVICE_STATUS,
   joinStatusFilterValue,
   mergeStatusFacets,
@@ -458,7 +459,13 @@ function DeviceStatusGridCell({ device }: { device: DeviceRow }) {
     loading && !device.last_seen ? undefined : device.last_seen ? formatDateTime(device.last_seen) : 'Never';
   return (
     <DataTable.Cell
-      tag={<DeviceLifecycleTag status={device.status} connectivity={device.connectivity ?? null} />}
+      tag={
+        <DeviceLifecycleTag
+          status={device.status}
+          connectivity={device.connectivity ?? null}
+          clientOutdated={device.clientOutdated}
+        />
+      }
       secondary={lastSeen}
     />
   );
@@ -554,6 +561,16 @@ function buildDeviceFilterOptions(
   const status = mergeStatusFacets(deviceFilters?.statuses ?? [])
     .filter(s => (DEFAULT_VISIBLE_STATUSES as readonly string[]).includes(s.value))
     .map(s => ({ id: s.value, label: getDeviceLifecycleConfig(s.value).label, value: s.value, count: s.count }));
+  // OUTDATED rides in the Status funnel in either display, counted by its own facet; a host without that facet gets
+  // no option.
+  if (deviceFilters?.clientOutdated) {
+    status.push({
+      id: DEVICE_FILTER_OUTDATED,
+      label: getDeviceStatusConfig(DEVICE_FILTER_OUTDATED).label,
+      value: DEVICE_FILTER_OUTDATED,
+      count: deviceFilters.clientOutdated.find(option => option.value === 'true')?.count ?? 0,
+    });
+  }
 
   // Online / Offline, in that order, from the connectivity facet (none from a backend without one).
   const connectivityRows = deviceFilters?.connectivity ?? [];
@@ -721,7 +738,11 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
         return (
           <div className="flex shrink-0 flex-col items-start gap-1">
             <div className="inline-flex">
-              <DeviceLifecycleTag status={device.status} connectivity={device.connectivity ?? null} />
+              <DeviceLifecycleTag
+                status={device.status}
+                connectivity={device.connectivity ?? null}
+                clientOutdated={device.clientOutdated}
+              />
             </div>
             <DeviceLastSeen lastSeen={device.last_seen} />
           </div>

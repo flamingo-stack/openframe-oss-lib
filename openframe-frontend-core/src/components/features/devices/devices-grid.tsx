@@ -97,8 +97,12 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                     operatingSystem: getDeviceOperatingSystem(device.osType),
                   }}
                   statusTag={
-                    device.status
-                      ? deviceLifecycleTagProps(device.status, { connectivity: device.connectivity ?? null, display })
+                    device.status || device.clientOutdated
+                      ? deviceLifecycleTagProps(device.status, {
+                          connectivity: device.connectivity ?? null,
+                          display,
+                          clientOutdated: device.clientOutdated,
+                        })
                       : undefined
                   }
                   connectivity={device.connectivity ?? null}

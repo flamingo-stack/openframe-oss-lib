@@ -10,8 +10,13 @@ import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionResult;
+import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
+import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
@@ -21,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -41,6 +47,9 @@ public class SoftwareInstallUpdateManagementService {
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
     private final DeviceService deviceService;
+    private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
+    private final SoftwareActionResultRepository softwareActionResultRepository;
+    private final TenantIdProvider tenantIdProvider;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -52,13 +61,15 @@ public class SoftwareInstallUpdateManagementService {
 
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,
                                                   String initiatedBy, ExecutionSource source) {
+        List<SoftwarePackageInput> packages = input.getPackages();
+        softwarePackageSelectionResolver.resolve(packages);
         List<String> machineIds = input.getMachineIds();
         Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         Set<String> orderMachines = packageUpdateEligibility.eligibleMachines(action, machineIds);
         Map<SoftwareScriptCode, ScriptResponse> scriptCache = new EnumMap<>(SoftwareScriptCode.class);
 
-        List<SoftwareDispatchResult> results = new ArrayList<>(input.getPackages().size());
-        for (SoftwarePackageInput pkg : input.getPackages()) {
+        List<SoftwareDispatchResult> results = new ArrayList<>(packages.size());
+        for (SoftwarePackageInput pkg : packages) {
             PackageManagerHandler handler = packageManagerRegistry.handlerFor(pkg.getPackageManager());
             SoftwareScriptCode code = handler.scriptCode(action);
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
@@ -99,6 +110,8 @@ public class SoftwareInstallUpdateManagementService {
                         .build(), pkg.getBrewPackageType());
             }
 
+            recordAction(executionId, action, pkg, targets, initiatedBy);
+
             results.add(SoftwareDispatchResult.builder()
                     .packageManager(pkg.getPackageManager())
                     .packageName(pkg.getPackageName())
@@ -107,7 +120,32 @@ public class SoftwareInstallUpdateManagementService {
         }
 
         log.info("Software {} dispatched: packages={}/{} machines={} initiatedBy={} source={}",
-                action, results.size(), input.getPackages().size(), machineIds.size(), initiatedBy, source);
+                action, results.size(), packages.size(), machineIds.size(), initiatedBy, source);
         return results;
+    }
+
+    // the Software Actions list reads its rows from here: no row, no line on the screen
+    private void recordAction(String executionId, SoftwareAction action, SoftwarePackageInput pkg,
+                              List<String> targets, String initiatedBy) {
+        Instant now = Instant.now();
+        String tenantId = tenantIdProvider.getTenantId();
+        SoftwareActionResult row = SoftwareActionResult.builder()
+                .id(executionId)
+                .tenantId(tenantId)
+                .executionId(executionId)
+                .action(action)
+                .kind(action.kind())
+                .packageManager(pkg.getPackageManager())
+                .packageName(pkg.getPackageName())
+                .version(pkg.getVersion())
+                .status(SoftwareActionStatus.IN_PROGRESS)
+                .mode(SoftwareBundleMode.NOW)
+                .machineIds(targets)
+                .totalMachineCount(targets.size())
+                .dispatchedAt(now)
+                .initiatedBy(initiatedBy)
+                .createdAt(now)
+                .build();
+        softwareActionResultRepository.save(row);
     }
 }

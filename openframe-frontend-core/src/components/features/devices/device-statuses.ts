@@ -186,6 +186,13 @@ export const DEVICE_ENRICHMENT_FILTER: DeviceFilterInput = { statuses: [...DEVIC
 export type DefaultVisibleStatus = (typeof DEFAULT_VISIBLE_STATUSES)[number];
 
 /**
+ * The Status funnel's OUTDATED option: not a `DeviceStatus` but the outdated-client flag, which the
+ * server filters with its own `clientOutdated` input. A host that reads the funnel's values takes
+ * this one out of `statuses` and sends `clientOutdated: true` instead.
+ */
+export const DEVICE_FILTER_OUTDATED = 'OUTDATED';
+
+/**
  * Statuses that are hidden by default (for documentation/reference)
  */
 export const HIDDEN_DEVICE_STATUSES = [DEVICE_STATUS.ARCHIVED, DEVICE_STATUS.DELETED] as const;

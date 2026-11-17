@@ -49,7 +49,7 @@ class ScheduleScriptExecutionAggregatorTest {
     @DisplayName("any leaf still RUNNING → header untouched (transitionIfRunning never called)")
     void anyLeafRunning_shortCircuits() {
         when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
-                .thenReturn(new LeafStatusCounts(2, 0));
+                .thenReturn(new LeafStatusCounts(2, 0, 0));
 
         aggregator.aggregate(TENANT_ID, EXECUTION_ID);
 
@@ -61,7 +61,7 @@ class ScheduleScriptExecutionAggregatorTest {
     @DisplayName("all leaves terminal, none failed → header transition requested with SUCCESS + finishedAt")
     void allTerminalNoFailed_transitionsToSuccess() {
         when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
-                .thenReturn(new LeafStatusCounts(0, 0));
+                .thenReturn(new LeafStatusCounts(0, 0, 0));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
                 .thenReturn(1L);
 
@@ -77,7 +77,7 @@ class ScheduleScriptExecutionAggregatorTest {
     @DisplayName("all leaves terminal, any FAILED → header transition requested with FAILED (a single failing leaf poisons the whole fire)")
     void allTerminalAnyFailed_transitionsToFailed() {
         when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
-                .thenReturn(new LeafStatusCounts(0, 1));
+                .thenReturn(new LeafStatusCounts(0, 1, 0));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
                 .thenReturn(1L);
 
@@ -88,10 +88,52 @@ class ScheduleScriptExecutionAggregatorTest {
     }
 
     @Test
+    @DisplayName("all leaves terminal, no FAILED but a SCRIPT_ERROR → header transition requested with SCRIPT_ERROR")
+    void allTerminalScriptErrorNoFailed_transitionsToScriptError() {
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
+                .thenReturn(new LeafStatusCounts(0, 0, 2));
+        when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
+                .thenReturn(1L);
+
+        aggregator.aggregate(TENANT_ID, EXECUTION_ID);
+
+        verify(scheduleScriptExecutionRepository)
+                .transitionIfRunning(eq(TENANT_ID), eq(EXECUTION_ID), eq(ExecutionStatus.SCRIPT_ERROR), any());
+        verify(scheduleScriptExecutionRepository, never()).reviseSettledStatus(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("FAILED outranks SCRIPT_ERROR in the header")
+    void failedAndScriptError_transitionsToFailed() {
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
+                .thenReturn(new LeafStatusCounts(0, 1, 3));
+        when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
+                .thenReturn(1L);
+
+        aggregator.aggregate(TENANT_ID, EXECUTION_ID);
+
+        verify(scheduleScriptExecutionRepository)
+                .transitionIfRunning(eq(TENANT_ID), eq(EXECUTION_ID), eq(ExecutionStatus.FAILED), any());
+    }
+
+    @Test
+    @DisplayName("header already settled (a late result overrode a watchdog verdict) → settled status revised from the leaves")
+    void headerAlreadySettled_revisesSettledStatus() {
+        when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
+                .thenReturn(new LeafStatusCounts(0, 0, 0));
+        when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
+                .thenReturn(0L);
+
+        aggregator.aggregate(TENANT_ID, EXECUTION_ID);
+
+        verify(scheduleScriptExecutionRepository).reviseSettledStatus(TENANT_ID, EXECUTION_ID, ExecutionStatus.SUCCESS);
+    }
+
+    @Test
     @DisplayName("header already terminal (concurrent last-leaf race) → repo returns modifiedCount=0, aggregator returns cleanly")
     void headerAlreadyTerminal_noOp() {
         when(scriptExecutionRepository.countLeavesByStatus(TENANT_ID, EXECUTION_ID))
-                .thenReturn(new LeafStatusCounts(0, 0));
+                .thenReturn(new LeafStatusCounts(0, 0, 0));
         when(scheduleScriptExecutionRepository.transitionIfRunning(any(), any(), any(), any()))
                 .thenReturn(0L);   // lost the race
 

@@ -30,6 +30,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -238,6 +240,33 @@ class DeviceServiceTest {
         // verifications
         verify(machineRepository).facet(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(), eq(DeviceFacetDimension.CONNECTIVITY));
         verify(machineRepository).facet(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(), eq(DeviceFacetDimension.STATUS));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = {true, false})
+    void queryDevices_clientOutdatedFilter_reachesTheRepoAsIs(Boolean clientOutdated) {
+        // setup
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder().clientOutdated(clientOutdated).build();
+
+        // execution
+        service().queryDevices(filter, CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        // verifications
+        assertThat(capturedFilter().getClientOutdated()).isEqualTo(clientOutdated);
+    }
+
+    @Test
+    void getAvailableDeviceFilters_clientOutdatedFacet_computedFromMongo() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.getAvailableDeviceFilters(List.of(MAC_OS), null, null);
+
+        // verifications
+        verify(machineRepository).facet(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                eq(DeviceFacetDimension.CLIENT_OUTDATED));
     }
 
     @Test

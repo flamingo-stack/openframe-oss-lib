@@ -33,10 +33,6 @@
         <!-- OpenFrame Dependencies -->
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data-cassandra</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-pinot</artifactId>
         </dependency>
         <dependency>

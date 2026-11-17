@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
@@ -27,15 +28,12 @@ import java.util.Set;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
-import static org.springframework.util.StringUtils.hasText;
 
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class SoftwareCatalogStatus {
 
-    private static final String CASK_BUILD_SEPARATOR = ",";
-    private static final String UNVERSIONED_CASK = "latest";
     private static final Map<PackageManagerType, SoftwareSource> SOURCE_BY_MANAGER =
             Map.of(PackageManagerType.WINGET, SoftwareSource.WINGET);
 
@@ -93,8 +91,9 @@ public class SoftwareCatalogStatus {
     private static void applyBrewPackage(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages) {
         String token = brewTokenOf(row);
         PackageCatalogEntry entry = token == null ? null : brewPackages.get(token);
-        String latest = entry == null ? null : brewVersionOf(entry);
+        String latest = entry == null ? null : PackageCatalogVersions.shownVersionOf(entry);
         applyLatest(row, latest);
+        row.setManagingPackage(entry);
         if (row.getAutoUpdate() == null) {
             row.setAutoUpdate(entry != null ? SoftwareAutoUpdateStatus.OFF : SoftwareAutoUpdateStatus.NO_PACKAGE);
         }
@@ -103,11 +102,12 @@ public class SoftwareCatalogStatus {
     // winget updates a program it matches whoever installed it, so a match alone makes the program manageable
     private static void applyMatch(SoftwareResponse row, PackageMatch match) {
         PackageCatalogEntry entry = match.getEntry();
-        String latest = match.isMatched() ? versionOf(entry) : null;
+        String latest = match.isMatched() ? PackageCatalogVersions.shownVersionOf(entry) : null;
         applyLatest(row, latest);
         if (match.isMatched()) {
             SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
             row.setSource(source);
+            row.setManagingPackage(entry);
         }
         if (row.getAutoUpdate() != null) {
             return;
@@ -156,20 +156,6 @@ public class SoftwareCatalogStatus {
                 .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)))
                 .entrySet().stream()
                 .collect(toMap(Map.Entry::getKey, e -> e.getValue().stream().min(FORMULA_FIRST).orElseThrow()));
-    }
-
-    private static String versionOf(PackageCatalogEntry entry) {
-        return hasText(entry.getDisplayVersion()) ? entry.getDisplayVersion() : entry.getVersion();
-    }
-
-    // a cask version may end in a build after a comma (3.3.3,5004) that the app does not report, or be "latest"
-    private static String brewVersionOf(PackageCatalogEntry entry) {
-        String version = entry.getVersion();
-        if (UNVERSIONED_CASK.equals(version)) {
-            return null;
-        }
-        int build = version.indexOf(CASK_BUILD_SEPARATOR);
-        return build < 0 ? version : version.substring(0, build);
     }
 
     private static boolean isBrewPackage(SoftwareResponse row) {

@@ -278,7 +278,7 @@ Includes:
 
 **Class:** `LogDataFetcher`
 
-- Enabled when Cassandra is active
+- Enabled when `openframe.tool-events.store` is set
 - Query audit logs
 - Fetch log details
 

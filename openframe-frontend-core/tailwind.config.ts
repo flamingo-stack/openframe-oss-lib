@@ -331,6 +331,13 @@ const config: Config = {
               'secondary-hover': 'var(--ods-flamingo-cyan-secondary-hover)',
               'secondary-active': 'var(--ods-flamingo-cyan-secondary-action)',
             },
+            orange: {
+              DEFAULT: 'var(--ods-flamingo-orange-base)',
+              hover: 'var(--ods-flamingo-orange-hover)',
+              secondary: 'var(--ods-flamingo-orange-secondary)',
+              'secondary-hover': 'var(--ods-flamingo-orange-secondary-hover)',
+              'secondary-active': 'var(--ods-flamingo-orange-secondary-action)',
+            },
           },
           'open-yellow': {
             DEFAULT: 'var(--ods-open-yellow-base)',
