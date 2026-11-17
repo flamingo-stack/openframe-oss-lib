@@ -42,6 +42,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
     private final MeshControlCommandProperties meshControlProperties;
     private final ObjectMapper objectMapper;
     private final RelayAccessWatcher relayAccessWatcher;
+    private final RemoteSessionCapProperties remoteSessionCapProperties;
 
     private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
     private record SessionInfo(Instant createdAt, String path, String sub) {}
@@ -72,11 +73,8 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
             gatewayTrafficMetrics.webSocketOpened(sessionId, path, sub);
             Disposable disposable = relay
-                    ? watchRelay(exchange, session, expiresAt, context)
+                    ? guardRelay(exchange, session, path, sub, debugPath, expiresAt, context)
                     : scheduleExpiryClose(session, path, sub, debugPath, expiresAt);
-            if (debugPath && relay) {
-                log.debug(LOG_PREFIX + "relay session opened, no JWT expiry close", sessionId, path, sub);
-            }
             processSessionClosedEvent(session, path, sub, relay, disposable);
 
             WebSocketSession sessionToHandle = session;
@@ -98,8 +96,19 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         }
     }
 
-    private Disposable watchRelay(ServerWebExchange exchange, WebSocketSession session, Instant expiresAt,
-                                  ContextView context) {
+    private Disposable guardRelay(ServerWebExchange exchange, WebSocketSession session, String path, String sub,
+                                  boolean debugPath, Instant expiresAt, ContextView context) {
+        if (debugPath) {
+            log.debug(LOG_PREFIX + "relay session opened, closing at the remote session cap", session.getId(), path, sub);
+        }
+        long capSeconds = remoteSessionCapProperties.getMaxDurationSeconds();
+        Disposable capClose = scheduleSessionRemoveJob(session, path, sub, debugPath, capSeconds);
+        Disposable deviceWatch = watchRelayDevice(exchange, session, expiresAt, context);
+        return Disposables.composite(capClose, deviceWatch);
+    }
+
+    private Disposable watchRelayDevice(ServerWebExchange exchange, WebSocketSession session, Instant expiresAt,
+                                        ContextView context) {
         Optional<String> machineId = requestJwtReader.getMachineId(exchange);
         if (machineId.isEmpty()) {
             return Disposables.disposed();

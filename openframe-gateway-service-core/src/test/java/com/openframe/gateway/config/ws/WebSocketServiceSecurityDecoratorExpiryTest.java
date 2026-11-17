@@ -20,6 +20,7 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.server.WebSocketService;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Mono;
 import reactor.test.scheduler.VirtualTimeScheduler;
@@ -53,6 +54,8 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
     private static final String CONTEXT_VALUE = "dev";
     private static final Duration TOKEN_LIFETIME = Duration.ofHours(1);
     private static final Duration PAST_EXPIRY = Duration.ofHours(2);
+    private static final Duration SESSION_CAP = Duration.ofHours(3);
+    private static final Duration JUST_BEFORE_SESSION_CAP = SESSION_CAP.minusSeconds(1);
 
     @Mock private WebSocketService defaultWebSocketService;
     @Mock private RequestJwtClaimsReader requestJwtReader;
@@ -70,14 +73,18 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
     private WebSocketServiceSecurityDecorator decorator;
     private VirtualTimeScheduler virtualTime;
     private Instant expiresAt;
+    private Disposable deviceWatch;
 
     @BeforeEach
     void setUp() {
         virtualTime = VirtualTimeScheduler.getOrSet();
         expiresAt = Instant.now().plus(TOKEN_LIFETIME);
+        deviceWatch = Disposables.single();
+        RemoteSessionCapProperties sessionCap = new RemoteSessionCapProperties();
+        sessionCap.setMaxDurationSeconds(SESSION_CAP.getSeconds());
         decorator = new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtReader,
                 gatewayTrafficMetrics, new WebSocketLoggingProperties(), new MeshControlCommandProperties(),
-                new ObjectMapper(), relayAccessWatcher);
+                new ObjectMapper(), relayAccessWatcher, sessionCap);
     }
 
     @AfterEach
@@ -150,6 +157,78 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
         verify(relayAccessWatcher).watch(eq(clientSession), any(RelayDevice.class), any(Instant.class),
                 contextCaptor.capture());
         assertThat(contextCaptor.getValue().getOrDefault(CONTEXT_KEY, "")).isEqualTo(CONTEXT_VALUE);
+    }
+
+    @Test
+    void handleRequest_browserRelayAtSessionCap_sessionClosed() {
+        // setup
+        stubOpenSession(BROWSER_RELAY_PATH, Mono.never());
+        when(requestJwtReader.getMachineId(exchange)).thenReturn(Optional.empty());
+        when(clientSession.close()).thenReturn(Mono.empty());
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+        virtualTime.advanceTimeBy(SESSION_CAP);
+
+        // verifications
+        verify(clientSession).close();
+    }
+
+    @Test
+    void handleRequest_agentRelayAtSessionCap_sessionClosed() {
+        // setup
+        stubOpenSession(AGENT_RELAY_PATH, Mono.never());
+        stubAgentRelayWatch();
+        when(clientSession.close()).thenReturn(Mono.empty());
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+        virtualTime.advanceTimeBy(SESSION_CAP);
+
+        // verifications
+        verify(clientSession).close();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {BROWSER_RELAY_PATH, AGENT_RELAY_PATH})
+    void handleRequest_relayJustBeforeSessionCap_sessionKeptOpen(String path) {
+        // setup
+        stubOpenSession(path, Mono.never());
+        when(requestJwtReader.getMachineId(exchange)).thenReturn(Optional.empty());
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+        virtualTime.advanceTimeBy(JUST_BEFORE_SESSION_CAP);
+
+        // verifications
+        verify(clientSession, never()).close();
+    }
+
+    @Test
+    void handleRequest_agentRelayClosed_deviceWatchStopped() {
+        // setup
+        stubOpenSession(AGENT_RELAY_PATH, Mono.just(CloseStatus.NORMAL));
+        stubAgentRelayWatch();
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+
+        // verifications
+        assertThat(deviceWatch.isDisposed()).isTrue();
+    }
+
+    @Test
+    void handleRequest_relayClosedBeforeSessionCap_capCloseCancelled() {
+        // setup
+        stubOpenSession(BROWSER_RELAY_PATH, Mono.just(CloseStatus.NORMAL));
+        when(requestJwtReader.getMachineId(exchange)).thenReturn(Optional.empty());
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+        virtualTime.advanceTimeBy(SESSION_CAP);
+
+        // verifications
+        verify(clientSession, never()).close();
     }
 
     @ParameterizedTest
@@ -289,6 +368,6 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
         when(request.getHeaders()).thenReturn(headers);
         when(requestJwtReader.getMachineId(exchange)).thenReturn(Optional.of(MACHINE_ID));
         when(relayAccessWatcher.watch(eq(clientSession), any(RelayDevice.class), any(Instant.class),
-                any(ContextView.class))).thenReturn(Disposables.single());
+                any(ContextView.class))).thenReturn(deviceWatch);
     }
 }
