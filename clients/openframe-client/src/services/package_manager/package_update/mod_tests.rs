@@ -1,6 +1,10 @@
 use super::*;
 use crate::platform::DirectoryManager;
 use crate::services::tool_run_manager::ClientUpdatePendingFlag;
+use crate::services::{
+    InitialConfigurationService, InstalledToolsService, ToolCommandParamsResolver, ToolKillService,
+    ToolOps,
+};
 use crate::utils::latch::Latch;
 use tempfile::TempDir;
 
@@ -18,14 +22,25 @@ impl Fixture {
             dir.path().join("app"),
             dir.path().join("secured"),
         );
-        let config = AgentConfigurationService::new(directories).unwrap();
+        let config = AgentConfigurationService::new(directories.clone()).unwrap();
+        let tool_run_manager = ToolRunManager::new(
+            InstalledToolsService::new(directories.clone()).unwrap(),
+            ToolCommandParamsResolver::new(
+                directories.clone(),
+                InitialConfigurationService::new(directories.clone()).unwrap(),
+                config.clone(),
+            ),
+            ToolKillService::new(),
+            ToolOps::default(),
+        );
         let orders = Arc::new(OrderStore::load(dir.path().join("package_updates.json")));
         let (status, _events) = StatusReporter::in_memory();
         let agent_restart = Latch::default();
         let worker = Arc::new(Worker {
-            machine: Box::new(System),
+            machine: Box::new(System { tool_run_manager }),
             orders,
             status,
+            results: DeliveryResults::in_memory().0,
             config,
             signals: RestartSignals {
                 client_update: ClientUpdatePendingFlag::default().view(),
