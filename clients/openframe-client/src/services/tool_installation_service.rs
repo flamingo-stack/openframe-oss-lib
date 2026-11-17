@@ -281,7 +281,7 @@ impl ToolInstallationService {
                     .await
                     .with_context(|| {
                         format!(
-                            "Aborting reinstall of {}: processes under {} could not be stopped; existing installation kept, will retry",
+                            "Aborting reinstall of {}: processes under {} could not be stopped; the tool is stopped and its directory kept, will retry",
                             tool_agent_id,
                             tool_folder_path.display()
                         )
