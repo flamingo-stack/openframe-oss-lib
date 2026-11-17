@@ -40,7 +40,15 @@ const { join, relative, resolve } = require('node:path');
 const { brotliCompressSync, constants } = require('node:zlib');
 
 const { fullSheetUrl } = require('./next-styles.cjs');
-const { STYLES_DIR, BUILD_INFO, MANIFEST, PLACEHOLDER, COMPLETE_PLACEHOLDER } = require('./route-styles-markers.cjs');
+const {
+  STYLES_DIR,
+  BUILD_INFO,
+  MANIFEST,
+  PLACEHOLDER,
+  COMPLETE_PLACEHOLDER,
+  COMPLETE_SOURCE,
+  FULL_ALIAS,
+} = require('./route-styles-markers.cjs');
 /** The mark the package's stylesheet carries before `@tailwind components`: the utilities start there. */
 const UTILITIES_MARK = '/*! next-styles:utilities */';
 const DEFAULT_BUDGET = 15 * 1024;
@@ -295,8 +303,11 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
   for (const page of crawled) sample(page.route, page.html);
 
   const routeSheet = await stylesheetBuilder({ root, input, config });
-  const fullSheet = fullConfig === config ? routeSheet : await stylesheetBuilder({ root, input, config: fullConfig });
-  const full = await fullSheet(null);
+  // The complete sheet `buildWithRouteStyles` built before the build, whose hash named it; built here otherwise.
+  const builtFirst = join(stylesDir, COMPLETE_SOURCE);
+  const full = fs.existsSync(builtFirst)
+    ? fs.readFileSync(builtFirst, 'utf8')
+    : await (fullConfig === config ? routeSheet : await stylesheetBuilder({ root, input, config: fullConfig }))(null);
   const fullUrl = fullSheetUrl(info);
   // The file's own name: the address may carry a query (`?dpl=`, `fullSheetUrl`).
   const fullFile = fullUrl.split('?')[0].split('/').pop();
@@ -321,6 +332,9 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
       : join(resolve(root, info.distDir), 'static');
   fs.mkdirSync(join(staticDir, 'next-styles'), { recursive: true });
   fs.writeFileSync(join(staticDir, 'next-styles', fullFile), full);
+  // The live build's complete sheet under one name every build writes: where a page from a build whose files are
+  // gone loads its sheet from (`fallbackSheetUrl`).
+  fs.writeFileSync(join(staticDir, 'next-styles', FULL_ALIAS), full);
   const manifest = { version: 1, buildId: info.buildId, full: fullFile, fullUrl, routes };
   fs.writeFileSync(join(stylesDir, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -393,10 +407,17 @@ async function buildWithRouteStyles({ root, nextArgs = [], ...options }) {
   fs.mkdirSync(join(stylesDir, 'sheets'), { recursive: true });
   // The server bundle traces these files when it is built, so they exist before it is (filled after it).
   fs.writeFileSync(join(stylesDir, MANIFEST), `${JSON.stringify({ version: 1, pending: true })}\n`);
+  // The complete sheet depends on the sources alone, so it is built first and its content names the build: two builds
+  // of the same styles share the sheet's name and every file that carries its address (the browser bundle does), as
+  // Next names its own files by content. A rolling update between them has nothing to miss.
+  const full = await (
+    await stylesheetBuilder({ root, input: options.input, config: options.fullConfig ?? options.config })
+  )(null);
+  fs.writeFileSync(join(stylesDir, COMPLETE_SOURCE), full);
   const nextBin = require.resolve('next/dist/bin/next', { paths: [root] });
   await run(process.execPath, [nextBin, 'build', ...nextArgs], {
     root,
-    env: { NEXT_STYLES: 'routes', NEXT_STYLES_OPTIONS: JSON.stringify(options) },
+    env: { NEXT_STYLES: 'routes', NEXT_STYLES_OPTIONS: JSON.stringify(options), NEXT_STYLES_BUILD_ID: hash(full) },
   });
   if (!fs.existsSync(join(stylesDir, BUILD_INFO))) {
     throw new Error('next-styles: the build did not record its settings: wrap next.config with withRouteStyles');

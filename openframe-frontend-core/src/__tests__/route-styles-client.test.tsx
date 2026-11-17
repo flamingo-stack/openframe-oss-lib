@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/missing' }));
 
@@ -9,21 +9,19 @@ const FULL_URL = '/_next/static/next-styles/full-b3.css';
 const fullLinks = () =>
   [...document.head.getElementsByTagName('link')].filter(link => link.hasAttribute('data-next-styles-full'));
 
-/** `RouteStyle` drawn in the browser, as Next draws a page it did not render on the server (a 404's error shell). */
+/**
+ * `RouteStyle` drawn in the browser, as Next draws a page it did not render on the server (a 404's error shell). The
+ * server part hands it the complete sheet's address as a prop: page data, never code in the browser bundle.
+ */
 async function renderInBrowser(build = 'b3') {
   vi.resetModules();
-  process.env.NEXT_STYLES_FULL_URL = FULL_URL;
   const { RouteStyle } = await import('../../scripts/route-styles-client.mjs');
-  return render(createElement(RouteStyle, { build, complete: false }));
+  return render(createElement(RouteStyle, { build, complete: false, fullUrl: FULL_URL }));
 }
 
 describe('RouteStyle: a page the server did not render', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
-  });
-
-  afterEach(() => {
-    delete process.env.NEXT_STYLES_FULL_URL;
   });
 
   it('loads the complete sheet itself, once', async () => {
@@ -49,5 +47,14 @@ describe('RouteStyle: a page the server did not render', () => {
     document.head.appendChild(link);
     await renderInBrowser();
     expect(fullLinks()).toHaveLength(1);
+  });
+
+  it('asks for the live build’s sheet once when its own is gone', async () => {
+    await renderInBrowser();
+    const [link] = fullLinks();
+    link.dispatchEvent(new Event('error'));
+    expect(link.getAttribute('href')).toBe('/_next/static/next-styles/full.css?from=b3');
+    link.dispatchEvent(new Event('error'));
+    expect(link.getAttribute('href')).toBe('/_next/static/next-styles/full.css?from=b3');
   });
 });

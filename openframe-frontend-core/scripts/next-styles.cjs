@@ -91,8 +91,11 @@ function withRouteStyles(nextConfig) {
     if (process.env.NEXT_STYLES !== 'routes' || phase !== 'phase-production-build') return inline;
     const root = process.cwd();
     const infoFile = join(root, STYLES_DIR, BUILD_INFO);
-    // One id per build: the server checks the sheets it reads were written for it.
-    const buildId = existsSync(infoFile) ? JSON.parse(readFileSync(infoFile, 'utf8')).buildId : crypto.randomUUID();
+    // One id per build: the server checks the sheets it reads were written for it. `next-styles build` names it by
+    // the complete sheet's content (`buildWithRouteStyles`); any other build gets a random one.
+    const buildId = existsSync(infoFile)
+      ? JSON.parse(readFileSync(infoFile, 'utf8')).buildId
+      : (process.env.NEXT_STYLES_BUILD_ID ?? crypto.randomUUID());
     const info = {
       buildId,
       deploymentId: skewDeploymentId(),
