@@ -25,6 +25,8 @@ export { CloudMusicIcon } from './cloud-music-icon';
 export { CloudXmarkIcon } from './cloud-xmark-icon';
 export { ComputerMouseIcon } from './computer-mouse-icon';
 export { ConnectionIcon } from './connection-icon';
+export { DeviceOfflineIcon } from './device-offline-icon';
+export { DeviceOnlineIcon } from './device-online-icon';
 export { EarphoneIcon } from './earphone-icon';
 export { EjectIcon } from './eject-icon';
 export { FloppyDiscIcon } from './floppy-disc-icon';

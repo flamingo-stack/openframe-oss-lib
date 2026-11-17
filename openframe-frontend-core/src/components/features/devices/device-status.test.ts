@@ -51,7 +51,8 @@ describe('Status funnel OUTDATED option', () => {
         { value: 'false', count: 6 },
       ],
     });
-    expect(options.map(option => option.value)).toEqual(['ONLINE', 'OFFLINE', DEVICE_FILTER_OUTDATED]);
+    // The lifecycle display reads the ONLINE / OFFLINE statuses as one MANAGED option (`mergeStatusFacets`).
+    expect(options.map(option => option.value)).toEqual(['MANAGED', DEVICE_FILTER_OUTDATED]);
     expect(options[options.length - 1]).toEqual({ id: 'OUTDATED', label: 'OUTDATED', value: 'OUTDATED', count: 4 });
   });
 
@@ -67,6 +68,6 @@ describe('Status funnel OUTDATED option', () => {
   });
 
   it('is not offered when the host does not ask for the facet', () => {
-    expect(statusOptions(facets).map(option => option.value)).toEqual(['ONLINE', 'OFFLINE']);
+    expect(statusOptions(facets).map(option => option.value)).toEqual(['MANAGED']);
   });
 });
