@@ -8,6 +8,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type CSSProperties,
@@ -15,6 +16,8 @@ import {
 } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
+import { useComposerDockHeight } from '../../navigation/app-layout-context';
+import { useMobileActionBarHeight } from '../mobile-action-bar';
 import {
   DataTableLayoutContext,
   GRID_PIN_LEFT_VAR,
@@ -158,6 +161,15 @@ function findScrollParent(element: HTMLElement): HTMLElement | null {
  */
 function useFillHeight(element: HTMLDivElement | null, enabled: boolean): number | null {
   const [height, setHeight] = useState<number | null>(null);
+  // What `AppLayout` pads its `<main>` by (the floating dock, a phone's action bar). The dock's height is set inside
+  // the dock's own ResizeObserver delivery, to land in the dock's frame (CU-17tkuw6633f); `<main>` is the dock's
+  // sibling, so a content box changed there would be a notification at the same depth, left undelivered ("loop
+  // completed with undelivered notifications"). So the scroll parent is watched on its border box, and a change of
+  // these paddings re-measures here instead, in the same commit. Through the measure the observer's effect keeps, not
+  // by running that effect again: a new observation made inside the delivery is one more at that depth.
+  const dockHeight = useComposerDockHeight();
+  const actionBarHeight = useMobileActionBarHeight();
+  const measureRef = useRef<(() => void) | null>(null);
   // A layout effect: its first measure lands in the same commit, before the browser paints. In a passive effect (or
   // from the observer's first report) the table was painted once at the fallback height on every mount, and its
   // bottom edge jumped a frame later.
@@ -177,17 +189,25 @@ function useFillHeight(element: HTMLDivElement | null, enabled: boolean): number
       setHeight(Math.max(MIN_FILL_HEIGHT, Math.floor(parentHeight - top - paddingBelow)));
     };
     measure();
+    measureRef.current = measure;
     window.addEventListener('resize', measure);
-    if (typeof ResizeObserver === 'undefined') return () => window.removeEventListener('resize', measure);
+    const stop = () => {
+      measureRef.current = null;
+      window.removeEventListener('resize', measure);
+    };
+    if (typeof ResizeObserver === 'undefined') return stop;
     const observer = new ResizeObserver(measure);
-    observer.observe(parent ?? element.ownerDocument.documentElement);
+    observer.observe(parent ?? element.ownerDocument.documentElement, { box: 'border-box' });
     // What sits above the table (a banner, a toolbar that wraps) moves its top without resizing the page.
     for (let node = element.parentElement; node && node !== parent; node = node.parentElement) observer.observe(node);
     return () => {
       observer.disconnect();
-      window.removeEventListener('resize', measure);
+      stop();
     };
   }, [element, enabled]);
+  useIsomorphicLayoutEffect(() => {
+    measureRef.current?.();
+  }, [dockHeight, actionBarHeight]);
   return height;
 }
 
