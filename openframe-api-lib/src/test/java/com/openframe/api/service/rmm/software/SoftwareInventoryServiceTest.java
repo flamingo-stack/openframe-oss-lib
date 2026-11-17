@@ -56,6 +56,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
@@ -125,6 +126,19 @@ class SoftwareInventoryServiceTest {
                 scheduleDeviceLocalDispatchRepository);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void isSoftwareReadModelEnabled_flagOfTheConfig_returnedAsIs(boolean enabled) {
+        // setup
+        ReflectionTestUtils.setField(service, "softwareReadModel", enabled);
+
+        // execution
+        boolean result = service.isSoftwareReadModelEnabled();
+
+        // verifications
+        assertThat(result).isEqualTo(enabled);
     }
 
     @Test

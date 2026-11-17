@@ -79,6 +79,7 @@ class DeviceServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
     @Captor private ArgumentCaptor<MachineUpdate> statusUpdateCaptor;
+    @Captor private ArgumentCaptor<MachineQueryFilter> machineQueryFilterCaptor;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, deviceSoftwareConnectivitySync,
@@ -318,6 +319,105 @@ class DeviceServiceTest {
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(any(), captor.capture(), any());
         assertThat(captor.getValue().getStatuses()).containsExactly(DeviceStatus.DELETED.name());
+    }
+
+    @Test
+    void queryAvailableDevicesForSchedule_restrictToMachineIds_pageAndCountNarrowedToThem() {
+        // setup
+        DeviceService s = service();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+
+        // execution
+        s.queryAvailableDevicesForSchedule(null, List.of("m1"), null, pagination, null, List.of("m1", "m2"));
+
+        // verifications
+        verify(machineRepository).findAvailableForScheduleWithCursor(eq(TENANT_ID), machineQueryFilterCaptor.capture(),
+                isNull(), eq(List.of("m1")), isNull(), eq(11));
+        assertThat(machineQueryFilterCaptor.getValue().getRestrictToMachineIds()).containsExactly("m1", "m2");
+        assertThat(capturedFilter().getRestrictToMachineIds()).containsExactly("m1", "m2");
+    }
+
+    @Test
+    void queryAvailableDevicesForSchedule_noRestriction_everyDeviceOfThePicker() {
+        // setup
+        DeviceService s = service();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+
+        // execution
+        s.queryAvailableDevicesForSchedule(null, List.of("m1"), null, pagination, null);
+
+        // verifications
+        assertThat(capturedFilter().getRestrictToMachineIds()).isNull();
+    }
+
+    @Test
+    void getAvailableDeviceFilters_restrictToMachineIds_facetsAndCountNarrowedToThem() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.getAvailableDeviceFilters(null, null, null, List.of("m1", "m2"));
+
+        // verifications
+        verify(machineRepository).facet(eq(TENANT_ID), machineQueryFilterCaptor.capture(), isNull(),
+                eq(DeviceFacetDimension.OS_TYPE));
+        assertThat(machineQueryFilterCaptor.getValue().getRestrictToMachineIds()).containsExactly("m1", "m2");
+        assertThat(capturedFilter().getRestrictToMachineIds()).containsExactly("m1", "m2");
+    }
+
+    @Test
+    void getAvailableDeviceFilters_noRestriction_everyDeviceOfThePicker() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.getAvailableDeviceFilters(null, null, null);
+
+        // verifications
+        assertThat(capturedFilter().getRestrictToMachineIds()).isNull();
+    }
+
+    @Test
+    void findAllDeviceIds_restrictToMachineIds_onlyConnectedDevicesAmongThem() {
+        // setup
+        DeviceService s = service();
+        when(machineRepository.findMachineIds(eq(TENANT_ID), machineQueryFilterCaptor.capture(), isNull()))
+                .thenReturn(List.of("m1"));
+
+        // execution
+        List<String> result = s.findAllDeviceIds(null, null, List.of("m1", "m2"));
+
+        // verifications
+        assertThat(result).containsExactly("m1");
+        assertThat(machineQueryFilterCaptor.getValue().getRestrictToMachineIds()).containsExactly("m1", "m2");
+        assertThat(machineQueryFilterCaptor.getValue().getExcludeStatuses())
+                .contains(DeviceStatus.DELETED.name(), DeviceStatus.ARCHIVED.name());
+    }
+
+    @Test
+    void findAllDeviceIds_emptyRestriction_reachesTheQueryAsEmptyNotAsNoRestriction() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.findAllDeviceIds(null, null, List.of());
+
+        // verifications
+        verify(machineRepository).findMachineIds(eq(TENANT_ID), machineQueryFilterCaptor.capture(), isNull());
+        assertThat(machineQueryFilterCaptor.getValue().getRestrictToMachineIds()).isEmpty();
+    }
+
+    @Test
+    void findAllDeviceIds_noRestriction_everyDeviceOfThePicker() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.findAllDeviceIds(null, null);
+
+        // verifications
+        verify(machineRepository).findMachineIds(eq(TENANT_ID), machineQueryFilterCaptor.capture(), isNull());
+        assertThat(machineQueryFilterCaptor.getValue().getRestrictToMachineIds()).isNull();
     }
 
     @Test
