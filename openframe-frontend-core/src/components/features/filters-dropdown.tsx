@@ -117,6 +117,26 @@ function floatingPanelPosition(
   return { left: `${Math.min(Math.max(wanted, FLOATING_GAP), max)}px`, top: `${rect.bottom + FLOATING_GAP}px` };
 }
 
+/**
+ * The horizontal room an `absolute` panel has: the nearest ancestor that clips its overflow (a page's scrolling column,
+ * a card with `overflow-hidden`), within the window. A panel measured against the window alone fits there and is still
+ * cut off by its column, or slides under whatever stands beside it (a side panel, a navigation rail).
+ */
+const CLIPPING_OVERFLOW = new Set(['hidden', 'clip', 'auto', 'scroll', 'overlay']);
+
+function horizontalBounds(element: Element): { left: number; right: number } {
+  let left = 0;
+  let right = window.innerWidth;
+  for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+    if (!CLIPPING_OVERFLOW.has(window.getComputedStyle(node).overflowX)) continue;
+    const rect = node.getBoundingClientRect();
+    left = Math.max(left, rect.left);
+    right = Math.min(right, rect.right);
+    break;
+  }
+  return { left, right };
+}
+
 // Animation timings (ms). Must stay in sync with the `duration-200` Tailwind
 // class on the dropdown panel below.
 const ANIMATION_MS = 200;
@@ -210,7 +230,8 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
 
       const triggerRect = trigger.getBoundingClientRect();
       const dropdownWidth = 320; // Fixed width from the dropdown
-      const viewportWidth = window.innerWidth;
+      // The room the panel has is its clipping container's, not the window's: see `horizontalBounds`.
+      const bounds = horizontalBounds(trigger);
 
       // The panel hangs off ONE edge of the trigger — its left for `bottom-start`,
       // its right for `bottom-end` — so what has to fit is the panel's own width
@@ -219,10 +240,10 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
       // cell) would otherwise report no room past its right edge while the
       // panel, hung from its left, has the whole column to itself — and flip to
       // the far end of the row, away from the label it belongs to.
-      const fitsFromLeft = triggerRect.left + dropdownWidth <= viewportWidth;
-      const fitsFromRight = triggerRect.right - dropdownWidth >= 0;
+      const fitsFromLeft = triggerRect.left + dropdownWidth <= bounds.right;
+      const fitsFromRight = triggerRect.right - dropdownWidth >= bounds.left;
       const center = (triggerRect.left + triggerRect.right) / 2;
-      const fitsCentered = center - dropdownWidth / 2 >= 0 && center + dropdownWidth / 2 <= viewportWidth;
+      const fitsCentered = center - dropdownWidth / 2 >= bounds.left && center + dropdownWidth / 2 <= bounds.right;
 
       let optimalPlacement = placement;
 
