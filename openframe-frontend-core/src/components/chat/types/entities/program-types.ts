@@ -18,6 +18,7 @@
  */
 
 import type { ReactNode } from 'react';
+import type { VideoTeaser } from '../../../../types/video-processing';
 
 // ============================================================================
 // HOST TYPES
@@ -194,7 +195,7 @@ export interface PodcastItem extends BaseProgramItem {
   transcript_words_data?: unknown;
   srt_content?: string | null;
   video_summary?: string | null;
-  video_bites?: unknown[];
+  video_bites?: VideoTeaser[];
   highlight_video_url?: string | null;
   highlight_video_source?: string | null;
   highlight_video_thumbnail?: string | null;
@@ -231,7 +232,7 @@ export interface WebinarItem extends BaseProgramItem {
   transcript_words_data?: unknown;
   srt_content?: string | null;
   video_summary?: string | null;
-  video_bites?: unknown[];
+  video_bites?: VideoTeaser[];
   highlight_video_url?: string | null;
   highlight_video_source?: string | null;
   highlight_video_thumbnail?: string | null;
