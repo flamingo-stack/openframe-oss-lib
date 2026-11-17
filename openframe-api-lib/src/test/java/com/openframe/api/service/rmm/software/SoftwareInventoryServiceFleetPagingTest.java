@@ -357,6 +357,48 @@ class SoftwareInventoryServiceFleetPagingTest {
     }
 
     @Test
+    void listMachineIdsForSoftware_readModelOff_machinesOfTheHostsOfEveryVersion() {
+        // setup
+        SoftwareTitle chrome = fleetTitle("Chrome", 42L, 2);
+        chrome.setVersions(List.of(versionWithCve(10L, "1.0"), versionWithCve(11L, "2.0")));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(chrome);
+        when(fleet.searchHosts(any(HostSearchRequest.class)))
+                .thenAnswer(inv -> List.of(host(((HostSearchRequest) inv.getArgument(0)).getSoftwareVersionId())));
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(10L, machine("m-10"), 11L, machine("m-11")));
+
+        // execution
+        List<String> result = service.listMachineIdsForSoftware("42");
+
+        // verifications
+        assertThat(result).containsExactly("m-10", "m-11");
+        verifyNoInteractions(tenantSoftwareReadModelQuery);
+    }
+
+    @Test
+    void listMachineIdsForSoftware_readModelOffAndTitleUnknownToFleet_empty() {
+        // setup
+        when(fleet.getSoftwareTitle(42L)).thenReturn(null);
+
+        // execution
+        List<String> result = service.listMachineIdsForSoftware("42");
+
+        // verifications
+        assertThat(result).isEmpty();
+        verify(fleet, never()).searchHosts(any(HostSearchRequest.class));
+    }
+
+    @Test
+    void listMachineIdsForSoftware_readModelOffAndIdNotANumber_emptyWithoutFleet() {
+        // execution
+        List<String> result = service.listMachineIdsForSoftware("not-a-number");
+
+        // verifications
+        assertThat(result).isEmpty();
+        verifyNoInteractions(fleet, hostMachineResolver);
+    }
+
+    @Test
     void listSoftwareForDevice_noFleetCallPerRow() {
         // setup
         when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.of(

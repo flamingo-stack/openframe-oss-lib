@@ -497,6 +497,16 @@ public class SoftwareInventoryService {
         return rows;
     }
 
+    public List<String> listMachineIdsForSoftware(String softwareId) {
+        if (softwareReadModel) {
+            String tenantId = tenantIdProvider.getTenantId();
+            return tenantSoftwareReadModelQuery.machineIdsForSoftware(tenantId, softwareId);
+        }
+        return allDevicesForSoftware(softwareId, null).stream()
+                .map(row -> row.getDevice().getMachineId())
+                .toList();
+    }
+
     private static boolean isManagedWithoutPolicy(SoftwareOnDeviceResponse row) {
         SoftwareSource installedBy = row.getInstalledBy();
         return row.getAutoUpdate() == null && installedBy != null && installedBy != SoftwareSource.UNMANAGED;

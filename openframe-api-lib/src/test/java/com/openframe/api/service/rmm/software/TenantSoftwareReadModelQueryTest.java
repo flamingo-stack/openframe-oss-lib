@@ -32,6 +32,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -273,6 +275,44 @@ class TenantSoftwareReadModelQueryTest {
 
         assertThat(rows).extracting(row -> row.getDevice().getMachineId()).containsExactly("m1");
         assertThat(rows.getFirst().getStatus()).isEqualTo(SoftwareOnDeviceStatus.OUTDATED);
+    }
+
+    @Test
+    void machineIdsForSoftware_titleOnConnectedDevices_theirMachineIdsOnceEach() {
+        // setup
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of(installed("m1", "1.7"), installed("m1", "1.6"), installed("m2", "1.7")));
+
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, "42");
+
+        // verifications
+        assertThat(result).containsExactly("m1", "m2");
+    }
+
+    @Test
+    void machineIdsForSoftware_titleOnNoDevice_empty() {
+        // setup
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of());
+
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, "42");
+
+        // verifications
+        assertThat(result).isEmpty();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " ", "abc"})
+    void machineIdsForSoftware_idThatIsNotANumber_emptyWithoutQuerying(String softwareId) {
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, softwareId);
+
+        // verifications
+        assertThat(result).isEmpty();
+        verifyNoInteractions(deviceSoftwareRepository);
     }
 
     @Test

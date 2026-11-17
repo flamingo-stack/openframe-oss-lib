@@ -149,8 +149,19 @@ public class DeviceService {
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search) {
+        return queryAvailableDevicesForSchedule(platformNames, assignedMachineIds, filterOptions, paginationCriteria,
+                search, null);
+    }
+
+    // restrictToMachineIds: null = every device, an empty collection = no device
+    public CountedGenericQueryResult<Machine> queryAvailableDevicesForSchedule(Collection<OsType> platformNames,
+                                                  Collection<String> assignedMachineIds,
+                                                  DeviceFilterCriteria filterOptions,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  String search,
+                                                  Collection<String> restrictToMachineIds) {
         String tenantId = tenantIdProvider.getTenantId();
-        MachineQueryFilter filter = scheduleDeviceFilter(filterOptions, platformNames, null);
+        MachineQueryFilter filter = scheduleDeviceFilter(filterOptions, platformNames, restrictToMachineIds);
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
@@ -180,7 +191,13 @@ public class DeviceService {
 
     public DeviceFilters getAvailableDeviceFilters(Collection<OsType> platformNames,
                                                    DeviceFilterCriteria filterOptions, String search) {
-        return deviceFilters(scheduleDeviceFilter(filterOptions, platformNames, null), search);
+        return getAvailableDeviceFilters(platformNames, filterOptions, search, null);
+    }
+
+    public DeviceFilters getAvailableDeviceFilters(Collection<OsType> platformNames,
+                                                   DeviceFilterCriteria filterOptions, String search,
+                                                   Collection<String> restrictToMachineIds) {
+        return deviceFilters(scheduleDeviceFilter(filterOptions, platformNames, restrictToMachineIds), search);
     }
 
     private DeviceFilters deviceFilters(MachineQueryFilter filter, String search) {
@@ -219,8 +236,13 @@ public class DeviceService {
     }
 
     public List<String> findAllDeviceIds(DeviceFilterCriteria filterOptions, String search) {
+        return findAllDeviceIds(filterOptions, search, null);
+    }
+
+    public List<String> findAllDeviceIds(DeviceFilterCriteria filterOptions, String search,
+                                         Collection<String> restrictToMachineIds) {
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
-                scheduleDeviceFilter(filterOptions, null, null), search);
+                scheduleDeviceFilter(filterOptions, null, restrictToMachineIds), search);
     }
 
     private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,

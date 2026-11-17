@@ -22,6 +22,7 @@ import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
+import com.openframe.api.service.rmm.software.SoftwareInventoryService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
@@ -50,6 +51,7 @@ import static com.openframe.graphql.relay.NodeType.SOFTWARE_BUNDLE;
 public class SoftwareBundleDataFetcher {
 
     private final SoftwareBundleService softwareBundleService;
+    private final SoftwareInventoryService softwareInventoryService;
     private final DeviceService deviceService;
     private final GraphQLDeviceMapper deviceMapper;
     private final PackageManagerAvailability packageManagerAvailability;
@@ -87,10 +89,12 @@ public class SoftwareBundleDataFetcher {
     @DgsMutation
     public SoftwareBundleResponse addAllDevicesToSoftwareBundle(@InputArgument String bundleId,
                                                                 @InputArgument @Valid DeviceFilterInput filter,
-                                                                @InputArgument String search) {
+                                                                @InputArgument String search,
+                                                                @InputArgument String softwareId) {
         List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
-        List<String> machineIds = deviceService.findAllDeviceIds(filterOptions, search);
+        List<String> softwareMachineIds = machineIdsWithSoftware(softwareId);
+        List<String> machineIds = deviceService.findAllDeviceIds(filterOptions, search, softwareMachineIds);
         String rawBundleId = relayIdCodec.decode(bundleId, SOFTWARE_BUNDLE);
         String userId = getCurrentUserId();
         return softwareBundleService.addDevices(rawBundleId, machineIds, userId);
@@ -158,16 +162,18 @@ public class SoftwareBundleDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before,
             @InputArgument String search,
-            @InputArgument @Valid SortInput sort) {
+            @InputArgument @Valid SortInput sort,
+            @InputArgument String softwareId) {
         SoftwareBundleResponse bundle = dfe.getSource();
         List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
         CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(
                 ConnectionArgs.builder().first(first).after(after).last(last).before(before).build());
         Set<String> assignedMachineIds = new HashSet<>(bundle.getMachineIds() == null ? List.of() : bundle.getMachineIds());
+        List<String> softwareMachineIds = machineIdsWithSoftware(softwareId);
         // No OS restriction at device-selection time — packages (and thus platforms) are chosen at submit.
         CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
-                null, assignedMachineIds, filterOptions, pagination, search);
+                null, assignedMachineIds, filterOptions, pagination, search, softwareMachineIds);
         return deviceMapper.toAvailableDeviceConnection(result, assignedMachineIds);
     }
 
@@ -186,10 +192,17 @@ public class SoftwareBundleDataFetcher {
     public DeviceFilters availableDeviceFilters(
             DgsDataFetchingEnvironment dfe,
             @InputArgument @Valid DeviceFilterInput filter,
-            @InputArgument String search) {
+            @InputArgument String search,
+            @InputArgument String softwareId) {
         List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
-        return deviceService.getAvailableDeviceFilters(null, filterOptions, search);
+        List<String> softwareMachineIds = machineIdsWithSoftware(softwareId);
+        return deviceService.getAvailableDeviceFilters(null, filterOptions, search, softwareMachineIds);
+    }
+
+    // null, not an empty list, without a softwareId: an empty list narrows the picker to no device
+    private List<String> machineIdsWithSoftware(String softwareId) {
+        return softwareId == null ? null : softwareInventoryService.listMachineIdsForSoftware(softwareId);
     }
 
     private List<String> decodeMachineIds(List<String> machineIds) {

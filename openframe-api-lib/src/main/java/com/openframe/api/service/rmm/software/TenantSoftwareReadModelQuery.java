@@ -151,6 +151,16 @@ public class TenantSoftwareReadModelQuery {
                 .toList();
     }
 
+    public List<String> machineIdsForSoftware(String tenantId, String softwareId) {
+        Long titleId = parseLong(softwareId);
+        if (titleId == null) {
+            return List.of();
+        }
+        return deviceSoftwareRepository
+                .findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(tenantId, titleId).stream()
+                .map(DeviceSoftware::getMachineId).filter(Objects::nonNull).distinct().toList();
+    }
+
     private static SoftwareOnDeviceResponse toOnDevice(DeviceSoftware installed, Map<String, Machine> machineById,
                                                        String latestVersion) {
         Machine machine = machineById.get(installed.getMachineId());
