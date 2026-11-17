@@ -120,5 +120,7 @@ export function RouteStyles({ complete = false } = {}) {
   if (!BUILD) return null;
   globalThis[REGISTRY] ??= new Map();
   if (!globalThis[REGISTRY].has(BUILD)) globalThis[REGISTRY].set(BUILD, createResolver());
-  return createElement(RouteStyle, { build: BUILD, complete });
+  // The complete sheet's address is page data (a prop), never code in the browser bundle: compiled in, it renamed a
+  // shared chunk whenever the sheet changed, and a page from the previous build asked for a chunk the new one lacks.
+  return createElement(RouteStyle, { build: BUILD, complete, fullUrl: FULL_URL });
 }

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
@@ -257,6 +258,50 @@ describe('route-styles: a build on a skew-protected host', () => {
   });
 });
 
+describe('route-styles: a page from a build whose files are gone', () => {
+  let root: string;
+  beforeAll(() => {
+    root = finishedBuild();
+  });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('writes the complete sheet `buildWithRouteStyles` built first, under its name and the name every build writes', async () => {
+    // What `buildWithRouteStyles` writes before `next build`: the build is named by this sheet's content.
+    writeFileSync(join(root, '.next-styles', 'complete.css'), '.built-first{color:red}');
+    await routeStyles.writeRouteStyles({
+      root,
+      input: 'app/globals.css',
+      config: 'tailwind.config.cjs',
+      fullConfig: 'tailwind.config.cjs',
+    });
+    const dir = join(root, '.next', 'static', 'next-styles');
+    expect(readFileSync(join(dir, 'full-b1.css'), 'utf8')).toBe('.built-first{color:red}');
+    expect(readFileSync(join(dir, 'full.css'), 'utf8')).toBe('.built-first{color:red}');
+  });
+});
+
+describe('route-styles: where a page loads its complete sheet once its own is gone', () => {
+  const { fallbackSheetUrl } = require('../../scripts/route-styles-markers.cjs') as {
+    fallbackSheetUrl: (url: string) => string;
+  };
+
+  it('asks for the live build’s sheet, keyed by the missing build and keeping the address’s own query', () => {
+    expect(fallbackSheetUrl('/_next/static/next-styles/full-86010d21.css')).toBe(
+      '/_next/static/next-styles/full.css?from=86010d21',
+    );
+    expect(fallbackSheetUrl('/docs/_next/static/next-styles/full-ab12.css?dpl=dpl_x')).toBe(
+      '/docs/_next/static/next-styles/full.css?from=ab12&dpl=dpl_x',
+    );
+    expect(fallbackSheetUrl('/_next/static/chunks/a.css')).toBe('');
+  });
+
+  it('is self-contained, so the inline loader can carry its source', () => {
+    // Run in a fresh context, as the page runs it: nothing it reads may come from this module.
+    const rebuilt = runInNewContext(`(${fallbackSheetUrl.toString()})`) as (url: string) => string;
+    expect(rebuilt('/_next/static/next-styles/full-x.css')).toBe('/_next/static/next-styles/full.css?from=x');
+  });
+});
+
 describe('route-styles: the build adapter', () => {
   let root: string;
   const node = (id: string, hashed: boolean): Output => ({
@@ -330,15 +375,16 @@ describe('route-styles: the build adapter', () => {
     expect(webpack.assets['.next-styles/manifest.json']).toBeDefined();
     expect(webpack.assetsHashes).toEqual({});
     expect(edgeOutput.assets).toEqual({ 'app/page.js': '/x/app/page.js' });
-    expect(handed.staticFiles).toEqual([
-      {
+    // The build's complete sheet, and the live build's under the name every build writes (`fallbackSheetUrl`).
+    expect([...handed.staticFiles].sort((a, b) => a.id.localeCompare(b.id))).toEqual(
+      ['full-b2.css', 'full.css'].map(name => ({
         type: 'STATIC_FILE',
-        id: 'static/next-styles/full-b2.css',
-        pathname: '/_next/static/next-styles/full-b2.css',
-        filePath: join(root, '.next', 'static', 'next-styles', 'full-b2.css'),
+        id: `static/next-styles/${name}`,
+        pathname: `/_next/static/next-styles/${name}`,
+        filePath: join(root, '.next', 'static', 'next-styles', name),
         immutableHash: undefined,
-      },
-    ]);
+      })),
+    );
   });
 });
 
