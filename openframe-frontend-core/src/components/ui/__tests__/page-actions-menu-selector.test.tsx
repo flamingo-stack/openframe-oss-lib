@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
 import { ActionsMenu } from '../actions-menu';
+import { loadActionsMenuDropdown } from '../actions-menu-on-demand';
 import { PageActions } from '../page-actions';
 
 const MENU_ACTIONS = [
@@ -8,6 +9,11 @@ const MENU_ACTIONS = [
     items: [{ id: 'edit-statuses', label: 'Edit Statuses', onClick: () => {} }],
   },
 ];
+
+// The "…" menu's module loads on demand; loaded once here, every menu below renders at once.
+beforeAll(async () => {
+  await loadActionsMenuDropdown();
+});
 
 describe('ActionsMenu header', () => {
   it('renders the header node as the first row, above every group', () => {

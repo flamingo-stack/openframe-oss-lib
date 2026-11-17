@@ -1,5 +1,6 @@
 package com.openframe.api.integration.service;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.openframe.api.dto.force.request.ForceClientUninstallRequest;
@@ -80,7 +81,7 @@ class MachineFieldLevelWritesIT {
         client = MongoClients.create(uri);
         template = new MongoTemplate(client, "test");
         storedMachines = new MongoRepositoryFactory(template).getRepository(MachineRepository.class,
-                RepositoryFragments.just(new CustomMachineRepositoryImpl(template)));
+                RepositoryFragments.just(new CustomMachineRepositoryImpl(template, new ClientVersionThreshold("1.6.0"))));
         machineWriter = new MachineWriter(template, absent(), absent());
     }
 

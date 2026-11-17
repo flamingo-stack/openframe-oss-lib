@@ -1,5 +1,6 @@
 package com.openframe.data.integration.support;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
 import org.springframework.boot.SpringBootConfiguration;
@@ -23,6 +24,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @EnableAutoConfiguration
 @EnableMongoRepositories(basePackageClasses = MachineRepository.class)
 @Import({
+        ClientVersionThreshold.class,
         CustomMachineRepositoryImpl.class
 })
 public class MachineIntegrationTestApplication {

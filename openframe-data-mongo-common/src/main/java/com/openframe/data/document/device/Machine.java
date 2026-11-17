@@ -29,6 +29,8 @@ public class Machine implements TenantScoped {
     private String macAddress;
     private String osUuid;
     private String agentVersion;
+    // agentVersion as ClientVersionKey; null when the version is unknown or unparseable
+    private Long agentVersionKey;
     @Indexed
     private DeviceStatus status;
     // connectivity, kept moving while status is frozen in PENDING_DELETION; null until the first heartbeat after this field appeared

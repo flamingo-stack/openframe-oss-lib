@@ -1,7 +1,10 @@
 package com.openframe.data.repository.rmm.software;
 
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageMatchState;
 import com.openframe.data.document.rmm.software.Software;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -11,6 +14,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -22,6 +26,9 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
 
     private static final String SOURCE = "source";
     private static final String MATCH_STATE = "packageMatch.state";
+    private static final String MATCH_MANAGER = "packageMatch.manager";
+    private static final String TITLE_ID = "softwareTitleId";
+    private static final String BREW_SOURCE = FleetSource.HOMEBREW_PACKAGES.getFleetName();
 
     private final MongoTemplate mongoTemplate;
 
@@ -43,11 +50,25 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
         if (titles.isVulnerableOnly()) {
             criteria.and("cveCount").gt(0);
         }
+        List<Criteria> narrowed = new ArrayList<>();
         Boolean manageable = titles.getManageable();
-        if (manageable == null) {
-            return criteria;
+        if (manageable != null) {
+            Criteria byManager = manageable ? managed(titles) : unmanaged(titles);
+            narrowed.add(byManager);
         }
-        return criteria.andOperator(manageable ? managed(titles) : unmanaged(titles));
+        if (titles.getOsSources() != null) {
+            Criteria bySystem = Criteria.where(SOURCE).in(titles.getOsSources());
+            narrowed.add(bySystem);
+        }
+        if (titles.getInstallerSources() != null) {
+            Criteria bySource = chosenSources(titles);
+            narrowed.add(bySource);
+        }
+        if (titles.getAutoUpdateStatuses() != null) {
+            Criteria byAutoUpdate = chosenAutoUpdate(titles);
+            narrowed.add(byAutoUpdate);
+        }
+        return narrowed.isEmpty() ? criteria : criteria.andOperator(narrowed);
     }
 
     private static Criteria managed(SoftwareTitleQuery titles) {
@@ -61,5 +82,46 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
         return new Criteria().andOperator(
                 Criteria.where(SOURCE).nin(titles.getManagerSources()),
                 Criteria.where(MATCH_STATE).ne(PackageMatchState.MATCHED));
+    }
+
+    private static Criteria chosenSources(SoftwareTitleQuery titles) {
+        List<Criteria> chosen = new ArrayList<>();
+        Criteria installed = Criteria.where(SOURCE).in(titles.getInstallerSources());
+        chosen.add(installed);
+        if (titles.isMatchedChosen()) {
+            Criteria matched = Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED)
+                    .and(MATCH_MANAGER).is(PackageManagerType.WINGET);
+            chosen.add(matched);
+        }
+        if (titles.isUnmanagedChosen()) {
+            Criteria unmanaged = unmanaged(titles);
+            chosen.add(unmanaged);
+        }
+        return new Criteria().orOperator(chosen);
+    }
+
+    private static Criteria chosenAutoUpdate(SoftwareTitleQuery titles) {
+        List<Criteria> chosen = titles.getAutoUpdateStatuses().stream()
+                .map(status -> autoUpdate(status, titles))
+                .toList();
+        return new Criteria().orOperator(chosen);
+    }
+
+    // a brew title projected before brew titles were matched has no match state yet and stays OFF until its next sync
+    private static Criteria autoUpdate(SoftwareAutoUpdateStatus status, SoftwareTitleQuery titles) {
+        return switch (status) {
+            case ON -> Criteria.where(TITLE_ID).in(titles.getEnabledPolicyTitleIds());
+            case OFF -> new Criteria().orOperator(
+                    Criteria.where(TITLE_ID).in(titles.getPolicyTitleIds()).nin(titles.getEnabledPolicyTitleIds()),
+                    withoutPolicy(titles).orOperator(
+                            Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED),
+                            Criteria.where(SOURCE).is(BREW_SOURCE).and(MATCH_STATE).ne(PackageMatchState.NO_PACKAGE)));
+            case NO_PACKAGE -> withoutPolicy(titles).and(MATCH_STATE).is(PackageMatchState.NO_PACKAGE);
+            case NEEDS_ADOPTION -> Criteria.where(TITLE_ID).in(List.of());
+        };
+    }
+
+    private static Criteria withoutPolicy(SoftwareTitleQuery titles) {
+        return Criteria.where(TITLE_ID).nin(titles.getPolicyTitleIds());
     }
 }

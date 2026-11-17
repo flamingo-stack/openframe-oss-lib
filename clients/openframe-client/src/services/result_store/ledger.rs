@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use redb::{ReadableTable, TableDefinition, WriteTransaction};
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,7 @@ pub(super) const DELIVERY_SEQUENCE: TableDefinition<&str, &[u8]> =
     TableDefinition::new("delivery_sequence");
 
 const ERROR_DELIVERY_INTERRUPTED: &str = "interrupted by agent restart";
+const ERROR_DELIVERY_ORPHANED: &str = "the agent lost the work it took on";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct LedgerRecord {
@@ -27,6 +30,7 @@ struct LedgerRecord {
 pub enum LedgerState {
     InFlight,
     AwaitingRestart,
+    Deferred,
     Settled(DeliveryResultMessage),
 }
 
@@ -91,13 +95,23 @@ impl ResultStore {
     }
 
     pub async fn delivery_await_restart(&self, dispatch_id: String) -> Result<()> {
+        self.leave_in_flight(dispatch_id, LedgerState::AwaitingRestart)
+            .await
+    }
+
+    pub async fn delivery_defer(&self, dispatch_id: String) -> Result<()> {
+        self.leave_in_flight(dispatch_id, LedgerState::Deferred)
+            .await
+    }
+
+    async fn leave_in_flight(&self, dispatch_id: String, state: LedgerState) -> Result<()> {
         self.with_db(move |db| {
             let txn = db.begin_write()?;
             {
                 let mut ledger = txn.open_table(DELIVERY_LEDGER)?;
                 if let Some(mut record) = read_ledger(&ledger, &dispatch_id)? {
                     if matches!(record.state, LedgerState::InFlight) {
-                        record.state = LedgerState::AwaitingRestart;
+                        record.state = state;
                         record.updated_at_secs = now_secs();
                         write_ledger(&mut ledger, &record)?;
                     }
@@ -144,6 +158,27 @@ impl ResultStore {
             },
             result,
             error,
+        )
+        .await
+    }
+
+    // Deferred rows of `delivery_type` no work owns any more fail, so the backend runs them again
+    pub async fn delivery_settle_orphaned(
+        &self,
+        delivery_type: String,
+        owned: HashSet<String>,
+    ) -> Result<Vec<DeliveryRef>> {
+        if !self.enabled() {
+            return Ok(Vec::new());
+        }
+        self.settle_ledger(
+            move |record| {
+                matches!(record.state, LedgerState::Deferred)
+                    && record.delivery.delivery_type == delivery_type
+                    && !owned.contains(&record.delivery.dispatch_id)
+            },
+            DeliveryResult::Failed,
+            Some(ERROR_DELIVERY_ORPHANED.to_string()),
         )
         .await
     }

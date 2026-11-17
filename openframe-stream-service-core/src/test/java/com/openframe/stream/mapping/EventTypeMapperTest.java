@@ -1,6 +1,6 @@
 package com.openframe.stream.mapping;
 
-import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

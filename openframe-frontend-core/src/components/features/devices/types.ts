@@ -44,6 +44,12 @@ export interface DeviceRow extends DeviceNameSource {
   directorySources?: readonly string[];
   /** The viewer's unread notifications about this device. Absent or 0: no indicator. */
   unreadNotificationCount?: number;
+  /**
+   * The server's verdict that the device's OpenFrame client is below the supported version
+   * (`Machine.clientOutdated`). The lists then show OUTDATED in place of the status. The
+   * threshold is the server's: never derive this from a version string here.
+   */
+  clientOutdated?: boolean;
 }
 
 export interface DeviceFilterValue {
@@ -75,6 +81,11 @@ export interface DeviceFilters {
   userLinks?: DeviceFilterValue[];
   /** Behind the SOURCES funnel; only hosts that draw the directory columns read it. */
   directorySources?: DeviceFilterValue[];
+  /**
+   * The outdated-client facet: the `"true"` and `"false"` options. Present only where the host asks
+   * for it; the Status funnel then offers OUTDATED with the `"true"` count.
+   */
+  clientOutdated?: DeviceFilterValue[];
 }
 
 /** What narrows a device list, in the backend's field names. */
@@ -87,4 +98,6 @@ export interface DeviceFilterInput {
   tagValues?: string[];
   userLinks?: string[];
   directorySources?: string[];
+  /** `true`: outdated clients only. Absent: no narrowing. */
+  clientOutdated?: boolean;
 }
