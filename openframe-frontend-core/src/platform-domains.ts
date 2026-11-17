@@ -267,8 +267,8 @@ export function hostOf(value: string | null | undefined): string | null {
 }
 
 /** Expand a host into its `www.`/apex pair. 3+-label and single-label hosts return `[host]`. */
-export function expandWwwApex(host: string): string[] {
-  if (host.startsWith('www.')) return [host, host.slice(4)];
+export function expandWwwApex(host: string, options: { keepWww: boolean }): string[] {
+  if (host.startsWith('www.')) return options.keepWww ? [host] : [host, host.slice(4)];
   if (host.split('.').length === 2) return [host, `www.${host}`];
   return [host];
 }
