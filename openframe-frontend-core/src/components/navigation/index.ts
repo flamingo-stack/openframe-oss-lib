@@ -84,7 +84,7 @@ export { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from '../../utils/wo
 export type { AppLayoutWorkAreaMode, AppLayoutWorkAreaProps, WorkAreaColumnState } from './app-layout-work-area';
 export { AppColumnHeader } from './app-column-header';
 export type { AppColumnHeaderLayoutAction, AppColumnHeaderProps } from './app-column-header';
-export { ColumnBackSlot, ColumnBackSlotReset, useColumnBack } from '../layout/column-back-slot';
+export { ColumnBackSlot, ColumnBackSlotReset, useColumnBack, useHandColumnBack } from '../layout/column-back-slot';
 export type { ColumnBack } from '../layout/column-back-slot';
 
 export {
