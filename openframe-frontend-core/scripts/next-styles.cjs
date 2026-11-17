@@ -42,12 +42,24 @@ const { brotliCompressSync, constants } = require('node:zlib');
 const { STYLES_DIR, BUILD_INFO } = require('./route-styles-markers.cjs');
 
 /**
- * The complete sheet's address for a build (`{ buildId, assetPrefix, basePath }`). Named by the build, so the browser
- * bundle knows it too: a page Next draws only in the browser (a 404 is served as an empty error shell, then rendered
- * from its data) has no route sheet from the server and loads this one itself.
+ * The complete sheet's address for a build (`{ buildId, assetPrefix, basePath, deploymentId }`). Named by the build, so
+ * the browser bundle knows it too: a page Next draws only in the browser (a 404 is served as an empty error shell, then
+ * rendered from its data) has no route sheet from the server and loads this one itself.
+ *
+ * The name is new on every build and each deployment serves only its own, so a page one deployment served that asks
+ * for its sheet after the next deployment went live got a 404: no rule only this sheet holds applied (the chat panel's
+ * z-index, the hero scene's fills), seen on flamingo.run in the minute a deploy went live. On a host with skew
+ * protection (Vercel's `VERCEL_SKEW_PROTECTION_ENABLED`) the address names its deployment (`?dpl=`), which routes the
+ * request to the deployment that drew the page. Next's own files need none of this: their names are content hashes,
+ * the same in every build that did not change them.
  */
-const fullSheetUrl = ({ buildId, assetPrefix, basePath }) =>
-  `${(assetPrefix || basePath || '').replace(/\/$/, '')}/_next/static/next-styles/full-${buildId}.css`;
+const fullSheetUrl = ({ buildId, assetPrefix, basePath, deploymentId }) =>
+  `${(assetPrefix || basePath || '').replace(/\/$/, '')}/_next/static/next-styles/full-${buildId}.css` +
+  (deploymentId ? `?dpl=${encodeURIComponent(deploymentId)}` : '');
+
+/** The deployment a skew-protected host routes this build's requests to, else null (`fullSheetUrl`). */
+const skewDeploymentId = (env = process.env) =>
+  (env.VERCEL_SKEW_PROTECTION_ENABLED === '1' && env.VERCEL_DEPLOYMENT_ID) || null;
 
 /**
  * The route-sheet build (`./route-styles.cjs`), loaded only by the `build` command. The app's next.config imports
@@ -83,6 +95,7 @@ function withRouteStyles(nextConfig) {
     const buildId = existsSync(infoFile) ? JSON.parse(readFileSync(infoFile, 'utf8')).buildId : crypto.randomUUID();
     const info = {
       buildId,
+      deploymentId: skewDeploymentId(),
       distDir: inline.distDir ?? '.next',
       output: inline.output ?? null,
       assetPrefix: inline.assetPrefix ?? '',
@@ -259,6 +272,7 @@ module.exports = {
   STYLES_DIR,
   BUILD_INFO,
   fullSheetUrl,
+  skewDeploymentId,
   withInlineStyles,
   withRouteStyles,
   measureStylesheet,

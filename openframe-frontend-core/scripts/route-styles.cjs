@@ -298,7 +298,8 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
   const fullSheet = fullConfig === config ? routeSheet : await stylesheetBuilder({ root, input, config: fullConfig });
   const full = await fullSheet(null);
   const fullUrl = fullSheetUrl(info);
-  const fullFile = fullUrl.split('/').pop();
+  // The file's own name: the address may carry a query (`?dpl=`, `fullSheetUrl`).
+  const fullFile = fullUrl.split('?')[0].split('/').pop();
 
   const routes = {};
   const sheets = new Map();

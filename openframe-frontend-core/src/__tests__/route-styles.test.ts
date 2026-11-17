@@ -157,50 +157,56 @@ describe('route-styles: the complete sheet under next-styles build', () => {
   });
 });
 
+/** A finished Next build of three pages, recorded as build `b1` (and, given one, deployment `deploymentId`). */
+function finishedBuild(deploymentId?: string): string {
+  const root = mkdtempSync(join(tmpdir(), 'route-styles-build-'));
+  mkdirSync(join(root, 'app'), { recursive: true });
+  mkdirSync(join(root, '.next', 'server', 'app', 'blog'), { recursive: true });
+  mkdirSync(join(root, '.next', 'static'), { recursive: true });
+  mkdirSync(join(root, '.next-styles'), { recursive: true });
+  writeFileSync(join(root, 'app', 'page.tsx'), 'export default () => <p className="p-2 text-center underline" />');
+  writeFileSync(
+    join(root, 'app', 'globals.css'),
+    `@tailwind base;\n${routeStyles.UTILITIES_MARK}\n@tailwind components;\n@tailwind utilities;\n`,
+  );
+  writeFileSync(
+    join(root, 'tailwind.config.cjs'),
+    `module.exports = { content: [${JSON.stringify(join(root, 'app', 'page.tsx'))}] }`,
+  );
+  writeFileSync(
+    join(root, 'postcss.config.cjs'),
+    `module.exports = { plugins: { ${JSON.stringify(require.resolve('tailwindcss'))}: {} } }`,
+  );
+  writeFileSync(
+    join(root, '.next-styles', 'build.json'),
+    JSON.stringify({ buildId: 'b1', deploymentId, distDir: '.next', output: null }),
+  );
+  writeFileSync(
+    join(root, '.next', 'prerender-manifest.json'),
+    JSON.stringify({
+      routes: {
+        '/': { srcRoute: '/' },
+        '/blog/a': { srcRoute: '/blog/[slug]' },
+        '/blog/b': { srcRoute: '/blog/[slug]' },
+      },
+    }),
+  );
+  const page = (classes: string) =>
+    `<html><head><style data-href="next-styles:x" data-precedence="next-styles">${routeStyles.PLACEHOLDER}</style></head><body class="${classes}"><script data-next-styles-full="/_next/static/next-styles/full-b1.css"></script></body></html>`;
+  writeFileSync(join(root, '.next', 'server', 'app', 'index.html'), page('p-2'));
+  // The static 404 Next copies from the app's not-found page: no prerender entry names it.
+  mkdirSync(join(root, '.next', 'server', 'pages'), { recursive: true });
+  writeFileSync(join(root, '.next', 'server', 'pages', '404.html'), page('underline'));
+  writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'a.html'), page('text-center'));
+  writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'b.html'), page('underline'));
+  return root;
+}
+
 describe('route-styles: a finished build', () => {
   let root: string;
 
   beforeAll(() => {
-    root = mkdtempSync(join(tmpdir(), 'route-styles-build-'));
-    mkdirSync(join(root, 'app'), { recursive: true });
-    mkdirSync(join(root, '.next', 'server', 'app', 'blog'), { recursive: true });
-    mkdirSync(join(root, '.next', 'static'), { recursive: true });
-    mkdirSync(join(root, '.next-styles'), { recursive: true });
-    writeFileSync(join(root, 'app', 'page.tsx'), 'export default () => <p className="p-2 text-center underline" />');
-    writeFileSync(
-      join(root, 'app', 'globals.css'),
-      `@tailwind base;\n${routeStyles.UTILITIES_MARK}\n@tailwind components;\n@tailwind utilities;\n`,
-    );
-    writeFileSync(
-      join(root, 'tailwind.config.cjs'),
-      `module.exports = { content: [${JSON.stringify(join(root, 'app', 'page.tsx'))}] }`,
-    );
-    writeFileSync(
-      join(root, 'postcss.config.cjs'),
-      `module.exports = { plugins: { ${JSON.stringify(require.resolve('tailwindcss'))}: {} } }`,
-    );
-    writeFileSync(
-      join(root, '.next-styles', 'build.json'),
-      JSON.stringify({ buildId: 'b1', distDir: '.next', output: null }),
-    );
-    writeFileSync(
-      join(root, '.next', 'prerender-manifest.json'),
-      JSON.stringify({
-        routes: {
-          '/': { srcRoute: '/' },
-          '/blog/a': { srcRoute: '/blog/[slug]' },
-          '/blog/b': { srcRoute: '/blog/[slug]' },
-        },
-      }),
-    );
-    const page = (classes: string) =>
-      `<html><head><style data-href="next-styles:x" data-precedence="next-styles">${routeStyles.PLACEHOLDER}</style></head><body class="${classes}"><script data-next-styles-full="/_next/static/next-styles/full-b1.css"></script></body></html>`;
-    writeFileSync(join(root, '.next', 'server', 'app', 'index.html'), page('p-2'));
-    // The static 404 Next copies from the app's not-found page: no prerender entry names it.
-    mkdirSync(join(root, '.next', 'server', 'pages'), { recursive: true });
-    writeFileSync(join(root, '.next', 'server', 'pages', '404.html'), page('underline'));
-    writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'a.html'), page('text-center'));
-    writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'b.html'), page('underline'));
+    root = finishedBuild();
   });
 
   afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -229,6 +235,25 @@ describe('route-styles: a finished build', () => {
     expect(
       readFileSync(join(root, '.next', 'static', 'next-styles', manifest.fullUrl.split('/').pop() as string), 'utf8'),
     ).toContain('.underline');
+  });
+});
+
+describe('route-styles: a build on a skew-protected host', () => {
+  let root: string;
+  beforeAll(() => {
+    root = finishedBuild('dpl_abc');
+  });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('names the deployment in the complete sheet’s address, and writes the sheet under its own name', async () => {
+    const manifest = await routeStyles.writeRouteStyles({
+      root,
+      input: 'app/globals.css',
+      config: 'tailwind.config.cjs',
+      fullConfig: 'tailwind.config.cjs',
+    });
+    expect(manifest.fullUrl).toBe('/_next/static/next-styles/full-b1.css?dpl=dpl_abc');
+    expect(readFileSync(join(root, '.next', 'static', 'next-styles', 'full-b1.css'), 'utf8')).toContain('.underline');
   });
 });
 
