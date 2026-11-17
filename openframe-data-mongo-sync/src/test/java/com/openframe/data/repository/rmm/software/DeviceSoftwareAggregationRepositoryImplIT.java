@@ -58,6 +58,20 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
     }
 
     @Test
+    @DisplayName("title: the distinct winget ids of its machines, without the machines that report none")
+    void title_wingetIds() {
+        save(row(TENANT, "m1", CHROME).wingetId("Google.Chrome").build());
+        save(row(TENANT, "m2", CHROME).wingetId("Google.Chrome").build());
+        save(row(TENANT, "m3", CHROME).wingetId("Google.Chrome.EXE").build());
+        save(row(TENANT, "m4", CHROME).wingetId(" ").build());
+        save(row(TENANT, "m5", CHROME).build());
+
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        assertThat(rollup.wingetIds()).containsExactly("Google.Chrome", "Google.Chrome.EXE");
+    }
+
+    @Test
     @DisplayName("title: unions versions, CVEs and Windows keys across machines, without blanks, sorted")
     void title_unionsAcrossMachines() {
         save(row(TENANT, "m1", CHROME)

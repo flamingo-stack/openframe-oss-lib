@@ -1,7 +1,9 @@
 package com.openframe.client.listener.packageupdate;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
@@ -10,6 +12,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
+import com.openframe.data.nats.packageupdate.UpdateSource;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
@@ -24,6 +27,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +42,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -210,6 +216,45 @@ class PackageUpdateStatusProcessorTest {
     }
 
     @Test
+    void waitingAfterTheUpdateCompleted_isIgnored_theActionStaysCompleted() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.COMPLETED);
+        st.setLastEventId("e2");
+        st.setLastEventAt(T);
+        st.setDoneResult("UPGRADED");
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+
+        PackageUpdateStatusMessage late = waiting("e3", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING, PackageUpdateStatusMessage.Waiting.Phase.PROMPT);
+        processor.process("m1", late);
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
+        assertThat(st.getDoneResult()).isEqualTo("UPGRADED");
+        assertThat(st.getWaitingReason()).isNull();
+        verify(deviceStateRepository, never()).save(any());
+        verifyNoInteractions(executionRecorder, deliveryDispatcher, deliveryTracker, requestRepository);
+    }
+
+    @Test
+    void waitingAfterTheUpdateFailed_stillApplies() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.FAILED);
+        st.setLastEventId("e2");
+        st.setLastEventAt(T);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.FORCE, null)));
+        when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(List.of(st));
+
+        PackageUpdateStatusMessage again = waiting("e3", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.MANAGER_BUSY, PackageUpdateStatusMessage.Waiting.Phase.PROMPT);
+        processor.process("m1", again);
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
+        verify(deviceStateRepository).save(st);
+    }
+
+    @Test
     void done_completesAndClearsWaitingDetail() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
@@ -233,7 +278,9 @@ class PackageUpdateStatusProcessorTest {
         assertThat(st.getRebootRequired()).isTrue();
         assertThat(st.getWaitingReason()).isNull();              // stale waiting detail cleared
         assertThat(st.getHolders()).isNull();
-        verifyNoInteractions(deliveryDispatcher, deliveryTracker); // no deadline, nothing to withdraw
+        verifyNoInteractions(deliveryDispatcher);
+        // no deadline, no prompt held: nothing to withdraw
+        verify(deliveryTracker, never()).cancel(any(), any(), any(), any());
     }
 
     @Test
@@ -281,6 +328,132 @@ class PackageUpdateStatusProcessorTest {
     }
 
     @Test
+    void postponedByTheUser_nextPromptIsTheIntervalLater_theDeadlineArmedEarlierStays() {
+        ReflectionTestUtils.setField(processor, "askAgainSeconds", 1800L);
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(T.plusSeconds(3600));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", waiting("e2", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.POSTPONED));
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
+        assertThat(st.getWaitingPhase()).isEqualTo("POSTPONED");
+        assertThat(st.getAskAgainAt()).isEqualTo(T.plusSeconds(1860));
+        assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
+        // the force after the prompt: the agent drops an order older than the one it holds
+        InOrder order = inOrder(deliveryDispatcher, deviceStateRepository);
+        order.verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(T.plusSeconds(1860)));
+        order.verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(T.plusSeconds(3600)));
+        order.verify(deviceStateRepository).save(st);
+        PackageUpdateDeliverySeed prompt = seedCaptor.getAllValues().get(0);
+        assertThat(prompt.getMode()).isEqualTo(PackageUpdateMode.WAIT);
+        assertThat(prompt.getTargetId()).isEqualTo("req-1");
+        PackageUpdateDeliverySeed force = seedCaptor.getAllValues().get(1);
+        assertThat(force.getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(force.getTargetId()).isEqualTo("req-1:deadline");
+        verifyNoInteractions(deliveryTracker);
+    }
+
+    @Test
+    void postponedByTheUser_theDeadlineComesFirst_noNextPrompt() {
+        ReflectionTestUtils.setField(processor, "askAgainSeconds", 86400L);
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(T.plusSeconds(3600));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", waiting("e2", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.POSTPONED));
+
+        assertThat(st.getWaitingPhase()).isEqualTo("POSTPONED");
+        assertThat(st.getAskAgainAt()).isNull();
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+    }
+
+    @Test
+    void postponedByTheUser_noDeadline_nextPromptIsTheIntervalLater() {
+        ReflectionTestUtils.setField(processor, "askAgainSeconds", 86400L);
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.POSTPONED));
+
+        assertThat(st.getAskAgainAt()).isEqualTo(T.plusSeconds(86400));
+        verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(T.plusSeconds(86400)));
+        PackageUpdateDeliverySeed prompt = seedCaptor.getValue();
+        assertThat(prompt.getMode()).isEqualTo(PackageUpdateMode.WAIT);
+        assertThat(prompt.getRequestId()).isEqualTo("req-1");
+        assertThat(prompt.getTargetId()).isEqualTo("req-1");
+        verifyNoMoreInteractions(deliveryDispatcher);
+    }
+
+    // the agent takes a newer sequence of a finished request as a new order and would run the update again
+    @Test
+    void finishedWhileTheNextPromptIsHeld_thePromptIsWithdrawn() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        MachineDelivery held = MachineDelivery.builder().status(DeliveryStatus.PENDING).build();
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+        when(deliveryTracker.find(DeliveryType.PACKAGE_UPDATE, "req-1", "m1")).thenReturn(Optional.of(held));
+
+        processor.process("m1", base("e3", T, PackageUpdateStatusMessage.State.DONE));
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
+        InOrder order = inOrder(deliveryTracker, autoUpdateRetry);
+        order.verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1"), eq("m1"), any());
+        order.verify(autoUpdateRetry).scheduleIfDue(eq(st), any());      // a retry takes the row after the withdrawal
+        verifyNoInteractions(deliveryDispatcher);
+    }
+
+    @Test
+    void finished_theOrderIsOnTheDevice_itsRowIsLeftForTheAgentsAnswer() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        MachineDelivery onTheDevice = MachineDelivery.builder().status(DeliveryStatus.ACKED).build();
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+        when(deliveryTracker.find(DeliveryType.PACKAGE_UPDATE, "req-1", "m1")).thenReturn(Optional.of(onTheDevice));
+
+        processor.process("m1", base("e3", T, PackageUpdateStatusMessage.State.DONE));
+
+        verify(deliveryTracker, never()).cancel(any(), any(), any(), any());
+    }
+
+    @Test
+    void promptShownAgainAfterPostponed_clearsTheNextPromptTime() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setWaitingPhase("POSTPONED");
+        st.setAskAgainAt(T.plusSeconds(1800));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+
+        processor.process("m1", waiting("e3", T.plusSeconds(1800),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
+
+        assertThat(st.getWaitingPhase()).isEqualTo("PROMPT");
+        assertThat(st.getAskAgainAt()).isNull();
+    }
+
+    @Test
     void doneBeforeTheDeadline_withdrawsTheScheduledForce() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
@@ -295,6 +468,74 @@ class PackageUpdateStatusProcessorTest {
         verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1:deadline"), eq("m1"), any());
         verify(deliveryTracker, never()).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1"), eq("m1"), any());
         verifyNoInteractions(deliveryDispatcher);
+    }
+
+    @Test
+    void updateNowByTheUser_deadlineArmedEarlier_theForceGoesOutAtOnceOnTheDeadlineRow_noCountdown() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(Instant.now().plusSeconds(3600));
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L);
+        req.setForceCountdownSeconds(300);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.APPROVED));
+
+        assertThat(st.getDeadlineAt()).isBeforeOrEqualTo(Instant.now());
+        assertThat(st.getWaitingPhase()).isEqualTo("APPROVED");
+        InOrder order = inOrder(deliveryDispatcher, deviceStateRepository);
+        order.verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(st.getDeadlineAt()));
+        order.verify(deviceStateRepository).save(st);
+        PackageUpdateDeliverySeed seed = seedCaptor.getValue();
+        assertThat(seed.getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(seed.getCountdownSeconds()).isZero();
+        assertThat(seed.getRequestId()).isEqualTo("req-1");
+        assertThat(seed.getTargetId()).isEqualTo("req-1:deadline");      // replaces the force held for the deadline
+        verifyNoInteractions(deliveryTracker);
+    }
+
+    @Test
+    void updateNowByTheUser_requestWithoutADeadline_theForceGoesOutAtOnce() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.APPROVED));
+
+        verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(st.getDeadlineAt()));
+        assertThat(st.getDeadlineAt()).isBeforeOrEqualTo(Instant.now());
+        assertThat(seedCaptor.getValue().getMode()).isEqualTo(PackageUpdateMode.FORCE);
+    }
+
+    // the countdown of a FORCE request shows Update Now too
+    @Test
+    void updateNowByTheUser_requestAlreadyForced_theForceGoesOutAgainWithNoCountdown() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        PackageUpdateRequest req = request(PackageUpdateSource.ADMIN, PackageUpdateMode.FORCE, null);
+        req.setForceCountdownSeconds(300);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.APPROVED));
+
+        assertThat(st.getDeadlineAt()).isBeforeOrEqualTo(Instant.now());
+        verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(st.getDeadlineAt()));
+        PackageUpdateDeliverySeed seed = seedCaptor.getValue();
+        assertThat(seed.getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(seed.getCountdownSeconds()).isZero();
+        assertThat(seed.getSource().getOrigin()).isEqualTo(UpdateSource.Origin.USER);
+        assertThat(seed.getRequestId()).isEqualTo("req-1");
+        verifyNoInteractions(deliveryTracker);
     }
 
     // the force's row takes the agent's result; the WAIT row would wait for one until its timeout

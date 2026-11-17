@@ -20,6 +20,7 @@ public class PackageUpdateDeliverySeed implements DeliverySeed {
     private final PackageReference packageRef;
     private final PackageUpdateMode mode;
     private final Integer countdownSeconds;
+    private final Long deadlineSeconds;
     private final boolean deadlineForce;
 
     public static String deadlineTargetId(String requestId) {
