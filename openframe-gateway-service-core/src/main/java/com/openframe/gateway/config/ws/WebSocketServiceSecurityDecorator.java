@@ -18,7 +18,6 @@ import reactor.util.context.ContextView;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -66,6 +65,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         boolean debugPath = loggingProperties.isDebugPath(path);
 
         sessionRegistry.put(sessionId, new SessionInfo(Instant.now(), path, sub));
+        SecuredWebSocket socket = new SecuredWebSocket(exchange, session, path, sub, debugPath);
 
         try {
             Instant expiresAt = requestJwtReader.getExpiration(exchange);
@@ -73,8 +73,8 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
             gatewayTrafficMetrics.webSocketOpened(sessionId, path, sub);
             Disposable disposable = relay
-                    ? guardRelay(exchange, session, path, sub, debugPath, expiresAt, context)
-                    : scheduleExpiryClose(session, path, sub, debugPath, expiresAt);
+                    ? guardRelay(socket, expiresAt, context)
+                    : scheduleExpiryClose(socket, expiresAt);
             processSessionClosedEvent(session, path, sub, relay, disposable);
 
             WebSocketSession sessionToHandle = session;
@@ -90,33 +90,34 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
             }
             return defaultWebSocketHandler.handle(sessionToHandle);
         } catch (Exception e) {
-            log.warn(LOG_PREFIX + "JWT expiration read failed, closing", sessionId, path, sub, e);
+            log.warn(LOG_PREFIX + "WebSocket session setup failed, closing", sessionId, path, sub, e);
             sessionRegistry.remove(sessionId);
             return session.close();
         }
     }
 
-    private Disposable guardRelay(ServerWebExchange exchange, WebSocketSession session, String path, String sub,
-                                  boolean debugPath, Instant expiresAt, ContextView context) {
-        if (debugPath) {
-            log.debug(LOG_PREFIX + "relay session opened, closing at the remote session cap", session.getId(), path, sub);
+    private Disposable guardRelay(SecuredWebSocket socket, Instant expiresAt, ContextView context) {
+        if (socket.isDebugPath()) {
+            log.debug(LOG_PREFIX + "relay session opened, closing at the remote session cap",
+                    socket.getSessionId(), socket.getPath(), socket.getSub());
         }
         long capSeconds = remoteSessionCapProperties.getMaxDurationSeconds();
-        Disposable capClose = scheduleSessionRemoveJob(session, path, sub, debugPath, capSeconds);
-        Disposable deviceWatch = watchRelayDevice(exchange, session, expiresAt, context);
+        Disposable capClose = scheduleSessionRemoveJob(socket, capSeconds, CloseReason.SESSION_CAP);
+        Disposable deviceWatch = watchRelayDevice(socket, expiresAt, context);
         return Disposables.composite(capClose, deviceWatch);
     }
 
-    private Disposable watchRelayDevice(ServerWebExchange exchange, WebSocketSession session, Instant expiresAt,
-                                        ContextView context) {
-        Optional<String> machineId = requestJwtReader.getMachineId(exchange);
-        if (machineId.isEmpty()) {
-            return Disposables.disposed();
-        }
-        String tenantId = tenantId(exchange);
-        RelayDevice device = new RelayDevice(tenantId, machineId.get());
+    private Disposable watchRelayDevice(SecuredWebSocket socket, Instant expiresAt, ContextView context) {
         Instant firstCheckAt = expiresAt.plusSeconds(CLOCK_SKEW_SECONDS);
-        return relayAccessWatcher.watch(session, device, firstCheckAt, context);
+        return requestJwtReader.getMachineId(socket.getExchange())
+                .map(machineId -> relayDevice(socket, machineId))
+                .map(device -> relayAccessWatcher.watch(socket.getSession(), device, firstCheckAt, context))
+                .orElseGet(Disposables::disposed);
+    }
+
+    private static RelayDevice relayDevice(SecuredWebSocket socket, String machineId) {
+        String tenantId = tenantId(socket.getExchange());
+        return new RelayDevice(tenantId, machineId);
     }
 
     /* TODO: avoid hardcoded paths.
@@ -137,29 +138,34 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         return endpoint.endsWith(RELAY_ENDPOINT);
     }
 
-    private Disposable scheduleExpiryClose(WebSocketSession session, String path, String sub, boolean debugPath,
-                                           Instant expiresAt) {
-        if (debugPath) {
-            log.debug(LOG_PREFIX + "session opened, scheduling JWT expiry close", session.getId(), path, sub);
+    private Disposable scheduleExpiryClose(SecuredWebSocket socket, Instant expiresAt) {
+        if (socket.isDebugPath()) {
+            log.debug(LOG_PREFIX + "session opened, scheduling JWT expiry close",
+                    socket.getSessionId(), socket.getPath(), socket.getSub());
         }
         long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
         long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
-        return scheduleSessionRemoveJob(session, path, sub, debugPath, effectiveSeconds);
+        return scheduleSessionRemoveJob(socket, effectiveSeconds, CloseReason.JWT_EXPIRY);
     }
 
     private static String tenantId(ServerWebExchange exchange) {
         return exchange.getRequest().getHeaders().getFirst(TenantRoutingHeaders.TENANT_ID_HEADER);
     }
 
-    private Disposable scheduleSessionRemoveJob(WebSocketSession session, String path, String sub, boolean debugPath, long secondsUntilExpiration) {
-        String sessionId = session.getId();
+    private Disposable scheduleSessionRemoveJob(SecuredWebSocket socket, long delaySeconds, CloseReason reason) {
+        WebSocketSession session = socket.getSession();
+        String sessionId = socket.getSessionId();
+        String path = socket.getPath();
+        String sub = socket.getSub();
+        boolean debugPath = socket.isDebugPath();
         if (debugPath) {
-            log.debug(LOG_PREFIX + "scheduling session remove job in {}s", sessionId, path, sub, secondsUntilExpiration);
+            log.debug(LOG_PREFIX + "scheduling session remove job ({}) in {}s",
+                    sessionId, path, sub, reason.getLabel(), delaySeconds);
         }
-        return Mono.delay(Duration.ofSeconds(secondsUntilExpiration))
+        return Mono.delay(Duration.ofSeconds(delaySeconds))
                 .flatMap(__ -> {
                     if (debugPath) {
-                        log.debug(LOG_PREFIX + "executing session remove job (JWT expiry)", sessionId, path, sub);
+                        log.debug(LOG_PREFIX + "executing session remove job ({})", sessionId, path, sub, reason.getLabel());
                     }
                     return session.close()
                             .doOnSuccess(___ -> {

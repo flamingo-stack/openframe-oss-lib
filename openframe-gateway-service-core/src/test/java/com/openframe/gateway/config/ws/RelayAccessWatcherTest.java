@@ -11,12 +11,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
+import reactor.test.publisher.PublisherProbe;
 import reactor.test.scheduler.VirtualTimeScheduler;
 import reactor.util.context.Context;
 
@@ -25,6 +25,7 @@ import java.time.Instant;
 
 import static com.openframe.gateway.config.ws.RelayAccessWatcher.DEVICE_REMOVED;
 import static com.openframe.gateway.config.ws.RelayAccessWatcher.RECHECK_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -43,17 +44,21 @@ class RelayAccessWatcherTest {
     @Mock private ReactiveMachineRepository machineRepository;
     @Mock private WebSocketSession session;
 
-    @InjectMocks private RelayAccessWatcher watcher;
-
+    private RelayAccessWatcher watcher;
+    private RelayAccessWatcher singleTenantWatcher;
     private VirtualTimeScheduler virtualTime;
     private RelayDevice device;
     private Instant firstCheckAt;
+    private PublisherProbe<Void> closeProbe;
 
     @BeforeEach
     void setUp() {
         virtualTime = VirtualTimeScheduler.getOrSet();
+        watcher = new RelayAccessWatcher(machineRepository, true);
+        singleTenantWatcher = new RelayAccessWatcher(machineRepository, false);
         device = new RelayDevice(TENANT_ID, MACHINE_ID);
         firstCheckAt = Instant.now().plus(UNTIL_FIRST_CHECK);
+        closeProbe = PublisherProbe.empty();
     }
 
     @AfterEach
@@ -78,14 +83,45 @@ class RelayAccessWatcherTest {
     }
 
     @Test
-    void watch_machineMissing_sessionClosed() {
+    void watch_machineRemoved_closeIsSubscribed() {
         // setup
-        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Mono.empty());
+        Machine deleted = machineWithStatus(DeviceStatus.DELETED);
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Mono.just(deleted));
         stubSessionClose();
 
         // execution
         watcher.watch(session, device, firstCheckAt, Context.empty());
         virtualTime.advanceTimeBy(UNTIL_FIRST_CHECK);
+
+        // verifications
+        assertThat(closeProbe.wasSubscribed()).isTrue();
+    }
+
+    @Test
+    void watch_machineNotFound_sessionKeptOpen() {
+        // setup
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Mono.empty());
+
+        // execution
+        watcher.watch(session, device, firstCheckAt, Context.empty());
+        virtualTime.advanceTimeBy(UNTIL_FIRST_CHECK);
+
+        // verifications
+        verify(session, never()).close(DEVICE_REMOVED);
+    }
+
+    @Test
+    void watch_machineNotFoundThenRemoved_sessionClosedAtNextCheck() {
+        // setup
+        Machine deleted = machineWithStatus(DeviceStatus.DELETED);
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .thenReturn(Mono.empty(), Mono.just(deleted));
+        stubSessionClose();
+
+        // execution
+        watcher.watch(session, device, firstCheckAt, Context.empty());
+        virtualTime.advanceTimeBy(UNTIL_FIRST_CHECK);
+        virtualTime.advanceTimeBy(RECHECK_INTERVAL);
 
         // verifications
         verify(session).close(DEVICE_REMOVED);
@@ -188,7 +224,38 @@ class RelayAccessWatcherTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", " "})
-    void watch_noTenant_machineLookedUpByIdOnly(String tenantId) {
+    void watch_tenantRoutingWithoutTenant_machineNotLookedUp(String tenantId) {
+        // setup
+        RelayDevice noTenantDevice = new RelayDevice(tenantId, MACHINE_ID);
+        when(session.getId()).thenReturn(SESSION_ID);
+
+        // execution
+        watcher.watch(session, noTenantDevice, firstCheckAt, Context.empty());
+        virtualTime.advanceTimeBy(UNTIL_FIRST_CHECK);
+
+        // verifications
+        verifyNoInteractions(machineRepository);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void watch_tenantRoutingWithoutTenant_returnsDisposedWatch(String tenantId) {
+        // setup
+        RelayDevice noTenantDevice = new RelayDevice(tenantId, MACHINE_ID);
+        when(session.getId()).thenReturn(SESSION_ID);
+
+        // execution
+        Disposable watch = watcher.watch(session, noTenantDevice, firstCheckAt, Context.empty());
+
+        // verifications
+        assertThat(watch.isDisposed()).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " ", TENANT_ID})
+    void watch_singleTenantMode_machineLookedUpByIdOnly(String tenantId) {
         // setup
         RelayDevice singleTenantDevice = new RelayDevice(tenantId, MACHINE_ID);
         Machine deleted = machineWithStatus(DeviceStatus.DELETED);
@@ -196,7 +263,7 @@ class RelayAccessWatcherTest {
         stubSessionClose();
 
         // execution
-        watcher.watch(session, singleTenantDevice, firstCheckAt, Context.empty());
+        singleTenantWatcher.watch(session, singleTenantDevice, firstCheckAt, Context.empty());
         virtualTime.advanceTimeBy(UNTIL_FIRST_CHECK);
 
         // verifications
@@ -224,7 +291,8 @@ class RelayAccessWatcherTest {
     void watch_firstCheckAlreadyDue_checkedImmediately() {
         // setup
         Instant overdue = Instant.now().minusSeconds(30);
-        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Mono.empty());
+        Machine deleted = machineWithStatus(DeviceStatus.DELETED);
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Mono.just(deleted));
         stubSessionClose();
 
         // execution
@@ -250,7 +318,7 @@ class RelayAccessWatcherTest {
 
     private void stubSessionClose() {
         when(session.getId()).thenReturn(SESSION_ID);
-        when(session.close(DEVICE_REMOVED)).thenReturn(Mono.empty());
+        when(session.close(DEVICE_REMOVED)).thenReturn(closeProbe.mono());
     }
 
     private static Machine machineWithStatus(DeviceStatus status) {

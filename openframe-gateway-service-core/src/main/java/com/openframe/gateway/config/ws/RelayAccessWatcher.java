@@ -5,10 +5,12 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.reactive.repository.device.ReactiveMachineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.Disposable;
+import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.context.ContextView;
@@ -35,7 +37,15 @@ public class RelayAccessWatcher {
 
     private final ReactiveMachineRepository machineRepository;
 
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private final boolean tenantRoutingEnabled;
+
     public Disposable watch(WebSocketSession session, RelayDevice device, Instant firstCheckAt, ContextView context) {
+        if (tenantRoutingEnabled && isBlank(device.getTenantId())) {
+            log.warn("Relay session {} of machine {} has no tenant, so its device is not checked",
+                    session.getId(), device.getMachineId());
+            return Disposables.disposed();
+        }
         Duration untilFirstCheck = delayUntil(firstCheckAt);
         return Flux.interval(untilFirstCheck, RECHECK_INTERVAL)
                 .concatMap(tick -> isRemoved(device).contextWrite(context))
@@ -56,7 +66,7 @@ public class RelayAccessWatcher {
     private Mono<Boolean> isRemoved(RelayDevice device) {
         return findMachine(device)
                 .map(machine -> REMOVED_STATUSES.contains(machine.getStatus()))
-                .defaultIfEmpty(true)
+                .switchIfEmpty(Mono.fromSupplier(() -> keepOpenWhenNotFound(device)))
                 .onErrorResume(failure -> {
                     log.warn("Relay access check failed for machine {}, relay kept open until the next check",
                             device.getMachineId(), failure);
@@ -64,11 +74,17 @@ public class RelayAccessWatcher {
                 });
     }
 
+    private static boolean keepOpenWhenNotFound(RelayDevice device) {
+        log.warn("Relay access check found no machine {} in tenant {}, relay kept open",
+                device.getMachineId(), device.getTenantId());
+        return false;
+    }
+
     private Mono<Machine> findMachine(RelayDevice device) {
-        if (isBlank(device.getTenantId())) {
-            return machineRepository.findByMachineId(device.getMachineId());
+        if (tenantRoutingEnabled) {
+            return machineRepository.findByTenantIdAndMachineId(device.getTenantId(), device.getMachineId());
         }
-        return machineRepository.findByTenantIdAndMachineId(device.getTenantId(), device.getMachineId());
+        return machineRepository.findByMachineId(device.getMachineId());
     }
 
     private Mono<Void> closeRemoved(WebSocketSession session, RelayDevice device) {

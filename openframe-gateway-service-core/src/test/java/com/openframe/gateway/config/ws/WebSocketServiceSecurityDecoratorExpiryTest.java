@@ -23,6 +23,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Mono;
+import reactor.test.publisher.PublisherProbe;
 import reactor.test.scheduler.VirtualTimeScheduler;
 import reactor.util.context.Context;
 import reactor.util.context.ContextView;
@@ -298,6 +299,73 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "/ws/tools/agent/meshcentral-server/agent.ashx",
+            "/ws/tools/meshcentral-server/control.ashx",
+            "/ws/nats"
+    })
+    void handleRequest_nonRelayClosedBeforeExpiry_expiryCloseCancelled(String path) {
+        // setup
+        stubOpenSession(path, Mono.just(CloseStatus.NORMAL));
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+        virtualTime.advanceTimeBy(PAST_EXPIRY);
+
+        // verifications
+        verify(clientSession, never()).close();
+    }
+
+    @Test
+    void handleRequest_tokenExpiryUnreadable_sessionClosed() {
+        // setup
+        PublisherProbe<Void> closeProbe = PublisherProbe.empty();
+        stubSecuredPath(AGENT_RELAY_PATH);
+        when(requestJwtReader.getSubject(exchange)).thenReturn(Optional.of(SUBJECT));
+        when(requestJwtReader.getExpiration(exchange)).thenThrow(new IllegalStateException("No Authorization header found"));
+        when(clientSession.getId()).thenReturn(SESSION_ID);
+        when(clientSession.close()).thenReturn(closeProbe.mono());
+        when(defaultWebSocketService.handleRequest(eq(exchange), any(WebSocketHandler.class)))
+                .thenAnswer(invocation -> invocation.<WebSocketHandler>getArgument(1).handle(clientSession));
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+
+        // verifications
+        assertThat(closeProbe.wasSubscribed()).isTrue();
+    }
+
+    @Test
+    void handleRequest_unsecuredPath_handedToDefaultHandler() {
+        // setup
+        PublisherProbe<Void> handled = PublisherProbe.empty();
+        stubSecuredPath("/ws/other");
+        when(defaultWebSocketService.handleRequest(exchange, proxyHandler)).thenReturn(handled.mono());
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+
+        // verifications
+        assertThat(handled.wasSubscribed()).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/ws/tools/agent/meshcentral-server/agent.ashx",
+            "/ws/tools/meshcentral-server/control.ashx"
+    })
+    void handleRequest_securedSession_openingRecorded(String path) {
+        // setup
+        stubOpenSession(path, Mono.never());
+
+        // execution
+        decorator.handleRequest(exchange, proxyHandler).block();
+
+        // verifications
+        verify(gatewayTrafficMetrics).webSocketOpened(SESSION_ID, path, SUBJECT);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/ws/tools/agent/meshcentral-server/agent.ashx",
             "/ws/tools/meshcentral-server/control.ashx"
     })
     void handleRequest_nonRelayClosed_closeRecordedAsNotRelay(String path) {
@@ -349,10 +417,14 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
         assertThat(relay).isFalse();
     }
 
-    private void stubOpenSession(String path, Mono<CloseStatus> closeStatus) {
+    private void stubSecuredPath(String path) {
         when(exchange.getRequest()).thenReturn(request);
         when(request.getPath()).thenReturn(requestPath);
         when(requestPath.value()).thenReturn(path);
+    }
+
+    private void stubOpenSession(String path, Mono<CloseStatus> closeStatus) {
+        stubSecuredPath(path);
         when(requestJwtReader.getSubject(exchange)).thenReturn(Optional.of(SUBJECT));
         when(requestJwtReader.getExpiration(exchange)).thenReturn(expiresAt);
         when(clientSession.getId()).thenReturn(SESSION_ID);
