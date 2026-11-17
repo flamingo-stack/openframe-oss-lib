@@ -14,7 +14,8 @@ import java.time.Instant;
 /**
  * The tenant's agent log key, shared by the api (dashboard install command),
  * the client (agents that registered without one) and management (creates it).
- * One key per tenant, never rotated.
+ * The newest key is the current one: rotating adds a key, and the logs gateway
+ * only accepts the newest.
  */
 @Slf4j
 @Service
@@ -25,12 +26,19 @@ public class AgentLogKeyService {
     private final SecretKeyGenerator keyGenerator;
     private final EncryptionService encryptionService;
 
-    public AgentLogKeyResponse getLogKey() {
+    public AgentKeyResponse current() {
         return logKeyRepository.findFirstByOrderByCreatedAtDesc()
-                .map(logKey -> new AgentLogKeyResponse(
+                .map(logKey -> new AgentKeyResponse(
                         encryptionService.decrypt(logKey.getEncryptedKey()),
                         logKey.getCreatedAt()))
                 .orElseThrow(AgentLogKeyNotFoundException::new);
+    }
+
+    public AgentKeyResponse rotate() {
+        String plainKey = keyGenerator.generate();
+        AgentLogKey savedKey = saveNewKey(plainKey);
+        log.info("Rotated agent log key, new key ID: {}", savedKey.getId());
+        return new AgentKeyResponse(plainKey, savedKey.getCreatedAt());
     }
 
     public void createIfMissing() {
@@ -39,12 +47,15 @@ public class AgentLogKeyService {
             return;
         }
 
-        AgentLogKey logKey = new AgentLogKey();
-        logKey.setEncryptedKey(encryptionService.encrypt(keyGenerator.generate()));
-        logKey.setCreatedAt(Instant.now());
-
-        AgentLogKey savedKey = logKeyRepository.save(logKey);
+        AgentLogKey savedKey = saveNewKey(keyGenerator.generate());
         log.info("Generated agent log key with ID: {}", savedKey.getId());
+    }
+
+    private AgentLogKey saveNewKey(String plainKey) {
+        AgentLogKey logKey = new AgentLogKey();
+        logKey.setEncryptedKey(encryptionService.encrypt(plainKey));
+        logKey.setCreatedAt(Instant.now());
+        return logKeyRepository.save(logKey);
     }
 
 }
