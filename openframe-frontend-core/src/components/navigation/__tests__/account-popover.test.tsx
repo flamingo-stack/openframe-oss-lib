@@ -98,10 +98,20 @@ describe('AccountPopover', () => {
     expect(trigger()).toHaveClass('justify-center', 'gap-0', 'px-0');
     expect(nameHidden()).toBe(true);
 
-    // `avatarOnly` in the rail: the same 8px in, not a padless square.
+    // `avatarOnly` in the rail: the circle around the avatar, 8px in, not a full-width row.
     rerender(<AccountPopover collapsed avatarOnly name="Ada Lovelace" items={entries()} />);
-    expect(trigger()).toHaveClass('pl-[var(--spacing-system-xsf)]');
-    expect(trigger()).not.toHaveClass('p-0');
+    expect(trigger()).toHaveClass('size-8', 'rounded-full', 'ml-[var(--spacing-system-xsf)]');
+    expect(trigger()).not.toHaveClass('w-full', 'rounded-md', 'pl-[var(--spacing-system-xsf)]');
+
+    // `avatarOnly` in a centred rail: the same circle on the rail's centre line.
+    rerender(<AccountPopover collapsed collapsedAlign="center" avatarOnly name="Ada Lovelace" items={entries()} />);
+    expect(trigger()).toHaveClass('size-8', 'rounded-full', 'mx-auto');
+    expect(trigger()).not.toHaveClass('w-full', 'rounded-md');
+
+    // A row trigger in the rail keeps its corners.
+    rerender(<AccountPopover collapsed name="Ada Lovelace" items={entries()} />);
+    expect(trigger()).toHaveClass('w-full', 'rounded-md');
+    expect(trigger()).not.toHaveClass('rounded-full');
 
     // Expanded, `collapsedAlign` changes nothing.
     rerender(<AccountPopover collapsedAlign="center" name="Ada Lovelace" items={entries()} />);
@@ -113,9 +123,10 @@ describe('AccountPopover', () => {
     render(<AccountPopover avatarOnly name="Ada Lovelace" email="ada@example.com" items={entries()} />);
     const trigger = screen.getByRole('button', { name: 'Account: Ada Lovelace' });
     expect(trigger).toHaveAttribute('title', 'Ada Lovelace');
-    // A square around the avatar, not the row's full width; the name's column taken out.
-    expect(trigger).toHaveClass('size-8', 'justify-center');
-    expect(trigger).not.toHaveClass('w-full');
+    // A circle around the round avatar (its hover and open tint follow the avatar), not the row's full width; the
+    // name's column taken out.
+    expect(trigger).toHaveClass('size-8', 'justify-center', 'rounded-full');
+    expect(trigger).not.toHaveClass('w-full', 'rounded-md');
     expect(/class="[^"]*\bflex-1\b[^"]*\bhidden\b/.test(document.body.innerHTML)).toBe(true);
 
     const menu = await openMenu(trigger);

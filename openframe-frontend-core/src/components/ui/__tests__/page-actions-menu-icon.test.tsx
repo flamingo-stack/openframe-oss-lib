@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
+import { loadActionsMenuDropdown } from '../actions-menu-on-demand';
 import { type PageActionButton, PageActions } from '../page-actions';
 
 const RETINT = '[&&_svg]:!text-ods-text-secondary';
@@ -17,6 +18,11 @@ function menuRowIcon(testId: string): HTMLElement {
 function renderActions(actions: PageActionButton[]) {
   render(<PageActions variant="icon-buttons" actions={actions} />);
 }
+
+// The "…" menu's module loads on demand; loaded once here, every menu below renders at once.
+beforeAll(async () => {
+  await loadActionsMenuDropdown();
+});
 
 describe('PageActions mobile menu row icon', () => {
   it('re-tints an icon tinted for an accent button', () => {

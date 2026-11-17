@@ -25,6 +25,9 @@ import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedReposito
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +40,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -73,7 +77,7 @@ class SoftwareActionDetailServiceTest {
     }
 
     @Test
-    @DisplayName("NOW: leaves map their status, offline NEW sentinels become SCHEDULED, OS-skip is hidden")
+    @DisplayName("NOW: leaves map their status, NEW sentinels are IN_PROGRESS, OS-skip is hidden")
     void bundleDevices() {
         when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of(
                 leaf("m-success", ExecutionStatus.SUCCESS),
@@ -88,7 +92,23 @@ class SoftwareActionDetailServiceTest {
                 .containsExactlyInAnyOrder("m-success", "m-running", "m-offline");
         assertThat(status(rows, "m-success")).isEqualTo(SoftwareActionStatus.COMPLETED);
         assertThat(status(rows, "m-running")).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
-        assertThat(status(rows, "m-offline")).isEqualTo(SoftwareActionStatus.SCHEDULED);
+        assertThat(status(rows, "m-offline")).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void devices_nowBundleDeviceAwaitingDispatch_inProgress() {
+        // setup
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of());
+        when(bundleOnlineDispatchRepository.findByTenantIdAndBundleId(TENANT, "b1")).thenReturn(List.of(
+                bundleSentinel("m-waiting", DeviceOnlineDispatchStatus.NEW)));
+
+        // execution
+        List<SoftwareActionDeviceResponse> rows = service.devices(EXEC, "b1", null, null, null);
+
+        // verifications
+        assertThat(rows)
+                .extracting(SoftwareActionDeviceResponse::getMachineId, SoftwareActionDeviceResponse::getStatus)
+                .containsExactly(tuple("m-waiting", SoftwareActionStatus.IN_PROGRESS));
     }
 
     @Test
@@ -178,6 +198,40 @@ class SoftwareActionDetailServiceTest {
         assignment.setTagId(tagId);
         assignment.setEntityType(TagEntityType.DEVICE);
         return assignment;
+    }
+
+    @Test
+    @DisplayName("package update: a waiting device carries why it waits and when it is asked again, closed and forced")
+    void packageUpdateWaiting_detail() {
+        Instant askAgainAt = Instant.parse("2026-11-14T10:00:00Z");
+        Instant deadlineAt = Instant.parse("2026-11-20T10:00:00Z");
+        ScriptExecution autoUpdate = updateLeaf("m-auto", ExecutionStatus.RUNNING, "req-1");
+        autoUpdate.setSoftwareAction(SoftwareAction.UPDATE);
+        autoUpdate.setSource(ExecutionSource.PACKAGE_AUTO_UPDATE);
+        ScriptExecution adminUpdate = updateLeaf("m-admin", ExecutionStatus.RUNNING, "req-1");
+        adminUpdate.setSoftwareAction(SoftwareAction.UPDATE);
+        adminUpdate.setSource(ExecutionSource.PACKAGE_UPDATE);
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of(autoUpdate, adminUpdate));
+        PackageUpdateDeviceState postponed = deviceState("req-1", "m-auto", SoftwareActionStatus.WAITING);
+        postponed.setWaitingReason("APP_RUNNING");
+        postponed.setWaitingPhase("POSTPONED");
+        postponed.setAskAgainAt(askAgainAt);
+        postponed.setDeadlineAt(deadlineAt);
+        when(packageUpdateDeviceStateRepository.findByTenantIdAndRequestIdIn(TENANT, Set.of("req-1")))
+                .thenReturn(List.of(postponed, deviceState("req-1", "m-admin", SoftwareActionStatus.IN_PROGRESS)));
+
+        List<SoftwareActionDeviceResponse> rows = service.devices(EXEC, null, null, null, null);
+
+        SoftwareActionDeviceResponse waiting = rows.get(0);
+        assertThat(waiting.getKind()).isEqualTo(SoftwareActionKind.AUTO_UPDATE);
+        assertThat(waiting.getWaitingReason()).isEqualTo("APP_RUNNING");
+        assertThat(waiting.getWaitingPhase()).isEqualTo("POSTPONED");
+        assertThat(waiting.getAskAgainAt()).isEqualTo(askAgainAt);
+        assertThat(waiting.getDeadlineAt()).isEqualTo(deadlineAt);
+        SoftwareActionDeviceResponse running = rows.get(1);
+        assertThat(running.getKind()).isEqualTo(SoftwareActionKind.UPDATE);
+        assertThat(running.getWaitingReason()).isNull();
+        assertThat(running.getDeadlineAt()).isNull();
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.openframe.api.service.NotificationRecipientResolver;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
@@ -25,6 +26,9 @@ import com.openframe.data.document.tool.ToolType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -35,6 +39,7 @@ import org.dataloader.DataLoader;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
@@ -54,6 +59,7 @@ class DeviceDataFetcherTest {
     @Mock private NotificationRecipientResolver recipientResolver;
     @Mock private DgsDataFetchingEnvironment dfe;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
+    @Spy private ClientVersionThreshold clientVersionThreshold = new ClientVersionThreshold("1.6.0");
 
     @InjectMocks private DeviceDataFetcher fetcher;
 
@@ -114,6 +120,30 @@ class DeviceDataFetcherTest {
 
         // verifications
         assertThat(result).isNull();
+    }
+
+    @ParameterizedTest
+    @MethodSource("clientOutdatedCases")
+    void clientOutdated_agentVersionKeyAgainstThreshold_outdatedOnlyBelow(Long agentVersionKey, boolean expected) {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        machine.setAgentVersionKey(agentVersionKey);
+        when(dfe.getSource()).thenReturn(machine);
+
+        // execution
+        boolean result = fetcher.clientOutdated(dfe);
+
+        // verifications
+        assertThat(result).isEqualTo(expected);
+    }
+
+    private static Stream<Arguments> clientOutdatedCases() {
+        return Stream.of(
+                Arguments.of(null, false),
+                Arguments.of(1_000_005_000_009L, true),
+                Arguments.of(1_000_006_000_000L, false),
+                Arguments.of(1_000_006_000_001L, false));
     }
 
     @Test

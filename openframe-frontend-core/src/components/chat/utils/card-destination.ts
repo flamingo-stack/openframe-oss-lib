@@ -51,6 +51,14 @@ function readFetchedCardUrl(item: unknown): string | null {
   return typeof url === 'string' && url ? url : null;
 }
 
+/** A doc's tree path, on the ref or on the fetched row. A record shown again from history comes as a bare ref, and its
+ *  row may name no url: the path is what still opens it in the host's docs viewer. */
+function readDocPath(source: unknown): string | null {
+  if (!source || typeof source !== 'object') return null;
+  const path = (source as { metadata?: { path?: unknown } | null }).metadata?.path;
+  return typeof path === 'string' && path ? path : null;
+}
+
 /**
  * Human title of a fetched row: `title`, else `name`, else null.
  *
@@ -70,7 +78,7 @@ export function readFetchedCardTitle(item: unknown): string | null {
 /** The row a card's ref and its fetched row describe, in the words the row resolver reads. */
 export function recordRowOf({ chatRef, item }: Pick<CardDestinationInput, 'chatRef' | 'item'>): SourceRowInput {
   const url = chatRef.url ?? readFetchedCardUrl(item);
-  const path = typeof chatRef.metadata?.path === 'string' && chatRef.metadata.path ? chatRef.metadata.path : null;
+  const path = readDocPath(chatRef) ?? readDocPath(item);
   return {
     documentType: chatRef.type,
     id: chatRef.id,

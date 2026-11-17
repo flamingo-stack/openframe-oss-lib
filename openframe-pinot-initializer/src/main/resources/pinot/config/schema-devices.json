@@ -23,6 +23,12 @@
       "singleValueField": true
     },
     {
+      "name": "agentVersionKey",
+      "dataType": "LONG",
+      "singleValueField": true,
+      "defaultNullValue": -1
+    },
+    {
       "name": "deviceType",
       "dataType": "STRING",
       "singleValueField": true

@@ -1,6 +1,8 @@
 package com.openframe.data.repository.ticket;
 
+import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketOwnerType;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
@@ -59,6 +61,33 @@ class TicketProjectionRepositoryTest {
                 .containsEntry("statusKind", TicketStatusKind.ARCHIVED)
                 .containsKey("updatedAt");
         assertThat(archived).isEqualTo(3);
+    }
+
+    @Test
+    void findMachineOrganizationId_readsTheTenantsMachineFromThePrimary() {
+        // setup
+        Machine machine = new Machine();
+        machine.setOrganizationId("org-b");
+        when(mongoOperations.findOne(any(Query.class), eq(Machine.class))).thenReturn(machine);
+
+        // execution
+        Optional<String> organizationId = repository.findMachineOrganizationId("tenant-a", "machine-1");
+
+        // verifications
+        verify(mongoOperations).findOne(queryCaptor.capture(), eq(Machine.class));
+        Query query = queryCaptor.getValue();
+        assertThat(query.getQueryObject()).containsEntry("tenantId", "tenant-a").containsEntry("machineId", "machine-1");
+        assertThat(query.getReadPreference()).isEqualTo(ReadPreference.primary());
+        assertThat(organizationId).contains("org-b");
+    }
+
+    @Test
+    void findMachineOrganizationId_goneMachine_empty() {
+        // execution
+        Optional<String> organizationId = repository.findMachineOrganizationId("tenant-a", "machine-gone");
+
+        // verifications
+        assertThat(organizationId).isEmpty();
     }
 
     @Test

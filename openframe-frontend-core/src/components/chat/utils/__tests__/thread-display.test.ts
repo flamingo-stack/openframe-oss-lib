@@ -14,6 +14,7 @@ import {
   pendingApprovalIdOf,
   pendingOfferIdOf,
   threadForDisplay,
+  withEmbeddedChatAuthor,
   withThreadAuthor,
 } from '../thread-display';
 
@@ -172,6 +173,46 @@ describe('who wrote a row', () => {
     expect(isForeignReply(holding('p'))).toBe(false);
     expect(isForeignReply(userRow('u'))).toBe(false);
     expect(isForeignReply(holding('a', { type: 'text', text: 'Hi' }))).toBe(true);
+  });
+});
+
+describe('who wrote a row in the embeddable chat (Mingo and guide)', () => {
+  const VIEWER = { ownName: 'Michael Doe', ownAvatar: 'https://cdn.example.com/michael.png' };
+  const ownSend: ChatMessage = { id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'what can you do' }] };
+  const authorOf = (message: ChatMessage, defaults = {}) => withEmbeddedChatAuthor(message, defaults).metadata?.author;
+
+  it('Mingo: the viewer’s own just-sent row (no author at all) takes the viewer’s name and photo', () => {
+    expect(authorOf(ownSend, VIEWER)).toEqual({ name: 'Michael Doe', avatar: 'https://cdn.example.com/michael.png' });
+    expect(authorOf(ownSend, { ownName: 'Michael Doe' })).toEqual({ name: 'Michael Doe', avatar: null });
+    // No name known for the viewer: the generic default, as before.
+    expect(authorOf(ownSend, {})).toEqual({ name: 'You', avatar: null });
+  });
+
+  it('Mingo: a row with an author keeps its own, even with its photo or name missing', () => {
+    const jane: ChatMessage = {
+      id: 'm-1',
+      role: 'user',
+      metadata: { author: { name: 'Jane Smith', authorType: 'admin' } },
+      parts: [],
+    };
+    const nameless: ChatMessage = { id: 'm-2', role: 'user', metadata: { author: { authorType: 'admin' } }, parts: [] };
+    expect(authorOf(jane, VIEWER)).toEqual({ name: 'Jane Smith', authorType: 'admin', avatar: null });
+    expect(authorOf(nameless, VIEWER)).toEqual({ name: 'You', authorType: 'admin', avatar: null });
+  });
+
+  it('guide: every user row without its own name or photo takes the viewer’s, as before', () => {
+    const guide = { guideName: 'Michael Doe', guideAvatar: 'guide.png' };
+    const authored: ChatMessage = { id: 'm-3', role: 'user', metadata: { author: { authorType: 'user' } }, parts: [] };
+    expect(authorOf(ownSend, guide)).toEqual({ name: 'Michael Doe', avatar: 'guide.png' });
+    expect(authorOf(authored, guide)).toEqual({ name: 'Michael Doe', authorType: 'user', avatar: 'guide.png' });
+  });
+
+  it('the assistant is Mingo unless it names itself', () => {
+    expect(authorOf({ id: 'a', role: 'assistant', parts: [] }, VIEWER)).toEqual({
+      name: 'Mingo',
+      avatar: null,
+      assistantType: 'mingo',
+    });
   });
 });
 

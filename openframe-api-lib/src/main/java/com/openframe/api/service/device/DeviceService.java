@@ -41,6 +41,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +57,13 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 @Validated
 @RequiredArgsConstructor
 public class DeviceService {
+
+    // the API only ends a device's life; registration, promotion and the archive job own every other transition
+    private static final Set<DeviceStatus> API_SETTABLE_STATUSES = EnumSet.of(DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
+    private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
+            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
+            .map(Enum::name)
+            .toList();
 
     private final MachineRepository machineRepository;
     private final DeletedMachineCleanup deletedMachineCleanup;
@@ -94,7 +102,7 @@ public class DeviceService {
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
         if (!DeviceStatus.CONNECTED.contains(machine.getStatus())) {
             throw new BadRequestException(
-                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
+                    "Machine is not in a dispatchable state (must be a managed device): " + machineId);
         }
     }
 
@@ -180,6 +188,7 @@ public class DeviceService {
         return DeviceFilters.builder()
                 .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.STATUS)))
                 .connectivity(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.CONNECTIVITY)))
+                .clientOutdated(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.CLIENT_OUTDATED)))
                 .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.DEVICE_TYPE)))
                 .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.OS_TYPE)))
                 .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
@@ -251,12 +260,6 @@ public class DeviceService {
                 .build();
     }
 
-
-    private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
-            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
-            .map(Enum::name)
-            .toList();
-
     private MachineQueryFilter scheduleDeviceFilter(DeviceFilterCriteria filter,
                                                     Collection<OsType> osTypeScope,
                                                     Collection<String> restrictToMachineIds) {
@@ -273,6 +276,7 @@ public class DeviceService {
         if (filter != null) {
             builder.statuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null)
                     .connectivity(filter.getConnectivity() != null ? filter.getConnectivity().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .clientOutdated(filter.getClientOutdated())
                     .deviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null)
                     .organizationIds(filter.getOrganizationIds())
                     .manageableByPackageManagers(filter.getManageableByPackageManagers())
@@ -352,6 +356,9 @@ public class DeviceService {
 
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
+        if (!API_SETTABLE_STATUSES.contains(status)) {
+            throw new BadRequestException("Device status can only be set to DELETED or ARCHIVED, got " + status);
+        }
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         if (machine.getStatus() == status) {

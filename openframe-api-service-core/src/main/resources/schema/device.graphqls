@@ -21,6 +21,8 @@ extend type Query {
 type DeviceFilters {
     statuses: [DeviceFilterOption!]!
     connectivity: [DeviceFilterOption!]!
+    """Outdated client options: "true" (client below the minimum supported version) and "false" (supported or unknown version), both always listed, counted under the other filters. The outdated client banner reads the "true" count."""
+    clientOutdated: [DeviceFilterOption!]!
     deviceTypes: [DeviceFilterOption!]!
     osTypes: [DeviceFilterOption!]!
     organizationIds: [DeviceFilterOption!]!
@@ -47,6 +49,8 @@ type TagFilterOption {
 input DeviceFilterInput {
     statuses: [DeviceStatus!]
     connectivity: [DeviceConnectivity!]
+    """true: only devices whose client is below the minimum supported version; false: only supported or unknown versions; null: no filter."""
+    clientOutdated: Boolean
     deviceTypes: [DeviceType!]
     osTypes: [String!]
     organizationIds: [String!]
@@ -68,6 +72,8 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     status: DeviceStatus
     """Whether the agent is talking to us right now, independent of the lifecycle status. Null until the first heartbeat."""
     connectivity: DeviceConnectivity
+    """The client runs a version below the minimum supported one (server setting, 1.6.0 by default). False when the version is unknown. The devices sort field "clientOutdated" (DESC = outdated first) uses the same value."""
+    clientOutdated: Boolean!
     lastSeen: Instant
     organizationId: String
     organization: Organization
@@ -137,6 +143,7 @@ type MachinePackageManagers {
 
 enum DeviceStatus {
     PENDING,
+    MANAGED,
     ACTIVE
     INACTIVE
     MAINTENANCE
