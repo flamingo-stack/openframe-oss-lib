@@ -92,6 +92,8 @@ export * from '../layout/page-layout';
 export * from '../layout/article-detail-layout';
 export { ToggleGroup, ToggleGroupItem } from '../toggle-group';
 export * from './actions-menu';
+export * from './actions-menu-on-demand';
+export * from './actions-menu-trigger';
 export * from './benefit-card';
 export * from './brand-association-card';
 export * from './brand-association-grid';
