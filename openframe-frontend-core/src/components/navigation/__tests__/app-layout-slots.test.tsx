@@ -323,6 +323,11 @@ describe("AppLayout and the floating dock's frame", () => {
     const main = observed.find(entry => entry.target === screen.getByRole('main'));
     expect(main?.options).toEqual({ box: 'border-box' });
   });
+
+  it("watches the dock's border box, the height it hands the page", () => {
+    render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }));
+    expect(dockObserver()?.options).toEqual({ box: 'border-box' });
+  });
 });
 
 describe('AppLayout content width', () => {

@@ -309,7 +309,8 @@ export function AppLayout({
       last = height;
       flushSync(() => setDockHeight(height));
     });
-    observer.observe(dockElement);
+    // Its border box, what `offsetHeight` reads: a padding or border change is a new height too.
+    observer.observe(dockElement, { box: 'border-box' });
     return () => observer.disconnect();
   }, [hasDock, dockElement]);
 
