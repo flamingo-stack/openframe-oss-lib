@@ -152,6 +152,28 @@ class SoftwareProjectorTest {
     }
 
     @Test
+    void project_packageWingetInstalled_matchedByTheIdsOfItsDevices() {
+        when(aggregationRepository.rollUpTitle("t1", 9L)).thenReturn(Optional.of(rollup()
+                .name("Google Chrome").source("winget_packages").wingetIds(List.of("Google.Chrome")).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 9L)).thenReturn(Optional.empty());
+        PackageCatalogEntry chrome = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.WINGET).packageId("Google.Chrome").version("130.0").build();
+        List<InstalledProgram> asked = stubMatch(PackageMatch.of(chrome));
+
+        projector.project("t1", 9L);
+
+        InstalledProgram program = asked.getFirst();
+        assertThat(program.getFleetSource()).isEqualTo(FleetSource.WINGET_PACKAGES);
+        assertThat(program.getWingetIds()).containsExactly("Google.Chrome");
+        ArgumentCaptor<Software> captor = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(captor.capture());
+        Software saved = captor.getValue();
+        assertThat(saved.getWingetIds()).containsExactly("Google.Chrome");
+        assertThat(saved.getPackageMatch().getState()).isEqualTo(PackageMatchState.MATCHED);
+        assertThat(saved.getPackageMatch().getPackageId()).isEqualTo("Google.Chrome");
+    }
+
+    @Test
     void project_windowsProgram_storesItsKeysAndTheMatch() {
         when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(rollup()
                 .name("Google Chrome").source("programs").vendor("Google LLC").upgradeCode("{UPGRADE}")
@@ -262,6 +284,19 @@ class SoftwareProjectorTest {
         assertThat(captor.getValue().getPackageMatch().getState()).isEqualTo(PackageMatchState.AMBIGUOUS);
     }
 
+    @Test
+    void project_wingetIdsOfTheDevicesChanged_matchesAgain() {
+        Software stored = chromeProjected(Instant.now());
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup()
+                .wingetIds(List.of("Google.Chrome")).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.of(stored));
+        List<InstalledProgram> asked = stubMatch(PackageMatch.noPackage());
+
+        projector.project("t1", 7L);
+
+        assertThat(asked.getFirst().getWingetIds()).containsExactly("Google.Chrome");
+    }
+
     private static RollupBuilder chromeRollup() {
         return rollup().name("Google Chrome").source("programs").vendor("Google LLC")
                 .versions(List.of("130.0")).arpKeys(List.of("Google Chrome")).systemComponent(false);
@@ -302,6 +337,7 @@ class SoftwareProjectorTest {
         private List<String> arpKeys = List.of();
         private List<String> packageFamilyNames = List.of();
         private List<String> installerTypes = List.of();
+        private List<String> wingetIds = List.of();
         private boolean systemComponent;
         private Map<String, Integer> devicesByVersion = Map.of("1.0", 1);
 
@@ -315,12 +351,13 @@ class SoftwareProjectorTest {
         RollupBuilder arpKeys(List<String> value) { arpKeys = value; return this; }
         RollupBuilder packageFamilyNames(List<String> value) { packageFamilyNames = value; return this; }
         RollupBuilder installerTypes(List<String> value) { installerTypes = value; return this; }
+        RollupBuilder wingetIds(List<String> value) { wingetIds = value; return this; }
         RollupBuilder systemComponent(boolean value) { systemComponent = value; return this; }
         RollupBuilder devicesByVersion(Map<String, Integer> value) { devicesByVersion = value; return this; }
 
         SoftwareTitleRollup build() {
             return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
-                    arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion);
+                    arpKeys, packageFamilyNames, installerTypes, wingetIds, systemComponent, devicesByVersion);
         }
     }
 }

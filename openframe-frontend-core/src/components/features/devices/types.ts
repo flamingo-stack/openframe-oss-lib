@@ -19,7 +19,10 @@ export interface DeviceRow extends DeviceNameSource {
   id: string;
   /** The agent's id. Empty when the agent is not connected. */
   machineId: string;
+  /** The lifecycle status: PENDING, MANAGED (legacy ONLINE / OFFLINE), PENDING_DELETION, ARCHIVED, DELETED. */
   status: string;
+  /** ONLINE / OFFLINE right now, apart from the lifecycle. Absent or null reads as OFFLINE. */
+  connectivity?: string | null;
   /** When the device was last seen, ISO. Two spellings, one per source. */
   last_seen?: string;
   lastSeen?: string;
@@ -44,6 +47,12 @@ export interface DeviceRow extends DeviceNameSource {
   directorySources?: readonly string[];
   /** The viewer's unread notifications about this device. Absent or 0: no indicator. */
   unreadNotificationCount?: number;
+  /**
+   * The server's verdict that the device's OpenFrame client is below the supported version
+   * (`Machine.clientOutdated`). The lists then show OUTDATED in place of the status. The
+   * threshold is the server's: never derive this from a version string here.
+   */
+  clientOutdated?: boolean;
 }
 
 export interface DeviceFilterValue {
@@ -66,6 +75,8 @@ export interface TagFilterOption {
 /** The facets behind the device filters, as the server counts them. */
 export interface DeviceFilters {
   statuses: DeviceFilterValue[];
+  /** ONLINE / OFFLINE counts; absent from a backend that has no connectivity facet. */
+  connectivity?: DeviceFilterValue[];
   deviceTypes: DeviceFilterValue[];
   osTypes: DeviceFilterValue[];
   organizationIds: DeviceFilterTag[];
@@ -75,11 +86,17 @@ export interface DeviceFilters {
   userLinks?: DeviceFilterValue[];
   /** Behind the SOURCES funnel; only hosts that draw the directory columns read it. */
   directorySources?: DeviceFilterValue[];
+  /**
+   * The outdated-client facet: the `"true"` and `"false"` options. Present only where the host asks
+   * for it; the Status funnel then offers OUTDATED with the `"true"` count.
+   */
+  clientOutdated?: DeviceFilterValue[];
 }
 
 /** What narrows a device list, in the backend's field names. */
 export interface DeviceFilterInput {
   statuses?: string[];
+  connectivity?: string[];
   deviceTypes?: string[];
   osTypes?: string[];
   organizationIds?: string[];
@@ -87,4 +104,6 @@ export interface DeviceFilterInput {
   tagValues?: string[];
   userLinks?: string[];
   directorySources?: string[];
+  /** `true`: outdated clients only. Absent: no narrowing. */
+  clientOutdated?: boolean;
 }

@@ -1,15 +1,18 @@
 package com.openframe.data.pinot.repository;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pinot.client.Connection;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static com.openframe.data.document.device.DeviceStatus.DELETED;
+import static com.openframe.data.document.device.DeviceStatus.MANAGED;
 import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
 import static com.openframe.data.document.device.DeviceStatus.ONLINE;
 
@@ -26,14 +29,20 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     private static final String TAG_KEY_VALUES = "tagKeyValues";
     private static final String DIRECTORY_SOURCES = "directorySources";
     private static final String DIRECTORY_USER_LINK = "directoryUserLink";
+    private static final String AGENT_VERSION_KEY = "agentVersionKey";
+    // args: column, column, threshold key / column, column, threshold key, column
+    private static final String OUTDATED_CONDITION = "(%s >= 0 AND %s < %d)";
+    private static final String NOT_OUTDATED_CONDITION = "(%s < 0 OR %s >= %d OR %s IS NULL)";
+    private static final String OUTDATED_FACET_VALUE = "true";
+    private static final String NOT_OUTDATED_FACET_VALUE = "false";
 
     /**
      * Statuses considered "active" for the organization device counts facet
-     * ({@link #getOrganizationFilterOptions}). That facet counts only ONLINE and OFFLINE
-     * devices; every other facet and the filtered device count keep the default behaviour
-     * of excluding only DELETED devices.
+     * ({@link #getOrganizationFilterOptions}). That facet counts only managed devices
+     * (ONLINE/OFFLINE until migration 031 rewrites them); every other facet and the filtered
+     * device count keep the default behaviour of excluding only DELETED devices.
      */
-    private static final List<String> ACTIVE_STATUSES = List.of(ONLINE.name(), OFFLINE.name());
+    private static final List<String> ACTIVE_STATUSES = List.of(MANAGED.name(), ONLINE.name(), OFFLINE.name());
 
     /**
      * Explicit upper bound for faceted GROUP BY queries. Without an explicit LIMIT,
@@ -46,8 +55,12 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     @Value("${pinot.tables.devices.name:devices}")
     private String devicesTable;
 
-    public PinotClientDeviceRepository(@Qualifier("pinotBrokerConnection") Connection pinotConnection) {
+    private final ClientVersionThreshold clientVersionThreshold;
+
+    public PinotClientDeviceRepository(@Qualifier("pinotBrokerConnection") Connection pinotConnection,
+                                       ClientVersionThreshold clientVersionThreshold) {
         super(pinotConnection);
+        this.clientVersionThreshold = clientVersionThreshold;
     }
 
     @Override
@@ -55,6 +68,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -62,7 +76,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues,
             List<String> directorySources,
             List<String> userLinks) {
-        return executeFacetQuery(STATUS, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+        return executeFacetQuery(STATUS, tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
                 directorySources, userLinks, STATUS);
     }
 
@@ -71,6 +85,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -78,12 +93,12 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues,
             List<String> directorySources,
             List<String> userLinks) {
-        return executeFacetQuery(CONNECTIVITY, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys,
+        return executeFacetQuery(CONNECTIVITY, tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys,
                 tagKeyValues, directorySources, userLinks, CONNECTIVITY);
     }
 
     @Override
-    public Map<String, Integer> getDeviceTypeFilterOptions(
+    public Map<String, Integer> getClientOutdatedFilterOptions(
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
@@ -94,7 +109,31 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues,
             List<String> directorySources,
             List<String> userLinks) {
-        return executeFacetQuery(DEVICE_TYPE, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+        // Two counts, one per side of the clientOutdated filter, every other filter as given
+        int outdated = getFilteredDeviceCount(tenantId, statuses, connectivity, Boolean.TRUE, deviceTypes, osTypes,
+                organizationIds, tagKeys, tagKeyValues, directorySources, userLinks);
+        int notOutdated = getFilteredDeviceCount(tenantId, statuses, connectivity, Boolean.FALSE, deviceTypes, osTypes,
+                organizationIds, tagKeys, tagKeyValues, directorySources, userLinks);
+        Map<String, Integer> options = new LinkedHashMap<>();
+        options.put(OUTDATED_FACET_VALUE, outdated);
+        options.put(NOT_OUTDATED_FACET_VALUE, notOutdated);
+        return options;
+    }
+
+    @Override
+    public Map<String, Integer> getDeviceTypeFilterOptions(
+            String tenantId,
+            List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
+            List<String> deviceTypes,
+            List<String> osTypes,
+            List<String> organizationIds,
+            List<String> tagKeys,
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
+        return executeFacetQuery(DEVICE_TYPE, tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
                 directorySources, userLinks, DEVICE_TYPE);
     }
 
@@ -103,6 +142,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -110,7 +150,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues,
             List<String> directorySources,
             List<String> userLinks) {
-        return executeFacetQuery(OS_TYPE, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+        return executeFacetQuery(OS_TYPE, tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
                 directorySources, userLinks, OS_TYPE);
     }
 
@@ -119,6 +159,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -127,7 +168,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> directorySources,
             List<String> userLinks) {
         // Organization device counts only include active devices (ONLINE / OFFLINE).
-        return executeActiveFacetQuery(ORGANIZATION_ID, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys,
+        return executeActiveFacetQuery(ORGANIZATION_ID, tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys,
                 tagKeyValues, directorySources, userLinks, ORGANIZATION_ID);
     }
 
@@ -136,6 +177,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -143,7 +185,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues,
             List<String> directorySources,
             List<String> userLinks) {
-        return executeFacetQuery(TAG_KEY_VALUES, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys,
+        return executeFacetQuery(TAG_KEY_VALUES, tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys,
                 tagKeyValues, directorySources, userLinks, TAG_KEY_VALUES);
     }
 
@@ -152,6 +194,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -160,7 +203,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> directorySources,
             List<String> userLinks) {
         // A machine no directory knows stores [""] (the column's defaultNullValue), which executeKeyCountQuery skips.
-        return executeFacetQuery(DIRECTORY_SOURCES, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys,
+        return executeFacetQuery(DIRECTORY_SOURCES, tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys,
                 tagKeyValues, directorySources, userLinks, DIRECTORY_SOURCES);
     }
 
@@ -169,6 +212,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -178,7 +222,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> userLinks) {
         // A machine no external directory integration wrote reads NONE (the column's defaultNullValue), so it is
         // counted.
-        return executeFacetQuery(DIRECTORY_USER_LINK, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys,
+        return executeFacetQuery(DIRECTORY_USER_LINK, tenantId, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys,
                 tagKeyValues, directorySources, userLinks, DIRECTORY_USER_LINK);
     }
 
@@ -187,6 +231,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             String tenantId,
             List<String> statuses,
             List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -196,7 +241,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> userLinks) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(devicesTable, tenantId)
                 .selectCountAll();
-        applyDeviceFilters(queryBuilder, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+        applyDeviceFilters(queryBuilder, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
                 directorySources, userLinks, null);
         return executeCountQuery(queryBuilder.build());
     }
@@ -211,6 +256,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                                     String tenantId,
                                                     List<String> statuses,
                                                     List<String> connectivity,
+                                                    Boolean clientOutdated,
                                                     List<String> deviceTypes,
                                                     List<String> osTypes,
                                                     List<String> organizationIds,
@@ -220,7 +266,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                                     List<String> userLinks,
                                                     String excludeField) {
         PinotQueryBuilder queryBuilder = newFacetQueryBuilder(facetField, tenantId);
-        applyDeviceFilters(queryBuilder, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+        applyDeviceFilters(queryBuilder, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
                 directorySources, userLinks, excludeField);
         return executeKeyCountQuery(queryBuilder.build());
     }
@@ -233,6 +279,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                                          String tenantId,
                                                          List<String> statuses,
                                                          List<String> connectivity,
+                                                         Boolean clientOutdated,
                                                          List<String> deviceTypes,
                                                          List<String> osTypes,
                                                          List<String> organizationIds,
@@ -242,7 +289,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                                          List<String> userLinks,
                                                          String excludeField) {
         PinotQueryBuilder queryBuilder = newFacetQueryBuilder(facetField, tenantId);
-        applyActiveDeviceFilters(queryBuilder, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+        applyActiveDeviceFilters(queryBuilder, statuses, connectivity, clientOutdated, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
                 directorySources, userLinks, excludeField);
         return executeKeyCountQuery(queryBuilder.build());
     }
@@ -266,6 +313,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     private void applyDeviceFilters(PinotQueryBuilder queryBuilder,
                                     List<String> statuses,
                                     List<String> connectivity,
+                                    Boolean clientOutdated,
                                     List<String> deviceTypes,
                                     List<String> osTypes,
                                     List<String> organizationIds,
@@ -280,6 +328,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
         }
         applyStatusFilter(queryBuilder, requestedStatuses, excludeField);
         applyConnectivityFilter(queryBuilder, connectivity, excludeField);
+        applyClientOutdatedFilter(queryBuilder, clientOutdated);
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
                 directorySources, userLinks, excludeField);
     }
@@ -292,6 +341,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     private void applyActiveDeviceFilters(PinotQueryBuilder queryBuilder,
                                           List<String> statuses,
                                           List<String> connectivity,
+                                          Boolean clientOutdated,
                                           List<String> deviceTypes,
                                           List<String> osTypes,
                                           List<String> organizationIds,
@@ -303,6 +353,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
         queryBuilder.whereIn(STATUS, ACTIVE_STATUSES);
         applyStatusFilter(queryBuilder, sanitizeStatuses(statuses), excludeField);
         applyConnectivityFilter(queryBuilder, connectivity, excludeField);
+        applyClientOutdatedFilter(queryBuilder, clientOutdated);
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
                 directorySources, userLinks, excludeField);
     }
@@ -339,6 +390,19 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             return;
         }
         queryBuilder.whereOr(CONNECTIVITY, connectivity);
+    }
+
+    // A row without a known version holds the column default -1 (0 is never a real key, ClientVersionKey reads 0.0.0
+    // as unknown); IS NULL is kept for queries run with null handling on. Either way it lands on the not-outdated side
+    private void applyClientOutdatedFilter(PinotQueryBuilder queryBuilder, Boolean clientOutdated) {
+        if (clientOutdated == null) {
+            return;
+        }
+        long thresholdKey = clientVersionThreshold.getMinSupportedKey();
+        String condition = clientOutdated
+                ? OUTDATED_CONDITION.formatted(AGENT_VERSION_KEY, AGENT_VERSION_KEY, thresholdKey)
+                : NOT_OUTDATED_CONDITION.formatted(AGENT_VERSION_KEY, AGENT_VERSION_KEY, thresholdKey, AGENT_VERSION_KEY);
+        queryBuilder.where(condition);
     }
 
     private void applyNonStatusFilters(PinotQueryBuilder queryBuilder,

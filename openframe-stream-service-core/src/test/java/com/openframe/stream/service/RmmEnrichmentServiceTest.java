@@ -84,7 +84,7 @@ class RmmEnrichmentServiceTest {
         service.getExtraParams(message);
 
         assertThat(message.getExcludedDestinations()).containsExactlyInAnyOrder(
-                Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+                Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
     }
 
     @Test
@@ -100,7 +100,7 @@ class RmmEnrichmentServiceTest {
         service.getExtraParams(message);
 
         assertThat(message.getExcludedDestinations()).containsExactlyInAnyOrder(
-                Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+                Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
     }
 
     @Test

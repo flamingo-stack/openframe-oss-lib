@@ -58,6 +58,20 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
     }
 
     @Test
+    @DisplayName("title: the distinct winget ids of its machines, without the machines that report none")
+    void title_wingetIds() {
+        save(row(TENANT, "m1", CHROME).wingetId("Google.Chrome").build());
+        save(row(TENANT, "m2", CHROME).wingetId("Google.Chrome").build());
+        save(row(TENANT, "m3", CHROME).wingetId("Google.Chrome.EXE").build());
+        save(row(TENANT, "m4", CHROME).wingetId(" ").build());
+        save(row(TENANT, "m5", CHROME).build());
+
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        assertThat(rollup.wingetIds()).containsExactly("Google.Chrome", "Google.Chrome.EXE");
+    }
+
+    @Test
     @DisplayName("title: unions versions, CVEs and Windows keys across machines, without blanks, sorted")
     void title_unionsAcrossMachines() {
         save(row(TENANT, "m1", CHROME)
@@ -190,6 +204,27 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
 
         assertThat(repository.machineIdsWithCve(TENANT, "CVE-1")).isEmpty();
         assertThat(repository.machineIdsWithCve(TENANT, "CVE-404")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("title machines: each connected machine of this tenant that has the title, once")
+    void titleMachines_distinctConnectedMachinesOfTheTenant() {
+        save(row(TENANT, "m1", CHROME).build());
+        save(row(TENANT, "m2", CHROME).build());
+        save(row(TENANT, "m3", CHROME).machineConnected(false).build());
+        save(row(TENANT, "m4", FIREFOX).build());
+        save(row(OTHER_TENANT, "m9", CHROME).build());
+
+        assertThat(repository.machineIdsWithTitle(TENANT, CHROME)).containsExactlyInAnyOrder("m1", "m2");
+    }
+
+    @Test
+    @DisplayName("title machines: no connected row has the title -> empty")
+    void titleMachines_none() {
+        save(row(TENANT, "m1", CHROME).machineConnected(false).build());
+
+        assertThat(repository.machineIdsWithTitle(TENANT, CHROME)).isEmpty();
+        assertThat(repository.machineIdsWithTitle(TENANT, 404L)).isEmpty();
     }
 
     private void save(DeviceSoftware row) {

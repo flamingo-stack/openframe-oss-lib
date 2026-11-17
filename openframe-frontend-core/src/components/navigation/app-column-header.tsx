@@ -2,9 +2,16 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { Collapse02Icon, Expand01Icon, XmarkIcon } from '../icons-v2-generated';
+import { Chevron02LeftIcon, Collapse02Icon, Expand01Icon, XmarkIcon } from '../icons-v2-generated';
+import type { ColumnBack } from '../layout/column-back-slot';
 import { HeaderButton } from './header-button';
-import { COLUMN_HEADER_CELL, SQUEEZED_HIDDEN, SQUEEZED_KEPT_CELL, SQUEEZED_STICKY_HEADER } from './work-area-squeeze';
+import {
+  COLUMN_HEADER_BACK_CELL,
+  COLUMN_HEADER_CELL,
+  SQUEEZED_HIDDEN,
+  SQUEEZED_KEPT_CELL,
+  SQUEEZED_STICKY_HEADER,
+} from './work-area-squeeze';
 
 /**
  * What the layout button of a column header does:
@@ -20,8 +27,15 @@ export interface AppColumnHeaderProps {
   /** The column's title (a chat's name, a page's name). Truncated to one line. */
   title: ReactNode;
   /**
-   * Before the title, e.g. a Back button on a details page (`useColumnBack()`). Kept while
-   * the column is squeezed: a page's Back is its way out, not an extra.
+   * The page's Back (`useColumnBack()`): the header's first cell, as big as the close cell and
+   * flush with the column's start edge, the divider after it. Its label (default "Back") is
+   * its accessible name and tooltip. Kept while the column is squeezed: a page's Back is its
+   * way out, not an extra.
+   */
+  back?: ColumnBack | null;
+  /**
+   * Before the title (after `back` when both are given): content of the host's own. Kept
+   * while the column is squeezed.
    */
   leading?: ReactNode;
   /**
@@ -53,6 +67,7 @@ const LAYOUT_LABEL: Record<AppColumnHeaderLayoutAction, string> = {
  */
 export function AppColumnHeader({
   title,
+  back,
   leading,
   actions,
   layoutAction,
@@ -77,6 +92,16 @@ export function AppColumnHeader({
       )}
       data-column-header=""
     >
+      {back && (
+        <HeaderButton
+          className={cn(COLUMN_HEADER_BACK_CELL, SQUEEZED_KEPT_CELL)}
+          icon={<Chevron02LeftIcon className="h-5 w-5" />}
+          onClick={back.onClick}
+          aria-label={back.label ?? 'Back'}
+          title={back.label ?? 'Back'}
+          data-column-back=""
+        />
+      )}
       {leading && (
         // Kept while squeezed and shrinking with the layout and close cells, so the three share the floor
         // instead of the Back keeping its width and folding the other two to slivers.

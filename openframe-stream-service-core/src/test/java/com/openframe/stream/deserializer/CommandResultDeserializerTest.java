@@ -77,7 +77,7 @@ class CommandResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("eventToolId: two machines under the SAME executionId get DISTINCT event ids (no unified_logs collision)")
+    @DisplayName("eventToolId: two machines under the SAME executionId get DISTINCT event ids")
     void eventToolId_distinctPerMachineWithinBatch() {
         ObjectNode a = after().put("executionId", "batch-1").put("machineId", "machine-a");
         ObjectNode b = after().put("executionId", "batch-1").put("machineId", "machine-b");

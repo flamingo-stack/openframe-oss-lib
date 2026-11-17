@@ -1,5 +1,6 @@
 package com.openframe.external.mapper;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.DeviceFilters;
@@ -19,11 +20,15 @@ import com.openframe.external.dto.device.DevicesResponse;
 import com.openframe.external.dto.device.TagFilterItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -36,7 +41,7 @@ class DeviceMapperTest {
     private static final Instant UPDATED_AT = Instant.parse("2026-02-03T04:05:06Z");
     private static final Instant TAG_CREATED_AT = Instant.parse("2025-12-01T00:00:00Z");
 
-    private final DeviceMapper mapper = new DeviceMapper();
+    private final DeviceMapper mapper = new DeviceMapper(new ClientVersionThreshold("1.6.0"));
 
     @Test
     void deviceResponseCarriesEveryMachineField() {
@@ -203,6 +208,52 @@ class DeviceMapperTest {
         assertTrue(response.getCustomerIds().isEmpty());
         assertTrue(response.getTagKeys().isEmpty());
         assertNull(response.getFilteredCount());
+    }
+
+    @ParameterizedTest
+    @MethodSource("clientOutdatedCases")
+    void toDeviceResponse_agentVersionKeyAgainstThreshold_clientOutdated(Long agentVersionKey, boolean expected) {
+        // setup
+        Machine machine = machine("m-1");
+        machine.setAgentVersionKey(agentVersionKey);
+
+        // execution
+        DeviceResponse response = mapper.toDeviceResponse(machine, List.of());
+
+        // verifications
+        assertThat(response.isClientOutdated()).isEqualTo(expected);
+    }
+
+    @Test
+    void toDeviceFilterResponse_clientOutdatedFacet_mappedWithCounts() {
+        // setup
+        DeviceFilters filters = DeviceFilters.builder()
+                .clientOutdated(List.of(new DeviceFilterOption("true", "true", 2), new DeviceFilterOption("false", "false", 8)))
+                .build();
+
+        // execution
+        DeviceFilterResponse response = mapper.toDeviceFilterResponse(filters);
+
+        // verifications
+        assertThat(response.getClientOutdated())
+                .containsExactly(new DeviceFilterItem("true", "true", 2), new DeviceFilterItem("false", "false", 8));
+    }
+
+    @Test
+    void toDeviceFilterResponse_missingClientOutdatedFacet_emptyList() {
+        // execution
+        DeviceFilterResponse response = mapper.toDeviceFilterResponse(new DeviceFilters());
+
+        // verifications
+        assertThat(response.getClientOutdated()).isEmpty();
+    }
+
+    private static Stream<Arguments> clientOutdatedCases() {
+        return Stream.of(
+                Arguments.of(null, false),
+                Arguments.of(1_000_005_000_009L, true),
+                Arguments.of(1_000_006_000_000L, false),
+                Arguments.of(1_000_006_000_001L, false));
     }
 
     private static List<String> tagKeys(DeviceResponse device) {

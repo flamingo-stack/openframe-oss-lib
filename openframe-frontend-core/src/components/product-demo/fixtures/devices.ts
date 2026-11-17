@@ -14,7 +14,7 @@ function device(
   cast: DemoCast,
   demo: DemoDevice,
   type: 'laptop' | 'desktop' | 'server',
-  status: 'ONLINE' | 'OFFLINE',
+  connectivity: 'ONLINE' | 'OFFLINE',
   lastSeenMinutesAgo: number,
 ): DeviceRow {
   const organization = cast.organization(demo.organization);
@@ -23,7 +23,8 @@ function device(
     machineId: demo.id,
     hostname: demo.hostname,
     nickname: undefined,
-    status,
+    status: 'MANAGED',
+    connectivity,
     type,
     osType: demo.os,
     last_seen: demoMinutesAgo(lastSeenMinutesAgo),
@@ -56,10 +57,11 @@ export interface DevicesFixture {
 /** The fleet of the three demo customers on an ordinary morning: a mix of states, one desktop offline since last night. */
 export function buildDevicesFixture(cast: DemoCast): DevicesFixture {
   const devices: DeviceRow[] = DEMO_FLEET.map(entry =>
-    device(cast, entry.device, entry.type, entry.status, entry.lastSeenMinutesAgo),
+    device(cast, entry.device, entry.type, entry.connectivity, entry.lastSeenMinutesAgo),
   );
   const deviceFilters: DeviceFilters = {
     statuses: countBy(devices, row => row.status),
+    connectivity: countBy(devices, row => row.connectivity ?? undefined),
     deviceTypes: countBy(devices, row => row.type),
     osTypes: countBy(devices, row => row.osType),
     organizationIds: countBy(devices, row => row.organizationId).map(entry => ({

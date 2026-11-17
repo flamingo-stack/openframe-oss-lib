@@ -1,5 +1,6 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -29,7 +30,8 @@ class CustomMachineRepositoryImplTest {
 
     private static final String TENANT_ID = "tenant-1";
 
-    private final CustomMachineRepositoryImpl repo = new CustomMachineRepositoryImpl(mock(TenantAwareMongoTemplate.class));
+    private final CustomMachineRepositoryImpl repo = new CustomMachineRepositoryImpl(mock(TenantAwareMongoTemplate.class),
+            new ClientVersionThreshold("1.6.0"));
 
     private static Document statusClause(Document queryObject) {
         @SuppressWarnings("unchecked")
@@ -246,7 +248,7 @@ class CustomMachineRepositoryImplTest {
 
     private static Document runNicknameCursor(String cursorNickname, boolean asc) {
         MongoTemplate tpl = mock(MongoTemplate.class);
-        CustomMachineRepositoryImpl r = new CustomMachineRepositoryImpl(tpl);
+        CustomMachineRepositoryImpl r = new CustomMachineRepositoryImpl(tpl, new ClientVersionThreshold("1.6.0"));
         Machine cursorDoc = new Machine();
         cursorDoc.setNickname(cursorNickname);
         when(tpl.findById(any(ObjectId.class), eq(Machine.class))).thenReturn(cursorDoc);

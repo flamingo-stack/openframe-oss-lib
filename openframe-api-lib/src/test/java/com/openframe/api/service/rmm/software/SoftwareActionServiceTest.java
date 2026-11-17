@@ -8,6 +8,8 @@ import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.ScriptStatus;
@@ -112,6 +114,53 @@ class SoftwareActionServiceTest {
         assertThat(row.getTotalMachineCount()).isEqualTo(7);
         assertThat(row.getRespondedMachineCount()).isZero();
         assertThat(row.getScheduledAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("list: a device-time schedule is SCHEDULED until its time passed in the last time zone")
+    void list_deviceTimeSchedule_scheduledWhileAheadOnSomeDevice() {
+        Instant now = Instant.now();
+        Instant aheadSomewhere = now.minusSeconds(3600);
+        Instant passedEverywhere = now.minusSeconds(13 * 3600);
+        when(scheduleRepository.findByTenantIdAndStatusAndTriggerAndTimeReference(TENANT, ScriptStatus.ACTIVE,
+                ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL))
+                .thenReturn(List.of(deviceTimeSchedule("ahead", aheadSomewhere), deviceTimeSchedule("passed", passedEverywhere)));
+        when(assignedRepository.countByTenantIdAndSoftwareScheduleId(TENANT, "ahead")).thenReturn(3L);
+        when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(0L);
+
+        PageResult<SoftwareActionResponse> result = service.list(null, null, null, 0, 25);
+
+        assertThat(result.items()).extracting(SoftwareActionResponse::getScheduleId).containsExactly("ahead");
+        SoftwareActionResponse row = result.items().get(0);
+        assertThat(row.getStatus()).isEqualTo(SoftwareActionStatus.SCHEDULED);
+        assertThat(row.getScheduledAt()).isEqualTo(aheadSomewhere);
+        assertThat(row.getTimeReference()).isEqualTo(ScheduleTimeReference.DEVICE_LOCAL);
+        assertThat(row.getTotalMachineCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("list: a repeating device-time schedule shows its next run, not the first one")
+    void list_repeatingDeviceTimeSchedule_showsTheNextRun() {
+        Instant firstRun = Instant.now().minusSeconds(3 * 86400 + 600);
+        SoftwareSchedule daily = deviceTimeSchedule("daily", firstRun);
+        daily.setRepeat(86400L);
+        when(scheduleRepository.findByTenantIdAndStatusAndTriggerAndTimeReference(TENANT, ScriptStatus.ACTIVE,
+                ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)).thenReturn(List.of(daily));
+        when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(0L);
+
+        PageResult<SoftwareActionResponse> result = service.list(null, null, null, 0, 25);
+
+        assertThat(result.items().get(0).getScheduledAt()).isEqualTo(firstRun.plusSeconds(4 * 86400));
+    }
+
+    private static SoftwareSchedule deviceTimeSchedule(String id, Instant startAt) {
+        return SoftwareSchedule.builder()
+                .id(id).tenantId(TENANT).action(SoftwareAction.UPDATE)
+                .timeReference(ScheduleTimeReference.DEVICE_LOCAL)
+                .startAt(startAt)
+                .packages(List.of(SoftwareSchedulePackage.builder()
+                        .packageManager(PackageManagerType.BREW).packageName("slack").build()))
+                .build();
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.openframe.api.schema;
 import com.apollographql.federation.graphqljava.Federation;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketStatus;
 import graphql.ExecutionResult;
@@ -245,6 +246,18 @@ class ApiSubgraphSchemaTest {
 
         // execution
         List<String> sdlNames = sdlEnumNames(type);
+
+        // verifications
+        assertThat(sdlNames).containsExactlyInAnyOrderElementsOf(javaNames);
+    }
+
+    @Test
+    void executionSource_valuesEqualJavaEnum_aRunOfAnySourceSerializes() {
+        // setup
+        List<String> javaNames = javaEnumNames(ExecutionSource.class);
+
+        // execution
+        List<String> sdlNames = sdlEnumNames("ExecutionSource");
 
         // verifications
         assertThat(sdlNames).containsExactlyInAnyOrderElementsOf(javaNames);

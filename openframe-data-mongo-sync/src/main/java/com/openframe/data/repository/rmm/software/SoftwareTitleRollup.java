@@ -14,6 +14,7 @@ public record SoftwareTitleRollup(
         List<String> arpKeys,
         List<String> packageFamilyNames,
         List<String> installerTypes,
+        List<String> wingetIds,
         boolean systemComponent,
         Map<String, Integer> devicesByVersion) {
 }

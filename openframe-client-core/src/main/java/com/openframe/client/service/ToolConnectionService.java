@@ -46,6 +46,7 @@ public class ToolConnectionService {
     private final ToolConnectionRepository toolConnectionRepository;
     private final MachineRepository machineRepository;
     private final ToolAgentIdTransformerService toolAgentIdTransformerService;
+    private final DeviceLifecycleService deviceLifecycleService;
 
     @Transactional
     public void disconnectAll(String machineId) {
@@ -74,6 +75,7 @@ public class ToolConnectionService {
 
         resolveRegistration(observed, agentToolId, lastAttempt)
                 .ifPresent(registration -> persistRegistration(observed, registration));
+        deviceLifecycleService.promoteIfReady(openframeAgentId);
     }
 
     private Optional<ToolConnection> resolveRegistration(ToolConnection observed, String reportedId, boolean lastAttempt) {
@@ -163,8 +165,7 @@ public class ToolConnectionService {
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new MachineNotFoundException("Machine not found: " + machineId));
         DeviceStatus status = machine.getStatus();
-        boolean retired = DeviceStatus.DELETING_OR_DELETED.contains(status)
-                || status == DeviceStatus.ARCHIVED || status == DeviceStatus.DECOMMISSIONED;
+        boolean retired = DeviceStatus.FROZEN.contains(status) || status == DeviceStatus.DECOMMISSIONED;
         if (retired) {
             throw new MachineNotFoundException(MACHINE_NO_LONGER_MANAGED + machineId);
         }

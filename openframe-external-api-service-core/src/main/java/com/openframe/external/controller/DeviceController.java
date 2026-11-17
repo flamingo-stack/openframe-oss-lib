@@ -70,12 +70,17 @@ public class DeviceController {
     @GetMapping
     @ResponseStatus(OK)
     public DevicesResponse getDevices(
-            @Parameter(description = "Device lifecycle statuses to filter by. `connectivity` is the online/offline filter; " +
-                    "`ONLINE`/`OFFLINE` in `statuses` stop matching in the next release and are removed the release after.")
+            @Parameter(description = "Device lifecycle statuses to filter by: PENDING, MANAGED, PENDING_DELETION, DELETED, " +
+                    "ARCHIVED. `connectivity` is the online/offline filter; `ONLINE`/`OFFLINE` in `statuses` no longer " +
+                    "match any device and are removed in the next release.")
             @RequestParam(required = false) List<DeviceStatus> statuses,
 
             @Parameter(description = "Connectivity to filter by: ONLINE (agent talking to us right now) or OFFLINE")
             @RequestParam(required = false) List<TelemetryStatus> connectivity,
+
+            @Parameter(description = "Outdated client filter: true = only devices whose client is below the minimum " +
+                    "supported version, false = only supported or unknown versions; omit for no filter")
+            @RequestParam(required = false) Boolean clientOutdated,
 
             @Parameter(description = "Device types to filter by")
             @RequestParam(required = false) List<DeviceType> deviceTypes,
@@ -104,7 +109,8 @@ public class DeviceController {
             @Parameter(description = "Cursor for pagination (from pageInfo.endCursor). An unreadable cursor is rejected with 400.")
             @RequestParam(required = false) String cursor,
 
-            @Parameter(description = "Field to sort by (e.g., hostname, displayName, status, connectivity, lastSeen); connectivity DESC lists online devices first")
+            @Parameter(description = "Field to sort by (e.g., hostname, displayName, status, connectivity, clientOutdated, lastSeen); " +
+                    "connectivity DESC lists online devices first, clientOutdated DESC lists outdated clients first")
             @RequestParam(required = false) String sortField,
 
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
@@ -118,6 +124,7 @@ public class DeviceController {
         DeviceFilterCriteria filterCriteria = DeviceFilterCriteria.builder()
                 .statuses(statuses)
                 .connectivity(connectivity)
+                .clientOutdated(clientOutdated)
                 .deviceTypes(deviceTypes)
                 .osTypes(osTypes)
                 .organizationIds(customerIds)
@@ -177,12 +184,17 @@ public class DeviceController {
     @GetMapping("/filters")
     @ResponseStatus(OK)
     public DeviceFilterResponse getDeviceFilters(
-            @Parameter(description = "Device lifecycle statuses to filter by. `connectivity` is the online/offline filter; " +
-                    "`ONLINE`/`OFFLINE` in `statuses` stop matching in the next release and are removed the release after.")
+            @Parameter(description = "Device lifecycle statuses to filter by: PENDING, MANAGED, PENDING_DELETION, DELETED, " +
+                    "ARCHIVED. `connectivity` is the online/offline filter; `ONLINE`/`OFFLINE` in `statuses` no longer " +
+                    "match any device and are removed in the next release.")
             @RequestParam(required = false) List<DeviceStatus> statuses,
 
             @Parameter(description = "Connectivity to filter by: ONLINE (agent talking to us right now) or OFFLINE")
             @RequestParam(required = false) List<TelemetryStatus> connectivity,
+
+            @Parameter(description = "Outdated client filter: true = only devices whose client is below the minimum " +
+                    "supported version, false = only supported or unknown versions; omit for no filter")
+            @RequestParam(required = false) Boolean clientOutdated,
 
             @Parameter(description = "Device types to filter by")
             @RequestParam(required = false) List<DeviceType> deviceTypes,
@@ -206,6 +218,7 @@ public class DeviceController {
         DeviceFilterCriteria filterCriteria = DeviceFilterCriteria.builder()
                 .statuses(statuses)
                 .connectivity(connectivity)
+                .clientOutdated(clientOutdated)
                 .deviceTypes(deviceTypes)
                 .osTypes(osTypes)
                 .organizationIds(customerIds)

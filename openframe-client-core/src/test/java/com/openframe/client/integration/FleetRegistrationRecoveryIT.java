@@ -5,11 +5,14 @@ import com.mongodb.client.MongoClients;
 import com.openframe.client.listener.ToolConnectionListener;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.ToolConnectionService;
+import com.openframe.client.service.DeviceLifecycleService;
+import com.openframe.client.event.DeviceFirstConnectedEvent;
 import com.openframe.client.service.agentregistration.fleet.FleetHostFactsWriter;
 import com.openframe.client.service.agentregistration.fleet.FleetMdmClients;
 import com.openframe.client.service.agentregistration.transformer.FleetMdmAgentIdTransformer;
 import com.openframe.client.service.agentregistration.transformer.ToolAgentIdTransformerService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
@@ -41,6 +44,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
 import org.springframework.data.mongodb.core.index.Index;
@@ -88,6 +92,7 @@ class FleetRegistrationRecoveryIT {
     private MongoTemplate template;
     private ToolConnectionRepository connections;
     private ToolConnectionService service;
+    private ApplicationEventPublisher events;
     private HttpServer fleet;
     private String machineId;
     private String database;
@@ -128,7 +133,7 @@ class FleetRegistrationRecoveryIT {
                 .on("tenantId", Sort.Direction.ASC).on("machineId", Sort.Direction.ASC).on("toolType", Sort.Direction.ASC)
                 .unique().named("tenant_machine_tool_idx"));
         MachineRepository machines = repositories.getRepository(MachineRepository.class,
-                RepositoryFragments.just(new CustomMachineRepositoryImpl(template)));
+                RepositoryFragments.just(new CustomMachineRepositoryImpl(template, new ClientVersionThreshold("1.6.0"))));
         Machine machine = new Machine();
         machine.setMachineId(machineId);
         machine.setTenantId("synthetic-tenant");
@@ -147,7 +152,10 @@ class FleetRegistrationRecoveryIT {
         MachineWriter writer = new MachineWriter(template, absent(), absent());
         FleetHostFactsWriter facts = new FleetHostFactsWriter(machines, writer);
         FleetMdmAgentIdTransformer transformer = new FleetMdmAgentIdTransformer(clients, facts);
-        service = new ToolConnectionService(connections, machines, new ToolAgentIdTransformerService(List.of(transformer)));
+        events = mock(ApplicationEventPublisher.class);
+        DeviceLifecycleService lifecycle = new DeviceLifecycleService(machines, connections, writer, events, true);
+        service = new ToolConnectionService(connections, machines,
+                new ToolAgentIdTransformerService(List.of(transformer)), lifecycle);
         THREADS.add(Thread.currentThread().getName());
         MAX_ACTIVE_CASES.accumulateAndGet(ACTIVE_CASES.incrementAndGet(), Math::max);
         log.info("Fleet recovery isolated fixture: db={}, httpPort={}", database, fleet.getAddress().getPort());
@@ -193,6 +201,35 @@ class FleetRegistrationRecoveryIT {
                 .containsExactly(ConnectionStatus.CONNECTED, "42");
         verify(laterClientReport).ack();
         assertThat(fleetRequests.get()).isEqualTo(5);
+    }
+
+    @Test
+    void addToolConnection_unresolvedFleetThenRecovered_promotesOnlyAfterConfirmedRegistration() {
+        // setup
+        template.updateFirst(Query.query(Criteria.where("machineId").is(machineId)),
+                new Update().set("registeredAt", OLD_CONNECTION).set("lastSeen", OLD_CONNECTION.plusSeconds(1)), Machine.class);
+        ToolConnection mesh = new ToolConnection();
+        mesh.setTenantId("synthetic-tenant");
+        mesh.setMachineId(machineId);
+        mesh.setToolType(ToolType.MESHCENTRAL);
+        mesh.setStatus(ConnectionStatus.CONNECTED);
+        mesh.setAgentToolId("synthetic-mesh-node");
+        connections.save(mesh);
+
+        // execution
+        service.addToolConnection(machineId, "FLEET_MDM", RAW_ID, true);
+        Machine pending = template.findOne(Query.query(Criteria.where("machineId").is(machineId)), Machine.class);
+        fleetMode.set("resolved");
+        service.addToolConnection(machineId, "FLEET_MDM", RAW_ID, false);
+        service.addToolConnection(machineId, "FLEET_MDM", RAW_ID, false);
+
+        // verifications
+        assertThat(pending.getStatus()).isEqualTo(DeviceStatus.PENDING);
+        assertThat(template.findOne(Query.query(Criteria.where("machineId").is(machineId)), Machine.class).getStatus())
+                .isEqualTo(DeviceStatus.MANAGED);
+        verify(events).publishEvent(org.mockito.ArgumentMatchers.isA(DeviceFirstConnectedEvent.class));
+        assertThat(stored()).extracting(ToolConnection::getStatus, ToolConnection::getAgentToolId)
+                .containsExactly(ConnectionStatus.CONNECTED, "42");
     }
 
     @Test

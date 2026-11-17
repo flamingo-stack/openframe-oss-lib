@@ -17,6 +17,7 @@ import {
   type DataTableSettings,
 } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
+import { useDeviceStatusDisplay } from './device-status-display';
 import { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-filter-toolbar';
 import { DevicesGrid } from './devices-grid';
 import { DevicesGridFilters } from './devices-grid-filters';
@@ -184,10 +185,13 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   // The view measures its toolbar for the headers pinned under it, unless the host
   // holds the toolbar's ref itself: then they keep the desktop toolbar's 96px.
   const { toolbarRef, containerStyle } = useStickyToolbar();
+  const statusDisplay = useDeviceStatusDisplay();
   const measured = toolbar.toolbarRef === undefined;
   const gridColumns =
     filterColumns ??
-    getDeviceFilterColumns(deviceFilters, { directoryColumns }).filter(column => !hideFilters?.includes(column.key));
+    getDeviceFilterColumns(deviceFilters, { directoryColumns, statusDisplay }).filter(
+      column => !hideFilters?.includes(column.key),
+    );
 
   const list = (
     // The table header and the grid's filters pin flush under the toolbar, whatever

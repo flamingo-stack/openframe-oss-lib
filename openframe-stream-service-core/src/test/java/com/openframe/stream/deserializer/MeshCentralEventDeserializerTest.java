@@ -1,6 +1,6 @@
 package com.openframe.stream.deserializer;
 
-import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
