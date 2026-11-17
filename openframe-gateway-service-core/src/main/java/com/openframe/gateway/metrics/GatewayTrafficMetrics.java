@@ -119,10 +119,10 @@ public class GatewayTrafficMetrics {
      * the shared multi-tenant gateway — it surfaces trends like "0s meshcentral flaps rising"; per-tenant
      * / per-agent drill-down stays in the logs (which carry tenant + sub).
      */
-    public void recordSessionClosed(String tool, boolean relay, int closeCode, long lifetimeSeconds) {
+    public void recordSessionClosed(String tool, WebSocketKind kind, int closeCode, long lifetimeSeconds) {
         registry.counter(CLOSED_COUNTER,
                 "tool", tool,
-                "relay", String.valueOf(relay),
+                "relay", kind.getRelayTag(),
                 "code", String.valueOf(closeCode),
                 "lifetime", lifetimeBucket(lifetimeSeconds)).increment();
     }

@@ -1,6 +1,7 @@
 package com.openframe.gateway.config.ws;
 
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
+import com.openframe.gateway.metrics.WebSocketKind;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -280,7 +281,7 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
         decorator.handleRequest(exchange, proxyHandler).block();
 
         // verifications
-        verify(gatewayTrafficMetrics).recordSessionClosed(TOOL, true, CloseStatus.NORMAL.getCode(), 0L);
+        verify(gatewayTrafficMetrics).recordSessionClosed(TOOL, WebSocketKind.RELAY, CloseStatus.NORMAL.getCode(), 0L);
     }
 
     @Test
@@ -293,7 +294,7 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
         decorator.handleRequest(exchange, proxyHandler).block();
 
         // verifications
-        verify(gatewayTrafficMetrics).recordSessionClosed(TOOL, true, CloseStatus.NORMAL.getCode(), 0L);
+        verify(gatewayTrafficMetrics).recordSessionClosed(TOOL, WebSocketKind.RELAY, CloseStatus.NORMAL.getCode(), 0L);
     }
 
     @ParameterizedTest
@@ -376,7 +377,7 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
         decorator.handleRequest(exchange, proxyHandler).block();
 
         // verifications
-        verify(gatewayTrafficMetrics).recordSessionClosed(TOOL, false, CloseStatus.NORMAL.getCode(), 0L);
+        verify(gatewayTrafficMetrics).recordSessionClosed(TOOL, WebSocketKind.CHANNEL, CloseStatus.NORMAL.getCode(), 0L);
     }
 
     @ParameterizedTest

@@ -67,11 +67,13 @@ public class RelayAccessWatcher {
         return findMachine(device)
                 .map(machine -> REMOVED_STATUSES.contains(machine.getStatus()))
                 .switchIfEmpty(Mono.fromSupplier(() -> keepOpenWhenNotFound(device)))
-                .onErrorResume(failure -> {
-                    log.warn("Relay access check failed for machine {}, relay kept open until the next check",
-                            device.getMachineId(), failure);
-                    return Mono.just(false);
-                });
+                .onErrorResume(failure -> keepOpenOnFailure(device, failure));
+    }
+
+    private static Mono<Boolean> keepOpenOnFailure(RelayDevice device, Throwable failure) {
+        log.warn("Relay access check failed for machine {}, relay kept open until the next check",
+                device.getMachineId(), failure);
+        return Mono.just(false);
     }
 
     private static boolean keepOpenWhenNotFound(RelayDevice device) {

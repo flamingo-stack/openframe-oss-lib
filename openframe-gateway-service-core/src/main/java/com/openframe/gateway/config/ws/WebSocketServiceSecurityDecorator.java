@@ -2,6 +2,7 @@ package com.openframe.gateway.config.ws;
 
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
+import com.openframe.gateway.metrics.WebSocketKind;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,13 +70,13 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
         try {
             Instant expiresAt = requestJwtReader.getExpiration(exchange);
-            boolean relay = isRelayPath(path);
+            WebSocketKind kind = isRelayPath(path) ? WebSocketKind.RELAY : WebSocketKind.CHANNEL;
 
             gatewayTrafficMetrics.webSocketOpened(sessionId, path, sub);
-            Disposable disposable = relay
+            Disposable disposable = kind == WebSocketKind.RELAY
                     ? guardRelay(socket, expiresAt, context)
                     : scheduleExpiryClose(socket, expiresAt);
-            processSessionClosedEvent(session, path, sub, relay, disposable);
+            processSessionClosedEvent(session, path, sub, kind, disposable);
 
             WebSocketSession sessionToHandle = session;
             // Command allowlist first, so the logging tap (when on) records what actually
@@ -182,7 +183,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 );
     }
 
-    private void processSessionClosedEvent(WebSocketSession session, String path, String sub, boolean relay,
+    private void processSessionClosedEvent(WebSocketSession session, String path, String sub, WebSocketKind kind,
                                            Disposable disposable) {
         String sessionId = session.getId();
         session.closeStatus()
@@ -195,7 +196,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                             String logSub = info != null ? info.sub() : sub;
                             gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
                             String tool = toolFromPath(path);
-                            gatewayTrafficMetrics.recordSessionClosed(tool, relay, status.getCode(), lifetimeSec);
+                            gatewayTrafficMetrics.recordSessionClosed(tool, kind, status.getCode(), lifetimeSec);
                             if (loggingProperties.isDebugPath(path)) {
                                 log.debug(LOG_PREFIX + "session closed code={} reason={} lifetime={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason(), formatLifetime(lifetimeSec));
