@@ -20,18 +20,12 @@ import java.time.Instant;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AgentLogKeyService implements AgentKeyProvider {
+public class AgentLogKeyService {
 
     private final AgentLogKeyRepository logKeyRepository;
     private final SecretKeyGenerator keyGenerator;
     private final EncryptionService encryptionService;
 
-    @Override
-    public AgentKeyType type() {
-        return AgentKeyType.LOG;
-    }
-
-    @Override
     public AgentKeyResponse current() {
         return logKeyRepository.findFirstByOrderByCreatedAtDesc()
                 .map(logKey -> new AgentKeyResponse(
@@ -40,7 +34,6 @@ public class AgentLogKeyService implements AgentKeyProvider {
                 .orElseThrow(AgentLogKeyNotFoundException::new);
     }
 
-    @Override
     public AgentKeyResponse rotate() {
         String plainKey = keyGenerator.generate();
         AgentLogKey savedKey = saveNewKey(plainKey);

@@ -1,6 +1,4 @@
-package com.openframe.core.agentkey;
-
-import com.openframe.core.exception.NotFoundException;
+package com.openframe.api.service.agentkey;
 
 import java.util.Arrays;
 
@@ -27,6 +25,6 @@ public enum AgentKeyType {
         return Arrays.stream(values())
                 .filter(type -> type.path.equals(path))
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException("Unknown agent key type: " + path));
+                .orElseThrow(() -> new IllegalArgumentException("Unknown agent key type: " + path));
     }
 }

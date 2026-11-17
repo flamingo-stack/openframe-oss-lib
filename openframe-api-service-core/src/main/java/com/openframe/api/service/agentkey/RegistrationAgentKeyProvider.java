@@ -1,15 +1,14 @@
-package com.openframe.api.service;
+package com.openframe.api.service.agentkey;
 
 import com.openframe.api.dto.AgentRegistrationSecretResponse;
-import com.openframe.core.agentkey.AgentKeyProvider;
+import com.openframe.api.service.AgentRegistrationSecretService;
 import com.openframe.core.agentkey.AgentKeyResponse;
-import com.openframe.core.agentkey.AgentKeyType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * The registration key (initialKey) behind the generic agent key API. Rotation goes through
- * {@link AgentRegistrationSecretService} so the old key is deactivated and the processor hooks still run.
+ * The registration key (initialKey). Rotation goes through {@link AgentRegistrationSecretService}
+ * so the old key is deactivated and the processor hooks still run.
  */
 @Component
 @RequiredArgsConstructor

@@ -1,8 +1,8 @@
-package com.openframe.api.service;
+package com.openframe.api.service.agentkey;
 
 import com.openframe.api.dto.AgentRegistrationSecretResponse;
+import com.openframe.api.service.AgentRegistrationSecretService;
 import com.openframe.core.agentkey.AgentKeyResponse;
-import com.openframe.core.agentkey.AgentKeyType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

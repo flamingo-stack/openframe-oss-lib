@@ -84,11 +84,6 @@ class AgentLogKeyServiceTest {
     }
 
     @Test
-    void servesTheLogType() {
-        assertThat(service.type()).isEqualTo(AgentKeyType.LOG);
-    }
-
-    @Test
     void rotateSavesANewEncryptedKeyAndReturnsItsPlaintext() {
         when(keyGenerator.generate()).thenReturn(PLAIN_KEY);
         when(encryptionService.encrypt(PLAIN_KEY)).thenReturn(ENCRYPTED_KEY);

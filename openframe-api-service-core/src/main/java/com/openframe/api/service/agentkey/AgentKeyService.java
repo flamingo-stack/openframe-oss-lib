@@ -1,19 +1,19 @@
-package com.openframe.core.agentkey;
+package com.openframe.api.service.agentkey;
 
-import com.openframe.core.exception.NotFoundException;
+import com.openframe.core.agentkey.AgentKeyResponse;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 /**
- * One entry point for every agent key type. A service only serves the types it has a
- * provider for: the registration key lives in the api, so the client and management have the log key only.
+ * Picks the {@link AgentKeyProvider} for a key type. Every type must have exactly one provider,
+ * checked at startup, so a missing or duplicated provider fails the deploy instead of a request.
  */
 @Service
 public class AgentKeyService {
@@ -26,22 +26,27 @@ public class AgentKeyService {
                 identity(),
                 AgentKeyService::rejectDuplicate,
                 () -> new EnumMap<>(AgentKeyType.class)));
+        requireAllTypes(this.providers);
     }
 
     public AgentKeyResponse current(AgentKeyType type) {
-        return providerOf(type).current();
+        return providers.get(type).current();
     }
 
     public AgentKeyResponse rotate(AgentKeyType type) {
-        return providerOf(type).rotate();
-    }
-
-    private AgentKeyProvider providerOf(AgentKeyType type) {
-        return Optional.ofNullable(providers.get(type))
-                .orElseThrow(() -> new NotFoundException("Agent key type not served here: " + type.path()));
+        return providers.get(type).rotate();
     }
 
     private static AgentKeyProvider rejectDuplicate(AgentKeyProvider first, AgentKeyProvider second) {
         throw new IllegalStateException("Two agent key providers for " + first.type());
+    }
+
+    private static void requireAllTypes(Map<AgentKeyType, AgentKeyProvider> providers) {
+        List<AgentKeyType> missing = Arrays.stream(AgentKeyType.values())
+                .filter(type -> !providers.containsKey(type))
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException("No agent key provider for " + missing);
+        }
     }
 }

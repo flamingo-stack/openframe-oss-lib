@@ -1,8 +1,8 @@
 package com.openframe.api.controller;
 
+import com.openframe.api.service.agentkey.AgentKeyService;
+import com.openframe.api.service.agentkey.AgentKeyType;
 import com.openframe.core.agentkey.AgentKeyResponse;
-import com.openframe.core.agentkey.AgentKeyService;
-import com.openframe.core.agentkey.AgentKeyType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,13 +26,13 @@ public class AgentKeyController {
     private final AgentKeyService agentKeyService;
 
     @GetMapping
-    public AgentKeyResponse current(@PathVariable String type) {
-        return agentKeyService.current(AgentKeyType.fromPath(type));
+    public AgentKeyResponse current(@PathVariable AgentKeyType type) {
+        return agentKeyService.current(type);
     }
 
     @PostMapping("/rotate")
     @ResponseStatus(HttpStatus.CREATED)
-    public AgentKeyResponse rotate(@PathVariable String type) {
-        return agentKeyService.rotate(AgentKeyType.fromPath(type));
+    public AgentKeyResponse rotate(@PathVariable AgentKeyType type) {
+        return agentKeyService.rotate(type);
     }
 }
