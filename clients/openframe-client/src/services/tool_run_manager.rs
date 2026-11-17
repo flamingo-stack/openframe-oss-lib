@@ -127,8 +127,7 @@ impl ToolRunManager {
         info!("Tool run manager: shutdown signalled, no new launches will occur");
     }
 
-    /// Reversibly stop every managed tool (kill processes / stop services) without uninstalling.
-    /// Used when the tenant is gone, to stop tools hammering their now-unreachable endpoints.
+    /// Reversibly stop every managed tool without uninstalling, while the client is paused (tenant gone or 403).
     pub async fn stop_all(&self) -> Result<()> {
         {
             // Under the supervision lock so a concurrent resume_after_update_failure cannot undo the stop
