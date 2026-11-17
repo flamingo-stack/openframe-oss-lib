@@ -35,7 +35,37 @@ class SoftwarePackageMatcherTest {
         // setup
         InstalledProgram chrome = program("Google Chrome", FleetSource.PROGRAMS);
         PackageMatch match = PackageMatch.noPackage();
-        when(wingetMatcher.getManager()).thenReturn(PackageManagerType.WINGET);
+        when(wingetMatcher.getFleetSource()).thenReturn(FleetSource.PROGRAMS);
+        when(wingetMatcher.match(List.of(chrome))).thenReturn(List.of(match));
+
+        // execution
+        Map<InstalledProgram, PackageMatch> matches = matcher(wingetMatcher).match(List.of(chrome));
+
+        // verifications
+        assertThat(matches).containsEntry(chrome, match);
+    }
+
+    @Test
+    void match_brewPrograms_matchedByTheBrewMatcher() {
+        // setup
+        InstalledProgram wget = program("wget", FleetSource.HOMEBREW_PACKAGES);
+        PackageMatch match = PackageMatch.noPackage();
+        when(wingetMatcher.getFleetSource()).thenReturn(FleetSource.HOMEBREW_PACKAGES);
+        when(wingetMatcher.match(List.of(wget))).thenReturn(List.of(match));
+
+        // execution
+        Map<InstalledProgram, PackageMatch> matches = matcher(wingetMatcher).match(List.of(wget));
+
+        // verifications
+        assertThat(matches).containsEntry(wget, match);
+    }
+
+    @Test
+    void match_packagesWingetInstalled_matchedByTheMatcherOfThatTable() {
+        // setup
+        InstalledProgram chrome = program("Google Chrome", FleetSource.WINGET_PACKAGES);
+        PackageMatch match = PackageMatch.noPackage();
+        when(wingetMatcher.getFleetSource()).thenReturn(FleetSource.WINGET_PACKAGES);
         when(wingetMatcher.match(List.of(chrome))).thenReturn(List.of(match));
 
         // execution
@@ -48,7 +78,7 @@ class SoftwarePackageMatcherTest {
     @Test
     void match_programsNoMatcherTakes_leftOut() {
         // setup
-        when(wingetMatcher.getManager()).thenReturn(PackageManagerType.WINGET);
+        when(wingetMatcher.getFleetSource()).thenReturn(FleetSource.PROGRAMS);
         List<InstalledProgram> programs = List.of(program("Google Chrome", FleetSource.APPS),
                 program("googlechrome", FleetSource.CHOCOLATEY_PACKAGES), program("xz", FleetSource.OTHER));
 
@@ -110,7 +140,7 @@ class SoftwarePackageMatcherTest {
         PackageMatch fresh = PackageMatch.of(wingetPackage("Google.Chrome"));
         when(catalogRepository.findByManagerAndPackageIdIn(eq(PackageManagerType.WINGET), eq(Set.of("Google.Chrome.Old"))))
                 .thenReturn(List.of());
-        when(wingetMatcher.getManager()).thenReturn(PackageManagerType.WINGET);
+        when(wingetMatcher.getFleetSource()).thenReturn(FleetSource.PROGRAMS);
         when(wingetMatcher.match(List.of(chrome))).thenReturn(List.of(fresh));
 
         // execution

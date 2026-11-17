@@ -7,9 +7,17 @@ use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+use crate::clients::AuthClient;
 use crate::platform::directories::DirectoryManager;
 use crate::services::backend_call_retry::RetryTiming;
-use crate::services::AgentConfigurationService;
+use crate::services::encryption_service::EncryptionService;
+use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
+use crate::services::nats_connection_manager::NatsConnectionManager;
+use crate::services::shared_token_service::SharedTokenService;
+use crate::services::{
+    AgentAuthService, AgentConfigurationService, DeactivationService, InitialConfigurationService,
+    MachineIdService,
+};
 
 const READY_BOUND: Duration = Duration::from_secs(10);
 
@@ -99,6 +107,34 @@ pub(crate) async fn registered_agent(dm: &DirectoryManager) -> AgentConfiguratio
         .await
         .unwrap();
     agent
+}
+
+/// The agent's NATS connection manager for `url`, with an auth endpoint nothing listens on.
+pub(crate) fn connection_manager(
+    url: String,
+    directories: &DirectoryManager,
+    config: &AgentConfigurationService,
+) -> NatsConnectionManager {
+    let initial = InitialConfigurationService::new(directories.clone()).unwrap();
+    let deactivation = DeactivationService::new(directories);
+    let auth = AgentAuthService::new(
+        AuthClient::new(
+            "http://127.0.0.1:9".into(),
+            reqwest::Client::new(),
+            deactivation.clone(),
+        ),
+        config.clone(),
+        SharedTokenService::new(directories.clone(), EncryptionService::new()),
+    );
+    NatsConnectionManager::new(
+        url,
+        config.clone(),
+        initial.clone(),
+        auth,
+        LocalTlsConfigProvider::new(initial),
+        deactivation,
+        MachineIdService::new(directories),
+    )
 }
 
 pub(crate) async fn wait_until(condition: impl Fn() -> bool) {

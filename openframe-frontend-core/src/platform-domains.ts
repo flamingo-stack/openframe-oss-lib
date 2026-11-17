@@ -42,6 +42,7 @@ export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
   { key: 'revenue-hub', defaultUrl: 'https://revenue-hub.flamingo.so', envVar: 'NEXT_PUBLIC_REVENUE_HUB_URL' },
   { key: 'people-hub', defaultUrl: 'https://people-hub.flamingo.so', envVar: 'NEXT_PUBLIC_PEOPLE_HUB_URL' },
   { key: 'coding-hub', defaultUrl: 'https://coding-hub.flamingo.so', envVar: 'NEXT_PUBLIC_CODING_HUB_URL' },
+  { key: 'security-hub', defaultUrl: 'https://security-hub.flamingo.so', envVar: 'NEXT_PUBLIC_SECURITY_HUB_URL' },
   { key: 'openmsp', defaultUrl: 'https://www.openmsp.ai', envVar: 'NEXT_PUBLIC_OPENMSP_URL' },
   // ORDERING INVARIANT (first-wins, load-bearing): `flamingo` MUST precede `universal`.
   // Both resolve to www.flamingo.run; the reverse index is first-wins → flamingo claims the shared host,

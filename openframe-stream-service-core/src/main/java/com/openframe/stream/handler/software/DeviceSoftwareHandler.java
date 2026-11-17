@@ -2,7 +2,9 @@ package com.openframe.stream.handler.software;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -174,11 +176,22 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (title.getInstalledVersions() == null) {
             return List.of();
         }
-        return title.getInstalledVersions().stream()
+        List<String> versions = title.getInstalledVersions().stream()
                 .map(HostSoftwareInstalledVersion::getVersion)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+        String source = title.getSource();
+        boolean homebrew = FleetSource.of(source) == FleetSource.HOMEBREW_PACKAGES;
+        return homebrew ? newestOf(versions) : versions;
+    }
+
+    // Homebrew keeps the versions it upgraded from in the Cellar: only the newest one is installed
+    private static List<String> newestOf(List<String> versions) {
+        return versions.stream()
+                .max(SoftwareVersions::compare)
+                .map(List::of)
+                .orElseGet(List::of);
     }
 
     private static String firstOf(HostSoftwareTitle title, Function<HostSoftwareInstalledVersion, String> value) {

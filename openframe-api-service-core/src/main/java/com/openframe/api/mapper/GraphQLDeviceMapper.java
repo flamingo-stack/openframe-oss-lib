@@ -40,6 +40,7 @@ public class GraphQLDeviceMapper {
         return DeviceFilterCriteria.builder()
                 .statuses(input.getStatuses())
                 .connectivity(input.getConnectivity())
+                .clientOutdated(input.getClientOutdated())
                 .deviceTypes(input.getDeviceTypes())
                 .osTypes(input.getOsTypes())
                 .organizationIds(input.getOrganizationIds())
@@ -92,7 +93,7 @@ public class GraphQLDeviceMapper {
                 .registeredAt(machine.getRegisteredAt())
                 .connectedAt(connectedAt)
                 .inventoryConnectedAt(inventoryConnectedAt)
-                .ready(connectedAt != null && inventoryConnectedAt != null)
+                .ready(machine.getStatus() != DeviceStatus.PENDING)
                 .build();
     }
 

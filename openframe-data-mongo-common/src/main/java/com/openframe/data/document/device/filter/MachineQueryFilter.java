@@ -20,6 +20,8 @@ public class MachineQueryFilter {
     private List<String> statuses;
     private List<String> excludeStatuses;
     private List<String> connectivity;
+    // true: only outdated clients, false: only supported or unknown versions, null: no filter
+    private Boolean clientOutdated;
     private List<String> deviceTypes;
     private List<OsType> osTypes;
     private List<String> organizationIds;

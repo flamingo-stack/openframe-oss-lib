@@ -4,7 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.model.enums.UnifiedEventType;
 import com.openframe.data.loki.client.LokiPushException;
 import com.openframe.data.loki.client.LokiPushRejectedException;
 import com.openframe.data.loki.client.LokiQueryException;

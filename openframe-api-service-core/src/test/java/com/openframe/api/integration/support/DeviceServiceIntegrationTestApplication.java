@@ -1,5 +1,6 @@
 package com.openframe.api.integration.support;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
@@ -35,6 +36,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @EnableMongoAuditing
 @EnableMongoRepositories(basePackageClasses = {MachineRepository.class, TagRepository.class})
 @Import({
+        ClientVersionThreshold.class,
         CustomMachineRepositoryImpl.class,
         MachineWriter.class,
         DeviceService.class

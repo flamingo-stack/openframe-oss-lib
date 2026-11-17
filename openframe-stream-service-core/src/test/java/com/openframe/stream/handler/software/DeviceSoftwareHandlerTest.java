@@ -11,6 +11,7 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,6 +43,8 @@ class DeviceSoftwareHandlerTest {
     @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjectionTrigger projectionTrigger;
+
+    @Captor private ArgumentCaptor<DeviceSoftware> deviceSoftwareCaptor;
 
     @InjectMocks private DeviceSoftwareHandler handler;
 
@@ -299,6 +302,25 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getInstallerTypes()).containsExactly("exe", "msi");
         assertThat(saved.getSystemComponent()).isFalse();
         assertThat(saved.getWingetId()).isNull();
+    }
+
+    @Test
+    void handle_homebrewFormulaWithOldVersionsInTheCellar_onlyTheNewestVersionKept() {
+        // setup
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        HostSoftwareTitle libnghttp2 = title(44L, "libnghttp2", "homebrew_packages", "1.70.0", "1.68.0", "1.71.0");
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(libnghttp2));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 44L))
+                .thenReturn(Optional.empty());
+        DeserializedDebeziumMessage message = msg("c", null, row().put("host_id", 100));
+
+        // execution
+        handler.handle(message, null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        assertThat(deviceSoftwareCaptor.getValue().getVersions()).containsExactly("1.71.0");
     }
 
     @Test

@@ -81,7 +81,7 @@ public class PackageUpdateDispatchService {
                 .packageUpdateRequestId(requestId)
                 .build());
 
-        requestRepository.save(PackageUpdateRequest.builder()
+        PackageUpdateRequest request = PackageUpdateRequest.builder()
                 .tenantId(tenantId)
                 .requestId(requestId)
                 .executionId(execution.getExecutionId())
@@ -100,7 +100,8 @@ public class PackageUpdateDispatchService {
                 .initiatedBy(execution.getInitiatedBy())
                 .createdAt(now)
                 .updatedAt(now)
-                .build());
+                .build();
+        requestRepository.save(request);
 
         deviceStateRepository.saveAll(targets.stream()
                 .map(machineId -> PackageUpdateDeviceState.builder()
@@ -114,9 +115,9 @@ public class PackageUpdateDispatchService {
                         .build())
                 .toList());
 
-        targets.forEach(machineId -> deliveryRouter.dispatch(PackageUpdateWire.seed(
-                machineId, requestId, source, execution.getPackageManager(), execution.getPackageName(),
-                brewPackageType, mode, forceCountdownSeconds)));
+        targets.stream()
+                .map(machineId -> PackageUpdateWire.seed(machineId, request))
+                .forEach(deliveryRouter::dispatch);
 
         log.info("Package-update dispatched requestId={} executionId={} source={} mode={} machines={} package={}/{}",
                 requestId, execution.getExecutionId(), source, mode, targets.size(), execution.getPackageManager(),

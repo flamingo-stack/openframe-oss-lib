@@ -282,6 +282,13 @@ export interface AnnouncementBarProps {
    */
   surface?: AnnouncementSurface;
   className?: string;
+  /**
+   * Told whether the bar is showing (expanded) on mount and on every change: an announcement arriving, being
+   * dismissed, deactivated, or excluded on this path. A host whose single top-bar slot gives way to the announcement
+   * uses it to draw its own bar while this one has nothing to show. Never called in preview mode with anything but
+   * the preview's own state.
+   */
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 export interface AnnouncementFormProps {

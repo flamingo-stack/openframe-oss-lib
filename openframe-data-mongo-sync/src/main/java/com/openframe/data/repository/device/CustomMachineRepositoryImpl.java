@@ -1,5 +1,6 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
@@ -61,6 +62,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String STATUS_FIELD = "status";
     private static final String TELEMETRY_STATUS_FIELD = "telemetryStatus";
     private static final String CONNECTIVITY_SORT_FIELD = "connectivity";
+    private static final String AGENT_VERSION_KEY_FIELD = "agentVersionKey";
+    private static final String CLIENT_OUTDATED_SORT_FIELD = "clientOutdated";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
     private static final String PACKAGE_MANAGERS_FIELD = "packageManagers";
@@ -82,26 +85,35 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             "nickname",
             "status",
             "connectivity",
+            "clientOutdated",
             "lastSeen"
     );
     private static final String DEFAULT_SORT_FIELD = "_id";
     // The order a DESC status sort returns (the frontends send DESC meaning "online first"); ASC is its exact reverse.
-    static final List<String> STATUS_DESC_ORDER = List.of("ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
+    static final List<String> STATUS_DESC_ORDER = List.of("MANAGED", "ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
     private static final String STATUS_RANK_FIELD = "_statusRank";
     private static final int UNKNOWN_STATUS_RANK = 0;
     // "connectivity" sorts on telemetryStatus; DESC means online first, like the status sort.
     private static final String CONNECTIVITY_RANK_FIELD = "_connectivityRank";
     private static final int ONLINE_RANK = 1;
     private static final int NOT_ONLINE_RANK = 0;
+    // "clientOutdated" sorts on agentVersionKey against the threshold; DESC means outdated first.
+    private static final String CLIENT_OUTDATED_RANK_FIELD = "_clientOutdatedRank";
+    private static final int OUTDATED_RANK = 1;
+    private static final int NOT_OUTDATED_RANK = 0;
+    private static final String OUTDATED_FACET_VALUE = "true";
+    private static final String NOT_OUTDATED_FACET_VALUE = "false";
 
     private static final String TENANT_ID_FIELD = "tenantId";
     private static final List<DeviceStatus> RETIRED_STATUSES =
             List.of(DeviceStatus.PENDING_DELETION, DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
 
     private final MongoTemplate mongoTemplate;
+    private final ClientVersionThreshold clientVersionThreshold;
 
-    public CustomMachineRepositoryImpl(MongoTemplate mongoTemplate) {
+    public CustomMachineRepositoryImpl(MongoTemplate mongoTemplate, ClientVersionThreshold clientVersionThreshold) {
         this.mongoTemplate = mongoTemplate;
+        this.clientVersionThreshold = clientVersionThreshold;
     }
 
     @Override
@@ -241,6 +253,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             AggregationOperation rankStage = connectivityRankAddFieldsStage();
             return findMachinesByRank(query, cursor, limit, isDesc, CONNECTIVITY_RANK_FIELD, rankStage, CustomMachineRepositoryImpl::connectivityRankOf);
         }
+        if (CLIENT_OUTDATED_SORT_FIELD.equals(sortField)) {
+            AggregationOperation rankStage = clientOutdatedRankAddFieldsStage();
+            return findMachinesByRank(query, cursor, limit, isDesc, CLIENT_OUTDATED_RANK_FIELD, rankStage, this::clientOutdatedRankOf);
+        }
         Sort.Direction mongoSortDirection = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
 
         if (cursor != null && !cursor.trim().isEmpty()) {
@@ -311,6 +327,17 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return ctx -> addFields;
     }
 
+    private AggregationOperation clientOutdatedRankAddFieldsStage() {
+        String keyRef = "$" + AGENT_VERSION_KEY_FIELD;
+        long thresholdKey = clientVersionThreshold.getMinSupportedKey();
+        Document known = new Document("$isNumber", keyRef);
+        Document belowThreshold = new Document("$lt", List.of(keyRef, thresholdKey));
+        Document outdated = new Document("$and", List.of(known, belowThreshold));
+        Document rank = new Document("$cond", List.of(outdated, OUTDATED_RANK, NOT_OUTDATED_RANK));
+        Document addFields = new Document("$addFields", new Document(CLIENT_OUTDATED_RANK_FIELD, rank));
+        return ctx -> addFields;
+    }
+
     private Optional<AggregationOperation> rankCursorStage(String cursor, boolean isDesc,
                                                            String rankField, ToIntFunction<Machine> cursorRank) {
         if (cursor == null || cursor.isBlank()) {
@@ -358,6 +385,11 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     static int connectivityRank(TelemetryStatus telemetryStatus) {
         return telemetryStatus == TelemetryStatus.ONLINE ? ONLINE_RANK : NOT_ONLINE_RANK;
+    }
+
+    private int clientOutdatedRankOf(Machine machine) {
+        Long agentVersionKey = machine.getAgentVersionKey();
+        return clientVersionThreshold.isOutdated(agentVersionKey) ? OUTDATED_RANK : NOT_OUTDATED_RANK;
     }
 
     private List<Machine> findAvailableForScheduleWithCursor(Query baseQuery, Collection<String> assignedMachineIds,
@@ -533,6 +565,9 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     @Override
     public Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search,
                                       DeviceFacetDimension dimension) {
+        if (dimension == DeviceFacetDimension.CLIENT_OUTDATED) {
+            return clientOutdatedFacet(tenantId, filter, search);
+        }
         String field = dimension.fieldName();
         Query query = buildTenantQuery(tenantId, filter, search, field);
         Aggregation agg = Aggregation.newAggregation(
@@ -551,6 +586,39 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             counts.put(id.toString(), ((Number) doc.get(COUNT_FIELD)).intValue());
         }
         return counts;
+    }
+
+    // Both buckets always, zero counts included: the banner reads the "true" count under the list's other filters
+    private Map<String, Integer> clientOutdatedFacet(String tenantId, MachineQueryFilter filter, String search) {
+        Query base = buildTenantQuery(tenantId, filter, search, AGENT_VERSION_KEY_FIELD);
+        int outdated = countClientOutdated(base, true);
+        int notOutdated = countClientOutdated(base, false);
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        counts.put(OUTDATED_FACET_VALUE, outdated);
+        counts.put(NOT_OUTDATED_FACET_VALUE, notOutdated);
+        return counts;
+    }
+
+    private int countClientOutdated(Query base, boolean outdated) {
+        Document predicate = base.getQueryObject();
+        Criteria clientOutdated = clientOutdatedCriteria(outdated);
+        Document bucket = clientOutdated.getCriteriaObject();
+        List<Document> conditions = List.of(predicate, bucket);
+        Document combined = new Document("$and", conditions);
+        Query query = new BasicQuery(combined);
+        long count = mongoTemplate.count(query, Machine.class);
+        return Math.toIntExact(count);
+    }
+
+    // $lt never matches a null or missing key, so an unknown version is not outdated; the negation takes it explicitly
+    private Criteria clientOutdatedCriteria(boolean outdated) {
+        long thresholdKey = clientVersionThreshold.getMinSupportedKey();
+        if (outdated) {
+            return Criteria.where(AGENT_VERSION_KEY_FIELD).lt(thresholdKey);
+        }
+        Criteria supported = Criteria.where(AGENT_VERSION_KEY_FIELD).gte(thresholdKey);
+        Criteria unknown = Criteria.where(AGENT_VERSION_KEY_FIELD).is(null);
+        return new Criteria().orOperator(supported, unknown);
     }
 
     @Override
@@ -654,6 +722,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             if (!TELEMETRY_STATUS_FIELD.equals(excludeField)
                     && filter.getConnectivity() != null && !filter.getConnectivity().isEmpty()) {
                 criteriaList.add(Criteria.where(TELEMETRY_STATUS_FIELD).in(filter.getConnectivity()));
+            }
+            Boolean clientOutdated = filter.getClientOutdated();
+            if (!AGENT_VERSION_KEY_FIELD.equals(excludeField) && clientOutdated != null) {
+                criteriaList.add(clientOutdatedCriteria(clientOutdated));
             }
             if (!TYPE_FIELD.equals(excludeField)
                     && filter.getDeviceTypes() != null && !filter.getDeviceTypes().isEmpty()) {

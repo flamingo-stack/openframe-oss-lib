@@ -13,8 +13,8 @@ import java.util.Optional;
 import static java.util.stream.Collectors.toMap;
 import static org.springframework.util.StringUtils.hasText;
 
-// the version the openframe client runs: installed_agents, which the agent reports at registration and again after
-// every update it applies. Machine.agentVersion is the version it was installed with and never moves
+// the version the openframe client runs: installed_agents, which the agent reports at registration and again on every
+// start. Machine.agentVersion (and its agentVersionKey) follows the same reports, written by the client service
 @Service
 @RequiredArgsConstructor
 public class AgentVersionService {

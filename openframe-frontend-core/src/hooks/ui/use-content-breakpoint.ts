@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, createElement, type ReactNode, useContext } from 'react';
+import { ColumnBackSlotReset } from '../../components/layout/column-back-slot';
 import { LAYOUT_STEPS } from '../../styles/layout-steps';
 import { breakpoints, useLgUp, useMdUp, useMediaQuery } from './use-media-query';
 
@@ -32,10 +33,16 @@ export const ContentAreaWidthContext = createContext<number | null>(null);
 /**
  * For window chrome opened from a content area (a modal, a drawer): its subtree
  * is back on the viewport's steps. Context crosses a portal, so without this
- * the hooks below would still answer with the content area's width.
+ * the hooks below would still answer with the content area's width. A page title in
+ * it keeps its own Back too, instead of handing it to the column's header
+ * (`ColumnBackSlot`).
  */
 export function ViewportBreakpoints({ children }: { children: ReactNode }) {
-  return createElement(ContentAreaWidthContext.Provider, { value: null }, children);
+  return createElement(
+    ContentAreaWidthContext.Provider,
+    { value: null },
+    createElement(ColumnBackSlotReset, null, children),
+  );
 }
 
 export function contentBreakpointFor(width: number): ContentBreakpoint {

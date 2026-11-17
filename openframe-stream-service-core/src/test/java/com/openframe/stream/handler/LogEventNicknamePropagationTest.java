@@ -1,14 +1,11 @@
 package com.openframe.stream.handler;
 
 import tools.jackson.databind.json.JsonMapper;
-import com.openframe.data.cassandra.model.CassandraLogEvent;
-import com.openframe.data.cassandra.model.enums.UnifiedEventType;
-import com.openframe.data.cassandra.repository.CassandraLogEventRepository;
+import com.openframe.data.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
-import com.openframe.stream.config.ToolEventProperties;
 import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -23,10 +20,6 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-/**
- * The two log sinks must agree: whatever enrichment resolved has to reach both the Cassandra
- * detail row and the Kafka message that Pinot ingests, or the list and detail views disagree.
- */
 class LogEventNicknamePropagationTest {
 
     private static final String TENANT_ID = "tenant-a";
@@ -56,40 +49,6 @@ class LogEventNicknamePropagationTest {
         enriched.setHostname(HOSTNAME);
         enriched.setNickname(nickname);
         return enriched;
-    }
-
-    @Test
-    @DisplayName("Cassandra sink: hostname and nickname are both written to unified_logs")
-    void cassandraHandlerWritesBothNameFields() {
-        CassandraLogEventRepository repository = mock(CassandraLogEventRepository.class);
-        CassandraLogEventHandler handler = new CassandraLogEventHandler(
-                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
-                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
-
-        handler.handle(message(), enriched(NICKNAME));
-
-        ArgumentCaptor<CassandraLogEvent> captor = ArgumentCaptor.forClass(CassandraLogEvent.class);
-        verify(repository).save(captor.capture());
-        CassandraLogEvent saved = captor.getValue();
-        assertThat(saved.getHostname()).isEqualTo(HOSTNAME);
-        assertThat(saved.getNickname()).isEqualTo(NICKNAME);
-    }
-
-    @Test
-    @DisplayName("Cassandra sink: a machine with no nickname writes a null nickname, not the hostname")
-    void cassandraHandlerWritesNullNicknameWhenAbsent() {
-        CassandraLogEventRepository repository = mock(CassandraLogEventRepository.class);
-        CassandraLogEventHandler handler = new CassandraLogEventHandler(
-                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
-                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
-
-        handler.handle(message(), enriched(null));
-
-        ArgumentCaptor<CassandraLogEvent> captor = ArgumentCaptor.forClass(CassandraLogEvent.class);
-        verify(repository).save(captor.capture());
-        CassandraLogEvent saved = captor.getValue();
-        assertThat(saved.getHostname()).isEqualTo(HOSTNAME);
-        assertThat(saved.getNickname()).isNull();
     }
 
     @Test
