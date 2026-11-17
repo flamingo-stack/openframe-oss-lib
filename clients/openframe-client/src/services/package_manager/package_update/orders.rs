@@ -7,7 +7,7 @@ use tokio::sync::Notify;
 use tracing::{info, warn};
 
 use crate::models::{PackageRef, PackageUpdateMessage, SourceKind, UpdateMode, UpdateSource};
-use crate::utils::fs::atomic_write;
+use crate::utils::fs::{atomic_write, read_json_or_quarantine};
 
 /// Finished requests remembered for the stale-sequence rule.
 const FINISHED_MEMORY: usize = 100;
@@ -75,12 +75,8 @@ pub struct OrderStore {
 
 impl OrderStore {
     pub fn load(path: PathBuf) -> Self {
-        let state = match std::fs::read(&path) {
-            Ok(bytes) => serde_json::from_slice::<Orders>(&bytes).unwrap_or_else(|e| {
-                warn!(path = %path.display(), "Package update orders unreadable, starting empty: {:#}", e);
-                Orders::default()
-            }),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Orders::default(),
+        let state = match read_json_or_quarantine::<Orders>(&path) {
+            Ok(file) => file.parsed().unwrap_or_default(),
             Err(e) => {
                 warn!(path = %path.display(), "Failed to read package update orders, starting empty: {:#}", e);
                 Orders::default()

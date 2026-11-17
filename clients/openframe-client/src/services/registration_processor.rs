@@ -5,6 +5,7 @@ use tracing::{error, info};
 use crate::models::AgentRegistrationResponse;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::AgentRegistrationService;
+use crate::utils::fs::CorruptJson;
 
 #[derive(Clone)]
 pub struct RegistrationProcessor {
@@ -24,7 +25,14 @@ impl RegistrationProcessor {
     }
 
     pub async fn process(&self) -> Result<()> {
-        let machine_id = self.config_service.get_machine_id()?;
+        let machine_id = match self.config_service.get_machine_id() {
+            Err(e) if e.is::<CorruptJson>() => {
+                let saved = AgentRegistrationService::read_persisted_credentials().await?;
+                self.config_service.replace_corrupt(saved.as_ref()).await?;
+                self.config_service.get_machine_id()?
+            }
+            other => other?,
+        };
         if !machine_id.is_empty() {
             info!("Already registered (machine_id: {})", machine_id);
             return Ok(());
