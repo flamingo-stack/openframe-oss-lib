@@ -462,7 +462,7 @@ function DeviceStatusGridCell({ device }: { device: DeviceRow }) {
       tag={
         <DeviceLifecycleTag
           status={device.status}
-          connectivity={device.connectivity ?? null}
+          connectivity={device.connectivity}
           clientOutdated={device.clientOutdated}
         />
       }
@@ -740,7 +740,7 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
             <div className="inline-flex">
               <DeviceLifecycleTag
                 status={device.status}
-                connectivity={device.connectivity ?? null}
+                connectivity={device.connectivity}
                 clientOutdated={device.clientOutdated}
               />
             </div>

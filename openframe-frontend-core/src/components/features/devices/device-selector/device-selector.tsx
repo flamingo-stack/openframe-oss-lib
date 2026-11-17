@@ -94,7 +94,7 @@ function DeviceCell({ device }: { device: DeviceRow }) {
 /** The STATUS cell: the device's status as its tag; the tag's loading form while the device is read. */
 function StatusCell({ device }: { device: DeviceRow }) {
   if (useLoadingScope()) return <Tag loading label="" className="w-min" />;
-  return <DeviceLifecycleTag status={device.status} connectivity={device.connectivity ?? null} className="w-min" />;
+  return <DeviceLifecycleTag status={device.status} connectivity={device.connectivity} className="w-min" />;
 }
 
 /** The add / remove control: static chrome, drawn real and inert while the device is read. */

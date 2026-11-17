@@ -99,7 +99,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                   statusTag={
                     device.status || device.clientOutdated
                       ? deviceLifecycleTagProps(device.status, {
-                          connectivity: device.connectivity ?? null,
+                          connectivity: device.connectivity,
                           display,
                           clientOutdated: device.clientOutdated,
                         })

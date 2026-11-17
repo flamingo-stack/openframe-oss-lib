@@ -6,6 +6,7 @@ import { DeviceLifecycleTag, deviceLifecycleTagProps } from './device-lifecycle-
 import { getLegacyDeviceStatusConfig } from './device-status';
 import { DeviceStatusDisplayProvider } from './device-status-display';
 import { deviceStatusFilterGroups, splitStatusFilterValue } from './device-statuses';
+import { DevicesGrid } from './devices-grid';
 import { getDeviceFilterColumns } from './devices-table-columns';
 import type { DeviceFilters } from './types';
 import { useTagFilterModal } from './use-tag-filter-modal';
@@ -223,5 +224,22 @@ describe('an outdated client (clientOutdated)', () => {
         count: 2,
       });
     }
+  });
+});
+
+describe('a row that does not carry connectivity, in the legacy display', () => {
+  it('reads its own status on the grid card, not OFFLINE', () => {
+    // A host whose rows have no connectivity field (a phase-1 backend): the legacy tag falls back to the status.
+    render(
+      <DevicesGrid
+        devices={[{ id: 'd-1', machineId: 'm-1', hostname: 'host-1', nickname: null, status: 'ONLINE' }]}
+        isLoading={false}
+      />,
+      {
+        wrapper: legacy,
+      },
+    );
+    expect(screen.getByText('ONLINE')).toBeInTheDocument();
+    expect(screen.queryByText('OFFLINE')).not.toBeInTheDocument();
   });
 });
