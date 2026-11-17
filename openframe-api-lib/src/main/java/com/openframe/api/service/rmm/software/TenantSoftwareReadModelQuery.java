@@ -25,6 +25,7 @@ import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareAggregationRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
@@ -61,6 +62,7 @@ public class TenantSoftwareReadModelQuery {
 
     private final SoftwareRepository softwareRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
+    private final DeviceSoftwareAggregationRepository deviceSoftwareAggregationRepository;
     private final VulnerabilityRepository vulnerabilityRepository;
     private final MachineRepository machineRepository;
     private final PackageAutoUpdatePolicyRepository packageAutoUpdatePolicyRepository;
@@ -149,6 +151,14 @@ public class TenantSoftwareReadModelQuery {
                 .map(row -> toOnDevice(row, machineById, latestVersion))
                 .filter(row -> matchesHostname(row, search))
                 .toList();
+    }
+
+    public List<String> machineIdsForSoftware(String tenantId, String softwareId) {
+        Long titleId = parseLong(softwareId);
+        if (titleId == null) {
+            return List.of();
+        }
+        return deviceSoftwareAggregationRepository.machineIdsWithTitle(tenantId, titleId);
     }
 
     private static SoftwareOnDeviceResponse toOnDevice(DeviceSoftware installed, Map<String, Machine> machineById,
