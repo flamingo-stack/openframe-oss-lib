@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -47,12 +46,13 @@ public class DeviceLifecycleService {
         if (!managedStatusEnabled) {
             return;
         }
-        Optional<Machine> found = machineRepository.findByMachineId(machineId);
-        if (found.isEmpty()) {
-            log.warn("Promotion check for unknown machine {}, ignoring", machineId);
-            return;
-        }
-        Machine machine = found.get();
+        machineRepository.findByMachineId(machineId).ifPresentOrElse(
+                this::promoteIfEligible,
+                () -> log.warn("Promotion check for unknown machine {}, ignoring", machineId));
+    }
+
+    private void promoteIfEligible(Machine machine) {
+        String machineId = machine.getMachineId();
         if (machine.getStatus() != DeviceStatus.PENDING) {
             return;
         }
@@ -87,13 +87,15 @@ public class DeviceLifecycleService {
     private void promote(String machineId) {
         Criteria stillPending = Criteria.where(STATUS.path()).is(DeviceStatus.PENDING);
         MachineUpdate toManaged = machineUpdate().set(STATUS, DeviceStatus.MANAGED);
-        Optional<MachineWriteResult> written = machineWriter.update(machineId, stillPending, toManaged);
-        if (written.isEmpty()) {
-            log.debug("Machine {} was promoted concurrently, nothing to do", machineId);
-            return;
-        }
-        Machine promoted = written.get().after();
-        log.info("Device promoted PENDING -> MANAGED: machineId={}", machineId);
+        machineWriter.update(machineId, stillPending, toManaged)
+                .map(MachineWriteResult::after)
+                .ifPresentOrElse(
+                        this::announcePromotion,
+                        () -> log.debug("Machine {} was promoted concurrently, nothing to do", machineId));
+    }
+
+    private void announcePromotion(Machine promoted) {
+        log.info("Device promoted PENDING -> MANAGED: machineId={}", promoted.getMachineId());
         eventPublisher.publishEvent(new DeviceFirstConnectedEvent(this, promoted));
     }
 }
