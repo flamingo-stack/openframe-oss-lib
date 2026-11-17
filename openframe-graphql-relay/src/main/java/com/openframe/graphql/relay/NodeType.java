@@ -39,7 +39,7 @@ public enum NodeType {
     NOTIFICATION("Notification", "id"),
     SOFTWARE_SCHEDULE("SoftwareSchedule", "id"),
     GUARDRAIL_POLICY("GuardrailPolicy", "id"),
-    EMAIL_MAILBOX("EmailMailbox", "id"),
+    MAILBOX("Mailbox", "id"),
     HELD_EMAIL("HeldEmail", "id"),
     EMAIL_BLOCK_LIST_ENTRY("EmailBlockListEntry", "id");
 

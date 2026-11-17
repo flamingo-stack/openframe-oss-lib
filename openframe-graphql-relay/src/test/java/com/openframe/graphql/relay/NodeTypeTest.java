@@ -57,7 +57,7 @@ class NodeTypeTest {
 
     @ParameterizedTest
     @CsvSource({
-            "EmailMailbox, EMAIL_MAILBOX",
+            "Mailbox, MAILBOX",
             "HeldEmail, HELD_EMAIL",
             "EmailBlockListEntry, EMAIL_BLOCK_LIST_ENTRY"
     })

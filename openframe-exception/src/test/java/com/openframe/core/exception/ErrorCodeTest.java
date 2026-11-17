@@ -12,14 +12,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ErrorCodeTest {
 
     private static final String EMAIL_PREFIX = "EMAIL_";
+    private static final String MAILBOX_PREFIX = "MAILBOX_";
 
     @ParameterizedTest
     @CsvSource({
-            "EMAIL_MAILBOX_NOT_FOUND, EMAIL_MAILBOX_NOT_FOUND, 404",
-            "EMAIL_MAILBOX_EXISTS, EMAIL_MAILBOX_EXISTS, 409",
-            "EMAIL_MAILBOX_REMOVED, EMAIL_MAILBOX_REMOVED, 409",
-            "EMAIL_MAILBOX_NOT_PENDING, EMAIL_MAILBOX_NOT_PENDING, 409",
-            "EMAIL_MAILBOX_PENDING, EMAIL_MAILBOX_PENDING, 409",
+            "MAILBOX_NOT_FOUND, MAILBOX_NOT_FOUND, 404",
+            "MAILBOX_EXISTS, MAILBOX_EXISTS, 409",
+            "MAILBOX_REMOVED, MAILBOX_REMOVED, 409",
+            "MAILBOX_NOT_PENDING, MAILBOX_NOT_PENDING, 409",
+            "MAILBOX_PENDING, MAILBOX_PENDING, 409",
             "EMAIL_FORWARDING_TEST_IN_PROGRESS, EMAIL_FORWARDING_TEST_IN_PROGRESS, 409",
             "EMAIL_FORWARDING_TEST_NOT_PASSED, EMAIL_FORWARDING_TEST_NOT_PASSED, 409",
             "EMAIL_FORWARDING_TEST_SEND_FAILED, EMAIL_FORWARDING_TEST_SEND_FAILED, 502",
@@ -35,20 +36,20 @@ class ErrorCodeTest {
     }
 
     @Test
-    void values_emailPrefix_exactlyTheNineCodes() {
+    void values_emailOrMailboxPrefix_exactlyTheNineCodes() {
         // execution
-        List<String> emailCodes = Arrays.stream(ErrorCode.values())
+        List<String> emailToTicketCodes = Arrays.stream(ErrorCode.values())
                 .map(ErrorCode::name)
-                .filter(name -> name.startsWith(EMAIL_PREFIX))
+                .filter(name -> name.startsWith(EMAIL_PREFIX) || name.startsWith(MAILBOX_PREFIX))
                 .toList();
 
         // verifications
-        assertThat(emailCodes).containsExactlyInAnyOrder(
-                "EMAIL_MAILBOX_NOT_FOUND",
-                "EMAIL_MAILBOX_EXISTS",
-                "EMAIL_MAILBOX_REMOVED",
-                "EMAIL_MAILBOX_NOT_PENDING",
-                "EMAIL_MAILBOX_PENDING",
+        assertThat(emailToTicketCodes).containsExactlyInAnyOrder(
+                "MAILBOX_NOT_FOUND",
+                "MAILBOX_EXISTS",
+                "MAILBOX_REMOVED",
+                "MAILBOX_NOT_PENDING",
+                "MAILBOX_PENDING",
                 "EMAIL_FORWARDING_TEST_IN_PROGRESS",
                 "EMAIL_FORWARDING_TEST_NOT_PASSED",
                 "EMAIL_FORWARDING_TEST_SEND_FAILED",
