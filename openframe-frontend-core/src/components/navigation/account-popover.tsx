@@ -182,13 +182,16 @@ export function AccountPopover({
           // both widths, on the rows' icon line — and the name fades as the width
           // crosses 140px. `collapsed` flips on the click, mid-way through that.
           className={cn(
-            'group/account flex h-11 min-w-0 items-center gap-[var(--spacing-system-xsf)] overflow-hidden rounded-md text-left',
-            // Avatar only: a square around it, the size of the row's other buttons.
-            avatarOnly && !collapsed ? 'size-8 shrink-0 justify-center gap-0 p-0' : 'w-full',
+            'group/account flex h-11 min-w-0 items-center gap-[var(--spacing-system-xsf)] overflow-hidden text-left',
+            // Avatar only, at both widths: a circle around the round avatar, as wide as the row's other buttons, so the
+            // hover and open tint follow the avatar's shape instead of a box behind it. A row trigger keeps its corners.
+            avatarOnly ? 'size-8 shrink-0 justify-center gap-0 rounded-full p-0' : 'w-full rounded-md',
             centred && 'justify-center gap-0 px-0',
-            // The rail keeps the avatar 8px in, `avatarOnly` or not; only the square above has no padding.
+            // In the rail the avatar-only circle sits on the centre line, as the buttons stacked under it, or 8px in.
+            collapsed && avatarOnly && (centred ? 'mx-auto' : 'ml-[var(--spacing-system-xsf)]'),
+            // The rail keeps the avatar 8px in; only the avatar-only circle has no padding.
             !centred &&
-              (!avatarOnly || collapsed) &&
+              !avatarOnly &&
               'pl-[var(--spacing-system-xsf)] pr-0 @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
             'transition-[padding,background-color] duration-200 hover:bg-ods-bg-hover data-[state=open]:bg-ods-bg-hover motion-reduce:transition-none',
             disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',

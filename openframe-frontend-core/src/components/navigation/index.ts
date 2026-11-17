@@ -13,7 +13,8 @@ export type { AskAiOpenDetail } from './mingo-ai-button';
 export { MingoAiButton, openAskAi } from './mingo-ai-button';
 export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from '../chat/utils/ask-ai-events';
 export type { MingoAiButtonProps } from './mingo-ai-button';
-export { MobileNavSheet, siteNavHasMobileMenus } from './mobile-nav-sheet';
+export { MobileNavSheet } from './mobile-nav-sheet';
+export { siteNavHasMobileMenus } from './site-nav-mobile-menus';
 export { MOBILE_NAV_SHEET_ID } from './mobile-nav-sheet-id';
 export type { MobileNavSheetProps } from './mobile-nav-sheet';
 export { SiteFooter } from './site-footer';
@@ -83,7 +84,7 @@ export { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from '../../utils/wo
 export type { AppLayoutWorkAreaMode, AppLayoutWorkAreaProps, WorkAreaColumnState } from './app-layout-work-area';
 export { AppColumnHeader } from './app-column-header';
 export type { AppColumnHeaderLayoutAction, AppColumnHeaderProps } from './app-column-header';
-export { ColumnBackSlot, ColumnBackSlotReset, useColumnBack } from '../layout/column-back-slot';
+export { ColumnBackSlot, ColumnBackSlotReset, useColumnBack, useHandColumnBack } from '../layout/column-back-slot';
 export type { ColumnBack } from '../layout/column-back-slot';
 
 export {
