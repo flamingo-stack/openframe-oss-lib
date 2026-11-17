@@ -90,6 +90,7 @@ public class SoftwareProjector {
                 .productCodes(rollup.arpKeys())
                 .packageFamilyNames(rollup.packageFamilyNames())
                 .systemComponent(rollup.systemComponent())
+                .wingetIds(rollup.wingetIds())
                 .build();
     }
 
@@ -99,6 +100,7 @@ public class SoftwareProjector {
         software.setArpKeys(program.getProductCodes());
         software.setPackageFamilyNames(program.getPackageFamilyNames());
         software.setSystemComponent(program.isSystemComponent());
+        software.setWingetIds(program.getWingetIds());
     }
 
     // the handler projects every title of a host on every host_software event, so a title is matched again only
@@ -110,6 +112,7 @@ public class SoftwareProjector {
                 && Objects.equals(software.getUpgradeCode(), program.getUpgradeCode())
                 && Objects.equals(orEmpty(software.getArpKeys()), program.getProductCodes())
                 && Objects.equals(orEmpty(software.getPackageFamilyNames()), program.getPackageFamilyNames())
+                && Objects.equals(orEmpty(software.getWingetIds()), program.getWingetIds())
                 && Boolean.TRUE.equals(software.getSystemComponent()) == program.isSystemComponent();
     }
 

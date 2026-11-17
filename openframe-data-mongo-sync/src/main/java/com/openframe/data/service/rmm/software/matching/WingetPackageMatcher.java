@@ -2,6 +2,7 @@ package com.openframe.data.service.rmm.software.matching;
 
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -31,8 +32,8 @@ public class WingetPackageMatcher implements PackageMatcher {
     private final PackageCatalogRepository catalogRepository;
 
     @Override
-    public PackageManagerType getManager() {
-        return PackageManagerType.WINGET;
+    public FleetSource getFleetSource() {
+        return FleetSource.PROGRAMS;
     }
 
     @Override
@@ -50,9 +51,8 @@ public class WingetPackageMatcher implements PackageMatcher {
         if (productCodes.isEmpty() && upgradeCodes.isEmpty() && packageFamilyNames.isEmpty() && names.isEmpty()) {
             return new CatalogLookup(List.of());
         }
-        PackageManagerType manager = getManager();
-        List<PackageCatalogEntry> entries = catalogRepository.findByManagerAndAnyMatchingKey(manager, productCodes,
-                upgradeCodes, packageFamilyNames, names);
+        List<PackageCatalogEntry> entries = catalogRepository.findByManagerAndAnyMatchingKey(
+                PackageManagerType.WINGET, productCodes, upgradeCodes, packageFamilyNames, names);
         return new CatalogLookup(entries);
     }
 

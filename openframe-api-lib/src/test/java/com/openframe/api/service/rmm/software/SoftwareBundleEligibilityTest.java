@@ -34,6 +34,7 @@ class SoftwareBundleEligibilityTest {
     @Mock private SoftwareActionResultRepository softwareActionResultRepository;
     @Mock private MachinePlatformResolver machinePlatformResolver;
     @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
 
     @InjectMocks private SoftwareBundleService service;
 

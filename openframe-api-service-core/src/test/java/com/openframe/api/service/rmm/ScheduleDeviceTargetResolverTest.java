@@ -220,6 +220,7 @@ class ScheduleDeviceTargetResolverTest {
 
     private static Machine machine(String orgId, DeviceType type, OsType osType) {
         Machine m = new Machine();
+        m.setStatus(DeviceStatus.MANAGED);
         m.setOrganizationId(orgId);
         m.setType(type);
         m.setOsType(osType);
