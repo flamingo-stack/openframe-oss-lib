@@ -4,7 +4,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.invitation.InvitationFilterInput;
 import com.openframe.api.dto.invitation.InvitationFilters;
 import com.openframe.api.dto.invitation.InvitationResponse;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.user.FilterOption;
 import com.openframe.api.dto.user.UpdateUserRequest;

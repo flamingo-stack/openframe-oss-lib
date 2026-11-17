@@ -1,6 +1,6 @@
 package com.openframe.api.service.device;
 
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 
 /**
  * Position in a newest-first device log listing: the Loki timestamp of the last returned line. A page never splits

@@ -6,7 +6,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;

@@ -6,7 +6,7 @@ import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.notification.UnreadCategoryCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;

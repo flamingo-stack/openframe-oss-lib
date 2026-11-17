@@ -5,7 +5,7 @@ import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;

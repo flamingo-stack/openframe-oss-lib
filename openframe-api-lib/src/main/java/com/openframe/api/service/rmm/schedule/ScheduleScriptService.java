@@ -8,7 +8,7 @@ import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;

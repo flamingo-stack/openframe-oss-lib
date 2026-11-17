@@ -35,15 +35,15 @@ public class PlainText {
         }
         String stripped = stripMarkup(value);
         String collapsed = collapseWhitespace(stripped);
-        return collapsed.isEmpty() ? null : collapsed;
+        return collapsed.isBlank() ? null : collapsed;
     }
 
     public static String sanitizeAndExcerpt(String value, int maxChars) {
         String sanitized = sanitize(value);
-        return excerpt(sanitized, maxChars);
+        return excerpt(sanitized, maxChars, ELLIPSIS);
     }
 
-    public static String excerpt(String value, int maxChars) {
+    public static String excerpt(String value, int maxChars, String ellipsis) {
         if (value == null) {
             return null;
         }

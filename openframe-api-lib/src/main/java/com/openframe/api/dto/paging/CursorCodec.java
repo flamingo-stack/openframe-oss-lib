@@ -1,4 +1,4 @@
-package com.openframe.api.dto.shared;
+package com.openframe.api.dto.paging;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

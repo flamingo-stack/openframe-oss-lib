@@ -6,7 +6,7 @@ import com.openframe.api.dto.packagesearch.PackageDetails;
 import com.openframe.api.dto.packagesearch.PackageSearchHit;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.config.PackageManagerProperties;

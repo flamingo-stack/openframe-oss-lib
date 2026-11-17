@@ -4,7 +4,7 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.audit.*;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;

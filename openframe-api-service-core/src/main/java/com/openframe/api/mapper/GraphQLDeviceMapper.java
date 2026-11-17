@@ -5,7 +5,7 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.*;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.PageInfo;

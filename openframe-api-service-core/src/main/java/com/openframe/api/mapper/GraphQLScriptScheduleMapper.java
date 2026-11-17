@@ -5,7 +5,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import org.springframework.stereotype.Component;
 

@@ -4,7 +4,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseCursors;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseScope;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;

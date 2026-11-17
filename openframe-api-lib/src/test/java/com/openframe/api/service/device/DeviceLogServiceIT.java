@@ -7,7 +7,7 @@ import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
 import com.openframe.api.dto.device.DeviceLogFilterCriteria;
 import com.openframe.api.dto.device.DeviceLogLevel;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.tenant.TenantDomainService;
 import com.openframe.data.document.device.Machine;

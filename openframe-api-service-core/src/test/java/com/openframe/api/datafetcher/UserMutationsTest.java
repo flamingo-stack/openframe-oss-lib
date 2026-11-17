@@ -5,7 +5,7 @@ import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.invitation.InviteUsersInput;
 import com.openframe.api.dto.invitation.InviteUsersPayload;
 import com.openframe.api.dto.invitation.ResendInvitationPayload;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.MutationError;
 import com.openframe.api.dto.user.DeleteUserInput;
 import com.openframe.api.dto.user.TransferOwnershipInput;

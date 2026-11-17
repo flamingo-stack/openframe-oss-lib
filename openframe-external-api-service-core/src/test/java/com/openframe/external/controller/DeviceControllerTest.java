@@ -7,7 +7,7 @@ import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.device.TagFilterOption;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;

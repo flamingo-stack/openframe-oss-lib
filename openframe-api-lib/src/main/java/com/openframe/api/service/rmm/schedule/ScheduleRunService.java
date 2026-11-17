@@ -3,7 +3,7 @@ package com.openframe.api.service.rmm.schedule;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunFilterInput;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import org.springframework.data.domain.Sort;

@@ -1,6 +1,6 @@
 package com.openframe.api.mapper;
 
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import org.junit.jupiter.api.Test;
 

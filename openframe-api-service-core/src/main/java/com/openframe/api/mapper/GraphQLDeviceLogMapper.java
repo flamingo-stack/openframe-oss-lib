@@ -7,7 +7,7 @@ import com.openframe.api.dto.device.DeviceLogEntry;
 import com.openframe.api.dto.device.DeviceLogFilterCriteria;
 import com.openframe.api.dto.device.DeviceLogFilterInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;

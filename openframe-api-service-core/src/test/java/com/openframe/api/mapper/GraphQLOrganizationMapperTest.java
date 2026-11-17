@@ -8,7 +8,7 @@ import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.organization.OrganizationSortField;
 import com.openframe.api.dto.organization.OrganizationSortInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;

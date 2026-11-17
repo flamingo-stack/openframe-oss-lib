@@ -6,7 +6,7 @@ import com.openframe.api.dto.knowledgebase.FolderChildrenAction;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseAttachmentUpload;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
 import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseAttachmentService;

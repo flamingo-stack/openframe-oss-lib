@@ -1,6 +1,6 @@
 package com.openframe.external.util;
 
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
 import org.junit.jupiter.api.Test;

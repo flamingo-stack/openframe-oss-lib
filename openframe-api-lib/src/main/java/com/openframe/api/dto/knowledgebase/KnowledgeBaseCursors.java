@@ -1,6 +1,6 @@
 package com.openframe.api.dto.knowledgebase;
 
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemCursor;
 

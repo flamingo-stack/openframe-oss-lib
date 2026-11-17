@@ -5,7 +5,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.assignment.AssignedItemCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;

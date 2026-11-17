@@ -3,7 +3,7 @@ package com.openframe.api.service.device;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilters;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;

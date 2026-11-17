@@ -3,7 +3,7 @@ package com.openframe.api.service.rmm.script;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;

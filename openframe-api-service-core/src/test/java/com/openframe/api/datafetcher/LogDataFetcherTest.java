@@ -10,7 +10,7 @@ import com.openframe.api.dto.audit.LogFilterInput;
 import com.openframe.api.dto.audit.LogFilters;
 import com.openframe.api.dto.audit.LogSortField;
 import com.openframe.api.dto.audit.LogSortInput;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.paging.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
