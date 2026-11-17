@@ -75,10 +75,7 @@ impl ToolCommandParamsResolver {
             .iter()
             .chain(&tool.run_command_args)
             .flat_map(|arg| ASSETS_PATH_REGEX.captures_iter(arg))
-            .map(|caps| {
-                self.directory_manager
-                    .get_asset_path(&tool.tool_agent_id, &caps[1], true)
-            })
+            .map(|caps| self.command_asset_path(&tool.tool_agent_id, &caps[1]))
             .collect();
         for path in asset_paths {
             if !self
@@ -100,12 +97,15 @@ impl ToolCommandParamsResolver {
             .to_string()
     }
 
+    fn command_asset_path(&self, tool_agent_id: &str, asset_name: &str) -> PathBuf {
+        self.directory_manager
+            .get_asset_path(tool_agent_id, asset_name, true)
+    }
+
     fn process_assets_placeholders(&self, arg: &str, tool_agent_id: &str) -> String {
         ASSETS_PATH_REGEX
             .replace_all(arg, |caps: &regex::Captures| {
-                let asset_name = &caps[1];
-                self.directory_manager
-                    .get_asset_path(tool_agent_id, asset_name, true) // Assets referenced in commands are typically executable
+                self.command_asset_path(tool_agent_id, &caps[1])
                     .to_string_lossy()
                     .into_owned()
             })

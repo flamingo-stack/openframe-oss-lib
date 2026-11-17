@@ -515,7 +515,12 @@ impl ToolInstallationService {
                 // On reinstall, always refresh server-generated config assets (e.g. the mesh .msh).
                 let refresh_config_asset =
                     reinstall && matches!(asset.source, AssetSource::ToolApi);
-                if !asset_path.exists() || refresh_config_asset {
+                if !self
+                    .directory_manager
+                    .tool_artifact_present(&asset_path, false)
+                    .await
+                    || refresh_config_asset
+                {
                     if is_executable {
                         if let Err(e) = self
                             .tool_kill_service
