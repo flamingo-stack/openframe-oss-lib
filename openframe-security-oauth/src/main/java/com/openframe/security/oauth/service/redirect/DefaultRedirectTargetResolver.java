@@ -22,6 +22,9 @@ import static org.springframework.util.StringUtils.hasText;
 public class DefaultRedirectTargetResolver implements RedirectTargetResolver {
 
     private static final String ROOT = "/";
+    private static final int DEFAULT_HTTPS_PORT = 443;
+    private static final int DEFAULT_HTTP_PORT = 80;
+    private static final int NO_PORT = -1;
 
     // Exact allow-list (comma-separated), e.g. native-app callback URIs. Empty: nothing is allowed.
     @Value("${openframe.gateway.redirect.allowed-uris:}")
@@ -88,13 +91,13 @@ public class DefaultRedirectTargetResolver implements RedirectTargetResolver {
     }
 
     private static int effectivePort(URI uri) {
-        if (uri.getPort() != -1) {
+        if (uri.getPort() != NO_PORT) {
             return uri.getPort();
         }
         return switch (uri.getScheme().toLowerCase()) {
-            case "https" -> 443;
-            case "http" -> 80;
-            default -> -1;
+            case "https" -> DEFAULT_HTTPS_PORT;
+            case "http" -> DEFAULT_HTTP_PORT;
+            default -> NO_PORT;
         };
     }
 }
