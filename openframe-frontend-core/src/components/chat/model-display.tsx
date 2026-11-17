@@ -5,11 +5,15 @@ import { cn } from '../../utils/cn';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
 import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { Popover, PopoverContent, PopoverTrigger } from '../popover';
+import { CircularProgress } from '../ui/circular-progress';
 import { useLoadingScope } from '../ui/loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { useChatAppearance } from './chat-appearance-context';
 import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
+import { type ChatUsagePanelData, chatContextTone, contextRatio, formatTokensFull } from './usage/chat-usage';
+import { CHAT_USAGE_TONE_COLOR, ChatUsagePanel } from './usage/chat-usage-panel';
 
 const getProviderIcon = (provider?: string) => {
   if (!provider) return null;
@@ -55,6 +59,66 @@ const formatTokenCount = (count: number): string => {
 const hasAnyBreakdownRow = (breakdown?: ModelUsageBreakdown): breakdown is ModelUsageBreakdown =>
   !!breakdown && !!(breakdown.haikuRewriter || breakdown.haikuClassifier || breakdown.haikuSummarizer);
 
+/**
+ * The counter as the Usage panel's trigger: a button (Tab, Enter or Space opens it) with a ring in the chat context's
+ * colour. The panel opens above the counter; focus stays in the composer, and Esc or a click outside closes it.
+ */
+function UsagePanelTrigger({
+  usagePanel,
+  usedTokens,
+  budget,
+  text,
+}: {
+  usagePanel: ChatUsagePanelData;
+  usedTokens?: number;
+  budget: number | null | undefined;
+  text: React.ReactNode;
+}) {
+  const { compactionThreshold } = usagePanel.context;
+  const tone = chatContextTone(usedTokens, budget, compactionThreshold);
+  const ratio = contextRatio(usedTokens, budget);
+  const label =
+    usedTokens != null && budget != null && budget > 0
+      ? `Usage: ${formatTokensFull(usedTokens)} of ${formatTokensFull(budget)} context budget tokens. Show usage details`
+      : 'Show usage details';
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="ml-auto flex items-center gap-1 rounded-sm text-ods-text-secondary transition-colors text-h6 hover:text-ods-text-primary focus:outline-none focus-visible:text-ods-text-primary focus-visible:ring-2 focus-visible:ring-ods-accent data-[state=open]:text-ods-text-primary"
+        >
+          <span data-accent="mingo" className="flex shrink-0 items-center" aria-hidden>
+            <CircularProgress
+              percentage={ratio == null ? 0 : ratio * 100}
+              size={14}
+              strokeWidth={2}
+              showLabel={false}
+              color={CHAT_USAGE_TONE_COLOR[tone]}
+              trackColor="var(--color-bg-surface-active)"
+            />
+          </span>
+          <span>{text}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={8}
+        collisionPadding={16}
+        // Focus stays in the composer: the panel only shows numbers, there is nothing in it to operate.
+        onOpenAutoFocus={event => event.preventDefault()}
+        className="w-[360px] max-w-[calc(100vw-32px)] overflow-hidden rounded-md border-ods-border bg-ods-card p-0 text-ods-text-primary"
+      >
+        <ChatUsagePanel
+          data={{ ...usagePanel, context: { ...usagePanel.context, used: usedTokens ?? null, limit: budget ?? null } }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /** The inline row, loaded and loading. */
 const MODEL_DISPLAY_ROW_CLASS = 'flex items-center gap-1 text-h6';
 /** The provider's mark: 16px, as the loaded icons. */
@@ -75,6 +139,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       outputTokens,
       onModelClick,
       modelTooltip,
+      usagePanel,
       loading = false,
       ...props
     },
@@ -147,24 +212,37 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // (typically from the first `message-metadata` chunk); `usedTokens` lags
     // by a tick — it only becomes non-null after the first usage chunk, so
     // the tail shows "— / 150K context budget" until then.
+    const tailText = (budget: number | null | undefined) => (
+      <>
+        {usedTokens != null ? formatCount(usedTokens) : '—'}
+        {isV2 ? ' / ' : '/'}
+        {budget != null && budget > 0 ? formatCount(budget) : '—'} context budget
+      </>
+    );
+
     const inline = (
       <div ref={ref} className={cn(MODEL_DISPLAY_ROW_CLASS, 'text-ods-text-secondary', className)} {...props}>
         {labelWithTooltip}
-        {contextWindow != null && (
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="ml-auto opacity-70 text-h6">
-                  {usedTokens != null ? formatCount(usedTokens) : '—'}
-                  {isV2 ? ' / ' : '/'}
-                  {formatCount(contextWindow)} context budget
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" align="end">
-                {CONTEXT_BUDGET_HINT}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        {usagePanel ? (
+          <UsagePanelTrigger
+            usagePanel={usagePanel}
+            usedTokens={usedTokens}
+            budget={contextWindow ?? usagePanel.context.limit}
+            text={tailText(contextWindow ?? usagePanel.context.limit)}
+          />
+        ) : (
+          contextWindow != null && (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="ml-auto opacity-70 text-h6">{tailText(contextWindow)}</span>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="end">
+                  {CONTEXT_BUDGET_HINT}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )
         )}
       </div>
     );
@@ -172,7 +250,8 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // Without a breakdown there's no story to tell on hover — return the
     // bare inline so we don't add a stray pointer cursor / accessibility
     // chrome on chat surfaces that don't capture cross-call usage.
-    if (!hasAnyBreakdownRow(breakdown)) return inline;
+    // With the Usage panel the counter opens the panel on click; a hover card on the same row would be a second popup.
+    if (usagePanel || !hasAnyBreakdownRow(breakdown)) return inline;
 
     return (
       <HoverCard openDelay={150} closeDelay={100}>
