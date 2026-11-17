@@ -53,6 +53,9 @@ public class DebeziumMessage<T> {
 
             @JsonProperty("sequence")
             private String sequence;
+
+            @JsonProperty("gtid")
+            private String gtid;
             
             @JsonProperty("schema")
             private String schema;

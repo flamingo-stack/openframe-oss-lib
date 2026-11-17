@@ -19,6 +19,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @RequiredArgsConstructor
 public class RequestJwtClaimsReader {
 
+    private static final String MACHINE_ID_CLAIM = "machine_id";
+
     public Instant getExpiration(ServerWebExchange exchange) {
         Claims jwtClaims = getClaims(exchange);
         return jwtClaims.getExpiration().toInstant();
@@ -32,6 +34,12 @@ public class RequestJwtClaimsReader {
         } catch (Exception e) {
             return Optional.empty();
         }
+    }
+
+    public Optional<String> getMachineId(ServerWebExchange exchange) {
+        Claims claims = getClaims(exchange);
+        Object machineId = claims.get(MACHINE_ID_CLAIM);
+        return machineId == null ? Optional.empty() : Optional.of(String.valueOf(machineId));
     }
 
     private Claims getClaims(ServerWebExchange exchange) {

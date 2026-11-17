@@ -244,7 +244,7 @@ class PinotClientDeviceRepositoryTest {
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("connectivity = 'ONLINE'"), "was: " + query);
-            assertTrue(query.contains("status IN ('ONLINE', 'OFFLINE')"), "was: " + query);
+            assertTrue(query.contains("status IN ('MANAGED', 'ONLINE', 'OFFLINE')"), "was: " + query);
         }
 
         @Test
@@ -355,7 +355,7 @@ class PinotClientDeviceRepositoryTest {
             // verifications
             String query = captureQuery();
             assertTrue(query.contains(OUTDATED), "was: " + query);
-            assertTrue(query.contains("status IN ('ONLINE', 'OFFLINE')"), "was: " + query);
+            assertTrue(query.contains("status IN ('MANAGED', 'ONLINE', 'OFFLINE')"), "was: " + query);
         }
 
         @Test

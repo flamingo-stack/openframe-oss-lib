@@ -4,10 +4,8 @@ import com.openframe.data.document.device.Machine;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
-/**
- * Published when a device transitions from PENDING to ONLINE (first heartbeat received).
- * Used by SaaS layer to trigger DEVICE_REGISTERED event.
- */
+// Published once per registration: on the promotion PENDING -> MANAGED with the managed-status flag on, or on the first
+// connect PENDING -> ONLINE/OFFLINE with it off. The SaaS layer turns it into DEVICE_REGISTERED.
 @Getter
 public class DeviceFirstConnectedEvent extends ApplicationEvent {
 

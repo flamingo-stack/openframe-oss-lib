@@ -41,6 +41,8 @@ class DeviceSoftwareHandlerTest {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final long COMMIT_TS = 1_793_700_000_000L;
+    private static final String GTID_1 = "3e11fa47-71ca-11e1-9e33-c80aa9429562:101";
+    private static final String GTID_2 = "3e11fa47-71ca-11e1-9e33-c80aa9429562:102";
 
     @Mock private FleetHostResolver fleetHostResolver;
     @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -52,12 +54,21 @@ class DeviceSoftwareHandlerTest {
     @InjectMocks private DeviceSoftwareHandler handler;
 
     private DeserializedDebeziumMessage msg(String op, JsonNode before, JsonNode after) {
+        return msgAt(op, before, after, COMMIT_TS);
+    }
+
+    private DeserializedDebeziumMessage msgAt(String op, JsonNode before, JsonNode after, long commitTs) {
+        return msgIn(op, before, after, commitTs, null);
+    }
+
+    private DeserializedDebeziumMessage msgIn(String op, JsonNode before, JsonNode after, long commitTs, String gtid) {
         DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setOperation(op);
         payload.setBefore(before);
         payload.setAfter(after);
         DebeziumMessage.Payload.Source source = new DebeziumMessage.Payload.Source();
-        source.setTimestamp(COMMIT_TS);
+        source.setTimestamp(commitTs);
+        source.setGtid(gtid);
         payload.setSource(source);
         DeserializedDebeziumMessage m = new DeserializedDebeziumMessage();
         m.setPayload(payload);
@@ -120,7 +131,7 @@ class DeviceSoftwareHandlerTest {
     void handle_reconcile_upsertsSnapshotTitlesDeletesStaleAndProjects() {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(
                 title(42L, "Google Chrome", "apps", "1.0", "2.0")));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
@@ -155,7 +166,7 @@ class DeviceSoftwareHandlerTest {
     void handle_reconcile_setsVulnerabilitiesAndProjectsAffectedCves() {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(
                 titleWithCves(42L, "Google Chrome", "1.0", "CVE-1", "CVE-2")));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
@@ -175,7 +186,7 @@ class DeviceSoftwareHandlerTest {
     void handle_deleteEvent_reReconcilesFromSnapshot() {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of());
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of());
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
                 DeviceSoftware.builder().tenantId("t1").machineId("m1").softwareTitleId(42L).build()));
 
@@ -199,8 +210,8 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
         handler.handle(noSource, null);
 
-        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS);
-        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, 555L);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, "555");
     }
 
     @Test
@@ -215,8 +226,8 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("r", null, row().put("host_id", 101).put("software_id", 1)), null);
         handler.handle(msg("r", null, row().put("host_id", 100).put("software_id", 3)), null);
 
-        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, COMMIT_TS);
-        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 101L, COMMIT_TS);
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 101L, String.valueOf(COMMIT_TS));
         verify(fleetHostResolver, times(1)).resolve("100");
         verify(projectionTrigger, times(2)).titlesChanged(eq("t1"), any());
     }
@@ -225,7 +236,7 @@ class DeviceSoftwareHandlerTest {
     void handle_snapshotReadThatFailed_isReconciledByTheNextRowOfTheHost() {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS))
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
                 .thenThrow(new IllegalStateException("Fleet 503"))
                 .thenReturn(List.of());
 
@@ -233,7 +244,7 @@ class DeviceSoftwareHandlerTest {
                 .isInstanceOf(IllegalStateException.class);
         handler.handle(msg("r", null, row().put("host_id", 100)), null);
 
-        verify(fleetHostSoftwareCache, times(2)).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(fleetHostSoftwareCache, times(2)).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
         verify(projectionTrigger).titlesChanged(eq("t1"), any());
     }
 
@@ -258,7 +269,7 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         verify(fleetHostResolver, times(2)).isResolvable("100");
-        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
     }
 
     @Test
@@ -267,11 +278,125 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
 
         handler.handle(msg("r", null, row().put("host_id", 100)), null);
-        handler.handle(msg("u", row().put("host_id", 100), row().put("host_id", 100)), null);
-        handler.handle(msg("c", null, row().put("host_id", 100)), null);
-        handler.handle(msg("d", row().put("host_id", 100), null), null);
+        handler.handle(msgAt("u", row().put("host_id", 100), row().put("host_id", 100), COMMIT_TS + 1), null);
+        handler.handle(msgAt("c", null, row().put("host_id", 100), COMMIT_TS + 2), null);
+        handler.handle(msgAt("d", row().put("host_id", 100), null, COMMIT_TS + 3), null);
 
-        verify(fleetHostSoftwareCache, times(4)).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS + 1));
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS + 2));
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS + 3));
+    }
+
+    @Test
+    void handle_changeEventsOfOneCommit_reconcileTheHostOnce() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msg("c", null, row().put("host_id", 100).put("software_id", 1)), null);
+        handler.handle(msg("u", row().put("host_id", 100).put("software_id", 2), row().put("host_id", 100).put("software_id", 2)), null);
+        handler.handle(msg("d", row().put("host_id", 100).put("software_id", 3), null), null);
+        handler.handle(msg("c", null, row().put("host_id", 100).put("software_id", 4)), null);
+
+        verify(fleetHostResolver, times(1)).resolve("100");
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
+        verify(deviceSoftwareRepository, times(1)).findByTenantIdAndMachineId("t1", "m1");
+        verify(projectionTrigger, times(1)).titlesChanged(eq("t1"), any());
+        verify(projectionTrigger, times(1)).cvesChanged(eq("t1"), any());
+    }
+
+    @Test
+    void handle_oneCommitOnTwoHosts_reconcilesEachHost() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.isResolvable("101")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostResolver.resolve("101")).thenReturn(new FleetHostRef("t1", "m2"));
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+        handler.handle(msg("c", null, row().put("host_id", 101)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 101L, String.valueOf(COMMIT_TS));
+    }
+
+    @Test
+    void handle_changeEventThatFailed_isReconciledByTheNextRowOfTheCommit() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
+                .thenThrow(new IllegalStateException("Fleet 503"))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> handler.handle(msg("c", null, row().put("host_id", 100)), null))
+                .isInstanceOf(IllegalStateException.class);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        verify(fleetHostSoftwareCache, times(2)).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
+        verify(projectionTrigger, times(1)).titlesChanged(eq("t1"), any());
+    }
+
+    @Test
+    void handle_changeEventOfAnUnresolvedHost_isResolvedByTheNextRowOfTheCommit() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false, true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        verify(fleetHostResolver, times(2)).isResolvable("100");
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
+    }
+
+    @Test
+    void handle_changeEventsWithoutACommitTime_alwaysReconcile() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        DeserializedDebeziumMessage first = msg("c", null, row().put("host_id", 100));
+        first.getPayload().setSource(null);
+        DeserializedDebeziumMessage second = msg("c", null, row().put("host_id", 100));
+        second.getPayload().setSource(null);
+
+        handler.handle(first, null);
+        handler.handle(second, null);
+
+        verify(fleetHostSoftwareCache, times(2)).hostSoftware("t1", 100L, DeviceSoftwareHandler.NO_COMMIT);
+    }
+
+    @Test
+    void handle_twoTransactionsOfAHostInOneSecond_reconcileTheHostForEach() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", row().put("host_id", 100), row().put("host_id", 100), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("c", null, row().put("host_id", 100), COMMIT_TS, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
+        verify(projectionTrigger, times(2)).titlesChanged(eq("t1"), any());
+    }
+
+    @Test
+    void handle_rowsOfOneTransaction_reconcileTheHostOnce() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 1), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 2), COMMIT_TS + 1, GTID_1), null);
+
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, GTID_1);
+        verify(projectionTrigger, times(1)).titlesChanged(eq("t1"), any());
+    }
+
+    @Test
+    void handle_blankGtid_isKeyedByTheSourceCommitTime() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100), COMMIT_TS, " "), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, String.valueOf(COMMIT_TS));
     }
 
     @Test
@@ -289,7 +414,7 @@ class DeviceSoftwareHandlerTest {
         msi.setArpKey("{8A69D345-D564-463C-AFF1-A69D9E530F96}");
         msi.setPackageFamilyName("");
         msi.setInstallerType("msi");
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(chrome));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(chrome));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
 
@@ -314,7 +439,8 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         HostSoftwareTitle libnghttp2 = title(44L, "libnghttp2", source, "1.70.0", "1.68.0", "1.71.0");
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(libnghttp2));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
+                .thenReturn(List.of(libnghttp2));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 44L))
                 .thenReturn(Optional.empty());
         DeserializedDebeziumMessage message = msg("c", null, row().put("host_id", 100));
@@ -333,7 +459,7 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         HostSoftwareTitle sevenZip = title(43L, "7-Zip", "winget_packages", "24.08");
         sevenZip.getInstalledVersions().get(0).setWingetId("7zip.7zip");
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(sevenZip));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(sevenZip));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 43L))
                 .thenReturn(Optional.empty());
 
@@ -348,7 +474,7 @@ class DeviceSoftwareHandlerTest {
     void handle_reconcile_noVersionReportsTheFlag_systemComponentUnknown() {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS))
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
                 .thenReturn(List.of(title(42L, "Slack", "apps", "4.0")));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
@@ -489,7 +615,8 @@ class DeviceSoftwareHandlerTest {
     private void stubHostSoftware(HostSoftwareTitle hostSoftwareTitle) {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(hostSoftwareTitle));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
+                .thenReturn(List.of(hostSoftwareTitle));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
     }

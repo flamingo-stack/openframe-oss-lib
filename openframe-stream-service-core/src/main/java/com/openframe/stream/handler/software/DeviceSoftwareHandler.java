@@ -45,6 +45,9 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
 
     static final Duration SNAPSHOT_HOST_WINDOW = Duration.ofHours(24);
     static final Duration SNAPSHOT_UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
+    static final Duration RECONCILED_COMMIT_WINDOW = Duration.ofHours(1);
+    static final long RECONCILED_COMMIT_CAPACITY = 100_000;
+    static final String NO_COMMIT = "0";
 
     private static final Pattern APP_PATH = Pattern.compile("(?:.*/)?([^/]+)\\.app", Pattern.CASE_INSENSITIVE);
     private static final Pattern TOP_LEVEL_APP_PATH = Pattern.compile(
@@ -60,6 +63,10 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             .build();
     private final Cache<Long, Boolean> snapshotUnresolvedHosts = Caffeine.newBuilder()
             .expireAfterWrite(SNAPSHOT_UNRESOLVED_HOST_WINDOW)
+            .build();
+    private final Cache<HostCommit, Boolean> reconciledCommits = Caffeine.newBuilder()
+            .expireAfterWrite(RECONCILED_COMMIT_WINDOW)
+            .maximumSize(RECONCILED_COMMIT_CAPACITY)
             .build();
 
     @Override
@@ -91,6 +98,11 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
                 || snapshotUnresolvedHosts.getIfPresent(hostId) != null)) {
             return;
         }
+        String commit = commitOf(payload);
+        HostCommit hostCommit = snapshotRead || NO_COMMIT.equals(commit) ? null : new HostCommit(hostId, commit);
+        if (hostCommit != null && reconciledCommits.getIfPresent(hostCommit) != null) {
+            return;
+        }
         String fleetHostId = String.valueOf(hostId);
         if (!fleetHostResolver.isResolvable(fleetHostId)) {
             if (snapshotRead) {
@@ -100,26 +112,32 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
-        long commitTs = commitTimestamp(payload);
-        reconcile(host, hostId, commitTs);
+        reconcile(host, hostId, commit);
         if (snapshotRead) {
             snapshotReconciledHosts.put(hostId, Boolean.TRUE);
         }
+        if (hostCommit != null) {
+            reconciledCommits.put(hostCommit, Boolean.TRUE);
+        }
     }
 
-    // the source commit time: every row event of one Fleet commit shares it, so a burst re-reads Fleet once,
-    // and a later commit on the same host never gets the list fetched for an earlier one
-    private static long commitTimestamp(DebeziumMessage.Payload<JsonNode> payload) {
+    private record HostCommit(long hostId, String commit) {
+    }
+
+    private static String commitOf(DebeziumMessage.Payload<JsonNode> payload) {
         DebeziumMessage.Payload.Source source = payload.getSource();
+        if (source != null && !isBlank(source.getGtid())) {
+            return source.getGtid();
+        }
         if (source != null && source.getTimestamp() != null) {
-            return source.getTimestamp();
+            return String.valueOf(source.getTimestamp());
         }
         Long emitted = payload.getTimestamp();
-        return emitted == null ? 0L : emitted;
+        return emitted == null ? NO_COMMIT : String.valueOf(emitted);
     }
 
-    private void reconcile(FleetHostRef host, Long hostId, long commitTs) {
-        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId, commitTs);
+    private void reconcile(FleetHostRef host, Long hostId, String commit) {
+        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId, commit);
         Instant now = Instant.now();
         Set<Long> present = new HashSet<>();
         Set<Long> affectedTitles = new HashSet<>();
