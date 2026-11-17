@@ -674,10 +674,23 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   const openRecord = recordEntry && recordEntry.dialogId === dialogId ? recordEntry : null;
   /** How many times the open record was asked for again (the refresh timer): each one reads it once more. */
   const [recordReads, setRecordReads] = useState(0);
+  // The host's model changed (its settings): the open dialog's budget is the new model's, which only its record says
+  // until the next reply streams. Read it again, and let that read replace the usage the stream left.
+  const [usageModel, setUsageModel] = useState(modelLabel);
+  /** The read (by `recordReads`) whose usage replaces the stream's: the one the model change asked for. */
+  const [usageRereadAt, setUsageRereadAt] = useState<number | null>(null);
+  if (usageModel !== modelLabel) {
+    setUsageModel(modelLabel);
+    if (usageModel != null) {
+      setUsageRereadAt(recordReads + 1);
+      setRecordReads(recordReads + 1);
+    }
+  }
   useEffect(() => {
     if (!active || !dialogId || !fetchDialog) return undefined;
     let current = true;
     const key = keyOfDialogRef.current(dialogId);
+    const replacesUsage = usageRereadAt === recordReads;
     fetchDialog(dialogId)
       .then(record => {
         if (!current) return;
@@ -685,7 +698,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         // A title the list does not have yet (generated since the list was read).
         if (record) patchDialog(dialogId, { title: record.dialog.title });
         // The dialog's usage until the stream says more.
-        if (record?.tokenUsage && !store.snapshotOf(key).state.dialogTokenUsage) {
+        if (record?.tokenUsage && (replacesUsage || !store.snapshotOf(key).state.dialogTokenUsage)) {
           store.mutate(key, r => r.setDialogTokenUsage(record.tokenUsage ?? null));
         }
       })
@@ -700,7 +713,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     return () => {
       current = false;
     };
-  }, [active, dialogId, fetchDialog, store, patchDialog, recordReads]);
+  }, [active, dialogId, fetchDialog, store, patchDialog, recordReads, usageRereadAt]);
 
   // The list's scope follows the open dialog once: someone else's dialog is on no tab but everyone's. Reconciled during
   // render, so the tab that cannot list it never shows for a frame; never back, which would fight a person's own pick.
