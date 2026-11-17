@@ -481,12 +481,7 @@ public class OAuthBffService {
      * own domain and still allow-lists absolute targets.
      */
     private static boolean isCarriableRedirect(String url) {
-        return isAbsoluteUrl(url) || isSafeRelativePath(url);
-    }
-
-    private static boolean isSafeRelativePath(String url) {
-        return url != null && url.startsWith("/")
-                && (url.length() == 1 || (url.charAt(1) != '/' && url.charAt(1) != '\\'));
+        return isAbsoluteUrl(url) || RedirectTargetResolver.isSafeRelativePath(url);
     }
 
     private record OAuthSessionData(String codeVerifier, String tenantId, String redirectTo, boolean authMobile) {
