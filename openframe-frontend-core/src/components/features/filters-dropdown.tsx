@@ -118,8 +118,8 @@ function floatingPanelPosition(
 }
 
 /**
- * The horizontal room an `absolute` panel has: the nearest ancestor that clips its overflow (a page's scrolling column,
- * a card with `overflow-hidden`), within the window. A panel measured against the window alone fits there and is still
+ * The horizontal room an `absolute` panel has: inside every ancestor that clips its overflow (a page's scrolling
+ * column, a card with `overflow-hidden`), within the window. A panel measured against the window alone fits there and is still
  * cut off by its column, or slides under whatever stands beside it (a side panel, a navigation rail).
  */
 const CLIPPING_OVERFLOW = new Set(['hidden', 'clip', 'auto', 'scroll', 'overlay']);
@@ -129,10 +129,10 @@ function horizontalBounds(element: Element): { left: number; right: number } {
   let right = window.innerWidth;
   for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
     if (!CLIPPING_OVERFLOW.has(window.getComputedStyle(node).overflowX)) continue;
+    // Every clipping ancestor cuts the panel, so the room is what is left inside all of them.
     const rect = node.getBoundingClientRect();
     left = Math.max(left, rect.left);
     right = Math.min(right, rect.right);
-    break;
   }
   return { left, right };
 }
