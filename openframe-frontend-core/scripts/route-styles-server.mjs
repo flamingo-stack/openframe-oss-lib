@@ -4,6 +4,7 @@
  *   import { RouteStyles } from '<package>/route-styles'
  *   <body><RouteStyles />…</body>                      // once, in the root layout
  *   <RouteStyles complete />                            // pages that depend on who is signed in
+ *   <RouteStyles complete={['/admin']} />               // only the pages under these paths
  *
  * It writes the rules of the page's route into the HTML (a `<style precedence>`, which React puts in the head after
  * the app's own stylesheets) and starts the complete sheet loading after paint. The route is the page's path
@@ -25,6 +26,19 @@ const REGISTRY = Symbol.for(REGISTRY_KEY);
 /** The build these rules belong to, and its complete sheet: written by `withRouteStyles` into the bundles. */
 const BUILD = process.env.NEXT_STYLES_BUILD || '';
 const FULL_URL = process.env.NEXT_STYLES_FULL_URL || '';
+
+/**
+ * Whether the page at `path` carries the complete sheet: `true` for every page, or the path prefixes whose pages do
+ * (`/admin` takes `/admin` and every page under it, never `/administer`).
+ */
+function wantsComplete(complete, path) {
+  if (complete === true) return true;
+  if (!Array.isArray(complete)) return false;
+  return complete.some(prefix => {
+    const base = normalize(prefix);
+    return base === '/' || path === base || path.startsWith(`${base}/`);
+  });
+}
 
 /** `/blog/[slug]` → a RegExp for its paths; `[...x]` takes one or more segments, `[[...x]]` none or more. */
 function routePattern(route) {
@@ -73,8 +87,10 @@ function createResolver() {
   }
   const manifest = JSON.parse(readFileSync(file, 'utf8'));
   if (manifest.pending) {
-    return (_pathname, complete) =>
-      complete ? { css: COMPLETE_PLACEHOLDER, fullUrl: null } : { css: PLACEHOLDER, fullUrl: FULL_URL };
+    return (pathname, complete) =>
+      wantsComplete(complete, normalize(pathname))
+        ? { css: COMPLETE_PLACEHOLDER, fullUrl: null }
+        : { css: PLACEHOLDER, fullUrl: FULL_URL };
   }
   if (manifest.buildId !== BUILD) {
     throw new Error(`next-styles: ${file} belongs to build ${manifest.buildId}, this server to ${BUILD}`);
@@ -89,7 +105,7 @@ function createResolver() {
   };
   return (pathname, complete) => {
     const path = normalize(pathname);
-    const match = complete ? undefined : patterns.find(pattern => pattern.regex.test(path));
+    const match = wantsComplete(complete, path) ? undefined : patterns.find(pattern => pattern.regex.test(path));
     if (!match) return { css: sheet(manifest.full), fullUrl: null };
     return { css: sheet(manifest.routes[match.route].file), fullUrl: manifest.fullUrl };
   };
@@ -97,11 +113,14 @@ function createResolver() {
 
 /**
  * The page's rules: its route's sheet, or the complete sheet where no route matches its path or where `complete`
- * says the page's markup depends on who is looking (a signed-in hub), so no one page can sample its route.
+ * says the page's markup depends on who is looking (a signed-in hub, or the staff screens under a path prefix of a
+ * public site), so no one page can sample its route.
  */
 export function RouteStyles({ complete = false } = {}) {
   if (!BUILD) return null;
   globalThis[REGISTRY] ??= new Map();
   if (!globalThis[REGISTRY].has(BUILD)) globalThis[REGISTRY].set(BUILD, createResolver());
-  return createElement(RouteStyle, { build: BUILD, complete });
+  // The complete sheet's address is page data (a prop), never code in the browser bundle: compiled in, it renamed a
+  // shared chunk whenever the sheet changed, and a page from the previous build asked for a chunk the new one lacks.
+  return createElement(RouteStyle, { build: BUILD, complete, fullUrl: FULL_URL });
 }

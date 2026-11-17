@@ -5,14 +5,22 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
+  fullSheetUrl as FullSheetUrl,
   measureStylesheet as Measure,
   resolveImports as Resolve,
+  skewDeploymentId as SkewDeploymentId,
   withInlineStyles as WithInline,
 } from '../../scripts/next-styles';
 
-const { withInlineStyles, measureStylesheet, resolveImports } = createRequire(import.meta.url)(
-  '../../scripts/next-styles.cjs',
-) as { withInlineStyles: typeof WithInline; measureStylesheet: typeof Measure; resolveImports: typeof Resolve };
+const { withInlineStyles, measureStylesheet, resolveImports, fullSheetUrl, skewDeploymentId } = createRequire(
+  import.meta.url,
+)('../../scripts/next-styles.cjs') as {
+  withInlineStyles: typeof WithInline;
+  measureStylesheet: typeof Measure;
+  resolveImports: typeof Resolve;
+  fullSheetUrl: typeof FullSheetUrl;
+  skewDeploymentId: typeof SkewDeploymentId;
+};
 
 describe('next-styles: withInlineStyles', () => {
   it('turns inlining on and keeps the rest of the config and its experimental flags', () => {
@@ -86,5 +94,22 @@ describe('next-styles: the stylesheet as the build builds it', () => {
       execFileSync(process.execPath, [script, 'budget', '--budget', String(budget)], { cwd: root, encoding: 'utf8' });
     expect(run(100_000)).toContain('[css-budget] src/app/globals.css:');
     expect(() => run(1)).toThrow();
+  });
+});
+
+describe('next-styles: the complete sheet across deployments', () => {
+  it('names its deployment where the host routes by it, so a page from the previous deployment still gets its sheet', () => {
+    expect(fullSheetUrl({ buildId: 'b1', deploymentId: 'dpl_abc' })).toBe(
+      '/_next/static/next-styles/full-b1.css?dpl=dpl_abc',
+    );
+    expect(fullSheetUrl({ buildId: 'b1', basePath: '/docs/', deploymentId: null })).toBe(
+      '/docs/_next/static/next-styles/full-b1.css',
+    );
+  });
+
+  it('reads the deployment only when skew protection is on', () => {
+    expect(skewDeploymentId({ VERCEL_SKEW_PROTECTION_ENABLED: '1', VERCEL_DEPLOYMENT_ID: 'dpl_abc' })).toBe('dpl_abc');
+    expect(skewDeploymentId({ VERCEL_DEPLOYMENT_ID: 'dpl_abc' })).toBeNull();
+    expect(skewDeploymentId({ VERCEL_SKEW_PROTECTION_ENABLED: '1' })).toBeNull();
   });
 });

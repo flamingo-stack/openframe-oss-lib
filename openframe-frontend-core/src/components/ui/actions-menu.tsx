@@ -7,8 +7,9 @@ import React, { useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
 import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
-import { Chevron02RightIcon, Ellipsis01Icon } from '../icons-v2-generated';
+import { Chevron02RightIcon } from '../icons-v2-generated';
 import { ActionsMenuHeaderContext } from './actions-menu-header-context';
+import { ActionsMenuTriggerButton } from './actions-menu-trigger';
 import { Button } from './button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu';
 import { InertWhileLoading, useLoadingScope } from './loading-scope';
@@ -656,15 +657,10 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
 
   // The trigger is a static control: drawn for real in both forms, inert while the menu's subject loads.
   const triggerNode = customTrigger ?? (
-    <Button
-      variant="outline"
-      size="icon"
-      aria-label={triggerAriaLabel}
-      className={
-        triggerClassName ||
-        'flex items-center justify-center border-ods-border bg-ods-card hover:bg-ods-bg-hover focus-visible:ring-0'
-      }
-      leftIcon={trigger ?? <Ellipsis01Icon size={24} className="text-ods-text-primary" />}
+    <ActionsMenuTriggerButton
+      trigger={trigger}
+      triggerAriaLabel={triggerAriaLabel}
+      triggerClassName={triggerClassName}
     />
   );
 

@@ -13,8 +13,7 @@ use tokio::sync::{broadcast, watch};
 use tokio::time::{interval, timeout, MissedTickBehavior};
 use tracing::{error, info, warn};
 
-/// Reconnect delay while the tenant is gone (suspended): backs the 5s storm off ~60x so a
-/// deleted-tenant client barely touches the gateway. Auto-reverts to 5s on recovery.
+/// Reconnect delay while suspended (gone or 403), instead of the 5s storm; reverts to 5s on recovery.
 const SUSPENDED_RECONNECT_DELAY: Duration = Duration::from_secs(5 * 60);
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(15);
@@ -120,9 +119,7 @@ impl NatsConnectionManager {
             .reconnect_delay_callback(move |attempt| {
                 note_activity(&last_activity);
 
-                // Tenant gone: async-nats can't be stopped from here (its reconnect loop never
-                // polls Drain), but this callback IS called per attempt — so back off hard to
-                // turn the 5s WS-upgrade storm into a rare probe against the gone gateway.
+                // Suspended: async-nats can't be stopped from here, but this per-attempt callback can back off hard.
                 if deactivation_for_delay.is_suspended() {
                     return SUSPENDED_RECONNECT_DELAY;
                 }
@@ -276,10 +273,10 @@ impl NatsConnectionManager {
         deactivation: Arc<DeactivationService>,
         nats_server_url: String,
     ) -> std::result::Result<String, async_nats::AuthError> {
-        // Tenant gone: skip reauth so NATS reconnects fail locally instead of hammering the gateway.
+        // Suspended: skip reauth so NATS reconnects fail locally instead of hammering the gateway.
         if deactivation.is_suspended() {
             return Err(async_nats::AuthError::new(
-                "client suspended (tenant gone); skipping NATS reauthentication".to_string(),
+                "client suspended; skipping NATS reauthentication".to_string(),
             ));
         }
 

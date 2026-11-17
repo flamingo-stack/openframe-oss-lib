@@ -163,3 +163,48 @@ export function isForeignReply(message: ChatMessage): boolean {
   if (message.role === 'user') return message.metadata?.author?.authorType === 'admin';
   return message.role === 'assistant' && message.parts.some(part => part.type !== 'data-error');
 }
+
+/** What the embeddable chat (Mingo and guide) gives a row that does not say it itself. */
+export interface EmbeddedChatAuthorDefaults {
+  /**
+   * Guide mode only: the viewer's name and photo. Every guide user row IS the viewer (its SSE rows carry no author), so
+   * each one without a name or photo of its own takes them. Undefined outside guide mode.
+   */
+  guideName?: string;
+  guideAvatar?: string;
+  /**
+   * Outside guide mode only: the viewer's name and photo for their own just-sent message. A send draws its bubble at once
+   * with no author at all (the reducer's `pushOptimisticSend` / `beginSseSend`) and keeps none until history replaces
+   * it, while every row from the wire or from history carries an author object, even one with fields missing. So only a
+   * user row with NO author takes these. A row that has an author keeps the generic defaults, never the viewer's:
+   * other participants' bubbles carry their own identity, and overlaying the viewer's there stamped the viewer's photo
+   * onto every one of them.
+   */
+  ownName?: string;
+  ownAvatar?: string;
+}
+
+/**
+ * The embeddable chat's row author: whatever the row says, then the role's default. The assistant is Mingo; a user row
+ * takes the viewer as `EmbeddedChatAuthorDefaults` allows, else the generic 'You' and no photo.
+ */
+export function withEmbeddedChatAuthor(message: ChatMessage, defaults: EmbeddedChatAuthorDefaults): ChatMessage {
+  const author = message.metadata?.author;
+  const isAssistant = message.role === 'assistant';
+  const isUser = message.role === 'user';
+  const isOwnSend = isUser && author === undefined;
+  const userName = defaults.guideName ?? (isOwnSend ? defaults.ownName : undefined) ?? 'You';
+  const userAvatar = defaults.guideAvatar ?? (isOwnSend ? defaults.ownAvatar : undefined) ?? null;
+  return {
+    ...message,
+    metadata: {
+      ...message.metadata,
+      author: {
+        ...author,
+        name: author?.name ?? (isAssistant ? 'Mingo' : userName),
+        avatar: author?.avatar ?? (isUser ? userAvatar : null),
+        ...(isAssistant ? { assistantType: 'mingo' as const } : {}),
+      },
+    },
+  };
+}
