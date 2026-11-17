@@ -274,6 +274,62 @@ describe('AppLayout composer dock height', () => {
   });
 });
 
+describe("AppLayout and the floating dock's frame", () => {
+  // Observers as a browser delivers them: never on observe, later, from outside React.
+  const observed: Array<{ target: Element; options?: ResizeObserverOptions; fire: () => void }> = [];
+  let dockHeight = 143;
+
+  beforeEach(() => {
+    observed.length = 0;
+    dockHeight = 143;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        private readonly callback: ResizeObserverCallback;
+        constructor(callback: ResizeObserverCallback) {
+          this.callback = callback;
+        }
+        observe(target: Element, options?: ResizeObserverOptions) {
+          observed.push({ target, options, fire: () => this.callback([], this) });
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(() => dockHeight);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const dockObserver = () => observed.find(entry => entry.target.textContent === 'dock');
+
+  // CU-17tkuw6633f: an update set from the observer rendered after the frame was painted, so a
+  // page centred above the dock (Start Work) kept the old inset for a frame and then moved.
+  it('hands the page its new height in the frame the dock changed in', () => {
+    render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }));
+    expect(screen.getByRole('main')).toHaveStyle({ '--composer-dock-inset': '143px' });
+
+    dockHeight = 207;
+    // Outside `act`, as the browser delivers it: nothing else flushes React before the assertion.
+    dockObserver()?.fire();
+    expect(screen.getByRole('main')).toHaveStyle({ '--composer-dock-inset': '207px', paddingBottom: '207px' });
+  });
+
+  it("watches <main>'s border box, which the padding it gets from the dock does not change", () => {
+    render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }));
+    const main = observed.find(entry => entry.target === screen.getByRole('main'));
+    expect(main?.options).toEqual({ box: 'border-box' });
+  });
+
+  it("watches the dock's border box, the height it hands the page", () => {
+    render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }));
+    expect(dockObserver()?.options).toEqual({ box: 'border-box' });
+  });
+});
+
 describe('AppLayout content width', () => {
   afterEach(() => {
     vi.restoreAllMocks();
