@@ -93,8 +93,9 @@ public class SoftwareBundleDataFetcher {
                                                                 @InputArgument String softwareId) {
         List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
-        List<String> softwareMachineIds = machineIdsWithSoftware(softwareId);
-        List<String> machineIds = deviceService.findAllDeviceIds(filterOptions, search, softwareMachineIds);
+        List<String> machineIds = isNarrowedBySoftware(softwareId)
+                ? findDeviceIdsWithSoftware(softwareId, filterOptions, search)
+                : deviceService.findAllDeviceIds(filterOptions, search);
         String rawBundleId = relayIdCodec.decode(bundleId, SOFTWARE_BUNDLE);
         String userId = getCurrentUserId();
         return softwareBundleService.addDevices(rawBundleId, machineIds, userId);
@@ -170,10 +171,11 @@ public class SoftwareBundleDataFetcher {
         CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(
                 ConnectionArgs.builder().first(first).after(after).last(last).before(before).build());
         Set<String> assignedMachineIds = new HashSet<>(bundle.getMachineIds() == null ? List.of() : bundle.getMachineIds());
-        List<String> softwareMachineIds = machineIdsWithSoftware(softwareId);
         // No OS restriction at device-selection time — packages (and thus platforms) are chosen at submit.
-        CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
-                null, assignedMachineIds, filterOptions, pagination, search, softwareMachineIds);
+        CountedGenericQueryResult<Machine> result = isNarrowedBySoftware(softwareId)
+                ? queryAvailableDevicesWithSoftware(softwareId, assignedMachineIds, filterOptions, pagination, search)
+                : deviceService.queryAvailableDevicesForSchedule(
+                        null, assignedMachineIds, filterOptions, pagination, search);
         return deviceMapper.toAvailableDeviceConnection(result, assignedMachineIds);
     }
 
@@ -196,13 +198,30 @@ public class SoftwareBundleDataFetcher {
             @InputArgument String softwareId) {
         List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
         DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
-        List<String> softwareMachineIds = machineIdsWithSoftware(softwareId);
+        if (!isNarrowedBySoftware(softwareId)) {
+            return deviceService.getAvailableDeviceFilters(null, filterOptions, search);
+        }
+        List<String> softwareMachineIds = softwareInventoryService.listMachineIdsForSoftware(softwareId);
         return deviceService.getAvailableDeviceFilters(null, filterOptions, search, softwareMachineIds);
     }
 
-    // null, not an empty list, without a softwareId: an empty list narrows the picker to no device
-    private List<String> machineIdsWithSoftware(String softwareId) {
-        return softwareId == null ? null : softwareInventoryService.listMachineIdsForSoftware(softwareId);
+    // the devices of a Software are known only from the software read model: without it softwareId is ignored
+    private boolean isNarrowedBySoftware(String softwareId) {
+        return softwareId != null && softwareInventoryService.isSoftwareReadModelEnabled();
+    }
+
+    private List<String> findDeviceIdsWithSoftware(String softwareId, DeviceFilterCriteria filterOptions,
+                                                   String search) {
+        List<String> softwareMachineIds = softwareInventoryService.listMachineIdsForSoftware(softwareId);
+        return deviceService.findAllDeviceIds(filterOptions, search, softwareMachineIds);
+    }
+
+    private CountedGenericQueryResult<Machine> queryAvailableDevicesWithSoftware(
+            String softwareId, Set<String> assignedMachineIds, DeviceFilterCriteria filterOptions,
+            CursorPaginationCriteria pagination, String search) {
+        List<String> softwareMachineIds = softwareInventoryService.listMachineIdsForSoftware(softwareId);
+        return deviceService.queryAvailableDevicesForSchedule(
+                null, assignedMachineIds, filterOptions, pagination, search, softwareMachineIds);
     }
 
     private List<String> decodeMachineIds(List<String> machineIds) {

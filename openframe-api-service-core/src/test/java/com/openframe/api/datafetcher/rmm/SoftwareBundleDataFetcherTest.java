@@ -36,6 +36,8 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -88,11 +90,12 @@ class SoftwareBundleDataFetcherTest {
     }
 
     @Test
-    void availableDevices_softwareId_onlyTheDevicesThatHaveTheSoftwareListed() {
+    void availableDevices_softwareIdAndReadModelOn_onlyTheDevicesThatHaveTheSoftwareListed() {
         // setup
         stubPicker();
         List<String> softwareMachineIds = List.of(ASSIGNED_MACHINE_ID, OTHER_MACHINE_ID);
         CountedGenericQueryResult<Machine> page = page(machine(ASSIGNED_MACHINE_ID), machine(OTHER_MACHINE_ID));
+        when(softwareInventoryService.isSoftwareReadModelEnabled()).thenReturn(true);
         when(softwareInventoryService.listMachineIdsForSoftware(SOFTWARE_ID)).thenReturn(softwareMachineIds);
         when(deviceService.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, manageableDevices, firstPage,
                 SEARCH, softwareMachineIds)).thenReturn(page);
@@ -114,6 +117,7 @@ class SoftwareBundleDataFetcherTest {
         stubPicker();
         List<String> noMachineIds = List.of();
         CountedGenericQueryResult<Machine> emptyPage = page();
+        when(softwareInventoryService.isSoftwareReadModelEnabled()).thenReturn(true);
         when(softwareInventoryService.listMachineIdsForSoftware(SOFTWARE_ID)).thenReturn(noMachineIds);
         when(deviceService.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, manageableDevices, firstPage,
                 SEARCH, noMachineIds)).thenReturn(emptyPage);
@@ -127,12 +131,32 @@ class SoftwareBundleDataFetcherTest {
     }
 
     @Test
-    void availableDevices_noSoftwareId_pickerNotNarrowedAndInventoryNotRead() {
+    void availableDevices_softwareIdAndReadModelOff_softwareIdIgnoredAndEveryDeviceListed() {
+        // setup
+        stubPicker();
+        CountedGenericQueryResult<Machine> page = page(machine(ASSIGNED_MACHINE_ID), machine(OTHER_MACHINE_ID));
+        when(softwareInventoryService.isSoftwareReadModelEnabled()).thenReturn(false);
+        when(deviceService.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, manageableDevices, firstPage,
+                SEARCH)).thenReturn(page);
+
+        // execution
+        CountedGenericConnection<AvailableDeviceEdge> result =
+                dataFetcher.availableDevices(dfe, null, PAGE_SIZE, null, null, null, SEARCH, null, SOFTWARE_ID);
+
+        // verifications
+        assertThat(result.getEdges())
+                .extracting(edge -> edge.getNode().getMachineId())
+                .containsExactly(ASSIGNED_MACHINE_ID, OTHER_MACHINE_ID);
+        verify(softwareInventoryService, never()).listMachineIdsForSoftware(SOFTWARE_ID);
+    }
+
+    @Test
+    void availableDevices_noSoftwareId_everyDeviceListedAndInventoryNotRead() {
         // setup
         stubPicker();
         CountedGenericQueryResult<Machine> page = page(machine(ASSIGNED_MACHINE_ID), machine(OTHER_MACHINE_ID));
         when(deviceService.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, manageableDevices, firstPage,
-                SEARCH, null)).thenReturn(page);
+                SEARCH)).thenReturn(page);
 
         // execution
         CountedGenericConnection<AvailableDeviceEdge> result =
@@ -146,11 +170,12 @@ class SoftwareBundleDataFetcherTest {
     }
 
     @Test
-    void availableDeviceFilters_softwareId_countedOverTheDevicesThatHaveTheSoftware() {
+    void availableDeviceFilters_softwareIdAndReadModelOn_countedOverTheDevicesThatHaveTheSoftware() {
         // setup
         List<String> softwareMachineIds = List.of(OTHER_MACHINE_ID);
         DeviceFilters filters = DeviceFilters.builder().filteredCount(1).build();
         when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
+        when(softwareInventoryService.isSoftwareReadModelEnabled()).thenReturn(true);
         when(softwareInventoryService.listMachineIdsForSoftware(SOFTWARE_ID)).thenReturn(softwareMachineIds);
         when(deviceService.getAvailableDeviceFilters(null, manageableDevices, SEARCH, softwareMachineIds))
                 .thenReturn(filters);
@@ -163,11 +188,27 @@ class SoftwareBundleDataFetcherTest {
     }
 
     @Test
-    void availableDeviceFilters_noSoftwareId_countedOverEveryDeviceAndInventoryNotRead() {
+    void availableDeviceFilters_softwareIdAndReadModelOff_softwareIdIgnoredAndEveryDeviceCounted() {
         // setup
         DeviceFilters filters = DeviceFilters.builder().filteredCount(2).build();
         when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
-        when(deviceService.getAvailableDeviceFilters(null, manageableDevices, SEARCH, null)).thenReturn(filters);
+        when(softwareInventoryService.isSoftwareReadModelEnabled()).thenReturn(false);
+        when(deviceService.getAvailableDeviceFilters(null, manageableDevices, SEARCH)).thenReturn(filters);
+
+        // execution
+        DeviceFilters result = dataFetcher.availableDeviceFilters(dfe, null, SEARCH, SOFTWARE_ID);
+
+        // verifications
+        assertThat(result).isSameAs(filters);
+        verify(softwareInventoryService, never()).listMachineIdsForSoftware(SOFTWARE_ID);
+    }
+
+    @Test
+    void availableDeviceFilters_noSoftwareId_everyDeviceCountedAndInventoryNotRead() {
+        // setup
+        DeviceFilters filters = DeviceFilters.builder().filteredCount(2).build();
+        when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
+        when(deviceService.getAvailableDeviceFilters(null, manageableDevices, SEARCH)).thenReturn(filters);
 
         // execution
         DeviceFilters result = dataFetcher.availableDeviceFilters(dfe, null, SEARCH, null);
@@ -178,11 +219,12 @@ class SoftwareBundleDataFetcherTest {
     }
 
     @Test
-    void addAllDevicesToSoftwareBundle_softwareId_onlyTheDevicesThatHaveTheSoftwareAdded() {
+    void addAllDevicesToSoftwareBundle_softwareIdAndReadModelOn_onlyTheDevicesThatHaveTheSoftwareAdded() {
         // setup
         List<String> softwareMachineIds = List.of(ASSIGNED_MACHINE_ID, OTHER_MACHINE_ID);
         List<String> matchingMachineIds = List.of(OTHER_MACHINE_ID);
         when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
+        when(softwareInventoryService.isSoftwareReadModelEnabled()).thenReturn(true);
         when(softwareInventoryService.listMachineIdsForSoftware(SOFTWARE_ID)).thenReturn(softwareMachineIds);
         when(deviceService.findAllDeviceIds(manageableDevices, SEARCH, softwareMachineIds))
                 .thenReturn(matchingMachineIds);
@@ -201,6 +243,7 @@ class SoftwareBundleDataFetcherTest {
         // setup
         List<String> noMachineIds = List.of();
         when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
+        when(softwareInventoryService.isSoftwareReadModelEnabled()).thenReturn(true);
         when(softwareInventoryService.listMachineIdsForSoftware(SOFTWARE_ID)).thenReturn(noMachineIds);
         when(deviceService.findAllDeviceIds(manageableDevices, SEARCH, noMachineIds)).thenReturn(noMachineIds);
         when(softwareBundleService.addDevices(RAW_BUNDLE_ID, noMachineIds, ACTING_USER_ID)).thenReturn(bundle);
@@ -214,11 +257,29 @@ class SoftwareBundleDataFetcherTest {
     }
 
     @Test
+    void addAllDevicesToSoftwareBundle_softwareIdAndReadModelOff_softwareIdIgnoredAndEveryMatchingDeviceAdded() {
+        // setup
+        List<String> matchingMachineIds = List.of(ASSIGNED_MACHINE_ID, OTHER_MACHINE_ID);
+        when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
+        when(softwareInventoryService.isSoftwareReadModelEnabled()).thenReturn(false);
+        when(deviceService.findAllDeviceIds(manageableDevices, SEARCH)).thenReturn(matchingMachineIds);
+        when(softwareBundleService.addDevices(RAW_BUNDLE_ID, matchingMachineIds, ACTING_USER_ID)).thenReturn(bundle);
+
+        // execution
+        SoftwareBundleResponse result =
+                dataFetcher.addAllDevicesToSoftwareBundle(bundleGlobalId, null, SEARCH, SOFTWARE_ID);
+
+        // verifications
+        assertThat(result).isSameAs(bundle);
+        verify(softwareInventoryService, never()).listMachineIdsForSoftware(SOFTWARE_ID);
+    }
+
+    @Test
     void addAllDevicesToSoftwareBundle_noSoftwareId_everyMatchingDeviceAddedAndInventoryNotRead() {
         // setup
         List<String> matchingMachineIds = List.of(ASSIGNED_MACHINE_ID, OTHER_MACHINE_ID);
         when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
-        when(deviceService.findAllDeviceIds(manageableDevices, SEARCH, null)).thenReturn(matchingMachineIds);
+        when(deviceService.findAllDeviceIds(manageableDevices, SEARCH)).thenReturn(matchingMachineIds);
         when(softwareBundleService.addDevices(RAW_BUNDLE_ID, matchingMachineIds, ACTING_USER_ID)).thenReturn(bundle);
 
         // execution

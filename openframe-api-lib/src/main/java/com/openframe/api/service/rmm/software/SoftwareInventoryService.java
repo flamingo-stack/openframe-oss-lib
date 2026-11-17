@@ -497,14 +497,14 @@ public class SoftwareInventoryService {
         return rows;
     }
 
+    public boolean isSoftwareReadModelEnabled() {
+        return softwareReadModel;
+    }
+
+    // reads the read model whatever the flag: check isSoftwareReadModelEnabled() first, an unfilled one lists no device
     public List<String> listMachineIdsForSoftware(String softwareId) {
-        if (softwareReadModel) {
-            String tenantId = tenantIdProvider.getTenantId();
-            return tenantSoftwareReadModelQuery.machineIdsForSoftware(tenantId, softwareId);
-        }
-        return allDevicesForSoftware(softwareId, null).stream()
-                .map(row -> row.getDevice().getMachineId())
-                .toList();
+        String tenantId = tenantIdProvider.getTenantId();
+        return tenantSoftwareReadModelQuery.machineIdsForSoftware(tenantId, softwareId);
     }
 
     private static boolean isManagedWithoutPolicy(SoftwareOnDeviceResponse row) {

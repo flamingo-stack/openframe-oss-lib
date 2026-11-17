@@ -10,4 +10,6 @@ public interface DeviceSoftwareAggregationRepository {
     Optional<CveRollup> rollUpCve(String tenantId, String cveId);
 
     List<String> machineIdsWithCve(String tenantId, String cveId);
+
+    List<String> machineIdsWithTitle(String tenantId, Long softwareTitleId);
 }

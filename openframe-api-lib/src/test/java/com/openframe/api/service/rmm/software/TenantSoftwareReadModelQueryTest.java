@@ -18,6 +18,7 @@ import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareAggregationRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
@@ -67,6 +68,7 @@ class TenantSoftwareReadModelQueryTest {
 
     @Mock private SoftwareRepository softwareRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
+    @Mock private DeviceSoftwareAggregationRepository deviceSoftwareAggregationRepository;
     @Mock private VulnerabilityRepository vulnerabilityRepository;
     @Mock private MachineRepository machineRepository;
     @Mock private PackageAutoUpdatePolicyRepository packageAutoUpdatePolicyRepository;
@@ -278,23 +280,22 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
-    void machineIdsForSoftware_titleOnConnectedDevices_theirMachineIdsOnceEach() {
+    void machineIdsForSoftware_titleOnConnectedDevices_machineIdsOfTheRepositoryWithoutLoadingRows() {
         // setup
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
-                .thenReturn(List.of(installed("m1", "1.7"), installed("m1", "1.6"), installed("m2", "1.7")));
+        when(deviceSoftwareAggregationRepository.machineIdsWithTitle(TENANT, 42L)).thenReturn(List.of("m1", "m2"));
 
         // execution
         List<String> result = query.machineIdsForSoftware(TENANT, "42");
 
         // verifications
         assertThat(result).containsExactly("m1", "m2");
+        verifyNoInteractions(deviceSoftwareRepository, softwareRepository, machineRepository);
     }
 
     @Test
     void machineIdsForSoftware_titleOnNoDevice_empty() {
         // setup
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
-                .thenReturn(List.of());
+        when(deviceSoftwareAggregationRepository.machineIdsWithTitle(TENANT, 42L)).thenReturn(List.of());
 
         // execution
         List<String> result = query.machineIdsForSoftware(TENANT, "42");
@@ -312,7 +313,7 @@ class TenantSoftwareReadModelQueryTest {
 
         // verifications
         assertThat(result).isEmpty();
-        verifyNoInteractions(deviceSoftwareRepository);
+        verifyNoInteractions(deviceSoftwareAggregationRepository);
     }
 
     @Test
