@@ -127,8 +127,7 @@ public class SsoJoinController {
                     payload.invitationId(), names[0], names[1], resolvePictureUrl(user),
                     Boolean.TRUE.equals(payload.switchTenant()));
             AuthUser created = invitationRegistrationService.registerByInvitation(req);
-            // The account exists only now, after AuthSuccessHandler's lastLogin write found nothing.
-            userService.touchLastLogin(created.getEmail(), created.getTenantId());
+            userService.recordSsoLogin(created);
             sessionPrincipalBinder.bind(authentication, created, request, response);
             appleWebTokenCapture.captureIfApple(request, authentication);
             clearCookie(response, OF_SSO_INVITE);
@@ -142,7 +141,7 @@ public class SsoJoinController {
                     .orElseThrow(this::expired);
             AuthUser provisioned = ssoOidcUserService.autoProvisionByGlobalDomain(provider, user)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "no_auto_provision_tenant"));
-            userService.touchLastLogin(provisioned.getEmail(), provisioned.getTenantId());
+            userService.recordSsoLogin(provisioned);
             appleWebTokenCapture.captureIfApple(request, authentication);
             clearCookie(response, OF_SSO_LOGIN);
             continueInto(response, provisioned.getTenantId(), payload.redirectTo(), payload.authMobile());

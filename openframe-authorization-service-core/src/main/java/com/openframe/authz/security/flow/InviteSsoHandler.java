@@ -78,8 +78,7 @@ public class InviteSsoHandler implements SsoFlowHandler {
 
         var userCreated = invitationRegistrationService.registerByInvitation(req);
         String targetTenantId = userCreated.getTenantId();
-        // The account exists only now, after AuthSuccessHandler's lastLogin write found nothing.
-        userService.touchLastLogin(userCreated.getEmail(), targetTenantId);
+        userService.recordSsoLogin(userCreated);
         // Sign in as the invited account, which may differ from the IdP email that accepted it.
         sessionPrincipalBinder.bind(authentication, userCreated, request, response);
 

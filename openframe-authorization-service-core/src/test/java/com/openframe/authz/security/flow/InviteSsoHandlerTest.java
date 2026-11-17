@@ -78,7 +78,7 @@ class InviteSsoHandlerTest {
         handler.handle(request, response, authentication);
 
         verify(sessionPrincipalBinder).bind(authentication, invited, request, response);
-        verify(userService).touchLastLogin("new@acme.com", "tenant-9");
+        verify(userService).recordSsoLogin(invited);
         ArgumentCaptor<InvitationRegistrationRequest> req = ArgumentCaptor.forClass(InvitationRegistrationRequest.class);
         verify(invitationRegistrationService).registerByInvitation(req.capture());
         assertThat(req.getValue().getInvitationId()).isEqualTo("inv-1");

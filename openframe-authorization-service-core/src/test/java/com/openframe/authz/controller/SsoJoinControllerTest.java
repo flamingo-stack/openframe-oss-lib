@@ -190,7 +190,7 @@ class SsoJoinControllerTest {
         InOrder order = inOrder(sessionPrincipalBinder, appleWebTokenCapture);
         order.verify(sessionPrincipalBinder).bind(session, invited, request, response);
         order.verify(appleWebTokenCapture).captureIfApple(request, session);
-        verify(userService).touchLastLogin("tim@apple-corp.com", "tenant-1");
+        verify(userService).recordSsoLogin(invited);
         assertThat(response.getHeader("Location"))
                 .isEqualTo("https://auth.example.com/oauth/continue?tenantId=tenant-1&redirectTo=%2Fhome");
         assertThat(response.getCookies()).anySatisfy(c -> {
@@ -220,19 +220,19 @@ class SsoJoinControllerTest {
                 .isInstanceOf(ResponseStatusException.class);
 
         verify(appleWebTokenCapture, never()).captureIfApple(any(), any());
-        verify(userService, never()).touchLastLogin(any(), any());
+        verify(userService, never()).recordSsoLogin(any());
     }
 
     @Test
     void shouldCompleteSharedDomainLoginAndKeepMobileContext() throws Exception {
-        when(ssoOidcUserService.autoProvisionByGlobalDomain("apple", sessionUser))
-                .thenReturn(Optional.of(activeUser("u", "tenant-1", "x7k2@privaterelay.appleid.com")));
+        var provisioned = activeUser("u", "tenant-1", "x7k2@privaterelay.appleid.com");
+        when(ssoOidcUserService.autoProvisionByGlobalDomain("apple", sessionUser)).thenReturn(Optional.of(provisioned));
         MockHttpServletRequest request = loginRequest();
 
         controller.complete(true, session, request, response);
 
         verify(appleWebTokenCapture).captureIfApple(request, session);
-        verify(userService).touchLastLogin("x7k2@privaterelay.appleid.com", "tenant-1");
+        verify(userService).recordSsoLogin(provisioned);
         assertThat(response.getHeader("Location")).isEqualTo(
                 "https://auth.example.com/oauth/continue?tenantId=tenant-1&redirectTo=com.openframe.app%3A%2F%2Fauth&authMobile=true");
         assertThat(response.getCookies()).anySatisfy(c -> assertThat(c.getName()).isEqualTo(SsoFlowCookieNames.OF_SSO_LOGIN));
