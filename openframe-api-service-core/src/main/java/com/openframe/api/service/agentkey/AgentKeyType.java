@@ -23,7 +23,7 @@ public enum AgentKeyType {
 
     public static AgentKeyType fromPath(String path) {
         return Arrays.stream(values())
-                .filter(type -> type.path.equals(path))
+                .filter(type -> type.path().equals(path))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown agent key type: " + path));
     }
