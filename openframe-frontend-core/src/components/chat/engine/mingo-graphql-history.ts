@@ -69,11 +69,10 @@ export interface MingoGraphqlDialogsOptions {
   /** A face's absolute address, from the stored image (the host's image service). */
   imageUrlOf?: (image: MingoImage) => string | null;
   /**
-   * The record's token usage also carries the cache split and the compaction ratio (`TokenUsageCacheSplit`), read
-   * with their own query beside the record. A backend that refuses that query (it does not have the fields yet) is
-   * not asked again in this session, and the usage comes without them.
+   * Read complete usage with the dialog. A callback reads a host's current rollout flag for every request.
+   * Older backends that reject the optional fields use the original query for the rest of the session.
    */
-  tokenUsageSplit?: boolean;
+  tokenUsageSplit?: boolean | (() => boolean);
 }
 
 /** The list's order: the dialog with the latest message first. The cursor follows it. */
@@ -138,11 +137,7 @@ function splitOf(entry: MingoTokenUsageEntry | null): Partial<DialogTokenUsage> 
 }
 
 /** The usage the record's composer readout shows: the chat's own, with the split when it was read. */
-function tokenUsageOf(
-  node: MingoDialogNode,
-  chatType: MingoChatType | undefined,
-  splitNode?: MingoDialogNode | null,
-): DialogTokenUsage | null {
+function tokenUsageOf(node: MingoDialogNode, chatType: MingoChatType | undefined): DialogTokenUsage | null {
   const usage = usageEntryOf(node, chatType);
   if (!usage) return null;
   return {
@@ -151,8 +146,16 @@ function tokenUsageOf(
     outputTokensSize: usage.outputTokensSize ?? 0,
     totalTokensSize: usage.totalTokensSize ?? 0,
     contextSize: usage.contextSize ?? 0,
-    ...splitOf(usageEntryOf(splitNode, chatType)),
+    ...splitOf(usage),
   };
+}
+
+function isUnsupportedUsageSplit(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    /uncachedInputTokensSize|cacheReadTokensSize|cacheWriteTokensSize|compactionThreshold/.test(error.message) &&
+    /cannot query field|FieldUndefined|unknown field|field.+(?:undefined|not defined)/i.test(error.message)
+  );
 }
 
 /**
@@ -197,18 +200,19 @@ export function createMingoGraphqlDialogs(
         nextCursor: data.dialogs.pageInfo.hasNextPage ? data.dialogs.pageInfo.endCursor : null,
       };
     };
-  // Cleared once the backend refuses the split query: it does not have the fields, and asking again only fails again.
-  let splitSupported = tokenUsageSplit;
-  const readSplit = async (dialogId: string): Promise<MingoDialogNode | null> => {
-    if (!splitSupported) return null;
+  let splitSupported = true;
+  const readWithoutUnsupportedSplit = (dialogId: string, error: unknown) => {
+    if (!isUnsupportedUsageSplit(error)) throw error;
+    splitSupported = false;
+    return post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_QUERY, { id: dialogId });
+  };
+  const readDialog = async (dialogId: string): Promise<{ dialog: MingoDialogNode | null }> => {
+    const enabled = typeof tokenUsageSplit === 'function' ? tokenUsageSplit() : tokenUsageSplit;
+    if (!enabled || !splitSupported) return post(MINGO_DIALOG_QUERY, { id: dialogId });
     try {
-      const data = await post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY, {
-        id: dialogId,
-      });
-      return data.dialog;
-    } catch {
-      splitSupported = false;
-      return null;
+      return await post(MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY, { id: dialogId });
+    } catch (error) {
+      return readWithoutUnsupportedSplit(dialogId, error);
     }
   };
   const mutate = async (mutation: string, field: string, input: Record<string, unknown>): Promise<void> => {
@@ -219,14 +223,11 @@ export function createMingoGraphqlDialogs(
     fetchDialogs: page(mingoDialogsQuery({ pendingApproval, unread }), statuses),
     fetchArchivedDialogs: page(mingoDialogsQuery({ pendingApproval: false }), ['ARCHIVED']),
     fetchDialog: async (dialogId: string): Promise<ChatDialogRecord | null> => {
-      const [data, splitNode] = await Promise.all([
-        post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_QUERY, { id: dialogId }),
-        readSplit(dialogId),
-      ]);
+      const data = await readDialog(dialogId);
       if (!data.dialog) return null;
       return {
         dialog: dialogItemOfNode(data.dialog, imageUrlOf),
-        tokenUsage: tokenUsageOf(data.dialog, chatType, splitNode),
+        tokenUsage: tokenUsageOf(data.dialog, chatType),
         streamState: streamStateOf(data.dialog),
       };
     },

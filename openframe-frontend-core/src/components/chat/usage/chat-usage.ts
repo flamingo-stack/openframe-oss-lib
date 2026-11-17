@@ -4,11 +4,8 @@
  * ring and the hosts that build the panel's data, so they cannot disagree.
  */
 
-/** The compaction ratio when the backend did not send one: the design's 75%. */
-export const DEFAULT_COMPACTION_THRESHOLD = 0.75;
-
-/** How far before compaction the context turns yellow: ten points, so there is time to tidy the chat first. */
-export const CONTEXT_WARNING_LEAD = 0.1;
+/** The context warning starts at 65% of the current model's budget. */
+export const CONTEXT_WARNING_THRESHOLD = 0.65;
 
 export type ChatUsageTone = 'default' | 'warning' | 'error';
 
@@ -25,15 +22,15 @@ export interface ChatUsagePanelData {
   /** The company figures are being read for the first time: their rows draw skeletons. */
   companyLoading?: boolean;
   /** This chat: the last reply's whole context against the model's budget, and the share at which memory is
-   *  compacted (the backend's ratio; the design's 75% when absent). On the counter, the counter's own figures win. */
+   *  compacted (the backend's ratio, unknown when absent). On the counter, the counter's own figures win. */
   context: { used: number | null; limit: number | null; compactionThreshold?: number | null };
-  /** The last reply's tokens by kind; they add up to `context.used`. Null while the backend does not report it. */
-  breakdown: { input: number; cacheRead: number; cacheWrite: number; output: number } | null;
+  /** The last reply's tokens by kind. Legacy input parts can be unknown while output is still reported. */
+  breakdown: { input: number | null; cacheRead: number | null; cacheWrite: number | null; output: number } | null;
 }
 
-/** A usable compaction ratio: the backend's when it is a share in (0, 1], else the default. */
-export function compactionThresholdOf(threshold: number | null | undefined): number {
-  return typeof threshold === 'number' && threshold > 0 && threshold <= 1 ? threshold : DEFAULT_COMPACTION_THRESHOLD;
+/** The actual compaction ratio when it is a share in (0, 1], otherwise unknown. */
+export function compactionThresholdOf(threshold: number | null | undefined): number | null {
+  return typeof threshold === 'number' && threshold > 0 && threshold <= 1 ? threshold : null;
 }
 
 /** The share of the budget the chat holds, or null while either figure is unknown (no reply yet, no budget). */
@@ -42,11 +39,8 @@ export function contextRatio(used: number | null | undefined, limit: number | nu
   return used / limit;
 }
 
-/** Ratios compared in whole basis points, so 65% is yellow at exactly 65% whatever the float error of 0.75 - 0.1. */
-const basisPoints = (ratio: number) => Math.round(ratio * 10_000);
-
 /**
- * The context's colour: yellow from ten points before compaction, red once past it (compaction fires when the chat
+ * The context's colour: yellow from 65%, red once past compaction (compaction fires when the chat
  * holds MORE than the threshold, so exactly at it is still yellow). Unknown figures read as the default.
  */
 export function chatContextTone(
@@ -57,8 +51,8 @@ export function chatContextTone(
   const ratio = contextRatio(used, limit);
   if (ratio == null) return 'default';
   const compactAt = compactionThresholdOf(threshold);
-  if (basisPoints(ratio) > basisPoints(compactAt)) return 'error';
-  return basisPoints(ratio) >= basisPoints(compactAt - CONTEXT_WARNING_LEAD) ? 'warning' : 'default';
+  if (compactAt != null && ratio > compactAt) return 'error';
+  return ratio >= CONTEXT_WARNING_THRESHOLD ? 'warning' : 'default';
 }
 
 /** `12840` → `"12,840"`: the panel's full figures. */

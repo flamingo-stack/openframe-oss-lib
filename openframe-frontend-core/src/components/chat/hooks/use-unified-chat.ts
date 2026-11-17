@@ -214,7 +214,6 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       dialogCapabilities,
       // Token usage + connection
       dialogTokenUsage: activeState.dialogTokenUsage,
-      // The composer counter's Usage panel, when the host builds one (Mingo).
       usagePanel: activeState.usagePanel,
       connectionState: activeState.connectionState,
     }),

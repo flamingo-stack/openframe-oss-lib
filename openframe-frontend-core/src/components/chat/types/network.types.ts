@@ -69,6 +69,7 @@ export interface ChunkData {
   providerName?: string;
   provider?: string;
   contextWindow?: number;
+  contextBudget?: number | null;
   ownerType?: string;
   displayName?: string;
   /** Chunk kinds this lib does not model yet — decoders read them through

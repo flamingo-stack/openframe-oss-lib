@@ -336,8 +336,9 @@ export function mingoDialogsQuery({
  * `unreadMessageCount` is the viewer's unread replies as of this read: a host that shows them reads the record again
  * when a reply ended out of sight.
  */
-export const MINGO_DIALOG_QUERY = `
-  query GetDialog($id: ID!) {
+function mingoDialogQuery(tokenUsageSplit: boolean): string {
+  return `
+  query ${tokenUsageSplit ? 'GetDialogTokenUsageSplit' : 'GetDialog'}($id: ID!) {
     dialog(id: $id) {
       id
       dialogId
@@ -361,31 +362,28 @@ export const MINGO_DIALOG_QUERY = `
         inputTokensSize
         outputTokensSize
         totalTokensSize
-        contextSize
-      }
-    }
-  }
-`;
-
-/**
- * The open dialog's token usage split (the cache read and written, the input read fresh) and its compaction ratio. Its
- * own query, not fields of `MINGO_DIALOG_QUERY`: a backend that does not have them yet refuses the whole document, and
- * the dialog itself must still open. A host reads it beside the record and drops it when the backend refuses it.
- */
-export const MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY = `
-  query GetDialogTokenUsageSplit($id: ID!) {
-    dialog(id: $id) {
-      id
-      tokenUsage {
-        chatType
+        contextSize${
+          tokenUsageSplit
+            ? `
         uncachedInputTokensSize
         cacheReadTokensSize
         cacheWriteTokensSize
-        compactionThreshold
+        compactionThreshold`
+            : ''
+        }
       }
     }
   }
 `;
+}
+
+export const MINGO_DIALOG_QUERY = mingoDialogQuery(false);
+
+/**
+ * The open dialog and its complete token usage in one response, so the breakdown and total describe the same reply.
+ * Older backends can reject the optional fields; the reader then uses the original dialog query.
+ */
+export const MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY = mingoDialogQuery(true);
 
 // ─── The chat's commands ─────────────────────────────────────────────────────
 // What every OpenFrame chat sends to the ai-agent's `/chat/graphql` (OpenFrame's Mingo and tickets, the Fae client). A

@@ -479,6 +479,7 @@ exports[`chat stream reducer — what the thread holds after a wire > normal tur
     "totalTokensSize": 120,
   },
   "liveModel": {
+    "contextBudget": 180000,
     "contextWindowMaxTokens": 200000,
     "modelLabel": "Claude Sonnet",
     "provider": "anthropic",

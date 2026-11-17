@@ -435,6 +435,33 @@ describe('createChatStreamReducer — the message a stream builds', () => {
     expect(r.state.messages).toHaveLength(2);
   });
 
+  it('keeps physical metadata unchanged while effective usage updates the run budget', () => {
+    const effects: unknown[] = [];
+    const { r, send } = onWire({ onEffect: effect => effects.push(effect) });
+    send({ type: 'MESSAGE_START' });
+    send({
+      type: 'AI_METADATA',
+      modelName: 'opus',
+      providerName: 'Anthropic',
+      contextWindow: 1_000_000,
+      contextBudget: 200_000,
+    });
+    expect(r.state.liveModel).toMatchObject({ contextWindowMaxTokens: 1_000_000, contextBudget: 200_000 });
+    expect(effects).toContainEqual({
+      name: 'onMetadata',
+      args: [{ modelName: 'opus', providerName: 'Anthropic', contextWindow: 1_000_000 }],
+    });
+    send({
+      type: 'TOKEN_USAGE',
+      inputTokensSize: 1000,
+      outputTokensSize: 0,
+      totalTokensSize: 1000,
+      contextSize: 200_000,
+    });
+    expect(r.state.liveModel).toMatchObject({ contextWindowMaxTokens: 1_000_000, contextBudget: 200_000 });
+    expect(trailing(r).metadata).toMatchObject({ contextWindowMaxTokens: 1_000_000 });
+  });
+
   it('metadata reaches the message being built and the live model', () => {
     const { r, send } = onWire();
     r.pushOptimisticSend('hi');

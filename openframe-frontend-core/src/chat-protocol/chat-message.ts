@@ -337,6 +337,8 @@ export interface ChatMessageMetadata {
   modelLabel?: string;
   provider?: string;
   contextWindowMaxTokens?: number;
+  /** The effective token budget pinned to this run, independently of the physical model window. */
+  contextBudget?: number;
   scrollAnchor?: string;
   routing?: ChatRouting;
   willAutoContinue?: boolean;
@@ -777,6 +779,7 @@ const METADATA_FIELDS: Record<'stored-row' | 'stream', Record<string, FieldReade
     modelLabel: stringField,
     provider: stringField,
     contextWindowMaxTokens: numberField,
+    contextBudget: numberField,
     scrollAnchor: stringField,
     routing: routingField,
     willAutoContinue: booleanField,

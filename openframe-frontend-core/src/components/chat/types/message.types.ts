@@ -408,6 +408,7 @@ export interface AIMetadataMessageData extends MessageDataBase {
   providerName?: string;
   provider?: string;
   contextWindow?: number;
+  contextBudget?: number | null;
 }
 
 /**

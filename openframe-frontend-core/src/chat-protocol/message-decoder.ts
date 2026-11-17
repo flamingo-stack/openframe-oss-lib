@@ -267,6 +267,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
               model,
               provider,
               contextWindowMaxTokens: numOr(raw.contextWindow),
+              ...numField('contextBudget', raw.contextBudget),
               ...(modelLabel !== undefined ? { modelLabel } : {}),
             },
           });

@@ -117,7 +117,6 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     }
   };
 
-  // A NaN or out-of-range value (a total of 0 upstream) draws an empty or a full bar, never a broken one.
   const safeProgress = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : 0;
   const filledCount = Math.round((safeProgress / 100) * segmentCount);
   const dimFromIndex = dimTrackFrom == null ? segmentCount : Math.round((dimTrackFrom / 100) * segmentCount);

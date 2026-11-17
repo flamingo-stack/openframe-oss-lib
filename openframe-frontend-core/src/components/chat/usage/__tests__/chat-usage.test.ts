@@ -1,5 +1,5 @@
 /**
- * The Usage panel's rules: the context turns yellow ten points before compaction and red once past it, whatever the
+ * The Usage panel's rules: the context turns yellow at65% and red once past compaction, whatever the
  * backend's threshold, and the token figures never read as spent before they are.
  */
 
@@ -14,18 +14,23 @@ import {
 } from '../chat-usage';
 
 describe('chatContextTone', () => {
-  it('follows the default 75% threshold: yellow from 65%, red past 75%', () => {
-    expect(chatContextTone(64_900, 100_000)).toBe('default');
-    expect(chatContextTone(65_000, 100_000)).toBe('warning');
-    expect(chatContextTone(75_000, 100_000)).toBe('warning');
-    expect(chatContextTone(75_100, 100_000)).toBe('error');
+  it('follows an actual 75% threshold: yellow from 65%, red past 75%', () => {
+    expect(chatContextTone(64_900, 100_000, 0.75)).toBe('default');
+    expect(chatContextTone(65_000, 100_000, 0.75)).toBe('warning');
+    expect(chatContextTone(75_000, 100_000, 0.75)).toBe('warning');
+    expect(chatContextTone(75_100, 100_000, 0.75)).toBe('error');
   });
 
-  it('follows the backend threshold: at 80%, yellow from 70%, red past 80%', () => {
-    expect(chatContextTone(69_900, 100_000, 0.8)).toBe('default');
-    expect(chatContextTone(70_000, 100_000, 0.8)).toBe('warning');
+  it('warns from 65% while following the backend compaction threshold', () => {
+    expect(chatContextTone(64_999, 100_000, 0.8)).toBe('default');
+    expect(chatContextTone(65_000, 100_000, 0.8)).toBe('warning');
     expect(chatContextTone(80_000, 100_000, 0.8)).toBe('warning');
     expect(chatContextTone(80_100, 100_000, 0.8)).toBe('error');
+  });
+
+  it('turns red at the first token past the actual compaction boundary', () => {
+    expect(chatContextTone(120_000, 150_000, 0.8)).toBe('warning');
+    expect(chatContextTone(120_001, 150_000, 0.8)).toBe('error');
   });
 
   it('is red when a smaller model leaves the chat over its budget', () => {
@@ -40,11 +45,11 @@ describe('chatContextTone', () => {
 });
 
 describe('compactionThresholdOf', () => {
-  it('takes a share in (0, 1] and falls back to 75% otherwise', () => {
+  it('takes a share in (0, 1] and leaves absent or invalid ratios unknown', () => {
     expect(compactionThresholdOf(0.8)).toBe(0.8);
-    expect(compactionThresholdOf(null)).toBe(0.75);
-    expect(compactionThresholdOf(0)).toBe(0.75);
-    expect(compactionThresholdOf(80)).toBe(0.75);
+    expect(compactionThresholdOf(null)).toBeNull();
+    expect(compactionThresholdOf(0)).toBeNull();
+    expect(compactionThresholdOf(80)).toBeNull();
   });
 });
 
@@ -76,4 +81,9 @@ describe('token formats', () => {
     expect(formatUsd(0)).toBe('$0.00');
     expect(formatUsd(1_000_000)).toBe('$1,000,000.00');
   });
+});
+
+it('keeps unknown compaction ratios unknown and does not infer a critical boundary', () => {
+  expect(compactionThresholdOf(undefined)).toBeNull();
+  expect(chatContextTone(95_000, 100_000, null)).toBe('warning');
 });

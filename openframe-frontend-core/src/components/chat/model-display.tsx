@@ -87,7 +87,7 @@ function UsagePanelTrigger({
         <button
           type="button"
           aria-label={label}
-          className="ml-auto flex items-center gap-1 rounded-sm text-ods-text-secondary transition-colors text-h6 hover:text-ods-text-primary focus:outline-none focus-visible:text-ods-text-primary focus-visible:ring-2 focus-visible:ring-ods-accent data-[state=open]:text-ods-text-primary"
+          className="ml-auto flex items-center gap-[var(--spacing-system-xxs)] rounded-sm text-ods-text-secondary transition-colors text-h6 hover:text-ods-text-primary focus:outline-none focus-visible:text-ods-text-primary focus-visible:ring-2 focus-visible:ring-ods-accent data-[state=open]:text-ods-text-primary"
         >
           <span data-accent="mingo" className="flex shrink-0 items-center" aria-hidden>
             <CircularProgress
@@ -107,7 +107,6 @@ function UsagePanelTrigger({
         align="end"
         sideOffset={8}
         collisionPadding={16}
-        // Focus stays in the composer: the panel only shows numbers, there is nothing in it to operate.
         onOpenAutoFocus={event => event.preventDefault()}
         className="w-[360px] max-w-[calc(100vw-32px)] overflow-hidden rounded-md border-ods-border bg-ods-card p-0 text-ods-text-primary"
       >
@@ -250,7 +249,6 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // Without a breakdown there's no story to tell on hover — return the
     // bare inline so we don't add a stray pointer cursor / accessibility
     // chrome on chat surfaces that don't capture cross-call usage.
-    // With the Usage panel the counter opens the panel on click; a hover card on the same row would be a second popup.
     if (usagePanel || !hasAnyBreakdownRow(breakdown)) return inline;
 
     return (

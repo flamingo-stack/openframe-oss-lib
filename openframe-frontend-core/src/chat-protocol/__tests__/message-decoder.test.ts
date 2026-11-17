@@ -59,6 +59,28 @@ describe('createMingoDecoder: the table', () => {
     ]);
   });
 
+  it('keeps the effective run budget separate from the physical metadata window', () => {
+    expect(
+      decodeAll({
+        type: 'AI_METADATA',
+        modelName: 'opus',
+        providerName: 'Anthropic',
+        contextWindow: 1_000_000,
+        contextBudget: 200_000,
+      }),
+    ).toEqual([
+      {
+        type: 'message-metadata',
+        messageMetadata: {
+          model: 'opus',
+          provider: 'Anthropic',
+          contextWindowMaxTokens: 1_000_000,
+          contextBudget: 200_000,
+        },
+      },
+    ]);
+  });
+
   it('AI_METADATA is message metadata', () => {
     expect(
       decodeAll({

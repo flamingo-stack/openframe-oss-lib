@@ -74,6 +74,7 @@ export interface ChatReducerState {
     provider: string | null;
     modelLabel: string | null;
     contextWindowMaxTokens: number | null;
+    contextBudget?: number | null;
   } | null;
   /**
    * What this client knows about approvals and offers, by id, whoever told it. A card's status is its part's; this is
@@ -652,7 +653,12 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   // A turn opening and ending
   // ===========================================================================
 
+  function clearRunContextBudget(): void {
+    if (liveModel?.contextBudget != null) liveModel = { ...liveModel, contextBudget: null };
+  }
+
   function applyStart(chunk: Extract<UiChunk, { type: 'start' }>): void {
+    clearRunContextBudget();
     isInStream = true;
     turnStartedAt = Date.now();
     setPhaseInternal('streaming');
@@ -823,7 +829,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   // ===========================================================================
 
   function applyMetadata(chunk: Extract<UiChunk, { type: 'message-metadata' }>): void {
-    const { model, modelLabel, provider, contextWindowMaxTokens } = chunk.messageMetadata;
+    const { model, modelLabel, provider, contextWindowMaxTokens, contextBudget } = chunk.messageMetadata;
     if (model !== undefined || modelLabel !== undefined || provider !== undefined) {
       onEffect?.({
         name: 'onMetadata',
@@ -840,6 +846,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         provider: provider || null,
         modelLabel: modelLabel || model || null,
         contextWindowMaxTokens: contextWindowMaxTokens || null,
+        ...(contextBudget !== undefined ? { contextBudget: contextBudget > 0 ? contextBudget : null } : {}),
       };
       invalidate();
     }
@@ -919,6 +926,10 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
 
       case 'data-token-usage':
         dialogTokenUsage = chunk.data;
+        liveModel = {
+          ...(liveModel ?? { provider: null, modelLabel: null, contextWindowMaxTokens: null }),
+          contextBudget: chunk.data.contextSize > 0 ? chunk.data.contextSize : null,
+        };
         invalidate();
         break;
 
@@ -1082,6 +1093,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       invalidate();
     },
     pushOptimisticSend(text, hidden = false) {
+      clearRunContextBudget();
       // Record the text so the backend's MESSAGE_REQUEST echo consumes this
       // send instead of rendering a duplicate row (cap keeps the list from
       // growing if a backend never echoes).

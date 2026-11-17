@@ -93,10 +93,10 @@ describe('createMingoGraphqlDialogs', () => {
   describe('token usage split', () => {
     const split = {
       dialog: {
-        id: 'R2xvYmFs',
+        ...node,
         tokenUsage: [
           {
-            chatType: 'ADMIN_AI_CHAT',
+            ...node.tokenUsage[0],
             uncachedInputTokensSize: 1,
             cacheReadTokensSize: 2,
             cacheWriteTokensSize: 0,
@@ -118,8 +118,8 @@ describe('createMingoGraphqlDialogs', () => {
       return { post, dialogs };
     };
 
-    it('merges the split into the record usage when the backend answers it', async () => {
-      const { dialogs } = splitBackend(() => Promise.resolve(split));
+    it('reads the aggregate and split from one response to keep the same provider round', async () => {
+      const { post, dialogs } = splitBackend(() => Promise.resolve(split));
       const record = await dialogs.fetchDialog('d1');
       expect(record?.tokenUsage).toEqual({
         chatType: 'ADMIN_AI_CHAT',
@@ -132,10 +132,19 @@ describe('createMingoGraphqlDialogs', () => {
         cacheWriteTokensSize: 0,
         compactionThreshold: 0.8,
       });
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(post.mock.calls[0][0]).toContain('totalTokensSize');
+      expect(post.mock.calls[0][0]).toContain('cacheReadTokensSize');
     });
 
     it('opens the record without the split when the backend refuses it, and does not ask again', async () => {
-      const { post, dialogs } = splitBackend(() => Promise.reject(new Error('Validation error: unknown field')));
+      const { post, dialogs } = splitBackend(() =>
+        Promise.reject(
+          new Error(
+            "Validation error (FieldUndefined@[dialog/tokenUsage/uncachedInputTokensSize]): Field 'uncachedInputTokensSize' is undefined",
+          ),
+        ),
+      );
       const first = await dialogs.fetchDialog('d1');
       expect(first?.tokenUsage).toEqual({
         chatType: 'ADMIN_AI_CHAT',
@@ -147,6 +156,41 @@ describe('createMingoGraphqlDialogs', () => {
       await dialogs.fetchDialog('d1');
       const splitCalls = post.mock.calls.filter(([query]) => query === MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY);
       expect(splitCalls).toHaveLength(1);
+    });
+
+    it.each(['Network timeout', 'Unauthorized', 'Validation error: unrelated input'])(
+      'retries the split after a recoverable failure: %s',
+      async message => {
+        let failed = false;
+        const { dialogs } = splitBackend(() => {
+          if (!failed) {
+            failed = true;
+            return Promise.reject(new Error(message));
+          }
+          return Promise.resolve(split);
+        });
+        await expect(dialogs.fetchDialog('d1')).rejects.toThrow(message);
+        expect((await dialogs.fetchDialog('d1'))?.tokenUsage?.cacheReadTokensSize).toBe(2);
+      },
+    );
+
+    it('reads the flag for each load and resumes the split after it is enabled', async () => {
+      let enabled = false;
+      const post = vi.fn((query: string) =>
+        Promise.resolve(query === MINGO_DIALOG_QUERY ? { dialog: node } : split),
+      ) as unknown as MingoGraphqlPost & ReturnType<typeof vi.fn>;
+      const dialogs = createMingoGraphqlDialogs(post, {
+        agentTypes: ['ADMIN'],
+        statuses: ['ACTIVE'],
+        chatType: 'ADMIN_AI_CHAT',
+        tokenUsageSplit: () => enabled,
+      });
+      expect((await dialogs.fetchDialog('d1'))?.tokenUsage?.cacheReadTokensSize).toBeUndefined();
+      expect(post).toHaveBeenLastCalledWith(MINGO_DIALOG_QUERY, { id: 'd1' });
+      enabled = true;
+      expect((await dialogs.fetchDialog('d1'))?.tokenUsage?.cacheReadTokensSize).toBe(2);
+      enabled = false;
+      expect((await dialogs.fetchDialog('d1'))?.tokenUsage?.cacheReadTokensSize).toBeUndefined();
     });
 
     it('does not ask for the split unless the host turns it on', async () => {

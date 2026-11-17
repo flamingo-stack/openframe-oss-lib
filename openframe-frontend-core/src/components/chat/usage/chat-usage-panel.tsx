@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { ProgressBar } from '../../ui/progress-bar';
 import {
   type ChatUsagePanelData,
@@ -46,7 +47,8 @@ function Section({ children, className }: { children: ReactNode; className?: str
   );
 }
 
-function LabelRow({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
+function LabelRow({ label, value, loading: loadingProp }: { label: string; value: string; loading?: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   return (
     <div className="flex items-center justify-between gap-[var(--spacing-system-xsf)] text-h6">
       <span>{label}</span>
@@ -116,11 +118,13 @@ export function ChatUsagePanel({ data, className }: { data: ChatUsagePanelData; 
           progress={ratio == null ? 0 : ratio * 100}
           fillColor={CHAT_USAGE_TONE_COLOR[contextTone]}
           trackColor="var(--color-accent-secondary)"
-          dimTrackFrom={compactAt * 100}
+          dimTrackFrom={compactAt == null ? undefined : compactAt * 100}
         />
-        <span className="text-ods-text-secondary text-h6">
-          Mingo compacts chat memory at {Math.round(compactAt * 100)}%
-        </span>
+        {compactAt != null && (
+          <span className="text-ods-text-secondary text-h6">
+            Mingo compacts chat memory at {Math.round(compactAt * 100)}%
+          </span>
+        )}
         <div className="flex flex-col pt-[var(--spacing-system-xxs)]">
           <BreakdownRow label="Input" value={breakdown?.input ?? null} />
           <BreakdownRow label="Cache Read" value={breakdown?.cacheRead ?? null} />

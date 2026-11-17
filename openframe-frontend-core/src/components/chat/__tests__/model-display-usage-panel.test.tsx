@@ -16,6 +16,28 @@ const panel: ChatUsagePanelData = {
 };
 
 describe('ModelDisplay usage panel', () => {
+  it('keeps zero figures visible without inventing an unknown compaction policy', async () => {
+    render(
+      <ModelDisplay
+        provider="anthropic"
+        modelName="Claude"
+        usedTokens={0}
+        contextWindow={150_000}
+        usagePanel={{
+          ...panel,
+          context: { used: null, limit: null, compactionThreshold: null },
+          breakdown: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /show usage details/i }));
+    const group = await screen.findByRole('group', { name: 'Usage' });
+    expect(group).toHaveTextContent('Chat Context0 / 150,000');
+    expect(group).toHaveTextContent('Input0');
+    expect(group).toHaveTextContent('Output0');
+    expect(group).not.toHaveTextContent(/Mingo compacts chat memory at/);
+  });
+
   it('stays plain text without the panel data', () => {
     render(<ModelDisplay provider="anthropic" modelName="Claude" usedTokens={12_300} contextWindow={150_000} />);
     expect(screen.queryByRole('button', { name: /usage/i })).not.toBeInTheDocument();
@@ -77,5 +99,23 @@ describe('ModelDisplay usage panel', () => {
     expect(group).toHaveTextContent('Free AI Tokens—');
     expect(group).toHaveTextContent('Chat Context— / 30,000');
     expect(group).toHaveTextContent('Input—');
+  });
+
+  it('keeps known output while the three legacy input parts stay unknown', async () => {
+    render(
+      <ModelDisplay
+        provider="anthropic"
+        modelName="Claude"
+        usedTokens={12_840}
+        contextWindow={150_000}
+        usagePanel={{ ...panel, breakdown: { input: null, cacheRead: null, cacheWrite: null, output: 940 } }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /show usage details/i }));
+    const group = await screen.findByRole('group', { name: 'Usage' });
+    expect(group).toHaveTextContent('Input—');
+    expect(group).toHaveTextContent('Cache Read—');
+    expect(group).toHaveTextContent('Cache Write—');
+    expect(group).toHaveTextContent('Output940');
   });
 });
