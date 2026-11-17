@@ -2,6 +2,7 @@ package com.openframe.data.repository.ticket;
 
 import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.Ticket.Fields;
 import com.openframe.data.document.ticket.TicketOwnerType;
@@ -29,11 +30,21 @@ public class TicketProjectionRepository {
     // From the primary: a lagging secondary could count 0 or miss items, and the event would skip a real update.
     private static final ReadPreference PRIMARY = ReadPreference.primary();
     private static final String FIELD_KIND = "kind";
+    private static final String FIELD_TENANT_ID = "tenantId";
+    private static final String FIELD_MACHINE_ID = "machineId";
+    private static final String FIELD_ORGANIZATION_ID = "organizationId";
     private static final String FIELD_OWNER_TYPE = "owner.ticketOwnerType";
     private static final String FIELD_OWNER_MACHINE_ID = "owner.machineId";
     private static final String FIELD_OWNER_ORGANIZATION_ID = "owner.organizationId";
 
     private final MongoOperations mongoOperations;
+
+    public Optional<String> findMachineOrganizationId(String tenantId, String machineId) {
+        Query query = new Query(Criteria.where(FIELD_TENANT_ID).is(tenantId).and(FIELD_MACHINE_ID).is(machineId));
+        query.fields().include(FIELD_ORGANIZATION_ID);
+        query.withReadPreference(PRIMARY);
+        return Optional.ofNullable(mongoOperations.findOne(query, Machine.class)).map(Machine::getOrganizationId);
+    }
 
     public long updateOrganizationName(String tenantId, String organizationId, String organizationName) {
         Criteria outdatedNames = matchTicketsToUpdateOrganizationName(tenantId, organizationId, organizationName);

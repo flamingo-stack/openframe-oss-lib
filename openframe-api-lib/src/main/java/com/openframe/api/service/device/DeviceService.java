@@ -188,6 +188,7 @@ public class DeviceService {
         return DeviceFilters.builder()
                 .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.STATUS)))
                 .connectivity(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.CONNECTIVITY)))
+                .clientOutdated(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.CLIENT_OUTDATED)))
                 .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.DEVICE_TYPE)))
                 .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.OS_TYPE)))
                 .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
@@ -275,6 +276,7 @@ public class DeviceService {
         if (filter != null) {
             builder.statuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null)
                     .connectivity(filter.getConnectivity() != null ? filter.getConnectivity().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .clientOutdated(filter.getClientOutdated())
                     .deviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null)
                     .organizationIds(filter.getOrganizationIds())
                     .manageableByPackageManagers(filter.getManageableByPackageManagers())

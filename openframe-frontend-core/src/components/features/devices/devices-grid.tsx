@@ -6,7 +6,7 @@ import { LoadingRegion } from '../../loading/loading-region';
 import { DeviceCard } from '../../ui';
 import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { getDeviceName } from './device-name';
-import { getDeviceOperatingSystem, getDeviceStatusConfig } from './device-status';
+import { getDeviceOperatingSystem, getDeviceRowStatusConfig } from './device-status';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDevicesViewConfig } from './devices-view-config';
 import type { DeviceRow } from './types';
@@ -82,7 +82,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
         <>
           <div className={DEVICES_GRID_CLASS}>
             {devices.map(device => {
-              const statusConfig = getDeviceStatusConfig(device.status);
+              const statusConfig = getDeviceRowStatusConfig(device);
               return (
                 <DeviceCard
                   key={device.id || device.machineId}
@@ -95,7 +95,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                     operatingSystem: getDeviceOperatingSystem(device.osType),
                   }}
                   statusTag={
-                    device.status
+                    device.status || device.clientOutdated
                       ? {
                           label: statusConfig.label,
                           variant: statusConfig.variant,

@@ -6,7 +6,8 @@
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
+import { loadActionsMenuDropdown } from '../actions-menu-on-demand';
 import { type PageActionButton, PageActions } from '../page-actions';
 
 const ACTIONS: PageActionButton[] = [
@@ -26,6 +27,11 @@ const ROW_GLYPH = '[&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6';
 
 /** A class string as serialized markup carries it (`&` is escaped in attribute values). */
 const inMarkup = (classes: string) => classes.replace(/&/g, '&amp;');
+
+// The "…" menu's module loads on demand; loaded once here, every menu below renders at once.
+beforeAll(async () => {
+  await loadActionsMenuDropdown();
+});
 
 describe('PageActions glyphs', () => {
   it('scale every header button glyph, the split segment included', () => {
