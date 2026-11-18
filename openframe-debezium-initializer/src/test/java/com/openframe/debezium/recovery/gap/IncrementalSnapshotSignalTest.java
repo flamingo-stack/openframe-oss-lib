@@ -21,7 +21,8 @@ class IncrementalSnapshotSignalTest {
         IncrementalSnapshotSignal signal = new IncrementalSnapshotSignal(List.of(FILTERED, WHOLE));
 
         // execution
-        JsonNode json = objectMapper.readTree(signal.toJson(objectMapper));
+        String payload = signal.toJson(objectMapper);
+        JsonNode json = objectMapper.readTree(payload);
 
         // verifications
         assertThat(json.path("id").asText()).isEqualTo(signal.getId());

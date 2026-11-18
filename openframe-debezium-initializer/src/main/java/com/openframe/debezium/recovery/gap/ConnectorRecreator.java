@@ -78,7 +78,8 @@ public class ConnectorRecreator {
     }
 
     public void recreate(RecreationRequest request) {
-        Map<String, Object> config = ConnectorSpecs.configOf(request.getSpec());
+        Map<String, Object> spec = request.getSpec();
+        Map<String, Object> config = ConnectorSpecs.configOf(spec);
         Map<String, Object> recreationConfig = debeziumService.recreationConfig(config);
         if (canHandOver(request, config)) {
             handOver(request, recreationConfig);

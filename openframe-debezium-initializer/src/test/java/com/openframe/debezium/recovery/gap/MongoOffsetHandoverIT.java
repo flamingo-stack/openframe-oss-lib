@@ -75,8 +75,10 @@ class MongoOffsetHandoverIT {
         ReflectionTestUtils.setField(debeziumService, "readTimeout", Duration.ofSeconds(60));
         debeziumService.init();
         SourceDialects dialects = new SourceDialects(List.of(new MongoSourceDialect()));
-        recreator = new ConnectorRecreator(debeziumService, dialects, mock(ConnectorCheckpointRepository.class),
-                backfillRepository, properties, mock(UnfilledGapAlerts.class));
+        ConnectorCheckpointRepository checkpointRepository = mock(ConnectorCheckpointRepository.class);
+        UnfilledGapAlerts unfilledGapAlerts = mock(UnfilledGapAlerts.class);
+        recreator = new ConnectorRecreator(debeziumService, dialects, checkpointRepository,
+                backfillRepository, properties, unfilledGapAlerts);
         beans.addBean("connectorRecreator", recreator);
         mongoClient = MongoClients.create(HOST_MONGO);
         config = connectorConfig();

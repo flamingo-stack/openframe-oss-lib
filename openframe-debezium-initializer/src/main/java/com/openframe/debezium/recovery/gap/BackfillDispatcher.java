@@ -65,8 +65,9 @@ public class BackfillDispatcher {
             return;
         }
         Map<String, String> backfillFilters = ConnectorSpecs.backfillOf(spec);
-        List<SnapshotCondition> conditions = sourceDialects.dialectFor(config)
-                .gapConditions(config, backfillFilters, backfill.getGapFrom());
+        Instant gapFrom = backfill.getGapFrom();
+        SourceDialect dialect = sourceDialects.dialectFor(config);
+        List<SnapshotCondition> conditions = dialect.gapConditions(config, backfillFilters, gapFrom);
         if (conditions.isEmpty()) {
             markExpired(backfill, "No data collections to backfill");
             return;

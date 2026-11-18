@@ -144,7 +144,8 @@ class MongoGapBackfillIT {
 
     private String eventId(JsonNode record) {
         try {
-            JsonNode after = objectMapper.readTree(record.path("after").asText());
+            String afterJson = record.path("after").asText();
+            JsonNode after = objectMapper.readTree(afterJson);
             return after.path("_id").path("$oid").asText();
         } catch (Exception e) {
             throw new IllegalStateException(e);

@@ -57,12 +57,14 @@ class SnapshotSignalPublisherIT {
         GapRecoveryProperties properties = new GapRecoveryProperties();
         properties.setBackfillExpiry(BACKFILL_EXPIRY);
         publisher = new SnapshotSignalPublisher(objectMapper, properties, new SignalKafkaClients());
-        admin = Admin.create(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, HOST_KAFKA));
+        Map<String, Object> adminConfig = Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, HOST_KAFKA);
+        admin = Admin.create(adminConfig);
     }
 
     @AfterEach
     void tearDown() throws Exception {
-        admin.deleteTopics(List.of(topic)).all().get();
+        List<String> topics = List.of(topic);
+        admin.deleteTopics(topics).all().get();
         admin.close();
     }
 
@@ -82,7 +84,8 @@ class SnapshotSignalPublisherIT {
         assertThat(records)
                 .extracting(ConsumerRecord::key, ConsumerRecord::partition)
                 .containsExactly(tuple(topicPrefix, 0));
-        JsonNode signal = objectMapper.readTree(records.getFirst().value());
+        String payload = records.getFirst().value();
+        JsonNode signal = objectMapper.readTree(payload);
         assertThat(signal.path("type").asString()).isEqualTo("execute-snapshot");
     }
 

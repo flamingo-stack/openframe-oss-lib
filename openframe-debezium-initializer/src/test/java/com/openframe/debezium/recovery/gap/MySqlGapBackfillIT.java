@@ -148,7 +148,8 @@ class MySqlGapBackfillIT {
         connector.put("database.port", "3306");
         connector.put("database.user", "root");
         connector.put("database.password", "root");
-        connector.put("database.server.id", String.valueOf(Math.abs(topicPrefix.hashCode() % 100000) + 1000));
+        int serverId = Math.abs(topicPrefix.hashCode() % 100000) + 1000;
+        connector.put("database.server.id", String.valueOf(serverId));
         connector.put("database.include.list", database);
         connector.put("table.include.list", database + ".activity_past," + database + ".teams,"
                 + database + ".host_software," + database + ".host_software_windows_details");
