@@ -367,6 +367,26 @@ export const MINGO_DIALOG_QUERY = `
   }
 `;
 
+/**
+ * The open dialog's token usage split (the cache read and written, the input read fresh) and its compaction ratio. Its
+ * own query, not fields of `MINGO_DIALOG_QUERY`: a backend that does not have them yet refuses the whole document, and
+ * the dialog itself must still open. A host reads it beside the record and drops it when the backend refuses it.
+ */
+export const MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY = `
+  query GetDialogTokenUsageSplit($id: ID!) {
+    dialog(id: $id) {
+      id
+      tokenUsage {
+        chatType
+        uncachedInputTokensSize
+        cacheReadTokensSize
+        cacheWriteTokensSize
+        compactionThreshold
+      }
+    }
+  }
+`;
+
 // ─── The chat's commands ─────────────────────────────────────────────────────
 // What every OpenFrame chat sends to the ai-agent's `/chat/graphql` (OpenFrame's Mingo and tickets, the Fae client). A
 // refused command answers HTTP 200 with `userErrors`, whose `code` is the one the REST endpoints these replace answered.
@@ -540,6 +560,10 @@ export interface MingoDialogNode {
     outputTokensSize?: number | null;
     totalTokensSize?: number | null;
     contextSize?: number | null;
+    uncachedInputTokensSize?: number | null;
+    cacheReadTokensSize?: number | null;
+    cacheWriteTokensSize?: number | null;
+    compactionThreshold?: number | null;
   }> | null;
 }
 
