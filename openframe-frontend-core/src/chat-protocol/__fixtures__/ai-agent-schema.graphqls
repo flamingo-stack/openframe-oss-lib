@@ -1587,7 +1587,6 @@ input DeleteByIdInput {
     id: ID!
 }
 
-# TODO(lifecycle-rollout): rename `TicketStatusDefinition` → `TicketStatus`
 type TicketStatusDefinition implements Node @key(fields: "id") @shareable {
     id: ID!
     name: String!

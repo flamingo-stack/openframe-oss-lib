@@ -5,7 +5,6 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.ticket.TicketFilterOption;
 import com.openframe.api.dto.ticket.TicketFilters;
 import com.openframe.api.dto.ticket.TicketStatistics;
-import com.openframe.api.dto.ticket.TicketStatusCount;
 import com.openframe.api.dto.ticket.TicketStatusDefinitionCount;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.ticket.AdminTicketOwner;
@@ -18,7 +17,6 @@ import com.openframe.data.document.ticket.TicketNote;
 import com.openframe.data.document.ticket.TicketOwner;
 import com.openframe.data.document.ticket.TicketOwnerType;
 import com.openframe.data.document.ticket.TicketResolver;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.external.dto.ticket.TicketAttachmentResponse;
@@ -431,9 +429,6 @@ class TicketMapperTest {
     void statisticsAreCopiedWithStatusDefinitionsMapped() {
         TicketStatistics statistics = TicketStatistics.builder()
                 .totalCount(12)
-                .statusCounts(List.of(
-                        new TicketStatusCount(TicketStatus.ACTIVE, 7),
-                        new TicketStatusCount(TicketStatus.RESOLVED, 5)))
                 .statusDefinitionCounts(List.of(
                         new TicketStatusDefinitionCount(status("st-ai", TicketStatusKind.AI_ASSISTANCE, "AI"), 4),
                         new TicketStatusDefinitionCount(null, 8)))
