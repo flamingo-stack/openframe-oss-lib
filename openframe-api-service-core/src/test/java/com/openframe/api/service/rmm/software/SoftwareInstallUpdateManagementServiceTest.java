@@ -82,8 +82,6 @@ class SoftwareInstallUpdateManagementServiceTest {
 
     private final PackageManagerProperties packageManagerProperties = new PackageManagerProperties();
 
-    private final PackageManagerProperties packageManagerProperties = new PackageManagerProperties();
-
     private SoftwareInstallUpdateManagementService service;
 
     @org.junit.jupiter.api.BeforeEach
