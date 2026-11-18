@@ -69,7 +69,17 @@ export interface ChatTokenUsageChunk {
   type: 'data-token-usage';
   id?: string;
   transient: true;
-  data: { inputTokensSize: number; outputTokensSize: number; totalTokensSize: number; contextSize: number };
+  data: {
+    inputTokensSize: number;
+    outputTokensSize: number;
+    totalTokensSize: number;
+    contextSize: number;
+    /** The cache split and compaction ratio (`TokenUsageCacheSplit`); only when the backend sent them. */
+    uncachedInputTokensSize?: number;
+    cacheReadTokensSize?: number;
+    cacheWriteTokensSize?: number;
+    compactionThreshold?: number;
+  };
 }
 
 export interface ChatDialogClosedChunk {

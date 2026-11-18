@@ -64,6 +64,11 @@ function numOr(value: unknown, fallback = 0): number {
   return typeof value === 'number' ? value : fallback;
 }
 
+/** `{ [key]: value }` when the value is a finite number, else nothing: a field the sender left out stays out. */
+function numField<K extends string>(key: K, value: unknown): Partial<Record<K, number>> {
+  return typeof value === 'number' && Number.isFinite(value) ? ({ [key]: value } as Record<K, number>) : {};
+}
+
 /** Decode an error's `details`: a JSON envelope (`{ error: { message } }`) or an already human string. */
 function errorDetails(details: unknown): string | undefined {
   if (typeof details !== 'string' || details === '') return undefined;
@@ -490,6 +495,10 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
             outputTokensSize: numOr(raw.outputTokensSize),
             totalTokensSize: numOr(raw.totalTokensSize),
             contextSize: numOr(raw.contextSize),
+            ...numField('uncachedInputTokensSize', raw.uncachedInputTokensSize),
+            ...numField('cacheReadTokensSize', raw.cacheReadTokensSize),
+            ...numField('cacheWriteTokensSize', raw.cacheWriteTokensSize),
+            ...numField('compactionThreshold', raw.compactionThreshold),
           },
         });
         break;
