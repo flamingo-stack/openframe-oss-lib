@@ -417,3 +417,35 @@ describe('useChatEngine: the context budget the counter shows', () => {
     expect(result.current.currentContextWindowMaxTokens).toBe(150_000);
   });
 });
+
+describe('useChatEngine: a reload while a reply streams', () => {
+  it("draws the prompt once: history holds it, and the tail's replayed echo is its twin", async () => {
+    // The backend persists the prompt with no seq, so the tail starts after the last answer (7) and replays its echo.
+    const history: HistoricalMessage[] = [
+      ...persisted,
+      {
+        id: 'u2',
+        createdAt: '2026-11-04T10:01:00Z',
+        owner: { type: 'ADMIN' },
+        parts: [{ type: 'TEXT', text: 'Reload check' }],
+      },
+    ];
+    const { result, tail } = setup({
+      dialogId: 'd1',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: history, nextCursor: null }) },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => {
+      tail.current?.onEvent(
+        { type: 'MESSAGE_REQUEST', text: 'Reload check', ownerType: 'ADMIN', streamSeq: 8 },
+        'message',
+      );
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 9 }, 'message');
+      tail.current?.onEvent({ type: 'TEXT', text: 'Backups matter', streamSeq: 10 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 11 }, 'message');
+    });
+    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    const prompts = result.current.messages.filter(m => m.role === 'user');
+    expect(prompts.map(m => m.id)).toEqual(['u2']);
+  });
+});
