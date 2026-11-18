@@ -237,7 +237,7 @@ public class SoftwareActionDetailService {
         if (action == null) {
             return null;
         }
-        return leaf.getSource() == ExecutionSource.PACKAGE_AUTO_UPDATE ? SoftwareActionKind.AUTO_UPDATE : action.kind();
+        return leaf.getSource() == ExecutionSource.PACKAGE_AUTO_UPDATE ? SoftwareActionKind.AUTO_UPDATE : SoftwareActionKindMapper.kindOf(action);
     }
 
     private static SoftwareActionDeviceResponse pending(String machineId, SoftwareActionStatus status, String error) {

@@ -152,7 +152,7 @@ public class PackageUpdateStatusProcessor {
                     requestId, machineId, askAgainAt);
             return;
         }
-        if (!isTerminal(state)) {
+        if (!PackageUpdateDeviceStateReducer.isTerminal(state)) {
             return;
         }
         Optional<MachineDelivery> order = deliveryTracker.find(DeliveryType.PACKAGE_UPDATE, requestId, machineId);
@@ -185,7 +185,7 @@ public class PackageUpdateStatusProcessor {
                     requestId, machineId, deadlineAt, approved);
             return;
         }
-        if (!isTerminal(state)) {
+        if (!PackageUpdateDeviceStateReducer.isTerminal(state)) {
             return;
         }
         if (Instant.now().isBefore(deadlineAt)) {
@@ -227,33 +227,12 @@ public class PackageUpdateStatusProcessor {
             return;
         }
         List<PackageUpdateDeviceState> all = deviceStateRepository.findByTenantIdAndRequestId(tenantId, requestId);
-        SoftwareActionStatus rolled = rollUpStatus(all);
+        SoftwareActionStatus rolled = PackageUpdateDeviceStateReducer.rollUpStatus(all);
         if (rolled != null && rolled != request.getStatus()) {
             log.info("[package-update] request status requestId={} {} -> {}", requestId, request.getStatus(), rolled);
             request.setStatus(rolled);
             request.setUpdatedAt(Instant.now());
             requestRepository.save(request);
         }
-    }
-
-    private static SoftwareActionStatus rollUpStatus(List<PackageUpdateDeviceState> all) {
-        if (all.isEmpty()) {
-            return null;
-        }
-        boolean allTerminal = all.stream().allMatch(PackageUpdateStatusProcessor::isTerminal);
-        if (allTerminal) {
-            return all.stream().anyMatch(s -> s.getStatus() == SoftwareActionStatus.FAILED) ? SoftwareActionStatus.FAILED : SoftwareActionStatus.COMPLETED;
-        }
-        if (all.stream().anyMatch(s -> s.getStatus() == SoftwareActionStatus.WAITING)) {
-            return SoftwareActionStatus.WAITING;
-        }
-        if (all.stream().anyMatch(s -> s.getStatus() == SoftwareActionStatus.IN_PROGRESS)) {
-            return SoftwareActionStatus.IN_PROGRESS;
-        }
-        return SoftwareActionStatus.SCHEDULED;
-    }
-
-    private static boolean isTerminal(PackageUpdateDeviceState s) {
-        return s.getStatus() == SoftwareActionStatus.COMPLETED || s.getStatus() == SoftwareActionStatus.FAILED;
     }
 }

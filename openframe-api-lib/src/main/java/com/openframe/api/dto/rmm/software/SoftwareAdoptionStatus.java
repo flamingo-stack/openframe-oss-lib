@@ -1,4 +1,4 @@
-package com.openframe.data.document.rmm.software;
+package com.openframe.api.dto.rmm.software;
 
 public enum SoftwareAdoptionStatus {
     ADOPTING,

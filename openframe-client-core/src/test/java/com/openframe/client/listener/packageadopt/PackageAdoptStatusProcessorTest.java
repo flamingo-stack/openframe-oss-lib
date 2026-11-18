@@ -1,25 +1,31 @@
 package com.openframe.client.listener.packageadopt;
 
-import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.client.listener.packageupdate.PackageUpdateExecutionRecorder;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.software.SoftwareAdoption;
-import com.openframe.data.document.rmm.software.SoftwareAdoptionStatus;
+import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
+import com.openframe.data.document.rmm.software.PackageUpdateRequest;
+import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage;
 import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage.State;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.repository.rmm.SoftwareAdoptionRepository;
+import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
+import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,20 +41,24 @@ class PackageAdoptStatusProcessorTest {
 
     private static final String TENANT = "t1";
     private static final String REQUEST_ID = "req-1";
-    private static final String EARLIER_REQUEST_ID = "req-0";
     private static final String MACHINE_ID = "m1";
+    private static final String OTHER_MACHINE_ID = "m2";
     private static final String DISPATCH_ID = "d-1";
     private static final String ERROR = "brew install --cask postman: exit 1";
     private static final DeliveryRef DELIVERY = new DeliveryRef(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, DISPATCH_ID);
 
     @Mock private MachineRepository machineRepository;
-    @Mock private SoftwareAdoptionRepository softwareAdoptionRepository;
+    @Mock private PackageUpdateRequestRepository packageUpdateRequestRepository;
+    @Mock private PackageUpdateDeviceStateRepository packageUpdateDeviceStateRepository;
+    @Mock private PackageUpdateExecutionRecorder packageUpdateExecutionRecorder;
     @Mock private DeliveryTracker deliveryTracker;
+
+    @Captor private ArgumentCaptor<PackageUpdateRequest> requestCaptor;
 
     @InjectMocks private PackageAdoptStatusProcessor processor;
 
     private Machine machine;
-    private SoftwareAdoption adoption;
+    private PackageUpdateRequest request;
     private MachineDelivery delivery;
 
     @BeforeEach
@@ -56,255 +66,252 @@ class PackageAdoptStatusProcessorTest {
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setTenantId(TENANT);
-        adoption = SoftwareAdoption.builder()
+        request = PackageUpdateRequest.builder()
                 .tenantId(TENANT)
-                .machineId(MACHINE_ID)
-                .softwareId("42")
                 .requestId(REQUEST_ID)
-                .status(SoftwareAdoptionStatus.ADOPTING)
+                .executionId("exec-1")
+                .action(SoftwareAction.ADOPT)
+                .softwareId("42")
+                .status(SoftwareActionStatus.IN_PROGRESS)
+                .machineIds(List.of(MACHINE_ID))
                 .build();
         delivery = new MachineDelivery();
         delivery.setDispatchId(DISPATCH_ID);
     }
 
     @Test
-    void process_done_deliveryClosedDoneThenTheRecordOfThatRequestRemoved() {
+    void process_done_stateCompletedThenHistoryThenDeliveryClosedDone() {
         // setup
-        PackageAdoptStatusMessage event = status(REQUEST_ID, State.DONE);
-        stubAdoptionOfTheRequest();
-        InOrder deliveryThenRecord = inOrder(deliveryTracker, softwareAdoptionRepository);
+        PackageAdoptStatusMessage event = status(State.DONE, null);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.COMPLETED, null, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.COMPLETED));
+        InOrder stateThenHistoryThenDelivery = inOrder(packageUpdateDeviceStateRepository,
+                packageUpdateExecutionRecorder, deliveryTracker);
 
         // execution
         processor.process(MACHINE_ID, event);
 
         // verifications
-        deliveryThenRecord.verify(deliveryTracker).done(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID);
-        deliveryThenRecord.verify(softwareAdoptionRepository).deleteByTenantIdAndRequestIdAndMachineId(TENANT, REQUEST_ID, MACHINE_ID);
-        verify(softwareAdoptionRepository, never()).save(any(SoftwareAdoption.class));
+        stateThenHistoryThenDelivery.verify(packageUpdateDeviceStateRepository)
+                .finishInProgress(TENANT, REQUEST_ID, MACHINE_ID, SoftwareActionStatus.COMPLETED, null);
+        stateThenHistoryThenDelivery.verify(packageUpdateExecutionRecorder)
+                .recordDone(request, MACHINE_ID, PackageAdoptStatusProcessor.ADOPTED_SUMMARY);
+        stateThenHistoryThenDelivery.verify(deliveryTracker).done(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID);
     }
 
     @Test
-    void process_doneAfterTheAdoptionFailed_recordRemovedAndDeliveryClosedDone() {
+    void process_doneOfTheLastDevice_requestCompleted() {
         // setup
-        PackageAdoptStatusMessage event = status(REQUEST_ID, State.DONE);
-        adoption.setStatus(SoftwareAdoptionStatus.FAILED);
-        adoption.setError("TIMEOUT");
-        stubAdoptionOfTheRequest();
+        PackageAdoptStatusMessage event = status(State.DONE, null);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.COMPLETED, null, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.COMPLETED));
 
         // execution
         processor.process(MACHINE_ID, event);
 
         // verifications
-        verify(deliveryTracker).done(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID);
-        verify(softwareAdoptionRepository).deleteByTenantIdAndRequestIdAndMachineId(TENANT, REQUEST_ID, MACHINE_ID);
+        verify(packageUpdateRequestRepository).save(requestCaptor.capture());
+        assertThat(requestCaptor.getValue())
+                .extracting(PackageUpdateRequest::getStatus)
+                .isEqualTo(SoftwareActionStatus.COMPLETED);
+        assertThat(requestCaptor.getValue().getUpdatedAt()).isNotNull();
     }
 
     @Test
-    void process_failed_recordFailedWithTheAgentsTextThenDeliveryClosedFailedByItsDispatch() {
+    void process_doneWhileAnotherDeviceStillAdopts_requestStaysInProgress() {
         // setup
-        PackageAdoptStatusMessage event = status(REQUEST_ID, State.FAILED);
-        event.setMessage(ERROR);
-        stubAdoptionOfTheRequest();
+        PackageAdoptStatusMessage event = status(State.DONE, null);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.COMPLETED, null, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.COMPLETED),
+                state(OTHER_MACHINE_ID, SoftwareActionStatus.IN_PROGRESS));
+
+        // execution
+        processor.process(MACHINE_ID, event);
+
+        // verifications
+        verify(packageUpdateRequestRepository, never()).save(any(PackageUpdateRequest.class));
+    }
+
+    @Test
+    void process_failed_stateFailedWithTheAgentsTextThenHistoryThenDeliveryClosedFailedByItsDispatch() {
+        // setup
+        PackageAdoptStatusMessage event = status(State.FAILED, ERROR);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.FAILED, ERROR, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.FAILED));
         when(deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID)).thenReturn(Optional.of(delivery));
-        InOrder recordThenDelivery = inOrder(softwareAdoptionRepository, deliveryTracker);
+        InOrder stateThenHistoryThenDelivery = inOrder(packageUpdateDeviceStateRepository,
+                packageUpdateExecutionRecorder, deliveryTracker);
 
         // execution
         processor.process(MACHINE_ID, event);
 
         // verifications
-        recordThenDelivery.verify(softwareAdoptionRepository).save(adoption);
-        recordThenDelivery.verify(deliveryTracker).fail(DELIVERY, MACHINE_ID, ERROR);
-        assertThat(adoption)
-                .extracting(SoftwareAdoption::getStatus, SoftwareAdoption::getError)
-                .containsExactly(SoftwareAdoptionStatus.FAILED, ERROR);
+        stateThenHistoryThenDelivery.verify(packageUpdateDeviceStateRepository)
+                .finishInProgress(TENANT, REQUEST_ID, MACHINE_ID, SoftwareActionStatus.FAILED, ERROR);
+        stateThenHistoryThenDelivery.verify(packageUpdateExecutionRecorder).recordFailed(request, MACHINE_ID, ERROR);
+        stateThenHistoryThenDelivery.verify(deliveryTracker).fail(DELIVERY, MACHINE_ID, ERROR);
     }
 
     @Test
-    void process_failedWithoutADeliveryRow_recordFailedAndNothingClosed() {
+    void process_failedOfTheLastDevice_requestFailed() {
         // setup
-        PackageAdoptStatusMessage event = status(REQUEST_ID, State.FAILED);
-        event.setMessage(ERROR);
-        stubAdoptionOfTheRequest();
+        PackageAdoptStatusMessage event = status(State.FAILED, ERROR);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.FAILED, ERROR, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.FAILED),
+                state(OTHER_MACHINE_ID, SoftwareActionStatus.COMPLETED));
         when(deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID)).thenReturn(Optional.empty());
 
         // execution
         processor.process(MACHINE_ID, event);
 
         // verifications
-        verify(softwareAdoptionRepository).save(adoption);
-        verify(deliveryTracker, never()).fail(any(DeliveryRef.class), any(String.class), any(String.class));
-        assertThat(adoption.getStatus()).isEqualTo(SoftwareAdoptionStatus.FAILED);
+        verify(packageUpdateRequestRepository).save(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
     }
 
     @Test
-    void process_failedWithoutAText_recordFailedWithoutAnError() {
+    void process_failedWithoutADeliveryRow_stateFailedAndNothingClosed() {
         // setup
-        PackageAdoptStatusMessage event = status(REQUEST_ID, State.FAILED);
-        stubAdoptionOfTheRequest();
+        PackageAdoptStatusMessage event = status(State.FAILED, ERROR);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.FAILED, ERROR, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.FAILED));
+        when(deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID)).thenReturn(Optional.empty());
+
+        // execution
+        processor.process(MACHINE_ID, event);
+
+        // verifications
+        verify(packageUpdateExecutionRecorder).recordFailed(request, MACHINE_ID, ERROR);
+        verify(deliveryTracker, never()).fail(any(DeliveryRef.class), any(String.class), any(String.class));
+    }
+
+    @Test
+    void process_failedWithoutAText_stateAndDeliveryFailedWithTheDefaultError() {
+        // setup
+        PackageAdoptStatusMessage event = status(State.FAILED, " ");
+        String error = PackageAdoptStatusProcessor.FAILED_ERROR;
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.FAILED, error, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.FAILED));
         when(deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID)).thenReturn(Optional.of(delivery));
 
         // execution
         processor.process(MACHINE_ID, event);
 
         // verifications
-        verify(deliveryTracker).fail(DELIVERY, MACHINE_ID, null);
-        assertThat(adoption)
-                .extracting(SoftwareAdoption::getStatus, SoftwareAdoption::getError)
-                .containsExactly(SoftwareAdoptionStatus.FAILED, null);
+        verify(packageUpdateExecutionRecorder).recordFailed(request, MACHINE_ID, error);
+        verify(deliveryTracker).fail(DELIVERY, MACHINE_ID, error);
     }
 
     @Test
-    void process_lateOrRepeatedStatusOfAFinishedAdoption_ignored() {
+    void process_doneOfAStateNoLongerInProgress_noOp() {
         // setup
-        PackageAdoptStatusMessage event = status(REQUEST_ID, State.DONE);
-        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
-        when(softwareAdoptionRepository.findByTenantIdAndRequestIdAndMachineId(TENANT, REQUEST_ID, MACHINE_ID))
-                .thenReturn(Optional.empty());
+        PackageAdoptStatusMessage event = status(State.DONE, null);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.COMPLETED, null, false);
 
         // execution
         processor.process(MACHINE_ID, event);
 
         // verifications
-        verifyNoInteractions(deliveryTracker);
-        verify(softwareAdoptionRepository, never()).deleteByTenantIdAndRequestIdAndMachineId(TENANT, REQUEST_ID, MACHINE_ID);
-        verify(softwareAdoptionRepository, never()).save(any(SoftwareAdoption.class));
+        verifyNoInteractions(packageUpdateExecutionRecorder, deliveryTracker);
+        verify(packageUpdateDeviceStateRepository, never()).findByTenantIdAndRequestId(TENANT, REQUEST_ID);
+        verify(packageUpdateRequestRepository, never()).save(any(PackageUpdateRequest.class));
     }
 
     @Test
-    void process_statusOfARequestALaterAdoptionReplaced_theLaterAdoptionIsNotTouched() {
+    void process_failedOfAStateNoLongerInProgress_noOp() {
         // setup
-        PackageAdoptStatusMessage event = status(EARLIER_REQUEST_ID, State.FAILED);
-        event.setMessage(ERROR);
-        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
-        when(softwareAdoptionRepository.findByTenantIdAndRequestIdAndMachineId(TENANT, EARLIER_REQUEST_ID, MACHINE_ID))
-                .thenReturn(Optional.empty());
+        PackageAdoptStatusMessage event = status(State.FAILED, ERROR);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.FAILED, ERROR, false);
 
         // execution
         processor.process(MACHINE_ID, event);
 
         // verifications
-        verifyNoInteractions(deliveryTracker);
-        verify(softwareAdoptionRepository, never()).save(any(SoftwareAdoption.class));
-        assertThat(adoption)
-                .extracting(SoftwareAdoption::getRequestId, SoftwareAdoption::getStatus)
-                .containsExactly(REQUEST_ID, SoftwareAdoptionStatus.ADOPTING);
+        verifyNoInteractions(packageUpdateExecutionRecorder, deliveryTracker);
+        verify(packageUpdateRequestRepository, never()).save(any(PackageUpdateRequest.class));
+    }
+
+    @Test
+    void process_requestOfAnUpdate_ignored() {
+        // setup
+        PackageAdoptStatusMessage event = status(State.DONE, null);
+        request.setAction(SoftwareAction.UPDATE);
+        stubAdoptRequest();
+
+        // execution
+        processor.process(MACHINE_ID, event);
+
+        // verifications
+        verifyNoInteractions(packageUpdateDeviceStateRepository, packageUpdateExecutionRecorder, deliveryTracker);
+    }
+
+    @Test
+    void process_unknownRequest_ignored() {
+        // setup
+        PackageAdoptStatusMessage event = status(State.DONE, null);
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+        when(packageUpdateRequestRepository.findByTenantIdAndRequestId(TENANT, REQUEST_ID)).thenReturn(Optional.empty());
+
+        // execution
+        processor.process(MACHINE_ID, event);
+
+        // verifications
+        verifyNoInteractions(packageUpdateDeviceStateRepository, packageUpdateExecutionRecorder, deliveryTracker);
     }
 
     @Test
     void process_unknownMachine_ignored() {
         // setup
-        PackageAdoptStatusMessage event = status(REQUEST_ID, State.DONE);
+        PackageAdoptStatusMessage event = status(State.DONE, null);
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
 
         // execution
         processor.process(MACHINE_ID, event);
 
         // verifications
-        verifyNoInteractions(softwareAdoptionRepository, deliveryTracker);
+        verifyNoInteractions(packageUpdateRequestRepository, packageUpdateDeviceStateRepository,
+                packageUpdateExecutionRecorder, deliveryTracker);
     }
 
-    @Test
-    void failUndelivered_orderNeverAnswered_recordFailedWithTheReason() {
-        // setup
-        stubAdoptionOfTheRequest();
-        when(deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID)).thenReturn(Optional.of(delivery));
-
-        // execution
-        processor.failUndelivered(MACHINE_ID, REQUEST_ID, DeliveryFailure.EXHAUSTED);
-
-        // verifications
-        verify(softwareAdoptionRepository).save(adoption);
-        assertThat(adoption)
-                .extracting(SoftwareAdoption::getStatus, SoftwareAdoption::getError)
-                .containsExactly(SoftwareAdoptionStatus.FAILED, "EXHAUSTED");
-    }
-
-    @Test
-    void failUndelivered_agentRefusedTheOrder_recordFailedWithTheReasonAndTheAgentsError() {
-        // setup
-        delivery.setError("the order could not be stored");
-        stubAdoptionOfTheRequest();
-        when(deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID)).thenReturn(Optional.of(delivery));
-
-        // execution
-        processor.failUndelivered(MACHINE_ID, REQUEST_ID, DeliveryFailure.AGENT_ERROR);
-
-        // verifications
-        verify(softwareAdoptionRepository).save(adoption);
-        assertThat(adoption)
-                .extracting(SoftwareAdoption::getStatus, SoftwareAdoption::getError)
-                .containsExactly(SoftwareAdoptionStatus.FAILED, "AGENT_ERROR: the order could not be stored");
-    }
-
-    @Test
-    void failUndelivered_deliveryRowGone_recordFailedWithTheReasonAlone() {
-        // setup
-        stubAdoptionOfTheRequest();
-        when(deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID)).thenReturn(Optional.empty());
-
-        // execution
-        processor.failUndelivered(MACHINE_ID, REQUEST_ID, DeliveryFailure.TIMEOUT);
-
-        // verifications
-        verify(softwareAdoptionRepository).save(adoption);
-        assertThat(adoption.getError()).isEqualTo("TIMEOUT");
-    }
-
-    @Test
-    void failUndelivered_adoptionAlreadyFailedByTheDevicesStatus_leftAsIs() {
-        // setup
-        adoption.setStatus(SoftwareAdoptionStatus.FAILED);
-        adoption.setError(ERROR);
-        stubAdoptionOfTheRequest();
-
-        // execution
-        processor.failUndelivered(MACHINE_ID, REQUEST_ID, DeliveryFailure.AGENT_ERROR);
-
-        // verifications
-        verify(softwareAdoptionRepository, never()).save(any(SoftwareAdoption.class));
-        verifyNoInteractions(deliveryTracker);
-        assertThat(adoption.getError()).isEqualTo(ERROR);
-    }
-
-    @Test
-    void failUndelivered_recordGoneOrReplaced_nothingSaved() {
-        // setup
+    private void stubAdoptRequest() {
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
-        when(softwareAdoptionRepository.findByTenantIdAndRequestIdAndMachineId(TENANT, REQUEST_ID, MACHINE_ID))
-                .thenReturn(Optional.empty());
-
-        // execution
-        processor.failUndelivered(MACHINE_ID, REQUEST_ID, DeliveryFailure.OFFLINE);
-
-        // verifications
-        verify(softwareAdoptionRepository, never()).save(any(SoftwareAdoption.class));
-        verifyNoInteractions(deliveryTracker);
+        when(packageUpdateRequestRepository.findByTenantIdAndRequestId(TENANT, REQUEST_ID)).thenReturn(Optional.of(request));
     }
 
-    @Test
-    void failUndelivered_unknownMachine_ignored() {
-        // setup
-        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
-
-        // execution
-        processor.failUndelivered(MACHINE_ID, REQUEST_ID, DeliveryFailure.EXHAUSTED);
-
-        // verifications
-        verifyNoInteractions(softwareAdoptionRepository, deliveryTracker);
+    private void stubTransition(SoftwareActionStatus status, String failedMessage, boolean moved) {
+        when(packageUpdateDeviceStateRepository.finishInProgress(TENANT, REQUEST_ID, MACHINE_ID, status, failedMessage))
+                .thenReturn(moved);
     }
 
-    private void stubAdoptionOfTheRequest() {
-        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
-        when(softwareAdoptionRepository.findByTenantIdAndRequestIdAndMachineId(TENANT, REQUEST_ID, MACHINE_ID))
-                .thenReturn(Optional.of(adoption));
+    private void stubDeviceStates(PackageUpdateDeviceState... states) {
+        when(packageUpdateDeviceStateRepository.findByTenantIdAndRequestId(TENANT, REQUEST_ID)).thenReturn(List.of(states));
     }
 
-    private static PackageAdoptStatusMessage status(String requestId, State state) {
+    private static PackageUpdateDeviceState state(String machineId, SoftwareActionStatus status) {
+        return PackageUpdateDeviceState.builder()
+                .tenantId(TENANT)
+                .requestId(REQUEST_ID)
+                .machineId(machineId)
+                .status(status)
+                .build();
+    }
+
+    private static PackageAdoptStatusMessage status(State state, String message) {
         PackageAdoptStatusMessage event = new PackageAdoptStatusMessage();
         event.setEventId("e1");
-        event.setRequestId(requestId);
+        event.setRequestId(REQUEST_ID);
         event.setMachineId(MACHINE_ID);
         event.setState(state);
+        event.setMessage(message);
         return event;
     }
 }

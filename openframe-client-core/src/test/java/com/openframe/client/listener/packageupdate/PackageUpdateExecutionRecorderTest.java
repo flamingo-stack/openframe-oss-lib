@@ -278,6 +278,54 @@ class PackageUpdateExecutionRecorderTest {
     }
 
     @Test
+    void recordDone_rowOfTheRequest_successWithTheSummary() {
+        // setup
+        ScriptExecution row = rowFound(ExecutionStatus.QUEUED);
+
+        // execution
+        recorder.recordDone(request, "m1", "Adopted.");
+
+        // verifications
+        verify(scriptExecutionRepository).save(row);
+        assertThat(row)
+                .extracting(ScriptExecution::getStatus, ScriptExecution::getStdout, ScriptExecution::getError,
+                        ScriptExecution::getFailureReason)
+                .containsExactly(ExecutionStatus.SUCCESS, "Adopted.", null, null);
+        assertThat(row.getFinishedAt()).isNotNull();
+        assertThat(row.getStatusChangedAt()).isNotNull();
+    }
+
+    @Test
+    void recordFailed_rowOfTheRequest_failedWithTheError() {
+        // setup
+        ScriptExecution row = rowFound(ExecutionStatus.QUEUED);
+
+        // execution
+        recorder.recordFailed(request, "m1", "brew install --cask postman: exit 1");
+
+        // verifications
+        verify(scriptExecutionRepository).save(row);
+        assertThat(row)
+                .extracting(ScriptExecution::getStatus, ScriptExecution::getError, ScriptExecution::getFailureReason)
+                .containsExactly(ExecutionStatus.FAILED, "brew install --cask postman: exit 1",
+                        ExecutionFailureReason.SYSTEM_SCRIPT_ERROR);
+        assertThat(row.getFinishedAt()).isNotNull();
+    }
+
+    @Test
+    void recordFailed_noRowOwnedByThisRequest_writesNothing() {
+        // setup
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineIdAndPackageUpdateRequestId(
+                "t1", "exec-1", "m1", "req-1")).thenReturn(Optional.empty());
+
+        // execution
+        recorder.recordFailed(request, "m1", "exit 1");
+
+        // verifications
+        verify(scriptExecutionRepository, never()).save(any(ScriptExecution.class));
+    }
+
+    @Test
     void undelivered_noRowOwnedByThisRequest_writesNothing() {
         when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineIdAndPackageUpdateRequestId(
                 "t1", "exec-1", "m1", "req-1")).thenReturn(Optional.empty());

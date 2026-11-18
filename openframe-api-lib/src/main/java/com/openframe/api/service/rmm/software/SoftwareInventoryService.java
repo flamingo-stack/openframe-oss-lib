@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareAdoptionResponse;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
@@ -40,7 +41,6 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
-import com.openframe.data.document.rmm.software.SoftwareAdoption;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.organization.Organization;
@@ -52,7 +52,6 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
-import com.openframe.data.repository.rmm.SoftwareAdoptionRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -132,7 +131,7 @@ public class SoftwareInventoryService {
     private final SoftwareScheduleRepository softwareScheduleRepository;
     private final SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
     private final ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
-    private final SoftwareAdoptionRepository softwareAdoptionRepository;
+    private final SoftwareAdoptionService softwareAdoptionService;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -505,20 +504,14 @@ public class SoftwareInventoryService {
     }
 
     private void applyAdoptions(String softwareId, List<SoftwareOnDeviceResponse> rows) {
-        if (rows.isEmpty()) {
-            return;
-        }
-        String tenantId = tenantIdProvider.getTenantId();
         List<String> machineIds = rows.stream().map(row -> row.getDevice().getMachineId()).toList();
-        Map<String, SoftwareAdoption> adoptions = softwareAdoptionRepository
-                .findByTenantIdAndSoftwareIdAndMachineIdIn(tenantId, softwareId, machineIds).stream()
-                .collect(Collectors.toMap(SoftwareAdoption::getMachineId, Function.identity()));
+        Map<String, SoftwareAdoptionResponse> adoptions = softwareAdoptionService.getAdoptionsByMachineId(softwareId, machineIds);
         rows.forEach(row -> applyAdoption(row, adoptions));
     }
 
-    private static void applyAdoption(SoftwareOnDeviceResponse row, Map<String, SoftwareAdoption> adoptions) {
+    private static void applyAdoption(SoftwareOnDeviceResponse row, Map<String, SoftwareAdoptionResponse> adoptions) {
         String machineId = row.getDevice().getMachineId();
-        SoftwareAdoption adoption = adoptions.get(machineId);
+        SoftwareAdoptionResponse adoption = adoptions.get(machineId);
         row.setAdoption(adoption);
     }
 

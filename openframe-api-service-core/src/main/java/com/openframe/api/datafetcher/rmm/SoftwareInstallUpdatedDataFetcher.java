@@ -48,7 +48,8 @@ public class SoftwareInstallUpdatedDataFetcher {
         List<String> machineGlobalIds = input.getMachineIds();
         List<String> machineIds = relayIdCodec.decodeAll(machineGlobalIds, MACHINE);
         input.setMachineIds(machineIds);
-        List<String> orderedMachineIds = softwareInstallUpdateManagementService.adopt(input);
+        String initiatedBy = getCurrentUserId();
+        List<String> orderedMachineIds = softwareInstallUpdateManagementService.adopt(input, initiatedBy);
         return orderedMachineIds.stream()
                 .map(machineId -> relayIdCodec.encode(MACHINE, machineId))
                 .toList();

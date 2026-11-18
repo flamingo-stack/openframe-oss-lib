@@ -1,7 +1,6 @@
 package com.openframe.api.dto.rmm.software;
 
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.software.SoftwareAdoption;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import lombok.Builder;
 import lombok.Data;
@@ -14,6 +13,6 @@ public class SoftwareOnDeviceResponse {
     private String softwareVersion;
     private SoftwareOnDeviceStatus status;
     private SoftwareSource installedBy;
-    private SoftwareAdoption adoption;
+    private SoftwareAdoptionResponse adoption;
     private SoftwareAutoUpdateStatus autoUpdate;
 }

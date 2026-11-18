@@ -25,7 +25,6 @@ import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
-import com.openframe.data.repository.rmm.SoftwareAdoptionRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -89,7 +88,7 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private SoftwareScheduleRepository softwareScheduleRepository;
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
     @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
-    @Mock private SoftwareAdoptionRepository softwareAdoptionRepository;
+    @Mock private SoftwareAdoptionService softwareAdoptionService;
 
     private SoftwareInventoryService service;
 
@@ -99,7 +98,7 @@ class SoftwareInventoryServiceFleetPagingTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository, softwareAdoptionRepository);
+                scheduleDeviceLocalDispatchRepository, softwareAdoptionService);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }

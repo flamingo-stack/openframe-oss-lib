@@ -13,22 +13,17 @@ import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
-import com.openframe.data.document.rmm.software.SoftwareAdoption;
-import com.openframe.data.document.rmm.software.SoftwareAdoptionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
-import com.openframe.data.nats.delivery.PackageAdoptDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
-import com.openframe.data.nats.packageupdate.PackageReference;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
-import com.openframe.data.nats.packageupdate.PackageUpdateWire;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
-import com.openframe.data.repository.rmm.SoftwareAdoptionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
@@ -67,7 +62,6 @@ public class SoftwareInstallUpdateManagementService {
     private final DeliveryRouter deliveryRouter;
     private final SoftwareInventoryService softwareInventoryService;
     private final PackageManagerAvailability packageManagerAvailability;
-    private final SoftwareAdoptionRepository softwareAdoptionRepository;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -77,7 +71,7 @@ public class SoftwareInstallUpdateManagementService {
         return dispatch(SoftwareAction.UPDATE, input, initiatedBy, source);
     }
 
-    public List<String> adopt(AdoptSoftwareInput input) {
+    public List<String> adopt(AdoptSoftwareInput input, String initiatedBy) {
         String softwareId = input.getSoftwareId();
         SoftwareBundlePackage adoptionPackage = softwareInventoryService.getAdoptionPackage(softwareId);
         PackageManagerType packageManager = adoptionPackage.getPackageManager();
@@ -93,20 +87,29 @@ public class SoftwareInstallUpdateManagementService {
         requireAdoptOrderReaches(targets);
         deviceService.verifyDispatchable(targets);
 
-        String requestId = UUID.randomUUID().toString();
-        recordAdoptions(targets, softwareId, adoptionPackage, requestId);
+        String executionId = UUID.randomUUID().toString();
         BrewPackageType brewPackageType = adoptionPackage.getBrewPackageType();
-        PackageReference packageRef = PackageUpdateWire.reference(packageManager, packageName, brewPackageType);
-        targets.stream()
-                .map(machineId -> PackageAdoptDeliverySeed.builder()
-                        .machineId(machineId)
-                        .requestId(requestId)
-                        .packageRef(packageRef)
-                        .build())
-                .forEach(deliveryRouter::dispatch);
+        boolean brew = packageManager == PackageManagerType.BREW;
+        String adoptScriptId = brew ? SoftwareScriptCode.BREW_ADOPT_SCRIPT_ID : SoftwareScriptCode.CHOCO_ADOPT_SCRIPT_ID;
+        PrivilegeLevel adoptPrivilegeLevel = brew ? PrivilegeLevel.USER : PrivilegeLevel.ADMIN;
+        String requestId = packageUpdateDispatchService.dispatchAdopt(RunningExecutionRows.builder()
+                .executionId(executionId)
+                .scriptId(adoptScriptId)
+                .machineIds(targets)
+                .privilegeLevel(adoptPrivilegeLevel)
+                .initiatedBy(initiatedBy)
+                .source(ExecutionSource.PACKAGE_INSTALLATION)
+                .packageManager(packageManager)
+                .packageName(packageName)
+                .softwareAction(SoftwareAction.ADOPT)
+                .build(), brewPackageType, softwareId);
+        SoftwarePackageInput pkg = new SoftwarePackageInput();
+        pkg.setPackageManager(packageManager);
+        pkg.setPackageName(packageName);
+        recordAction(executionId, SoftwareAction.ADOPT, pkg, targets, initiatedBy);
 
-        log.info("Software adopt order sent: requestId={} softwareId={} package={}/{} machines={}/{}",
-                requestId, softwareId, packageManager, packageName, targets.size(), machineIds.size());
+        log.info("Software adopt order sent: requestId={} executionId={} softwareId={} package={}/{} machines={}/{}",
+                requestId, executionId, softwareId, packageManager, packageName, targets.size(), machineIds.size());
         return targets;
     }
 
@@ -125,29 +128,6 @@ public class SoftwareInstallUpdateManagementService {
             throw new BadRequestException("The adopt order cannot reach devices " + unreachable + ": "
                     + DeliveryType.PACKAGE_ADOPT + " is switched off or their agent is too old for it");
         }
-    }
-
-    // the id is the device and the title: saving a repeated adoption replaces the earlier record
-    private void recordAdoptions(List<String> machineIds, String softwareId, SoftwareBundlePackage adoptionPackage,
-                                 String requestId) {
-        String tenantId = tenantIdProvider.getTenantId();
-        PackageManagerType packageManager = adoptionPackage.getPackageManager();
-        String packageName = adoptionPackage.getPackageName();
-        Instant now = Instant.now();
-        List<SoftwareAdoption> adoptions = machineIds.stream()
-                .map(machineId -> SoftwareAdoption.builder()
-                        .id(machineId + ":" + softwareId)
-                        .tenantId(tenantId)
-                        .machineId(machineId)
-                        .softwareId(softwareId)
-                        .packageManager(packageManager)
-                        .packageName(packageName)
-                        .requestId(requestId)
-                        .status(SoftwareAdoptionStatus.ADOPTING)
-                        .createdAt(now)
-                        .build())
-                .toList();
-        softwareAdoptionRepository.saveAll(adoptions);
     }
 
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,
@@ -226,7 +206,7 @@ public class SoftwareInstallUpdateManagementService {
                 .tenantId(tenantId)
                 .executionId(executionId)
                 .action(action)
-                .kind(action.kind())
+                .kind(SoftwareActionKindMapper.kindOf(action))
                 .packageManager(pkg.getPackageManager())
                 .packageName(pkg.getPackageName())
                 .version(pkg.getVersion())

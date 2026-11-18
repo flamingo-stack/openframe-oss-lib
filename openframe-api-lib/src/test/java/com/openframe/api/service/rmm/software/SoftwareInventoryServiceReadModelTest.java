@@ -23,15 +23,14 @@ import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.SoftwareAction;
-import com.openframe.data.document.rmm.software.SoftwareAdoption;
-import com.openframe.data.document.rmm.software.SoftwareAdoptionStatus;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
+import com.openframe.api.dto.rmm.software.SoftwareAdoptionResponse;
+import com.openframe.api.dto.rmm.software.SoftwareAdoptionStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
-import com.openframe.data.repository.rmm.SoftwareAdoptionRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
@@ -85,7 +84,7 @@ class SoftwareInventoryServiceReadModelTest {
     @Mock private SoftwareScheduleRepository softwareScheduleRepository;
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
     @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
-    @Mock private SoftwareAdoptionRepository softwareAdoptionRepository;
+    @Mock private SoftwareAdoptionService softwareAdoptionService;
 
     private SoftwareInventoryService service;
 
@@ -95,7 +94,7 @@ class SoftwareInventoryServiceReadModelTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository, softwareAdoptionRepository);
+                scheduleDeviceLocalDispatchRepository, softwareAdoptionService);
         ReflectionTestUtils.setField(service, "softwareReadModel", true);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
@@ -252,20 +251,18 @@ class SoftwareInventoryServiceReadModelTest {
     }
 
     @Test
-    void listDevicesForSoftware_adoptionRecordedForADevice_thatRowCarriesItAndTheOthersNone() {
+    void listDevicesForSoftware_adoptionOfADevice_thatRowCarriesItAndTheOthersNone() {
         // setup
-        SoftwareAdoption adopting = SoftwareAdoption.builder()
-                .machineId("m2")
-                .softwareId("42")
-                .packageManager(PackageManagerType.BREW)
+        SoftwareAdoptionResponse adopting = SoftwareAdoptionResponse.builder()
                 .status(SoftwareAdoptionStatus.ADOPTING)
+                .packageManager(PackageManagerType.BREW)
                 .build();
         when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
         when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.UNMANAGED));
         when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
                 .thenReturn(List.of(onDevice("m1"), onDevice("m2")));
-        when(softwareAdoptionRepository.findByTenantIdAndSoftwareIdAndMachineIdIn(TENANT, "42", List.of("m1", "m2")))
-                .thenReturn(List.of(adopting));
+        when(softwareAdoptionService.getAdoptionsByMachineId("42", List.of("m1", "m2")))
+                .thenReturn(Map.of("m2", adopting));
 
         // execution
         PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 20, null);
@@ -288,20 +285,8 @@ class SoftwareInventoryServiceReadModelTest {
         service.listDevicesForSoftware("42", null, null, 0, 2, null);
 
         // verifications
-        verify(softwareAdoptionRepository).findByTenantIdAndSoftwareIdAndMachineIdIn(TENANT, "42", List.of("m1", "m2"));
-        verifyNoMoreInteractions(softwareAdoptionRepository);
-    }
-
-    @Test
-    void listDevicesForSoftware_noDevice_adoptionsNotRead() {
-        // setup
-        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(false);
-
-        // execution
-        service.listDevicesForSoftware("42", null, null, 0, 20, null);
-
-        // verifications
-        verifyNoInteractions(softwareAdoptionRepository);
+        verify(softwareAdoptionService).getAdoptionsByMachineId("42", List.of("m1", "m2"));
+        verifyNoMoreInteractions(softwareAdoptionService);
     }
 
     @Test
