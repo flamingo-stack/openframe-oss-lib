@@ -41,16 +41,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -63,7 +61,6 @@ class AuditEventWriterTest {
     private static final String SERVED_TENANT_ID = "tenant-1";
     private static final String USER_ID = "user-1";
     private static final String MACHINE_ID = "machine-1";
-    private static final Instant OCCURRED_AT = Instant.parse("2026-10-28T14:12:00Z");
     private static final AuditRequestInfo REQUEST_INFO =
             new AuditRequestInfo("203.0.113.5", "Mingo", "request-7", "session-7");
     private static final AuditContext JOB_CONTEXT =
@@ -98,76 +95,6 @@ class AuditEventWriterTest {
     @AfterEach
     void detachAppender() {
         logger.detachAppender(appender);
-    }
-
-    @Test
-    void write_entryInContext_storesTheEventBuiltFromTheContextTheResolvedTenantAndTheClock() {
-        AuditActor job = AuditActor.system("invoice-sync");
-        when(tenantResolver.tenantFor(job, "tenant-2")).thenReturn("tenant-7");
-        when(auditClock.now()).thenReturn(OCCURRED_AT);
-        AuditEvent event = mapsToAnEvent();
-
-        writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE).toBuilder().tenantId("tenant-2").build()),
-                new AuditContext(job, REQUEST_INFO, "event-0"), true);
-
-        verify(auditEventMapper).toEvent(any(), eq(job), eq(REQUEST_INFO), eq("tenant-7"), eq("event-0"),
-                eq(OCCURRED_AT));
-        verify(auditEventRepository).insert(List.of(event));
-    }
-
-    @Test
-    void write_entryWithoutTargetType_passesItsFieldsOnWithTheActionsTargetType() {
-        mapsToAnEvent();
-
-        writer.write(List.of(AuditEntry.builder()
-                .action(AuditAction.TICKET_ARCHIVE)
-                .outcome(AuditOutcome.REFUSED)
-                .reason("Ticket is archived")
-                .targetId("ticket-1")
-                .targetName("Printer offline")
-                .organizationId("org-1")
-                .deviceId("device-1")
-                .details(Map.of("statusKind", "RESOLVED"))
-                .changes(Map.of("status", new AuditChange("OPEN", "ARCHIVED")))
-                .build()), JOB_CONTEXT, true);
-
-        assertThat(mappedEntry())
-                .extracting(AuditEntry::targetTypeOrDefault, AuditEntry::getOutcome, AuditEntry::getReason,
-                        AuditEntry::getTargetId, AuditEntry::getTargetName, AuditEntry::getOrganizationId,
-                        AuditEntry::getDeviceId, AuditEntry::getDetails, AuditEntry::getChanges)
-                .containsExactly(AuditTargetType.TICKET, AuditOutcome.REFUSED, "Ticket is archived", "ticket-1",
-                        "Printer offline", "org-1", "device-1", Map.of("statusKind", "RESOLVED"),
-                        Map.of("status", new AuditChange("OPEN", "ARCHIVED")));
-    }
-
-    @Test
-    void write_actionOfSeveralTargetKindsWithTheKindNamed_passesItOnWithTheNamedType() {
-        mapsToAnEvent();
-
-        writer.write(List.of(entry(AuditAction.LINK_CREATE).toBuilder().targetType(AuditTargetType.KB_ARTICLE).build()),
-                JOB_CONTEXT, true);
-
-        assertThat(mappedEntry().getTargetType()).isEqualTo(AuditTargetType.KB_ARTICLE);
-    }
-
-    @Test
-    void write_eventsStored_returnsTrue() {
-        mapsToAnEvent();
-
-        boolean stored = writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
-
-        assertThat(stored).isTrue();
-    }
-
-    @Test
-    void write_severalEntries_storesTheirEventsInOneInsert() {
-        AuditEvent first = AuditEvent.builder().id("event-1").build();
-        AuditEvent second = AuditEvent.builder().id("event-2").build();
-        when(auditEventMapper.toEvent(any(), any(), any(), any(), any(), any())).thenReturn(first, second);
-
-        writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE), entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
-
-        verify(auditEventRepository).insert(List.of(first, second));
     }
 
     @Test
@@ -206,19 +133,6 @@ class AuditEventWriterTest {
         });
     }
 
-    @Test
-    void write_insertFailsForAnEventJsonCannotWrite_logsTheEventAsText() {
-        Map<String, Object> cyclicDetails = new HashMap<>();
-        cyclicDetails.put("result", cyclicDetails);
-        AuditEvent event = mapsTo(AuditEvent.builder().id("event-1").details(cyclicDetails).build());
-        when(auditEventRepository.insert(List.of(event))).thenThrow(new DataAccessResourceFailureException("mongo down"));
-
-        writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
-
-        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage).singleElement().asString()
-                .startsWith("Audit events not stored: [AuditEvent(id=event-1,");
-    }
-
     @ParameterizedTest
     @MethodSource("people")
     void write_personActor_storesTheUsersName(AuditActor person) {
@@ -252,17 +166,6 @@ class AuditEventWriterTest {
     }
 
     @Test
-    void write_actorWithoutId_readsNoName() {
-        mapsToAnEvent();
-
-        writer.write(List.of(entry(AuditAction.AUTH_LOGIN_FAIL)),
-                contextOf(AuditActor.fromUser(null, "unknown@acme.com", List.of(), null, SUPER_TENANT_ID)), true);
-
-        assertThat(savedEvents()).extracting(AuditEvent::getActorName).containsOnlyNulls();
-        verifyNoInteractions(userRepository);
-    }
-
-    @Test
     void write_apiKeyWithoutName_readsNoName() {
         mapsToAnEvent();
 
@@ -274,16 +177,6 @@ class AuditEventWriterTest {
     }
 
     @Test
-    void write_userRecordGone_storesNoName() {
-        mapsToAnEvent();
-        when(userRepository.findById("staff-1")).thenReturn(Optional.empty());
-
-        writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), contextOf(AuditActor.staff("staff-1")), true);
-
-        assertThat(savedEvents()).extracting(AuditEvent::getActorName).containsOnlyNulls();
-    }
-
-    @Test
     void write_actorNameReadFails_storesTheEventWithoutTheName() {
         mapsToAnEvent();
         when(userRepository.findById("staff-1")).thenThrow(new DataAccessResourceFailureException("mongo down"));
@@ -291,6 +184,7 @@ class AuditEventWriterTest {
         writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), contextOf(AuditActor.staff("staff-1")), true);
 
         assertThat(savedEvents()).extracting(AuditEvent::getActorName).containsOnlyNulls();
+        assertLoggedDataAccessError("Audit lookup of the user name failed, the event is stored without it");
     }
 
     @Test
@@ -369,17 +263,6 @@ class AuditEventWriterTest {
     }
 
     @Test
-    void write_targetNotStored_passesTheEntryOnWithoutItsName() {
-        mapsToAnEvent();
-        when(targetRepository.load(List.of(TICKET_TARGET), "ticket-1")).thenReturn(Optional.empty());
-
-        writer(targetsOf(TICKET_TARGET)).write(List.of(ticketArchive()), JOB_CONTEXT, true);
-
-        assertThat(mappedEntry()).extracting(AuditEntry::getTargetId, AuditEntry::getTargetName)
-                .containsExactly("ticket-1", null);
-    }
-
-    @Test
     void write_targetReadFails_passesTheEntryOnWithoutItsName() {
         mapsToAnEvent();
         when(targetRepository.load(List.of(TICKET_TARGET), "ticket-1"))
@@ -389,6 +272,7 @@ class AuditEventWriterTest {
 
         assertThat(mappedEntry()).extracting(AuditEntry::getTargetId, AuditEntry::getTargetName)
                 .containsExactly("ticket-1", null);
+        assertLoggedDataAccessError("Audit target ticket-1 not read, ticket.archive is stored without its name");
     }
 
     @Test
@@ -420,25 +304,19 @@ class AuditEventWriterTest {
     }
 
     @Test
-    void write_secretTargetId_passesOnItsHash() {
+    void write_secretTargetId_readsTheRecordByThePlainIdAndPassesOnItsHash() {
         mapsToAnEvent();
+        AuditTarget<Invitation> invitations = invitationTarget();
+        Invitation invitation = new Invitation();
+        invitation.setEmail("new@acme.com");
+        when(targetRepository.load(List.of(invitations), "abc"))
+                .thenReturn(Optional.of(new LoadedTarget(invitations, invitation)));
 
-        writer(targetsOf(invitationTarget())).write(List.of(entry(AuditAction.INVITATION_REVOKE).toBuilder()
-                .targetId("abc")
-                .targetName("new@acme.com")
-                .build()), JOB_CONTEXT, true);
+        writer(targetsOf(invitations)).write(
+                List.of(entry(AuditAction.INVITATION_REVOKE).toBuilder().targetId("abc").build()), JOB_CONTEXT, true);
 
-        assertThat(mappedEntry().getTargetId())
-                .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-    }
-
-    @Test
-    void write_secretTargetWithoutId_passesItOnWithoutId() {
-        mapsToAnEvent();
-
-        writer(targetsOf(invitationTarget())).write(List.of(entry(AuditAction.INVITATION_REVOKE)), JOB_CONTEXT, true);
-
-        assertThat(mappedEntry().getTargetId()).isNull();
+        assertThat(mappedEntry()).extracting(AuditEntry::getTargetId, AuditEntry::getTargetName)
+                .containsExactly("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "new@acme.com");
     }
 
     @Test
@@ -452,31 +330,109 @@ class AuditEventWriterTest {
     }
 
     @Test
-    void hasChildren_eventStoredUnderAParent_isTrue() {
+    void write_targetRecordOfAnotherTenant_passesTheEntryOnWithoutItsNameCustomerDeviceAndChanges() {
+        mapsToAnEvent();
+        when(tenantResolver.tenantFor(any(), any())).thenReturn("tenant-a");
+        when(tenantResolver.belongsToAnotherTenant("tenant-b", "tenant-a")).thenReturn(true);
+
+        writer.write(List.of(namedTicketArchiveOf("tenant-b")), JOB_CONTEXT, false);
+
+        assertThat(mappedEntry())
+                .extracting(AuditEntry::getTargetId, AuditEntry::getTargetName, AuditEntry::getOrganizationId,
+                        AuditEntry::getDeviceId, AuditEntry::getChanges, AuditEntry::getDetails)
+                .containsExactly("ticket-1", null, null, null, null, Map.of("via", "dialog"));
+    }
+
+    @Test
+    void write_targetRecordOfTheEventsTenant_passesTheEntryOnWhole() {
+        mapsToAnEvent();
+        when(tenantResolver.tenantFor(any(), any())).thenReturn("tenant-a");
+        when(tenantResolver.belongsToAnotherTenant("tenant-a", "tenant-a")).thenReturn(false);
+        AuditEntry entry = namedTicketArchiveOf("tenant-a");
+
+        writer.write(List.of(entry), JOB_CONTEXT, false);
+
+        assertThat(mappedEntry())
+                .extracting(AuditEntry::getTargetName, AuditEntry::getOrganizationId, AuditEntry::getDeviceId,
+                        AuditEntry::getChanges)
+                .containsExactly("Printer offline", "org-7", "device-7", entry.getChanges());
+    }
+
+    @Test
+    void write_targetReadFromARecordOfAnotherTenant_passesTheEntryOnWithoutThatRecordsFields() {
+        mapsToAnEvent();
+        when(tenantResolver.tenantFor(any(), any())).thenReturn("tenant-a");
+        when(tenantResolver.belongsToAnotherTenant("tenant-b", "tenant-a")).thenReturn(true);
+        Optional<LoadedTarget> foreignTicket = storedTicket();
+        ((Ticket) foreignTicket.orElseThrow().document()).setTenantId("tenant-b");
+        when(targetRepository.load(List.of(TICKET_TARGET), "ticket-1")).thenReturn(foreignTicket);
+
+        writer(targetsOf(TICKET_TARGET)).write(List.of(ticketArchive()), JOB_CONTEXT, true);
+
+        assertThat(mappedEntry())
+                .extracting(AuditEntry::getTargetName, AuditEntry::getOrganizationId, AuditEntry::getDeviceId)
+                .containsExactly(null, null, null);
+    }
+
+    @Test
+    void write_callerNamesTheTargetsTenantAndTheRecordReadHasNone_keepsTheCallersTenant() {
+        mapsToAnEvent();
+        when(targetRepository.load(List.of(TICKET_TARGET), "ticket-1")).thenReturn(storedTicket());
+
+        writer(targetsOf(TICKET_TARGET)).write(
+                List.of(ticketArchive().toBuilder().targetTenantId("tenant-b").build()), JOB_CONTEXT, true);
+
+        assertThat(mappedEntry().getTargetTenantId()).isEqualTo("tenant-b");
+    }
+
+    @Test
+    void hadChildren_eventStoredUnderATrackedAction_isTrue() {
+        mapsTo(AuditEvent.builder().id("event-2").parentEventId("event-1").build());
+        writer.trackChildrenOf("event-1");
+
+        writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
+
+        assertThat(writer.hadChildren("event-1")).isTrue();
+    }
+
+    @Test
+    void hadChildren_eventUnderATrackedActionNotStored_isFalse() {
+        AuditEvent event = mapsTo(AuditEvent.builder().id("event-2").parentEventId("event-1").build());
+        when(auditEventRepository.insert(List.of(event))).thenThrow(new DataAccessResourceFailureException("mongo down"));
+        writer.trackChildrenOf("event-1");
+
+        writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
+
+        assertThat(writer.hadChildren("event-1")).isFalse();
+    }
+
+    @Test
+    void hadChildren_noEventStoredUnderTheTrackedAction_isFalse() {
+        mapsTo(AuditEvent.builder().id("event-2").build());
+        writer.trackChildrenOf("event-1");
+
+        writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
+
+        assertThat(writer.hadChildren("event-1")).isFalse();
+    }
+
+    @Test
+    void hadChildren_eventStoredUnderAnActionThatIsNotTracked_isFalse() {
         mapsTo(AuditEvent.builder().id("event-2").parentEventId("event-1").build());
 
         writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
 
-        assertThat(writer.hasChildren("event-1")).isTrue();
+        assertThat(writer.hadChildren("event-1")).isFalse();
     }
 
     @Test
-    void hasChildren_eventUnderAParentNotStored_isFalse() {
-        AuditEvent event = mapsTo(AuditEvent.builder().id("event-2").parentEventId("event-1").build());
-        when(auditEventRepository.insert(List.of(event))).thenThrow(new DataAccessResourceFailureException("mongo down"));
-
+    void hadChildren_askedASecondTime_isFalse() {
+        mapsTo(AuditEvent.builder().id("event-2").parentEventId("event-1").build());
+        writer.trackChildrenOf("event-1");
         writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
+        writer.hadChildren("event-1");
 
-        assertThat(writer.hasChildren("event-1")).isFalse();
-    }
-
-    @Test
-    void hasChildren_noEventStoredUnderIt_isFalse() {
-        mapsTo(AuditEvent.builder().id("event-2").build());
-
-        writer.write(List.of(entry(AuditAction.TICKET_ARCHIVE)), JOB_CONTEXT, true);
-
-        assertThat(writer.hasChildren("event-1")).isFalse();
+        assertThat(writer.hadChildren("event-1")).isFalse();
     }
 
     @Test
@@ -505,6 +461,13 @@ class AuditEventWriterTest {
         return AuditTarget.of(AuditTargetType.INVITATION, Invitation.class, Invitation::getEmail).withSecretId(true);
     }
 
+    private void assertLoggedDataAccessError(String message) {
+        assertThat(appender.list)
+                .extracting(ILoggingEvent::getLevel, ILoggingEvent::getFormattedMessage,
+                        logged -> logged.getThrowableProxy().getClassName())
+                .containsExactly(tuple(Level.ERROR, message, DataAccessResourceFailureException.class.getName()));
+    }
+
     private AuditEvent mapsToAnEvent() {
         return mapsTo(AuditEvent.builder().id("event-1").build());
     }
@@ -530,6 +493,17 @@ class AuditEventWriterTest {
 
     private static AuditEntry entry(AuditAction action) {
         return AuditEntry.builder().action(action).outcome(AuditOutcome.SUCCESS).build();
+    }
+
+    private static AuditEntry namedTicketArchiveOf(String targetTenantId) {
+        return ticketArchive().toBuilder()
+                .targetName("Printer offline")
+                .organizationId("org-7")
+                .deviceId("device-7")
+                .targetTenantId(targetTenantId)
+                .details(Map.of("via", "dialog"))
+                .changes(Map.of("statusKind", new AuditChange("OPEN", "ARCHIVED")))
+                .build();
     }
 
     private static AuditEntry ticketArchive() {

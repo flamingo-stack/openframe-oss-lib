@@ -16,10 +16,11 @@ import java.util.Objects;
 public interface AuditEventMapper {
 
     @Mapping(target = "id", expression = "java(idOf(entry))")
-    @Mapping(target = "parentEventId", expression = "java(parentEventIdOf(entry, parentEventId))")
+    @Mapping(target = "parentEventId", source = "parentEventId")
     @Mapping(target = "schemaVersion", expression = "java(AuditEvent.SCHEMA_VERSION)")
     @Mapping(target = "action", source = "entry.action.name")
     @Mapping(target = "targetType", expression = "java(entry.targetTypeOrDefault())")
+    @Mapping(target = "details", expression = "java(entry.plainDetails())")
     @Mapping(target = "tenantId", source = "tenantId")
     @Mapping(target = "actorType", source = "actor.type")
     @Mapping(target = "actorId", source = "actor.id")
@@ -36,9 +37,5 @@ public interface AuditEventMapper {
 
     default String idOf(AuditEntry entry) {
         return Objects.requireNonNullElseGet(entry.getId(), () -> UlidCreator.getUlid().toString());
-    }
-
-    default String parentEventIdOf(AuditEntry entry, String parentEventId) {
-        return entry.getParentEventId() != null ? entry.getParentEventId() : parentEventId;
     }
 }

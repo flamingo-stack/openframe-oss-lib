@@ -1,7 +1,5 @@
 package com.openframe.audit;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.audit.targets.AuditTarget;
 import com.openframe.audit.targets.AuditTargetRegistry;
 import com.openframe.audit.targets.AuditTargetRepository;
@@ -26,8 +24,10 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import static com.openframe.data.document.audit.AuditActorType.FAE;
@@ -38,8 +38,6 @@ import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
 @RequiredArgsConstructor
 public class AuditEventWriter {
 
-    private static final int CACHE_MAX_ENTRIES = 10_000;
-
     private final AuditEventRepository auditEventRepository;
     private final UserRepository userRepository;
     private final MachineRepository machineRepository;
@@ -49,9 +47,7 @@ public class AuditEventWriter {
     private final AuditEventMapper auditEventMapper;
     private final ObjectMapper objectMapper;
     private final AuditClock auditClock;
-    private final Cache<String, Boolean> parentsOfStoredEvents = Caffeine.newBuilder()
-            .maximumSize(CACHE_MAX_ENTRIES)
-            .build();
+    private final Map<String, Boolean> childSavedByRunningParent = new ConcurrentHashMap<>();
 
     boolean write(List<AuditEntry> entries, AuditContext context, boolean loadTarget) {
         ActorNames names = namesOf(context.actor());
@@ -64,7 +60,8 @@ public class AuditEventWriter {
             events.stream()
                     .map(AuditEvent::getParentEventId)
                     .filter(Objects::nonNull)
-                    .forEach(parentEventId -> parentsOfStoredEvents.put(parentEventId, Boolean.TRUE));
+                    .forEach(parentEventId -> childSavedByRunningParent.computeIfPresent(parentEventId,
+                            (_, _) -> Boolean.TRUE));
             return true;
         } catch (DataAccessException e) {
             log.error("Audit events not stored: {}", events.stream().map(this::asJson).toList(), e);
@@ -72,8 +69,12 @@ public class AuditEventWriter {
         }
     }
 
-    boolean hasChildren(String eventId) {
-        return parentsOfStoredEvents.getIfPresent(eventId) != null;
+    void trackChildrenOf(String eventId) {
+        childSavedByRunningParent.put(eventId, Boolean.FALSE);
+    }
+
+    boolean hadChildren(String eventId) {
+        return Boolean.TRUE.equals(childSavedByRunningParent.remove(eventId));
     }
 
     String targetIdOf(AuditTargetType targetType, String targetId) {
@@ -96,9 +97,12 @@ public class AuditEventWriter {
 
     private AuditEntry withTargetFields(AuditEntry entry) {
         boolean complete = entry.getTargetName() != null && entry.getOrganizationId() != null && entry.getDeviceId() != null;
+        if (complete) {
+            return entry;
+        }
         AuditTargetType targetType = entry.targetTypeOrDefault();
         String targetId = targetIdOf(targetType, entry.getTargetId());
-        if (complete || targetId == null) {
+        if (targetId == null) {
             return entry;
         }
         try {
@@ -107,6 +111,7 @@ public class AuditEventWriter {
                             .targetName(firstNonNull(entry.getTargetName(), loaded.name()))
                             .organizationId(firstNonNull(entry.getOrganizationId(), loaded.organizationId()))
                             .deviceId(firstNonNull(entry.getDeviceId(), loaded.deviceId()))
+                            .targetTenantId(firstNonNull(loaded.tenantId(), entry.getTargetTenantId()))
                             .build())
                     .orElse(entry);
         } catch (RuntimeException e) {
@@ -158,7 +163,7 @@ public class AuditEventWriter {
         AuditTargetType targetType = entry.targetTypeOrDefault();
         String targetId = targetIdOf(targetType, entry.getTargetId());
         boolean secretId = targets.find(targetType).stream().anyMatch(AuditTarget::secretId);
-        AuditEntry entryToUse = entry.toBuilder()
+        AuditEntry entryToUse = withoutFieldsOfAnotherTenant(entry, tenantId).toBuilder()
                 .targetId(secretId && targetId != null ? Sha256.hex(targetId) : targetId)
                 .build();
         AuditEvent event = auditEventMapper.toEvent(entryToUse, actor, context.requestInfo(), tenantId,
@@ -167,6 +172,15 @@ public class AuditEventWriter {
         event.setOnBehalfOfName(names.onBehalfOf());
         event.setApproverName(names.approver());
         return event;
+    }
+
+    private AuditEntry withoutFieldsOfAnotherTenant(AuditEntry entry, String tenantId) {
+        if (!tenantResolver.belongsToAnotherTenant(entry.getTargetTenantId(), tenantId)) {
+            return entry;
+        }
+        log.warn("Audit target {} of {} belongs to another tenant, the event is stored without its name, customer, "
+                + "device and changes", entry.getTargetId(), entry.getAction().getName());
+        return entry.toBuilder().targetName(null).organizationId(null).deviceId(null).changes(null).build();
     }
 
     private String asJson(AuditEvent event) {

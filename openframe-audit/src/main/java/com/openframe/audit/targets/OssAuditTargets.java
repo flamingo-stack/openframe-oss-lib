@@ -55,36 +55,42 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(TICKET, Ticket.class, Ticket::getTitle)
                         .withOrganizationId(Ticket::getOrganizationId)
                         .withDeviceId(Ticket::getDeviceId)
-                        .withIgnoredFields(Set.of("lastActivityAt", "awaitingClientSince")),
+                        .withIgnoredFields(Set.of("lastActivityAt", "awaitingClientSince", "hasPendingApproval")),
                 AuditTarget.of(DEVICE, Machine.class, Machine::deviceName)
                         .withIdField("machineId")
                         .withOrganizationId(Machine::getOrganizationId)
                         .withDeviceId(Machine::getMachineId)
                         .withIgnoredFields(Set.of("lastSeen", "telemetryStatus", "packageManagers", "securityState",
                                 "complianceState", "securityAlerts", "lastSecurityScan", "lastComplianceScan",
-                                "stuckNotifiedAt")),
+                                "stuckNotifiedAt", "hostFactsCheckedAt", "computerName", "directorySources",
+                                "directoryUserLink", "directoryUserIds", "directoryUserName")),
                 AuditTarget.of(USER, User.class, User::nameOrEmail)
                         .withIgnoredFields(Set.of("crmSynced", "lastLogin"))
                         .withMaskedFields(Set.of("passwordHash")),
                 AuditTarget.of(ORGANIZATION, Organization.class, Organization::getName)
                         .withIdField("organizationId")
                         .withOrganizationId(Organization::getOrganizationId),
-                AuditTarget.of(TENANT, Tenant.class, Tenant::getName),
+                AuditTarget.of(TENANT, Tenant.class, Tenant::getName)
+                        .withTenantId(Tenant::getId),
                 AuditTarget.of(SCRIPT, Script.class, Script::getName)
-                        .withMaskedFields(Set.of("scriptBody", "envVars")),
+                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs", "contentHash")),
                 AuditTarget.of(SCRIPT_SCHEDULE, ScheduleScript.class, ScheduleScript::getName)
-                        .withMaskedFields(Set.of("scriptCustomParams")),
-                AuditTarget.of(SOFTWARE_SCHEDULE, SoftwareSchedule.class, SoftwareSchedule::getName),
+                        .withIgnoredFields(Set.of("nextRunAt", "lastRunAt"))
+                        .withMaskedFields(Set.of("scriptCustomParams.args", "scriptCustomParams.value")),
+                AuditTarget.of(SOFTWARE_SCHEDULE, SoftwareSchedule.class, SoftwareSchedule::getName)
+                        .withIgnoredFields(Set.of("nextRunAt", "lastRunAt")),
                 AuditTarget.of(EXECUTION, ScriptExecution.class, ScriptExecution::getExecutionId)
                         .withDeviceId(ScriptExecution::getMachineId)
-                        .withMaskedFields(Set.of("stdout", "stderr")),
+                        .withIgnoredFields(Set.of("waiting"))
+                        .withMaskedFields(Set.of("stdout", "stderr", "error")),
                 AuditTarget.of(EXECUTION, CommandExecution.class, CommandExecution::getExecutionId)
                         .withDeviceId(CommandExecution::getMachineId)
-                        .withMaskedFields(Set.of("stdout", "stderr")),
+                        .withMaskedFields(Set.of("command", "stdout", "stderr", "error")),
                 AuditTarget.of(TAG, Tag.class, Tag::getKey),
                 AuditTarget.of(KB_ARTICLE, KnowledgeBaseItem.class, KnowledgeBaseItem::getName)
                         .withMaskedFields(Set.of("content")),
-                AuditTarget.of(KB_FOLDER, KnowledgeBaseItem.class, KnowledgeBaseItem::getName),
+                AuditTarget.of(KB_FOLDER, KnowledgeBaseItem.class, KnowledgeBaseItem::getName)
+                        .withMaskedFields(Set.of("content")),
                 AuditTarget.of(IMAGE, KnowledgeBaseImage.class, KnowledgeBaseImage::getFileName),
                 AuditTarget.of(TICKET_STATUS, TicketStatusDefinition.class, TicketStatusDefinition::getName),
                 AuditTarget.of(TIME_ENTRY, TimeEntry.class, TimeEntry::getTicketTitle)
@@ -92,7 +98,7 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(API_KEY, ApiKey.class, ApiKey::getName)
                         .withMaskedFields(Set.of("hashedKey")),
                 AuditTarget.of(INTEGRATED_TOOL, IntegratedTool.class, IntegratedTool::getName)
-                        .withMaskedFields(Set.of("credentials")),
+                        .withMaskedFields(Set.of("credentials", "debeziumConnectors")),
                 AuditTarget.of(INVITATION, Invitation.class, Invitation::getEmail)
                         .withSecretId(true),
                 AuditTarget.of(OAUTH_CLIENT, OAuthClient.class, OAuthClient::getClientId)

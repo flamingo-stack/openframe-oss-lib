@@ -12,7 +12,7 @@ import com.openframe.data.model.audit.AuditRequestInfo;
 import com.openframe.data.reactive.repository.audit.ReactiveAuditEventRepository;
 import com.openframe.data.reactive.repository.device.ReactiveMachineRepository;
 import com.openframe.data.reactive.repository.user.ReactiveUserRepository;
-import com.openframe.data.repository.redis.ReactiveAuditOnceRepository;
+import com.openframe.data.repository.redis.ReactiveAuditWindowRepository;
 import com.openframe.data.service.AuditClock;
 import com.openframe.data.service.AuditTenantResolver;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,8 +30,11 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import reactor.util.context.Context;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -42,10 +45,10 @@ import static com.openframe.data.document.audit.AuditAction.STAFF_TENANT_ACCESS_
 import static com.openframe.data.document.audit.AuditAction.TOOL_ENDPOINT_REFUSE;
 import static com.openframe.data.document.audit.AuditActorType.STAFF;
 import static com.openframe.data.document.audit.AuditActorType.USER;
+import static com.openframe.data.document.audit.AuditOutcome.FAILURE;
 import static com.openframe.data.document.audit.AuditOutcome.REFUSED;
 import static com.openframe.data.document.audit.AuditOutcome.SUCCESS;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -61,7 +64,8 @@ class ReactiveAuditEventWriterTest {
     private static final Instant NOW = Instant.parse("2026-10-28T14:12:00Z");
     private static final AuditActor NAMED_KEY = AuditActor.fromApiKey("key-1", "CI key", List.of("ADMIN"), null, null);
     private static final String RATE_LIMITED_PATH = "/api/v1/devices";
-    private static final String RATE_LIMIT_CLAIM = "api_key.rate_limit.refuse:/api/v1/devices:key-1";
+    private static final String RATE_LIMIT_CLAIM =
+            "api_key.rate_limit.refuse:REFUSED:/api/v1/devices:API_KEY:key-1";
 
     @Mock
     private ReactiveAuditEventRepository auditEventRepository;
@@ -70,7 +74,7 @@ class ReactiveAuditEventWriterTest {
     @Mock
     private ReactiveMachineRepository machineRepository;
     @Mock
-    private ReactiveAuditOnceRepository auditOnceRepository;
+    private ReactiveAuditWindowRepository auditWindowRepository;
     @Mock
     private AuditEventMapper auditEventMapper;
     @Mock
@@ -88,17 +92,13 @@ class ReactiveAuditEventWriterTest {
     }
 
     @Test
-    void writeAll_auditDisabled_recordsNothing() {
-        writerWith(false).writeAll(List.of(entry(AUTH_ACCESS_REFUSE)), callerOf(NAMED_KEY)).block();
+    void writeAll_auditDisabled_recordsNothingAndNeverAsksForTheCaller() {
+        Sinks.One<AuditCaller> caller = Sinks.one();
 
+        writerWith(false).writeAll(List.of(entry(AUTH_ACCESS_REFUSE)), caller.asMono()).block();
+
+        assertThat(caller.currentSubscriberCount()).isZero();
         verifyNoInteractions(auditEventMapper, auditEventRepository);
-    }
-
-    @Test
-    void writeAll_noEntries_recordsNothing() {
-        writer.writeAll(List.of(), callerOf(NAMED_KEY)).block();
-
-        verifyNoInteractions(auditEventRepository);
     }
 
     @ParameterizedTest
@@ -141,17 +141,6 @@ class ReactiveAuditEventWriterTest {
     }
 
     @Test
-    void writeAll_actorWithoutId_storesEventWithoutLookup() {
-        AuditActor withoutId = person(USER, null);
-        AuditEntry entry = entry(AUTH_ACCESS_REFUSE);
-        stored(entry, withoutId, SERVED_TENANT);
-
-        writer.writeAll(List.of(entry), callerOf(withoutId)).block();
-
-        verifyNoInteractions(userRepository);
-    }
-
-    @Test
     void writeAll_apiKeyActorWithoutName_storesEventWithoutLookup() {
         AuditActor unknownKey = AuditActor.fromApiKey("key-1", null, null, null, null);
         AuditEntry entry = entry(AUTH_ACCESS_REFUSE);
@@ -163,27 +152,16 @@ class ReactiveAuditEventWriterTest {
     }
 
     @Test
-    void writeAll_userRecordGone_storesEventWithoutActorName() {
+    void writeAll_userRecordOfTheEventsTenant_namesTheEvent() {
         AuditActor person = person(USER, "user-1");
         AuditEntry entry = entry(AUTH_ACCESS_REFUSE);
         stored(entry, person, SERVED_TENANT);
-        when(userRepository.findById("user-1")).thenReturn(Mono.empty());
+        when(userRepository.findById("user-1"))
+                .thenReturn(Mono.just(User.builder().firstName("Anna").lastName("Kowalski").tenantId(SERVED_TENANT).build()));
 
         writer.writeAll(List.of(entry), callerOf(person)).block();
 
-        assertThat(insertedEvents()).extracting(AuditEvent::getActorName).containsOnlyNulls();
-    }
-
-    @Test
-    void writeAll_userRecordWithoutName_storesEventWithoutActorName() {
-        AuditActor person = person(USER, "user-1");
-        AuditEntry entry = entry(AUTH_ACCESS_REFUSE);
-        stored(entry, person, SERVED_TENANT);
-        when(userRepository.findById("user-1")).thenReturn(Mono.just(user(null, null)));
-
-        writer.writeAll(List.of(entry), callerOf(person)).block();
-
-        assertThat(insertedEvents()).extracting(AuditEvent::getActorName).containsOnlyNulls();
+        assertThat(insertedEvents()).extracting(AuditEvent::getActorName).containsExactly("Anna Kowalski");
     }
 
     @Test
@@ -198,6 +176,36 @@ class ReactiveAuditEventWriterTest {
 
         assertThat(insertedEvents()).extracting(AuditEvent::getActorName).containsOnlyNulls();
         assertThat(output).contains("Audit lookup of the user name failed, the event is stored without it");
+    }
+
+    @Test
+    void writeAll_deviceRecordOfAnotherTenant_storesTheEventWithoutItsName() {
+        AuditActor agent = AuditActor.fromAgent("machine-1", List.of("AGENT"), null);
+        AuditEntry entry = entry(AUTH_ACCESS_REFUSE);
+        when(tenantResolver.superTenantId()).thenReturn("platform");
+        stored(entry, agent, SERVED_TENANT);
+        Machine foreign = laptop();
+        foreign.setTenantId("another-tenant");
+        when(machineRepository.findByMachineId("machine-1")).thenReturn(Mono.just(foreign));
+
+        writer.writeAll(List.of(entry), callerOf(agent)).block();
+
+        assertThat(insertedEvents()).extracting(AuditEvent::getActorName).containsOnlyNulls();
+    }
+
+    @Test
+    void writeAll_staffRecordOfThePlatformTenant_namesTheEventAfterIt() {
+        AuditActor staff = person(STAFF, "staff-1");
+        AuditEntry entry = entry(AUTH_ACCESS_REFUSE);
+        stored(entry, staff, SERVED_TENANT);
+        when(tenantResolver.superTenantId()).thenReturn("platform");
+        User sam = user("Sam", "Rivera");
+        sam.setTenantId("platform");
+        when(userRepository.findById("staff-1")).thenReturn(Mono.just(sam));
+
+        writer.writeAll(List.of(entry), callerOf(staff)).block();
+
+        assertThat(insertedEvents()).extracting(AuditEvent::getActorName).containsExactly("Sam Rivera");
     }
 
     @Test
@@ -225,16 +233,6 @@ class ReactiveAuditEventWriterTest {
     }
 
     @Test
-    void writeAll_entryNamesTenant_storesEventUnderThatTenant() {
-        AuditEntry entry = AuditEntry.builder().action(AUTH_ACCESS_REFUSE).outcome(REFUSED).tenantId("tenant-b").build();
-        stored(entry, NAMED_KEY, "tenant-b");
-
-        writer.writeAll(List.of(entry), callerOf(NAMED_KEY)).block();
-
-        assertThat(insertedEvents()).extracting(AuditEvent::getTenantId).containsExactly("tenant-b");
-    }
-
-    @Test
     void writeAll_callerFails_completesAndLogsFailure(CapturedOutput output) {
         writer.writeAll(List.of(entry(AUTH_ACCESS_REFUSE)),
                 Mono.error(new IllegalArgumentException("Unsupported roles claim"))).block();
@@ -257,27 +255,21 @@ class ReactiveAuditEventWriterTest {
     }
 
     @Test
-    void writeOnce_entryWithoutOutcome_throws() {
-        AuditEntry entry = AuditEntry.builder().action(API_KEY_RATE_LIMIT_REFUSE).build();
+    void writeOnce_auditDisabled_recordsNothingAndNeverAsksForTheCaller() {
+        Sinks.One<AuditCaller> caller = Sinks.one();
 
-        assertThatThrownBy(() -> writer.writeOnce(entry, callerOf(NAMED_KEY), RATE_LIMITED_PATH, ONE_MINUTE))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("An audit entry needs an outcome");
-    }
-
-    @Test
-    void writeOnce_auditDisabled_recordsNothing() {
         writerWith(false)
-                .writeOnce(entry(API_KEY_RATE_LIMIT_REFUSE), callerOf(NAMED_KEY), RATE_LIMITED_PATH, ONE_MINUTE)
+                .writeOnce(entry(API_KEY_RATE_LIMIT_REFUSE), caller.asMono(), RATE_LIMITED_PATH, ONE_MINUTE)
                 .block();
 
-        verifyNoInteractions(auditOnceRepository, auditEventMapper);
+        assertThat(caller.currentSubscriberCount()).isZero();
+        verifyNoInteractions(auditWindowRepository, auditEventMapper);
     }
 
     @Test
-    void writeOnce_firstWithinWindow_storesEvent() {
+    void writeOnce_firstEventInWindow_storesEvent() {
         AuditEntry entry = entry(API_KEY_RATE_LIMIT_REFUSE);
-        when(auditOnceRepository.claim(RATE_LIMIT_CLAIM, ONE_MINUTE, SERVED_TENANT)).thenReturn(Mono.just(true));
+        when(auditWindowRepository.claim(RATE_LIMIT_CLAIM, ONE_MINUTE, SERVED_TENANT)).thenReturn(Mono.just(true));
         stored(entry, NAMED_KEY, SERVED_TENANT);
 
         writer.writeOnce(entry, callerOf(NAMED_KEY), RATE_LIMITED_PATH, ONE_MINUTE).block();
@@ -286,24 +278,36 @@ class ReactiveAuditEventWriterTest {
     }
 
     @Test
-    void writeOnce_claimedByAnotherPod_recordsNothing() {
-        when(auditOnceRepository.claim(RATE_LIMIT_CLAIM, ONE_MINUTE, SERVED_TENANT)).thenReturn(Mono.just(false));
+    void writeOnce_sameKeyWithAnotherOutcome_claimsItUnderItsOwnKey() {
+        AuditEntry failed = AuditEntry.builder().action(API_KEY_RATE_LIMIT_REFUSE).outcome(FAILURE).build();
+        when(auditWindowRepository.claim("api_key.rate_limit.refuse:FAILURE:/api/v1/devices:API_KEY:key-1", ONE_MINUTE,
+                SERVED_TENANT)).thenReturn(Mono.just(true));
+        stored(failed, NAMED_KEY, SERVED_TENANT);
 
-        writer.writeOnce(entry(API_KEY_RATE_LIMIT_REFUSE), callerOf(NAMED_KEY), RATE_LIMITED_PATH, ONE_MINUTE).block();
+        writer.writeOnce(failed, callerOf(NAMED_KEY), RATE_LIMITED_PATH, ONE_MINUTE).block();
 
-        verifyNoInteractions(auditEventRepository);
+        assertThat(insertedEvents()).hasSize(1);
     }
 
     @Test
-    void writeOnce_sameSessionInAnotherTenant_recordsAgain() {
+    void writeOnce_claimedByAnotherPod_recordsNothing() {
+        when(auditWindowRepository.claim(RATE_LIMIT_CLAIM, ONE_MINUTE, SERVED_TENANT)).thenReturn(Mono.just(false));
+
+        writer.writeOnce(entry(API_KEY_RATE_LIMIT_REFUSE), callerOf(NAMED_KEY), RATE_LIMITED_PATH, ONE_MINUTE).block();
+
+        verifyNoInteractions(auditEventMapper, auditEventRepository);
+    }
+
+    @Test
+    void writeOnce_sameSessionInAnotherTenant_claimsItUnderEachServedTenant() {
         AuditActor staff = new AuditActor(STAFF, "staff-1", "Sam Rivera", "sam@flamingo.test", List.of("ADMIN"),
                 "platform", null, null);
         AuditEntry entry = AuditEntry.builder().action(STAFF_TENANT_ACCESS_START).outcome(SUCCESS).build();
         Duration refreshTokenLife = Duration.ofDays(7);
-        String claim = "staff.tenant_access.start:session-1:staff-1";
+        String claim = "staff.tenant_access.start:SUCCESS:session-1:STAFF:staff-1";
         when(tenantResolver.superTenantId()).thenReturn("platform");
-        when(auditOnceRepository.claim(claim, refreshTokenLife, "tenant-a")).thenReturn(Mono.just(true));
-        when(auditOnceRepository.claim(claim, refreshTokenLife, "tenant-b")).thenReturn(Mono.just(true));
+        when(auditWindowRepository.claim(claim, refreshTokenLife, "tenant-a")).thenReturn(Mono.just(true));
+        when(auditWindowRepository.claim(claim, refreshTokenLife, "tenant-b")).thenReturn(Mono.just(true));
         stored(entry, staff, "tenant-a");
         stored(entry, staff, "tenant-b");
 
@@ -320,7 +324,7 @@ class ReactiveAuditEventWriterTest {
     @Test
     void writeOnce_dedupeStoreUnreachable_storesEventAndLogsFailure(CapturedOutput output) {
         AuditEntry entry = entry(API_KEY_RATE_LIMIT_REFUSE);
-        when(auditOnceRepository.claim(RATE_LIMIT_CLAIM, ONE_MINUTE, SERVED_TENANT))
+        when(auditWindowRepository.claim(RATE_LIMIT_CLAIM, ONE_MINUTE, SERVED_TENANT))
                 .thenReturn(Mono.error(new RedisConnectionFailureException("Redis unreachable")));
         stored(entry, NAMED_KEY, SERVED_TENANT);
 
@@ -328,6 +332,56 @@ class ReactiveAuditEventWriterTest {
 
         assertThat(insertedEvents()).extracting(AuditEvent::getAction).containsExactly("api_key.rate_limit.refuse");
         assertThat(output).contains("Audit dedupe lookup failed, the event is recorded");
+    }
+
+    @Test
+    void writeOnce_claimThrowsBeforeItReachesTheStore_storesEventAndLogsFailure(CapturedOutput output) {
+        AuditEntry entry = entry(API_KEY_RATE_LIMIT_REFUSE);
+        when(auditWindowRepository.claim(RATE_LIMIT_CLAIM, ONE_MINUTE, SERVED_TENANT))
+                .thenThrow(new IllegalStateException("Missing required openframe.redis.tenant-id"));
+        stored(entry, NAMED_KEY, SERVED_TENANT);
+
+        writer.writeOnce(entry, callerOf(NAMED_KEY), RATE_LIMITED_PATH, ONE_MINUTE).block();
+
+        assertThat(insertedEvents()).extracting(AuditEvent::getAction).containsExactly("api_key.rate_limit.refuse");
+        assertThat(output).contains("Audit dedupe lookup failed, the event is recorded");
+    }
+
+    @Test
+    void writeOnce_claimFailsWithAnErrorTheStoreDidNotTranslate_storesEvent() {
+        AuditEntry entry = entry(API_KEY_RATE_LIMIT_REFUSE);
+        when(auditWindowRepository.claim(RATE_LIMIT_CLAIM, ONE_MINUTE, SERVED_TENANT))
+                .thenReturn(Mono.error(new IOException("Connection reset by peer")));
+        stored(entry, NAMED_KEY, SERVED_TENANT);
+
+        writer.writeOnce(entry, callerOf(NAMED_KEY), RATE_LIMITED_PATH, ONE_MINUTE).block();
+
+        assertThat(insertedEvents()).extracting(AuditEvent::getAction).containsExactly("api_key.rate_limit.refuse");
+    }
+
+    @Test
+    void writeAll_requestCancelledBeforeTheCallerIsKnown_stillStoresTheEvent() {
+        AuditEntry entry = entry(AUTH_ACCESS_REFUSE);
+        Sinks.One<AuditCaller> caller = Sinks.one();
+        stored(entry, NAMED_KEY, SERVED_TENANT);
+
+        writer.writeAll(List.of(entry), caller.asMono()).subscribe().dispose();
+        caller.tryEmitValue(new AuditCaller(NAMED_KEY, REQUEST_INFO, SERVED_TENANT));
+
+        assertThat(insertedEvents()).extracting(AuditEvent::getAction).containsExactly("auth.access.refuse");
+    }
+
+    @Test
+    void writeAll_callerReadFromTheRequestContext_seesThatContext() {
+        AuditEntry entry = entry(AUTH_ACCESS_REFUSE);
+        stored(entry, NAMED_KEY, SERVED_TENANT);
+        Mono<AuditCaller> callerInContext = Mono.deferContextual(context -> Mono.just(context.get("caller")));
+
+        writer.writeAll(List.of(entry), callerInContext)
+                .contextWrite(Context.of("caller", new AuditCaller(NAMED_KEY, REQUEST_INFO, SERVED_TENANT)))
+                .block();
+
+        assertThat(insertedEvents()).extracting(AuditEvent::getAction).containsExactly("auth.access.refuse");
     }
 
     @Test
@@ -341,7 +395,7 @@ class ReactiveAuditEventWriterTest {
 
     private ReactiveAuditEventWriter writerWith(boolean enabled) {
         return new ReactiveAuditEventWriter(auditEventRepository, userRepository, machineRepository,
-                auditOnceRepository, auditEventMapper, tenantResolver, auditClock, new JsonMapper(), enabled);
+                auditWindowRepository, auditEventMapper, tenantResolver, auditClock, new JsonMapper(), enabled);
     }
 
     private AuditEvent mapped(AuditEntry entry, AuditActor actor, String tenantId) {

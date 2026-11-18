@@ -1,12 +1,9 @@
 package com.openframe.data.service;
 
-import com.openframe.data.model.audit.AuditActor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -19,11 +16,6 @@ class AuditTenantResolverTest {
 
     @Mock
     private TenantIdProvider tenantIdProvider;
-
-    @Test
-    void superTenantId_configured_returnsConfiguredId() {
-        assertThat(sharedService().superTenantId()).isEqualTo(SUPER_TENANT_ID);
-    }
 
     @Test
     void servedTenantId_tenantIsolatedService_returnsProviderTenant() {
@@ -57,25 +49,28 @@ class AuditTenantResolverTest {
     }
 
     @Test
-    void tenantFor_requestedTenant_returnsRequestedTenant() {
-        AuditActor user = AuditActor.fromUser("user-1", "anna@acme.com", List.of("ADMIN"), SERVED_TENANT_ID,
-                SUPER_TENANT_ID);
-
-        assertThat(tenantService().tenantFor(user, "tenant-2")).isEqualTo("tenant-2");
+    void belongsToAnotherTenant_recordOfTheEventsTenant_isFalse() {
+        assertThat(sharedService().belongsToAnotherTenant("tenant-1", "tenant-1")).isFalse();
     }
 
     @Test
-    void tenantFor_staffTokenInTenantIsolatedService_returnsServedTenant() {
-        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
-        AuditActor staff = AuditActor.fromUser("staff-1", "staff@flamingo.cx", List.of("ADMIN"), SUPER_TENANT_ID,
-                SUPER_TENANT_ID);
-
-        assertThat(tenantService().tenantFor(staff, null)).isEqualTo(SERVED_TENANT_ID);
+    void belongsToAnotherTenant_recordOfAnotherTenantThanTheEvents_isTrue() {
+        assertThat(sharedService().belongsToAnotherTenant("tenant-2", "tenant-1")).isTrue();
     }
 
     @Test
-    void tenantFor_noTenantInSharedService_returnsSuperTenant() {
-        assertThat(sharedService().tenantFor(AuditActor.system(), null)).isEqualTo(SUPER_TENANT_ID);
+    void belongsToAnotherTenant_recordThatBelongsToNoTenant_isFalse() {
+        assertThat(sharedService().belongsToAnotherTenant(null, "tenant-1")).isFalse();
+    }
+
+    @Test
+    void belongsToAnotherTenant_eventOfThePlatformTenant_isFalse() {
+        assertThat(sharedService().belongsToAnotherTenant("tenant-2", SUPER_TENANT_ID)).isFalse();
+    }
+
+    @Test
+    void belongsToAnotherTenant_serviceOfOneTenant_isFalseWhateverTheTenants() {
+        assertThat(tenantService().belongsToAnotherTenant("tenant-2", "tenant-1")).isFalse();
     }
 
     private AuditTenantResolver tenantService() {

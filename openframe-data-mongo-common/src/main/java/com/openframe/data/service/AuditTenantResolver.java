@@ -14,21 +14,26 @@ public class AuditTenantResolver {
     @Value("${openframe.security.jwt.super-tenant-id:}")
     private final String superTenantId;
     @Value("${openframe.tenant-isolation.enabled:false}")
-    private final boolean servesOneTenant;
+    private final boolean tenantIsolated;
 
     public String superTenantId() {
         return superTenantId;
     }
 
     public String servedTenantId() {
-        return servesOneTenant || !StringUtils.hasText(superTenantId) ? tenantIdProvider.getTenantId() : superTenantId;
+        return tenantIsolated || !StringUtils.hasText(superTenantId) ? tenantIdProvider.getTenantId() : superTenantId;
     }
 
     public String isolatedTenantId() {
-        return servesOneTenant ? tenantIdProvider.getTenantId() : null;
+        return tenantIsolated ? tenantIdProvider.getTenantId() : null;
     }
 
     public String tenantFor(AuditActor actor, String requestedTenantId) {
         return actor.tenantFor(requestedTenantId, superTenantId, this::servedTenantId);
+    }
+
+    public boolean belongsToAnotherTenant(String recordTenantId, String eventTenantId) {
+        return !tenantIsolated && recordTenantId != null && !recordTenantId.equals(eventTenantId)
+                && !superTenantId.equals(eventTenantId);
     }
 }

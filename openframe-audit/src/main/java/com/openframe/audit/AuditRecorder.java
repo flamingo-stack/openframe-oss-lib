@@ -5,10 +5,12 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.core.util.Sha256;
 import com.openframe.data.document.apikey.ApiKey;
 import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.model.audit.AuditActor;
 import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.model.audit.AuditRequestInfo;
 import com.openframe.data.repository.apikey.ApiKeyRepository;
+import com.openframe.data.service.AuditClock;
 import com.openframe.data.service.AuditTenantResolver;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
@@ -29,6 +31,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static com.openframe.core.constants.HttpHeaders.X_API_KEY_ID;
@@ -49,15 +54,21 @@ public class AuditRecorder {
     private final AuditTenantResolver tenantResolver;
     private final AuditOutcomeResolver outcomeResolver;
     private final AuditEventWriter writer;
+    private final AuditClock auditClock;
     @Value("${openframe.audit.enabled}")
     private final boolean enabled;
-    private final Cache<String, Boolean> unresolvedFailures = Caffeine.newBuilder()
+    private final Cache<String, Set<AuditOutcome>> unresolvedFailures = Caffeine.newBuilder()
             .maximumSize(CACHE_MAX_ENTRIES)
             .build();
     private final Cache<String, Boolean> recordedOnce = Caffeine.newBuilder()
             .expireAfterWrite(ONCE_WINDOW)
             .maximumSize(CACHE_MAX_ENTRIES)
+            .ticker(this::nanosNow)
             .build();
+
+    private long nanosNow() {
+        return TimeUnit.MILLISECONDS.toNanos(auditClock.now().toEpochMilli());
+    }
 
     public AuditContext context() {
         return Objects.requireNonNullElseGet(DECLARED_CONTEXT.get(),
@@ -66,9 +77,7 @@ public class AuditRecorder {
 
     public AuditContext context(AuditActor actor) {
         AuditContext declared = DECLARED_CONTEXT.get();
-        return declared == null
-                ? new AuditContext(actor, requestInfo(), null)
-                : new AuditContext(actor, declared.requestInfo(), declared.parentEventId());
+        return declared == null ? new AuditContext(actor, requestInfo(), null) : declared.withActor(actor);
     }
 
     public String parentEventId() {
@@ -83,7 +92,7 @@ public class AuditRecorder {
                 jwt == null ? loginSessionId(request) : jwt.getClaimAsString(SESSION_CLAIM));
     }
 
-    public AuditActor actorOf(AuthPrincipal principal) {
+    private AuditActor actorOf(AuthPrincipal principal) {
         return principal.getActorType() == ActorType.AGENT
                 ? AuditActor.fromAgent(principal.getMachineId(), principal.getRoles(), principal.getTenantId())
                 : AuditActor.fromUser(principal.getId(), principal.getEmail(), principal.getRoles(),
@@ -91,6 +100,9 @@ public class AuditRecorder {
     }
 
     private AuditActor actorOf(Jwt jwt, HttpServletRequest request) {
+        if (!enabled) {
+            return AuditActor.system();
+        }
         if (request != null && request.getAttribute(ACTOR_ATTRIBUTE) instanceof AuditActor declared) {
             return declared;
         }
@@ -130,8 +142,11 @@ public class AuditRecorder {
     }
 
     public <R, E extends Throwable> R runInContext(AuditContext context, AuditedWork<R, E> work) throws E {
+        if (context == null) {
+            return work.run();
+        }
         AuditContext outer = DECLARED_CONTEXT.get();
-        DECLARED_CONTEXT.set(addParentEventId(context));
+        DECLARED_CONTEXT.set(context);
         try {
             return work.run();
         } finally {
@@ -155,66 +170,69 @@ public class AuditRecorder {
         return () -> runInContext(context, work::get);
     }
 
-    private AuditContext addParentEventId(AuditContext context) {
-        String parentEventId = parentEventId();
-        return context != null && context.parentEventId() == null && parentEventId != null
-                ? context.withParentEventId(parentEventId)
-                : context;
-    }
-
     public boolean record(AuditEntry entry) {
-        return write(List.of(entry), null, true);
+        return write(List.of(entry), this::context, true);
     }
 
     public boolean record(AuditEntry entry, AuditActor actor) {
-        return record(entry, context(actor));
+        return write(List.of(entry), () -> context(actor), true);
     }
 
     public boolean record(AuditEntry entry, AuditContext context) {
-        return write(List.of(entry), context, true);
+        return write(List.of(entry), () -> context, true);
     }
 
-    public void recordOnce(AuditEntry entry, String key) {
-        recordOnce(entry, key, this::context);
-    }
-
-    public void recordOnce(AuditEntry entry, String key, AuditActor actor) {
-        recordOnce(entry, key, () -> context(actor));
-    }
-
-    private void recordOnce(AuditEntry entry, String key, Supplier<AuditContext> contextOf) {
-        if (!enabled) {
-            return;
-        }
+    public void recordOnce(AuditEntry.AuditEntryBuilder entry, Throwable failure, String key) {
         try {
-            AuditContext context = contextOf.get();
-            AuditActor actor = context.actor();
-            String onceKey = String.join(":", entry.getAction().getName(), key,
-                    tenantResolver.tenantFor(actor, entry.getTenantId()), actor.id());
-            if (recordedOnce.asMap().putIfAbsent(onceKey, Boolean.TRUE) == null) {
-                record(entry, context);
+            if (recordOnce(failed(entry, failure), key)) {
+                RecordedFailures.add(failure);
             }
         } catch (RuntimeException e) {
+            log.error("Audit event of a failure not recorded", e);
+        }
+    }
+
+    public boolean recordOnce(AuditEntry entry, String key) {
+        entry.requireOutcome();
+        try {
+            AuditContext context = context();
+            AuditActor actor = context.actor();
+            String onceKey = String.join(":", entry.getAction().getName(), entry.getOutcome().name(), key,
+                    tenantResolver.tenantFor(actor, entry.getTenantId()), actor.identity());
+            Boolean firstStored = recordedOnce.asMap().putIfAbsent(onceKey, true);
+            if (firstStored != null) {
+                return firstStored;
+            }
+            boolean stored = false;
+            try {
+                stored = record(entry, context);
+            } finally {
+                if (!stored) {
+                    recordedOnce.put(onceKey, false);
+                }
+            }
+            return stored;
+        } catch (RuntimeException e) {
             log.error("Audit event not recorded for {}", entry.getAction().getName(), e);
+            return false;
         }
     }
 
     public void recordAll(List<AuditEntry> entries) {
-        write(entries, null, true);
+        write(entries, this::context, true);
     }
 
-    boolean recordCaptured(AuditEntry entry, AuditContext context) {
-        return write(List.of(entry), context, false);
+    boolean recordAudited(AuditEntry entry, AuditContext context) {
+        return write(List.of(entry), () -> context, false);
     }
 
-    private boolean write(List<AuditEntry> entries, AuditContext context, boolean loadTarget) {
+    private boolean write(List<AuditEntry> entries, Supplier<AuditContext> context, boolean loadTarget) {
         entries.forEach(AuditEntry::requireOutcome);
         if (!enabled || entries.isEmpty()) {
             return false;
         }
         try {
-            AuditContext contextToUse = context == null ? context() : addParentEventId(context);
-            return writer.write(entries, contextToUse, loadTarget);
+            return writer.write(entries, context.get(), loadTarget);
         } catch (RuntimeException e) {
             log.error("Audit events not recorded: {}", entries, e);
             return false;
@@ -222,21 +240,38 @@ public class AuditRecorder {
     }
 
     public void recordFailure(AuditEntry.AuditEntryBuilder entry, Throwable failure) {
-        record(failed(entry, failure));
+        try {
+            if (record(failed(entry, failure))) {
+                RecordedFailures.add(failure);
+            }
+        } catch (RuntimeException e) {
+            log.error("Audit event of a failure not recorded", e);
+        }
     }
 
     public void recordUnresolvedFailure(AuditEntry entry, String key) {
-        String failureKey = failureKey(entry.getAction(), key);
-        if (unresolvedFailures.asMap().putIfAbsent(failureKey, Boolean.TRUE) != null) {
+        entry.requireOutcome();
+        Set<AuditOutcome> recordedOutcomes = unresolvedFailures.get(failureKey(entry.getAction(), key),
+                _ -> ConcurrentHashMap.newKeySet());
+        if (!recordedOutcomes.add(entry.getOutcome())) {
             return;
         }
-        if (!record(entry)) {
-            unresolvedFailures.invalidate(failureKey);
+        boolean stored = false;
+        try {
+            stored = record(entry);
+        } finally {
+            if (!stored) {
+                recordedOutcomes.remove(entry.getOutcome());
+            }
         }
     }
 
     public void recordUnresolvedFailure(AuditEntry.AuditEntryBuilder entry, Throwable failure, String key) {
-        recordUnresolvedFailure(failed(entry, failure), key);
+        try {
+            recordUnresolvedFailure(failed(entry, failure), key);
+        } catch (RuntimeException e) {
+            log.error("Audit event of a failure not recorded", e);
+        }
     }
 
     public void failureResolved(AuditAction action, String key) {

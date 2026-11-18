@@ -7,6 +7,8 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.openframe.data.document.audit.AuditActorType.API_KEY;
 import static com.openframe.data.document.audit.AuditActorType.DEVICE;
@@ -57,6 +59,10 @@ public record AuditActor(AuditActorType type, String id, String name, String ema
                                         String ownerId) {
         return new AuditActor(API_KEY, keyId, keyName, null, Objects.requireNonNullElse(keyRoles, List.of()),
                 keyTenantId, ownerId, null);
+    }
+
+    public String identity() {
+        return Stream.of(type.name(), id, onBehalfOfId).filter(Objects::nonNull).collect(Collectors.joining(":"));
     }
 
     public String tenantFor(String requestedTenantId, String superTenantId, Supplier<String> servedTenantId) {

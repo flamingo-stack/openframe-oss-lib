@@ -5,20 +5,26 @@ import com.openframe.data.document.audit.AuditEvent;
 import com.openframe.data.model.audit.AuditActor;
 import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.model.audit.AuditRequestInfo;
+import org.bson.types.ObjectId;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.UUID;
 
-import static com.openframe.data.document.audit.AuditAction.LINK_CREATE;
 import static com.openframe.data.document.audit.AuditAction.TICKET_ARCHIVE;
-import static com.openframe.data.document.audit.AuditActorType.MINGO;
-import static com.openframe.data.document.audit.AuditActorType.USER;
 import static com.openframe.data.document.audit.AuditOutcome.SUCCESS;
 import static com.openframe.data.document.audit.AuditTargetType.KB_ARTICLE;
 import static com.openframe.data.document.audit.AuditTargetType.TICKET;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AuditEventMapperTest {
 
@@ -42,24 +48,6 @@ class AuditEventMapperTest {
     }
 
     @Test
-    void toEvent_entryNamesParent_keepsEntryParent() {
-        AuditEntry entry = ticketArchive().parentEventId("event-named").build();
-
-        AuditEvent event = mapper.toEvent(entry, AuditActor.system(), NO_REQUEST, "tenant-1", "event-running",
-                OCCURRED_AT);
-
-        assertThat(event.getParentEventId()).isEqualTo("event-named");
-    }
-
-    @Test
-    void toEvent_entryNamesNoParent_takesRunningEventAsParent() {
-        AuditEvent event = mapper.toEvent(ticketArchive().build(), AuditActor.system(), NO_REQUEST, "tenant-1",
-                "event-running", OCCURRED_AT);
-
-        assertThat(event.getParentEventId()).isEqualTo("event-running");
-    }
-
-    @Test
     void toEvent_entryNamesNoTargetType_takesActionTargetType() {
         AuditEvent event = eventOf(ticketArchive().build());
 
@@ -74,78 +62,102 @@ class AuditEventMapperTest {
     }
 
     @Test
-    void toEvent_neitherEntryNorActionNamesTargetType_throws() {
-        AuditEntry entry = AuditEntry.builder().action(LINK_CREATE).outcome(SUCCESS).build();
+    void toEvent_detailWithoutValue_storesOnlyTheDetailsWithValues() {
+        Map<String, Object> details = new HashMap<>();
+        details.put("tagIds", null);
+        details.put("via", "dialog");
 
-        assertThatThrownBy(() -> eventOf(entry)).isInstanceOf(NullPointerException.class);
+        AuditEvent event = eventOf(ticketArchive().details(details).build());
+
+        assertThat(event.getDetails()).isEqualTo(Map.of("via", "dialog"));
     }
 
     @Test
-    void toEvent_listedAction_storesItsListName() {
-        AuditEvent event = eventOf(ticketArchive().build());
+    void toEvent_noDetailHasAValue_storesNoDetails() {
+        Map<String, Object> details = new HashMap<>();
+        details.put("tagIds", null);
 
-        assertThat(event.getAction()).isEqualTo("ticket.archive");
+        AuditEvent event = eventOf(ticketArchive().details(details).build());
+
+        assertThat(event.getDetails()).isNull();
     }
 
     @Test
-    void toEvent_anyEntry_stampsCurrentSchemaVersion() {
-        AuditEvent event = eventOf(ticketArchive().build());
+    void toEvent_detailsOfSimpleValuesAndListsOfThem_storesThemAll() {
+        Map<String, Object> details = Map.of("via", "dialog", "count", 2, "forced", true,
+                "tagIds", List.of("tag-1", "tag-2"));
 
-        assertThat(event.getSchemaVersion()).isEqualTo(AuditEvent.SCHEMA_VERSION);
+        AuditEvent event = eventOf(ticketArchive().details(details).build());
+
+        assertThat(event.getDetails()).isEqualTo(details);
     }
 
     @Test
-    void toEvent_recordingTime_storesItAsOccurredAt() {
-        AuditEvent event = eventOf(ticketArchive().build());
+    void toEvent_detailsThatAreNotTextNumberOrYesNo_storesThemAsText() {
+        Map<String, Object> details = Map.of(
+                "status", SUCCESS,
+                "dueAt", OffsetDateTime.parse("2026-10-28T14:12:00+02:00"),
+                "at", OCCURRED_AT,
+                "runId", UUID.fromString("0b7e1c52-4f0a-4d8e-9a51-2c7d3f6e8a10"),
+                "recordId", new ObjectId("671a9e03c2f4a1b2c3d4e5f6"),
+                "title", new StringBuilder("Printer offline"));
 
-        assertThat(event.getOccurredAt()).isEqualTo(Instant.parse("2026-10-28T14:12:00Z"));
+        AuditEvent event = eventOf(ticketArchive().details(details).build());
+
+        assertThat(event.getDetails()).isEqualTo(Map.of(
+                "status", "SUCCESS",
+                "dueAt", "2026-10-28T14:12+02:00",
+                "at", "2026-10-28T14:12:00Z",
+                "runId", "0b7e1c52-4f0a-4d8e-9a51-2c7d3f6e8a10",
+                "recordId", "671a9e03c2f4a1b2c3d4e5f6",
+                "title", "Printer offline"));
     }
 
     @Test
-    void toEvent_entryNamesNoTenant_storesResolvedTenant() {
-        AuditEvent event = mapper.toEvent(ticketArchive().build(), AuditActor.system(), NO_REQUEST,
-                "tenant-resolved", null, OCCURRED_AT);
+    void toEvent_detailsOfLargeNumbersDatesAndZones_storesThemAsText() {
+        Map<String, Object> details = Map.of(
+                "cap", new BigDecimal("10.000000000000000000000000000000001"),
+                "rate", new BigDecimal("1E+1"),
+                "count", new BigInteger("123456789012345678901234567890123456789"),
+                "sentAt", Date.from(OCCURRED_AT),
+                "zone", TimeZone.getTimeZone("Europe/Berlin"));
 
-        assertThat(event.getTenantId()).isEqualTo("tenant-resolved");
+        AuditEvent event = eventOf(ticketArchive().details(details).build());
+
+        assertThat(event.getDetails()).isEqualTo(Map.of(
+                "cap", "10.000000000000000000000000000000001",
+                "rate", "10",
+                "count", "123456789012345678901234567890123456789",
+                "sentAt", "2026-10-28T14:12:00Z",
+                "zone", "Europe/Berlin"));
     }
 
     @Test
-    void toEvent_userActor_storesWhoActed() {
-        AuditActor anna = new AuditActor(USER, "user-anna", "Anna Kowalski", "anna@example.com",
-                List.of("ADMIN", "TECHNICIAN"), "tenant-1", null, null);
+    void toEvent_detailsThatAreEmptyListsOrHoldOnlyEmptyPlaces_storesNoDetails() {
+        Map<String, Object> details = Map.of("tagIds", List.of(), "ownerIds", Arrays.asList(null, null));
 
-        AuditEvent event = mapper.toEvent(ticketArchive().build(), anna, NO_REQUEST, "tenant-1", null, OCCURRED_AT);
+        AuditEvent event = eventOf(ticketArchive().details(details).build());
 
-        assertThat(event)
-                .extracting(AuditEvent::getActorType, AuditEvent::getActorId, AuditEvent::getActorEmail,
-                        AuditEvent::getActorRoles)
-                .containsExactly(USER, "user-anna", "anna@example.com", List.of("ADMIN", "TECHNICIAN"));
+        assertThat(event.getDetails()).isNull();
     }
 
     @Test
-    void toEvent_aiActorWithApprover_storesSenderAndApprover() {
-        AuditActor approver = new AuditActor(USER, "user-approver", null, "owner@example.com", List.of("OWNER"),
-                "tenant-1", null, null);
-        AuditActor mingo = new AuditActor(MINGO, null, "Mingo", null, List.of(), null, "user-sender", approver);
+    void toEvent_detailThatIsAListWithAnEmptyPlace_storesTheListWithoutIt() {
+        Map<String, Object> details = Map.of("tagIds", Arrays.asList("tag-1", null, "tag-2"));
 
-        AuditEvent event = mapper.toEvent(ticketArchive().build(), mingo, NO_REQUEST, "tenant-1", null, OCCURRED_AT);
+        AuditEvent event = eventOf(ticketArchive().details(details).build());
 
-        assertThat(event)
-                .extracting(AuditEvent::getOnBehalfOfId, AuditEvent::getApproverId)
-                .containsExactly("user-sender", "user-approver");
+        assertThat(event.getDetails()).isEqualTo(Map.of("tagIds", List.of("tag-1", "tag-2")));
     }
 
     @Test
-    void toEvent_requestSource_storesRequestFields() {
-        AuditRequestInfo requestInfo = new AuditRequestInfo("203.0.113.24", "Chrome", "request-1", "session-1");
+    void toEvent_detailThatIsAMapOrAListOfLists_storesOnlyTheOtherDetails() {
+        Map<String, Object> details = Map.of("via", "dialog", "input", Map.of("password", "s3cret"),
+                "pairs", List.of(List.of("a", "b")));
 
-        AuditEvent event = mapper.toEvent(ticketArchive().build(), AuditActor.system(), requestInfo, "tenant-1", null,
-                OCCURRED_AT);
+        AuditEvent event = eventOf(ticketArchive().details(details).build());
 
-        assertThat(event)
-                .extracting(AuditEvent::getSourceIp, AuditEvent::getUserAgent, AuditEvent::getCorrelationId,
-                        AuditEvent::getSessionId)
-                .containsExactly("203.0.113.24", "Chrome", "request-1", "session-1");
+        assertThat(event.getDetails()).isEqualTo(Map.of("via", "dialog"));
     }
 
     private AuditEvent eventOf(AuditEntry entry) {

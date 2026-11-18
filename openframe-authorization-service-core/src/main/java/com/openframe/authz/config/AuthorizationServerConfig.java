@@ -203,8 +203,7 @@ public class AuthorizationServerConfig {
                     OAuth2Authorization authorization = context.getAuthorization();
                     if (authorization != null) {
                         claims.put(AuditConstants.SESSION_CLAIM, Objects.requireNonNullElse(
-                                authorization.getAttribute(AuditConstants.SESSION_ATTRIBUTE),
-                                authorization.getId()));
+                                authorization.getAttribute(AuditConstants.SESSION_ATTRIBUTE), authorization.getId()));
                     }
                 });
             }

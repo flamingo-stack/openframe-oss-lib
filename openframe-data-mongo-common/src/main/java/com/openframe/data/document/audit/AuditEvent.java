@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +19,6 @@ import java.util.Map;
 public class AuditEvent {
 
     public static final int SCHEMA_VERSION = 1;
-    public static final Duration RETENTION = Duration.ofDays(7);
 
     @Id
     private String id;

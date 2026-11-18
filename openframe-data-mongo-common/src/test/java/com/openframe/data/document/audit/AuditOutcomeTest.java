@@ -20,8 +20,8 @@ class AuditOutcomeTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {200, 299})
-    void ofStatus_twoHundreds_isSuccess(int status) {
+    @ValueSource(ints = {200, 399})
+    void ofStatus_twoOrThreeHundreds_isSuccess(int status) {
         assertThat(AuditOutcome.ofStatus(status)).isEqualTo(AuditOutcome.SUCCESS);
     }
 
@@ -31,9 +31,13 @@ class AuditOutcomeTest {
         assertThat(AuditOutcome.ofStatus(status)).isEqualTo(AuditOutcome.REFUSED);
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {199, 300, 399, 500})
-    void ofStatus_neitherTwoNorFourHundreds_isFailure(int status) {
-        assertThat(AuditOutcome.ofStatus(status)).isEqualTo(AuditOutcome.FAILURE);
+    @Test
+    void ofStatus_belowTwoHundred_isFailure() {
+        assertThat(AuditOutcome.ofStatus(199)).isEqualTo(AuditOutcome.FAILURE);
+    }
+
+    @Test
+    void ofStatus_fiveHundreds_isFailure() {
+        assertThat(AuditOutcome.ofStatus(500)).isEqualTo(AuditOutcome.FAILURE);
     }
 }

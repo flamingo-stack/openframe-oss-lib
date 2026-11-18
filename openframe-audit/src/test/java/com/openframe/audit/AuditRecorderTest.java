@@ -5,12 +5,12 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.openframe.data.document.apikey.ApiKey;
 import com.openframe.data.document.audit.AuditAction;
-import com.openframe.data.document.audit.AuditActorType;
 import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.model.audit.AuditActor;
 import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.model.audit.AuditRequestInfo;
 import com.openframe.data.repository.apikey.ApiKeyRepository;
+import com.openframe.data.service.AuditClock;
 import com.openframe.data.service.AuditTenantResolver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +29,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +38,7 @@ import java.util.function.Supplier;
 import static com.openframe.core.constants.HttpHeaders.X_API_KEY_ID;
 import static com.openframe.core.constants.HttpHeaders.X_USER_ID;
 import static com.openframe.data.model.audit.AuditConstants.ACTOR_ATTRIBUTE;
+import static com.openframe.data.model.audit.AuditConstants.ONCE_WINDOW;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -55,6 +57,7 @@ class AuditRecorderTest {
     private static final String USER_ID = "user-1";
     private static final String MACHINE_ID = "machine-1";
     private static final String ENDPOINT = "GET /api/users";
+    private static final Instant START = Instant.parse("2026-11-16T10:00:00Z");
     private static final AuditRequestInfo REQUEST_INFO =
             new AuditRequestInfo("203.0.113.5", "Mingo", "request-7", "session-7");
 
@@ -62,18 +65,18 @@ class AuditRecorderTest {
     @Mock private AuditTenantResolver tenantResolver;
     @Mock private AuditOutcomeResolver outcomeResolver;
     @Mock private AuditEventWriter writer;
+    @Mock private AuditClock auditClock;
     @Captor private ArgumentCaptor<List<AuditEntry>> entriesCaptor;
-    @Captor private ArgumentCaptor<AuditContext> contextCaptor;
 
     private final Logger logger = (Logger) LoggerFactory.getLogger(AuditRecorder.class);
     private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
-    private AuditContext seenInside;
+    private Instant now = START;
 
     private AuditRecorder recorder;
 
     @BeforeEach
     void setUp() {
-        recorder = new AuditRecorder(apiKeyRepository, tenantResolver, outcomeResolver, writer, true);
+        recorder = new AuditRecorder(apiKeyRepository, tenantResolver, outcomeResolver, writer, new AuditClock(), true);
         appender.start();
         logger.addAppender(appender);
     }
@@ -92,14 +95,6 @@ class AuditRecorderTest {
 
         assertThat(recorder.context().actor()).isEqualTo(
                 AuditActor.fromUser(USER_ID, "anna@acme.com", List.of("ADMIN"), SERVED_TENANT_ID, SUPER_TENANT_ID));
-    }
-
-    @Test
-    void context_platformTenantToken_isStaff() {
-        when(tenantResolver.superTenantId()).thenReturn(SUPER_TENANT_ID);
-        signIn("staff-1", SUPER_TENANT_ID, Map.of("roles", List.of("ADMIN")));
-
-        assertThat(recorder.context().actor().type()).isEqualTo(AuditActorType.STAFF);
     }
 
     @Test
@@ -204,70 +199,22 @@ class AuditRecorderTest {
     }
 
     @Test
-    void requestInfo_noRequest_isEmpty() {
-        assertThat(recorder.requestInfo()).isEqualTo(new AuditRequestInfo(null, null, null, null));
-    }
+    void context_auditOff_doesNotLookTheApiKeyUp() {
+        AuditRecorder off = recorderWithTheAuditOff();
+        currentRequest().addHeader(X_API_KEY_ID, "key-1");
 
-    @Test
-    void record_entryWithContext_handsItToTheWriterUnderThatContext() {
-        AuditEntry entry = entry();
-        AuditContext context = declaredContext("event-0");
-
-        recorder.record(entry, context);
-
-        verify(writer).write(List.of(entry), context, true);
-    }
-
-    @Test
-    void record_entryWithoutContext_handsItToTheWriterUnderTheCallersContext() {
-        AuditEntry entry = entry();
-        currentRequest().setAttribute(ACTOR_ATTRIBUTE, AuditActor.staff("staff-2"));
-
-        recorder.record(entry);
-
-        verify(writer).write(eq(List.of(entry)), contextCaptor.capture(), eq(true));
-        assertThat(contextCaptor.getValue().actor()).isEqualTo(AuditActor.staff("staff-2"));
-    }
-
-    @Test
-    void record_entryWithActor_handsItToTheWriterUnderThatActor() {
-        AuditEntry entry = entry();
-        AuditActor job = AuditActor.system("invoice-sync");
-
-        recorder.record(entry, job);
-
-        verify(writer).write(eq(List.of(entry)), contextCaptor.capture(), eq(true));
-        assertThat(contextCaptor.getValue().actor()).isEqualTo(job);
-    }
-
-    @Test
-    void record_entryWithoutOutcome_throws() {
-        AuditEntry entry = AuditEntry.builder().action(AuditAction.TICKET_ARCHIVE).build();
-
-        assertThatThrownBy(() -> recorder.record(entry))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("An audit entry needs an outcome");
+        assertThat(off.context().actor()).isEqualTo(AuditActor.system());
+        verifyNoInteractions(apiKeyRepository);
     }
 
     @Test
     void record_auditOff_recordsNothing() {
-        AuditRecorder off = new AuditRecorder(apiKeyRepository, tenantResolver, outcomeResolver, writer, false);
+        AuditRecorder off = recorderWithTheAuditOff();
 
         boolean recorded = off.record(entry());
 
         assertThat(recorded).isFalse();
         verifyNoInteractions(writer);
-    }
-
-    @Test
-    void record_eventStored_returnsTrue() {
-        AuditEntry entry = entry();
-        AuditContext context = declaredContext(null);
-        when(writer.write(List.of(entry), context, true)).thenReturn(true);
-
-        boolean recorded = recorder.record(entry, context);
-
-        assertThat(recorded).isTrue();
     }
 
     @Test
@@ -283,73 +230,6 @@ class AuditRecorderTest {
         assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage).singleElement().asString()
                 .startsWith("Audit events not recorded: [AuditEntry(")
                 .contains("action=TICKET_ARCHIVE", "targetId=ticket-1");
-    }
-
-    @Test
-    void record_callerCannotBeRead_logsTheEntriesAndRecordsNothing() {
-        currentRequest().addHeader(X_API_KEY_ID, "key-1");
-        when(apiKeyRepository.findById("key-1"))
-                .thenThrow(new IllegalArgumentException("No enum constant ApiKeyStatus.PAUSED"));
-
-        boolean recorded = recorder.record(ticketArchive("ticket-1"));
-
-        assertThat(recorded).isFalse();
-        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage).singleElement().asString()
-                .startsWith("Audit events not recorded: [AuditEntry(")
-                .contains("action=TICKET_ARCHIVE", "targetId=ticket-1");
-        verifyNoInteractions(writer);
-    }
-
-    @Test
-    void record_contextWithoutEventInsideADeclaredEvent_hangsUnderIt() {
-        AuditEntry entry = entry();
-        AuditActor job = AuditActor.system("invoice-sync");
-
-        recorder.runInContext(declaredContext("event-1"),
-                () -> recorder.record(entry, new AuditContext(job, REQUEST_INFO, null)));
-
-        verify(writer).write(List.of(entry), new AuditContext(job, REQUEST_INFO, "event-1"), true);
-    }
-
-    @Test
-    void record_contextWithItsOwnEventInsideADeclaredEvent_keepsItsOwnEvent() {
-        AuditEntry entry = entry();
-        AuditContext own = new AuditContext(AuditActor.system("invoice-sync"), REQUEST_INFO, "event-2");
-
-        recorder.runInContext(declaredContext("event-1"), () -> recorder.record(entry, own));
-
-        verify(writer).write(List.of(entry), own, true);
-    }
-
-    @Test
-    void recordCaptured_entry_handsItToTheWriterWithoutLoadingItsTarget() {
-        AuditEntry entry = ticketArchive("ticket-1");
-        AuditContext context = declaredContext(null);
-
-        recorder.recordCaptured(entry, context);
-
-        verify(writer).write(List.of(entry), context, false);
-    }
-
-    @Test
-    void runInContext_runnableWork_runsUnderTheDeclaredContext() {
-        AuditContext declared = declaredContext("event-1");
-
-        recorder.runInContext(declared, () -> {
-            seenInside = recorder.context();
-        });
-
-        assertThat(seenInside).isEqualTo(declared);
-    }
-
-    @Test
-    void runInContext_contextWithoutEventInsideADeclaredEvent_hangsUnderIt() {
-        AuditContext inner = new AuditContext(AuditActor.system("invoice-sync"), REQUEST_INFO, null);
-
-        AuditContext context = recorder.runInContext(declaredContext("event-1"),
-                () -> recorder.runInContext(inner, () -> recorder.context()));
-
-        assertThat(context.parentEventId()).isEqualTo("event-1");
     }
 
     @Test
@@ -385,6 +265,7 @@ class AuditRecorderTest {
     @Test
     void recordOnce_sameKeyTwice_recordsOnce() {
         AuditEntry denial = denial();
+        when(writer.write(eq(List.of(denial)), any(), eq(true))).thenReturn(true);
 
         recorder.recordOnce(denial, ENDPOINT);
         recorder.recordOnce(denial, ENDPOINT);
@@ -393,8 +274,73 @@ class AuditRecorderTest {
     }
 
     @Test
+    void recordOnce_firstEventNotStored_doesNotTryAgainWithinTheWindow() {
+        AuditEntry denial = denial();
+        when(writer.write(eq(List.of(denial)), any(), eq(true))).thenReturn(false);
+
+        recorder.recordOnce(denial, ENDPOINT);
+        recorder.recordOnce(denial, ENDPOINT);
+
+        verify(writer).write(eq(List.of(denial)), any(), eq(true));
+    }
+
+    @Test
+    void recordOnce_sameKeyAfterTheWindow_recordsItAgain() {
+        AuditEntry denial = denial();
+        AuditRecorder timed = recorderAtTheTestsTime();
+
+        timed.recordOnce(denial, ENDPOINT);
+        now = START.plus(ONCE_WINDOW);
+        timed.recordOnce(denial, ENDPOINT);
+
+        verify(writer, times(2)).write(eq(List.of(denial)), any(), eq(true));
+    }
+
+    @Test
+    void recordOnce_sameKeyJustBeforeTheWindowEnds_recordsOnce() {
+        AuditEntry denial = denial();
+        AuditRecorder timed = recorderAtTheTestsTime();
+
+        timed.recordOnce(denial, ENDPOINT);
+        now = START.plus(ONCE_WINDOW).minusMillis(1);
+        timed.recordOnce(denial, ENDPOINT);
+
+        verify(writer).write(eq(List.of(denial)), any(), eq(true));
+    }
+
+    @Test
+    void recordOnce_sameKeyOfAnotherAction_recordsItToo() {
+        AuditEntry denial = denial();
+        AuditEntry mismatch = AuditEntry.builder()
+                .action(AuditAction.AUTH_TENANT_MISMATCH_REFUSE)
+                .outcome(AuditOutcome.REFUSED)
+                .build();
+        storesEventsOfTheServedTenant(AuditActor.system());
+
+        recorder.recordOnce(denial, ENDPOINT);
+        recorder.recordOnce(mismatch, ENDPOINT);
+
+        verify(writer).write(eq(List.of(denial)), any(), eq(true));
+        verify(writer).write(eq(List.of(mismatch)), any(), eq(true));
+    }
+
+    @Test
+    void recordOnce_sameKeyWithAnotherOutcomeWithinTheWindow_recordsItToo() {
+        AuditEntry refused = denial();
+        AuditEntry failed = denial().toBuilder().outcome(AuditOutcome.FAILURE).build();
+        when(writer.write(any(), any(), eq(true))).thenReturn(true);
+
+        recorder.recordOnce(refused, ENDPOINT);
+        recorder.recordOnce(failed, ENDPOINT);
+
+        verify(writer).write(eq(List.of(refused)), any(), eq(true));
+        verify(writer).write(eq(List.of(failed)), any(), eq(true));
+    }
+
+    @Test
     void recordOnce_otherKey_recordsItToo() {
         AuditEntry denial = denial();
+        storesEventsOfTheServedTenant(AuditActor.system());
 
         recorder.recordOnce(denial, ENDPOINT);
         recorder.recordOnce(denial, "GET /api/devices");
@@ -405,9 +351,21 @@ class AuditRecorderTest {
     @Test
     void recordOnce_sameKeyForAnotherActor_recordsItToo() {
         AuditEntry denial = denial();
+        storesEventsOfTheServedTenant(AuditActor.system("invoice-sync"), AuditActor.system("script-watchdog"));
 
-        recorder.recordOnce(denial, ENDPOINT, AuditActor.system("invoice-sync"));
-        recorder.recordOnce(denial, ENDPOINT, AuditActor.system("script-watchdog"));
+        recorder.runInContext(contextOf(AuditActor.system("invoice-sync")), () -> recorder.recordOnce(denial, ENDPOINT));
+        recorder.runInContext(contextOf(AuditActor.system("script-watchdog")), () -> recorder.recordOnce(denial, ENDPOINT));
+
+        verify(writer, times(2)).write(eq(List.of(denial)), any(), eq(true));
+    }
+
+    @Test
+    void recordOnce_sameKeyForMingoActingForAnotherUser_recordsItToo() {
+        AuditEntry denial = denial();
+        storesEventsOfTheServedTenant(AuditActor.mingo("user-1"), AuditActor.mingo("user-2"));
+
+        recorder.runInContext(contextOf(AuditActor.mingo("user-1")), () -> recorder.recordOnce(denial, ENDPOINT));
+        recorder.runInContext(contextOf(AuditActor.mingo("user-2")), () -> recorder.recordOnce(denial, ENDPOINT));
 
         verify(writer, times(2)).write(eq(List.of(denial)), any(), eq(true));
     }
@@ -427,40 +385,101 @@ class AuditRecorderTest {
     }
 
     @Test
-    void recordOnce_callerCannotBeRead_logsAndRecordsNothing() {
-        currentRequest().addHeader(X_API_KEY_ID, "key-1");
-        when(apiKeyRepository.findById("key-1"))
-                .thenThrow(new IllegalArgumentException("No enum constant ApiKeyStatus.PAUSED"));
+    void recordOnce_failureWhoseEventIsStored_recordsItsOutcomeAndMarksItRecorded() {
+        IllegalStateException denied = billingDenial();
+        when(writer.write(any(), any(), eq(true))).thenReturn(true);
 
-        recorder.recordOnce(denial(), ENDPOINT);
+        recorder.recordOnce(billingRefusal(), denied, ENDPOINT);
 
-        assertThat(appender.list).extracting(ILoggingEvent::getFormattedMessage)
-                .containsExactly("Audit event not recorded for auth.access.refuse");
-        verifyNoInteractions(writer);
+        assertThat(recordedEntries()).extracting(AuditEntry::getAction, AuditEntry::getOutcome, AuditEntry::getReason)
+                .containsExactly(tuple(AuditAction.BILLING_ACCESS_REFUSE, AuditOutcome.REFUSED,
+                        "Billing is managed by the owner"));
+        assertThat(RecordedFailures.contains(denied)).isTrue();
     }
 
     @Test
-    void recordFailure_exception_recordsTheOutcomeAndReasonOfTheResolver() {
-        IllegalArgumentException failure = new IllegalArgumentException("Ticket is archived");
+    void recordOnce_failureUnderTheSameKeyAgainWithinTheWindow_recordsNothingMoreAndMarksItRecorded() {
+        IllegalStateException repeat = billingDenial();
+        when(writer.write(any(), any(), eq(true))).thenReturn(true);
+
+        recorder.recordOnce(billingRefusal(), billingDenial(), ENDPOINT);
+        recorder.recordOnce(billingRefusal(), repeat, ENDPOINT);
+
+        verify(writer).write(any(), any(), eq(true));
+        assertThat(RecordedFailures.contains(repeat)).isTrue();
+    }
+
+    @Test
+    void recordOnce_failureRepeatedWhileTheFirstEventIsBeingStored_marksTheRepeatRecorded() {
+        IllegalStateException repeat = billingDenial();
+        when(writer.write(any(), any(), eq(true))).thenAnswer(_ -> {
+            recorder.recordOnce(billingRefusal(), repeat, ENDPOINT);
+            return true;
+        });
+
+        recorder.recordOnce(billingRefusal(), billingDenial(), ENDPOINT);
+
+        verify(writer).write(any(), any(), eq(true));
+        assertThat(RecordedFailures.contains(repeat)).isTrue();
+    }
+
+    @Test
+    void recordOnce_failureRepeatedAfterTheFirstEventWasNotStored_leavesTheRepeatUnmarked() {
+        IllegalStateException repeat = billingDenial();
+        when(writer.write(any(), any(), eq(true))).thenReturn(false);
+
+        recorder.recordOnce(billingRefusal(), billingDenial(), ENDPOINT);
+        recorder.recordOnce(billingRefusal(), repeat, ENDPOINT);
+
+        verify(writer).write(any(), any(), eq(true));
+        assertThat(RecordedFailures.contains(repeat)).isFalse();
+    }
+
+    @Test
+    void recordOnce_firstStoreDiesWithAnError_leavesTheRepeatUnmarked() {
+        IllegalStateException repeat = billingDenial();
+        when(writer.write(any(), any(), eq(true))).thenThrow(new StackOverflowError());
+
+        assertThatThrownBy(() -> recorder.recordOnce(billingRefusal(), billingDenial(), ENDPOINT))
+                .isInstanceOf(StackOverflowError.class);
+        recorder.recordOnce(billingRefusal(), repeat, ENDPOINT);
+
+        verify(writer).write(any(), any(), eq(true));
+        assertThat(RecordedFailures.contains(repeat)).isFalse();
+    }
+
+    @Test
+    void recordOnce_failureWhoseEventIsNotStored_leavesItUnmarked() {
+        IllegalStateException denied = billingDenial();
+        when(writer.write(any(), any(), eq(true))).thenReturn(false);
+
+        recorder.recordOnce(billingRefusal(), denied, ENDPOINT);
+
+        assertThat(RecordedFailures.contains(denied)).isFalse();
+    }
+
+    @Test
+    void recordFailure_eventStored_marksTheFailureRecorded() {
+        IllegalStateException failure = new IllegalStateException("Ticket is archived");
         when(outcomeResolver.ofFailure(failure))
-                .thenReturn(new ActionOutcome(AuditOutcome.REFUSED, "Refused: archived"));
+                .thenReturn(new ActionOutcome(AuditOutcome.REFUSED, "Ticket is archived"));
+        when(writer.write(any(), any(), eq(true))).thenReturn(true);
 
         recorder.recordFailure(AuditEntry.builder().action(AuditAction.TICKET_ARCHIVE), failure);
 
-        assertThat(recordedEntries()).extracting(AuditEntry::getOutcome, AuditEntry::getReason)
-                .containsExactly(tuple(AuditOutcome.REFUSED, "Refused: archived"));
+        assertThat(RecordedFailures.contains(failure)).isTrue();
     }
 
     @Test
-    void recordUnresolvedFailure_exception_recordsTheOutcomeAndReasonOfTheResolver() {
-        RuntimeException failure = new RuntimeException("Stripe did not answer");
+    void recordFailure_eventNotStored_leavesTheFailureUnmarked() {
+        IllegalStateException failure = new IllegalStateException("Ticket is archived");
         when(outcomeResolver.ofFailure(failure))
-                .thenReturn(new ActionOutcome(AuditOutcome.FAILURE, "RuntimeException"));
+                .thenReturn(new ActionOutcome(AuditOutcome.REFUSED, "Ticket is archived"));
+        when(writer.write(any(), any(), eq(true))).thenReturn(false);
 
-        recorder.recordUnresolvedFailure(AuditEntry.builder().action(AuditAction.TICKET_ARCHIVE), failure, "invoice-1");
+        recorder.recordFailure(AuditEntry.builder().action(AuditAction.TICKET_ARCHIVE), failure);
 
-        assertThat(recordedEntries()).extracting(AuditEntry::getOutcome, AuditEntry::getReason)
-                .containsExactly(tuple(AuditOutcome.FAILURE, "RuntimeException"));
+        assertThat(RecordedFailures.contains(failure)).isFalse();
     }
 
     @Test
@@ -472,6 +491,18 @@ class AuditRecorderTest {
         recorder.recordUnresolvedFailure(failure, "invoice-1");
 
         verify(writer).write(eq(List.of(failure)), any(), eq(true));
+    }
+
+    @Test
+    void recordUnresolvedFailure_storeDiesWithAnError_recordsItOnTheNextRun() {
+        AuditEntry failure = failure();
+        when(writer.write(eq(List.of(failure)), any(), eq(true))).thenThrow(new StackOverflowError()).thenReturn(true);
+
+        assertThatThrownBy(() -> recorder.recordUnresolvedFailure(failure, "invoice-1"))
+                .isInstanceOf(StackOverflowError.class);
+        recorder.recordUnresolvedFailure(failure, "invoice-1");
+
+        verify(writer, times(2)).write(eq(List.of(failure)), any(), eq(true));
     }
 
     @Test
@@ -489,11 +520,25 @@ class AuditRecorderTest {
     @Test
     void recordUnresolvedFailure_otherKey_recordsItToo() {
         AuditEntry failure = failure();
+        when(writer.write(eq(List.of(failure)), any(), eq(true))).thenReturn(true);
 
         recorder.recordUnresolvedFailure(failure, "invoice-1");
         recorder.recordUnresolvedFailure(failure, "invoice-2");
 
         verify(writer, times(2)).write(eq(List.of(failure)), any(), eq(true));
+    }
+
+    @Test
+    void recordUnresolvedFailure_sameKeyOfAnotherAction_recordsItToo() {
+        AuditEntry archiveFailure = failure();
+        AuditEntry updateFailure = AuditEntry.builder().action(AuditAction.TICKET_UPDATE).outcome(AuditOutcome.FAILURE).build();
+        when(writer.write(any(), any(), eq(true))).thenReturn(true);
+
+        recorder.recordUnresolvedFailure(archiveFailure, "invoice-1");
+        recorder.recordUnresolvedFailure(updateFailure, "invoice-1");
+
+        verify(writer).write(eq(List.of(archiveFailure)), any(), eq(true));
+        verify(writer).write(eq(List.of(updateFailure)), any(), eq(true));
     }
 
     @Test
@@ -509,29 +554,34 @@ class AuditRecorderTest {
     }
 
     @Test
-    void recordAll_entries_handsThemToTheWriterInOneCall() {
-        List<AuditEntry> entries = List.of(ticketArchive("ticket-1"), ticketArchive("ticket-2"));
+    void recordUnresolvedFailure_sameKeyWithAnotherOutcome_recordsEachOutcomeOnce() {
+        AuditEntry failed = failure();
+        AuditEntry refused = failure().toBuilder().outcome(AuditOutcome.REFUSED).build();
+        when(writer.write(any(), any(), eq(true))).thenReturn(true);
 
-        recorder.recordAll(entries);
+        recorder.recordUnresolvedFailure(failed, "invoice-1");
+        recorder.recordUnresolvedFailure(refused, "invoice-1");
+        recorder.recordUnresolvedFailure(failed, "invoice-1");
+        recorder.recordUnresolvedFailure(refused, "invoice-1");
 
-        verify(writer).write(eq(entries), any(), eq(true));
+        verify(writer).write(eq(List.of(failed)), any(), eq(true));
+        verify(writer).write(eq(List.of(refused)), any(), eq(true));
     }
 
     @Test
-    void recordAll_noEntries_recordsNothing() {
-        recorder.recordAll(List.of());
+    void recordUnresolvedFailure_oneOutcomeNotStored_recordsOnlyThatOutcomeAgain() {
+        AuditEntry failed = failure();
+        AuditEntry refused = failure().toBuilder().outcome(AuditOutcome.REFUSED).build();
+        when(writer.write(eq(List.of(failed)), any(), eq(true))).thenReturn(true);
+        when(writer.write(eq(List.of(refused)), any(), eq(true))).thenReturn(false, true);
 
-        verifyNoInteractions(writer);
-    }
+        recorder.recordUnresolvedFailure(failed, "invoice-1");
+        recorder.recordUnresolvedFailure(refused, "invoice-1");
+        recorder.recordUnresolvedFailure(failed, "invoice-1");
+        recorder.recordUnresolvedFailure(refused, "invoice-1");
 
-    @Test
-    void recordAll_entryWithoutOutcomeAmongOthers_throws() {
-        List<AuditEntry> entries = List.of(entry(),
-                AuditEntry.builder().action(AuditAction.TICKET_ARCHIVE).build());
-
-        assertThatThrownBy(() -> recorder.recordAll(entries))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("An audit entry needs an outcome");
+        verify(writer).write(eq(List.of(failed)), any(), eq(true));
+        verify(writer, times(2)).write(eq(List.of(refused)), any(), eq(true));
     }
 
     private List<AuditEntry> recordedEntries() {
@@ -543,12 +593,44 @@ class AuditRecorderTest {
         return new AuditContext(AuditActor.system("script-watchdog"), REQUEST_INFO, parentEventId);
     }
 
+    private static AuditContext contextOf(AuditActor actor) {
+        return new AuditContext(actor, REQUEST_INFO, null);
+    }
+
     private static AuditEntry entry() {
         return AuditEntry.builder().action(AuditAction.TICKET_ARCHIVE).outcome(AuditOutcome.SUCCESS).build();
     }
 
     private static AuditEntry ticketArchive(String ticketId) {
         return entry().toBuilder().targetId(ticketId).build();
+    }
+
+    private IllegalStateException billingDenial() {
+        IllegalStateException denied = new IllegalStateException("Billing is managed by the owner");
+        when(outcomeResolver.ofFailure(denied))
+                .thenReturn(new ActionOutcome(AuditOutcome.REFUSED, "Billing is managed by the owner"));
+        return denied;
+    }
+
+    private static AuditEntry.AuditEntryBuilder billingRefusal() {
+        return AuditEntry.builder().action(AuditAction.BILLING_ACCESS_REFUSE);
+    }
+
+    private AuditRecorder recorderWithTheAuditOff() {
+        return new AuditRecorder(apiKeyRepository, tenantResolver, outcomeResolver, writer, new AuditClock(), false);
+    }
+
+    private AuditRecorder recorderAtTheTestsTime() {
+        when(auditClock.now()).thenAnswer(_ -> now);
+        storesEventsOfTheServedTenant(AuditActor.system());
+        return new AuditRecorder(apiKeyRepository, tenantResolver, outcomeResolver, writer, auditClock, true);
+    }
+
+    private void storesEventsOfTheServedTenant(AuditActor... actors) {
+        when(writer.write(any(), any(), eq(true))).thenReturn(true);
+        for (AuditActor actor : actors) {
+            when(tenantResolver.tenantFor(actor, null)).thenReturn(SERVED_TENANT_ID);
+        }
     }
 
     private static AuditEntry denial() {

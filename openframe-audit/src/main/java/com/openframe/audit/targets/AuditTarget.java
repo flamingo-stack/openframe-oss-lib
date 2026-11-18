@@ -1,5 +1,6 @@
 package com.openframe.audit.targets;
 
+import com.openframe.data.document.TenantScoped;
 import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditTargetType;
 import lombok.With;
@@ -16,6 +17,7 @@ public record AuditTarget<T>(AuditTargetType type,
                              Function<T, String> name,
                              Function<T, String> organizationId,
                              Function<T, String> deviceId,
+                             Function<T, String> tenantId,
                              Set<String> ignoredFields,
                              Set<String> maskedFields,
                              boolean secretId,
@@ -27,14 +29,14 @@ public record AuditTarget<T>(AuditTargetType type,
     private static final String ELEMENT_ID_FIELD = "id";
 
     public static <T> AuditTarget<T> of(AuditTargetType type, Class<T> documentType, Function<T, String> name) {
-        return new AuditTarget<>(type, documentType, MONGO_ID_FIELD, name, _ -> null, _ -> null, Set.of(), Set.of(),
-                false, Map.of(), null);
+        return new AuditTarget<>(type, documentType, MONGO_ID_FIELD, name, _ -> null, _ -> null,
+                AuditTarget::targetTenantIdOf, Set.of(), Set.of(), false, Map.of(), null);
     }
 
     public static <T> AuditTarget<T> embedded(AuditTargetType type, Class<T> elementType, Container<?, T> container,
                                               Function<T, String> name) {
-        return new AuditTarget<>(type, elementType, ELEMENT_ID_FIELD, name, _ -> null, _ -> null, Set.of(), Set.of(),
-                false, Map.of(), container);
+        return new AuditTarget<>(type, elementType, ELEMENT_ID_FIELD, name, _ -> null, _ -> null,
+                AuditTarget::targetTenantIdOf, Set.of(), Set.of(), false, Map.of(), container);
     }
 
     public boolean keyedByTenant() {
@@ -51,6 +53,14 @@ public record AuditTarget<T>(AuditTargetType type,
 
     public String deviceIdOf(Object document) {
         return deviceId.apply(documentType.cast(document));
+    }
+
+    public String tenantIdOf(Object document) {
+        return tenantId.apply(documentType.cast(document));
+    }
+
+    private static String targetTenantIdOf(Object document) {
+        return document instanceof TenantScoped scoped ? scoped.getTenantId() : null;
     }
 
     public record Container<C, T>(Class<C> type, String elementsField, Function<C, List<T>> elements, Function<T, String> elementId) {

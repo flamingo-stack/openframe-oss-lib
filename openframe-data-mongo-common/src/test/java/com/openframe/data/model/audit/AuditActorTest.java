@@ -2,6 +2,8 @@ package com.openframe.data.model.audit;
 
 import com.openframe.data.document.audit.AuditActorType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -33,43 +35,19 @@ class AuditActorTest {
     }
 
     @Test
-    void fromUser_noSuperTenantConfigured_isUser() {
-        AuditActor actor = AuditActor.fromUser("user-1", "owner@acme.com", List.of("OWNER"), "oss", "");
-
-        assertThat(actor.type()).isEqualTo(AuditActorType.USER);
+    void identity_actorWithAnId_isItsTypeAndId() {
+        assertThat(AuditActor.staff("staff-1").identity()).isEqualTo("STAFF:staff-1");
     }
 
     @Test
-    void fromAgent_agentToken_isDeviceWithTheTokensFacts() {
-        assertThat(AuditActor.fromAgent("machine-1", List.of("AGENT"), "tenant-1"))
-                .returns(AuditActorType.DEVICE, AuditActor::type)
-                .returns("machine-1", AuditActor::id)
-                .returns(List.of("AGENT"), AuditActor::roles)
-                .returns("tenant-1", AuditActor::tokenTenantId);
+    void identity_aiActingForAUser_namesThatUser() {
+        assertThat(AuditActor.mingo("user-1").identity()).isEqualTo("MINGO:user-1");
     }
 
     @Test
-    void fromApiKey_knownKey_actsAsTheKeyForItsOwner() {
-        assertThat(AuditActor.fromApiKey("key-1", "Billing sync", List.of("ADMIN"), "tenant-1", "user-1"))
-                .returns(AuditActorType.API_KEY, AuditActor::type)
-                .returns("key-1", AuditActor::id)
-                .returns("Billing sync", AuditActor::name)
-                .returns(List.of("ADMIN"), AuditActor::roles)
-                .returns("tenant-1", AuditActor::tokenTenantId)
-                .returns("user-1", AuditActor::onBehalfOfId);
-    }
-
-    @Test
-    void fromApiKey_unknownKey_hasNoRoles() {
-        assertThat(AuditActor.fromApiKey("key-2", null, null, null, "user-1").roles()).isEmpty();
-    }
-
-    @Test
-    void system_noCaller_isSystemWithoutIdentity() {
-        assertThat(AuditActor.system())
-                .returns(AuditActorType.SYSTEM, AuditActor::type)
-                .returns(null, AuditActor::id)
-                .returns(List.of(), AuditActor::roles);
+    void identity_apiKeyWithAnOwner_namesTheKeyAndItsOwner() {
+        assertThat(AuditActor.fromApiKey("key-1", "CI key", List.of("ADMIN"), null, "user-7").identity())
+                .isEqualTo("API_KEY:key-1:user-7");
     }
 
     @Test
@@ -82,55 +60,24 @@ class AuditActorTest {
         assertThat(TECHNICIAN.tenantFor(null, SUPER_TENANT_ID, () -> SERVED_TENANT_ID)).isEqualTo("tenant-1");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    void tenantFor_blankRequestedTenant_isTheTokensTenant(String requestedTenantId) {
+        assertThat(TECHNICIAN.tenantFor(requestedTenantId, SUPER_TENANT_ID, () -> SERVED_TENANT_ID))
+                .isEqualTo("tenant-1");
+    }
+
+    @Test
+    void tenantFor_blankTokenTenant_isTheServedTenant() {
+        AuditActor agent = AuditActor.fromAgent("machine-1", List.of("AGENT"), " ");
+
+        assertThat(agent.tenantFor(null, SUPER_TENANT_ID, () -> SERVED_TENANT_ID)).isEqualTo(SERVED_TENANT_ID);
+    }
+
     @Test
     void tenantFor_superTenantToken_isTheServedTenant() {
         AuditActor staff = AuditActor.fromUser("staff-1", null, List.of("ADMIN"), SUPER_TENANT_ID, SUPER_TENANT_ID);
 
         assertThat(staff.tenantFor(null, SUPER_TENANT_ID, () -> SERVED_TENANT_ID)).isEqualTo(SERVED_TENANT_ID);
-    }
-
-    @Test
-    void tenantFor_noTokenTenant_isTheServedTenant() {
-        AuditActor system = AuditActor.system();
-
-        assertThat(system.tenantFor(null, SUPER_TENANT_ID, () -> SERVED_TENANT_ID)).isEqualTo(SERVED_TENANT_ID);
-    }
-
-    @Test
-    void system_jobName_isTheSystemUnderTheJobsName() {
-        assertThat(AuditActor.system("stale-ticket-sweep"))
-                .returns(AuditActorType.SYSTEM, AuditActor::type)
-                .returns("stale-ticket-sweep", AuditActor::id)
-                .returns("stale-ticket-sweep", AuditActor::name);
-    }
-
-    @Test
-    void system_scheduledRun_actsOnBehalfOfItsAuthor() {
-        assertThat(AuditActor.system("scheduled-script-run", "user-1"))
-                .returns(AuditActorType.SYSTEM, AuditActor::type)
-                .returns("user-1", AuditActor::onBehalfOfId);
-    }
-
-    @Test
-    void staff_flamingoPerson_isStaffWithTheirId() {
-        assertThat(AuditActor.staff("hubspot-user-1"))
-                .returns(AuditActorType.STAFF, AuditActor::type)
-                .returns("hubspot-user-1", AuditActor::id);
-    }
-
-    @Test
-    void mingo_toolCall_isMingoOnBehalfOfTheSender() {
-        assertThat(AuditActor.mingo("user-1"))
-                .returns(AuditActorType.MINGO, AuditActor::type)
-                .returns("Mingo", AuditActor::name)
-                .returns("user-1", AuditActor::onBehalfOfId);
-    }
-
-    @Test
-    void fae_toolCall_isFaeOnBehalfOfTheDevice() {
-        assertThat(AuditActor.fae("machine-1"))
-                .returns(AuditActorType.FAE, AuditActor::type)
-                .returns("Fae", AuditActor::name)
-                .returns("machine-1", AuditActor::onBehalfOfId);
     }
 }

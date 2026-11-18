@@ -4,5 +4,5 @@ import com.openframe.data.model.audit.AuditActor;
 import com.openframe.data.model.audit.AuditRequestInfo;
 import lombok.With;
 
-public record AuditContext(AuditActor actor, AuditRequestInfo requestInfo, @With String parentEventId) {
+public record AuditContext(@With AuditActor actor, AuditRequestInfo requestInfo, @With String parentEventId) {
 }

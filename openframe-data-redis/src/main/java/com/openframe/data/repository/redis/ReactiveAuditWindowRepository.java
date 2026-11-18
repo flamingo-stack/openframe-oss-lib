@@ -12,9 +12,9 @@ import java.time.Duration;
 @Repository
 @RequiredArgsConstructor
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
-public class ReactiveAuditOnceRepository {
+public class ReactiveAuditWindowRepository {
 
-    private static final String PREFIX = "audit:once:";
+    private static final String PREFIX = "audit:window:";
 
     private final ReactiveStringRedisTemplate redisTemplate;
     private final OpenframeRedisKeyBuilder keyBuilder;

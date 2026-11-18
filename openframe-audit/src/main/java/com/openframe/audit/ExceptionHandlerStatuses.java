@@ -1,6 +1,7 @@
 package com.openframe.audit;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -29,6 +30,22 @@ public class ExceptionHandlerStatuses implements SmartInitializingSingleton {
                 .filter(Objects::nonNull)
                 .map(ExceptionHandlerMethodResolver::new)
                 .toList();
+    }
+
+    public Throwable handledExceptionOf(Throwable failure) {
+        List<Throwable> failureWithCauses = ExceptionUtils.getThrowableList(failure);
+        return exceptionHandlers.stream()
+                .map(handlers -> firstHandledBy(handlers, failureWithCauses))
+                .flatMap(Optional::stream)
+                .findFirst()
+                .orElse(failure);
+    }
+
+    private static Optional<Throwable> firstHandledBy(ExceptionHandlerMethodResolver handlers,
+                                                      List<Throwable> failureWithCauses) {
+        return failureWithCauses.stream()
+                .filter(thrown -> handlers.resolveMethodByExceptionType(thrown.getClass()) != null)
+                .findFirst();
     }
 
     public Optional<HttpStatusCode> statusOf(Throwable failure) {

@@ -25,7 +25,7 @@ public class AccessDeniedExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
         ErrorCode code = AccessDeniedErrorCode.forCurrentCaller();
         log.warn("Access denied ({}): {}", code.getCode(), ex.getMessage());
-        observers.forEach(observer -> observer.onAccessDenied(code, ex));
+        observers.forEach(observer -> observer.onAccessDenied(ex));
         return ResponseEntity.status(code.getHttpStatus())
                 .body(ErrorResponse.of(code, AccessDeniedErrorCode.MESSAGE));
     }

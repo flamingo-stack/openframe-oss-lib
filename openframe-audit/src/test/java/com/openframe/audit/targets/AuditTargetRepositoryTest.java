@@ -97,6 +97,16 @@ class AuditTargetRepositoryTest {
     }
 
     @Test
+    void load_embeddedTarget_readsItsParentByTheElementIdOnThePrimary() {
+        repository.load(List.of(POLICY_RULES), RULE_ID);
+
+        verify(mongoTemplate).findOne(queryCaptor.capture(), eq(Policy.class));
+        assertThat(queryCaptor.getValue())
+                .extracting(Query::getQueryObject, Query::getReadPreference)
+                .containsExactly(new Document("rules.id", RULE_ID), ReadPreference.primary());
+    }
+
+    @Test
     void load_embeddedTargetWithoutParent_returnsEmpty() {
         when(mongoTemplate.findOne(query("rules.id", RULE_ID), Policy.class)).thenReturn(null);
 

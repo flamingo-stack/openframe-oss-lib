@@ -1,15 +1,13 @@
 package com.openframe.data.reactive.service;
 
 import com.openframe.data.document.audit.AuditEvent;
-import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.user.User;
 import com.openframe.data.mapper.AuditEventMapper;
 import com.openframe.data.model.audit.AuditActor;
 import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.reactive.repository.audit.ReactiveAuditEventRepository;
 import com.openframe.data.reactive.repository.device.ReactiveMachineRepository;
 import com.openframe.data.reactive.repository.user.ReactiveUserRepository;
-import com.openframe.data.repository.redis.ReactiveAuditOnceRepository;
+import com.openframe.data.repository.redis.ReactiveAuditWindowRepository;
 import com.openframe.data.service.AuditClock;
 import com.openframe.data.service.AuditTenantResolver;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 import static com.openframe.data.document.audit.AuditActorType.FAE;
 
@@ -34,7 +33,7 @@ public class ReactiveAuditEventWriter {
     private final ReactiveAuditEventRepository auditEventRepository;
     private final ReactiveUserRepository userRepository;
     private final ReactiveMachineRepository machineRepository;
-    private final ReactiveAuditOnceRepository auditOnceRepository;
+    private final ReactiveAuditWindowRepository auditWindowRepository;
     private final AuditEventMapper auditEventMapper;
     private final AuditTenantResolver tenantResolver;
     private final AuditClock auditClock;
@@ -44,11 +43,11 @@ public class ReactiveAuditEventWriter {
 
     public Mono<Void> writeAll(List<AuditEntry> entries, Mono<AuditCaller> caller) {
         entries.forEach(AuditEntry::requireOutcome);
-        if (!enabled || entries.isEmpty()) {
+        if (!enabled) {
             return Mono.empty();
         }
-        return caller.flatMap(known -> save(entries, known))
-                .onErrorResume(e -> notRecorded(entries.getFirst(), e));
+        return saveOutsideRequest(caller.flatMap(known -> save(entries, known))
+                .onErrorResume(e -> notRecorded(entries.getFirst(), e)));
     }
 
     public Mono<Void> writeOnce(AuditEntry entry, Mono<AuditCaller> caller, String key, Duration window) {
@@ -56,16 +55,24 @@ public class ReactiveAuditEventWriter {
         if (!enabled) {
             return Mono.empty();
         }
-        return caller.flatMap(known -> firstWithin(entry, known, key, window)
+        return saveOutsideRequest(caller.flatMap(known -> isFirstEventInWindow(entry, known, key, window)
                         .flatMap(first -> first ? save(List.of(entry), known) : Mono.empty()))
-                .onErrorResume(e -> notRecorded(entry, e));
+                .onErrorResume(e -> notRecorded(entry, e)));
     }
 
-    private Mono<Boolean> firstWithin(AuditEntry entry, AuditCaller caller, String key, Duration window) {
-        String tenantId = tenantOf(entry, caller);
-        String onceKey = String.join(":", entry.getAction().getName(), key, caller.actor().id());
-        return auditOnceRepository.claim(onceKey, window, tenantId)
-                .onErrorResume(DataAccessException.class, e -> {
+    private static Mono<Void> saveOutsideRequest(Mono<Void> write) {
+        return Mono.deferContextual(requestContext -> {
+            Mono<Void> started = write.contextWrite(requestContext).cache();
+            started.subscribe();
+            return started;
+        });
+    }
+
+    private Mono<Boolean> isFirstEventInWindow(AuditEntry entry, AuditCaller caller, String key, Duration window) {
+        return Mono.defer(() -> auditWindowRepository.claim(String.join(":", entry.getAction().getName(),
+                                entry.getOutcome().name(), key, caller.actor().identity()), window,
+                        tenantOf(entry, caller)))
+                .onErrorResume(e -> {
                     log.error("Audit dedupe lookup failed, the event is recorded", e);
                     return Mono.just(true);
                 });
@@ -77,37 +84,56 @@ public class ReactiveAuditEventWriter {
                 .map(entry -> auditEventMapper.toEvent(entry, actor, caller.requestInfo(), tenantOf(entry, caller),
                         null, auditClock.now()))
                 .toList();
-        return Mono.when(nameOf(actor).doOnNext(name -> events.forEach(event -> event.setActorName(name))),
+        return Mono.when(nameOf(actor).doOnNext(named -> setNameOnEvents(events, named, AuditEvent::setActorName)),
                         onBehalfOfNameOf(actor)
-                                .doOnNext(name -> events.forEach(event -> event.setOnBehalfOfName(name))))
+                                .doOnNext(named -> setNameOnEvents(events, named, AuditEvent::setOnBehalfOfName)))
                 .then(Mono.defer(() -> insert(events)));
+    }
+
+    private void setNameOnEvents(List<AuditEvent> events, NameWithTenant named,
+                                 BiConsumer<AuditEvent, String> setName) {
+        events.stream()
+                .filter(event -> named.tenantId() == null || named.tenantId().equals(event.getTenantId())
+                        || named.tenantId().equals(tenantResolver.superTenantId()))
+                .forEach(event -> setName.accept(event, named.name()));
+    }
+
+    private record NameWithTenant(String name, String tenantId) {
     }
 
     private String tenantOf(AuditEntry entry, AuditCaller caller) {
         return caller.actor().tenantFor(entry.getTenantId(), tenantResolver.superTenantId(), caller::servedTenantId);
     }
 
-    private Mono<String> nameOf(AuditActor actor) {
+    private Mono<NameWithTenant> nameOf(AuditActor actor) {
         if (actor.name() != null) {
-            return Mono.just(actor.name());
+            return Mono.just(new NameWithTenant(actor.name(), null));
         }
         if (actor.id() == null) {
             return Mono.empty();
         }
         return switch (actor.type()) {
-            case USER, STAFF -> tryFind("user name", userRepository.findById(actor.id())).mapNotNull(User::fullName);
-            case DEVICE -> tryFind("device name", machineRepository.findByMachineId(actor.id())).mapNotNull(Machine::deviceName);
+            case USER, STAFF -> userNameOf(actor.id());
+            case DEVICE -> deviceNameOf(actor.id());
             default -> Mono.empty();
         };
     }
 
-    private Mono<String> onBehalfOfNameOf(AuditActor actor) {
+    private Mono<NameWithTenant> onBehalfOfNameOf(AuditActor actor) {
         if (actor.onBehalfOfId() == null) {
             return Mono.empty();
         }
-        return actor.type() == FAE
-                ? tryFind("device name", machineRepository.findByMachineId(actor.onBehalfOfId())).mapNotNull(Machine::deviceName)
-                : tryFind("user name", userRepository.findById(actor.onBehalfOfId())).mapNotNull(User::fullName);
+        return actor.type() == FAE ? deviceNameOf(actor.onBehalfOfId()) : userNameOf(actor.onBehalfOfId());
+    }
+
+    private Mono<NameWithTenant> userNameOf(String userId) {
+        return tryFind("user name", userRepository.findById(userId))
+                .map(user -> new NameWithTenant(user.fullName(), user.getTenantId()));
+    }
+
+    private Mono<NameWithTenant> deviceNameOf(String machineId) {
+        return tryFind("device name", machineRepository.findByMachineId(machineId))
+                .map(machine -> new NameWithTenant(machine.deviceName(), machine.getTenantId()));
     }
 
     private Mono<Void> insert(List<AuditEvent> events) {

@@ -12,7 +12,7 @@ public enum AuditOutcome {
         if (status == null || status == REQUEST_TIMEOUT || status == TOO_MANY_REQUESTS) {
             return FAILURE;
         }
-        if (status >= 200 && status < 300) {
+        if (status >= 200 && status < 400) {
             return SUCCESS;
         }
         return status >= 400 && status < 500 ? REFUSED : FAILURE;

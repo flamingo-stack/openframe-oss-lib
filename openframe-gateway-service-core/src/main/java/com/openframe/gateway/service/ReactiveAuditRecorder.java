@@ -11,6 +11,7 @@ import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
@@ -35,36 +36,10 @@ public class ReactiveAuditRecorder {
     private final ReactiveApiKeyRepository apiKeyRepository;
     private final AuditTenantResolver tenantResolver;
     private final ReactiveAuditEventWriter writer;
+    @Value("${openframe.gateway.tenant-routing.enabled:false}")
+    private final boolean tenantRoutingEnabled;
 
-    public Mono<Void> record(AuditEntry entry, ServerHttpRequest request) {
-        return recordAll(List.of(entry), request);
-    }
-
-    public Mono<Void> recordAll(List<AuditEntry> entries, ServerHttpRequest request) {
-        return writer.writeAll(entries, callerOf(request));
-    }
-
-    public Mono<Void> record(AuditEntry entry, ServerHttpRequest request, AuditActor actor) {
-        return writer.writeAll(List.of(entry), Mono.fromSupplier(() -> caller(actor, null, request)));
-    }
-
-    public Mono<Void> record(AuditEntry entry, AuditCaller caller) {
-        return writer.writeAll(List.of(entry), Mono.just(caller));
-    }
-
-    public Mono<Void> recordOnce(AuditEntry entry, ServerHttpRequest request, String key) {
-        return recordOnce(entry, request, key, ONCE_WINDOW);
-    }
-
-    public Mono<Void> recordOnce(AuditEntry entry, ServerHttpRequest request, String key, Duration window) {
-        return writer.writeOnce(entry, callerOf(request), key, window);
-    }
-
-    public Mono<Void> recordOnce(AuditEntry entry, ServerHttpRequest request, AuditActor actor, String key) {
-        return writer.writeOnce(entry, Mono.fromSupplier(() -> caller(actor, null, request)), key, ONCE_WINDOW);
-    }
-
-    public Mono<AuditCaller> callerOf(ServerHttpRequest request) {
+    Mono<AuditCaller> callerOf(ServerHttpRequest request) {
         return currentJwt()
                 .map(jwt -> caller(actorOf(jwt), jwt.getClaimAsString(SESSION_CLAIM), request))
                 .switchIfEmpty(Mono.defer(() -> actorOfApiKey(request)
@@ -73,7 +48,7 @@ public class ReactiveAuditRecorder {
     }
 
     private AuditCaller caller(AuditActor actor, String sessionId, ServerHttpRequest request) {
-        String routedTenantId = TenantRoutingHeaders.tenantId(request);
+        String routedTenantId = tenantRoutingEnabled ? TenantRoutingHeaders.tenantId(request) : null;
         String servedTenantId = StringUtils.hasText(routedTenantId) ? routedTenantId : tenantResolver.servedTenantId();
         return new AuditCaller(actor, AuditRequestInfo.fromHeaders(request.getHeaders()::getFirst, sessionId),
                 servedTenantId);
@@ -101,8 +76,27 @@ public class ReactiveAuditRecorder {
     private static Mono<Jwt> currentJwt() {
         return ReactiveSecurityContextHolder.getContext()
                 .mapNotNull(SecurityContext::getAuthentication)
-                .filter(JwtAuthenticationToken.class::isInstance)
-                .cast(JwtAuthenticationToken.class)
+                .ofType(JwtAuthenticationToken.class)
                 .map(JwtAuthenticationToken::getToken);
+    }
+
+    public Mono<Void> record(AuditEntry entry, ServerHttpRequest request) {
+        return writer.writeAll(List.of(entry), callerOf(request));
+    }
+
+    public Mono<Void> record(AuditEntry entry, ServerHttpRequest request, AuditActor actor) {
+        return writer.writeAll(List.of(entry), Mono.fromSupplier(() -> caller(actor, null, request)));
+    }
+
+    public Mono<Void> recordOnce(AuditEntry entry, ServerHttpRequest request, String key) {
+        return recordOnce(entry, request, key, ONCE_WINDOW);
+    }
+
+    public Mono<Void> recordOnce(AuditEntry entry, ServerHttpRequest request, String key, Duration window) {
+        return writer.writeOnce(entry, callerOf(request), key, window);
+    }
+
+    public Mono<Void> recordOnce(AuditEntry entry, ServerHttpRequest request, AuditActor actor, String key) {
+        return writer.writeOnce(entry, Mono.fromSupplier(() -> caller(actor, null, request)), key, ONCE_WINDOW);
     }
 }
