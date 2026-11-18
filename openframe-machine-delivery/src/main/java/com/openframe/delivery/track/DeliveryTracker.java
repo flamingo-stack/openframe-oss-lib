@@ -9,7 +9,6 @@ import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.spec.DeliveryRef;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -23,7 +22,6 @@ public class DeliveryTracker {
     private final MachineDeliveryRepository repository;
     private final DeliveryProperties properties;
     private final DeliveryCloser closer;
-    private final ApplicationEventPublisher applicationEventPublisher;
 
     // ref = the delivery block the agent copied back from the command; the row is looked up by that exact dispatch
     public void acknowledge(DeliveryRef ref, String machineId) {
@@ -59,8 +57,6 @@ public class DeliveryTracker {
         boolean done = repository.markDone(id, dispatchId, DeliveryStatus.COMPLETABLE, now, expiresAt);
         if (done) {
             log.info("Delivery DONE: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
-            DeliveryDoneEvent doneEvent = new DeliveryDoneEvent(type, targetId, machineId);
-            applicationEventPublisher.publishEvent(doneEvent);
         } else {
             log.debug("Delivery completion ignored, no row for this dispatch: id={} dispatchId={}", id, dispatchId);
         }
