@@ -264,6 +264,11 @@ impl ToolRunManager {
                 continue;
             }
 
+            if let Some(asset_path) = self.params_processor.missing_command_asset(tool).await {
+                warn!(tool_id = %tool.tool_agent_id, "Record left Installing and asset missing/empty at {} — awaiting reinstall", asset_path.display());
+                continue;
+            }
+
             if tool.installation.is_service() {
                 warn!(tool_id = %tool.tool_agent_id, "Record left Installing; binary present at {} but service registration can't be verified from disk — leaving Installing for a verified repair", path.display());
                 continue;
