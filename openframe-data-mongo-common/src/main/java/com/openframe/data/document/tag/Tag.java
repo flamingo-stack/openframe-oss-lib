@@ -39,4 +39,7 @@ public class Tag implements TenantScoped {
     private TagEntityType entityType;
     private Instant createdAt;
     private String createdBy;
+    // A plain field until every tenant has backfilled it; @Version comes in a later release.
+    @Builder.Default
+    private Long version = 0L;
 }
