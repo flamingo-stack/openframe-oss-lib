@@ -21,8 +21,11 @@ public interface PackageUpdateRequestRepository extends MongoRepository<PackageU
     List<PackageUpdateRequest> findByTenantIdAndActionAndSoftwareIdAndMachineIdsIn(
             String tenantId, SoftwareAction action, String softwareId, Collection<String> machineIds);
 
-    List<PackageUpdateRequest> findByTenantIdAndActionAndStatusOrderByCreatedAtAsc(
+    List<PackageUpdateRequest> findByTenantIdAndActionAndStatusOrderByIdAsc(
             String tenantId, SoftwareAction action, SoftwareActionStatus status, Limit limit);
+
+    List<PackageUpdateRequest> findByTenantIdAndActionAndStatusAndIdGreaterThanOrderByIdAsc(
+            String tenantId, SoftwareAction action, SoftwareActionStatus status, String afterId, Limit limit);
 
     long deleteByTenantIdAndRequestId(String tenantId, String requestId);
 }

@@ -37,14 +37,23 @@ public class PackageAdoptEngineFailureSweep {
     public void sweep() {
         String tenantId = tenantIdProvider.getTenantId();
         Limit limit = Limit.of(batchSize);
-        Map<String, PackageUpdateRequest> requests = packageUpdateRequestRepository
-                .findByTenantIdAndActionAndStatusOrderByCreatedAtAsc(tenantId, SoftwareAction.ADOPT,
-                        SoftwareActionStatus.IN_PROGRESS, limit)
-                .stream()
-                .collect(Collectors.toMap(PackageUpdateRequest::getRequestId, Function.identity()));
-        if (requests.isEmpty()) {
+        List<PackageUpdateRequest> page = packageUpdateRequestRepository.findByTenantIdAndActionAndStatusOrderByIdAsc(
+                tenantId, SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, limit);
+        sweepPage(tenantId, page);
+        while (page.size() == batchSize) {
+            String afterId = page.getLast().getId();
+            page = packageUpdateRequestRepository.findByTenantIdAndActionAndStatusAndIdGreaterThanOrderByIdAsc(
+                    tenantId, SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, afterId, limit);
+            sweepPage(tenantId, page);
+        }
+    }
+
+    private void sweepPage(String tenantId, List<PackageUpdateRequest> page) {
+        if (page.isEmpty()) {
             return;
         }
+        Map<String, PackageUpdateRequest> requests = page.stream()
+                .collect(Collectors.toMap(PackageUpdateRequest::getRequestId, Function.identity()));
         Set<String> requestIds = requests.keySet();
         List<PackageUpdateDeviceState> states = packageUpdateDeviceStateRepository
                 .findByTenantIdAndRequestIdIn(tenantId, requestIds);
@@ -59,7 +68,7 @@ public class PackageAdoptEngineFailureSweep {
         rollUpSettled(requests, states);
     }
 
-    // two devices finishing at once can leave a settled request in progress, holding its place at the head of the batch
+    // two devices finishing at once can leave a settled request in progress for good
     private void rollUpSettled(Map<String, PackageUpdateRequest> requests, List<PackageUpdateDeviceState> states) {
         Set<String> adopting = states.stream()
                 .filter(state -> state.getStatus() == SoftwareActionStatus.IN_PROGRESS)

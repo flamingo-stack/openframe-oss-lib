@@ -29,6 +29,7 @@ import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,10 +40,14 @@ class PackageAdoptEngineFailureSweepTest {
 
     private static final String TENANT = "t1";
     private static final String REQUEST_ID = "req-1";
+    private static final String NEXT_REQUEST_ID = "req-2";
+    private static final String REQUEST_DOC_ID = "6740a0000000000000000001";
+    private static final String NEXT_REQUEST_DOC_ID = "6740a0000000000000000002";
     private static final String MACHINE_ID = "m1";
     private static final String OTHER_MACHINE_ID = "m2";
     private static final String STATE_ID = "state-1";
     private static final String OTHER_STATE_ID = "state-2";
+    private static final String NEXT_STATE_ID = "state-3";
     private static final int BATCH_SIZE = 100;
 
     @Mock private TenantIdProvider tenantIdProvider;
@@ -53,6 +58,7 @@ class PackageAdoptEngineFailureSweepTest {
 
     private PackageAdoptEngineFailureSweep sweep;
     private PackageUpdateRequest request;
+    private PackageUpdateRequest nextRequest;
     private Instant now;
     private Instant longAgo;
 
@@ -62,12 +68,8 @@ class PackageAdoptEngineFailureSweepTest {
         sweep = new PackageAdoptEngineFailureSweep(tenantIdProvider, packageUpdateRequestRepository,
                 packageUpdateDeviceStateRepository, reader, packageAdoptStatusProcessor);
         ReflectionTestUtils.setField(sweep, "batchSize", BATCH_SIZE);
-        request = PackageUpdateRequest.builder()
-                .tenantId(TENANT)
-                .requestId(REQUEST_ID)
-                .action(SoftwareAction.ADOPT)
-                .status(SoftwareActionStatus.IN_PROGRESS)
-                .build();
+        request = adoptRequest(REQUEST_DOC_ID, REQUEST_ID);
+        nextRequest = adoptRequest(NEXT_REQUEST_DOC_ID, NEXT_REQUEST_ID);
         now = Instant.now();
         longAgo = now.minus(Duration.ofHours(1));
     }
@@ -85,6 +87,54 @@ class PackageAdoptEngineFailureSweepTest {
         // verifications
         verify(packageAdoptStatusProcessor).failByEngine(request, MACHINE_ID, "EXHAUSTED");
         verify(packageAdoptStatusProcessor, never()).rollUp(request);
+    }
+
+    @Test
+    void sweep_pageShorterThanTheBatch_noFurtherPageRead() {
+        // setup
+        stubStates(state(STATE_ID, MACHINE_ID, SoftwareActionStatus.IN_PROGRESS, now));
+        stubDeliveries(Set.of(deliveryId(MACHINE_ID)));
+
+        // execution
+        sweep.sweep();
+
+        // verifications
+        verify(packageUpdateRequestRepository, never()).findByTenantIdAndActionAndStatusAndIdGreaterThanOrderByIdAsc(
+                TENANT, SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, REQUEST_DOC_ID, Limit.of(BATCH_SIZE));
+    }
+
+    @Test
+    void sweep_engineFailureOnTheSecondPage_closedAndAnEmptyPageStopsTheWalk() {
+        // setup
+        ReflectionTestUtils.setField(sweep, "batchSize", 1);
+        Limit one = Limit.of(1);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+        when(packageUpdateRequestRepository.findByTenantIdAndActionAndStatusOrderByIdAsc(TENANT,
+                SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, one)).thenReturn(List.of(request));
+        when(packageUpdateRequestRepository.findByTenantIdAndActionAndStatusAndIdGreaterThanOrderByIdAsc(TENANT,
+                SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, REQUEST_DOC_ID, one))
+                .thenReturn(List.of(nextRequest));
+        when(packageUpdateRequestRepository.findByTenantIdAndActionAndStatusAndIdGreaterThanOrderByIdAsc(TENANT,
+                SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, NEXT_REQUEST_DOC_ID, one))
+                .thenReturn(List.of());
+        when(packageUpdateDeviceStateRepository.findByTenantIdAndRequestIdIn(TENANT, Set.of(REQUEST_ID)))
+                .thenReturn(List.of(state(STATE_ID, MACHINE_ID, SoftwareActionStatus.IN_PROGRESS, longAgo)));
+        PackageUpdateDeviceState onPageTwo = state(NEXT_STATE_ID, NEXT_REQUEST_ID, MACHINE_ID,
+                SoftwareActionStatus.IN_PROGRESS, longAgo);
+        when(packageUpdateDeviceStateRepository.findByTenantIdAndRequestIdIn(TENANT, Set.of(NEXT_REQUEST_ID)))
+                .thenReturn(List.of(onPageTwo));
+        stubDeliveries(Set.of(deliveryId(MACHINE_ID)), delivery(MACHINE_ID, DeliveryStatus.PENDING, null));
+        stubDeliveries(Set.of(deliveryId(NEXT_REQUEST_ID, MACHINE_ID)),
+                delivery(NEXT_REQUEST_ID, MACHINE_ID, DeliveryStatus.FAILED, DeliveryFailure.TIMEOUT));
+
+        // execution
+        sweep.sweep();
+
+        // verifications
+        verify(packageAdoptStatusProcessor).failByEngine(nextRequest, MACHINE_ID, "TIMEOUT");
+        verify(packageAdoptStatusProcessor, never()).failByEngine(request, MACHINE_ID, "TIMEOUT");
+        verify(packageUpdateRequestRepository).findByTenantIdAndActionAndStatusAndIdGreaterThanOrderByIdAsc(TENANT,
+                SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, NEXT_REQUEST_DOC_ID, one);
     }
 
     @Test
@@ -162,14 +212,15 @@ class PackageAdoptEngineFailureSweepTest {
     void sweep_noAdoptInProgress_nothingElseRead() {
         // setup
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
-        when(packageUpdateRequestRepository.findByTenantIdAndActionAndStatusOrderByCreatedAtAsc(TENANT,
+        when(packageUpdateRequestRepository.findByTenantIdAndActionAndStatusOrderByIdAsc(TENANT,
                 SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, Limit.of(BATCH_SIZE))).thenReturn(List.of());
 
         // execution
         sweep.sweep();
 
         // verifications
-        verifyNoInteractions(packageUpdateDeviceStateRepository, machineDeliveryRepository, packageAdoptStatusProcessor);
+        verifyNoInteractions(packageUpdateDeviceStateRepository, machineDeliveryRepository,
+                packageAdoptStatusProcessor);
     }
 
     @Test
@@ -188,24 +239,39 @@ class PackageAdoptEngineFailureSweepTest {
 
     private void stubStates(PackageUpdateDeviceState... states) {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
-        when(packageUpdateRequestRepository.findByTenantIdAndActionAndStatusOrderByCreatedAtAsc(TENANT,
-                SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, Limit.of(BATCH_SIZE))).thenReturn(List.of(request));
+        when(packageUpdateRequestRepository.findByTenantIdAndActionAndStatusOrderByIdAsc(TENANT,
+                SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(request));
         when(packageUpdateDeviceStateRepository.findByTenantIdAndRequestIdIn(TENANT, Set.of(REQUEST_ID)))
                 .thenReturn(List.of(states));
     }
 
     private void stubDeliveries(Set<String> ids, MachineDelivery... deliveries) {
-        when(machineDeliveryRepository.findAllById(argThat(
-                (Iterable<String> given) -> Set.copyOf((List<String>) given).equals(ids))))
-                .thenReturn(List.of(deliveries));
+        doReturn(List.of(deliveries)).when(machineDeliveryRepository).findAllById(argThat(
+                (Iterable<String> given) -> Set.copyOf((List<String>) given).equals(ids)));
+    }
+
+    private static PackageUpdateRequest adoptRequest(String id, String requestId) {
+        return PackageUpdateRequest.builder()
+                .id(id)
+                .tenantId(TENANT)
+                .requestId(requestId)
+                .action(SoftwareAction.ADOPT)
+                .status(SoftwareActionStatus.IN_PROGRESS)
+                .build();
     }
 
     private static PackageUpdateDeviceState state(String id, String machineId, SoftwareActionStatus status,
                                                   Instant createdAt) {
+        return state(id, REQUEST_ID, machineId, status, createdAt);
+    }
+
+    private static PackageUpdateDeviceState state(String id, String requestId, String machineId,
+                                                  SoftwareActionStatus status, Instant createdAt) {
         return PackageUpdateDeviceState.builder()
                 .id(id)
                 .tenantId(TENANT)
-                .requestId(REQUEST_ID)
+                .requestId(requestId)
                 .machineId(machineId)
                 .status(status)
                 .createdAt(createdAt)
@@ -213,10 +279,15 @@ class PackageAdoptEngineFailureSweepTest {
     }
 
     private static MachineDelivery delivery(String machineId, DeliveryStatus status, DeliveryFailure failure) {
+        return delivery(REQUEST_ID, machineId, status, failure);
+    }
+
+    private static MachineDelivery delivery(String requestId, String machineId, DeliveryStatus status,
+                                            DeliveryFailure failure) {
         return MachineDelivery.builder()
-                .id(deliveryId(machineId))
+                .id(deliveryId(requestId, machineId))
                 .type(DeliveryType.PACKAGE_ADOPT)
-                .targetId(REQUEST_ID)
+                .targetId(requestId)
                 .machineId(machineId)
                 .status(status)
                 .failure(failure)
@@ -224,6 +295,10 @@ class PackageAdoptEngineFailureSweepTest {
     }
 
     private static String deliveryId(String machineId) {
-        return DeliveryId.of(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, machineId);
+        return deliveryId(REQUEST_ID, machineId);
+    }
+
+    private static String deliveryId(String requestId, String machineId) {
+        return DeliveryId.of(DeliveryType.PACKAGE_ADOPT, requestId, machineId);
     }
 }
