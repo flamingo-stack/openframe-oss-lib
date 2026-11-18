@@ -112,10 +112,6 @@ export interface ChatRuntime {
      *  unset, the chat falls back to the explicit `emptyStateGreeting` /
      *  `suggestedQueries` / `enabledRagTableIds` props (or in-code defaults). */
     emptyStateUrl?: string;
-    /** GET the "What to ask?" exchange: `{ question, reply, groups, note? }`
-     *  (`WhatToAskContent`). OPTIONAL: when set and the host passes no `whatToAsk`, the v2 list's "What to ask?" entry
-     *  shows what it answers. Hub: '/api/docs/what-to-ask'. */
-    whatToAskUrl?: string;
     /** Build the per-agent display-config URL for an OpenFrame AI agent
      *  (Fae/Mingo). OPTIONAL. The returned endpoint MUST be byte-compatible
      *  with the empty-state wire shape ({ greeting, suggestedQueries,

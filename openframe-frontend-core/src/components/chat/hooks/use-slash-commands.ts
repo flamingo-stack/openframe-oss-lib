@@ -15,6 +15,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { WHAT_CAN_YOU_DO_COMMAND } from '../../../chat-protocol/what-can-you-do';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import type { SlashCommandSummary } from '../types/component.types';
 
@@ -171,4 +172,18 @@ export function useSlashCommandRegistry(
     // "Loaded" = the fetch has settled, or it isn't running (disabled).
     loaded: !query.isLoading,
   };
+}
+
+/**
+ * The "What to ask?" command (`/what-can-you-do`) as this chat's catalog serves it, or null when the server lists none:
+ * the entry is shown only then, under the command's own label (`whatToAskLabelOf`). Shares the catalog's one cache entry.
+ */
+export function useWhatToAskCommand(commandsUrl: string | undefined): SlashCommandSummary | null {
+  const { commands } = useSlashCommandRegistry(commandsUrl ?? '', { enabled: Boolean(commandsUrl) });
+  return commands.find(command => command.id === WHAT_CAN_YOU_DO_COMMAND) ?? null;
+}
+
+/** The entry's label: the command's own, as the server names it. */
+export function whatToAskLabelOf(command: SlashCommandSummary): string {
+  return command.label ?? `/${command.id}`;
 }

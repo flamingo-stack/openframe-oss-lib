@@ -38,7 +38,6 @@ import {
   type MingoDialogStatus,
   mingoDialogStatusOf,
   useLoadMoreSentinel,
-  whatToAskLabel,
 } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
@@ -245,7 +244,7 @@ export function MingoChatHistorySection({
   draftTitle,
   onOpenArchive,
   onWhatToAsk,
-  whatToAskLabel: whatToAskTitle = whatToAskLabel(),
+  whatToAskLabel,
   moreMenuItems = [],
   statusOf,
   onRequestRename,
@@ -306,11 +305,11 @@ export function MingoChatHistorySection({
           },
         ]
       : []),
-    ...(onWhatToAsk
+    ...(onWhatToAsk && whatToAskLabel
       ? [
           {
             id: 'what-to-ask',
-            label: whatToAskTitle,
+            label: whatToAskLabel,
             icon: <QuestionCircleIcon className={chatMenuIconClassName} />,
             onClick: onWhatToAsk,
           },

@@ -31,7 +31,6 @@ import {
   type MingoDialogStatus,
   mingoDialogStatusOf,
   useLoadMoreSentinel,
-  whatToAskLabel,
 } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
@@ -79,7 +78,7 @@ function MingoChatRailPanel({
   onOpenArchive,
   archiveActive = false,
   onWhatToAsk,
-  whatToAskLabel: whatToAskTitle = whatToAskLabel(),
+  whatToAskLabel,
   statusOf,
   onRequestRename,
   onRequestArchive,
@@ -121,7 +120,8 @@ function MingoChatRailPanel({
       onClick: onOpenArchive,
     });
   }
-  if (onWhatToAsk) items.push({ id: 'ask', label: whatToAskTitle, icon: <ChatQuestionIcon />, onClick: onWhatToAsk });
+  if (onWhatToAsk && whatToAskLabel)
+    items.push({ id: 'ask', label: whatToAskLabel, icon: <ChatQuestionIcon />, onClick: onWhatToAsk });
 
   const listMenu: ActionsMenuItem[] = [];
   if (scope && onScopeChange) {

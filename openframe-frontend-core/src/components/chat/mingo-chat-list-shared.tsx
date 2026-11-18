@@ -59,11 +59,11 @@ export interface MingoChatListProps {
    *  "Chat archive" in its ⋯ menu. */
   onOpenArchive?: () => void;
   /**
-   * "What to ask Mingo?": the suggestions a chat starts from. The rail draws it as an
-   * action under the logo, the section as an item of its ⋯ menu.
+   * "What to ask?": the `/what-can-you-do` command (`useWhatToAskCommand`). The rail draws it as an action under the
+   * logo, the section as an item of its ⋯ menu; only with `whatToAskLabel`.
    */
   onWhatToAsk?: () => void;
-  /** The "What to ask?" entry's label, named after the assistant (`whatToAskLabel`). Default: Mingo's. */
+  /** The entry's label: the command's, as the server's catalog names it (`whatToAskLabelOf`). No label, no entry. */
   whatToAskLabel?: string;
   /**
    * The host's own actions at the end of the section's ⋯ menu, after "Chat archive" and
@@ -249,12 +249,4 @@ export function useLoadMoreSentinel({
     // would load a single page per mount.
   }, [hasMore, isLoadingMore, itemCount, rootRef]);
   return sentinelRef;
-}
-
-/** The assistant the v2 chat is, unless the host names another (`EmbeddableChat`'s `assistantName`). */
-export const DEFAULT_ASSISTANT_NAME = 'Mingo';
-
-/** The "What to ask?" entry's label for an assistant: the rail's action, the section's menu item and a new chat's header. */
-export function whatToAskLabel(assistantName: string = DEFAULT_ASSISTANT_NAME): string {
-  return `What to ask ${assistantName}?`;
 }
