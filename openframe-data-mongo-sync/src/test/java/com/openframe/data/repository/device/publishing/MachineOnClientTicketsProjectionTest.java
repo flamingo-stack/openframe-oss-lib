@@ -3,6 +3,7 @@ package com.openframe.data.repository.device.publishing;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.ticket.AdminTicketOwner;
 import com.openframe.data.document.ticket.ClientTicketOwner;
+import com.openframe.data.document.ticket.EmailTicketOwner;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketOwner;
 import com.openframe.data.document.ticket.TicketStatusKind;
@@ -186,6 +187,22 @@ class MachineOnClientTicketsProjectionTest {
         ReconciliationResult result = projection.reconcile(List.of(
                 view("t1", TicketStatusKind.TECH_REQUIRED, new ClientTicketOwner("machine-1", null)),
                 view("t2", TicketStatusKind.TECH_REQUIRED, new AdminTicketOwner("admin-1"))));
+
+        // verifications
+        assertThat(result.getMismatches()).isEmpty();
+        verify(machineRepository, never()).findByTenantIdInAndMachineIdIn(any(), any());
+    }
+
+    // guard: green before implementation
+    @Test
+    void emailOwnedTickets_areSkipped_withoutAQuery() {
+        // setup
+        when(ticketProjectionRepository.findStatusId("tenant-a", TicketStatusKind.ARCHIVED))
+                .thenReturn(Optional.of(ARCHIVED_STATUS_ID));
+
+        // execution
+        ReconciliationResult result = projection.reconcile(List.of(
+                view("t1", TicketStatusKind.TECH_REQUIRED, new EmailTicketOwner("ann@acme.com"))));
 
         // verifications
         assertThat(result.getMismatches()).isEmpty();

@@ -28,6 +28,7 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.PackageMatchState;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -64,7 +65,11 @@ import static org.mockito.Mockito.when;
 class TenantSoftwareReadModelQueryTest {
 
     private static final String TENANT = "t1";
-    private static final Set<String> MANAGER_SOURCES = Set.of("homebrew_packages", "chocolatey_packages", "winget_packages");
+    private static final Set<String> MANAGER_SOURCES =
+            Set.of("homebrew_packages", "homebrew_casks", "chocolatey_packages", "winget_packages");
+
+    private static final List<PackageManagerType> ENABLED_MANAGERS =
+            List.of(PackageManagerType.WINGET, PackageManagerType.CHOCO);
 
     @Mock private SoftwareRepository softwareRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
@@ -72,6 +77,7 @@ class TenantSoftwareReadModelQueryTest {
     @Mock private VulnerabilityRepository vulnerabilityRepository;
     @Mock private MachineRepository machineRepository;
     @Mock private PackageAutoUpdatePolicyRepository packageAutoUpdatePolicyRepository;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
 
     @InjectMocks private TenantSoftwareReadModelQuery query;
 
@@ -378,11 +384,13 @@ class TenantSoftwareReadModelQueryTest {
         when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
         when(packageAutoUpdatePolicyRepository.findEnabledSoftwareIds(TENANT)).thenReturn(List.of("7"));
         when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT)).thenReturn(List.of("7", "9", "not-a-title"));
+        when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
         List<SoftwareAutoUpdateStatus> statuses = List.of(SoftwareAutoUpdateStatus.ON, SoftwareAutoUpdateStatus.OFF);
         SoftwareFilterInput filter = new SoftwareFilterInput();
         filter.setAutoUpdateStatuses(statuses);
         SoftwareTitleQuery expected = titles().autoUpdateStatuses(statuses)
-                .enabledPolicyTitleIds(Set.of(7L)).policyTitleIds(Set.of(7L, 9L)).build();
+                .enabledPolicyTitleIds(Set.of(7L)).policyTitleIds(Set.of(7L, 9L))
+                .adoptionManagers(ENABLED_MANAGERS).build();
 
         // execution
         query.listSoftware(TENANT, null, 0, 10, null, null, filter);
@@ -397,6 +405,7 @@ class TenantSoftwareReadModelQueryTest {
         when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
         when(packageAutoUpdatePolicyRepository.findEnabledSoftwareIds(TENANT)).thenReturn(List.of());
         when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT)).thenReturn(List.of("9"));
+        when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
         List<SoftwareAutoUpdateStatus> statuses = List.of(SoftwareAutoUpdateStatus.NO_PACKAGE);
         SoftwareFilterInput filter = new SoftwareFilterInput();
         filter.setManageable(false);
@@ -405,8 +414,9 @@ class TenantSoftwareReadModelQueryTest {
         filter.setAutoUpdateStatuses(statuses);
         SoftwareTitleQuery expected = titles().manageable(false)
                 .installerSources(Set.of()).unmanagedChosen(true)
-                .osSources(Set.of("apps", "homebrew_packages", "safari_extensions", "pkg_packages"))
-                .autoUpdateStatuses(statuses).enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of(9L)).build();
+                .osSources(Set.of("apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages"))
+                .autoUpdateStatuses(statuses).enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of(9L))
+                .adoptionManagers(ENABLED_MANAGERS).build();
 
         // execution
         query.listSoftware(TENANT, null, 0, 10, null, null, filter);
@@ -447,10 +457,12 @@ class TenantSoftwareReadModelQueryTest {
     @Test
     void get_carriesTheProgramKeysAndTheStoredMatch() {
         SoftwarePackageMatch stored = new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.WINGET, "Google.Chrome", null);
+        SoftwarePackageMatch storedAdoption =
+                new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.CHOCO, "googlechrome", null);
         Software chrome = Software.builder().tenantId(TENANT).softwareTitleId(7L).name("Google Chrome").source("programs")
                 .vendor("Google LLC").upgradeCode("{UPGRADE}").arpKeys(List.of("Google Chrome"))
                 .packageFamilyNames(List.of("google.chrome_x")).systemComponent(false)
-                .packageMatch(stored).build();
+                .packageMatch(stored).adoptionMatch(storedAdoption).build();
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 7L)).thenReturn(Optional.of(chrome));
 
         SoftwareResponse row = query.get(TENANT, "7");
@@ -462,23 +474,40 @@ class TenantSoftwareReadModelQueryTest {
         assertThat(row.getPackageFamilyNames()).containsExactly("google.chrome_x");
         assertThat(row.getSystemComponent()).isFalse();
         assertThat(row.getPackageMatch()).isEqualTo(stored);
+        assertThat(row.getAdoptionMatch()).isEqualTo(storedAdoption);
+    }
+
+    @Test
+    void get_macApp_carriesItsBundleIdAppFileNamesAndTopLevelFlag() {
+        // setup
+        Software slack = Software.builder().tenantId(TENANT).softwareTitleId(8L).name("Slack").source("apps")
+                .bundleIdentifier("com.tinyspeck.slackmacgap").appFileNames(List.of("Slack")).topLevelApp(true).build();
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 8L)).thenReturn(Optional.of(slack));
+
+        // execution
+        SoftwareResponse row = query.get(TENANT, "8");
+
+        // verifications
+        assertThat(row.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(row.getAppFileNames()).containsExactly("Slack");
+        assertThat(row.getTopLevelApp()).isTrue();
     }
 
     private static Stream<Arguments> sourcesAndTheirQuery() {
         return Stream.of(
                 Arguments.of(List.of(SoftwareSource.WINGET), Set.of("winget_packages"), true, false),
-                Arguments.of(List.of(SoftwareSource.BREW), Set.of("homebrew_packages"), false, false),
+                Arguments.of(List.of(SoftwareSource.BREW), Set.of("homebrew_packages", "homebrew_casks"), false, false),
                 Arguments.of(List.of(SoftwareSource.CHOCOLATEY), Set.of("chocolatey_packages"), false, false),
                 Arguments.of(List.of(SoftwareSource.UNMANAGED), Set.of(), false, true),
                 Arguments.of(List.of(SoftwareSource.WINGET, SoftwareSource.BREW, SoftwareSource.UNMANAGED),
-                        Set.of("winget_packages", "homebrew_packages"), true, true));
+                        Set.of("winget_packages", "homebrew_packages", "homebrew_casks"), true, true));
     }
 
     private static Stream<Arguments> osTypesAndTheirSources() {
         Set<String> windows = Set.of("programs", "chocolatey_packages", "winget_packages", "ie_extensions");
-        Set<String> macOs = Set.of("apps", "homebrew_packages", "safari_extensions", "pkg_packages");
+        Set<String> macOs = Set.of("apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages");
         Set<String> both = Set.of("programs", "chocolatey_packages", "winget_packages", "ie_extensions",
-                "apps", "homebrew_packages", "safari_extensions", "pkg_packages");
+                "apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages");
         return Stream.of(
                 Arguments.of(List.of(OsType.WINDOWS), windows),
                 Arguments.of(List.of(OsType.MAC_OS), macOs),

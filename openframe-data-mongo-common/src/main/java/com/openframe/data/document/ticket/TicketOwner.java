@@ -11,7 +11,8 @@ import org.springframework.data.mongodb.core.mapping.Field;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = ClientTicketOwner.class, name = "CLIENT"),
-    @JsonSubTypes.Type(value = AdminTicketOwner.class, name = "ADMIN")
+    @JsonSubTypes.Type(value = AdminTicketOwner.class, name = "ADMIN"),
+    @JsonSubTypes.Type(value = EmailTicketOwner.class, name = "EMAIL")
 })
 public abstract class TicketOwner {
 

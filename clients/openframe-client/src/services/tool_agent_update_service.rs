@@ -214,8 +214,14 @@ impl ToolAgentUpdateService {
             }
         }
 
-        // Windows GUI apps aren't run-manager-supervised; relaunch once after a successful update (no-op otherwise).
-        if result.is_ok() && was_gui_before_update {
+        // Windows GUI apps aren't run-manager-supervised; relaunch once after the update, after a failed one only if it isn't running (no-op otherwise).
+        if was_gui_before_update
+            && (result.is_ok()
+                || !self
+                    .tool_kill_service
+                    .is_installed_tool_running(&installed_tool)
+                    .await)
+        {
             self.relaunch_windows_gui_app(&installed_tool);
         }
 
@@ -369,10 +375,12 @@ impl ToolAgentUpdateService {
             .directory_manager
             .get_tool_executable_path(tool_agent_id, installed_tool.installation.executable_path());
         if !clear_aside_binary(&exec_path, tool_agent_id).await {
-            error!(tool_id = %tool_agent_id,
-                   "Pre-update process still holds {}: keeping recorded version {} instead of {} — the new binary is on disk but not running",
-                   exec_path.display(), installed_tool.version, new_version);
-            return Ok(());
+            anyhow::bail!(
+                "Pre-update process still holds {}: keeping recorded version {} instead of {} — the new binary is on disk but not running, will retry",
+                exec_path.display(),
+                installed_tool.version,
+                new_version
+            );
         }
 
         installed_tool.version = new_version.to_string();

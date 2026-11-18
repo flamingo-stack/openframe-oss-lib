@@ -164,6 +164,67 @@ class SoftwareRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(names(winget)).containsExactly("Google Chrome");
     }
 
+    @Test
+    @DisplayName("cask titles: OFF like any brew title, also before their first match; one the catalog lacks is not")
+    void findTitles_caskTitles_offUnlessTheCatalogLacksTheCask() {
+        repository.saveAll(List.of(
+                title(TENANT, 10L, "slack", "homebrew_casks", null, 1, 0),
+                title(TENANT, 11L, "tapped-app", "homebrew_casks", brewMatch(PackageMatchState.NO_PACKAGE), 1, 0)));
+        SoftwareTitleQuery off = titles().autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.OFF))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+
+        assertThat(names(off)).containsExactlyInAnyOrder("Google Chrome", "node", "slack");
+    }
+
+    @Test
+    @DisplayName("auto-update NEEDS_ADOPTION: no policy, no package that manages the title, and a package of an adoption manager; such a title is not NO_PACKAGE")
+    void findTitles_autoUpdateNeedsAdoption_aPackageToAdoptIntoAndNoneThatManages() {
+        Software sevenZip = title(TENANT, 8L, "7-Zip", "programs", match(PackageMatchState.NO_PACKAGE), 1, 0);
+        Software vlc = title(TENANT, 9L, "VLC media player", "programs", match(PackageMatchState.AMBIGUOUS), 1, 0);
+        Software firefox = title(TENANT, 10L, "Mozilla Firefox", "programs", match(PackageMatchState.MATCHED), 1, 0);
+        List.of(sevenZip, vlc, firefox).forEach(title -> title.setAdoptionMatch(chocoMatch()));
+        repository.saveAll(List.of(sevenZip, vlc, firefox));
+        List<PackageManagerType> chocoOn = List.of(PackageManagerType.WINGET, PackageManagerType.CHOCO);
+        List<PackageManagerType> chocoOff = List.of(PackageManagerType.WINGET);
+
+        assertThat(names(noPolicy(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, chocoOn)))
+                .containsExactlyInAnyOrder("7-Zip", "VLC media player");
+        assertThat(names(noPolicy(SoftwareAutoUpdateStatus.NO_PACKAGE, chocoOn))).containsExactly("Contoso Tool");
+        assertThat(names(noPolicy(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, chocoOff))).isEmpty();
+        assertThat(names(noPolicy(SoftwareAutoUpdateStatus.NO_PACKAGE, chocoOff)))
+                .containsExactlyInAnyOrder("Contoso Tool", "7-Zip");
+    }
+
+    @Test
+    @DisplayName("a Mac app has only an adoption match: a cask to adopt into is NEEDS_ADOPTION and not NO_PACKAGE, no cask is NO_PACKAGE, no match at all is neither")
+    void findTitles_macAppsWithoutAPackageMatch_followTheirAdoptionMatch() {
+        // setup
+        Software slack = title(TENANT, 8L, "Slack", "apps", null, 1, 0);
+        Software macTool = title(TENANT, 9L, "Mac Tool", "apps", null, 1, 0);
+        slack.setAdoptionMatch(brewMatch(PackageMatchState.MATCHED));
+        macTool.setAdoptionMatch(brewMatch(PackageMatchState.NO_PACKAGE));
+        repository.saveAll(List.of(slack, macTool));
+        List<PackageManagerType> brewOn = List.of(PackageManagerType.BREW);
+
+        // execution
+        List<String> needsAdoption = names(noPolicy(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, brewOn));
+        List<String> noPackage = names(noPolicy(SoftwareAutoUpdateStatus.NO_PACKAGE, brewOn));
+
+        // verifications
+        assertThat(needsAdoption).containsExactly("Slack");
+        assertThat(noPackage).containsExactlyInAnyOrder("Contoso Tool", "Mac Tool");
+    }
+
+    private static SoftwareTitleQuery noPolicy(SoftwareAutoUpdateStatus status, List<PackageManagerType> adoptionManagers) {
+        return titles().autoUpdateStatuses(List.of(status))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).adoptionManagers(adoptionManagers).build();
+    }
+
+    private static SoftwarePackageMatch chocoMatch() {
+        return SoftwarePackageMatch.builder().state(PackageMatchState.MATCHED).manager(PackageManagerType.CHOCO)
+                .packageId("some-package").build();
+    }
+
     private static SoftwarePackageMatch brewMatch(PackageMatchState state) {
         PackageManagerType manager = state == PackageMatchState.MATCHED ? PackageManagerType.BREW : null;
         return SoftwarePackageMatch.builder().state(state).manager(manager).build();

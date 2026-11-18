@@ -25,6 +25,11 @@ class BrewPackageMatcherTest {
     @InjectMocks private BrewPackageMatcher matcher;
 
     @Test
+    void isForAdoption_brewUpdatesWhatItInstalled_false() {
+        assertThat(matcher.isForAdoption()).isFalse();
+    }
+
+    @Test
     void match_tokenInTheCatalog_matched_tokenMissing_noPackage() {
         PackageCatalogEntry wget = entry("wget", BrewPackageType.FORMULA, "1.25.0");
         when(catalogRepository.findByManagerAndPackageIdIn(PackageManagerType.BREW, Set.of("wget", "tapped-tool")))

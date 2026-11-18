@@ -1169,6 +1169,7 @@ function EmbeddableChatInner({
     currentContextTokens,
     currentCacheHitRatePct,
     currentUsageBreakdown,
+    usagePanel,
     displayRef,
     // ─── Dialog management (Mingo-mode inline history) ───
     dialogs,
@@ -2754,6 +2755,7 @@ function EmbeddableChatInner({
               outputTokens: currentOutputTokens ?? undefined,
               hitRatePct: currentCacheHitRatePct ?? undefined,
               breakdown: currentUsageBreakdown ?? undefined,
+              usagePanel: usagePanel ?? undefined,
               onModelClick,
               modelTooltip,
             }

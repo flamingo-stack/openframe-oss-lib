@@ -1,5 +1,6 @@
 package com.openframe.data.config;
 
+import com.openframe.data.document.audit.AuditEvent;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,8 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.data.mongodb.core.index.PartialIndexFilter;
 import org.springframework.data.mongodb.core.query.Criteria;
+
+import java.time.Duration;
 
 @Slf4j
 @Configuration
@@ -27,6 +30,8 @@ public class MongoIndexConfig implements SmartLifecycle {
      * {@link #SCRIPTS_NAME_UNIQUE_INDEX}: uniqueness ignores soft-deleted rows.
      */
     private static final String SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX = "script_schedules_tenant_name_notDeleted_unique";
+
+    private static final Duration AUDIT_EVENTS_RETENTION = Duration.ofDays(7);
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -86,6 +91,11 @@ public class MongoIndexConfig implements SmartLifecycle {
         mongoTemplate.indexOps("application_events")
             .ensureIndex(new Index().on("type", Sort.Direction.ASC)
                                   .on("metadata.tags", Sort.Direction.ASC));
+
+        mongoTemplate.indexOps(AuditEvent.class)
+            .createIndex(new Index().on("occurredAt", Sort.Direction.ASC)
+                                    .expire(AUDIT_EVENTS_RETENTION)
+                                    .named("audit_events_ttl"));
 
         // Drop stale 'name' unique index from tags collection (legacy schema)
         dropStaleIndex("tags", "name");

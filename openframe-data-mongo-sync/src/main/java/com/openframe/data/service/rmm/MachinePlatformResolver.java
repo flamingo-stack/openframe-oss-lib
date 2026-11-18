@@ -2,6 +2,7 @@ package com.openframe.data.service.rmm;
 
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
@@ -33,6 +34,11 @@ public class MachinePlatformResolver {
                 .filter(m -> m.getOsType() != null)
                 .filter(packageManagerAvailability::isSoftwareManageable)
                 .collect(Collectors.toMap(Machine::getMachineId, Machine::getOsType, (a, b) -> a));
+    }
+
+    // the machines an order of the manager can go to: it would only fail where the manager cannot run
+    public List<String> supporting(List<String> machineIds, PackageManagerType manager) {
+        return packageManagerAvailability.supporting(machineIds, manager);
     }
 
     public List<String> compatible(List<String> machineIds, Map<String, OsType> osTypes,

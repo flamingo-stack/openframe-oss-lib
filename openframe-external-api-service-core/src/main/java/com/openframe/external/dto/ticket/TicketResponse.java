@@ -40,10 +40,10 @@ public class TicketResponse {
     @Schema(description = "Statuses this ticket may be transitioned to right now (single-ticket reads only; null in list responses). Use their ids with the transition endpoint.")
     private List<TicketStatusResponse> availableTransitions;
 
-    @Schema(description = "How the ticket was created")
+    @Schema(description = "How the ticket was created (FAE_FORM, FAE_DIALOG, ADMIN_DASHBOARD or EMAIL)")
     private TicketCreationSource creationSource;
 
-    @Schema(description = "Who opened the ticket: an end user's device (CLIENT) or an admin (ADMIN)")
+    @Schema(description = "Who opened the ticket: an end user's device (CLIENT), an admin (ADMIN) or the sender of an inbound email (EMAIL)")
     private TicketOwnerResponse owner;
 
     @Schema(description = "Linked device machineId")

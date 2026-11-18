@@ -12,6 +12,8 @@ public class HostSoftwareInstalledVersion {
 
     private String version;
     private List<String> vulnerabilities;
+    @JsonProperty("installed_paths")
+    private List<String> installedPaths;
 
     // reported only by the OpenFrame Fleet, from its osquery programs table (fleetmdm#256); null elsewhere. The ARP key
     // and installer are this host's own: the same program sits under other keys on other hosts
