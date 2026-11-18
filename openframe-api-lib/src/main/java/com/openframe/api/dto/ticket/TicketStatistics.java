@@ -13,7 +13,6 @@ import java.util.List;
 @AllArgsConstructor
 public class TicketStatistics {
     private Integer totalCount;
-    private List<TicketStatusCount> statusCounts;
     private List<TicketStatusDefinitionCount> statusDefinitionCounts;
     private String averageResolutionTimeFormatted;
     private Double averageRating;
