@@ -486,12 +486,14 @@ extend type Mutation {
     dispatched as its own RMM execution; returns one result (with its executionId) per package."""
     updateSoftware(input: SoftwareManagementInput!): [SoftwareDispatchResult!]!
 
-    """Adopt a package on devices that have the app installed by hand: the device reinstalls it with the package
-    manager, so it can be updated later. The call only sends the order to the devices: no result of the adoption
-    is reported back and no Software Actions row is written.
-    Returns the devices (Machine global ids) the order was sent to; a device whose OS the package manager does
-    not serve is left out. BAD_REQUEST when no device is left, when a device is not managed, and when the order
-    cannot reach a device (the order is switched off or the device's agent is too old for it)."""
+    """Adopt a software title on devices that have it installed by hand: the device reinstalls it with the title's
+    adoption package (Software.adoptionPackage), so it can be updated later. Sends the order to the devices now.
+    SoftwareOnDevice.adoption is ADOPTING until the device reports the reinstall done, then null; FAILED with the
+    error when the reinstall or its delivery failed.
+    Returns the devices (Machine global ids) the order was sent to; a device the package manager cannot run on is
+    left out. NOT_FOUND for an unknown title. BAD_REQUEST when the title has no adoption package, when no device
+    is left, when a device is not managed, and when the order cannot reach a device (the order is switched off or
+    the device's agent is too old for it)."""
     adoptSoftware(input: AdoptSoftwareInput!): [ID!]!
 
     """Save the Auto-update form: on with these settings for the bundle's devices, off for the title's other
@@ -508,10 +510,9 @@ extend type Mutation {
 # ────────── Adopt ──────────
 
 input AdoptSoftwareInput {
-    "BREW adopts on macOS, always as a cask; WINGET and CHOCO adopt on Windows."
-    packageManager: PackageManagerType!
-    "The package as package search returns it."
-    packageName: String!
+    """The software title (Software.id). It is adopted into its Software.adoptionPackage: a Homebrew cask on
+    macOS, a Chocolatey package on Windows."""
+    softwareId: ID!
     "The devices (Machine global ids), 1..100."
     machineIds: [ID!]!
 }

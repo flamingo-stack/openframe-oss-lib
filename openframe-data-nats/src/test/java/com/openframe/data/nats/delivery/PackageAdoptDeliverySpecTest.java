@@ -61,7 +61,7 @@ class PackageAdoptDeliverySpecTest {
     @Test
     void request_seed_requestIdIsTheTargetAndThePayloadCarriesThePackage() {
         // setup
-        PackageReference packageRef = wingetPackage();
+        PackageReference packageRef = chocoPackage();
         PackageAdoptDeliverySeed seed = PackageAdoptDeliverySeed.builder()
                 .machineId(MACHINE_ID)
                 .requestId(REQUEST_ID)
@@ -109,15 +109,15 @@ class PackageAdoptDeliverySpecTest {
     }
 
     @Test
-    void message_wingetPackage_serializedWithTheIdOnly() {
+    void message_chocoPackage_serializedWithTheIdOnly() {
         // setup
         PackageAdoptMessage message = new PackageAdoptMessage();
         message.setRequestId(REQUEST_ID);
-        message.setPackageRef(wingetPackage());
+        message.setPackageRef(chocoPackage());
         JsonNode expected = jsonMapper.readTree("""
                 {
                   "requestId": "req-1",
-                  "package": {"manager": "WINGET", "id": "Google.Chrome"}
+                  "package": {"manager": "CHOCO", "id": "googlechrome"}
                 }
                 """);
 
@@ -128,10 +128,10 @@ class PackageAdoptDeliverySpecTest {
         assertThat(jsonMapper.readTree(json)).isEqualTo(expected);
     }
 
-    private static PackageReference wingetPackage() {
+    private static PackageReference chocoPackage() {
         return PackageReference.builder()
-                .manager(PackageManagerType.WINGET)
-                .id("Google.Chrome")
+                .manager(PackageManagerType.CHOCO)
+                .id("googlechrome")
                 .build();
     }
 }

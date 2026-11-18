@@ -67,6 +67,15 @@ public class PackageManagerAvailability {
         return isEmpty(reported) || PackageManagerState.MANAGEABLE.contains(reported.get(manager));
     }
 
+    // in the order of machineIds; a machine that is not found is left out
+    public List<String> adoptableOn(Collection<String> machineIds, PackageManagerType manager) {
+        Set<String> adoptable = machines(machineIds).stream()
+                .filter(machine -> isAdoptableOn(machine, manager))
+                .map(Machine::getMachineId)
+                .collect(toSet());
+        return machineIds.stream().filter(adoptable::contains).toList();
+    }
+
     // an order of a manager the device cannot run would only fail there; MISSING and UNKNOWN change over time
     public static boolean isSupportedOn(Machine machine, PackageManagerType manager) {
         Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();

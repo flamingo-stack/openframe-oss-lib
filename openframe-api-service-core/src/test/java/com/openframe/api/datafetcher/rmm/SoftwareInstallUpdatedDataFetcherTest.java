@@ -2,7 +2,6 @@ package com.openframe.api.datafetcher.rmm;
 
 import com.openframe.api.dto.rmm.software.AdoptSoftwareInput;
 import com.openframe.api.service.rmm.software.SoftwareInstallUpdateManagementService;
-import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -29,7 +28,7 @@ class SoftwareInstallUpdatedDataFetcherTest {
 
     private static final String MACHINE_ID = "m1";
     private static final String OTHER_MACHINE_ID = "m2";
-    private static final String PACKAGE_NAME = "Google.Chrome";
+    private static final String SOFTWARE_ID = "42";
 
     @Mock private SoftwareInstallUpdateManagementService softwareInstallUpdateManagementService;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
@@ -59,9 +58,8 @@ class SoftwareInstallUpdatedDataFetcherTest {
         // verifications
         verify(softwareInstallUpdateManagementService).adopt(inputCaptor.capture());
         assertThat(inputCaptor.getValue())
-                .extracting(AdoptSoftwareInput::getPackageManager, AdoptSoftwareInput::getPackageName,
-                        AdoptSoftwareInput::getMachineIds)
-                .containsExactly(PackageManagerType.WINGET, PACKAGE_NAME, List.of(MACHINE_ID, OTHER_MACHINE_ID));
+                .extracting(AdoptSoftwareInput::getSoftwareId, AdoptSoftwareInput::getMachineIds)
+                .containsExactly(SOFTWARE_ID, List.of(MACHINE_ID, OTHER_MACHINE_ID));
         assertThat(ordered).containsExactly(machineGlobalId);
     }
 
@@ -81,8 +79,7 @@ class SoftwareInstallUpdatedDataFetcherTest {
 
     private static AdoptSoftwareInput input(List<String> machineIds) {
         AdoptSoftwareInput input = new AdoptSoftwareInput();
-        input.setPackageManager(PackageManagerType.WINGET);
-        input.setPackageName(PACKAGE_NAME);
+        input.setSoftwareId(SOFTWARE_ID);
         input.setMachineIds(machineIds);
         return input;
     }

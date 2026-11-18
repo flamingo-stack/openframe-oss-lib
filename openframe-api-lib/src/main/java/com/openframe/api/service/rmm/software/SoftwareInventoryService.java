@@ -40,7 +40,9 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareAdoption;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -50,6 +52,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
+import com.openframe.data.repository.rmm.SoftwareAdoptionRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -129,6 +132,7 @@ public class SoftwareInventoryService {
     private final SoftwareScheduleRepository softwareScheduleRepository;
     private final SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
     private final ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
+    private final SoftwareAdoptionRepository softwareAdoptionRepository;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -192,12 +196,25 @@ public class SoftwareInventoryService {
     }
 
     private SoftwareResponse getManagedSoftware(String softwareId) {
-        SoftwareResponse software = findById(softwareId)
-                .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
+        SoftwareResponse software = getSoftware(softwareId);
         if (software.getManagingPackage() == null) {
             throw new BadRequestException("No package manager manages " + software.getName());
         }
         return software;
+    }
+
+    public SoftwareBundlePackage getAdoptionPackage(String softwareId) {
+        SoftwareResponse software = getSoftware(softwareId);
+        SoftwareBundlePackage adoptionPackage = software.getAdoptionPackage();
+        if (adoptionPackage == null) {
+            throw new BadRequestException("No package to adopt " + software.getName() + " into");
+        }
+        return adoptionPackage;
+    }
+
+    private SoftwareResponse getSoftware(String softwareId) {
+        return findById(softwareId)
+                .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
     }
 
     public SoftwareResponse turnOnAutoUpdate(String softwareId, List<String> machineIds, PackageUpdateSettings settings,
@@ -482,7 +499,27 @@ public class SoftwareInventoryService {
                 .filter(row -> matchesDeviceFilter(row, filter, tagged))
                 .sorted(order)
                 .toList();
-        return paginateList(all, page, perPage);
+        PageResult<SoftwareOnDeviceResponse> result = paginateList(all, page, perPage);
+        applyAdoptions(softwareId, result.items());
+        return result;
+    }
+
+    private void applyAdoptions(String softwareId, List<SoftwareOnDeviceResponse> rows) {
+        if (rows.isEmpty()) {
+            return;
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        List<String> machineIds = rows.stream().map(row -> row.getDevice().getMachineId()).toList();
+        Map<String, SoftwareAdoption> adoptions = softwareAdoptionRepository
+                .findByTenantIdAndSoftwareIdAndMachineIdIn(tenantId, softwareId, machineIds).stream()
+                .collect(Collectors.toMap(SoftwareAdoption::getMachineId, Function.identity()));
+        rows.forEach(row -> applyAdoption(row, adoptions));
+    }
+
+    private static void applyAdoption(SoftwareOnDeviceResponse row, Map<String, SoftwareAdoption> adoptions) {
+        String machineId = row.getDevice().getMachineId();
+        SoftwareAdoption adoption = adoptions.get(machineId);
+        row.setAdoption(adoption);
     }
 
     // the filters read auto-update, so it is set on every row, not only on the page

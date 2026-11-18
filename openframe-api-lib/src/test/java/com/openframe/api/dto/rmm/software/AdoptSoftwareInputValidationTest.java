@@ -1,6 +1,5 @@
 package com.openframe.api.dto.rmm.software;
 
-import com.openframe.data.document.packagesearch.PackageManagerType;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -8,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Collections;
@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AdoptSoftwareInputValidationTest {
 
+    private static final String SOFTWARE_ID = "42";
     private static final String MACHINE_ID = "m1";
 
     private Validator validator;
@@ -83,10 +84,26 @@ class AdoptSoftwareInputValidationTest {
                 .containsExactly("machineIds[1].<list element>");
     }
 
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void validate_noSoftwareId_rejected(String softwareId) {
+        // setup
+        AdoptSoftwareInput input = input(List.of(MACHINE_ID));
+        input.setSoftwareId(softwareId);
+
+        // execution
+        Set<ConstraintViolation<AdoptSoftwareInput>> violations = validator.validate(input);
+
+        // verifications
+        assertThat(violations)
+                .extracting(ConstraintViolation::getMessage)
+                .containsExactly("softwareId is required");
+    }
+
     private static AdoptSoftwareInput input(List<String> machineIds) {
         AdoptSoftwareInput input = new AdoptSoftwareInput();
-        input.setPackageManager(PackageManagerType.WINGET);
-        input.setPackageName("Google.Chrome");
+        input.setSoftwareId(SOFTWARE_ID);
         input.setMachineIds(machineIds);
         return input;
     }

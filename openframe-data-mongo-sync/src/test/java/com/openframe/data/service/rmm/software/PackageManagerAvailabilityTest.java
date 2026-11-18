@@ -263,6 +263,34 @@ class PackageManagerAvailabilityTest {
         verifyNoInteractions(machineRepository);
     }
 
+    @Test
+    void adoptableOn_devicesTheManagerCannotBeAdoptedOn_leftOutInTheOrderAsked() {
+        // setup
+        Machine server = machine("m-server", Map.of(CHOCO, UNSUPPORTED));
+        Machine desktop = machine("m-win", Map.of(CHOCO, PRESENT));
+        Machine notYet = machine("m-new", Map.of(CHOCO, MISSING));
+        Machine oldAgent = machine("m-old-agent", null);
+        stubMachines(Set.of("m-old-agent", "m-server", "m-new", "m-win", "m-gone"), desktop, server, oldAgent, notYet);
+        List<String> machineIds = List.of("m-old-agent", "m-server", "m-new", "m-win", "m-gone");
+        packageManagerProperties.setChocoEnabled(true);
+
+        // execution
+        List<String> result = availability.adoptableOn(machineIds, CHOCO);
+
+        // verifications
+        assertThat(result).containsExactly("m-old-agent", "m-new", "m-win");
+    }
+
+    @Test
+    void adoptableOn_noMachines_emptyWithoutAQuery() {
+        // execution
+        List<String> result = availability.adoptableOn(List.of(), CHOCO);
+
+        // verifications
+        assertThat(result).isEmpty();
+        verifyNoInteractions(machineRepository);
+    }
+
     private void stubMachines(Set<String> machineIds, Machine... machines) {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.findByTenantIdAndMachineIdIn(TENANT_ID, machineIds)).thenReturn(List.of(machines));

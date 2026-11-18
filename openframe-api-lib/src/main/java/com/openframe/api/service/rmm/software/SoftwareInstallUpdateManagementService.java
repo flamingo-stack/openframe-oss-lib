@@ -17,6 +17,9 @@ import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.document.rmm.software.SoftwareAdoption;
+import com.openframe.data.document.rmm.software.SoftwareAdoptionStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.delivery.PackageAdoptDeliverySeed;
@@ -25,8 +28,10 @@ import com.openframe.data.nats.packageupdate.PackageReference;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.nats.packageupdate.PackageUpdateWire;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
+import com.openframe.data.repository.rmm.SoftwareAdoptionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.nats.packageupdate.PackageUpdateEligibilityService;
@@ -43,15 +48,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.springframework.util.StringUtils.hasText;
-
 @Slf4j
 @Service
 @ConditionalOnProperty(name = {"spring.cloud.stream.enabled", "openframe.rmm.software.enabled"}, havingValue = "true")
 @RequiredArgsConstructor
 public class SoftwareInstallUpdateManagementService {
-
-    private static final BrewPackageType ADOPTED_BREW_PACKAGE_TYPE = BrewPackageType.CASK;
 
     private final PackageManagerRegistry packageManagerRegistry;
     private final ScriptService scriptService;
@@ -64,6 +65,9 @@ public class SoftwareInstallUpdateManagementService {
     private final SoftwareActionResultRepository softwareActionResultRepository;
     private final TenantIdProvider tenantIdProvider;
     private final DeliveryRouter deliveryRouter;
+    private final SoftwareInventoryService softwareInventoryService;
+    private final PackageManagerAvailability packageManagerAvailability;
+    private final SoftwareAdoptionRepository softwareAdoptionRepository;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -74,25 +78,25 @@ public class SoftwareInstallUpdateManagementService {
     }
 
     public List<String> adopt(AdoptSoftwareInput input) {
-        PackageManagerType packageManager = input.getPackageManager();
-        String packageName = input.getPackageName();
-        if (packageManager == null || !hasText(packageName)) {
-            throw new BadRequestException("An adoption needs packageManager and packageName");
+        String softwareId = input.getSoftwareId();
+        SoftwareBundlePackage adoptionPackage = softwareInventoryService.getAdoptionPackage(softwareId);
+        PackageManagerType packageManager = adoptionPackage.getPackageManager();
+        String packageName = adoptionPackage.getPackageName();
+        if (packageManager == PackageManagerType.WINGET) {
+            throw new BadRequestException("A program is not adopted into WINGET: winget updates it as it is installed");
         }
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
-        Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
-        OsType packageOs = SoftwareBundleService.osTypeOf(packageManager);
-        Set<OsType> packageOsTypes = Set.of(packageOs);
-        List<String> targets = machinePlatformResolver.compatible(machineIds, osTypes, packageOsTypes);
+        List<String> targets = adoptableMachines(machineIds, packageManager);
         if (targets.isEmpty()) {
-            throw new BadRequestException("None of the given devices can adopt with " + packageManager
-                    + ": it takes a " + packageOs + " device with a usable package manager");
+            throw new BadRequestException("None of the given devices can adopt " + packageName + " with " + packageManager);
         }
         requireAdoptOrderReaches(targets);
         deviceService.verifyDispatchable(targets);
 
         String requestId = UUID.randomUUID().toString();
-        PackageReference packageRef = PackageUpdateWire.reference(packageManager, packageName, ADOPTED_BREW_PACKAGE_TYPE);
+        recordAdoptions(targets, softwareId, adoptionPackage, requestId);
+        BrewPackageType brewPackageType = adoptionPackage.getBrewPackageType();
+        PackageReference packageRef = PackageUpdateWire.reference(packageManager, packageName, brewPackageType);
         targets.stream()
                 .map(machineId -> PackageAdoptDeliverySeed.builder()
                         .machineId(machineId)
@@ -101,9 +105,17 @@ public class SoftwareInstallUpdateManagementService {
                         .build())
                 .forEach(deliveryRouter::dispatch);
 
-        log.info("Software adopt order sent: requestId={} package={}/{} machines={}/{}",
-                requestId, packageManager, packageName, targets.size(), machineIds.size());
+        log.info("Software adopt order sent: requestId={} softwareId={} package={}/{} machines={}/{}",
+                requestId, softwareId, packageManager, packageName, targets.size(), machineIds.size());
         return targets;
+    }
+
+    private List<String> adoptableMachines(List<String> machineIds, PackageManagerType packageManager) {
+        Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
+        OsType packageOs = SoftwareBundleService.osTypeOf(packageManager);
+        Set<OsType> packageOsTypes = Set.of(packageOs);
+        List<String> compatible = machinePlatformResolver.compatible(machineIds, osTypes, packageOsTypes);
+        return packageManagerAvailability.adoptableOn(compatible, packageManager);
     }
 
     private void requireAdoptOrderReaches(List<String> machineIds) {
@@ -113,6 +125,29 @@ public class SoftwareInstallUpdateManagementService {
             throw new BadRequestException("The adopt order cannot reach devices " + unreachable + ": "
                     + DeliveryType.PACKAGE_ADOPT + " is switched off or their agent is too old for it");
         }
+    }
+
+    // the id is the device and the title: saving a repeated adoption replaces the earlier record
+    private void recordAdoptions(List<String> machineIds, String softwareId, SoftwareBundlePackage adoptionPackage,
+                                 String requestId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        PackageManagerType packageManager = adoptionPackage.getPackageManager();
+        String packageName = adoptionPackage.getPackageName();
+        Instant now = Instant.now();
+        List<SoftwareAdoption> adoptions = machineIds.stream()
+                .map(machineId -> SoftwareAdoption.builder()
+                        .id(machineId + ":" + softwareId)
+                        .tenantId(tenantId)
+                        .machineId(machineId)
+                        .softwareId(softwareId)
+                        .packageManager(packageManager)
+                        .packageName(packageName)
+                        .requestId(requestId)
+                        .status(SoftwareAdoptionStatus.ADOPTING)
+                        .createdAt(now)
+                        .build())
+                .toList();
+        softwareAdoptionRepository.saveAll(adoptions);
     }
 
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,

@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -40,15 +41,17 @@ class DeliveryTrackerTest {
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliveryCloser closer;
+    @Mock private ApplicationEventPublisher applicationEventPublisher;
 
     @Captor private ArgumentCaptor<Instant> atCaptor;
     @Captor private ArgumentCaptor<Instant> untilCaptor;
+    @Captor private ArgumentCaptor<DeliveryDoneEvent> doneEventCaptor;
 
     private DeliveryTracker tracker;
 
     @BeforeEach
     void setUp() {
-        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer);
+        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer, applicationEventPublisher);
     }
 
     @Test
@@ -113,6 +116,33 @@ class DeliveryTrackerTest {
         // verifications
         Instant finishedAt = atCaptor.getValue();
         assertThat(untilCaptor.getValue()).isEqualTo(finishedAt.plusSeconds(TTL));
+    }
+
+    @Test
+    void done_rowMarkedDone_doneEventPublishedForTheDomain() {
+        // setup
+        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class))).thenReturn(true);
+
+        // execution
+        tracker.done(REF, MACHINE_ID);
+
+        // verifications
+        verify(applicationEventPublisher).publishEvent(doneEventCaptor.capture());
+        assertThat(doneEventCaptor.getValue())
+                .extracting(DeliveryDoneEvent::getType, DeliveryDoneEvent::getTargetId, DeliveryDoneEvent::getMachineId)
+                .containsExactly(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+    }
+
+    @Test
+    void done_noRowOfThisDispatch_noDoneEvent() {
+        // setup
+        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class))).thenReturn(false);
+
+        // execution
+        tracker.done(REF, MACHINE_ID);
+
+        // verifications
+        verifyNoInteractions(applicationEventPublisher);
     }
 
     @Test
