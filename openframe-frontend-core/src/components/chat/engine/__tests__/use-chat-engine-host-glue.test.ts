@@ -8,7 +8,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DialogItem, HistoricalMessage, SlashCommandSummary } from '../../types';
-import type { FetchDialogsParams } from '../../types/unified-chat-state.types';
+import type { DialogTokenUsage, FetchDialogsParams } from '../../types/unified-chat-state.types';
 import type {
   ChatDialogRecord,
   ChatHistoryBackend,
@@ -266,5 +266,50 @@ describe('useChatEngine: Display from the catalog', () => {
     expect(
       displayCommandFor({ type: 'device', id: 'm1', title: 'Mac', sourceRepo: 'docs', url: null }, commands),
     ).toBeNull();
+  });
+});
+
+describe('useChatEngine: the usage after the host changes its model', () => {
+  const usage = (contextSize: number): DialogTokenUsage => ({
+    inputTokensSize: 10,
+    outputTokensSize: 5,
+    totalTokensSize: 15,
+    contextSize,
+  });
+
+  function renderWithModel(fetchDialog: (id: string) => Promise<ChatDialogRecord>) {
+    const transport: ChatLiveTailTransport = { replays: true, useLiveTail: () => {}, publish: vi.fn() };
+    const history: ChatHistoryBackend = {
+      fetchDialogMessages: () => Promise.resolve({ messages: persisted, nextCursor: null }),
+      fetchDialog,
+    };
+    return renderHook(({ modelLabel }: { modelLabel: string }) => useChatEngine({ transport, history, modelLabel }), {
+      initialProps: { modelLabel: 'Model A' },
+    });
+  }
+
+  it("reads the open record again and takes its usage, the new model's budget", async () => {
+    let record: ChatDialogRecord = { dialog: { id: 'd1', title: 'Disk' }, tokenUsage: usage(200_000) };
+    const fetchDialog = vi.fn(() => Promise.resolve(record));
+    const { result, rerender } = renderWithModel(fetchDialog);
+    act(() => result.current.selectDialog('d1'));
+    await waitFor(() => expect(result.current.dialogTokenUsage?.contextSize).toBe(200_000));
+
+    record = { ...record, tokenUsage: usage(30_000) };
+    const reads = fetchDialog.mock.calls.length;
+    rerender({ modelLabel: 'Model B' });
+    await waitFor(() => expect(fetchDialog.mock.calls.length).toBe(reads + 1));
+    await waitFor(() => expect(result.current.dialogTokenUsage?.contextSize).toBe(30_000));
+  });
+
+  it('drops the old usage when the record has none for the new model', async () => {
+    let record: ChatDialogRecord = { dialog: { id: 'd1', title: 'Disk' }, tokenUsage: usage(200_000) };
+    const { result, rerender } = renderWithModel(() => Promise.resolve(record));
+    act(() => result.current.selectDialog('d1'));
+    await waitFor(() => expect(result.current.dialogTokenUsage?.contextSize).toBe(200_000));
+
+    record = { dialog: { id: 'd1', title: 'Disk' }, tokenUsage: null };
+    rerender({ modelLabel: 'Model B' });
+    await waitFor(() => expect(result.current.dialogTokenUsage).toBeNull());
   });
 });

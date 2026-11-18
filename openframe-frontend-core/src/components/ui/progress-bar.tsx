@@ -33,10 +33,23 @@ type ProgressBarProps = {
    * count), so a partial bar never reads as an error.
    */
   tone?: 'threshold' | 'neutral';
+  /** A fixed fill colour (a CSS colour value, e.g. `var(--ods-accent)`), overriding `tone` and the thresholds: for a
+   *  host that colours the bar by its own rule. */
+  fillColor?: string;
+  /** The colour of the empty segments (default `var(--color-bg-surface-active)`). */
+  trackColor?: string;
+  /** From this percentage on, empty segments take `dimTrackColor` instead of `trackColor`: marks a zone of the bar
+   *  (e.g. where a chat's memory is compacted). Filled segments keep the fill colour. */
+  dimTrackFrom?: number;
+  /** The empty segments' colour from `dimTrackFrom` (default `var(--color-bg-surface-active)`). */
+  dimTrackColor?: string;
   /** The value is still being read: the bar draws its `ProgressBarSkeleton` at its own height. A loading scope does
    *  the same. */
   loading?: boolean;
 };
+
+/** Empty segments, unless the host names its own track colours. */
+const UNFILLED_SEGMENT_COLOR = 'var(--color-bg-surface-active)';
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   progress,
@@ -49,6 +62,10 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   mobileHeight = PROGRESS_BAR_HEIGHT.mobile,
   inverted = false,
   tone = 'threshold',
+  fillColor,
+  trackColor = UNFILLED_SEGMENT_COLOR,
+  dimTrackFrom,
+  dimTrackColor = UNFILLED_SEGMENT_COLOR,
   loading: loadingProp,
 }) => {
   // ONE switch: in a page's loading state (or while the host reads the value) the bar is its skeleton.
@@ -83,6 +100,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
   // Pick color based on thresholds using ODS design tokens
   const getColor = () => {
+    if (fillColor) return fillColor;
     if (tone === 'neutral') return 'var(--color-text-secondary)';
     if (inverted) {
       // Inverted: high values = good (green), low values = bad (red)
@@ -97,6 +115,15 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       if (progress >= warningThreshold) return 'var(--color-warning)'; // warning yellow
       return 'var(--color-success)'; // base green
     }
+  };
+
+  // A NaN or out-of-range value (a total of 0 upstream) draws an empty or a full bar, never a broken one.
+  const safeProgress = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : 0;
+  const filledCount = Math.round((safeProgress / 100) * segmentCount);
+  const dimFromIndex = dimTrackFrom == null ? segmentCount : Math.round((dimTrackFrom / 100) * segmentCount);
+  const segmentColor = (i: number) => {
+    if (i < filledCount) return getColor();
+    return i >= dimFromIndex ? dimTrackColor : trackColor;
   };
 
   return (
@@ -119,8 +146,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           style={{
             width: `${effectiveSegmentWidth}px`,
             height: `${effectiveHeight}px`,
-            backgroundColor:
-              i < Math.round((progress / 100) * segmentCount) ? getColor() : 'var(--color-bg-surface-active)', // unfilled segments
+            backgroundColor: segmentColor(i),
           }}
         />
       ))}

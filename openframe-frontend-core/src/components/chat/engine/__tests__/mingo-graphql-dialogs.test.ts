@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MINGO_DIALOG_QUERY, MINGO_RENAME_DIALOG_MUTATION } from '../../../../chat-protocol/mingo-graphql';
+import {
+  MINGO_DIALOG_QUERY,
+  MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY,
+  MINGO_RENAME_DIALOG_MUTATION,
+} from '../../../../chat-protocol/mingo-graphql';
 import { createMingoGraphqlDialogs, type MingoGraphqlPost } from '../mingo-graphql-history';
 
 const node = {
@@ -84,5 +88,72 @@ describe('createMingoGraphqlDialogs', () => {
     const { post, dialogs } = backend({ renameDialog: { userErrors: [{ message: 'Title too long' }] } });
     await expect(dialogs.renameDialog('d1', 'x'.repeat(500))).rejects.toThrow('Title too long');
     expect(post).toHaveBeenCalledWith(MINGO_RENAME_DIALOG_MUTATION, { input: { id: 'd1', title: 'x'.repeat(500) } });
+  });
+
+  describe('token usage split', () => {
+    const split = {
+      dialog: {
+        id: 'R2xvYmFs',
+        tokenUsage: [
+          {
+            chatType: 'ADMIN_AI_CHAT',
+            uncachedInputTokensSize: 1,
+            cacheReadTokensSize: 2,
+            cacheWriteTokensSize: 0,
+            compactionThreshold: 0.8,
+          },
+        ],
+      },
+    };
+    const splitBackend = (answerSplit: () => Promise<unknown>) => {
+      const post = vi.fn((query: string) =>
+        query === MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY ? answerSplit() : Promise.resolve({ dialog: node }),
+      ) as unknown as MingoGraphqlPost & ReturnType<typeof vi.fn>;
+      const dialogs = createMingoGraphqlDialogs(post, {
+        agentTypes: ['ADMIN'],
+        statuses: ['ACTIVE'],
+        chatType: 'ADMIN_AI_CHAT',
+        tokenUsageSplit: true,
+      });
+      return { post, dialogs };
+    };
+
+    it('merges the split into the record usage when the backend answers it', async () => {
+      const { dialogs } = splitBackend(() => Promise.resolve(split));
+      const record = await dialogs.fetchDialog('d1');
+      expect(record?.tokenUsage).toEqual({
+        chatType: 'ADMIN_AI_CHAT',
+        inputTokensSize: 3,
+        outputTokensSize: 4,
+        totalTokensSize: 7,
+        contextSize: 9,
+        uncachedInputTokensSize: 1,
+        cacheReadTokensSize: 2,
+        cacheWriteTokensSize: 0,
+        compactionThreshold: 0.8,
+      });
+    });
+
+    it('opens the record without the split when the backend refuses it, and does not ask again', async () => {
+      const { post, dialogs } = splitBackend(() => Promise.reject(new Error('Validation error: unknown field')));
+      const first = await dialogs.fetchDialog('d1');
+      expect(first?.tokenUsage).toEqual({
+        chatType: 'ADMIN_AI_CHAT',
+        inputTokensSize: 3,
+        outputTokensSize: 4,
+        totalTokensSize: 7,
+        contextSize: 9,
+      });
+      await dialogs.fetchDialog('d1');
+      const splitCalls = post.mock.calls.filter(([query]) => query === MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY);
+      expect(splitCalls).toHaveLength(1);
+    });
+
+    it('does not ask for the split unless the host turns it on', async () => {
+      const { post, dialogs } = backend({ dialog: node });
+      await dialogs.fetchDialog('d1');
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(post).toHaveBeenCalledWith(MINGO_DIALOG_QUERY, { id: 'd1' });
+    });
   });
 });

@@ -10,8 +10,10 @@ use tokio::time::{timeout, Duration};
 
 use super::{
     Begin, ClientUpdateHandler, CommandContext, CommandHandler, CommandListener,
-    FeatureFlagsHandler, Outcome, PackageUpdateHandler, RestartGate, ToolUpdateHandler,
+    FeatureFlagsHandler, Outcome, PackageUpdateHandler, RestartGate, ToolInstallationHandler,
+    ToolUpdateHandler,
 };
+use crate::clients::ToolApiClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{
     DeliveryRef, DeliveryResult, DeliveryResultMessage, FailReason, Feature, FeatureFlagsState,
@@ -39,7 +41,9 @@ use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
 use crate::services::{
     AgentConfigurationService, GithubDownloadService, InitialConfigurationService,
-    InstalledToolsService, ToolCommandParamsResolver, ToolKillService, ToolOps,
+    InstalledToolsService, ToolCommandParamsResolver, ToolConnectionMessagePublisher,
+    ToolConnectionProcessingManager, ToolConnectionService, ToolInstallationService,
+    ToolKillService, ToolOps, ToolUrlParamsResolver,
 };
 use crate::test_support::{connection_manager, NatsServer};
 use crate::utils::in_progress::InProgress;
@@ -343,6 +347,41 @@ impl Agent {
             self.config.clone(),
             InstalledAgentMessagePublisher::new(self.publisher.clone()),
             ToolCommandParamsResolver::new(self.directories.clone(), initial, self.config.clone()),
+        )
+    }
+
+    fn tool_installation_service(&self) -> ToolInstallationService {
+        let initial = InitialConfigurationService::new(self.directories.clone()).unwrap();
+        let resolver = ToolCommandParamsResolver::new(
+            self.directories.clone(),
+            initial.clone(),
+            self.config.clone(),
+        );
+        let installed_tools = InstalledToolsService::new(self.directories.clone()).unwrap();
+        let connections = ToolConnectionService::new(self.directories.clone()).unwrap();
+        ToolInstallationService::new(
+            GithubDownloadService::new(reqwest::Client::new(), DmgExtractor::new()),
+            ToolApiClient::new(
+                reqwest::Client::new(),
+                "http://127.0.0.1:9".into(),
+                self.config.clone(),
+            ),
+            resolver.clone(),
+            ToolUrlParamsResolver::new(initial),
+            installed_tools.clone(),
+            self.directories.clone(),
+            self.tool_run_manager.clone(),
+            ToolConnectionProcessingManager::new(
+                installed_tools,
+                resolver,
+                ToolConnectionMessagePublisher::new(self.publisher.clone()),
+                self.config.clone(),
+                connections.clone(),
+                self.tool_ops.clone(),
+            ),
+            self.config.clone(),
+            InstalledAgentMessagePublisher::new(self.publisher.clone()),
+            connections,
         )
     }
 
@@ -1477,4 +1516,87 @@ async fn an_update_whose_old_binary_is_still_running_fails_and_keeps_the_recorde
         .unwrap()
         .expect("record kept");
     assert_eq!(recorded.version, "0.4.16");
+}
+
+async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empty: bool) {
+    use std::io::Write;
+
+    const TOOL: &str = "it-asset-tool";
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let run_args = vec![
+        "--helper".to_string(),
+        "${client.assetPath.helper}".to_string(),
+    ];
+    agent
+        .install_tool(InstalledTool {
+            run_command_args: run_args.clone(),
+            ..installed_tool(TOOL, "1.0.0", ToolRecordState::Installed, Vec::new())
+        })
+        .await;
+    let asset = agent.directories.get_asset_path(TOOL, "helper", true);
+    if asset_left_empty {
+        std::fs::write(&asset, b"").unwrap();
+    }
+
+    let helper = vec![9u8; 150 * 1024];
+    let stored =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    for (name, bytes) in [("agent", vec![7u8; 150 * 1024]), ("helper", helper.clone())] {
+        archive.start_file(name, stored).unwrap();
+        archive.write_all(&bytes).unwrap();
+    }
+    let release =
+        crate::test_support::mock_server_with_body(&[200], archive.finish().unwrap().into_inner())
+            .await;
+    let link = format!("{}/release.zip", release.url);
+    let tool_config = |os: &str| json!({"os": os, "fileName": "release.zip", "agentFileName": "agent", "link": link, "installationType": "STANDARD"});
+    let asset_config = |os: &str| json!({"os": os, "fileName": "release.zip", "assetFileName": "helper", "link": link});
+
+    let _reports = agent.installed_agents().await;
+    let handler = ToolInstallationHandler::new(
+        agent.tool_installation_service(),
+        ToolOps::default(),
+        agent.tool_run_manager.client_update_pending(),
+    );
+    agent.launch_command(handler).await;
+    agent
+        .send_to(
+            ToolInstallationHandler::subject(MACHINE),
+            json!({
+                "delivery": {"type": "TOOL_INSTALLATION", "targetId": TOOL, "dispatchId": "i1", "sequence": 1},
+                "toolAgentId": TOOL,
+                "toolId": "it-asset-tool-server",
+                "toolType": "",
+                "version": "1.0.0",
+                "reinstall": false,
+                "downloadConfigurations": [tool_config("windows"), tool_config("macos")],
+                "runCommandArgs": run_args,
+                "assets": [{
+                    "id": "helper",
+                    "source": "GITHUB",
+                    "executable": true,
+                    "version": "1.0.0",
+                    "localFilenameConfiguration": [{"os": "windows", "filename": "helper"}, {"os": "macos", "filename": "helper"}],
+                    "downloadConfigurations": [asset_config("windows"), asset_config("macos")],
+                }],
+            }),
+        )
+        .await;
+
+    agent.expect("i1", DeliveryResult::Acked).await;
+    agent.expect("i1", DeliveryResult::Done).await;
+    assert_eq!(std::fs::read(&asset).unwrap(), helper);
+}
+
+#[tokio::test]
+async fn an_install_of_a_present_tool_downloads_its_missing_command_asset() {
+    an_install_of_a_present_tool_rewrites_its_command_asset(false).await;
+}
+
+#[tokio::test]
+async fn an_install_of_a_present_tool_rewrites_its_empty_command_asset() {
+    an_install_of_a_present_tool_rewrites_its_command_asset(true).await;
 }

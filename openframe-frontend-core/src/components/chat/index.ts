@@ -59,6 +59,8 @@ export * from './context-items-list';
 export * from './chat-archive-page';
 export { ChatListLoadError, type MingoDialogStatus, type MingoHistoryScope } from './mingo-chat-list-shared';
 export * from './model-display';
+export * from './usage/chat-usage';
+export * from './usage/chat-usage-panel';
 export * from './chat-sidebar';
 export * from './chat-nav-sidebar';
 export * from './chat-list-empty-state';

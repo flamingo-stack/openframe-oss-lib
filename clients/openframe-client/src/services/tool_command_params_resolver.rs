@@ -1,8 +1,10 @@
+use crate::models::InstalledTool;
 use crate::platform::DirectoryManager;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
 use anyhow::Result;
 use openframe_common::auth::shared_token;
 use regex::Regex;
+use std::path::PathBuf;
 use std::sync::LazyLock;
 
 /// Regex for matching assets path placeholders like ${client.assetsPath.osquery}
@@ -65,6 +67,26 @@ impl ToolCommandParamsResolver {
             .collect())
     }
 
+    pub async fn missing_command_asset(&self, tool: &InstalledTool) -> Option<PathBuf> {
+        let asset_paths: Vec<PathBuf> = tool
+            .tool_agent_id_command_args
+            .iter()
+            .chain(&tool.run_command_args)
+            .flat_map(|arg| ASSETS_PATH_REGEX.captures_iter(arg))
+            .map(|caps| self.command_asset_path(&tool.tool_agent_id, &caps[1]))
+            .collect();
+        for path in asset_paths {
+            if !self
+                .directory_manager
+                .tool_artifact_present(&path, false)
+                .await
+            {
+                return Some(path);
+            }
+        }
+        None
+    }
+
     fn build_token_path(&self) -> String {
         self.directory_manager
             .secured_dir()
@@ -73,12 +95,15 @@ impl ToolCommandParamsResolver {
             .to_string()
     }
 
+    fn command_asset_path(&self, tool_agent_id: &str, asset_name: &str) -> PathBuf {
+        self.directory_manager
+            .get_asset_path(tool_agent_id, asset_name, true)
+    }
+
     fn process_assets_placeholders(&self, arg: &str, tool_agent_id: &str) -> String {
         ASSETS_PATH_REGEX
             .replace_all(arg, |caps: &regex::Captures| {
-                let asset_name = &caps[1];
-                self.directory_manager
-                    .get_asset_path(tool_agent_id, asset_name, true) // Assets referenced in commands are typically executable
+                self.command_asset_path(tool_agent_id, &caps[1])
                     .to_string_lossy()
                     .into_owned()
             })
