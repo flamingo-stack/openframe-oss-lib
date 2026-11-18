@@ -3,13 +3,14 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { ProgressBar } from '../../ui/progress-bar';
 import {
   type ChatUsagePanelData,
   type ChatUsageTone,
   chatContextTone,
-  compactionThresholdOf,
   contextRatio,
+  reportedCompactionThreshold,
   formatTokensFull,
   formatTokensShort,
   formatUsd,
@@ -46,7 +47,8 @@ function Section({ children, className }: { children: ReactNode; className?: str
   );
 }
 
-function LabelRow({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
+function LabelRow({ label, value, loading: loadingProp }: { label: string; value: string; loading?: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   return (
     <div className="flex items-center justify-between gap-[var(--spacing-system-xsf)] text-h6">
       <span>{label}</span>
@@ -70,7 +72,8 @@ function BreakdownRow({ label, value }: { label: string; value: number | null })
  */
 export function ChatUsagePanel({ data, className }: { data: ChatUsagePanelData; className?: string }) {
   const { free, balance, companyLoading, context, breakdown } = data;
-  const compactAt = compactionThresholdOf(context.compactionThreshold);
+  // Null until the backend reports its ratio: the zone and the line then say nothing rather than guess.
+  const compactAt = reportedCompactionThreshold(context.compactionThreshold);
   const ratio = contextRatio(context.used, context.limit);
   const contextTone = chatContextTone(context.used, context.limit, context.compactionThreshold);
   const freeProgress = free && free.total > 0 ? (free.used / free.total) * 100 : 0;
@@ -116,10 +119,10 @@ export function ChatUsagePanel({ data, className }: { data: ChatUsagePanelData; 
           progress={ratio == null ? 0 : ratio * 100}
           fillColor={CHAT_USAGE_TONE_COLOR[contextTone]}
           trackColor="var(--color-accent-secondary)"
-          dimTrackFrom={compactAt * 100}
+          {...(compactAt == null ? {} : { dimTrackFrom: compactAt * 100 })}
         />
         <span className="text-ods-text-secondary text-h6">
-          Mingo compacts chat memory at {Math.round(compactAt * 100)}%
+          Mingo compacts chat memory at {compactAt == null ? UNKNOWN : `${Math.round(compactAt * 100)}%`}
         </span>
         <div className="flex flex-col pt-[var(--spacing-system-xxs)]">
           <BreakdownRow label="Input" value={breakdown?.input ?? null} />

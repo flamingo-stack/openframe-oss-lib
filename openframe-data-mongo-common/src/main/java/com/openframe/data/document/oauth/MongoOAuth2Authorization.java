@@ -58,6 +58,8 @@ public class MongoOAuth2Authorization implements TenantScoped {
     private Instant refreshTokenExpiresAt;
     private Map<String, Object> refreshTokenMetadata;
     private List<RetiredRefreshToken> retiredRefreshTokens;
+
+    private String sessionId;
     // TTL index for automatic cleanup
     @Indexed(expireAfterSeconds = 0)
     private Instant expiresAt;  // Set to latest token expiration

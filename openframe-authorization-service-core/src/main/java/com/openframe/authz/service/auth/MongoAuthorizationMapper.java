@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static com.openframe.data.model.audit.AuditConstants.SESSION_ATTRIBUTE;
+
 class MongoAuthorizationMapper {
 
     private static final String CODE_CHALLENGE_KEY = "code_challenge";
@@ -58,6 +60,7 @@ class MongoAuthorizationMapper {
             entity.setArAdditional(additional);
         }
         entity.setState(auth.getAttribute("state"));
+        entity.setSessionId(auth.getAttribute(SESSION_ATTRIBUTE));
 
         OAuth2Authorization.Token<OAuth2AuthorizationCode> code = auth.getToken(OAuth2AuthorizationCode.class);
         if (code != null) {
@@ -159,6 +162,7 @@ class MongoAuthorizationMapper {
                 .authorizationGrantType(new org.springframework.security.oauth2.core.AuthorizationGrantType(e.getAuthorizationGrantType()))
                 .attributes(attrs -> {
                     if (e.getState() != null) attrs.put("state", e.getState());
+                    if (e.getSessionId() != null) attrs.put(SESSION_ATTRIBUTE, e.getSessionId());
                     // Rehydrate principal for token exchange (not persisted)
                     Authentication principal = new UsernamePasswordAuthenticationToken(e.getPrincipalName(), "N/A", java.util.Collections.emptyList());
                     attrs.put(java.security.Principal.class.getName(), principal);
