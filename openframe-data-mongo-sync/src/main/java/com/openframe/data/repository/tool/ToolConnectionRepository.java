@@ -4,14 +4,31 @@ import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+/** Stores provider registrations and conditionally updates registration fields without replacing unrelated connection data. */
 @Repository
 public interface ToolConnectionRepository extends MongoRepository<ToolConnection, String> {
+    /** Updates only registration-owned fields while the observed connection generation is unchanged. */
+    @Query("""
+            { '_id': ?#{[0].id}, 'tenantId': ?#{[0].tenantId}, 'machineId': ?#{[0].machineId},
+              'toolType': ?#{[0].toolType}, 'status': ?#{[0].status}, 'agentToolId': ?#{[0].agentToolId},
+              'connectedAt': ?#{[0].connectedAt}, 'disconnectedAt': ?#{[0].disconnectedAt},
+              'lastSyncAt': ?#{[0].lastSyncAt} }
+            """)
+    @Update("""
+            { '$set': { 'agentToolId': ?#{[1].agentToolId}, 'status': ?#{[1].status},
+              'connectedAt': ?#{[1].connectedAt}, 'disconnectedAt': ?#{[1].disconnectedAt},
+              'lastSyncAt': ?#{[1].lastSyncAt} } }
+            """)
+    long updateRegistrationIfUnchanged(ToolConnection observed, ToolConnection registration);
+
     List<ToolConnection> findByMachineId(String machineId);
 
     List<ToolConnection> findByMachineIdIn(List<String> machineIds);
