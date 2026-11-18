@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.MachineTag;
+import com.openframe.api.event.TagDeletedEvent;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
@@ -11,6 +12,7 @@ import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,12 +28,15 @@ public class TagService {
 
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
 
-    public TagService(TagRepository tagRepository, TagAssignmentRepository tagAssignmentRepository) {
+    public TagService(TagRepository tagRepository, TagAssignmentRepository tagAssignmentRepository,
+                      ApplicationEventPublisher eventPublisher) {
         this.tagRepository = tagRepository;
         this.tagAssignmentRepository = tagAssignmentRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public Optional<Tag> findById(String id) {
@@ -293,13 +298,15 @@ public class TagService {
     public void deleteTag(String tagId) {
         log.info("Deleting tag: {}", tagId);
 
-        if (!tagRepository.existsById(tagId)) {
-            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId);
-        }
+        Tag tag = requireTag(tagId);
+        String tenantId = tag.getTenantId();
 
         tagAssignmentRepository.deleteByTagId(tagId);
         tagRepository.deleteById(tagId);
         log.info("Tag deleted with cascade: {}", tagId);
+
+        TagDeletedEvent deleted = new TagDeletedEvent(this, tenantId, tagId);
+        eventPublisher.publishEvent(deleted);
     }
 
     private MachineTag buildMachineTag(TagAssignment assignment, Tag tag) {

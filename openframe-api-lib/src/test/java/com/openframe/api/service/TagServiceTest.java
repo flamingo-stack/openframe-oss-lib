@@ -1,7 +1,9 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.MachineTag;
+import com.openframe.api.event.TagDeletedEvent;
 import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
@@ -9,10 +11,14 @@ import com.openframe.data.repository.tag.TagRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +41,8 @@ class TagServiceTest {
 
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
+    @Mock private ApplicationEventPublisher eventPublisher;
+    @Captor private ArgumentCaptor<TagDeletedEvent> deletedEventCaptor;
 
     private TagService tagService;
 
@@ -45,7 +54,7 @@ class TagServiceTest {
 
     @BeforeEach
     void setUp() {
-        tagService = new TagService(tagRepository, tagAssignmentRepository);
+        tagService = new TagService(tagRepository, tagAssignmentRepository, eventPublisher);
     }
 
     @Test
@@ -352,5 +361,33 @@ class TagServiceTest {
                 .taggedAt(taggedAt)
                 .taggedBy(taggedBy)
                 .build();
+    }
+
+    @Test
+    void deleteTag_existingTag_assignmentsAndTagRemovedThenDeletionPublished() {
+        Tag tag = Tag.builder().id("tag-1").tenantId("tenant-1").key("site").entityType(DEVICE).build();
+        when(tagRepository.findById("tag-1")).thenReturn(Optional.of(tag));
+
+        tagService.deleteTag("tag-1");
+
+        InOrder order = inOrder(tagAssignmentRepository, tagRepository, eventPublisher);
+        order.verify(tagAssignmentRepository).deleteByTagId("tag-1");
+        order.verify(tagRepository).deleteById("tag-1");
+        order.verify(eventPublisher).publishEvent(deletedEventCaptor.capture());
+        assertThat(deletedEventCaptor.getValue())
+                .extracting(TagDeletedEvent::getTenantId, TagDeletedEvent::getTagId, TagDeletedEvent::getSource)
+                .containsExactly("tenant-1", "tag-1", tagService);
+    }
+
+    @Test
+    void deleteTag_missingTag_throwsNotFoundAndPublishesNothing() {
+        when(tagRepository.findById("tag-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tagService.deleteTag("tag-1"))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Tag not found: tag-1");
+
+        verify(tagRepository, never()).deleteById("tag-1");
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 }
