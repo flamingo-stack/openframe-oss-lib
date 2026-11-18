@@ -93,7 +93,7 @@ import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks
 import { useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
 import { MingoChatHeader, type MingoChatHeaderAction } from './mingo-chat-header';
-import type { MingoDialogStatus } from './mingo-chat-list-shared';
+import { DEFAULT_ASSISTANT_NAME, type MingoDialogStatus, whatToAskLabel } from './mingo-chat-list-shared';
 import { ChatDialogModals } from './mingo-chat-modals';
 import { MingoChatRail } from './mingo-chat-rail';
 import { MingoHistoryRail } from './mingo-history-rail';
@@ -451,6 +451,11 @@ export interface EmbeddableChatProps {
    */
   onWhatToAsk?: () => void;
   /**
+   * v2: the assistant's name where the chat speaks of it ("What to ask <name>?", the author of that answer).
+   * Default: Mingo.
+   */
+  assistantName?: string;
+  /**
    * v2: the "What to ask?" exchange the list's entry shows (when no
    * `onWhatToAsk` takes it over): every click opens a new chat holding it,
    * never the open conversation. Local - never sent, never stored. Picking a
@@ -615,9 +620,6 @@ const withoutRecordLink = (value: string, href: string): string =>
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
-
-/** The header over a new chat holding only the "What to ask Mingo?" answer. */
-const WHAT_TO_ASK_TITLE = 'What to ask Mingo?';
 
 /** One shared empty list, so "nothing staged" keeps a stable identity. */
 const NO_CONTEXT_ITEMS: ChatContextItem[] = [];
@@ -867,7 +869,8 @@ function EmbeddableChatInner({
   contextMemory,
   aboveComposer,
   onWhatToAsk,
-  whatToAsk: whatToAskContent,
+  assistantName = DEFAULT_ASSISTANT_NAME,
+  whatToAsk: whatToAskProp,
   chatMenuExtraItems,
   rail = 'auto',
   threadContainer,
@@ -1604,6 +1607,18 @@ function EmbeddableChatInner({
     [rawMessages, guideUserName, guideUserAvatar, ownSendName, ownSendAvatar],
   );
 
+  // The "What to ask?" content: the host's own (`whatToAsk`), else what its runtime serves (`endpoints.whatToAskUrl`),
+  // read on each click.
+  const whatToAskUrl = runtime.endpoints.whatToAskUrl;
+  const whatToAskContent = useMemo<WhatToAskContent | (() => Promise<WhatToAskContent>) | undefined>(() => {
+    if (whatToAskProp || !whatToAskUrl) return whatToAskProp;
+    return async () => {
+      const response = await fetch(whatToAskUrl, { credentials: 'include' });
+      if (!response.ok) throw new Error(`What to ask: ${response.status}`);
+      return (await response.json()) as WhatToAskContent;
+    };
+  }, [whatToAskProp, whatToAskUrl]);
+
   // "What to ask?" exchanges (`whatToAsk`) are the panel's own, shown in the
   // thread beside the host's messages; a new chat holding one reads as a
   // conversation until it is sent or left.
@@ -1615,7 +1630,7 @@ function EmbeddableChatInner({
       avatar: identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || null,
       authorType: AUTHOR_TYPE.ADMIN,
     },
-    assistant: { name: 'Mingo', assistantType: 'mingo' },
+    assistant: { name: assistantName, assistantType: 'mingo' },
   });
   const noteWhatToAskSend = whatToAsk.noteSend;
   const messages = whatToAsk.withExchanges(hostMessages);
@@ -2117,7 +2132,7 @@ function EmbeddableChatInner({
   const freshConversationTitle = isGuideEmpty ? (headerAssistantName ?? 'Mingo Guide') : 'New Chat';
   // The chat's own header over a new chat that holds only "What to ask?" exchanges: it is that
   // answer, not a chat the user started. The list's draft row keeps `freshConversationTitle`.
-  const draftHeaderTitle = isWhatToAskDraft ? WHAT_TO_ASK_TITLE : freshConversationTitle;
+  const draftHeaderTitle = isWhatToAskDraft ? whatToAskLabel(assistantName) : freshConversationTitle;
   const headerTitle = hasConversation
     ? activeDialog?.title || draftHeaderTitle
     : isGuideEmpty
@@ -2452,6 +2467,7 @@ function EmbeddableChatInner({
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
     onWhatToAsk: openWhatToAsk,
+    whatToAskLabel: whatToAskLabel(assistantName),
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,

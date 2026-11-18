@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { deepestTopic, isPagePathTopic, pageTopicFor, topicCandidates, topicMatchesPath } from '../page-topics';
+import {
+  deepestTopic,
+  isPagePathTopic,
+  normalizeTopic,
+  pageTopicFor,
+  sectionTopicFor,
+  topicCandidates,
+  topicMatchesPath,
+} from '../page-topics';
 
 describe('pageTopicFor: a page asks with its path', () => {
   it('drops the query, the hash and a trailing slash, lowercased and decoded', () => {
@@ -33,9 +41,27 @@ describe('which tags are written for a page', () => {
     expect(topicMatchesPath('/', '/pricing')).toBe(false);
   });
 
-  it('never matches a section word to a page', () => {
+  it('a word is not a topic: a section is its page and anchor', () => {
     expect(isPagePathTopic('agents')).toBe(false);
     expect(topicMatchesPath('agents', '/openframe')).toBe(false);
+    expect(normalizeTopic('agents')).toBeNull();
+    expect(normalizeTopic(' /OpenFrame/#Agents ')).toBe('/openframe#agents');
+    expect(normalizeTopic('/pricing#not an anchor')).toBeNull();
+    expect(sectionTopicFor('/Pricing/?x=1', 'AI-Token-Rates')).toBe('/pricing#ai-token-rates');
+  });
+
+  it('a section tag covers its section only; a page tag covers the page and its sections', () => {
+    expect(topicMatchesPath('/openframe#agents', '/openframe#agents')).toBe(true);
+    expect(topicMatchesPath('/openframe#agents', '/openframe')).toBe(false);
+    expect(topicMatchesPath('/openframe#agents', '/openframe#pricing')).toBe(false);
+    expect(topicMatchesPath('/openframe', '/openframe#agents')).toBe(true);
+    expect(topicMatchesPath('/', '/#agents')).toBe(true);
+    expect(topicMatchesPath('/', '/pricing#pricing')).toBe(false);
+    expect(topicCandidates('/pricing#ai-token-rates')).toEqual(['/pricing#ai-token-rates', '/pricing']);
+    expect(deepestTopic(['/pricing', '/pricing#ai-token-rates'], '/pricing#ai-token-rates')).toBe(
+      '/pricing#ai-token-rates',
+    );
+    expect(deepestTopic(['/pricing', '/pricing#ai-token-rates'], '/pricing')).toBe('/pricing');
   });
 
   it('lists the candidates deepest first, and picks the deepest tag', () => {
