@@ -44,6 +44,11 @@ describe('which tags are written for a page', () => {
   it('a word is not a topic: a section is its page and anchor', () => {
     expect(isPagePathTopic('agents')).toBe(false);
     expect(topicMatchesPath('agents', '/openframe')).toBe(false);
+    // Not a topic, so written for no place, itself included, and no tag can be written for it.
+    expect(topicMatchesPath('agents', 'agents')).toBe(false);
+    expect(topicMatchesPath('/openframe', 'agents')).toBe(false);
+    expect(topicCandidates('agents')).toEqual([]);
+    expect(topicCandidates('')).toEqual([]);
     expect(normalizeTopic('agents')).toBeNull();
     expect(normalizeTopic(' /OpenFrame/#Agents ')).toBe('/openframe#agents');
     expect(normalizeTopic('/pricing#not an anchor')).toBeNull();

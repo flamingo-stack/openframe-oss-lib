@@ -94,7 +94,8 @@ function pageCovers(tagPage: string, page: string): boolean {
 
 /**
  * Whether `tag` is written for the place `place` (a page, or a section of one): a page's tag covers that page, the
- * pages under it and all their sections; a section's tag covers that section only.
+ * pages under it and all their sections; a section's tag covers that section only. A value that is not a topic (a bare
+ * word: there is no other kind of topic) is written for no place and matches nothing, itself included.
  */
 export function topicMatchesPath(tag: string, place: string): boolean {
   if (!isPagePathTopic(tag) || !isPagePathTopic(place)) return false;
@@ -105,7 +106,7 @@ export function topicMatchesPath(tag: string, place: string): boolean {
 }
 
 /** Every tag that can be written for `place`, deepest first (a section, then its page and the pages above it): what a
- *  host queries its rows by. */
+ *  host queries its rows by. A value that is not a topic has none (`[]`): a host normalizes the place first. */
 export function topicCandidates(place: string): string[] {
   if (!isPagePathTopic(place)) return [];
   const { page, section } = splitTopic(place);
