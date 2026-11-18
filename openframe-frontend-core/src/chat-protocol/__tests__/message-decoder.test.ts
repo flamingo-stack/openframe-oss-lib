@@ -59,7 +59,7 @@ describe('createMingoDecoder: the table', () => {
     ]);
   });
 
-  it('AI_METADATA is message metadata', () => {
+  it("AI_METADATA is message metadata, without the model's window: it is not the chat's context budget", () => {
     expect(
       decodeAll({
         type: 'AI_METADATA',
@@ -71,7 +71,7 @@ describe('createMingoDecoder: the table', () => {
     ).toEqual([
       {
         type: 'message-metadata',
-        messageMetadata: { model: 'm', provider: 'anthropic', contextWindowMaxTokens: 9, modelLabel: 'M' },
+        messageMetadata: { model: 'm', provider: 'anthropic', modelLabel: 'M' },
       },
     ]);
     expect(decodeAll({ type: 'AI_METADATA', modelName: 'm' })).toEqual([]);

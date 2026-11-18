@@ -4,7 +4,8 @@
  * ring and the hosts that build the panel's data, so they cannot disagree.
  */
 
-/** The compaction ratio when the backend did not send one: the design's 75%. */
+/** The compaction ratio the colours assume when the backend did not send one: the design's 75%. The panel never
+ *  writes it: an environment compacts at its own ratio (0.8 on QA, stage and prod), so an unreported one reads "—". */
 export const DEFAULT_COMPACTION_THRESHOLD = 0.75;
 
 /** How far before compaction the context turns yellow: ten points, so there is time to tidy the chat first. */
@@ -25,15 +26,20 @@ export interface ChatUsagePanelData {
   /** The company figures are being read for the first time: their rows draw skeletons. */
   companyLoading?: boolean;
   /** This chat: the last reply's whole context against the model's budget, and the share at which memory is
-   *  compacted (the backend's ratio; the design's 75% when absent). On the counter, the counter's own figures win. */
+   *  compacted (the backend's ratio; "—" until it reports one). On the counter, the counter's own figures win. */
   context: { used: number | null; limit: number | null; compactionThreshold?: number | null };
   /** The last reply's tokens by kind; they add up to `context.used`. Null while the backend does not report it. */
   breakdown: { input: number; cacheRead: number; cacheWrite: number; output: number } | null;
 }
 
-/** A usable compaction ratio: the backend's when it is a share in (0, 1], else the default. */
+/** The backend's compaction ratio when it is a share in (0, 1], else null: not reported (a new chat, an older backend). */
+export function reportedCompactionThreshold(threshold: number | null | undefined): number | null {
+  return typeof threshold === 'number' && threshold > 0 && threshold <= 1 ? threshold : null;
+}
+
+/** A usable compaction ratio: the backend's when it reported one, else the default (the colours need one). */
 export function compactionThresholdOf(threshold: number | null | undefined): number {
-  return typeof threshold === 'number' && threshold > 0 && threshold <= 1 ? threshold : DEFAULT_COMPACTION_THRESHOLD;
+  return reportedCompactionThreshold(threshold) ?? DEFAULT_COMPACTION_THRESHOLD;
 }
 
 /** The share of the budget the chat holds, or null while either figure is unknown (no reply yet, no budget). */
@@ -72,11 +78,13 @@ function trimDecimal(value: number): string {
 }
 
 /**
- * The company figures, short: K below a million, M from it, one decimal at most, rounded DOWN so a figure never
- * reaches its total before it is spent ("9.9M / 10M", not "10M / 10M"), and a small balance never reads "0M".
+ * The company figures, short: K below a million, M below a billion, B from it (as Billing writes them), one decimal
+ * at most, rounded DOWN so a figure never reaches its total before it is spent ("9.9M / 10M", not "10M / 10M"), and a
+ * small balance never reads "0M".
  */
 export function formatTokensShort(count: number): string {
   const n = Math.max(0, Math.floor(count));
+  if (n >= 1_000_000_000) return `${trimDecimal(Math.floor(n / 100_000_000) / 10)}B`;
   if (n >= 1_000_000) return `${trimDecimal(Math.floor(n / 100_000) / 10)}M`;
   if (n >= 1_000) return `${trimDecimal(Math.floor(n / 100) / 10)}K`;
   return String(n);
