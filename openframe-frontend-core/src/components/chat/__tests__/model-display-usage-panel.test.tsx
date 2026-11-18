@@ -78,4 +78,31 @@ describe('ModelDisplay usage panel', () => {
     expect(group).toHaveTextContent('Chat Context— / 30,000');
     expect(group).toHaveTextContent('Input—');
   });
+
+  it("writes a compaction threshold the backend has not reported as a dash, never the design's 75% (a new chat)", async () => {
+    render(
+      <ModelDisplay
+        provider="anthropic"
+        modelName="Claude"
+        usagePanel={{ ...panel, context: { used: null, limit: null, compactionThreshold: null } }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /show usage details/i }));
+    const group = await screen.findByRole('group', { name: 'Usage' });
+    expect(group).toHaveTextContent('Mingo compacts chat memory at —');
+    expect(group).not.toHaveTextContent('75%');
+  });
+
+  it('writes a balance of a billion tokens or more in B, as Billing does', async () => {
+    render(
+      <ModelDisplay
+        provider="anthropic"
+        modelName="Claude"
+        usagePanel={{ ...panel, balance: { tokens: 100_000_000_000, usd: 1_000_000, tone: 'default' } }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /show usage details/i }));
+    const group = await screen.findByRole('group', { name: 'Usage' });
+    expect(group).toHaveTextContent('Current AI Balance100B ($1,000,000.00)');
+  });
 });

@@ -11,6 +11,7 @@ import {
   formatTokensFull,
   formatTokensShort,
   formatUsd,
+  reportedCompactionThreshold,
 } from '../chat-usage';
 
 describe('chatContextTone', () => {
@@ -48,6 +49,17 @@ describe('compactionThresholdOf', () => {
   });
 });
 
+describe('reportedCompactionThreshold', () => {
+  it("is the backend's share, and null when it reported none: the panel never writes the design's 75%", () => {
+    expect(reportedCompactionThreshold(0.8)).toBe(0.8);
+    expect(reportedCompactionThreshold(1)).toBe(1);
+    expect(reportedCompactionThreshold(null)).toBeNull();
+    expect(reportedCompactionThreshold(undefined)).toBeNull();
+    expect(reportedCompactionThreshold(0)).toBeNull();
+    expect(reportedCompactionThreshold(80)).toBeNull();
+  });
+});
+
 describe('contextRatio', () => {
   it('is null without a budget', () => {
     expect(contextRatio(10, 0)).toBeNull();
@@ -61,14 +73,17 @@ describe('token formats', () => {
     expect(formatTokensFull(12_840)).toBe('12,840');
   });
 
-  it('writes short figures rounded down, in K below a million', () => {
+  it('writes short figures rounded down: K below a million, M below a billion, B from it (as Billing does)', () => {
     expect(formatTokensShort(3_200_000)).toBe('3.2M');
     expect(formatTokensShort(10_000_000)).toBe('10M');
     expect(formatTokensShort(9_960_000)).toBe('9.9M');
     expect(formatTokensShort(30_000)).toBe('30K');
     expect(formatTokensShort(800_000)).toBe('800K');
     expect(formatTokensShort(0)).toBe('0');
-    expect(formatTokensShort(100_000_000_000)).toBe('100,000M');
+    expect(formatTokensShort(100_000_000_000)).toBe('100B');
+    expect(formatTokensShort(1_000_000_000)).toBe('1B');
+    expect(formatTokensShort(1_990_000_000)).toBe('1.9B');
+    expect(formatTokensShort(999_999_999)).toBe('999.9M');
   });
 
   it('writes dollars with two decimals and separators', () => {

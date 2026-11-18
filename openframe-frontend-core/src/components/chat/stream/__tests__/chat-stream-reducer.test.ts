@@ -445,10 +445,11 @@ describe('createChatStreamReducer — the message a stream builds', () => {
       providerName: 'anthropic',
       contextWindow: 200000,
     });
+    // The ai-agent's window is the model's, not the budget: the budget waits for the token usage.
     expect(r.state.liveModel).toEqual({
       provider: 'anthropic',
       modelLabel: 'Claude Sonnet',
-      contextWindowMaxTokens: 200000,
+      contextWindowMaxTokens: null,
     });
     expect(trailing(r).metadata).toMatchObject({ model: 'claude-sonnet-x', provider: 'anthropic' });
   });
@@ -457,7 +458,7 @@ describe('createChatStreamReducer — the message a stream builds', () => {
     const effects: unknown[] = [];
     const { send } = onWire({ onEffect: effect => effects.push(effect) });
     send({ type: 'AI_METADATA', modelName: 'm', providerName: 'p', contextWindow: 1 });
-    expect(effects).toEqual([{ name: 'onMetadata', args: [{ modelName: 'm', providerName: 'p', contextWindow: 1 }] }]);
+    expect(effects).toEqual([{ name: 'onMetadata', args: [{ modelName: 'm', providerName: 'p' }] }]);
   });
 
   it('a failed turn keeps what it said and ends with the failure on the same message', () => {
