@@ -81,10 +81,15 @@ needs the checklist above before a host asks it for the grid:
 |---|---|
 | `LogsTableView` | `size` / `minSize`, one-line `gridCell` for the two-line source and description cells, the row buttons (quick view, copy, open) as action columns, `meta.label` |
 | `PoliciesTable` | `size` / `minSize`, `gridCell` for the name + description cell and the status with its note, `actions` and `open` as action columns |
-| `ScriptsTable`, `ScriptSchedulesTable`, `ScriptExecutionsTable` | `size` / `minSize` in `scripts-table-columns.ts` (their `width` classes are card-only), `gridCell` for the name + description, date + time and initiator cells, `actions` and `open` as action columns |
 | `KnowledgeBaseTableBody` | `size` / `minSize`, `gridCell` for the name cell (icon, name, status, summary), `open` and the host's `actionsColumn` as action columns |
 | `TenantsTableView` (both variants) | `size` / `minSize`, `gridCell` for the tenant, customers and licences cells, `open` as an action column |
 | `DeviceSelector` | `size` / `minSize`, `gridCell` for the device and customer cells, its add / remove column as an action column |
+
+`ScriptsTable`, `ScriptSchedulesTable` and `ScriptExecutionsTable` are ready. Their layout is data
+(`features/scripts/scripts-table-columns.ts`: per column a `size`, a `minSize`, a `label`, and `gridKind: 'action'` on
+the row menu and the open button), read through `scriptsColumnSize()` and `scriptsColumnMeta()`; the one-line cells are
+the `...GridCell` components beside the card cells (`script-cells.tsx`, `execution-cells.tsx`). A host that builds its
+own columns on that layout (the web app's live Scripts tables) reads the same two helpers and cells.
 
 `DevicesTableBody` (`features/devices/devices-table-columns.tsx`) is the worked example: every column has a `size`, a
 `minSize` and a `gridCell`, its open column is kept by hand, and it adds `selectionColumn()` itself when the host

@@ -2,6 +2,7 @@
 
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { DataTableCell } from '../../ui/data-table/data-table-cell';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { scriptShellType } from './shell-types';
 
@@ -32,5 +33,17 @@ export function ScriptShellBadge({ value, className, iconClassName }: ScriptShel
       {Icon && <Icon className={cn('h-5 w-5 text-ods-text-secondary', iconClassName)} />}
       <span>{shell?.label ?? value}</span>
     </span>
+  );
+}
+
+/** A script's shell in a grid table's cell: its icon and label on one line; a bar while the shell is read. */
+export function ScriptShellGridCell({ value }: { value: string }) {
+  const shell = scriptShellType(value);
+  const Icon = shell?.icon;
+  return (
+    <DataTableCell
+      leading={Icon ? { type: 'icon', icon: <Icon className="size-5" /> } : undefined}
+      text={shell?.label ?? value}
+    />
   );
 }

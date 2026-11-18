@@ -9,6 +9,7 @@ import {
 import { resolveProductDemoCast } from '../components/product-demo/cast';
 import { buildScriptsFixture } from '../components/product-demo/fixtures/scripts';
 import ScriptsScreen from '../components/product-demo/screens/scripts';
+import { ActionsMenuDropdown } from '../components/ui/actions-menu';
 import { DataTable } from '../components/ui/data-table';
 
 const FIXTURE = buildScriptsFixture(resolveProductDemoCast());
@@ -63,6 +64,20 @@ const SCHEDULES: ScriptScheduleTableRow[] = [
   },
 ];
 
+/** A row menu, so the grid stories show both action columns. */
+const renderRowMenu = () => (
+  <ActionsMenuDropdown
+    groups={[
+      {
+        items: [
+          { id: 'edit', label: 'Edit' },
+          { id: 'archive', label: 'Archive' },
+        ],
+      },
+    ]}
+  />
+);
+
 const meta: Meta<typeof ScriptsTable> = {
   title: 'Features/ScriptsTable',
   component: ScriptsTable,
@@ -97,6 +112,43 @@ export const Executions: Story = {
     <ScriptExecutionsTable rows={FIXTURE.executions} rightSlot={<DataTable.RowCount itemName="execution" />} />
   ),
 };
+
+/**
+ * The library in the grid layout: one line per row (the description beside the name), the row menu and the open
+ * button as columns pinned right, the gear menu with the column layout kept in the browser. The same table at every
+ * width: try the tablet and phone viewports.
+ */
+export const Grid: Story = {
+  args: { layout: 'grid', tableSettings: { storageKey: 'story-scripts' }, renderActions: renderRowMenu },
+};
+
+/** The schedules in the grid layout: the time beside the date, what starts a schedule with no date in its place. */
+export const GridSchedules: Story = {
+  render: () => (
+    <ScriptSchedulesTable
+      rows={SCHEDULES}
+      rightSlot={<DataTable.RowCount />}
+      renderActions={renderRowMenu}
+      layout="grid"
+      tableSettings={{ storageKey: 'story-script-schedules' }}
+    />
+  ),
+};
+
+/** An Execution History in the grid layout: the id beside the time, the customer beside the device, one line of output. */
+export const GridExecutions: Story = {
+  render: () => (
+    <ScriptExecutionsTable
+      rows={FIXTURE.executions}
+      rightSlot={<DataTable.RowCount itemName="execution" />}
+      layout="grid"
+      tableSettings={{ storageKey: 'story-script-executions' }}
+    />
+  ),
+};
+
+/** The grid while it loads: bars in the header and in every cell, the action buttons drawn and inert. */
+export const GridLoading: Story = { args: { rows: [], isLoading: true, skeletonRows: 5, layout: 'grid' } };
 
 /** The product screen: the script beside its first night of runs, in the frame's size. */
 export const Screen: Story = {

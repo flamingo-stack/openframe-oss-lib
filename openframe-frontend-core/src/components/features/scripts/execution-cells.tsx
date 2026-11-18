@@ -5,6 +5,7 @@ import { cn } from '../../../utils/cn';
 import { AgentMark } from '../../agent-mark';
 import { MonitorIcon } from '../../icons-v2-generated/devices/monitor-icon';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { DataTableCell, type DataTableCellLeading } from '../../ui/data-table/data-table-cell';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
@@ -123,6 +124,74 @@ export function ExecutionResultCell({ result, empty = null }: { result?: string 
   // While the row is read (a loading scope) the output is two bars (`TruncateText`'s own loading form).
   const loading = useLoadingScope();
   return result || loading ? <TruncateText lines={2}>{result ?? ''}</TruncateText> : <>{empty}</>;
+}
+
+/* The same cells in the grid layout: one 48px line each, the second line as the secondary text beside the first. */
+
+const GRID_ICON_CLASS = 'size-5';
+
+/** Whether a source draws a chip (`ExecutionSourceBadge`): a manual run draws none. */
+function hasSourceBadge(source: string | null | undefined): boolean {
+  return source === 'SCHEDULED' || source === 'AI_ASSISTANT';
+}
+
+/** When an execution was dispatched, with its id beside it. */
+export function ExecutionTimestampGridCell({ timestamp, executionId }: { timestamp: string; executionId: string }) {
+  return <DataTableCell text={timestamp} secondary={executionId || undefined} />;
+}
+
+/** A status as its tag. */
+export function ExecutionStatusGridCell({ status }: { status: string | null | undefined }) {
+  const presentation = scriptExecutionStatus(status);
+  return (
+    <DataTableCell
+      tag={<Tag label={presentation?.label ?? String(status ?? '')} variant={presentation?.variant ?? 'grey'} />}
+    />
+  );
+}
+
+/** The device an execution ran on, with its customer beside it. */
+export function ExecutionDeviceGridCell({ name, organization }: { name: string; organization?: string | null }) {
+  return (
+    <DataTableCell
+      leading={{ type: 'icon', icon: <MonitorIcon className={GRID_ICON_CLASS} /> }}
+      text={name}
+      secondary={organization || undefined}
+    />
+  );
+}
+
+/**
+ * Who an execution ran for: the avatar, the name, the chip of what dispatched it, and the script's name where a list
+ * runs several. The grid's cell is text, so the name is not a link here: the row opens the execution.
+ */
+export function ExecutionInitiatorGridCell({
+  leading,
+  name,
+  source,
+  scriptName,
+}: {
+  /** The person's avatar (`{ type: 'avatar', src, name }`), or the host's own mark for a deleted account. */
+  leading?: DataTableCellLeading;
+  name: string;
+  source?: string | null;
+  scriptName?: string | null;
+}) {
+  return (
+    <DataTableCell
+      leading={leading}
+      text={name}
+      tag={hasSourceBadge(source) ? <ExecutionSourceBadge source={source} /> : undefined}
+      secondary={scriptName || undefined}
+    />
+  );
+}
+
+/** The Result column in one line: what the run printed, or the host's empty mark. */
+export function ExecutionResultGridCell({ result, empty = null }: { result?: string | null; empty?: ReactNode }) {
+  // While the row is read (a loading scope) the output is a bar (the text's own loading form).
+  const loading = useLoadingScope();
+  return result || loading ? <DataTableCell text={result ?? ''} /> : <>{empty}</>;
 }
 
 /**
