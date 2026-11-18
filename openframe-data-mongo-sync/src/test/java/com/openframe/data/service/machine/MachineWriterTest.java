@@ -11,6 +11,8 @@ import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
@@ -58,7 +60,7 @@ class MachineWriterTest {
     @BeforeEach
     void setUp() {
         template = mock(MongoTemplate.class);
-        writer = new MachineWriter(template, absent(), absent());
+        writer = new MachineWriter(template, absent(), absent(), new MachineLifecycleStatusPublishingProperties());
     }
 
     // Publishing off: no OutboxPublisher bean.
@@ -245,7 +247,7 @@ class MachineWriterTest {
         MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
         ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
         ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
-        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider, lifecycleStatusPublishing(false));
         Machine stored = new Machine();
         storedDocumentIs(stored);
 
@@ -261,7 +263,7 @@ class MachineWriterTest {
         MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
         ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
         ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
-        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider, lifecycleStatusPublishing(false));
         Machine stored = new Machine();
         stored.setId("doc-1");
         when(template.findOne(any(Query.class), eq(Machine.class))).thenReturn(stored);
@@ -271,16 +273,111 @@ class MachineWriterTest {
         verify(publisher).publishChangedByIds(eq(spec), eq(List.of("doc-1")), any());
     }
 
-    // A field added to MachineEvent must be added to EVENT_PATHS too, or its writes would not be published.
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING_DELETION", "DELETED", "ARCHIVED"})
+    void aLifecycleStatusWrite_isPublishedForTheMachinesDocument(DeviceStatus status) {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider, lifecycleStatusPublishing(true));
+        Machine stored = new Machine();
+        stored.setId("doc-1");
+        when(template.findOne(any(Query.class), eq(Machine.class))).thenReturn(stored);
+        when(publisher.publishChangedByIds(eq(spec), eq(List.of("doc-1")), any())).thenReturn(stored);
+
+        Optional<MachineWriteResult> result = publishingWriter.update("m1", machineUpdate().set(STATUS, status));
+
+        assertThat(result).map(MachineWriteResult::before).contains(stored);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING_DELETION", "DELETED", "ARCHIVED"})
+    void aLifecycleStatusWrite_isNotPublished_whileItsSwitchIsOff(DeviceStatus status) {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider, lifecycleStatusPublishing(false));
+        Machine stored = new Machine();
+        storedDocumentIs(stored);
+
+        publishingWriter.update("m1", machineUpdate().set(STATUS, status));
+
+        verifyNoInteractions(publisher);
+        capturedUpdate();
+    }
+
     @Test
-    void theEventPaths_areTheFieldsOfMachineEvent_butTheId() {
+    void aLifecycleStatusWrite_ofAMachineWithoutDocument_isWrittenWithoutPublishing() {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider, lifecycleStatusPublishing(true));
+        Machine stored = new Machine();
+        storedDocumentIs(stored);
+
+        Optional<MachineWriteResult> result = publishingWriter.update("m1", machineUpdate().set(STATUS, DeviceStatus.DELETED));
+
+        assertThat(result).map(MachineWriteResult::before).contains(stored);
+        verifyNoInteractions(publisher);
+    }
+
+    // The machine's _id is found, so only the status value keeps these writes out of the outbox.
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "OFFLINE", "PENDING"})
+    void aHeartbeatStatusWrite_isNotPublished(DeviceStatus status) {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider, lifecycleStatusPublishing(true));
+        Machine stored = new Machine();
+        stored.setId("doc-1");
+        when(template.findOne(any(Query.class), eq(Machine.class))).thenReturn(stored);
+        storedDocumentIs(stored);
+
+        publishingWriter.update("m1", machineUpdate().set(STATUS, status));
+
+        verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void aClearedStatusWrite_isNotPublished() {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider, lifecycleStatusPublishing(true));
+        Machine stored = new Machine();
+        stored.setId("doc-1");
+        when(template.findOne(any(Query.class), eq(Machine.class))).thenReturn(stored);
+        storedDocumentIs(stored);
+
+        publishingWriter.update("m1", machineUpdate().set(STATUS, null));
+
+        verifyNoInteractions(publisher);
+    }
+
+    // A field added to MachineEvent must be added to EVENT_PATHS too, or its writes would not be published; the status is
+    // published only for its lifecycle values, so it is not an event path.
+    @Test
+    void theEventPaths_areTheFieldsOfMachineEvent_butTheIdAndTheStatus() {
         Set<String> eventFields = Arrays.stream(MachineEvent.class.getDeclaredFields())
                 .filter(field -> !Modifier.isStatic(field.getModifiers()))
                 .map(Field::getName)
                 .filter(name -> !name.equals("machineId"))
+                .filter(name -> !name.equals("status"))
                 .collect(Collectors.toSet());
 
         assertThat(MachineWriter.EVENT_PATHS).isEqualTo(eventFields);
+    }
+
+    private static MachineLifecycleStatusPublishingProperties lifecycleStatusPublishing(boolean enabled) {
+        MachineLifecycleStatusPublishingProperties properties = new MachineLifecycleStatusPublishingProperties();
+        properties.setEnabled(enabled);
+        return properties;
     }
 
     @SuppressWarnings("unchecked")

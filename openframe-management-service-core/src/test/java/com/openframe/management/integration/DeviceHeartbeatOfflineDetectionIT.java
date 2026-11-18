@@ -10,6 +10,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.MachineLifecycleStatusPublishingProperties;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.management.service.DeviceHeartbeatOfflineDetectionService;
 import org.junit.jupiter.api.AfterAll;
@@ -72,7 +73,7 @@ class DeviceHeartbeatOfflineDetectionIT {
         template = new MongoTemplate(client, "test");
         storedMachines = new MongoRepositoryFactory(template).getRepository(MachineRepository.class,
                 RepositoryFragments.just(new CustomMachineRepositoryImpl(template, new ClientVersionThreshold("1.6.0"))));
-        machineWriter = new MachineWriter(template, absent(), absent());
+        machineWriter = new MachineWriter(template, absent(), absent(), new MachineLifecycleStatusPublishingProperties());
     }
 
     // Publishing off: no OutboxPublisher bean.

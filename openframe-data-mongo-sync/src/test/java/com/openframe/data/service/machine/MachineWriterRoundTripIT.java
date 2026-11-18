@@ -58,7 +58,7 @@ class MachineWriterRoundTripIT extends BaseMongoIntegrationTest {
     @BeforeEach
     void setUp() {
         mongoTemplate.dropCollection(Machine.class);
-        writer = new MachineWriter(mongoTemplate, absent(), absent());
+        writer = new MachineWriter(mongoTemplate, absent(), absent(), new MachineLifecycleStatusPublishingProperties());
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setTenantId("tenant-1");

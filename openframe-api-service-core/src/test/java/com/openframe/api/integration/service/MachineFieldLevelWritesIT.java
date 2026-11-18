@@ -18,6 +18,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.machine.MachineLifecycleStatusPublishingProperties;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
@@ -82,7 +83,7 @@ class MachineFieldLevelWritesIT {
         template = new MongoTemplate(client, "test");
         storedMachines = new MongoRepositoryFactory(template).getRepository(MachineRepository.class,
                 RepositoryFragments.just(new CustomMachineRepositoryImpl(template, new ClientVersionThreshold("1.6.0"))));
-        machineWriter = new MachineWriter(template, absent(), absent());
+        machineWriter = new MachineWriter(template, absent(), absent(), new MachineLifecycleStatusPublishingProperties());
     }
 
     // Publishing off: no OutboxPublisher bean.

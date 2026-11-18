@@ -31,6 +31,7 @@ import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
+import com.openframe.data.service.machine.MachineLifecycleStatusPublishingProperties;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import org.junit.jupiter.api.AfterAll;
@@ -104,7 +105,7 @@ class MachineFieldLevelWritesIT {
         template = new MongoTemplate(client, "test");
         storedMachines = new MongoRepositoryFactory(template).getRepository(MachineRepository.class,
                 RepositoryFragments.just(new CustomMachineRepositoryImpl(template, new ClientVersionThreshold("1.6.0"))));
-        machineWriter = new MachineWriter(template, absent(), absent());
+        machineWriter = new MachineWriter(template, absent(), absent(), new MachineLifecycleStatusPublishingProperties());
     }
 
     // Publishing off: no OutboxPublisher bean.

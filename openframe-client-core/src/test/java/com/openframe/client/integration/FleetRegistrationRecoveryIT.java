@@ -20,6 +20,7 @@ import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
+import com.openframe.data.service.machine.MachineLifecycleStatusPublishingProperties;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
@@ -149,7 +150,7 @@ class FleetRegistrationRecoveryIT {
                 return new FleetMdmClient(fleetUrl, "synthetic-local-token");
             }
         };
-        MachineWriter writer = new MachineWriter(template, absent(), absent());
+        MachineWriter writer = new MachineWriter(template, absent(), absent(), new MachineLifecycleStatusPublishingProperties());
         FleetHostFactsWriter facts = new FleetHostFactsWriter(machines, writer);
         FleetMdmAgentIdTransformer transformer = new FleetMdmAgentIdTransformer(clients, facts);
         events = mock(ApplicationEventPublisher.class);
