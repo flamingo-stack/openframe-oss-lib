@@ -30,6 +30,7 @@ public class MachineAggregateSpec implements AggregateSpec<Machine, MachineEvent
                 .hostname(machine.getHostname())
                 .nickname(machine.getNickname())
                 .organizationId(machine.getOrganizationId())
+                .status(machine.getStatus())
                 .build();
     }
 

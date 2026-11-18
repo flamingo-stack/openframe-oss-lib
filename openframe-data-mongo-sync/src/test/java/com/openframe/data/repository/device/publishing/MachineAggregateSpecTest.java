@@ -1,5 +1,6 @@
 package com.openframe.data.repository.device.publishing;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +14,7 @@ class MachineAggregateSpecTest {
     private final MachineAggregateSpec spec = new MachineAggregateSpec(machineOnTickets, machineOnClientTickets);
 
     @Test
-    void theEvent_carriesTheBusinessIdTheNamesAndTheOrganizationOnly() {
+    void theEvent_carriesTheBusinessIdTheNamesTheOrganizationAndTheStatusOnly() {
         Machine machine = new Machine();
         machine.setId("doc-1");
         machine.setMachineId("machine-1");
@@ -21,6 +22,7 @@ class MachineAggregateSpecTest {
         machine.setNickname("Front desk");
         machine.setOrganizationId("org-b");
         machine.setIp("10.0.0.1");
+        machine.setStatus(DeviceStatus.DELETED);
 
         MachineEvent event = spec.toEvent(machine);
 
@@ -28,6 +30,7 @@ class MachineAggregateSpecTest {
         assertThat(event.getHostname()).isEqualTo("host-1");
         assertThat(event.getNickname()).isEqualTo("Front desk");
         assertThat(event.getOrganizationId()).isEqualTo("org-b");
+        assertThat(event.getStatus()).isEqualTo(DeviceStatus.DELETED);
     }
 
     @Test

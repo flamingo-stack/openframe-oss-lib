@@ -1,5 +1,6 @@
 package com.openframe.data.repository.device.publishing;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.MachineName;
 import com.openframe.publishing.api.spec.PublishedEvent;
 import lombok.AllArgsConstructor;
@@ -19,6 +20,8 @@ public class MachineEvent implements PublishedEvent {
     private String hostname;
     private String nickname;
     private String organizationId;
+    // Current as of the last published write: MachineWriter publishes only lifecycle statuses, never heartbeats.
+    private DeviceStatus status;
 
     public String preferredName() {
         return MachineName.preferred(nickname, hostname);
