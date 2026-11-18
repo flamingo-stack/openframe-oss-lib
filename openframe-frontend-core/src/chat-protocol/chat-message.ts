@@ -685,9 +685,36 @@ function parseStoredPart(raw: unknown): ChatPart | null {
       const records = normalizeRecordUris(isRecord(raw.data) ? raw.data.records : undefined);
       return records.length > 0 ? { type: 'data-record-cards', data: { records } } : null;
     }
+    case 'data-suggestions': {
+      const groups = parseSuggestionGroups(isRecord(raw.data) ? raw.data.groups : undefined);
+      if (groups.length === 0) return null;
+      const note = isRecord(raw.data) ? optionalString(raw.data.note) : undefined;
+      return { type: 'data-suggestions', data: { groups, ...(note ? { note } : {}) } };
+    }
     default:
       return null;
   }
+}
+
+/** A stored suggestions part's groups: each with a caption and at least one chip with a label. */
+function parseSuggestionGroups(raw: unknown): ChatSuggestionGroup[] {
+  if (!Array.isArray(raw)) return [];
+  const groups: ChatSuggestionGroup[] = [];
+  for (const item of raw) {
+    if (!isRecord(item) || typeof item.label !== 'string' || !Array.isArray(item.prompts)) continue;
+    const prompts: ChatSuggestionPrompt[] = [];
+    for (const chip of item.prompts) {
+      if (!isRecord(chip) || typeof chip.label !== 'string') continue;
+      const prompt = optionalString(chip.prompt);
+      prompts.push({
+        label: chip.label,
+        ...(prompt ? { prompt } : {}),
+        ...(isRecord(chip.icon) ? { icon: chip.icon as unknown as QuickActionIconSpec } : {}),
+      });
+    }
+    if (prompts.length > 0) groups.push({ label: item.label, prompts });
+  }
+  return groups;
 }
 
 /** The parts of a stored row, in order. One a row may not hold is left out. */

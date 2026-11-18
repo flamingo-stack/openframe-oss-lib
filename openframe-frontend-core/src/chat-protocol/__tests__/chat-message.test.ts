@@ -441,6 +441,47 @@ describe.skipIf(!WIRE)('parseStoredParts', () => {
   });
 });
 
+describe('a stored row`s inline quick actions', () => {
+  it('reads back what was stored, icon and note included', () => {
+    const part = {
+      type: 'data-suggestions',
+      data: {
+        groups: [
+          { label: 'On any page', prompts: [{ label: 'What is new?' }] },
+          {
+            label: 'Pricing',
+            prompts: [
+              { label: 'Price?', prompt: 'What does a device cost?', icon: { name: 'tag', url: null, props: null } },
+            ],
+          },
+        ],
+        note: 'Each page offers its own.',
+      },
+    };
+    expect(parseStoredParts([{ type: 'text', text: 'Try one:' }, part])).toEqual([
+      { type: 'text', text: 'Try one:' },
+      part,
+    ]);
+  });
+
+  it('leaves out a chip with no label, a group with no chip, and a part with no group', () => {
+    expect(
+      parseStoredParts([
+        {
+          type: 'data-suggestions',
+          data: {
+            groups: [
+              { label: 'A', prompts: [{ prompt: 'x' }, { label: 'ok', prompt: 7 }] },
+              { label: 'B', prompts: [] },
+            ],
+          },
+        },
+        { type: 'data-suggestions', data: { groups: [] } },
+      ]),
+    ).toEqual([{ type: 'data-suggestions', data: { groups: [{ label: 'A', prompts: [{ label: 'ok' }] }] } }]);
+  });
+});
+
 describe('a stored row`s record URIs read in their one spelling', () => {
   const unencoded = 'record://markdown/docs/a.md';
   const canonical = 'record://markdown/docs%2Fa.md';
