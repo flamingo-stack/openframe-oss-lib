@@ -2,6 +2,8 @@ package com.openframe.data.document.device.filter;
 
 public enum DeviceFacetDimension {
     STATUS("status"),
+    CONNECTIVITY("telemetryStatus"),
+    CLIENT_OUTDATED("agentVersionKey"),
     DEVICE_TYPE("type"),
     OS_TYPE("osType"),
     ORGANIZATION_ID("organizationId");

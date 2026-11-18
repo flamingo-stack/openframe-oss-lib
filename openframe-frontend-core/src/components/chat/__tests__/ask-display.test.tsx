@@ -12,14 +12,13 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AskDisplay } from '../ask-display';
-import type { AskSegment } from '../types/message.types';
+import type { AskDisplayProps } from '../types';
 
 /** Mirrors `LOCKED_HINT` in ../ask-display — the veil's tooltip and the
  *  group's screen-reader description are the same string by design. */
 const LOCKED_HINT = 'This question was already answered';
 
-const card = (question: string): AskSegment => ({
-  type: 'ask',
+const card = (question: string): AskDisplayProps['cards'][number] => ({
   question,
   options: [
     { label: 'Find documentation', description: 'How the feature works and how to set it up' },

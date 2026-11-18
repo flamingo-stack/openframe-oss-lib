@@ -66,6 +66,12 @@ describe('ComposerSheet', () => {
     expect(within(card).getByText('thread')).toBeInTheDocument();
   });
 
+  it('meets a bar above it with flushTop: no top corners, no top border, the rest of the card kept', () => {
+    render(sheet({ flushTop: true, resizable: false }));
+    const card = screen.getByTestId('composer-sheet-card');
+    expect(card).toHaveClass('rounded-md', 'rounded-t-none', 'border', 'border-t-0');
+  });
+
   it('resizes from a tab standing on its top edge, and resets on a double click', () => {
     const onResetHeight = vi.fn();
     render(sheet({ onResetHeight }));
@@ -176,6 +182,14 @@ describe('ChatContextMemoryBar leading', () => {
     );
     expect(screen.getByRole('button', { name: 'Continue chat' })).toBeInTheDocument();
     expect(screen.getByText('1 recently viewed item in context')).toBeInTheDocument();
+  });
+
+  it('has a short count for a narrow strip, never a bare number: the strip itself picks the form', () => {
+    render(<ChatContextMemoryBar items={[{ type: 'DEVICE', id: 'd-1', label: 'MacBook' }]} />);
+    const long = screen.getByText('1 recently viewed item in context');
+    const short = screen.getByText('1 item in context');
+    expect(long).toHaveClass('hidden', '@[15rem]:inline');
+    expect(short).toHaveClass('@[15rem]:hidden');
   });
 
   it('still renders nothing with neither', () => {

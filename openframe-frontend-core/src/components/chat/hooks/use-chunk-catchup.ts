@@ -28,12 +28,7 @@ function makeBatchDedupKey(item: BufferedChunk): string {
   const text = typeof item.chunk.text === 'string' ? item.chunk.text : '';
   const integratedToolType = typeof item.chunk.integratedToolType === 'string' ? item.chunk.integratedToolType : '';
   const toolFunction = typeof item.chunk.toolFunction === 'string' ? item.chunk.toolFunction : '';
-  const approvalRequestId =
-    typeof item.chunk.approvalRequestId === 'string'
-      ? item.chunk.approvalRequestId
-      : typeof item.chunk.approval_request_id === 'string'
-        ? item.chunk.approval_request_id
-        : '';
+  const approvalRequestId = typeof item.chunk.approvalRequestId === 'string' ? item.chunk.approvalRequestId : '';
 
   return `${item.messageType}:${seq}:${type}:${text}:${integratedToolType}:${toolFunction}:${approvalRequestId}`;
 }
@@ -499,7 +494,7 @@ export function useChunkCatchup({
               if (pending.dialogId === currentDialogId) {
                 rearmForQueuedCatchup();
                 // AWAIT the re-run (not fire-and-forget): callers chain their own
-                // finally on this promise — the adapter lowers its onAgentBusy
+                // finally on this promise — the adapter lowers its agent-busy
                 // suppression there, and a detached re-run would replay a dead
                 // tail's EXECUTING chunk with suppression already off, locking
                 // the composer with no MESSAGE_END ever coming.

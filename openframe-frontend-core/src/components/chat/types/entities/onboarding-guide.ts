@@ -1,5 +1,6 @@
 import type { TagAssoc } from '../../../../types/blog';
 import type { EntityAuthor } from '../../../../types/entity-author';
+import type { VideoTeaser } from '../../../../types/video-processing';
 
 /**
  * Onboarding Guide entity — wire shape for the chat onboarding-guide
@@ -41,7 +42,11 @@ export interface OnboardingGuide {
   highlight_video_thumbnail: string | null;
   highlight_video_duration_ms: number | null;
   highlight_video_source: string | null;
-  video_bites: unknown[];
+  /** The guide's published clips, the same rows every other content type keeps in `video_bites`. */
+  video_bites: VideoTeaser[];
+
+  /** Where the guide opens, as the server answers it (absolute). */
+  url?: string | null;
 
   // Images
   featured_image: string | null;

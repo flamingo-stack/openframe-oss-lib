@@ -56,6 +56,13 @@
   --font-line-space-h5-caption: 1rem; /* 16px */
   --font-line-space-h6-caption: 1rem; /* 16px */
 
+  /* ODS v2 "body" (Figma open-design-system, responsive: font size / line space
+   * h3 - body = 16/20 desktop and tablet, 14/20 mobile): the three-column
+   * shell's body text (`text-shell-body`). The h3/h4 tokens keep their older
+   * 18/24 until the typography sync. */
+  --font-size-shell-body: 0.875rem; /* 14px */
+  --font-line-space-shell-body: 1.25rem; /* 20px */
+
   /* BADGE / STAMP SCALE — a COMPONENT token, not a step in the h1-h6 scale.
    * Family, weight and casing still come from the h5/h6 tokens; this only
    * carries the size a stamp renders at. Deliberately FIXED across
@@ -121,6 +128,10 @@
     --font-line-space-h5-caption: 1.25rem; /* 20px */
     --font-line-space-h6-caption: 1.25rem; /* 20px */
 
+    /* ODS v2 "body" — see the mobile block. */
+    --font-size-shell-body: 1rem; /* 16px */
+    --font-line-space-shell-body: 1.25rem; /* 20px */
+
     /* Tablet Icons */
     --icon-size-icon-size: 1.5rem; /* 24px */
   }
@@ -166,6 +177,10 @@
     --font-line-space-h4-body: 1.5rem; /* 24px */
     --font-line-space-h5-caption: 1.25rem; /* 20px */
     --font-line-space-h6-caption: 1.25rem; /* 20px */
+
+    /* ODS v2 "body" — see the mobile block. */
+    --font-size-shell-body: 1rem; /* 16px */
+    --font-line-space-shell-body: 1.25rem; /* 20px */
 
     /* Desktop Icons */
     --icon-size-icon-size: 1.5rem; /* 24px */

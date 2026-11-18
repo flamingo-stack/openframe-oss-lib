@@ -56,7 +56,7 @@ public class OpenFrameClientConfigurationService {
     }
 
     public boolean haveFeatureFlagsMoved(Map<String, ClientFeatureFlag> newFlags) {
-        Map<String, ClientFeatureFlag> oldFlags = currentFeatureFlags();
+        Map<String, ClientFeatureFlag> oldFlags = getFeatureFlags();
         return !oldFlags.equals(newFlags);
     }
 
@@ -69,7 +69,7 @@ public class OpenFrameClientConfigurationService {
         log.info("Updated client feature flags {} -> {}", oldFlags, newFlags);
     }
 
-    private Map<String, ClientFeatureFlag> currentFeatureFlags() {
+    public Map<String, ClientFeatureFlag> getFeatureFlags() {
         OpenFrameClientConfiguration config = get();
         return requireNonNullElse(config.getFeatureFlags(), Map.of());
     }

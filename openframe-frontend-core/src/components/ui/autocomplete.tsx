@@ -18,7 +18,7 @@ import {
   useState,
 } from 'react';
 import { MEASURE_LAYER_CLASS, useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags';
-import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
+import { useViewportCollisionPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
@@ -311,7 +311,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
 
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const keyboardPadding = useKeyboardCollisionPadding();
+  const viewportPadding = useViewportCollisionPadding();
   const containerRef = useRef<HTMLDivElement>(null);
   const hiddenTagsPopupRef = useRef<HTMLDivElement>(null);
 
@@ -727,19 +727,22 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
 
       <PopoverPrimitive.Content
         className={cn(
-          'z-50 mt-1 w-[var(--radix-popover-trigger-width)]',
+          'z-50 w-[var(--radix-popover-trigger-width)]',
           'rounded-[4px] border border-ods-border bg-ods-card',
           'flex max-h-[var(--radix-popper-available-height)] flex-col overflow-hidden',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
           'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
           dropdownClassName,
         )}
-        sideOffset={4}
+        // The gap is an offset, not a margin, so the collision padding counts it.
+        sideOffset={8}
         align="start"
         // The anchor is the text field that raises the software keyboard, so
         // this list is always positioned with the keyboard up — see
-        // useKeyboardCollisionPadding.
-        collisionPadding={{ bottom: keyboardPadding }}
+        // useViewportCollisionPadding.
+        collisionPadding={viewportPadding}
+        // Every frame: iOS scrolls the field into view as the keyboard rises, and the list must follow it.
+        updatePositionStrategy="always"
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();

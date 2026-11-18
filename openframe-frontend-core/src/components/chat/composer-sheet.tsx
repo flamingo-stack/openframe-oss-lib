@@ -38,6 +38,12 @@ export interface ComposerSheetProps {
    * the chat takes the screen) it has no tab, and its ceiling is the layer's height.
    */
   resizable?: boolean;
+  /**
+   * The sheet meets a bar right above it (a phone's top bar over a full-height list): its
+   * card has no top corners and no top border, the bar's own bottom line is its edge.
+   * Default `false`.
+   */
+  flushTop?: boolean;
   /** The sheet's width — the composer's under it, e.g. `max-w-[880px]`. Centred. */
   className?: string;
   /** The dialog's accessible name. */
@@ -97,6 +103,7 @@ export function ComposerSheet({
   defaultShare = DEFAULT_SHARE,
   minHeight = DEFAULT_MIN_HEIGHT,
   resizable = true,
+  flushTop = false,
   className,
   'aria-label': ariaLabel,
   children,
@@ -189,7 +196,10 @@ export function ComposerSheet({
         )}
         <div
           data-testid="composer-sheet-card"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg shadow-xl"
+          className={cn(
+            'flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg shadow-xl',
+            flushTop && 'rounded-t-none border-t-0',
+          )}
         >
           {children}
         </div>

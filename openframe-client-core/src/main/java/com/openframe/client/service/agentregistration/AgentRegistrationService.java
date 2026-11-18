@@ -8,6 +8,7 @@ import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.ToolConnectionService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
+import com.openframe.data.document.device.ClientVersionKey;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
@@ -26,15 +27,19 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Objects;
 import java.util.Set;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
+import static com.openframe.data.service.machine.AgentVersionService.OPENFRAME_CLIENT_AGENT_TYPE;
 import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION;
+import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION_KEY;
 import static com.openframe.data.service.machine.MachineFields.HOSTNAME;
 import static com.openframe.data.service.machine.MachineFields.LAST_SEEN;
 import static com.openframe.data.service.machine.MachineFields.MANUFACTURER;
 import static com.openframe.data.service.machine.MachineFields.MODEL;
+import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ASSIGNED_AT;
 import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ID;
 import static com.openframe.data.service.machine.MachineFields.OS_TYPE;
 import static com.openframe.data.service.machine.MachineFields.OS_UUID;
@@ -53,7 +58,6 @@ public class AgentRegistrationService {
 
     private static final String AGENT_ROLE = "AGENT";
     private static final String CLIENT_ID_TEMPLATE = "agent_%s";
-    private static final String OPENFRAME_CLIENT_AGENT_TYPE = "openframe-client";
     private static final Set<String> AVAILABLE_ZONES = ZoneId.getAvailableZoneIds();
 
     private final OAuthClientRepository oauthClientRepository;
@@ -85,9 +89,26 @@ public class AgentRegistrationService {
         createOAuthClient(machineId, clientId, clientSecret);
         Machine machine = createMachine(machineId, request, resolvedOrganizationId);
 
-        postProcessMachine(machine, request);
+        try {
+            postProcessMachine(machine, request);
+        } catch (RuntimeException e) {
+            discardFailedRegistration(machineId);
+            throw e;
+        }
 
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
+    }
+
+    // The agent never received this machine id and registers again under a new one, so the device would stay PENDING
+    // forever. A write, not a read-then-write: a read this soon after the insert can miss the machine on a secondary
+    private void discardFailedRegistration(String machineId) {
+        try {
+            machineWriter.update(machineId, machineUpdate().set(STATUS, DeviceStatus.DELETED));
+            installedAgentService.disconnectAll(machineId);
+            log.warn("Registration failed after the machine was saved, machine {} marked DELETED", machineId);
+        } catch (RuntimeException e) {
+            log.error("Failed to discard machine {} of a failed registration", machineId, e);
+        }
     }
 
     private String buildClientId(String machineId) {
@@ -116,6 +137,7 @@ public class AgentRegistrationService {
         registrationRequestFields(request).applyTo(machine);
         machine.setStatus(DeviceStatus.PENDING);
         machine.setOrganizationId(organizationId);
+        machine.setOrganizationAssignedAt(Instant.now());
         machine.setType(DeviceType.DESKTOP);
 
         Machine savedMachine = machineRepository.save(machine);
@@ -173,6 +195,9 @@ public class AgentRegistrationService {
         MachineUpdate update = registrationRequestFields(request).set(STATUS, DeviceStatus.PENDING);
         String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
         update.set(ORGANIZATION_ID, organizationId);
+        if (isNewEnrollment(machineId, organizationId)) {
+            update.set(ORGANIZATION_ASSIGNED_AT, Instant.now());
+        }
 
         Machine machine = machineWriter.update(machineId, update)
                 .map(MachineWriteResult::after)
@@ -182,11 +207,20 @@ public class AgentRegistrationService {
         return machine;
     }
 
+    private boolean isNewEnrollment(String machineId, String organizationId) {
+        return machineRepository.findByMachineId(machineId)
+                .map(machine -> !Objects.equals(machine.getOrganizationId(), organizationId))
+                .orElse(false);
+    }
+
     private MachineUpdate registrationRequestFields(AgentRegistrationRequest request) {
+        String agentVersion = request.getAgentVersion();
+        Long agentVersionKey = ClientVersionKey.parse(agentVersion);
         MachineUpdate update = machineUpdate()
                 .set(HOSTNAME, request.getHostname())
                 .set(OS_TYPE, normalizeOsType(request.getOsType()))
-                .set(AGENT_VERSION, request.getAgentVersion())
+                .set(AGENT_VERSION, agentVersion)
+                .set(AGENT_VERSION_KEY, agentVersionKey)
                 .set(LAST_SEEN, Instant.now());
         // Optional; keep the existing value on reinstall when the agent doesn't send it
         setIfNotBlank(update, USER_ID, request.getUserId());

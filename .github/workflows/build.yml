@@ -66,7 +66,7 @@ jobs:
           URL="https://maven.pkg.github.com/${{ github.repository }}/${{ env.REPOSITORY }}/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" |
                         grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+(?=</version>)' | sort -V | tail -1)
-          echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}-SNAPSHOT" >> $GITHUB_ENV
+          echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}-SNAPSHOT" >> "$GITHUB_ENV"
 
       - name: Build and Publish ${{ env.NEW_VERSION }}
         id: build
@@ -102,17 +102,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # No lockfile is committed (.gitignore), so the cache keys on package.json.
+          # The committed lockfile is what every install reads, so the cache keys on it.
           cache: npm
-          cache-dependency-path: openframe-frontend-core/package.json
+          cache-dependency-path: openframe-frontend-core/package-lock.json
 
-      # Bundled npm intermittently throws "Cannot read properties of null (reading 'edgesOut')" without a lockfile.
+      # The npm version the lockfile is maintained with.
       - name: Upgrade npm
         run: npm install -g npm@11.9.0
 
-      # `install`, not `ci`: `ci` needs a lockfile.
+      # Exactly the committed lockfile, as every developer's checkout has it; fails when package.json and the lockfile disagree.
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       # ~1s; a broken eslint config makes every lint result below meaningless.
       # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:config-smoke in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
@@ -139,7 +139,15 @@ jobs:
       - name: Format
         run: npm run format
 
+      # The chat wire and the record-link vectors are the hub's contracts, read from the hub that serves them
+      # (chat-protocol/__fixtures__/hub-contracts.ts). With the secret they are required; a fork's pull request has none,
+      # so they are skipped there. FLAMINGO_HUB_CONTRACTS_URL points them at a hub preview before its contracts reach
+      # production.
       - name: Test
+        env:
+          FLAMINGO_HUB_BASE_URL: ${{ secrets.FLAMINGO_HUB_SECRET != '' && (vars.FLAMINGO_HUB_CONTRACTS_URL || vars.FLAMINGO_HUB_BASE_URL) || '' }}
+          FLAMINGO_HUB_SECRET: ${{ secrets.FLAMINGO_HUB_SECRET }}
+          FLAMINGO_HUB_CONTRACTS_REQUIRED: ${{ secrets.FLAMINGO_HUB_SECRET != '' && '1' || '' }}
         run: npm run test:run
 
       - name: Build
@@ -201,6 +209,46 @@ jobs:
 
       - name: Test
         run: make -C clients/openframe-client test
+
+  build-rust-common:
+    name: "Build Rust common (${{ matrix.os }})"
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes || '{}').rust == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prepare Rust tools
+        uses: ./.github/steps/rust-setup
+        with:
+          path: clients/openframe-common
+          components: clippy,rustfmt
+          shared-key: openframe-common-${{ matrix.os }}
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack@0.6.46
+          fallback: none
+
+      - name: Lint (cargo fmt --check + cargo clippy -D warnings)
+        run: make -C clients/openframe-common lint
+
+      - name: Check every feature combination
+        run: make -C clients/openframe-common hack
+
+      - name: Test
+        run: make -C clients/openframe-common test
 
   cleanup:
     name: Cleanup

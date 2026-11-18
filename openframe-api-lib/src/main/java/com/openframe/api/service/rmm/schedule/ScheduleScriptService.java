@@ -71,9 +71,7 @@ public class ScheduleScriptService {
     public ScriptScheduleResponse create(CreateScriptScheduleInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
-        if (scheduleRepository.existsByTenantIdAndNameAndStatusIn(tenantId, input.getName(), NAME_UNIQUE_STATUSES)) {
-            throw new ConflictException("Script schedule with name '" + input.getName() + "' already exists");
-        }
+        requireNameAvailable(input.getName());
 
         ScheduleScriptTrigger trigger = defaultTrigger(input.getTrigger());
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
@@ -90,6 +88,17 @@ public class ScheduleScriptService {
         ScheduleScript saved = scheduleRepository.save(entity);
         log.info("Created script schedule id={} name='{}' tenantId={}", saved.getId(), saved.getName(), tenantId);
         return scheduleMapper.toResponse(saved);
+    }
+
+    public void requireNameAvailable(String name) {
+        if (scheduleRepository.existsByTenantIdAndNameAndStatusIn(
+                tenantIdProvider.getTenantId(), name, NAME_UNIQUE_STATUSES)) {
+            throw new ConflictException("Script schedule with name '" + name + "' already exists");
+        }
+    }
+
+    public ScheduleScript requireExisting(String id) {
+        return loadOrThrow(tenantIdProvider.getTenantId(), id);
     }
 
     /**

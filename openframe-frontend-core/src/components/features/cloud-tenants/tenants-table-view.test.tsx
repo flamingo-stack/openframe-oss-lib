@@ -95,6 +95,6 @@ describe('TenantsTableView, single-customer (the default)', () => {
   it('takes no multi-customer row, so a host that forgets the variant does not compile', () => {
     // @ts-expect-error multi-customer rows need variant="multi-customer"
     const forgotten = <TenantsTableView rows={[ROW]} getHref={row => `/tenants/${row.id}`} />;
-    expect(forgotten.props.variant).toBeUndefined();
+    expect((forgotten.props as { variant?: string }).variant).toBeUndefined();
   });
 });

@@ -44,8 +44,8 @@ public class FleetHostSoftwareCache {
     }
 
     // keyed by the source commit as well: one Fleet commit writes many host_software rows, and each row is an event
-    public List<HostSoftwareTitle> hostSoftware(String tenantId, long hostId, long commitTs) {
-        String key = tenantId + ":" + hostId + ":" + commitTs;
+    public List<HostSoftwareTitle> hostSoftware(String tenantId, long hostId, String commit) {
+        String key = tenantId + ":" + hostId + ":" + commit;
         return cache.get(key, k -> load(tenantId, hostId));
     }
 

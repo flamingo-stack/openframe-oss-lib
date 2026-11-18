@@ -10,6 +10,8 @@ import org.springframework.web.client.RestClient;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @Slf4j
 @Component
 public class WingetCatalogFetcher {
@@ -47,20 +49,33 @@ public class WingetCatalogFetcher {
         return indexEntry.getId() == null || indexEntry.getName() == null;
     }
 
-    private static PackageCatalogEntry toEntry(WingetEntry indexEntry) {
+    static PackageCatalogEntry toEntry(WingetEntry indexEntry) {
         String id = indexEntry.getId();
         String name = indexEntry.getName();
         String moniker = indexEntry.getMoniker();
         List<String> aliases = moniker == null || moniker.isBlank() ? List.of() : List.of(moniker);
+        String displayVersion = displayVersionOf(indexEntry);
         return PackageCatalogEntry.builder()
                 .manager(PackageManagerType.WINGET)
                 .packageId(id)
                 .name(name)
                 .version(indexEntry.getLatestVersion())
+                .displayVersion(displayVersion)
                 .publisher(publisherFromId(id))
                 .hashPrefix(indexEntry.getHashPrefix())
                 .aliases(aliases)
+                .productCodes(indexEntry.getProductCodes())
+                .upgradeCodes(indexEntry.getUpgradeCodes())
+                .normalizedNames(indexEntry.getNormalizedNames())
+                .normalizedPublishers(indexEntry.getNormalizedPublishers())
+                .packageFamilyNames(indexEntry.getPackageFamilyNames())
                 .build();
+    }
+
+    private static String displayVersionOf(WingetEntry indexEntry) {
+        String displayVersion = indexEntry.getLatestDisplayVersion();
+        String latestVersion = indexEntry.getLatestVersion();
+        return hasText(displayVersion) && !displayVersion.equals(latestVersion) ? displayVersion : null;
     }
 
     private static String publisherFromId(String packageId) {

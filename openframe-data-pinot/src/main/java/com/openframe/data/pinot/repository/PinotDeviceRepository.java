@@ -8,6 +8,36 @@ public interface PinotDeviceRepository {
     Map<String, Integer> getStatusFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
+            List<String> deviceTypes,
+            List<String> osTypes,
+            List<String> organizationIds,
+            List<String> tagKeys,
+            List<String> tagKeyValues,
+    List<String> directorySources,
+    List<String> userLinks
+    );
+
+    Map<String, Integer> getConnectivityFilterOptions(
+            String tenantId,
+            List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
+            List<String> deviceTypes,
+            List<String> osTypes,
+            List<String> organizationIds,
+            List<String> tagKeys,
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
+    );
+
+    // "true" and "false" with their counts under the other filters, zero counts included
+    Map<String, Integer> getClientOutdatedFilterOptions(
+            String tenantId,
+            List<String> statuses,
+            List<String> connectivity,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -20,6 +50,8 @@ public interface PinotDeviceRepository {
     Map<String, Integer> getDeviceTypeFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -32,6 +64,8 @@ public interface PinotDeviceRepository {
     Map<String, Integer> getOsTypeFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -44,6 +78,8 @@ public interface PinotDeviceRepository {
     Map<String, Integer> getOrganizationFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -59,6 +95,8 @@ public interface PinotDeviceRepository {
     Map<String, Integer> getTagKeyFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -74,6 +112,8 @@ public interface PinotDeviceRepository {
     Map<String, Integer> getDirectorySourceFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -89,6 +129,8 @@ public interface PinotDeviceRepository {
     Map<String, Integer> getUserLinkFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -101,6 +143,8 @@ public interface PinotDeviceRepository {
     int getFilteredDeviceCount(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
+            Boolean clientOutdated,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,

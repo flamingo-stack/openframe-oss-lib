@@ -1,0 +1,12 @@
+type ClientFeatureFlag {
+    name: String!
+    enabled: Boolean!
+    minVersion: String
+}
+
+type Query {
+    """
+    The tenant's client feature flags, the same set the CLIENT_FEATURE_FLAGS delivery carries.
+    """
+    clientFeatureFlags: [ClientFeatureFlag!]!
+}

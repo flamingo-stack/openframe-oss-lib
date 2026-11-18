@@ -18,3 +18,6 @@ package-lock.json
 # code-formatting commit has landed. (2026-08-24)
 *.md
 *.mdx
+
+# A verbatim snapshot of the ai-agent's federation subgraph (an empty `type Mutation {}` Prettier cannot parse).
+src/chat-protocol/__fixtures__/ai-agent-schema.graphqls

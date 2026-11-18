@@ -1,5 +1,6 @@
 package com.openframe.management.integration;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.openframe.data.document.device.DeviceStatus;
@@ -70,7 +71,7 @@ class DeviceHeartbeatOfflineDetectionIT {
         client = MongoClients.create(uri);
         template = new MongoTemplate(client, "test");
         storedMachines = new MongoRepositoryFactory(template).getRepository(MachineRepository.class,
-                RepositoryFragments.just(new CustomMachineRepositoryImpl(template)));
+                RepositoryFragments.just(new CustomMachineRepositoryImpl(template, new ClientVersionThreshold("1.6.0"))));
         machineWriter = new MachineWriter(template, absent(), absent());
     }
 
@@ -91,7 +92,7 @@ class DeviceHeartbeatOfflineDetectionIT {
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setTenantId("tenant-1");
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         machine.setTelemetryStatus(TelemetryStatus.ONLINE);
         machine.setLastSeen(LONG_AGO);
         template.save(machine);
@@ -114,7 +115,7 @@ class DeviceHeartbeatOfflineDetectionIT {
         // verifications
         Machine stored = storedMachines.findByMachineId(MACHINE_ID).orElseThrow();
         assertThat(stored).extracting(Machine::getStatus, Machine::getTelemetryStatus)
-                .containsExactly(DeviceStatus.OFFLINE, TelemetryStatus.OFFLINE);
+                .containsExactly(DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
         assertThat(stored).extracting(Machine::getDirectorySources, Machine::getDirectoryUserLink,
                         Machine::getDirectoryUserIds, Machine::getDirectoryUserName, Machine::getComputerName)
                 .containsExactly(List.of(DirectorySource.MICROSOFT_365), DirectoryUserLink.PRIMARY,
@@ -134,7 +135,7 @@ class DeviceHeartbeatOfflineDetectionIT {
         // verifications
         Machine stored = storedMachines.findByMachineId(MACHINE_ID).orElseThrow();
         assertThat(stored).extracting(Machine::getStatus, Machine::getTelemetryStatus)
-                .containsExactly(DeviceStatus.ONLINE, TelemetryStatus.ONLINE);
+                .containsExactly(DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
     }
 
     @Test
@@ -159,7 +160,7 @@ class DeviceHeartbeatOfflineDetectionIT {
             concurrentWrite.run();
             return read;
         }).when(machines).findByTelemetryStatusAndLastSeenBefore(eq(TelemetryStatus.ONLINE), any(Instant.class));
-        DeviceHeartbeatOfflineDetectionService service = new DeviceHeartbeatOfflineDetectionService(machines, machineWriter);
+        DeviceHeartbeatOfflineDetectionService service = new DeviceHeartbeatOfflineDetectionService(machines, machineWriter, true);
         ReflectionTestUtils.setField(service, "offlineThresholdSeconds", 130L);
         return service;
     }

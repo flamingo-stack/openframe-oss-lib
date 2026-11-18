@@ -6,6 +6,7 @@ import com.openframe.client.service.rmm.DeviceLocalScheduleService;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceLocalTimeDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
@@ -292,6 +293,7 @@ class DeviceLocalScheduleServiceTest {
         m.setMachineId(machineId);
         m.setTimezone(timezone);
         m.setStatus(status);
+        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
         return m;
     }
 }

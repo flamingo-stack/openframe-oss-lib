@@ -15,7 +15,7 @@ import {
 import { useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags';
 import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
-import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
+import { useViewportCollisionPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { SearchIcon } from '../icons-v2-generated';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
@@ -52,6 +52,8 @@ export interface FilterChipData {
   id: string;
   label: string;
   variant?: 'selected' | 'category' | 'subcategory' | 'tag';
+  /** The chip's label is still being read (an id the host is naming): the chip draws its loading form. */
+  loading?: boolean;
 }
 
 export interface SearchInputProps {
@@ -207,7 +209,7 @@ export function SearchInput({
   // ---- Popover state ----
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const keyboardPadding = useKeyboardCollisionPadding();
+  const viewportPadding = useViewportCollisionPadding();
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -496,6 +498,7 @@ export function SearchInput({
                   key={chip.id}
                   variant={chipVariantToTagVariant(chip.variant)}
                   label={chip.label}
+                  loading={chip.loading}
                   labelClassName="max-w-[120px] truncate"
                   onClose={onFilterRemove && !disabled ? () => onFilterRemove(chip.id) : undefined}
                 />
@@ -558,7 +561,7 @@ export function SearchInput({
 
         <PopoverPrimitive.Content
           className={cn(
-            'z-50 mt-1 w-[var(--radix-popover-trigger-width)]',
+            'z-50 w-[var(--radix-popover-trigger-width)]',
             'overflow-hidden rounded-[6px] border border-ods-border bg-ods-card shadow-lg',
             'flex max-h-[var(--radix-popper-available-height)] flex-col',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -567,12 +570,15 @@ export function SearchInput({
             'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
             dropdownClassName,
           )}
-          sideOffset={4}
+          // The gap is an offset, not a margin, so the collision padding counts it.
+          sideOffset={8}
           align="start"
           // The anchor is the search field that raises the software keyboard,
           // so these suggestions are always positioned with the keyboard up —
-          // see useKeyboardCollisionPadding.
-          collisionPadding={{ bottom: keyboardPadding }}
+          // see useViewportCollisionPadding.
+          collisionPadding={viewportPadding}
+          // Every frame: iOS scrolls the field into view as the keyboard rises, and the list must follow it.
+          updatePositionStrategy="always"
           onOpenAutoFocus={e => {
             e.preventDefault();
             inputRef.current?.focus();
@@ -624,6 +630,7 @@ export function SearchInput({
             key={`m-${chip.id}`}
             variant={chipVariantToTagVariant(chip.variant)}
             label={chip.label}
+            loading={chip.loading}
             labelClassName="max-w-[120px] truncate"
             onClose={() => {}}
           />

@@ -21,7 +21,7 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
 
-// The hostname every ticket keeps (deviceHostname, by deviceId); TicketCascadeAspect writes it until the mode is events.
+// The device name every ticket keeps (deviceHostname, by deviceId): the nickname, else the hostname, as everywhere else.
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -42,9 +42,9 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
         String tenantId = record.getTenantId();
         MachineEvent event = record.getEvent();
         String machineId = event.getMachineId();
-        String hostname = event.getHostname();
-        long updated = ticketProjectionRepository.updateDeviceHostname(tenantId, machineId, hostname);
-        log.debug("{} set the hostname of machine {} on {} ticket(s) of tenant {}", NAME, machineId, updated, tenantId);
+        String deviceName = event.preferredName();
+        long updated = ticketProjectionRepository.updateDeviceHostname(tenantId, machineId, deviceName);
+        log.debug("{} set the name of machine {} on {} ticket(s) of tenant {}", NAME, machineId, updated, tenantId);
     }
 
     @Override
@@ -52,8 +52,8 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
         String tenantId = record.getTenantId();
         MachineEvent event = record.getEvent();
         String machineId = event.getMachineId();
-        String hostname = event.getHostname();
-        return ticketProjectionRepository.countTicketsToUpdateDeviceHostname(tenantId, machineId, hostname, limit);
+        String deviceName = event.preferredName();
+        return ticketProjectionRepository.countTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName, limit);
     }
 
     @Override
@@ -61,8 +61,8 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
         String tenantId = record.getTenantId();
         MachineEvent event = record.getEvent();
         String machineId = event.getMachineId();
-        String hostname = event.getHostname();
-        return ticketProjectionRepository.updateDeviceHostnameBatch(tenantId, machineId, hostname, lastId, batchSize);
+        String deviceName = event.preferredName();
+        return ticketProjectionRepository.updateDeviceHostnameBatch(tenantId, machineId, deviceName, lastId, batchSize);
     }
 
     @Override
@@ -96,7 +96,7 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
         return new ReconciliationResult(mismatches);
     }
 
-    // Every machine of the batch, in one query: its hostname to compare, its _id to publish again.
+    // Every machine of the batch, in one query: its name to compare, its _id to publish again.
     private Map<TenantScopedId, Machine> findMachines(Set<String> tenantIds, Set<String> machineIds) {
         Map<TenantScopedId, Machine> machines = new HashMap<>();
         for (Machine machine : machineRepository.findByTenantIdInAndMachineIdIn(tenantIds, machineIds)) {
@@ -119,13 +119,13 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
         if (machine == null) {
             return null;
         }
-        String sourceHostname = machine.getHostname();
-        String copiedHostname = ticket.getDeviceHostname();
-        if (Objects.equals(sourceHostname, copiedHostname)) {
+        String sourceName = machine.preferredName();
+        String copiedName = ticket.getDeviceHostname();
+        if (Objects.equals(sourceName, copiedName)) {
             return null;
         }
         String sourceId = machine.getId();
         return new Mismatch(tenantId, ticketId, sourceId,
-            "hostname \"" + copiedHostname + "\" differs from machine's \"" + sourceHostname + "\"");
+            "device name \"" + copiedName + "\" differs from machine's \"" + sourceName + "\"");
     }
 }

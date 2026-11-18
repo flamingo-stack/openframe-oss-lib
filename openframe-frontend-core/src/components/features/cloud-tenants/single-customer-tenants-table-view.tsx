@@ -13,6 +13,7 @@ import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { dataTableLayoutProps, type FeatureTableLayoutProps } from '../feature-table-layout';
 import { TenantCell } from './tenant-cell';
 import { accessStateTag, formatLastRead, usersCountLabel } from './tenant-presentation';
 import type { TenantRow } from './tenant-row';
@@ -105,7 +106,7 @@ function OpenTenantButton({ href, name }: { href: string; name: string }) {
   );
 }
 
-export interface SingleCustomerTenantsTableViewProps {
+export interface SingleCustomerTenantsTableViewProps extends FeatureTableLayoutProps {
   /** The default: one customer per tenant, no licences and no funnels. */
   variant?: 'single-customer';
   rows: TenantRow[];
@@ -144,6 +145,9 @@ export function SingleCustomerTenantsTableView({
   isFetchingNextPage = false,
   onLoadMore,
   now,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: SingleCustomerTenantsTableViewProps) {
   const columns = useMemo<ColumnDef<TenantRow>[]>(
     () => [
@@ -202,14 +206,18 @@ export function SingleCustomerTenantsTableView({
   );
   const table = useDataTable<TenantRow>({ data: loadingRows ?? rows, columns, getRowId, enableSorting: false });
 
+  const rowCount = <DataTable.RowCount itemName="result" totalCount={totalCount ?? rows.length} loading={loading} />;
+
   return (
     // Dim, don't unmount, the stale rows while a deferred search refetches.
     <div className={cn('transition-opacity duration-200', isPending && 'opacity-60')}>
-      <DataTable table={table}>
+      <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+        {/* The grid's results count sits above the table; the card header carries its own (`rightSlot`). */}
+        {layout === 'grid' && <DataTable.Meta>{rowCount}</DataTable.Meta>}
         <DataTable.Header
           stickyHeader={stickyHeaderOffset !== undefined}
           stickyHeaderOffset={stickyHeaderOffset}
-          rightSlot={<DataTable.RowCount itemName="result" totalCount={totalCount ?? rows.length} loading={loading} />}
+          rightSlot={rowCount}
         />
         <DataTable.Body
           loadingCells

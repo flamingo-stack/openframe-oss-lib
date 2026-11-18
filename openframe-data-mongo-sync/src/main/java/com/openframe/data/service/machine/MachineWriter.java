@@ -32,7 +32,8 @@ public class MachineWriter {
     // The machine fields MachineEvent carries; a write of any other field changes no projection, so it is not published.
     private static final String HOSTNAME_PATH = MachineFields.HOSTNAME.path();
     private static final String NICKNAME_PATH = MachineFields.NICKNAME.path();
-    static final Set<String> EVENT_PATHS = Set.of(HOSTNAME_PATH, NICKNAME_PATH);
+    private static final String ORGANIZATION_ID_PATH = MachineFields.ORGANIZATION_ID.path();
+    static final Set<String> EVENT_PATHS = Set.of(HOSTNAME_PATH, NICKNAME_PATH, ORGANIZATION_ID_PATH);
 
     private final MongoTemplate mongoTemplate;
     // Present only while publishing is on: a write here must reach the projections like a MachineRepository save.

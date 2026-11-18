@@ -2,8 +2,17 @@
 
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
-import { type ColumnFiltersState, DataTable, type NoDataProps, type OnChangeFn } from '../../ui';
+import {
+  type ColumnFiltersState,
+  DataTable,
+  type DataTableLayout,
+  type DataTableSettings,
+  type NoDataProps,
+  type OnChangeFn,
+} from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
+import { useDeviceStatusDisplay } from './device-status-display';
+import { deviceStatusFilterGroups, joinStatusFilterValue, splitStatusFilterValue } from './device-statuses';
 import { DevicesFilterToolbar } from './devices-filter-toolbar';
 import { DevicesTableBody, getDeviceActionsColumn, getDeviceFilterColumns } from './devices-table-columns';
 import type { DeviceFilters, DeviceRow } from './types';
@@ -17,6 +26,8 @@ import { useTagFilterModal } from './use-tag-filter-modal';
 export interface DevicesListNarrowing {
   search: string;
   statuses: string[];
+  /** ONLINE / OFFLINE picks of the STATUS funnel's Connectivity group. Absent: none. */
+  connectivity?: string[];
   osTypes: string[];
   organizationIds: string[];
   /** Chips from the tag filter, `key:value`. A bare word from an old link stays visible and filters nothing. */
@@ -36,6 +47,7 @@ export function isNarrowed(narrowing: DevicesListNarrowing): boolean {
   return (
     narrowing.search.trim().length > 0 ||
     narrowing.statuses.length > 0 ||
+    (narrowing.connectivity?.length ?? 0) > 0 ||
     narrowing.osTypes.length > 0 ||
     narrowing.organizationIds.length > 0 ||
     narrowing.tags.length > 0
@@ -92,6 +104,15 @@ export interface DevicesListProps<T extends DeviceRow = DeviceRow> {
   hideColumns?: string[];
   /** Filter keys to drop from the funnels AND the modal; the column itself stays. */
   hideFilters?: string[];
+  /**
+   * The table's layout: `grid` draws 48px one-line rows in one bordered block at every width (see `DevicesTableBody`).
+   * Named apart from the view mode, whose own `grid` is the tile view. Default `cards`.
+   */
+  tableLayout?: DataTableLayout;
+  /** Grid layout: the table's height; `'fill'` makes the table the scroll area (see `DevicesTableBody`). */
+  tableMaxHeight?: number | string;
+  /** Grid layout: the table's settings (the gear's menu of columns, the saved column layout). */
+  tableSettings?: DataTableSettings;
   /** Per-row overflow menu. Omit for a read-only list. */
   rowActions?: (device: T) => ReactNode;
 
@@ -177,6 +198,9 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
   onNarrowingChange = NOOP,
   hideColumns,
   hideFilters,
+  tableLayout,
+  tableMaxHeight,
+  tableSettings,
   rowActions,
   emptyState,
   narrowedEmptyState,
@@ -194,27 +218,31 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
     [narrowing, onNarrowingChange],
   );
 
+  const statusDisplay = useDeviceStatusDisplay();
   const filterColumns = useMemo(() => {
     const hidden = new Set(hideFilters ?? []);
-    return getDeviceFilterColumns(deviceFilters).filter(column => !hidden.has(column.key));
-  }, [deviceFilters, hideFilters]);
+    return getDeviceFilterColumns(deviceFilters, { statusDisplay }).filter(column => !hidden.has(column.key));
+  }, [deviceFilters, hideFilters, statusDisplay]);
 
   // The column funnels speak in column ids; the narrowing speaks in the backend's
   // field names. This pair is the only place that translation lives.
   const columnFilters = useMemo<ColumnFiltersState>(
     () => [
-      ...(narrowing.statuses.length ? [{ id: 'status', value: narrowing.statuses }] : []),
+      ...(narrowing.statuses.length || narrowing.connectivity?.length
+        ? [{ id: 'status', value: joinStatusFilterValue(narrowing.statuses, narrowing.connectivity) }]
+        : []),
       ...(narrowing.osTypes.length ? [{ id: 'os', value: narrowing.osTypes }] : []),
       ...(narrowing.organizationIds.length ? [{ id: 'organization', value: narrowing.organizationIds }] : []),
     ],
-    [narrowing.statuses, narrowing.osTypes, narrowing.organizationIds],
+    [narrowing.statuses, narrowing.connectivity, narrowing.osTypes, narrowing.organizationIds],
   );
 
   const onColumnFiltersChange = useCallback<OnChangeFn<ColumnFiltersState>>(
     updater => {
       const next = typeof updater === 'function' ? updater(columnFilters) : updater;
       const pick = (id: string) => (next.find(f => f.id === id)?.value as string[] | undefined) ?? [];
-      patch({ statuses: pick('status'), osTypes: pick('os'), organizationIds: pick('organization') });
+      const { statuses, connectivity } = splitStatusFilterValue(pick('status'));
+      patch({ statuses, connectivity, osTypes: pick('os'), organizationIds: pick('organization') });
     },
     [columnFilters, patch],
   );
@@ -225,6 +253,7 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
       const pick = (key: string) => (params[key] as string[] | undefined) ?? [];
       patch({
         statuses: pick('statuses'),
+        connectivity: pick('connectivity'),
         osTypes: pick('osTypes'),
         organizationIds: pick('organizationIds'),
         tags: pick('tags'),
@@ -253,8 +282,12 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
 
   // The modal reads the current selection back in column-keyed form.
   const tableFilters = useMemo(
-    () => ({ status: narrowing.statuses, os: narrowing.osTypes, organization: narrowing.organizationIds }),
-    [narrowing.statuses, narrowing.osTypes, narrowing.organizationIds],
+    () => ({
+      ...deviceStatusFilterGroups(narrowing.statuses, narrowing.connectivity ?? [], statusDisplay),
+      os: narrowing.osTypes,
+      organization: narrowing.organizationIds,
+    }),
+    [narrowing.statuses, narrowing.connectivity, narrowing.osTypes, narrowing.organizationIds, statusDisplay],
   );
 
   const handleTagRemove = useCallback(
@@ -335,6 +368,9 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
           onColumnFiltersChange={onColumnFiltersChange}
           actionsColumn={actionsColumn}
           hideColumns={hideColumns}
+          layout={tableLayout}
+          tableMaxHeight={tableMaxHeight}
+          tableSettings={tableSettings}
           disableColumnFilters={hideFilters}
           totalCount={totalCount}
           footerSlot={

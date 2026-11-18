@@ -34,6 +34,7 @@
     "invertedIndexColumns": [
       "tenantId",
       "status",
+      "connectivity",
       "deviceType",
       "osType",
       "organizationId",
@@ -41,6 +42,9 @@
       "tagKeyValues",
       "directorySources",
       "directoryUserLink"
+    ],
+    "rangeIndexColumns": [
+      "agentVersionKey"
     ],
 
     "streamConfigs": {
@@ -87,7 +91,10 @@
       "UpsertCompactionTask": {
         "schedule": "0 0 3 * * ?",
         "bufferTimePeriod": "4h",
-        "invalidRecordsThresholdPercent": "30"
+        "invalidRecordsThresholdCount": "1",
+        "invalidRecordsThresholdPercent": "${pinot.tables.devices.compaction.invalid-records-threshold-percent:30}",
+        "validDocIdsConsensusMode": "EQUAL",
+        "validDocIdsValidationMode": "STRICT"
       }
     }
   }

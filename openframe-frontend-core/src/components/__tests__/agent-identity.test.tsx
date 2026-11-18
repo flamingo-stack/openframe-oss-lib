@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -120,18 +120,19 @@ describe('with no copy from the host, the identities are read from the server', 
   const fetchMock = vi.fn<typeof fetch>();
   /** A page: one react-query client above everything it draws. */
   const page = (ui: ReactNode) => render(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
+  const answer = () =>
+    new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL, props: null } }] }));
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('asks once for every provider on the page, and draws the picture the answer holds', async () => {
-    fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL, props: null } }] })),
-    );
+    fetchMock.mockResolvedValue(answer());
     page(
       <div data-testid="marks">
         <AgentIdentityProvider>
@@ -158,7 +159,8 @@ describe('with no copy from the host, the identities are read from the server', 
   });
 
   it('keeps the mark an empty box when the identities cannot be read', async () => {
-    fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    fetchMock.mockResolvedValue(new Response('nope', { status: 404 }));
     page(
       <div data-testid="marks">
         <AgentIdentityProvider>
@@ -211,5 +213,30 @@ describe('with no copy from the host, the identities are read from the server', 
       </AgentIdentityProvider>,
     );
     expect(html).toContain('<svg');
+  });
+
+  it('draws the marks, with no remount, after a read lost to a failure that passes (a 5xx)', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock
+        .mockResolvedValueOnce(new Response('down', { status: 503 }))
+        .mockImplementation(() => Promise.resolve(answer()));
+      page(
+        <AgentIdentityProvider>
+          <div data-testid="marks">
+            <AgentMark agent="fae" className="size-6" />
+          </div>
+        </AgentIdentityProvider>,
+      );
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('marks').innerHTML).toBe('<span aria-hidden="true" class="size-6"></span>');
+
+      await act(() => vi.advanceTimersByTimeAsync(60_000));
+      expect(screen.getByTestId('marks').innerHTML).toContain('fae.webp');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

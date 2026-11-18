@@ -17,6 +17,7 @@ public enum FleetSource {
     PROGRAMS("programs"),
     HOMEBREW_PACKAGES("homebrew_packages"),
     CHOCOLATEY_PACKAGES("chocolatey_packages"),
+    WINGET_PACKAGES("winget_packages"),
     DEB_PACKAGES("deb_packages"),
     RPM_PACKAGES("rpm_packages"),
     PORTAGE_PACKAGES("portage_packages"),

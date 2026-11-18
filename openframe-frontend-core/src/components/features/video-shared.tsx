@@ -330,11 +330,23 @@ export interface VideoYouTubeFacadeProps {
    *  `enablejsapi=1` postMessage channel. Lets a closing dialog stop iframe
    *  audio BEFORE the exit animation finishes unmounting it. */
   suspended?: boolean;
+  /** Words over the poster's lower edge, on a shade. */
+  caption?: VideoCaption;
+  /** The poster's Play was clicked (not `autoActivate`): a play to report. */
+  onPlay?: () => void;
+}
+
+/** A YouTube poster's caption: the video's title (`\n` breaks the line) and a line under it (who, how long). */
+export interface VideoCaption {
+  title: string;
+  meta?: string;
 }
 
 const VIDEO_YOUTUBE_FACADE_KEYS = [
   'autoActivate',
   'suspended',
+  'caption',
+  'onPlay',
 ] as const satisfies readonly (keyof VideoYouTubeFacadeProps)[];
 
 const _youTubeForwarded: AllKeysForwarded<VideoYouTubeFacadeProps, typeof VIDEO_YOUTUBE_FACADE_KEYS> = true;

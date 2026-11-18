@@ -10,21 +10,20 @@ use tokio::time::{timeout, Duration};
 
 use super::{
     Begin, ClientUpdateHandler, CommandContext, CommandHandler, CommandListener,
-    FeatureFlagsHandler, Outcome, PackageUpdateHandler, RestartGate,
+    FeatureFlagsHandler, Outcome, PackageUpdateHandler, RestartGate, ToolUpdateHandler,
 };
-use crate::clients::AuthClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{
     DeliveryRef, DeliveryResult, DeliveryResultMessage, FailReason, Feature, FeatureFlagsState,
-    OpenFrameClientUpdateMessage, PackageRef, PackageUpdateStatusMessage, UpdateStatus,
+    InstalledAsset, InstalledTool, OpenFrameClientUpdateMessage, PackageRef,
+    PackageUpdateStatusMessage, ToolRecordState, UpdateStatus,
 };
 use crate::platform::{DirectoryManager, DmgExtractor};
-use crate::services::encryption_service::EncryptionService;
+use crate::services::delivery_results::DeliveryResults;
 use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
 use crate::services::last_known_good_service::LastKnownGoodService;
-use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
@@ -33,19 +32,19 @@ use crate::services::package_manager::package_update::{OrderStore, StatusReporte
 use crate::services::package_manager::{is_supported, ManagerId};
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::{LedgerState, ResultStore};
-use crate::services::shared_token_service::SharedTokenService;
+use crate::services::tool_agent_update_service::ToolAgentUpdateService;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_cleanup_service::UpdateCleanupService;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
 use crate::services::{
-    AgentAuthService, AgentConfigurationService, DeactivationService, GithubDownloadService,
-    InitialConfigurationService, InstalledToolsService, MachineIdService,
-    ToolCommandParamsResolver, ToolKillService, ToolOps,
+    AgentConfigurationService, GithubDownloadService, InitialConfigurationService,
+    InstalledToolsService, ToolCommandParamsResolver, ToolKillService, ToolOps,
 };
-use crate::test_support::NatsServer;
+use crate::test_support::{connection_manager, NatsServer};
 use crate::utils::in_progress::InProgress;
 use crate::utils::latch::Latch;
+use openframe_common::protocol::InstalledAgentMessage;
 
 const MACHINE: &str = "it-machine";
 const BOUND: Duration = Duration::from_secs(10);
@@ -97,25 +96,7 @@ impl Agent {
             ToolKillService::new(),
             tool_ops.clone(),
         );
-        let deactivation = DeactivationService::new(&directories);
-        let auth = AgentAuthService::new(
-            AuthClient::new(
-                "http://127.0.0.1:9".into(),
-                reqwest::Client::new(),
-                deactivation.clone(),
-            ),
-            config.clone(),
-            SharedTokenService::new(directories.clone(), EncryptionService::new()),
-        );
-        let manager = NatsConnectionManager::new(
-            server.url(),
-            config.clone(),
-            initial.clone(),
-            auth,
-            LocalTlsConfigProvider::new(initial),
-            deactivation,
-            MachineIdService::new(&directories),
-        );
+        let manager = connection_manager(server.url(), &directories, &config);
         manager.use_client_for_tests(async_nats::connect(server.url()).await.unwrap());
 
         let tester = async_nats::connect(server.url()).await.unwrap();
@@ -174,7 +155,11 @@ impl Agent {
             self.manager.clone(),
             self.config.clone(),
             gate.clone(),
-            self.publisher.clone(),
+            DeliveryResults::new(
+                self.publisher.clone(),
+                self.store.clone(),
+                self.flush.clone(),
+            ),
             self.store.clone(),
             self.flush.clone(),
         );
@@ -221,7 +206,11 @@ impl Agent {
     }
 
     async fn launch_command<H: CommandHandler>(&mut self, handler: H) -> H {
-        let (_gate, context) = self.context();
+        self.launch_command_gated(handler).await.0
+    }
+
+    async fn launch_command_gated<H: CommandHandler>(&mut self, handler: H) -> (H, RestartGate) {
+        let (gate, context) = self.context();
         CommandListener::new(handler.clone(), context)
             .start()
             .await
@@ -242,7 +231,7 @@ impl Agent {
         })
         .await
         .expect("the fake listener never answered");
-        handler
+        (handler, gate)
     }
 
     async fn send(&self, payload: serde_json::Value) {
@@ -341,6 +330,51 @@ impl Agent {
 
     fn persisted(&self) -> FeatureFlagsState {
         serde_json::from_slice(&std::fs::read(&self.flags_path).unwrap()).unwrap()
+    }
+
+    fn tool_update_service(&self) -> ToolAgentUpdateService {
+        let initial = InitialConfigurationService::new(self.directories.clone()).unwrap();
+        ToolAgentUpdateService::new(
+            GithubDownloadService::new(reqwest::Client::new(), DmgExtractor::new()),
+            InstalledToolsService::new(self.directories.clone()).unwrap(),
+            ToolKillService::new(),
+            self.tool_run_manager.clone(),
+            self.directories.clone(),
+            self.config.clone(),
+            InstalledAgentMessagePublisher::new(self.publisher.clone()),
+            ToolCommandParamsResolver::new(self.directories.clone(), initial, self.config.clone()),
+        )
+    }
+
+    async fn install_tool(&self, tool: InstalledTool) {
+        let binary = self
+            .directories
+            .get_tool_executable_path(&tool.tool_agent_id, None);
+        std::fs::create_dir_all(binary.parent().unwrap()).unwrap();
+        std::fs::write(&binary, b"agent").unwrap();
+        InstalledToolsService::new(self.directories.clone())
+            .unwrap()
+            .save(tool)
+            .await
+            .unwrap();
+    }
+
+    async fn installed_agents(&self) -> async_nats::Subscriber {
+        async_nats::jetstream::new(self.tester.clone())
+            .create_stream(async_nats::jetstream::stream::Config {
+                name: "INSTALLED_AGENTS".into(),
+                subjects: vec!["machine.*.installed-agent".into()],
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let reports = self
+            .tester
+            .subscribe(format!("machine.{MACHINE}.installed-agent"))
+            .await
+            .unwrap();
+        self.tester.flush().await.unwrap();
+        reports
     }
 }
 
@@ -1058,8 +1092,13 @@ async fn launch_package_update(agent: &mut Agent) -> (Arc<OrderStore>, async_nat
         agent.store.clone(),
         agent.flush.clone(),
     );
+    let results = DeliveryResults::new(
+        agent.publisher.clone(),
+        agent.store.clone(),
+        agent.flush.clone(),
+    );
     agent
-        .launch_command(PackageUpdateHandler::new(orders.clone(), status))
+        .launch_command(PackageUpdateHandler::new(orders.clone(), status, results))
         .await;
     (orders, statuses)
 }
@@ -1084,7 +1123,7 @@ fn package_order(
 }
 
 #[tokio::test]
-async fn a_package_update_order_is_acked_done_and_stored_for_the_worker() {
+async fn a_package_update_order_is_acked_stored_and_answered_only_when_it_ends() {
     assert_order_stored(if cfg!(windows) {
         json!({"manager": "WINGET", "id": "Vendor.App"})
     } else {
@@ -1112,19 +1151,44 @@ async fn assert_order_stored(package: serde_json::Value) {
         return;
     };
     let (orders, _statuses) = launch_package_update(&mut agent).await;
+    let subject = format!("machine.{MACHINE}.package-update");
 
     agent
         .send_to(
-            format!("machine.{MACHINE}.package-update"),
-            package_order("p1", "req-1", package),
+            subject.clone(),
+            package_order("p1", "req-1", package.clone()),
         )
         .await;
 
-    agent.expect("p1", DeliveryResult::Acked).await;
-    agent.expect("p1", DeliveryResult::Done).await;
+    let acked = agent.expect("p1", DeliveryResult::Acked).await;
+    agent.expect_silence("p1").await;
+    assert_eq!(
+        agent.store.delivery_state("p1".to_string()).await.unwrap(),
+        Some(LedgerState::Deferred)
+    );
     let stored = OrderStore::load(agent.directories.secured_dir().join("package_updates.json"));
-    assert_eq!(stored.get("req-1").map(|order| order.package), Some(parsed));
-    assert!(orders.get("req-1").is_some());
+    let order = stored.get("req-1").unwrap();
+    assert_eq!(order.package, parsed);
+    assert_eq!(order.deliveries, vec![acked.delivery]);
+
+    agent
+        .send_to(subject, package_order("p1", "req-1", package))
+        .await;
+    agent.expect("p1", DeliveryResult::Acked).await;
+    agent.expect_silence("p1").await;
+    assert_eq!(orders.get("req-1").unwrap().deliveries.len(), 1);
+
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("other", Some(1), "done")).await;
+    agent.expect("other", DeliveryResult::Acked).await;
+    agent.expect("other", DeliveryResult::Done).await;
+    assert_eq!(handler.runs(), ["other"]);
+    agent.expect_silence("p1").await;
+    assert_eq!(
+        agent.store.delivery_state("p1".to_string()).await.unwrap(),
+        Some(LedgerState::Deferred),
+        "the next listener's restart recovery leaves it waiting"
+    );
 }
 
 #[tokio::test]
@@ -1161,4 +1225,201 @@ async fn an_unsupported_package_update_is_refused_on_the_status_stream() {
         Some(FailReason::NotSupported)
     );
     assert!(orders.get("req-2").is_none());
+}
+
+#[tokio::test]
+async fn a_waiting_package_order_holds_neither_a_restart_nor_the_next_order() {
+    let package = if cfg!(windows) {
+        json!({"manager": "WINGET", "id": "Vendor.App"})
+    } else {
+        json!({"manager": "BREW", "kind": "CASK", "name": "vendor-app"})
+    };
+    let parsed: PackageRef = serde_json::from_value(package.clone()).unwrap();
+    if !is_supported(ManagerId::of(&parsed)) {
+        return;
+    }
+    let Some((mut agent, _flags_gate)) = Agent::start().await else {
+        return;
+    };
+    let orders = Arc::new(OrderStore::load(
+        agent.directories.secured_dir().join("package_updates.json"),
+    ));
+    let status = StatusReporter::new(
+        agent.publisher.clone(),
+        agent.store.clone(),
+        agent.flush.clone(),
+    );
+    let results = DeliveryResults::new(
+        agent.publisher.clone(),
+        agent.store.clone(),
+        agent.flush.clone(),
+    );
+    let (_, gate) = agent
+        .launch_command_gated(PackageUpdateHandler::new(orders.clone(), status, results))
+        .await;
+    let subject = format!("machine.{MACHINE}.package-update");
+
+    for (i, name) in ["one", "two", "three"].iter().enumerate() {
+        let mut other = package.clone();
+        if cfg!(windows) {
+            other["id"] = json!(format!("Vendor.{name}"));
+        } else {
+            other["name"] = json!(format!("vendor-{name}"));
+        }
+        let dispatch = format!("p-{name}");
+        agent
+            .send_to(
+                subject.clone(),
+                package_order(&dispatch, &format!("req-{i}"), other),
+            )
+            .await;
+        agent.expect(&dispatch, DeliveryResult::Acked).await;
+    }
+    assert_eq!(orders.pending(MACHINE).len(), 3);
+
+    timeout(Duration::from_secs(5), gate.drain_and_request())
+        .await
+        .expect("a waiting package order held the restart");
+    for name in ["one", "two", "three"] {
+        agent.expect_silence(&format!("p-{name}")).await;
+        assert_eq!(
+            agent
+                .store
+                .delivery_state(format!("p-{name}"))
+                .await
+                .unwrap(),
+            Some(LedgerState::Deferred)
+        );
+    }
+}
+
+fn installed_tool(
+    tool_agent_id: &str,
+    version: &str,
+    state: ToolRecordState,
+    assets: Vec<InstalledAsset>,
+) -> InstalledTool {
+    InstalledTool {
+        tool_agent_id: tool_agent_id.into(),
+        version: version.into(),
+        assets,
+        state,
+        ..Default::default()
+    }
+}
+
+fn tool_update(
+    dispatch_id: &str,
+    sequence: i64,
+    tool_agent_id: &str,
+    version: &str,
+) -> serde_json::Value {
+    json!({
+        "delivery": {
+            "type": "TOOL_UPDATE",
+            "targetId": tool_agent_id,
+            "dispatchId": dispatch_id,
+            "sequence": sequence,
+        },
+        "toolAgentId": tool_agent_id,
+        "version": version,
+        "downloadConfigurations": [],
+        "assets": null,
+    })
+}
+
+async fn next_report(reports: &mut async_nats::Subscriber) -> (String, String) {
+    let message = timeout(BOUND, reports.next())
+        .await
+        .expect("no installed-agent report")
+        .expect("installed-agent subscription ended");
+    let report: InstalledAgentMessage = serde_json::from_slice(&message.payload).unwrap();
+    (report.agent_type, report.version)
+}
+
+#[tokio::test]
+async fn every_installed_tool_and_asset_version_is_published() {
+    let Some((agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            "fleetmdm-agent",
+            "0.4.18",
+            ToolRecordState::Installed,
+            vec![InstalledAsset {
+                id: "osqueryd".into(),
+                version: "0.0.11".into(),
+                executable: true,
+            }],
+        ))
+        .await;
+    agent
+        .install_tool(installed_tool(
+            "meshcentral-agent",
+            "0.0.32",
+            ToolRecordState::Installing,
+            Vec::new(),
+        ))
+        .await;
+    let mut reports = agent.installed_agents().await;
+
+    agent
+        .tool_update_service()
+        .publish_installed_versions()
+        .await;
+
+    let mut heard = vec![
+        next_report(&mut reports).await,
+        next_report(&mut reports).await,
+    ];
+    heard.sort();
+    assert_eq!(
+        heard,
+        [
+            ("fleetmdm-agent".to_string(), "0.4.18".to_string()),
+            ("osqueryd".to_string(), "0.0.11".to_string()),
+        ]
+    );
+    let more = timeout(QUIET, reports.next()).await;
+    assert!(
+        more.is_err(),
+        "a tool still being installed was reported: {more:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_update_to_the_installed_version_reports_it_again() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            "openframe-chat",
+            "1.6.10",
+            ToolRecordState::Installed,
+            Vec::new(),
+        ))
+        .await;
+    let mut reports = agent.installed_agents().await;
+    let handler = ToolUpdateHandler::new(
+        agent.tool_update_service(),
+        ToolOps::default(),
+        agent.tool_run_manager.client_update_pending(),
+    );
+    agent.launch_command(handler).await;
+
+    agent
+        .send_to(
+            ToolUpdateHandler::subject(MACHINE),
+            tool_update("t1", 1, "openframe-chat", "1.6.10"),
+        )
+        .await;
+
+    agent.expect("t1", DeliveryResult::Acked).await;
+    agent.expect("t1", DeliveryResult::Done).await;
+    assert_eq!(
+        next_report(&mut reports).await,
+        ("openframe-chat".to_string(), "1.6.10".to_string())
+    );
 }

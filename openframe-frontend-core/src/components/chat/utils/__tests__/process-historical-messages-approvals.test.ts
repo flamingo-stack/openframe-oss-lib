@@ -1,152 +1,236 @@
 /**
- * Regression guard for `displayApprovalTypes` semantics in the history
- * processors. An OMITTED option must render EVERY approval type inline —
- * consumers (tickets/mingo admin surfaces) that pass a wider list to their
- * realtime processor but omit it on the history path relied on this, and a
- * silent `['CLIENT']` default made their pending ADMIN approval cards vanish
- * on every reload/reconnect refetch. Parity with realtime is opt-in via an
- * explicit list.
+ * An approval is a part of its message on BOTH paths, carrying its tier. Whether THIS side answers that tier is a decision
+ * of the page that draws it (`approvalDisplaysInline`), never of the path a card arrived on. The reducer and the history
+ * processor used to disagree here by default, and a `['CLIENT']` default on history made pending ADMIN cards vanish on every
+ * reload.
  */
 
 import { describe, it, expect } from 'vitest';
+import {
+  approvalAnswerInFlight,
+  approvalStatusOf,
+  isToolPart,
+  type ChatMessage,
+} from '../../../../chat-protocol/chat-message';
+import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
 import { createChatStreamReducer } from '../../stream/chat-stream-reducer';
-import type { HistoricalMessage, MessageSegment } from '../../types';
-import { processHistoricalMessagesWithErrors } from '../process-historical-messages';
+import type { ApprovalRequestMessageData, ChatApprovalStatus, HistoricalMessage } from '../../types';
+import { approvalDisplaysInline } from '../approval-display';
+import { processHistoricalMessages } from '../process-historical-messages';
+
+const adminRequest: ApprovalRequestMessageData = {
+  type: 'APPROVAL_REQUEST',
+  approvalRequestId: 'req-m1',
+  approvalType: 'ADMIN',
+  toolCalls: [{ toolExecutionRequestId: 'req-m1', toolName: 'x', requiresApproval: true }],
+};
 
 const adminApprovalMessage = (id: string): HistoricalMessage => ({
   id,
   createdAt: '2026-07-17T12:00:00Z',
   owner: { type: 'ASSISTANT' },
-  messageData: [
-    {
-      type: 'APPROVAL_REQUEST',
-      approvalRequestId: `req-${id}`,
-      approvalType: 'ADMIN',
-      command: 'systemctl restart nats',
-    },
-  ],
+  parts: [adminRequest],
 });
 
-const approvalSegments = (segments: MessageSegment[] | string | undefined) =>
-  Array.isArray(segments) ? segments.filter(s => s.type === 'approval_request' || s.type === 'approval_batch') : [];
+const cardsOf = (messages: readonly ChatMessage[]) => messages.flatMap(message => message.parts).filter(isToolPart);
 
-describe('processHistoricalMessagesWithErrors — displayApprovalTypes', () => {
-  it('renders non-CLIENT approvals inline when the option is OMITTED', () => {
-    const { messages, escalatedApprovals } = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')]);
-    const rendered = messages.flatMap(m => approvalSegments(m.content));
-    expect(rendered).toHaveLength(1);
-    expect(escalatedApprovals.size).toBe(0);
+const live = () => {
+  const reducer = createChatStreamReducer();
+  const decoder = createMingoDecoder();
+  reducer.apply(decoder.decode({ type: 'MESSAGE_START' }));
+  reducer.apply(decoder.decode(adminRequest));
+  return cardsOf(reducer.state.messages);
+};
+
+describe('an approval of a tier this side does not answer', () => {
+  it('history and realtime hold the same card, with its tier', () => {
+    const history = cardsOf(processHistoricalMessages([adminApprovalMessage('m1')]).messages);
+    expect(history).toHaveLength(1);
+    expect(live()).toHaveLength(1);
+    for (const card of [history[0], live()[0]]) {
+      expect(card).toMatchObject({
+        toolCallId: 'req-m1',
+        state: 'approval-requested',
+        approval: { id: 'req-m1', descriptor: { approvalType: 'ADMIN', batchId: 'req-m1' } },
+      });
+    }
   });
 
-  it('escalates (does not render) approval types excluded by an explicit list', () => {
-    const { messages, escalatedApprovals } = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')], {
-      displayApprovalTypes: ['CLIENT'],
+  it('drawing it is the host list’s decision, on either path alike', () => {
+    expect(approvalDisplaysInline('ADMIN', ['CLIENT'])).toBe(false);
+    expect(approvalDisplaysInline('ADMIN', ['CLIENT', 'ADMIN'])).toBe(true);
+  });
+
+  it('a status known from elsewhere wins over what its row says', () => {
+    const { messages } = processHistoricalMessages([adminApprovalMessage('m1')], {
+      approvalStatuses: { 'req-m1': 'approved' },
     });
-    const rendered = messages.flatMap(m => approvalSegments(m.content));
-    expect(rendered).toHaveLength(0);
-    expect(escalatedApprovals.has('req-m1')).toBe(true);
+    expect(cardsOf(messages).map(approvalStatusOf)).toEqual(['approved']);
   });
 
-  it('renders approval types included by an explicit list', () => {
-    const { messages } = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')], {
-      displayApprovalTypes: ['CLIENT', 'ADMIN'],
-    });
-    const rendered = messages.flatMap(m => approvalSegments(m.content));
-    expect(rendered).toHaveLength(1);
+  it('a row’s answer does not overrule a status known from elsewhere', () => {
+    const { messages } = processHistoricalMessages(
+      [
+        {
+          ...adminApprovalMessage('m1'),
+          parts: [adminRequest, { type: 'APPROVAL_RESULT', approvalRequestId: 'req-m1', approved: false }],
+        },
+      ],
+      { approvalStatuses: { 'req-m1': 'approved' } },
+    );
+    expect(cardsOf(messages).map(approvalStatusOf)).toEqual(['approved']);
   });
+});
 
-  it('does not bleed a stale assistant id/streamSeq across an empty (escalated-only) flush', () => {
-    // a1 is an assistant turn whose ONLY data is an ADMIN approval that gets
-    // escalated (excluded by the explicit list) → it renders nothing, so the
-    // flush triggered by the following user row is EMPTY. Its grouping identity
-    // and streamSeq must be cleared, or the NEXT assistant turn (a2) inherits
-    // a1's id/timestamp and a Math.max-inflated streamSeq (100 instead of 50),
-    // which would over-cover synthetics in the history merge.
+describe('a turn’s identity', () => {
+  it('does not bleed across a turn that drew nothing: the next turn has its own id and sequence', () => {
+    // m1 is an assistant turn whose ONLY row is metadata → it draws nothing. Its grouping identity and sequence must be
+    // cleared, or the NEXT assistant turn inherits m1's id and an inflated streamSeq (100 instead of 50), which would
+    // over-cover synthetics in the history merge.
     const messages: HistoricalMessage[] = [
       {
-        id: 'a1',
+        id: 'm1',
         createdAt: '2026-07-17T12:00:00Z',
         owner: { type: 'ASSISTANT' },
         lastChunkStreamSeq: 100,
-        messageData: [{ type: 'APPROVAL_REQUEST', approvalRequestId: 'req-a1', approvalType: 'ADMIN', command: 'x' }],
+        parts: [{ type: 'ATTACHMENTS', sources: [] }],
       },
       {
         id: 'u1',
         createdAt: '2026-07-17T12:00:01Z',
         owner: { type: 'CLIENT' },
-        messageData: [{ type: 'TEXT', text: 'hello' }],
+        parts: [{ type: 'TEXT', text: 'hello' }],
       },
       {
         id: 'a2',
         createdAt: '2026-07-17T12:00:02Z',
         owner: { type: 'ASSISTANT' },
         lastChunkStreamSeq: 50,
-        messageData: [{ type: 'TEXT', text: 'hi there' }],
+        parts: [{ type: 'TEXT', text: 'hi there' }],
       },
     ];
-    const { messages: out } = processHistoricalMessagesWithErrors(messages, { displayApprovalTypes: ['CLIENT'] });
-    const asst = out.find(m => m.role === 'assistant');
-    expect(asst?.id).toBe('a2');
-    expect(asst?.streamSeq).toBe(50);
+    const { messages: out } = processHistoricalMessages(messages);
+    expect(out.map(message => message.id)).toEqual(['u1', 'a2']);
+    expect(out[1].metadata?.streamSeq).toBe(50);
+  });
+
+  it('a card’s own turn keeps its own sequence', () => {
+    const { messages } = processHistoricalMessages([
+      { ...adminApprovalMessage('a1'), lastChunkStreamSeq: 100 },
+      {
+        id: 'u1',
+        createdAt: '2026-07-17T12:00:01Z',
+        owner: { type: 'CLIENT' },
+        parts: [{ type: 'TEXT', text: 'hello' }],
+      },
+      {
+        id: 'a2',
+        createdAt: '2026-07-17T12:00:02Z',
+        owner: { type: 'ASSISTANT' },
+        lastChunkStreamSeq: 50,
+        parts: [{ type: 'TEXT', text: 'hi there' }],
+      },
+    ]);
+    expect(messages.map(message => [message.id, message.metadata?.streamSeq])).toEqual([
+      ['a1', 100],
+      ['u1', undefined],
+      ['a2', 50],
+    ]);
   });
 });
 
-/**
- * PAIRED-PATH contract. The history processor and the realtime reducer are the
- * two halves of one pipeline, and they DISAGREE by default: history renders
- * every approval type (the deliberate behaviour this file's header argues for),
- * the reducer defaults to `['CLIENT']`. Each half is pinned on its own — above
- * for history, in the reducer's own suite for realtime — but NOTHING asserted
- * the pair, so aligning one default "for consistency" (or a host wiring the
- * option into one call site only) changed observable behaviour with every test
- * still green.
- *
- * These two fixtures state the divergence and its remedy in one place: omitted
- * → the SAME approval is an inline card after a reload and invisible live;
- * explicit list → both paths agree. Read the header for why the asymmetric
- * defaults are the intended trade-off (a `['CLIENT']` history default made
- * pending ADMIN cards vanish on every refetch).
- */
-describe('displayApprovalTypes — history vs realtime default divergence', () => {
-  const liveApprovalSegments = (displayApprovalTypes?: string[]) => {
-    const effects: Array<{ name: string; args: unknown[] }> = [];
-    const r = createChatStreamReducer({
-      transport: 'nats',
-      onEffect: e => effects.push(e),
-      ...(displayApprovalTypes ? { displayApprovalTypes } : {}),
-    });
-    r.apply({ type: 'turn-start' });
-    r.apply({
-      type: 'approval-request',
-      requestId: 'req-m1',
-      approvalType: 'ADMIN',
-      command: 'systemctl restart nats',
-    });
-    return {
-      rendered: r.state.messages.flatMap(m => approvalSegments(m.segments)),
-      escalated: effects.filter(e => e.name === 'onEscalatedApproval'),
-    };
+describe('a rejected batch read back', () => {
+  const asking = {
+    type: 'APPROVAL_REQUEST',
+    approvalRequestId: 'req1',
+    approvalType: 'ADMIN',
+    toolCalls: [
+      { toolExecutionRequestId: 't1', toolName: 'run', toolTitle: 'Run ls', requiresApproval: true },
+      { toolExecutionRequestId: 't2', toolName: 'read', toolTitle: 'Read a log', requiresApproval: false },
+    ],
   };
+  const rejected = { type: 'APPROVAL_RESULT', approvalRequestId: 'req1', approved: false, displayName: 'Bob Admin' };
+  const refused = (id: string) => ({
+    type: 'EXECUTED_TOOL',
+    toolExecutionRequestId: id,
+    integratedToolType: 'OPENFRAME',
+    toolFunction: 'run',
+    success: false,
+    result: 'Rejected by user',
+  });
+  const row = (id: string, parts: unknown[]): HistoricalMessage =>
+    ({ id, createdAt: '2026-11-02T10:00:00Z', owner: { type: 'ASSISTANT' }, parts }) as HistoricalMessage;
+  const page = [row('a1', [asking]), row('a2', [rejected]), row('a3', [refused('t1'), refused('t2')])];
 
-  it('OMITTED: history renders the ADMIN card inline, realtime escalates it', () => {
-    const history = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')]);
-    expect(history.messages.flatMap(m => approvalSegments(m.content))).toHaveLength(1);
-    expect(history.escalatedApprovals.size).toBe(0);
-
-    const live = liveApprovalSegments();
-    expect(live.rendered).toHaveLength(0);
-    expect(live.escalated).toHaveLength(1);
+  it('reads as rejected whatever the map says about one of its rows', () => {
+    const { messages } = processHistoricalMessages(page, {
+      approvalStatuses: { req1: 'rejected', t1: 'approved', t2: 'approved' },
+    });
+    expect(cardsOf(messages).map(part => [part.toolCallId, part.state, approvalStatusOf(part)])).toEqual([
+      ['t1', 'output-denied', 'rejected'],
+      ['t2', 'output-denied', 'rejected'],
+    ]);
   });
 
-  it('EXPLICIT list: both paths render the same ADMIN card', () => {
-    const types = ['CLIENT', 'ADMIN'];
-    const history = processHistoricalMessagesWithErrors([adminApprovalMessage('m1')], {
-      displayApprovalTypes: types,
-    });
-    expect(history.messages.flatMap(m => approvalSegments(m.content))).toHaveLength(1);
+  it('keeps who answered when the status was already known', () => {
+    const statuses: Array<Record<string, ChatApprovalStatus>> = [{}, { req1: 'rejected' }];
+    for (const approvalStatuses of statuses) {
+      const [gate] = cardsOf(processHistoricalMessages(page, { approvalStatuses }).messages);
+      expect(gate.toolMetadata?.resolvedByName).toBe('Bob Admin');
+      expect(approvalStatusOf(gate)).toBe('rejected');
+    }
+  });
 
-    const live = liveApprovalSegments(types);
-    expect(live.rendered).toHaveLength(1);
-    expect(live.escalated).toHaveLength(0);
+  it('keeps who approved when the status was already known', () => {
+    const approved = { ...rejected, approved: true, displayName: 'Ann Admin' };
+    const { messages } = processHistoricalMessages([row('a1', [asking]), row('a2', [approved])], {
+      approvalStatuses: { req1: 'approved' },
+    });
+    expect(cardsOf(messages)[0].toolMetadata?.resolvedByName).toBe('Ann Admin');
+    expect(approvalStatusOf(cardsOf(messages)[0])).toBe('approved');
+  });
+
+  it('a reloaded row the tenant stored as approved stays Approved: nothing is on its way to it', () => {
+    const approved = { ...rejected, approved: true };
+    const { messages } = processHistoricalMessages([row('a1', [asking]), row('a2', [approved])]);
+    const [gate] = cardsOf(messages);
+    expect(gate.state).toBe('approval-responded');
+    expect(approvalStatusOf(gate)).toBe('approved');
+    expect(approvalAnswerInFlight(gate)).toBe(false);
+  });
+
+  it('nor a live one: its server answered, on the stream, and nothing here is waiting on that', () => {
+    const reducer = createChatStreamReducer();
+    const decoder = createMingoDecoder();
+    for (const raw of [{ type: 'MESSAGE_START' }, asking, { ...rejected, approved: true }]) {
+      reducer.apply(decoder.decode(raw));
+    }
+    const [gate] = cardsOf(reducer.state.messages);
+    expect(gate.state).toBe('approval-responded');
+    expect(approvalStatusOf(gate)).toBe('approved');
+    expect(approvalAnswerInFlight(gate)).toBe(false);
+  });
+
+  it('denies the rows that ask nothing too, when only the map knows the answer', () => {
+    const { messages } = processHistoricalMessages([row('a1', [asking])], { approvalStatuses: { req1: 'rejected' } });
+    expect(cardsOf(messages).map(part => part.state)).toEqual(['output-denied', 'output-denied']);
+  });
+
+  it('a pending status says nothing: the row that answers stands', () => {
+    const { messages } = processHistoricalMessages([row('a1', [asking]), row('a2', [rejected])], {
+      approvalStatuses: { req1: 'pending' },
+    });
+    expect(cardsOf(messages).map(approvalStatusOf)).toEqual(['rejected', 'rejected']);
+  });
+
+  it('live then refetched, through the map the reducer leaves', () => {
+    const reducer = createChatStreamReducer();
+    const decoder = createMingoDecoder();
+    for (const raw of [{ type: 'MESSAGE_START' }, asking, rejected, refused('t1'), refused('t2')]) {
+      reducer.apply(decoder.decode(raw));
+    }
+    expect(reducer.state.approvalStatuses).toEqual({ req1: 'rejected' });
+    const { messages } = processHistoricalMessages(page, { approvalStatuses: reducer.state.approvalStatuses });
+    expect(cardsOf(messages).map(approvalStatusOf)).toEqual(['rejected', 'rejected']);
   });
 });

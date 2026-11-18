@@ -33,10 +33,6 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
-            <artifactId>openframe-data-cassandra</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-nats</artifactId>
         </dependency>
         <dependency>
@@ -75,6 +71,11 @@
             <artifactId>fleetmdm</artifactId>
         </dependency>
         <!-- Spring Boot starters -->
+        <dependency>
+            <groupId>com.netflix.graphql.dgs</groupId>
+            <artifactId>dgs-starter</artifactId>
+            <version>${netflix.dgs.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>

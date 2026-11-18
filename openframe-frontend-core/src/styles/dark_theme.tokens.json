@@ -668,6 +668,78 @@
         "com.figma.variableId": "VariableID:1:204",
         "com.figma.scopes": ["ALL_SCOPES"]
       }
+    },
+    "orange": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [1.0, 0.5411764705882353, 0.23921568627450981],
+        "alpha": 1,
+        "hex": "#FF8A3D"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange (hover)": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.9607843137254902, 0.5019607843137255, 0.2],
+        "alpha": 1,
+        "hex": "#F58033"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange (action)": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.9215686274509803, 0.4627450980392157, 0.1607843137254902],
+        "alpha": 1,
+        "hex": "#EB7629"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange sec": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.2901960784313726, 0.16470588235294117, 0.08235294117647059],
+        "alpha": 1,
+        "hex": "#4A2A15"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange sec (hover)": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.32941176470588235, 0.20392156862745098, 0.12156862745098039],
+        "alpha": 1,
+        "hex": "#54341F"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
+    },
+    "orange sec (action)": {
+      "$type": "color",
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [0.3686274509803922, 0.24313725490196078, 0.1607843137254902],
+        "alpha": 1,
+        "hex": "#5E3E29"
+      },
+      "$extensions": {
+        "com.figma.scopes": ["ALL_SCOPES"]
+      }
     }
   },
   "$extensions": {

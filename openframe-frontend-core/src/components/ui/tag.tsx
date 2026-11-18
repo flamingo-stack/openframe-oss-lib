@@ -18,13 +18,32 @@ const TAG_FRAME_CLASS = 'inline-flex items-center justify-center rounded-md';
  * `large` is the Figma "Feature Item" chip (48px, h3 bold body label) used by chip groups acting as tabs
  * (OpenFrame categories). `sentence`: a sentence, not a label: body type in the case it was written in (a question
  * a visitor can ask), on the same chip surface. One line, always: a longer sentence clips and shows whole in the
- * label's tooltip.
+ * label's tooltip. `compact` is the tag as the design system draws it today (Figma `tag`, node 650:4300): 28px, a 16px
+ * icon, the same mono-uppercase label. The chat's quick actions row uses it; the other tags keep `default` until they
+ * are moved over.
  */
 export const TAG_SIZE_CLASS = {
   default: 'h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
+  compact: 'h-7 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
   large: 'h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] font-bold text-h3',
   sentence: 'h-9 gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h6',
 } as const;
+
+/** A tag that wraps (`wrap`): its size's height becomes the least it is, so a second line grows it. */
+const TAG_WRAP_HEIGHT_CLASS: Record<keyof typeof TAG_SIZE_CLASS, string> = {
+  default: 'h-auto min-h-8',
+  compact: 'h-auto min-h-7',
+  large: 'h-auto min-h-12',
+  sentence: 'h-auto min-h-9',
+};
+
+/** The box a tag's icon sits in, per size. */
+const TAG_ICON_BOX_CLASS: Record<keyof typeof TAG_SIZE_CLASS, string> = {
+  default: 'size-5',
+  compact: 'size-4',
+  large: 'size-6',
+  sentence: 'size-5',
+};
 
 const tagVariants = cva([TAG_FRAME_CLASS, 'transition-colors duration-150'], {
   variants: {
@@ -107,6 +126,12 @@ export interface TagProps
    * `<a>` — don't combine `as="span"` + `onClose` inside an anchor.
    */
   as?: 'div' | 'span';
+  /**
+   * The label wraps onto more lines (balanced, a long word breaks) instead of ending in "…", and the tag grows to hold
+   * it. For a tag that names something in a list or a column (a task, a title), where a cut name cannot be read on a
+   * touch screen; a row of tags keeps the default single line.
+   */
+  wrap?: boolean;
   /** The label is still being read: the tag draws its `TagSkeleton` (the tag's own frame and size). In a loading
    *  scope a tag with an EMPTY label does the same (its label is read data not here yet); a tag whose label is
    *  written ("Beta", "Coming Soon") is static copy and stays real. */
@@ -122,9 +147,24 @@ export interface TagProps
  * The trigger is a `span` so the tag stays valid phrasing content (`as="span"`
  * exists precisely for tags inside a `<p>`).
  */
-function TagLabel({ label, labelClassName }: { label: React.ReactNode; labelClassName?: string }) {
+function TagLabel({
+  label,
+  labelClassName,
+  wrap,
+}: {
+  label: React.ReactNode;
+  labelClassName?: string;
+  wrap?: boolean;
+}) {
   const isString = typeof label === 'string';
-  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(isString ? label : null);
+  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(isString && !wrap ? label : null);
+
+  // A wrapping label is never cut, so it needs no tooltip.
+  if (wrap) {
+    return (
+      <span className={cn('min-w-0 text-balance text-left [overflow-wrap:anywhere]', labelClassName)}>{label}</span>
+    );
+  }
 
   if (!isString) {
     return <span className={cn('truncate', labelClassName)}>{label}</span>;
@@ -157,6 +197,7 @@ function Tag({
   disabled,
   as: Comp = 'div',
   loading,
+  wrap,
   ...props
 }: TagProps) {
   // ONE switch: while the host reads the label, or in a page's loading state when the label is not here yet, the tag
@@ -167,16 +208,21 @@ function Tag({
     return <TagSkeleton size={size ?? 'default'} className={className} {...loadingItemProps(props)} />;
   return (
     <Comp
-      className={cn(tagVariants({ variant, size }), disabled && disabledTagClasses, className)}
+      className={cn(
+        tagVariants({ variant, size }),
+        wrap && TAG_WRAP_HEIGHT_CLASS[size ?? 'default'],
+        disabled && disabledTagClasses,
+        className,
+      )}
       aria-disabled={disabled || undefined}
       {...props}
     >
       {icon && (
-        <span className={cn('flex shrink-0 items-center justify-center', size === 'large' ? 'size-6' : 'size-5')}>
+        <span className={cn('flex shrink-0 items-center justify-center', TAG_ICON_BOX_CLASS[size ?? 'default'])}>
           {icon}
         </span>
       )}
-      <TagLabel label={label} labelClassName={labelClassName} />
+      <TagLabel label={label} labelClassName={labelClassName} wrap={wrap} />
       {onClose && (
         <Button
           variant="transparent"

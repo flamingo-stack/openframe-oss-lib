@@ -806,14 +806,17 @@ impl DirectoryManager {
         self.get_tool_executable_path(tool_agent_id, None)
     }
 
-    /// Returns the path to an asset file for a specific tool, adding .exe extension on Windows if executable
+    /// Returns the path to an asset file for a specific tool, adding .exe on Windows to an executable that lacks it
     pub fn get_asset_path(
         &self,
         tool_agent_id: &str,
         asset_filename: &str,
         is_executable: bool,
     ) -> PathBuf {
-        let asset_name = if cfg!(target_os = "windows") && is_executable {
+        let has_exe_extension = Path::new(asset_filename)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"));
+        let asset_name = if cfg!(target_os = "windows") && is_executable && !has_exe_extension {
             format!("{}.exe", asset_filename)
         } else {
             asset_filename.to_string()

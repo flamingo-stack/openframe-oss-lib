@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useMemo } from 'react';
+import { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
 import { CheckIcon, Copy02Icon, Filter02Icon, Refresh02HrIcon, SearchIcon } from '../../icons-v2-generated';
 import { PageLayout } from '../../layout/page-layout';
 import { Button } from '../../ui/button';
@@ -38,6 +39,9 @@ export function LogsPageView({
   hideSearch = false,
   onOpenFilters,
 }: LogsPageViewProps) {
+  // The table header pins flush under the search toolbar, whatever its height (the
+  // spacing tokens shrink it below the desktop step): `--sticky-toolbar-h`.
+  const { toolbarRef, containerStyle } = useStickyToolbar();
   const actions = useMemo(
     () => [
       {
@@ -52,28 +56,33 @@ export function LogsPageView({
 
   return (
     <PageLayout title="Logs" actions={actions} showHeader={showHeader} className={className}>
-      {!hideSearch && (
-        <div className="sticky top-0 z-20 -my-[var(--spacing-system-l)] flex items-center gap-[var(--spacing-system-m)] bg-ods-bg py-[var(--spacing-system-l)]">
-          <Input
-            userValue
-            placeholder="Search for Logs"
-            value={search}
-            onChange={e => onSearchChange(e.target.value)}
-            className="flex-1"
-            startAdornment={<SearchIcon className="h-4 w-4 content-md:h-6 content-md:w-6" />}
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            className="content-md:hidden"
-            onClick={onOpenFilters}
-            aria-label="Open filters"
-            leftIcon={<Filter02Icon className="text-ods-text-primary" />}
-          />
-        </div>
-      )}
+      <div className="contents" style={containerStyle}>
+        {!hideSearch && (
+          <div
+            ref={toolbarRef}
+            className="sticky top-0 z-20 -my-[var(--spacing-system-l)] flex items-center gap-[var(--spacing-system-m)] bg-ods-bg py-[var(--spacing-system-l)]"
+          >
+            <Input
+              userValue
+              placeholder="Search for Logs"
+              value={search}
+              onChange={e => onSearchChange(e.target.value)}
+              className="flex-1"
+              startAdornment={<SearchIcon className="h-4 w-4 content-md:h-6 content-md:w-6" />}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              className="content-md:hidden"
+              onClick={onOpenFilters}
+              aria-label="Open filters"
+              leftIcon={<Filter02Icon className="text-ods-text-primary" />}
+            />
+          </div>
+        )}
 
-      {children}
+        {children}
+      </div>
     </PageLayout>
   );
 }

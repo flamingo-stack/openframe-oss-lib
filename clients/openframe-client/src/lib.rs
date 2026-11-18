@@ -60,8 +60,8 @@ use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::deactivation_service::DeactivationService;
+use crate::services::delivery_results::DeliveryResults;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
-use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::github_download_service::GithubDownloadService;
@@ -202,6 +202,7 @@ pub struct Client {
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
+    tool_agent_update_service: ToolAgentUpdateService,
     openframe_client_info_service: OpenFrameClientInfoService,
     last_known_good_service: LastKnownGoodService,
     // Services needed for log streaming initialization
@@ -228,7 +229,7 @@ impl Client {
         // Perform initial health check
         directory_manager.perform_health_check()?;
 
-        // Detects the gateway's 410 Gone (tenant deleted) and drives backoff / stop / self-uninstall.
+        // Pauses on the token endpoint's 410 (then self-uninstalls) or 403: backoff / stop / restart.
         let deactivation_service = DeactivationService::new(&directory_manager);
 
         // Initialize initial configuration service
@@ -293,12 +294,8 @@ impl Client {
             deactivation_service.clone(),
         );
 
-        // Initialize encryption service
-        let encryption_service = EncryptionService::new();
-
         // Initialize shared token service
-        let shared_token_service =
-            SharedTokenService::new(directory_manager.clone(), encryption_service.clone());
+        let shared_token_service = SharedTokenService::new(directory_manager.clone());
 
         // Initialize authentication service
         let auth_service = AgentAuthService::new(
@@ -539,11 +536,16 @@ impl Client {
             package_upgrades.view(),
             agent_restart.clone(),
         );
+        let delivery_results = DeliveryResults::new(
+            nats_message_publisher.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
         let command_context = CommandContext::new(
             nats_connection_manager.clone(),
             config_service.clone(),
             restart_gate.clone(),
-            nats_message_publisher.clone(),
+            delivery_results.clone(),
             result_store.clone(),
             flush_notify.clone(),
         );
@@ -557,18 +559,20 @@ impl Client {
                 flush_notify.clone(),
             );
             let listener = CommandListener::new(
-                PackageUpdateHandler::new(orders.clone(), status.clone()),
+                PackageUpdateHandler::new(orders.clone(), status.clone(), delivery_results.clone()),
                 command_context.clone(),
             );
             let manager = PackageUpdateRunManager::new(
                 orders,
                 status,
+                delivery_results,
                 config_service.clone(),
                 RestartSignals {
                     client_update: tool_run_manager.client_update_pending(),
                     agent_restart: agent_restart.view(),
                 },
                 package_upgrades.clone(),
+                tool_run_manager.clone(),
             );
             PackageUpdate { listener, manager }
         });
@@ -586,7 +590,7 @@ impl Client {
         );
         let tool_update_listener = CommandListener::new(
             ToolUpdateHandler::new(
-                tool_agent_update_service,
+                tool_agent_update_service.clone(),
                 tool_ops.clone(),
                 tool_run_manager.client_update_pending(),
             ),
@@ -699,6 +703,7 @@ impl Client {
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             update_handler_service,
+            tool_agent_update_service,
             openframe_client_info_service,
             last_known_good_service,
             initial_configuration_service,
@@ -713,9 +718,7 @@ impl Client {
     pub async fn start(&self) -> Result<()> {
         info!("Starting OpenFrame Client");
 
-        // Tenant-gone supervisor: stops/restarts tools and self-uninstalls off the detection path.
-        // Started first so its commands are consumed even if the startup auth loop (which itself
-        // feeds the 410s) blocks below.
+        // Deactivation supervisor, started first so its commands drain even if the startup auth below blocks.
         self.deactivation_service
             .start(self.tool_run_manager.clone());
 
@@ -744,6 +747,7 @@ impl Client {
             &self.agent_configuration_service,
             &self.installed_tools_service,
             &self.directory_manager,
+            &self.log_key_service,
         )?
         .start()
         .await?;
@@ -753,7 +757,9 @@ impl Client {
         self.auth_processor.process().await?;
 
         // Needs the agent token, so only after authentication.
-        self.log_key_service.clone().start();
+        self.log_key_service
+            .clone()
+            .start(self.restart_gate.clone());
 
         self.token_refresh_run_manager.start();
 
@@ -765,6 +771,9 @@ impl Client {
         self.nats_connection_manager.start_connection_watchdog();
 
         self.update_handler_service.publish_running_version().await;
+        self.tool_agent_update_service
+            .publish_installed_versions()
+            .await;
 
         // Handle any pending update from previous run (after NATS is connected)
         if let Err(e) = self.update_handler_service.handle_pending_update().await {

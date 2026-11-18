@@ -41,6 +41,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +57,13 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 @Validated
 @RequiredArgsConstructor
 public class DeviceService {
+
+    // the API only ends a device's life; registration, promotion and the archive job own every other transition
+    private static final Set<DeviceStatus> API_SETTABLE_STATUSES = EnumSet.of(DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
+    private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
+            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
+            .map(Enum::name)
+            .toList();
 
     private final MachineRepository machineRepository;
     private final DeletedMachineCleanup deletedMachineCleanup;
@@ -94,7 +102,7 @@ public class DeviceService {
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
         if (!DeviceStatus.CONNECTED.contains(machine.getStatus())) {
             throw new BadRequestException(
-                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
+                    "Machine is not in a dispatchable state (must be a managed device): " + machineId);
         }
     }
 
@@ -141,8 +149,19 @@ public class DeviceService {
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
                                                   String search) {
+        return queryAvailableDevicesForSchedule(platformNames, assignedMachineIds, filterOptions, paginationCriteria,
+                search, null);
+    }
+
+    // restrictToMachineIds: null = every device, an empty collection = no device
+    public CountedGenericQueryResult<Machine> queryAvailableDevicesForSchedule(Collection<OsType> platformNames,
+                                                  Collection<String> assignedMachineIds,
+                                                  DeviceFilterCriteria filterOptions,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  String search,
+                                                  Collection<String> restrictToMachineIds) {
         String tenantId = tenantIdProvider.getTenantId();
-        MachineQueryFilter filter = scheduleDeviceFilter(filterOptions, platformNames, null);
+        MachineQueryFilter filter = scheduleDeviceFilter(filterOptions, platformNames, restrictToMachineIds);
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
@@ -172,13 +191,21 @@ public class DeviceService {
 
     public DeviceFilters getAvailableDeviceFilters(Collection<OsType> platformNames,
                                                    DeviceFilterCriteria filterOptions, String search) {
-        return deviceFilters(scheduleDeviceFilter(filterOptions, platformNames, null), search);
+        return getAvailableDeviceFilters(platformNames, filterOptions, search, null);
+    }
+
+    public DeviceFilters getAvailableDeviceFilters(Collection<OsType> platformNames,
+                                                   DeviceFilterCriteria filterOptions, String search,
+                                                   Collection<String> restrictToMachineIds) {
+        return deviceFilters(scheduleDeviceFilter(filterOptions, platformNames, restrictToMachineIds), search);
     }
 
     private DeviceFilters deviceFilters(MachineQueryFilter filter, String search) {
         String tenantId = tenantIdProvider.getTenantId();
         return DeviceFilters.builder()
                 .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.STATUS)))
+                .connectivity(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.CONNECTIVITY)))
+                .clientOutdated(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.CLIENT_OUTDATED)))
                 .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.DEVICE_TYPE)))
                 .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.OS_TYPE)))
                 .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
@@ -209,8 +236,13 @@ public class DeviceService {
     }
 
     public List<String> findAllDeviceIds(DeviceFilterCriteria filterOptions, String search) {
+        return findAllDeviceIds(filterOptions, search, null);
+    }
+
+    public List<String> findAllDeviceIds(DeviceFilterCriteria filterOptions, String search,
+                                         Collection<String> restrictToMachineIds) {
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
-                scheduleDeviceFilter(filterOptions, null, null), search);
+                scheduleDeviceFilter(filterOptions, null, restrictToMachineIds), search);
     }
 
     private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,
@@ -250,12 +282,6 @@ public class DeviceService {
                 .build();
     }
 
-
-    private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
-            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
-            .map(Enum::name)
-            .toList();
-
     private MachineQueryFilter scheduleDeviceFilter(DeviceFilterCriteria filter,
                                                     Collection<OsType> osTypeScope,
                                                     Collection<String> restrictToMachineIds) {
@@ -271,6 +297,8 @@ public class DeviceService {
         List<OsType> filterOsTypes = null;
         if (filter != null) {
             builder.statuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .connectivity(filter.getConnectivity() != null ? filter.getConnectivity().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .clientOutdated(filter.getClientOutdated())
                     .deviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null)
                     .organizationIds(filter.getOrganizationIds())
                     .manageableByPackageManagers(filter.getManageableByPackageManagers())
@@ -350,6 +378,9 @@ public class DeviceService {
 
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
+        if (!API_SETTABLE_STATUSES.contains(status)) {
+            throw new BadRequestException("Device status can only be set to DELETED or ARCHIVED, got " + status);
+        }
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         if (machine.getStatus() == status) {

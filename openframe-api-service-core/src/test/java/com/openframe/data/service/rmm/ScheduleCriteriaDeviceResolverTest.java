@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -10,6 +11,8 @@ import com.openframe.data.repository.device.MachineRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -55,6 +58,26 @@ class ScheduleCriteriaDeviceResolverTest {
         verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), filter.capture(), eq(List.of(WINDOWS)));
         assertThat(filter.getValue().getOrganizationIds()).containsExactly("org-1");
         assertThat(filter.getValue().getDeviceTypes()).containsExactly(DeviceType.DESKTOP.name());
+        assertThat(filter.getValue().getStatuses()).containsExactlyInAnyOrder("MANAGED", "ONLINE", "OFFLINE");
+    }
+
+    @Test
+    @DisplayName("resolveMachineIds and count: only managed devices match criteria; PENDING, deleting and ARCHIVED never do")
+    void resolveAndCount_restrictToManagedStatuses() {
+        ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build();
+        when(machineRepository.findMachineIdsByCriteria(eq(TENANT), any(), eq(null))).thenReturn(List.of("m-1"));
+        when(machineRepository.countMachinesByCriteria(eq(TENANT), any(), eq(null))).thenReturn(1L);
+
+        resolver.resolveMachineIds(TENANT, criteria, null);
+        resolver.count(TENANT, criteria, null);
+
+        verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), filterCaptor.capture(), eq(null));
+        verify(machineRepository).countMachinesByCriteria(eq(TENANT), filterCaptor.capture(), eq(null));
+        assertThat(filterCaptor.getAllValues())
+                .extracting(MachineQueryFilter::getStatuses)
+                .allSatisfy(statuses -> assertThat(statuses)
+                        .containsExactlyInAnyOrder("MANAGED", "ONLINE", "OFFLINE")
+                        .doesNotContain("PENDING", "PENDING_DELETION", "DELETED", "ARCHIVED"));
     }
 
     @Test
@@ -102,9 +125,21 @@ class ScheduleCriteriaDeviceResolverTest {
         assertThat(resolver.matches(null, criteria, null)).isFalse();
     }
 
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "ONLINE", "OFFLINE"}, mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("matches: a device outside the managed statuses never matches criteria, so nothing is armed for it")
+    void matches_notManaged_false(DeviceStatus status) {
+        ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build();
+        Machine machine = machine("org-1", WINDOWS);
+        machine.setStatus(status);
+
+        assertThat(resolver.matches(machine, criteria, null)).isFalse();
+    }
+
     private static Machine machine(String orgId, OsType osType) {
         Machine m = new Machine();
         m.setMachineId("m");
+        m.setStatus(DeviceStatus.MANAGED);
         m.setOrganizationId(orgId);
         m.setOsType(osType);
         return m;

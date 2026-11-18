@@ -4,7 +4,7 @@
  * over the jsapi channel — what an accordion step needs to start its demo
  * muted when it opens and stop it when it closes.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { forwardRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -70,5 +70,46 @@ describe('Video — YouTube facade host-driven autoplay', () => {
     // Steady state posts nothing.
     rerender(<Video kind="youtube" url="dQw4w9WgXcQ" title={TITLE} autoActivate suspended={false} />);
     expect(commands(post)).toEqual(['pauseVideo', 'playVideo']);
+  });
+});
+
+describe('Video — YouTube facade poster, caption and onPlay', () => {
+  it("draws the page's own poster and caption, and reports the poster's Play only", () => {
+    const onPlay = vi.fn();
+    render(
+      <Video
+        kind="youtube"
+        url="dQw4w9WgXcQ"
+        title={TITLE}
+        poster="/cover.jpg"
+        caption={{ title: 'Line one\nLine two', meta: 'Conrad · 0:45' }}
+        onPlay={onPlay}
+        lazy={false}
+      />,
+    );
+    const play = screen.getByRole('button', { name: `Play: ${TITLE}` });
+    expect(screen.getByAltText(TITLE).getAttribute('src')).toContain('/cover.jpg');
+    expect(screen.getByAltText(TITLE).getAttribute('src')).not.toContain('ytimg');
+    expect(screen.getByText('Conrad · 0:45')).toBeInTheDocument();
+    expect(onPlay).not.toHaveBeenCalled();
+
+    fireEvent.click(play);
+    expect(onPlay).toHaveBeenCalledTimes(1);
+    expect(iframe()).toBeInTheDocument();
+  });
+
+  it("falls back to YouTube's thumbnail when the page's poster fails to load", () => {
+    render(<Video kind="youtube" url="dQw4w9WgXcQ" title={TITLE} poster="/missing.jpg" lazy={false} />);
+    fireEvent.error(screen.getByAltText(TITLE));
+    expect(screen.getByAltText(TITLE).getAttribute('src')).toContain('i.ytimg.com/vi/dQw4w9WgXcQ');
+  });
+
+  it("keeps YouTube's thumbnail without a poster, and autoActivate is not a reported play", () => {
+    const onPlay = vi.fn();
+    render(<Video kind="youtube" url="dQw4w9WgXcQ" title={TITLE} lazy={false} />);
+    expect(screen.getByAltText(TITLE).getAttribute('src')).toContain('i.ytimg.com/vi/dQw4w9WgXcQ');
+
+    render(<Video kind="youtube" url="dQw4w9WgXcQ" title="Auto" autoActivate onPlay={onPlay} />);
+    expect(onPlay).not.toHaveBeenCalled();
   });
 });

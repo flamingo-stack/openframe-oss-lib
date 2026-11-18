@@ -33,7 +33,7 @@ import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
-import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
+import com.openframe.data.nats.packageupdate.PackageUpdateEligibilityService;
 import com.openframe.data.service.rmm.software.WingetPackageManagerHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -28,5 +28,6 @@ public class RmmResultEvent extends DebeziumMessage<RmmResultEvent> implements K
     private Long executionTimeMs;
     private Boolean timedOut;
     private String error;
+    private String failureReason;
     private Long eventTimestamp;
 }

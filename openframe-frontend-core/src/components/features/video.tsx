@@ -41,11 +41,12 @@ import {
   useSyncExternalStore,
   type ComponentType,
 } from 'react';
+import { useEndpointsRuntime } from '../../contexts/endpoints-runtime-context';
 import Image from '../../embed-shims/next-image';
 import { useNearViewport } from '../../hooks/use-near-viewport';
 import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
-import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { youtubePosterUrl } from '../../utils/youtube-poster';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { useLoadingScope } from '../ui/loading-scope';
@@ -102,20 +103,39 @@ const loadedFilePlayer = () => filePlayer;
 const noFilePlayer = () => null;
 
 /**
+ * A YouTube video's poster: the host's resolver when it names one (`youtubePosterBaseUrl`, the sharpest size the
+ * video really has), else `hqdefault` (`youtubePosterUrl`), the size every public video has. Never a guessed size.
+ */
+function youtubePosterFor(videoId: string, resolverBase: string | undefined): string {
+  return resolverBase ? `${resolverBase.replace(/\/$/, '')}/${encodeURIComponent(videoId)}` : youtubePosterUrl(videoId);
+}
+
+/** The poster a YouTube video has before its player is drawn, so the box is never empty and the page's HTML carries it. */
+function youtubeIdPoster(kind: string, url: string, resolverBase: string | undefined): string | undefined {
+  if (kind !== 'youtube') return undefined;
+  const id = extractYouTubeId(url);
+  return id ? youtubePosterFor(id, resolverBase) : undefined;
+}
+
+/** A YouTube video's box is 16:9 whatever its layout: the facade draws it so, and the box before it is the same. */
+const YT_BOX_STYLE = { paddingBottom: '56.25%' } as const;
+
+/**
  * The video's box with its poster in it, until the player is drawn. The poster is a real image, not a CSS background:
  * a background is found only after layout and is never ranked, so on a page whose video is the largest thing painted
  * the poster arrived last (CU-17tkuw5xp4q). A `priority` video's poster is fetched at once and ranked high.
  */
 const PosterBox = forwardRef<
   HTMLDivElement,
-  { poster?: string | null; className?: string; priority?: boolean; fill?: boolean }
->(function PosterBoxView({ poster, className, priority, fill }, ref) {
+  { poster?: string | null; className?: string; priority?: boolean; fill?: boolean; youtube?: boolean }
+>(function PosterBoxView({ poster, className, priority, fill, youtube }, ref) {
   return (
     <div
       ref={ref}
       aria-hidden="true"
-      className={cn('relative overflow-hidden', className)}
-      style={fill ? { width: '100%', height: '100%' } : undefined}
+      // A YouTube video's box is the facade's own (`relative w-full` + 16:9), so nothing moves when the player is drawn.
+      className={cn('relative overflow-hidden', youtube && 'w-full', className)}
+      style={fill ? { width: '100%', height: '100%' } : youtube ? YT_BOX_STYLE : undefined}
     >
       {poster ? (
         <Image
@@ -231,6 +251,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
   // Hooks run unconditionally; the gate only applies when `lazy` is set.
   const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>();
   const loading = useLoadingScope();
+  const youtubePosterBase = useEndpointsRuntime()?.youtubePosterBaseUrl;
   const url = props.url;
   const layout = props.layout ?? 'native';
   // ONE switch: in a loading scope with no url yet (it is read) the video is its skeleton and no player is mounted;
@@ -248,7 +269,8 @@ export function Video(props: VideoProps): React.ReactElement | null {
     return wrapWithLayout(
       <PosterBox
         ref={nearRef}
-        poster={props.poster}
+        poster={props.poster || youtubeIdPoster(effectiveKind, url, youtubePosterBase)}
+        youtube={effectiveKind === 'youtube'}
         className={props.className}
         priority={'priority' in props ? props.priority : undefined}
       />,
@@ -261,6 +283,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
       <YouTubeFacade
         url={url}
         title={props.title}
+        poster={props.poster}
         priority={props.priority}
         className={props.className}
         minimalControls={props.minimalControls}
@@ -403,6 +426,7 @@ function FirstFramePreview({
 interface YouTubeFacadeProps extends VideoYouTubeFacadeProps {
   url: string;
   title?: string;
+  poster?: string | null;
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
@@ -412,6 +436,7 @@ interface YouTubeFacadeProps extends VideoYouTubeFacadeProps {
 function YouTubeFacade({
   url,
   title = 'YouTube Video',
+  poster,
   priority,
   className,
   minimalControls,
@@ -430,6 +455,7 @@ function YouTubeFacade({
     <YouTubeFacadeInner
       videoId={videoId}
       title={title}
+      poster={poster}
       priority={priority}
       className={className}
       minimalControls={minimalControls}
@@ -442,6 +468,8 @@ function YouTubeFacade({
 interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
   videoId: string;
   title: string;
+  /** The page's own cover; omitted, YouTube's thumbnail. */
+  poster?: string | null;
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
@@ -452,15 +480,6 @@ interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
 }
 
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
-
-// Poster thumbnail tiers, best → always-present. YouTube serves each size at a
-// fixed path on i.ytimg.com. `maxresdefault` is 1280×720 (crisp) but is only
-// generated for uploads whose source was ≥720p, so it can 404; `mqdefault` is
-// 320×180 and ALWAYS exists. BOTH are 16:9 — unlike the letterboxed 4:3 `hq`/`sd`
-// sizes — so an `object-cover` frame never shows black bars regardless of tier.
-// The facade starts at `maxresdefault` and drops to `mqdefault` on load error,
-// so low-res-only videos render exactly as they did before this change.
-const YT_POSTER_TIERS = ['maxresdefault', 'mqdefault'] as const;
 
 // YouTube IFrame Player API state codes — documented integers.
 // https://developers.google.com/youtube/iframe_api_reference#Playback_status
@@ -507,12 +526,15 @@ function toYouTubeMessage(parsed: unknown): YouTubeInfoDeliveryMessage | null {
 function YouTubeFacadeInner({
   videoId,
   title,
+  poster,
   priority,
   className,
   minimalControls,
   muted,
   autoActivate,
   suspended,
+  caption,
+  onPlay,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(Boolean(autoActivate));
   // A host that flips `autoActivate` on later (an accordion step expanding)
@@ -579,25 +601,23 @@ function YouTubeFacadeInner({
     return `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`;
   }, [videoId, minimalControls, muted]);
 
-  // Poster starts at the highest tier and steps down on load error (see
-  // `YT_POSTER_TIERS`). Reset to the top tier whenever the video changes so a
-  // new id gets a fresh shot at its `maxresdefault`.
-  // Adjusted while rendering — React's documented pattern for a prop-driven
-  // reset — rather than from an effect: `posterJpg`/`posterWebp` are built from
-  // the tier two lines below, so an effect made the new video's first paint
-  // request the PREVIOUS video's degraded tier and only then step back up.
-  const [posterTier, setPosterTier] = useState(0);
-  const [posterTierFor, setPosterTierFor] = useState(videoId);
-  if (posterTierFor !== videoId) {
-    setPosterTierFor(videoId);
-    setPosterTier(0);
-  }
-  const posterQuality = YT_POSTER_TIERS[posterTier];
-  const posterJpg = `https://i.ytimg.com/vi/${videoId}/${posterQuality}.jpg`;
-  const posterWebp = `https://i.ytimg.com/vi_webp/${videoId}/${posterQuality}.webp`;
-  // On a 404 (e.g. no `maxresdefault`) drop one tier; clamp at the last so a
-  // genuinely missing thumbnail can't loop.
-  const handlePosterError = () => setPosterTier(tier => Math.min(tier + 1, YT_POSTER_TIERS.length - 1));
+  // The posters to try, in order: the page's own, the host's resolver (the sharpest size the video has), and
+  // `hqdefault`, which every public video has. One that fails to load gives way to the next; never a guessed size.
+  const youtubePosterBase = useEndpointsRuntime()?.youtubePosterBaseUrl;
+  const posterCandidates = useMemo(
+    () =>
+      [
+        ...new Set([poster, youtubePosterFor(videoId, youtubePosterBase), youtubePosterUrl(videoId)].filter(Boolean)),
+      ] as string[],
+    [poster, videoId, youtubePosterBase],
+  );
+  const [failedPosters, setFailedPosters] = useState<readonly string[]>([]);
+  const posterIndex = Math.max(
+    0,
+    posterCandidates.findIndex(c => !failedPosters.includes(c)),
+  );
+  const shownPoster = posterCandidates[posterIndex];
+  const hasNextPoster = posterIndex < posterCandidates.length - 1;
 
   // ---------------------------------------------------------------------------
   // YouTube control-fade accelerator (user-locked target: ~1s).
@@ -704,7 +724,7 @@ function YouTubeFacadeInner({
   }, [suspended, activated]);
 
   const wrapperClass = `relative w-full ${className ?? ''}`;
-  const wrapperStyle = { paddingBottom: '56.25%' as const };
+  const wrapperStyle = YT_BOX_STYLE;
 
   if (activated && failed) {
     return (
@@ -744,28 +764,24 @@ function YouTubeFacadeInner({
         variant="card"
         type="button"
         aria-label={`Play: ${title}`}
-        onClick={() => setActivated(true)}
+        onClick={() => {
+          setActivated(true);
+          onPlay?.();
+        }}
         className="group absolute inset-0 h-full overflow-hidden"
       >
-        <picture>
-          <source type="image/webp" srcSet={posterWebp} />
-          <img
-            src={posterJpg}
-            alt={title}
-            // A YouTube poster is 16:9; the attributes state the ratio before it arrives (the box sizes it).
-            width={1280}
-            height={720}
-            loading="lazy"
-            onError={handlePosterError}
-            // React 18 wants lowercase (`fetchpriority` DOM attribute);
-            // React 19 wants camelCase (`fetchPriority` prop). Detect at
-            // module load and spread the right shape so both runtimes
-            // render the DOM attribute cleanly with no console warnings.
-            {...fetchPriorityProp(priority)}
-            decoding={priority ? 'sync' : 'async'}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        </picture>
+        {/* The first poster that loads (`posterCandidates`). `object-cover` fills this 16:9 box with any of them,
+            and crops `hqdefault`'s letterbox bars (4:3 with the 16:9 frame inside) away exactly. */}
+        <Image
+          src={shownPoster}
+          alt={title}
+          fill
+          sizes={IMAGE_SLOT.full}
+          priority={priority}
+          unoptimized
+          onError={hasNextPoster ? () => setFailedPosters(tried => [...tried, shownPoster]) : undefined}
+          className="object-cover"
+        />
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
           {/* THE shared center play badge (video-center-badge.tsx) — same disc
               as strip cards / carousel thumbs / unmute chip; hero size + the
@@ -775,6 +791,14 @@ function YouTubeFacadeInner({
             className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
           />
         </div>
+        {caption && (
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-[var(--spacing-system-xxs)] bg-gradient-to-b from-transparent to-ods-bg p-[var(--spacing-system-l)] pt-[var(--spacing-system-xl)] text-left">
+            <span className="whitespace-pre-line font-heading text-[length:var(--font-size-h5-caption)] font-semibold leading-[var(--font-line-space-h5-caption)] text-ods-text-primary content-md:text-[length:var(--font-size-h4-body)] content-md:leading-[var(--font-line-space-h4-body)]">
+              {caption.title}
+            </span>
+            {caption.meta && <span className="text-ods-text-secondary text-h6">{caption.meta}</span>}
+          </span>
+        )}
       </Button>
     </div>
   );

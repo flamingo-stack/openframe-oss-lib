@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { ContentAreaWidthContext, contentStepFor } from '../../hooks/ui/use-content-breakpoint';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import type { NavigationSidebarConfig } from '../../types/navigation';
@@ -18,7 +19,9 @@ import {
   ComposerDockHeightContext,
 } from './app-layout-context';
 import { AppLayoutSidePanel, type AppLayoutSidePanelConfig, useAppLayoutSidePanel } from './app-layout-side-panel';
+import { AppLayoutWorkArea, type AppLayoutWorkAreaMode } from './app-layout-work-area';
 import { MobileBurgerMenu, type MobileBurgerMenuProps } from './mobile-burger-menu';
+import { MobileSidePanel } from './mobile-side-panel';
 import { NavigationSidebar } from './navigation-sidebar';
 
 export interface AppLayoutProps {
@@ -150,6 +153,58 @@ export interface AppLayoutProps {
    * closes any open in-layout drawer, as the toggle does.
    */
   onMobileMenuOpenChange?: (open: boolean) => void;
+  /**
+   * A chat column beside the page (`AppLayoutWorkArea`): the page column and it
+   * share the row, side by side or one at a time (`workAreaMode`), a divider
+   * between them. With it `<main>` is a content area, as with `sidePanel`. Keep
+   * it present for the whole session (pass the same element tree): a slot that
+   * comes and goes changes the elements above the page, and React remounts it.
+   * `null` keeps the work area with no chat column (the page alone), for a host
+   * that may add one once it knows (a flag still loading): the page does not
+   * remount when the column arrives. Optional; without it the layout is unchanged.
+   */
+  chatColumn?: ReactNode;
+  /** Which work-area columns show (`chatColumn` only). Default `'page'`. */
+  workAreaMode?: AppLayoutWorkAreaMode;
+  /** `localStorage` key for the divider position (`chatColumn` only). */
+  workAreaStorageKey?: string;
+  /** How far the divider may squeeze a column below its min width (`AppLayoutWorkArea` `squeezeFloor`). */
+  workAreaSqueezeFloor?: number;
+  /** The columns actually on screen, whenever they change (`AppLayoutWorkArea` `onShownModeChange`). */
+  onWorkAreaShownModeChange?: (shown: AppLayoutWorkAreaMode) => void;
+  /**
+   * A bar at the top of the page column, over `<main>` and outside its scroll (e.g. an
+   * `AppColumnHeader` with the page's title and the work area's layout buttons). Keep it
+   * present for the whole session, like `chatColumn`; `null` draws nothing. Optional;
+   * without it the layout is unchanged.
+   */
+  pageHeader?: ReactNode;
+  /**
+   * A second navigation sidebar on the window's right edge (`side: 'right'` is
+   * forced), e.g. the navigation while `sidebarConfig` holds the chat list. Not in
+   * the phone burger menu, which draws `sidebarConfig`. Optional.
+   */
+  endSidebarConfig?: NavigationSidebarConfig;
+  /**
+   * Animate the sidebars' width on collapse / expand (300ms, the rows' curve) even
+   * where the page column is a content area. Off by default there: each frame of
+   * the transition re-evaluates the page's `content-*` container queries. The
+   * three-column shell turns it on — its centre keeps at least 800px, so the page
+   * rarely crosses a content breakpoint mid-toggle.
+   */
+  animateSidebars?: boolean;
+  /**
+   * What the phone burger menu draws (below md). Default `sidebarConfig`. A layout whose
+   * `sidebarConfig` is not the navigation (the three-column shell's chat list, with the
+   * navigation in `endSidebarConfig`) hands the menu a config that has both.
+   */
+  mobileMenuConfig?: NavigationSidebarConfig;
+  /**
+   * A phone panel from the left, below the top bar, the burger menu's twin for other content (the three-column
+   * shell's chat list): `MobileSidePanel`, 320px, the whole width under 400px, closing on the scrim, Escape and a
+   * swipe left. The host owns `open` and closes it in `onClose`. Phone only; omitted, nothing is drawn.
+   */
+  mobileStartPanel?: { open: boolean; onClose: () => void; label: string; content: ReactNode };
 }
 
 /** The floating dock's height on `<main>`, for a page that runs on under it (`composerDockFloats`). */
@@ -174,6 +229,16 @@ export function AppLayout({
   contentCorner,
   mobileMenuOpen: mobileMenuOpenProp,
   onMobileMenuOpenChange,
+  chatColumn,
+  workAreaMode = 'page',
+  workAreaStorageKey,
+  workAreaSqueezeFloor,
+  onWorkAreaShownModeChange,
+  pageHeader,
+  endSidebarConfig,
+  animateSidebars = false,
+  mobileMenuConfig,
+  mobileStartPanel,
 }: AppLayoutProps) {
   const menuControlled = mobileMenuOpenProp !== undefined;
   const [uncontrolledMenuOpen, setUncontrolledMenuOpen] = useState(false);
@@ -185,6 +250,7 @@ export function AppLayout({
   const [dockHeight, setDockHeight] = useState(0);
 
   const hasSidePanel = sidePanel !== undefined;
+  const hasChatColumn = chatColumn !== undefined;
   const hasDock = composerDock !== undefined;
   const dockFloats = hasDock && composerDockFloats;
   // A page's window-pinned action bar (`PageActions` below md) lies over the page's end
@@ -193,12 +259,13 @@ export function AppLayout({
   const bottomInset = (dockFloats ? dockHeight : 0) + actionBarHeight;
   const hasCorner = contentCorner !== undefined;
   // The page column lays out by its own width: something narrows it (the
-  // panel) or shares it with the page (the dock).
-  const adaptive = hasSidePanel || hasDock;
+  // panel, the chat column) or shares it with the page (the dock).
+  const adaptive = hasSidePanel || hasChatColumn || hasDock;
   // The column needs a box of its own only to stack the dock under <main> and
   // to anchor the corner; otherwise it is `contents` and <main> stays the row's
   // flex item exactly as before.
-  const columnIsBox = hasDock || hasCorner;
+  const hasPageHeader = pageHeader !== undefined;
+  const columnIsBox = hasDock || hasCorner || hasPageHeader;
   const sidePanelState = useAppLayoutSidePanel(sidePanel, drawerContainer);
 
   useIsomorphicLayoutEffect(() => {
@@ -215,7 +282,10 @@ export function AppLayout({
     };
     update();
     const observer = new ResizeObserver(update);
-    observer.observe(mainElement);
+    // Its border box: `<main>`'s padding follows the floating dock, set inside the dock's own
+    // observer (below), and a content box changed there would be a second notification at the
+    // same depth in one delivery ("ResizeObserver loop completed with undelivered notifications").
+    observer.observe(mainElement, { box: 'border-box' });
     return () => observer.disconnect();
   }, [adaptive, mainElement]);
   const contentAreaWidth = adaptive ? contentWidth : null;
@@ -227,10 +297,20 @@ export function AppLayout({
   const hasSheet = hasDock && composerSheet != null && composerSheet !== false;
   useIsomorphicLayoutEffect(() => {
     if (!hasDock || !dockElement) return undefined;
-    const update = () => setDockHeight(dockElement.offsetHeight);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(dockElement);
+    let last = dockElement.offsetHeight;
+    setDockHeight(last);
+    // A new height lands in the frame the dock changed in. An update set from an observer
+    // renders after that frame is painted, so for one frame the page kept the old inset and
+    // a page centred above the dock (Start Work) moved when it caught up (CU-17tkuw6633f).
+    // Rendered synchronously here, before paint; an unchanged height renders nothing.
+    const observer = new ResizeObserver(() => {
+      const height = dockElement.offsetHeight;
+      if (height === last) return;
+      last = height;
+      flushSync(() => setDockHeight(height));
+    });
+    // Its border box, what `offsetHeight` reads: a padding or border change is a new height too.
+    observer.observe(dockElement, { box: 'border-box' });
     return () => observer.disconnect();
   }, [hasDock, dockElement]);
 
@@ -324,6 +404,119 @@ export function AppLayout({
     [setMobileMenuOpen],
   );
 
+  // The page column: `<main>` and what stacks on it (the corner, the sheet, the dock).
+  const pageColumn = (
+    <>
+      {/* The page column. One element tree whatever the slots: a
+      slot that comes or goes (the side panel on every cold load
+      with Mingo v2, the dock behind the paywall) must not change
+      the element types above the page, or React remounts it. */}
+      <div
+        data-surface={columnIsBox ? pageSurface : undefined}
+        className={
+          columnIsBox
+            ? cn(
+                'relative flex min-h-0 min-w-0 flex-1 flex-col',
+                pageSurface && 'ods-glow-accent-corner bg-ods-bg',
+                contentCovered && 'hidden',
+                contentOverlapped && 'isolate',
+              )
+            : 'contents'
+        }
+      >
+        {hasCorner && (
+          // z-40: the layer of the sticky header it stands in for —
+          // over the page's own layers, under in-layout drawers.
+          // Desktop only: the phone top bar holds these controls.
+          <div className="absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-40 hidden items-center gap-[var(--spacing-system-xsf)] md:flex">
+            {contentCorner}
+          </div>
+        )}
+        {/* Over <main>, outside its scroll; its own token scope (it is chrome). */}
+        {hasPageHeader && pageHeader}
+        {/* `hidden` while the panel covers the area: the page stays
+        mounted, it just takes no room. */}
+        <main
+          ref={setMainElement}
+          className={cn(
+            adaptive ? 'ods-content-area min-w-0 flex-1 overflow-y-auto' : 'flex-1 overflow-y-auto',
+            // A squeezed page column (`AppLayoutWorkArea` `squeezeFloor`): the page keeps the
+            // column's min width and scrolls sideways here, under the page header, with the
+            // vertical scrollbar still on screen. Its blocks sit in the content scope (`contents`).
+            hasChatColumn &&
+              'group-data-[squeezed]/work-area-page:overflow-x-auto [&>div>*]:group-data-[squeezed]/work-area-page:min-w-[var(--work-area-min-width)]',
+            contentCovered && 'hidden',
+            // While the panel is drawn over the page, keep the page's own
+            // z-indexed layers (sticky headers, fixed bars) under it.
+            contentOverlapped && 'isolate',
+            mainClassName,
+          )}
+          // The page column's sideways scroller while it is squeezed: the work area reads how
+          // far it is scrolled to shade the side of the page that is out of view.
+          data-work-area-scroller={hasChatColumn ? '' : undefined}
+          // A floating dock and a page's action bar lie over the page's end: the
+          // page runs on by their height, so its last line clears them. The dock's
+          // share is a variable too, for a page that runs on under it, and the
+          // page fades out to transparent under the dock (the mask stays with
+          // `<main>`'s box while its content scrolls).
+          style={
+            bottomInset > 0 || dockFloats
+              ? ({
+                  paddingBottom: bottomInset,
+                  [COMPOSER_DOCK_INSET_VAR]: `${dockFloats ? dockHeight : 0}px`,
+                  ...(dockFloats && dockHeight > 0 ? previewFadeMask(`calc(100% - ${dockHeight}px)`) : {}),
+                } as CSSProperties)
+              : undefined
+          }
+        >
+          <ContentAreaWidthContext.Provider value={contentAreaWidth}>
+            <ComposerDockHeightContext.Provider value={hasDock ? dockHeight : 0}>
+              {/* `display: contents` either way; it carries the content
+              tokens only inside an adaptive area. */}
+              <div className={adaptive ? 'ods-content-scope' : 'contents'}>{children}</div>
+            </ComposerDockHeightContext.Provider>
+          </ContentAreaWidthContext.Provider>
+        </main>
+        {hasSheet && (
+          // Over the page down to the dock's top edge. z-40: the
+          // layer of the corner and the page's own sticky bars' top —
+          // in-layout drawers (45) and modals still cover it.
+          <div
+            data-composer-sheet-layer=""
+            className="ods-content-area pointer-events-none absolute inset-x-0 top-0 z-40"
+            style={{ bottom: dockHeight }}
+          >
+            <ContentAreaWidthContext.Provider value={contentAreaWidth}>
+              {/* The sheet's scrim runs on under the dock, by its height. */}
+              <ComposerDockHeightContext.Provider value={dockHeight}>
+                <div className="ods-content-scope">{composerSheet}</div>
+              </ComposerDockHeightContext.Provider>
+            </ContentAreaWidthContext.Provider>
+          </div>
+        )}
+        {hasDock && (
+          // Its own container + token scope: a container query cannot
+          // reach from <main> to a sibling. Same column width. With a
+          // sheet it rises over the sheet's scrim, which runs on under it.
+          <div
+            ref={setDockElement}
+            className={cn(
+              'ods-content-area shrink-0',
+              hasSheet && 'relative z-40',
+              // Over the page's end; the page keeps the pointer where the dock
+              // is transparent.
+              dockFloats && 'pointer-events-none absolute inset-x-0 bottom-0 z-40',
+            )}
+          >
+            <ContentAreaWidthContext.Provider value={contentAreaWidth}>
+              <div className="ods-content-scope">{composerDock}</div>
+            </ContentAreaWidthContext.Provider>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <AppLayoutDrawerContainerContext.Provider value={drawerContainer}>
       <AppLayoutDrawerCoordinationContext.Provider value={drawerCoordination}>
@@ -338,16 +531,25 @@ export function AppLayout({
               config={sidebarConfig}
               disabled={disabled}
               pushOnTablet={hasSidePanel}
-              animateWidth={!adaptive}
+              animateWidth={animateSidebars || !adaptive}
             />
             {/* Mobile Burger Menu - opens below header */}
             <MobileBurgerMenu
               {...mobileBurgerMenuProps}
               isOpen={mobileMenuOpen}
               onClose={handleCloseMobileMenu}
-              config={sidebarConfig}
+              config={mobileMenuConfig ?? sidebarConfig}
               disabled={disabled}
             />
+            {mobileStartPanel && (
+              <MobileSidePanel
+                open={mobileStartPanel.open}
+                onClose={mobileStartPanel.onClose}
+                label={mobileStartPanel.label}
+              >
+                {mobileStartPanel.content}
+              </MobileSidePanel>
+            )}
 
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col overflow-hidden">
@@ -372,103 +574,18 @@ export function AppLayout({
                 ref={setDrawerContainer}
                 className={cn('relative flex flex-1 overflow-hidden', sidePanel ? 'flex-row' : 'flex-col')}
               >
-                {/* The page column. One element tree whatever the slots: a
-                  slot that comes or goes (the side panel on every cold load
-                  with Mingo v2, the dock behind the paywall) must not change
-                  the element types above the page, or React remounts it. */}
-                <div
-                  data-surface={columnIsBox ? pageSurface : undefined}
-                  className={
-                    columnIsBox
-                      ? cn(
-                          'relative flex min-h-0 min-w-0 flex-1 flex-col',
-                          pageSurface && 'ods-glow-accent-corner bg-ods-bg',
-                          contentCovered && 'hidden',
-                          contentOverlapped && 'isolate',
-                        )
-                      : 'contents'
-                  }
-                >
-                  {hasCorner && (
-                    // z-40: the layer of the sticky header it stands in for —
-                    // over the page's own layers, under in-layout drawers.
-                    // Desktop only: the phone top bar holds these controls.
-                    <div className="absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-40 hidden items-center gap-[var(--spacing-system-xsf)] md:flex">
-                      {contentCorner}
-                    </div>
-                  )}
-                  {/* `hidden` while the panel covers the area: the page stays
-                    mounted, it just takes no room. */}
-                  <main
-                    ref={setMainElement}
-                    className={cn(
-                      adaptive ? 'ods-content-area min-w-0 flex-1 overflow-y-auto' : 'flex-1 overflow-y-auto',
-                      contentCovered && 'hidden',
-                      // While the panel is drawn over the page, keep the page's own
-                      // z-indexed layers (sticky headers, fixed bars) under it.
-                      contentOverlapped && 'isolate',
-                      mainClassName,
-                    )}
-                    // A floating dock and a page's action bar lie over the page's end: the
-                    // page runs on by their height, so its last line clears them. The dock's
-                    // share is a variable too, for a page that runs on under it, and the
-                    // page fades out to transparent under the dock (the mask stays with
-                    // `<main>`'s box while its content scrolls).
-                    style={
-                      bottomInset > 0 || dockFloats
-                        ? ({
-                            paddingBottom: bottomInset,
-                            [COMPOSER_DOCK_INSET_VAR]: `${dockFloats ? dockHeight : 0}px`,
-                            ...(dockFloats && dockHeight > 0 ? previewFadeMask(`calc(100% - ${dockHeight}px)`) : {}),
-                          } as CSSProperties)
-                        : undefined
-                    }
-                  >
-                    <ContentAreaWidthContext.Provider value={contentAreaWidth}>
-                      <ComposerDockHeightContext.Provider value={hasDock ? dockHeight : 0}>
-                        {/* `display: contents` either way; it carries the content
-                          tokens only inside an adaptive area. */}
-                        <div className={adaptive ? 'ods-content-scope' : 'contents'}>{children}</div>
-                      </ComposerDockHeightContext.Provider>
-                    </ContentAreaWidthContext.Provider>
-                  </main>
-                  {hasSheet && (
-                    // Over the page down to the dock's top edge. z-40: the
-                    // layer of the corner and the page's own sticky bars' top —
-                    // in-layout drawers (45) and modals still cover it.
-                    <div
-                      data-composer-sheet-layer=""
-                      className="ods-content-area pointer-events-none absolute inset-x-0 top-0 z-40"
-                      style={{ bottom: dockHeight }}
-                    >
-                      <ContentAreaWidthContext.Provider value={contentAreaWidth}>
-                        {/* The sheet's scrim runs on under the dock, by its height. */}
-                        <ComposerDockHeightContext.Provider value={dockHeight}>
-                          <div className="ods-content-scope">{composerSheet}</div>
-                        </ComposerDockHeightContext.Provider>
-                      </ContentAreaWidthContext.Provider>
-                    </div>
-                  )}
-                  {hasDock && (
-                    // Its own container + token scope: a container query cannot
-                    // reach from <main> to a sibling. Same column width. With a
-                    // sheet it rises over the sheet's scrim, which runs on under it.
-                    <div
-                      ref={setDockElement}
-                      className={cn(
-                        'ods-content-area shrink-0',
-                        hasSheet && 'relative z-40',
-                        // Over the page's end; the page keeps the pointer where the dock
-                        // is transparent.
-                        dockFloats && 'pointer-events-none absolute inset-x-0 bottom-0 z-40',
-                      )}
-                    >
-                      <ContentAreaWidthContext.Provider value={contentAreaWidth}>
-                        <div className="ods-content-scope">{composerDock}</div>
-                      </ContentAreaWidthContext.Provider>
-                    </div>
-                  )}
-                </div>
+                {hasChatColumn ? (
+                  <AppLayoutWorkArea
+                    mode={workAreaMode}
+                    chat={chatColumn}
+                    page={pageColumn}
+                    storageKey={workAreaStorageKey}
+                    squeezeFloor={workAreaSqueezeFloor}
+                    onShownModeChange={onWorkAreaShownModeChange}
+                  />
+                ) : (
+                  pageColumn
+                )}
                 {sidePanel && sidePanelState && <AppLayoutSidePanel config={sidePanel} state={sidePanelState} />}
                 {/* `drawer` slot — rendered here so it sits inside the
                 AppLayoutDrawerContainerContext and can portal into this exact
@@ -478,6 +595,14 @@ export function AppLayout({
                 {drawer}
               </div>
             </div>
+            {endSidebarConfig && (
+              <NavigationSidebar
+                config={{ ...endSidebarConfig, side: 'right' }}
+                disabled={disabled}
+                pushOnTablet={hasSidePanel}
+                animateWidth={animateSidebars || !adaptive}
+              />
+            )}
           </div>
         </div>
       </AppLayoutDrawerCoordinationContext.Provider>

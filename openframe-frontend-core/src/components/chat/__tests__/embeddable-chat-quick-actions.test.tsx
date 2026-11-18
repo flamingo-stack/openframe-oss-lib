@@ -1,6 +1,7 @@
 /**
- * A quick action in the chat's empty state sends its prompt on the click, and still runs the
- * host's own `onClick`.
+ * A quick action in the chat's empty state sends its prompt on the click, still runs the
+ * host's own `onClick`, and leaves the keyboard in the composer; a host that sends from a
+ * control of its own asks for the same through the chat's handle (`focusComposer`).
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,14 +13,15 @@ vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 
+import { createRef } from 'react';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
-import { EmbeddableChat } from '../embeddable-chat';
+import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -65,8 +67,7 @@ function emptyState(sendMessage: (text: string) => Promise<void>): UnifiedChatSt
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };
@@ -74,25 +75,28 @@ function emptyState(sendMessage: (text: string) => Promise<void>): UnifiedChatSt
 
 function renderChat({ onClick }: { onClick?: () => void } = {}) {
   const sendMessage = vi.fn((_text: string) => Promise.resolve());
+  const handle = createRef<EmbeddableChatHandle>();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  const { unmount } = render(
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          shell="inline"
-          appearance="v2"
-          defaultOpen
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={emptyState(sendMessage)}
-          mingoWelcome={{
-            quickActions: [{ id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick }],
-          }}
-        />
+        <ChatEngineProvider engine={emptyState(sendMessage)}>
+          <EmbeddableChat
+            ref={handle}
+            shell="inline"
+            appearance="v2"
+            defaultOpen
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            mingoWelcome={{
+              quickActions: [{ id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick }],
+            }}
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
   );
-  return { sendMessage };
+  return { sendMessage, handle, unmount };
 }
 
 describe('EmbeddableChat quick actions', () => {
@@ -120,5 +124,34 @@ describe('EmbeddableChat quick actions', () => {
 
     await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the keyboard in the composer: the tag goes away with the send', async () => {
+    const { sendMessage } = renderChat();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Patching' }));
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('textbox')).toHaveFocus();
+  });
+
+  it('puts the keyboard in the composer when the host asks (its own quick actions over a docked composer)', () => {
+    const { handle } = renderChat();
+    expect(screen.getByRole('textbox')).not.toHaveFocus();
+
+    handle.current?.focusComposer();
+
+    expect(screen.getByRole('textbox')).toHaveFocus();
+  });
+
+  it('stops waiting for the next press or key when the chat goes away', () => {
+    const remove = vi.spyOn(document, 'removeEventListener');
+    const { handle, unmount } = renderChat();
+    handle.current?.focusComposer();
+
+    unmount();
+
+    expect(remove).toHaveBeenCalledWith('pointerdown', expect.any(Function), true);
+    expect(remove).toHaveBeenCalledWith('keydown', expect.any(Function), true);
   });
 });

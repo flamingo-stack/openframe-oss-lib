@@ -27,4 +27,6 @@ public class PackageUpdateMessage implements DeliveryPayload {
     private PackageUpdateMode mode;
 
     private Integer countdownSeconds;
+
+    private Long deadlineSeconds;
 }

@@ -6,6 +6,7 @@ import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { TruncateText } from '../../ui/truncate-text';
+import { dataTableLayoutProps, type FeatureTableLayoutProps, hasSlotContent } from '../feature-table-layout';
 import { OSTypeBadgeGroup } from '../os-type-badge-group';
 import { ScheduleDateTimeCell, ScriptNameCell } from './script-cells';
 import { SCHEDULE_COLUMNS, type ScriptsTableColumnLayout } from './scripts-table-columns';
@@ -27,7 +28,7 @@ export interface ScriptScheduleTableRow {
   href?: string;
 }
 
-export interface ScriptSchedulesTableProps {
+export interface ScriptSchedulesTableProps extends FeatureTableLayoutProps {
   rows: ScriptScheduleTableRow[];
   isLoading?: boolean;
   /** Column ids to leave out (`'deviceCount'`, `'supportedPlatforms'`, `'open'`). */
@@ -74,18 +75,21 @@ export function ScriptSchedulesTable({
   stickyHeaderOffset,
   rightSlot,
   skeletonRows,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: ScriptSchedulesTableProps) {
   // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header and the body's skeleton
   // rows alike.
   const loading = useLoadingScope() || isLoading;
   const columns = useMemo<ColumnDef<ScriptScheduleTableRow>[]>(() => {
-    const cell = (layout: ScriptsTableColumnLayout, render: (row: ScriptScheduleTableRow) => ReactNode) => ({
-      id: layout.id,
-      header: layout.header ?? '',
+    const cell = (columnLayout: ScriptsTableColumnLayout, render: (row: ScriptScheduleTableRow) => ReactNode) => ({
+      id: columnLayout.id,
+      header: columnLayout.header ?? '',
       cell: ({ row }: { row: Row<ScriptScheduleTableRow> }) => render(row.original),
       enableSorting: false,
       // A picture of the table sorts nothing: the layout's sort icon is the live page's.
-      meta: { ...scriptsColumnMeta(layout), sortable: false },
+      meta: { ...scriptsColumnMeta(columnLayout), sortable: false },
     });
     const all: ColumnDef<ScriptScheduleTableRow>[] = [
       cell(SCHEDULE_COLUMNS.name, row => <ScriptNameCell name={row.name} description={row.description} />),
@@ -129,9 +133,16 @@ export function ScriptSchedulesTable({
   const showHeader = loading || rows.length > 0;
 
   return (
-    <DataTable table={table}>
+    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+      {/* The grid's results row sits above the table; the card header carries it in its right slot. */}
+      {showHeader && layout === 'grid' && hasSlotContent(rightSlot) && <DataTable.Meta>{rightSlot}</DataTable.Meta>}
       {showHeader && (
-        <DataTable.Header stickyHeader={stickyHeader} stickyHeaderOffset={stickyHeaderOffset} rightSlot={rightSlot} />
+        <DataTable.Header
+          stickyHeader={stickyHeader}
+          stickyHeaderOffset={stickyHeaderOffset}
+          rightSlot={rightSlot}
+          loading={loading}
+        />
       )}
       <DataTable.Body
         loading={loading}

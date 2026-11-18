@@ -1,6 +1,10 @@
 package com.openframe.stream.handler.software;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -18,6 +22,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +31,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
+import static com.openframe.stream.handler.software.FleetRowFields.isSnapshotRead;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -35,10 +41,27 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Slf4j
 public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
+    static final Duration SNAPSHOT_HOST_WINDOW = Duration.ofHours(24);
+    static final Duration SNAPSHOT_UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
+    static final Duration RECONCILED_COMMIT_WINDOW = Duration.ofHours(1);
+    static final long RECONCILED_COMMIT_CAPACITY = 100_000;
+    static final String NO_COMMIT = "0";
+
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
+
+    private final Cache<Long, Boolean> snapshotReconciledHosts = Caffeine.newBuilder()
+            .expireAfterWrite(SNAPSHOT_HOST_WINDOW)
+            .build();
+    private final Cache<Long, Boolean> snapshotUnresolvedHosts = Caffeine.newBuilder()
+            .expireAfterWrite(SNAPSHOT_UNRESOLVED_HOST_WINDOW)
+            .build();
+    private final Cache<HostCommit, Boolean> reconciledCommits = Caffeine.newBuilder()
+            .expireAfterWrite(RECONCILED_COMMIT_WINDOW)
+            .maximumSize(RECONCILED_COMMIT_CAPACITY)
+            .build();
 
     @Override
     public EventHandlerType getType() {
@@ -64,29 +87,51 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (hostId == null) {
             return;
         }
+        boolean snapshotRead = isSnapshotRead(payload.getOperation());
+        if (snapshotRead && (snapshotReconciledHosts.getIfPresent(hostId) != null
+                || snapshotUnresolvedHosts.getIfPresent(hostId) != null)) {
+            return;
+        }
+        String commit = commitOf(payload);
+        HostCommit hostCommit = snapshotRead || NO_COMMIT.equals(commit) ? null : new HostCommit(hostId, commit);
+        if (hostCommit != null && reconciledCommits.getIfPresent(hostCommit) != null) {
+            return;
+        }
         String fleetHostId = String.valueOf(hostId);
         if (!fleetHostResolver.isResolvable(fleetHostId)) {
+            if (snapshotRead) {
+                snapshotUnresolvedHosts.put(hostId, Boolean.TRUE);
+            }
             log.debug("[software-cdc] host_software for unresolved Fleet host {} — skipping", hostId);
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
-        long commitTs = commitTimestamp(payload);
-        reconcile(host, hostId, commitTs);
+        reconcile(host, hostId, commit);
+        if (snapshotRead) {
+            snapshotReconciledHosts.put(hostId, Boolean.TRUE);
+        }
+        if (hostCommit != null) {
+            reconciledCommits.put(hostCommit, Boolean.TRUE);
+        }
     }
 
-    // the source commit time: every row event of one Fleet commit shares it, so a burst re-reads Fleet once,
-    // and a later commit on the same host never gets the list fetched for an earlier one
-    private static long commitTimestamp(DebeziumMessage.Payload<JsonNode> payload) {
+    private record HostCommit(long hostId, String commit) {
+    }
+
+    private static String commitOf(DebeziumMessage.Payload<JsonNode> payload) {
         DebeziumMessage.Payload.Source source = payload.getSource();
+        if (source != null && !isBlank(source.getGtid())) {
+            return source.getGtid();
+        }
         if (source != null && source.getTimestamp() != null) {
-            return source.getTimestamp();
+            return String.valueOf(source.getTimestamp());
         }
         Long emitted = payload.getTimestamp();
-        return emitted == null ? 0L : emitted;
+        return emitted == null ? NO_COMMIT : String.valueOf(emitted);
     }
 
-    private void reconcile(FleetHostRef host, Long hostId, long commitTs) {
-        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId, commitTs);
+    private void reconcile(FleetHostRef host, Long hostId, String commit) {
+        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId, commit);
         Instant now = Instant.now();
         Set<Long> present = new HashSet<>();
         Set<Long> affectedTitles = new HashSet<>();
@@ -123,6 +168,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setPackageFamilyNames(valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName));
             deviceSoftware.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
             deviceSoftware.setSystemComponent(systemComponentOf(title));
+            deviceSoftware.setWingetId(firstOf(title, HostSoftwareInstalledVersion::getWingetId));
             deviceSoftware.setVulnerabilities(vulnerabilities);
             deviceSoftware.setUpdatedAt(now);
             if (newRow) {
@@ -148,11 +194,22 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (title.getInstalledVersions() == null) {
             return List.of();
         }
-        return title.getInstalledVersions().stream()
+        List<String> versions = title.getInstalledVersions().stream()
                 .map(HostSoftwareInstalledVersion::getVersion)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+        String source = title.getSource();
+        boolean homebrew = FleetSource.of(source) == FleetSource.HOMEBREW_PACKAGES;
+        return homebrew ? newestOf(versions) : versions;
+    }
+
+    // Homebrew keeps the versions it upgraded from in the Cellar: only the newest one is installed
+    private static List<String> newestOf(List<String> versions) {
+        return versions.stream()
+                .max(SoftwareVersions::compare)
+                .map(List::of)
+                .orElseGet(List::of);
     }
 
     private static String firstOf(HostSoftwareTitle title, Function<HostSoftwareInstalledVersion, String> value) {

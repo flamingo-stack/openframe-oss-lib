@@ -27,3 +27,14 @@ export function resolveImports(input: string, root: string): string;
 export function withRouteStyles<T extends object>(
   nextConfig: T | ((...args: unknown[]) => T | Promise<T>),
 ): (phase: string, ...rest: unknown[]) => Promise<T & { experimental: { inlineCss: true } }>;
+
+/** The complete sheet's address for a build; with a `deploymentId` it names its deployment (`?dpl=`). */
+export function fullSheetUrl(build: {
+  buildId: string;
+  assetPrefix?: string;
+  basePath?: string;
+  deploymentId?: string | null;
+}): string;
+
+/** The deployment a skew-protected host (Vercel) routes this build's requests to, else null. */
+export function skewDeploymentId(env?: Record<string, string | undefined>): string | null;

@@ -1,4 +1,4 @@
-import type { RowData } from '@tanstack/react-table';
+import type { CellContext, RowData } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
 
 export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl';
@@ -20,6 +20,36 @@ export interface DataTableFilterOption {
    * the moment one is picked — do not feed one in.
    */
   count?: number;
+}
+
+/** An extra group in a column's filter dropdown: see `meta.filter.sections`. */
+export interface DataTableFilterSection {
+  id: string;
+  title: string;
+  options: DataTableFilterOption[];
+}
+
+/** A section option as the column's filter value holds it: `<section id>:<value>`. */
+export function filterSectionValue(sectionId: string, value: string): string {
+  return `${sectionId}:${value}`;
+}
+
+/**
+ * A column's filter value split back into the column's own values and each section's, by the `<section id>:`
+ * prefix of `filterSectionValue`. Values with no known prefix are the column's own.
+ */
+export function splitFilterSectionValues(
+  values: readonly string[] | undefined,
+  sectionIds: readonly string[],
+): { own: string[]; sections: Record<string, string[]> } {
+  const sections: Record<string, string[]> = Object.fromEntries(sectionIds.map(id => [id, [] as string[]]));
+  const own: string[] = [];
+  for (const value of values ?? []) {
+    const id = sectionIds.find(sectionId => value.startsWith(`${sectionId}:`));
+    if (id) sections[id].push(value.slice(id.length + 1));
+    else own.push(value);
+  }
+  return { own, sections };
 }
 
 /**
@@ -56,6 +86,12 @@ declare module '@tanstack/react-table' {
      */
     filter?: {
       options: DataTableFilterOption[];
+      /**
+       * More groups in the same dropdown, under their own titles (the devices STATUS funnel's "Connectivity").
+       * They share the column's filter value: a picked option of a section is stored as `<section id>:<value>`
+       * (`filterSectionValue`), so the host splits them back out with `splitFilterSectionValues`.
+       */
+      sections?: DataTableFilterSection[];
       placement?: 'bottom-start' | 'bottom-end' | 'bottom';
       /** Options are in flight — draw the funnel, inert, instead of hiding it. */
       pending?: boolean;
@@ -84,5 +120,21 @@ declare module '@tanstack/react-table' {
      * column with no label.
      */
     headerLoading?: boolean;
+    /**
+     * The cell's form in the GRID layout (`<DataTable layout="grid">`): one 48px line, normally a `DataTable.Cell`.
+     * `cell` stays the card-row form, for the same table in the cards layout. A column without it draws `cell` in
+     * both layouts (clipped to one line in the grid).
+     */
+    gridCell?: (context: CellContext<TData, TValue>) => ReactNode;
+    /**
+     * What a non-data column is in the grid layout: the selection column (always first, pinned left) or a row-action
+     * column (always last, pinned right). Set by `selectionColumn()` / `actionColumn()`, not by hand.
+     */
+    gridKind?: 'select' | 'action';
+    /**
+     * The column's name where columns are listed by name (the grid table's settings menu), in sentence case:
+     * "Device", "Last login". Without it the list shows the header text, or the column id when the header is a node.
+     */
+    label?: string;
   }
 }

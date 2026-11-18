@@ -11,7 +11,7 @@ const WATCH_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.VIDEO.label;
 const HIDE_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.VIDEO.openLabel;
 import { renderChatInlineEntityCard } from '../dispatch';
 
-/** `[card://video:mp4-<base64url(url)>]`: the id the hub mints for an embedded video, and one a reply can mint too. */
+/** `[mp4-<base64url(url)>](record://video/mp4-%3Cbase64url(url)%3E)`: the id the hub mints for an embedded video, and one a reply can mint too. */
 const mp4Ref = (url: string): ChatRef =>
   ({ type: 'video', id: `mp4-${btoa(url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}` }) as ChatRef;
 

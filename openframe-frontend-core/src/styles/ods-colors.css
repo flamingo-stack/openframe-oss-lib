@@ -95,6 +95,14 @@
   --ods-flamingo-pink-secondary-hover: #40102f;
   --ods-flamingo-pink-secondary-action: #360625;
 
+  /* Flamingo Orange (the Security Hub's accent) */
+  --ods-flamingo-orange-base: #ff8a3d;
+  --ods-flamingo-orange-hover: #f58033;
+  --ods-flamingo-orange-action: #eb7629;
+  --ods-flamingo-orange-secondary: #4a2a15;
+  --ods-flamingo-orange-secondary-hover: #54341f;
+  --ods-flamingo-orange-secondary-action: #5e3e29;
+
   /* Open Yellow */
   --ods-open-yellow-base: #ffc008;
   --ods-open-yellow-hover: #f5b600;
@@ -119,6 +127,32 @@
   --ods-system-greys-white: #fafafa;
   --ods-system-greys-white-hover: #f5f5f5;
   --ods-system-greys-white-action: #f0f0f0;
+
+  /* ODS v2 — groups the lib had not synced yet (Figma open-design-system,
+   * collection "colors", 2026-11): backgrounds and borders. The three-column
+   * shell uses them; nothing else does until the palette sync. */
+  --ods-backgrounds-openframe-background: #141414;
+  --ods-backgrounds-openframe-background-hover: #202020;
+  --ods-backgrounds-openframe-background-action: #272727;
+  --ods-backgrounds-panel: #191919;
+  --ods-backgrounds-overlay: #272727;
+  --ods-backgrounds-overlay-hover: #2e2e2e;
+  --ods-borders-subtle: #2e2e2e;
+  --ods-borders-default: #393939;
+  --ods-borders-strong: #4a4a4a;
+  /* ODS v2 values of tokens the lib still carries at their older values
+   * (system greys/grey, open colors/yellow sec), under the shell's own names so
+   * nothing else moves before the palette sync. */
+  --ods-shell-system-greys-grey: #a0a0a0;
+  --ods-shell-open-yellow-sec: #291f09;
+  --ods-shell-open-yellow-sec-hover: #322507;
+  --ods-shell-open-yellow-sec-action: #3c2b01;
+  /* ODS v2 attention colors/warning sec, warning border, warning text: the warning
+   * tag of the v2 palette (the shell's counters). The lib's warning tokens keep
+   * their older values until the palette sync. */
+  --ods-shell-attention-warning-sec: #2d1c0f;
+  --ods-shell-attention-warning-border: #542e0c;
+  --ods-shell-attention-warning-text: #ffb984;
 
   /* Shadcn/ui HSL bridge — DARK (mirrors app-globals.css :root).
    * Re-declared here so toggling data-theme also flips shadcn-mapped
@@ -187,6 +221,14 @@
   --ods-flamingo-pink-secondary-hover: #f5bae0;
   --ods-flamingo-pink-secondary-action: #ebb0d6;
 
+  /* Flamingo Orange (the Security Hub's accent) */
+  --ods-flamingo-orange-base: #d9661a;
+  --ods-flamingo-orange-hover: #cf5c10;
+  --ods-flamingo-orange-action: #c55206;
+  --ods-flamingo-orange-secondary: #ffd8bf;
+  --ods-flamingo-orange-secondary-hover: #f5ceb5;
+  --ods-flamingo-orange-secondary-action: #ebc4ab;
+
   /* Open Yellow */
   --ods-open-yellow-base: #e4aa00;
   --ods-open-yellow-hover: #f5b600;
@@ -211,6 +253,24 @@
   --ods-system-greys-white: #1a1a1a;
   --ods-system-greys-white-hover: #424242;
   --ods-system-greys-white-action: #6a6a6a;
+
+  /* ODS v2 groups — no light mode in Figma yet: the nearest light primitives. */
+  --ods-backgrounds-openframe-background: #fafafa;
+  --ods-backgrounds-openframe-background-hover: #f5f5f5;
+  --ods-backgrounds-openframe-background-action: #f0f0f0;
+  --ods-backgrounds-panel: #ffffff;
+  --ods-backgrounds-overlay: #f5f5f5;
+  --ods-backgrounds-overlay-hover: #f0f0f0;
+  --ods-borders-subtle: #f0f0f0;
+  --ods-borders-default: #e7e7e7;
+  --ods-borders-strong: #d3d3d3;
+  --ods-shell-system-greys-grey: #767676;
+  --ods-shell-open-yellow-sec: #fafafa;
+  --ods-shell-open-yellow-sec-hover: #f5f5f5;
+  --ods-shell-open-yellow-sec-action: #f0f0f0;
+  --ods-shell-attention-warning-sec: #ebdfbb;
+  --ods-shell-attention-warning-border: #cd9e18;
+  --ods-shell-attention-warning-text: #b98a04;
 
   /* Shadcn/ui HSL bridge — LIGHT */
   --background: 0 0% 98%; /* #fafafa */
@@ -269,6 +329,7 @@
   --social-stripe: #635bff;
   --social-reddit: #ff4500;
   --social-g2: #ff492c;
+  --social-alpaca: #fcd72b;
 }
 
 /* ===================================================================== */
@@ -328,6 +389,27 @@
   --color-accent-secondary-active: var(--ods-open-yellow-secondary-action);
   --color-accent-focus: var(--ods-open-yellow-base);
   --color-accent-disabled: var(--ods-system-greys-soft-grey);
+
+  /* Three-column shell (ODS v2): its sidebars' ground and divider, their
+   * secondary grey (icons, category labels) and the active entry's tint. */
+  --color-bg-panel: var(--ods-backgrounds-panel);
+  /* The deepest ground (ODS v2 backgrounds/openframe-background): the strip
+   * above the chat composer. Unlike `--color-bg`, no `data-surface` tints it. */
+  --color-bg-base: var(--ods-backgrounds-openframe-background);
+  --color-border-panel: var(--ods-borders-subtle);
+  /* A menu that floats over the page (ODS v2 Dropdown-menu): its ground
+   * (backgrounds/overlay) and a hovered row's (backgrounds/overlay hover).
+   * `--color-bg-overlay` is the dimmed BACKDROP behind a dialog, not this. */
+  --color-bg-menu: var(--ods-backgrounds-overlay);
+  --color-bg-menu-hover: var(--ods-backgrounds-overlay-hover);
+  --color-text-panel-secondary: var(--ods-shell-system-greys-grey);
+  --color-accent-tint: var(--ods-shell-open-yellow-sec);
+  --color-accent-tint-hover: var(--ods-shell-open-yellow-sec-hover);
+  --color-accent-tint-active: var(--ods-shell-open-yellow-sec-action);
+  /* The shell's warning tag (a row's counter): v2 warning sec / border / text. */
+  --color-warning-tint: var(--ods-shell-attention-warning-sec);
+  --color-warning-tint-border: var(--ods-shell-attention-warning-border);
+  --color-warning-tint-text: var(--ods-shell-attention-warning-text);
 
   /* Status Colors */
   --color-success: var(--ods-attention-green-success);
@@ -615,6 +697,22 @@
   --color-link-hover: var(--ods-system-greys-white-hover);
   --ods-current: var(--ods-system-greys-white);
   --ods-accent: var(--ods-system-greys-white);
+}
+
+[data-app-type='security-hub'] {
+  --color-accent-primary: var(--ods-flamingo-orange-base);
+  --color-accent-hover: var(--ods-flamingo-orange-hover);
+  --color-accent-active: var(--ods-flamingo-orange-action);
+  --color-accent-secondary: var(--ods-flamingo-orange-secondary);
+  --color-accent-secondary-hover: var(--ods-flamingo-orange-secondary-hover);
+  --color-accent-secondary-active: var(--ods-flamingo-orange-secondary-action);
+  --color-accent-focus: var(--ods-flamingo-orange-base);
+  --color-focus-ring: var(--ods-flamingo-orange-base);
+  --color-focus-visible: var(--ods-flamingo-orange-base);
+  --color-link: var(--ods-flamingo-orange-base);
+  --color-link-hover: var(--ods-flamingo-orange-hover);
+  --ods-current: var(--ods-flamingo-orange-base);
+  --ods-accent: var(--ods-flamingo-orange-base);
 }
 
 [data-app-type='company-hub'] {

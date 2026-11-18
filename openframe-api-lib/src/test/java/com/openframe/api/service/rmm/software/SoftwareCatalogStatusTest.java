@@ -14,6 +14,9 @@ import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -23,6 +26,7 @@ import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -238,6 +242,77 @@ class SoftwareCatalogStatusTest {
         assertThat(affinity)
                 .extracting(SoftwareResponse::getLatestVersion, SoftwareResponse::getVersionStatus)
                 .containsExactly("3.3.3", SoftwareVersionStatus.UP_TO_DATE);
+    }
+
+    @Test
+    void apply_brewTitleInTheCatalog_managedByItsCatalogPackage() {
+        // setup
+        SoftwareResponse docker = row("Docker", SoftwareSource.BREW, "28.0.0", 0);
+        PackageCatalogEntry formula = entry("docker", "28.1.0", BrewPackageType.FORMULA);
+        catalog(entry("docker", "4.40.0", BrewPackageType.CASK), formula);
+
+        // execution
+        status().apply(List.of(docker));
+
+        // verifications
+        assertThat(docker.getManagingPackage()).isSameAs(formula);
+    }
+
+    @Test
+    void apply_brewTitleTheCatalogDoesNotCarry_noManagingPackage() {
+        // setup
+        SoftwareResponse tapped = row("some-tap-tool", SoftwareSource.BREW, "1.0.0", 0);
+        catalog();
+
+        // execution
+        status().apply(List.of(tapped));
+
+        // verifications
+        assertThat(tapped.getManagingPackage()).isNull();
+    }
+
+    @Test
+    void apply_programMatchedToAWingetPackage_managedByThatPackage() {
+        // setup
+        SoftwareResponse chrome = program("Google Chrome", "141.0");
+        PackageCatalogEntry wingetChrome = wingetPackage("Google.Chrome", "142.0");
+        stubMatch(chrome, PackageMatch.of(wingetChrome));
+
+        // execution
+        status().apply(List.of(chrome));
+
+        // verifications
+        assertThat(chrome.getManagingPackage()).isSameAs(wingetChrome);
+    }
+
+    @ParameterizedTest
+    @MethodSource("matchesWithoutAPackage")
+    void apply_programNotMatchedToOnePackage_noManagingPackage(PackageMatch match) {
+        // setup
+        SoftwareResponse tool = program("Contoso Tool", "1.0");
+        stubMatch(tool, match);
+
+        // execution
+        status().apply(List.of(tool));
+
+        // verifications
+        assertThat(tool.getManagingPackage()).isNull();
+    }
+
+    @Test
+    void apply_titleNoMatcherTakes_noManagingPackage() {
+        // setup
+        SoftwareResponse choco = row("7zip", SoftwareSource.CHOCOLATEY, "24.08", 0);
+
+        // execution
+        status().apply(List.of(choco));
+
+        // verifications
+        assertThat(choco.getManagingPackage()).isNull();
+    }
+
+    private static Stream<Arguments> matchesWithoutAPackage() {
+        return Stream.of(Arguments.of(PackageMatch.noPackage()), Arguments.of(PackageMatch.ambiguous()));
     }
 
     private void catalog(PackageCatalogEntry... entries) {

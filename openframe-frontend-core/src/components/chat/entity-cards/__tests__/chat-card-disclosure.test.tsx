@@ -38,8 +38,9 @@ describe('the card footer keeps its actions in place while loading', () => {
   });
 
   it('draws Ask in its loading form with the same label width', () => {
-    render(<SourceActionButton chatRef={ref} onDiscuss={() => undefined} density="card" loading />);
+    const action = { label: 'Ask Mingo', icon: <span />, run: () => undefined };
+    render(<SourceActionButton action={action} title={ref.title} density="card" loading />);
     expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.getByText('Ask')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Ask Mingo')).toHaveAttribute('aria-hidden', 'true');
   });
 });

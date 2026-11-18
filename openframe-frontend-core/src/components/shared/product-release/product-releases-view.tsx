@@ -110,6 +110,7 @@ function ReleaseRow({
     slug: release.slug,
     basePath,
     platforms: release.product_release_platforms,
+    url: release.url,
   });
   const { target, rel } = useEntityCardLink({ href: cta.href, targetPlatform: cta.targetPlatform });
 

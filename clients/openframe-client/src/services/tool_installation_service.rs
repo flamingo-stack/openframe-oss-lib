@@ -119,24 +119,31 @@ impl ToolInstallationService {
             .installed_tools_service
             .get_by_tool_agent_id(tool_agent_id)
             .await?;
-        // A repeated install of a present tool is a no-op and needs no download config
+        // A repeated install of a present, fully installed tool is a no-op and needs no download config
         if let Some(installed_tool) = installed_tool.as_ref().filter(|_| !reinstall) {
-            let agent_path = self.directory_manager.get_tool_executable_path(
-                tool_agent_id,
-                installed_tool.installation.executable_path(),
-            );
-            let binary_present = self
-                .directory_manager
-                .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
-                .await;
-            if binary_present {
-                info!(
-                    "Tool {} is already installed with version {}, skipping installation",
-                    tool_agent_id, installed_tool.version
+            if installed_tool.state == ToolRecordState::Installing {
+                warn!(
+                    "Tool {} record is in Installing state (interrupted (re)install) — repairing via install",
+                    tool_agent_id
                 );
-                return Ok(());
+            } else {
+                let agent_path = self.directory_manager.get_tool_executable_path(
+                    tool_agent_id,
+                    installed_tool.installation.executable_path(),
+                );
+                let binary_present = self
+                    .directory_manager
+                    .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
+                    .await;
+                if binary_present {
+                    info!(
+                        "Tool {} is already installed with version {}, skipping installation",
+                        tool_agent_id, installed_tool.version
+                    );
+                    return Ok(());
+                }
+                warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
             }
-            warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
         }
 
         // Resolve the download before any destructive step
@@ -664,6 +671,20 @@ impl ToolInstallationService {
                 );
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+            if let Installation::Service {
+                service_name: svc, ..
+            } = &installation
+            {
+                crate::platform::system_service::remove_service(svc)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Aborting install of {}: existing service '{}' could not be removed",
+                            tool_agent_id, svc
+                        )
+                    })?;
+            }
 
             let mut cmd = Command::new(&file_path);
             cmd.args(&installation_command_args);

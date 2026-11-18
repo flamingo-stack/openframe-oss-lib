@@ -11,10 +11,11 @@ import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
-import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -77,7 +78,7 @@ class ScriptDeliveryRetryServiceTest {
         ReflectionTestUtils.setField(service, "retrySize", 3);
         ReflectionTestUtils.setField(service, "queuedThresholdSeconds", 30L);
         // Default: no target is offline; the SCHEDULE republisher is the one resolved. Tests override.
-        lenient().when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
+        lenient().when(machineRepository.findByMachineIdInAndTelemetryStatus(any(), eq(TelemetryStatus.OFFLINE)))
                 .thenReturn(List.of());
         lenient().when(deliveryRepublisherRegistry.get(any())).thenReturn(republisher);
         // Default: the batch went the way before the engine, no row under its executionId. Tests override.
@@ -114,6 +115,7 @@ class ScriptDeliveryRetryServiceTest {
         verify(repository).saveAll(captor.capture());
         assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.FAILED);
         assertThat(captor.getValue()).allMatch(r -> r.getError().equals("Agent could not receive the script after 7 delivery attempt(s)"));
+        assertThat(captor.getValue()).allMatch(r -> r.getFailureReason() == ExecutionFailureReason.NO_ACK);
         verify(retryStore).evict("exec-1", "m-1");
         verify(headerWatchdogService).finalizeAffectedHeaders(captor.getValue());
     }
@@ -139,7 +141,7 @@ class ScriptDeliveryRetryServiceTest {
         ScriptExecution withdrawn = queued("exec-2", "m-2", "s-a");
         when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
                 .thenReturn(List.of(offline, withdrawn));
-        when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
+        when(machineRepository.findByMachineIdInAndTelemetryStatus(any(), eq(TelemetryStatus.OFFLINE)))
                 .thenReturn(List.of(machine("m-1")));
         when(deliveryTracker.find(eq(DeliveryType.SCRIPT_SCHEDULE), any(), any()))
                 .thenReturn(Optional.of(engineRow(DeliveryStatus.CANCELLED, null, 0)));
@@ -210,6 +212,7 @@ class ScriptDeliveryRetryServiceTest {
         verify(repository).saveAll(captor.capture());
         assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.FAILED);
         assertThat(captor.getValue()).allMatch(r -> r.getError() != null && r.getError().contains("could not receive"));
+        assertThat(captor.getValue()).allMatch(r -> r.getFailureReason() == ExecutionFailureReason.NO_ACK);
         verify(retryStore).evict("exec-1", "m-1");
         verify(headerWatchdogService).finalizeAffectedHeaders(captor.getValue());
     }
@@ -248,7 +251,7 @@ class ScriptDeliveryRetryServiceTest {
         q.setScheduleId("sch-1");
         when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
                 .thenReturn(List.of(q));
-        when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
+        when(machineRepository.findByMachineIdInAndTelemetryStatus(any(), eq(TelemetryStatus.OFFLINE)))
                 .thenReturn(List.of(machine("m-1")));
 
         service.retryStuckQueuedDeliveries();
@@ -262,6 +265,25 @@ class ScriptDeliveryRetryServiceTest {
         assertThat(captor.getValue()).allMatch(r -> r.getError() != null && r.getError().contains("offline"));
         verify(retryStore).evict("exec-1", "m-1");
         verify(headerWatchdogService).finalizeAffectedHeaders(captor.getValue());
+    }
+
+    @Test
+    @DisplayName("offline targets come from telemetryStatus, never from the lifecycle status")
+    void offlineTargets_resolvedByTelemetryNotLifecycleStatus() {
+        // setup
+        ScriptExecution q = queued("exec-1", "m-1", "s-a");
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
+        when(machineRepository.findByMachineIdInAndTelemetryStatus(any(), eq(TelemetryStatus.OFFLINE)))
+                .thenReturn(List.of(machine("m-1")));
+
+        // execution
+        service.retryStuckQueuedDeliveries();
+
+        // verifications
+        verify(machineRepository).findByMachineIdInAndTelemetryStatus(any(), eq(TelemetryStatus.OFFLINE));
+        verify(machineRepository, never()).findByMachineIdInAndStatus(any(), any());
+        assertThat(q.getStatus()).isEqualTo(ExecutionStatus.FAILED);
     }
 
     private static Machine machine(String machineId) {

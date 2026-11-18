@@ -17,6 +17,11 @@ import { NavigationItemBadge } from './navigation-item-badge';
 import { isModifiedClick } from './navigation-sidebar';
 import { NavigationSidebarGroupedEntries, useOpenNavigationGroup } from './navigation-sidebar-grouped';
 import { resolveNavigationActive } from './navigation-sidebar-match';
+import {
+  NavigationSidebarSectionedEntries,
+  SECTIONED_PRIMARY_NAV_CLASSES,
+  useFoldedNavigationSections,
+} from './navigation-sidebar-sectioned';
 import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
 
 // Header height constant — the unified top-navigation `small` bar (56px on all screens)
@@ -91,11 +96,17 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
   // Grouped variant: the sidebar's own tree and active resolution. A parent
   // only opens and folds, as in the sidebar.
   const grouped = config.variant === 'grouped';
+  // Sectioned (the three-column shell's navigation): the sidebar's sections, folds and
+  // rows, in the same drawer.
+  const sectioned = config.variant === 'sectioned';
+  const panel = config.surface === 'panel';
+  const fromRight = config.side === 'right';
   const { activeId, groupId: activeGroupId } = useMemo(
     () => resolveNavigationActive(config.items, { currentPath: config.currentPath, includeChildren: true }),
     [config.items, config.currentPath],
   );
   const [openGroupId, setOpenGroupId] = useOpenNavigationGroup(activeGroupId);
+  const [foldedSectionIds, toggleSection] = useFoldedNavigationSections(activeGroupId, config.groupsStorageKey);
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
 
   // The grouped drawer stays mounted (`md:hidden` from md up, off-screen below
@@ -240,14 +251,45 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
     </Button>
   );
 
-  if (grouped) {
+  if (grouped || sectioned) {
     const { sectionSlot, footerSlot } = config;
+    const entries = (items: NavigationSidebarItem[]) =>
+      sectioned ? (
+        <NavigationSidebarSectionedEntries
+          items={items}
+          activeId={activeId}
+          pendingId={null}
+          foldedIds={foldedSectionIds}
+          showLabel
+          disabled={disabled}
+          onItemClick={handleGroupedItemClick}
+          onSectionClick={item => toggleSection(item.id)}
+        />
+      ) : (
+        <NavigationSidebarGroupedEntries
+          items={items}
+          activeId={activeId}
+          pendingId={null}
+          openGroupId={openGroupId}
+          showLabel
+          disabled={disabled}
+          onItemClick={handleGroupedItemClick}
+          onGroupClick={handleGroupClick}
+        />
+      );
     return (
       // The drawer's own stacking layer, below the header: the scrim, the panel
       // and the host its popups portal into (the account menu), so a menu opened
       // in the panel stacks over it instead of under its `z-[101]`. The layer
-      // itself takes no clicks; its children opt back in.
-      <div className="pointer-events-none absolute inset-0 z-[101] md:hidden" style={{ top: HEADER_HEIGHT }}>
+      // itself takes no clicks; its children opt back in. `overflow-x-clip`: a closed drawer
+      // from the right waits past the screen's edge, which must not widen the page (sideways
+      // scroll, a zoomed-out phone); clip, not hidden, so the layer is no scroller and its
+      // popups still reach past it up and down.
+      <div
+        data-testid="mobile-menu-layer"
+        className="pointer-events-none absolute inset-0 z-[101] overflow-x-clip md:hidden"
+        style={{ top: HEADER_HEIGHT }}
+      >
         <div
           className={cn(
             'absolute inset-0',
@@ -262,13 +304,20 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
         {/* The sidebar as a drawer from the left, 300px (at most 85% of the
             phone), with the sidebar's rows, slots and active resolution. */}
         <div
+          // A drawer that changes sides (the host's config resolving after the first paint: a
+          // flag) is a new panel, not one sliding across the screen from one edge to the other.
+          key={fromRight ? 'end' : 'start'}
           ref={panelRef}
           className={cn(
-            'absolute inset-y-0 left-0 flex w-[300px] max-w-[85vw] flex-col',
-            'border-r border-ods-border bg-ods-card',
+            // Sectioned: the navigation's own width (`expandedWidth`, the desktop's 200px).
+            'absolute inset-y-0 flex max-w-[85vw] flex-col',
+            !(sectioned && config.expandedWidth) && 'w-[300px]',
+            fromRight ? 'right-0 border-l' : 'left-0 border-r',
+            panel ? 'border-ods-border-panel bg-ods-panel' : 'border-ods-border bg-ods-card',
             'transition-transform duration-300 ease-out motion-reduce:transition-none',
-            isOpen ? 'pointer-events-auto translate-x-0' : '-translate-x-full',
+            isOpen ? 'pointer-events-auto translate-x-0' : fromRight ? 'translate-x-full' : '-translate-x-full',
           )}
+          style={sectioned && config.expandedWidth ? { width: config.expandedWidth } : undefined}
           role="dialog"
           aria-modal="true"
           aria-label="Mobile navigation menu"
@@ -280,7 +329,14 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
                 grouped rows — which read it — lay out expanded. */}
             <div className="flex min-h-0 flex-1 flex-col @container/of-nav-sidebar">
               {/* One inset all round the rows (8px), as in the sidebar. */}
-              <div className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-mf)] overflow-y-auto overflow-x-hidden overscroll-contain p-[var(--spacing-system-xsf)]">
+              <div
+                className={
+                  // Sectioned: full-bleed sections divided by the border, as in the sidebar.
+                  sectioned
+                    ? 'flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain'
+                    : 'flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-mf)] overflow-y-auto overflow-x-hidden overscroll-contain p-[var(--spacing-system-xsf)]'
+                }
+              >
                 {userCard}
 
                 {/* The top slot, the tree and the section as one block, spaced as in
@@ -288,17 +344,13 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
                 <div className="flex flex-col">
                   {config.topSlot?.({ minimized: false })}
 
-                  <nav aria-label="Primary navigation" className="flex flex-col gap-[var(--spacing-system-xxs)]">
-                    <NavigationSidebarGroupedEntries
-                      items={primaryItems}
-                      activeId={activeId}
-                      pendingId={null}
-                      openGroupId={openGroupId}
-                      showLabel
-                      disabled={disabled}
-                      onItemClick={handleGroupedItemClick}
-                      onGroupClick={handleGroupClick}
-                    />
+                  <nav
+                    aria-label="Primary navigation"
+                    className={
+                      sectioned ? SECTIONED_PRIMARY_NAV_CLASSES : 'flex flex-col gap-[var(--spacing-system-xxs)]'
+                    }
+                  >
+                    {entries(primaryItems)}
                   </nav>
 
                   {/* In the flow at its full height, as in the sidebar: the drawer's
@@ -311,17 +363,11 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
                 </div>
 
                 {secondaryItems.length > 0 && (
-                  <nav aria-label="Secondary navigation" className="flex flex-col">
-                    <NavigationSidebarGroupedEntries
-                      items={secondaryItems}
-                      activeId={activeId}
-                      pendingId={null}
-                      openGroupId={openGroupId}
-                      showLabel
-                      disabled={disabled}
-                      onItemClick={handleGroupedItemClick}
-                      onGroupClick={handleGroupClick}
-                    />
+                  <nav
+                    aria-label="Secondary navigation"
+                    className={cn('flex flex-col', sectioned && 'mt-auto border-t', panel && 'border-ods-border')}
+                  >
+                    {entries(secondaryItems)}
                   </nav>
                 )}
 

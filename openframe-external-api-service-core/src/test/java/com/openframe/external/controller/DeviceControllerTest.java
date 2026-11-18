@@ -1,5 +1,6 @@
 package com.openframe.external.controller;
 
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterFacet;
@@ -18,6 +19,7 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.external.mapper.DeviceMapper;
@@ -77,7 +79,7 @@ class DeviceControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = ExternalApiMockMvc.standalone(new DeviceController(
-                deviceService, deviceFilterService, tagService, new DeviceMapper()));
+                deviceService, deviceFilterService, tagService, new DeviceMapper(new ClientVersionThreshold("1.6.0"))));
     }
 
     @Test
@@ -86,6 +88,8 @@ class DeviceControllerTest {
 
         mockMvc.perform(get(BASE)
                         .param("statuses", "ONLINE,OFFLINE")
+                        .param("connectivity", "ONLINE")
+                        .param("clientOutdated", "true")
                         .param("deviceTypes", "LAPTOP")
                         .param("deviceTypes", "SERVER")
                         .param("osTypes", "WINDOWS")
@@ -105,6 +109,8 @@ class DeviceControllerTest {
         verify(deviceService).queryDevices(filter.capture(), pagination.capture(), eq("reception"), sort.capture());
 
         assertEquals(List.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE), filter.getValue().getStatuses());
+        assertEquals(List.of(TelemetryStatus.ONLINE), filter.getValue().getConnectivity());
+        assertEquals(Boolean.TRUE, filter.getValue().getClientOutdated());
         assertEquals(List.of(DeviceType.LAPTOP, DeviceType.SERVER), filter.getValue().getDeviceTypes());
         assertEquals(List.of(OsType.WINDOWS), filter.getValue().getOsTypes());
         assertEquals(List.of("cust-1", "cust-2"), filter.getValue().getOrganizationIds());
@@ -212,7 +218,7 @@ class DeviceControllerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"statuses,BOGUS", "deviceTypes,TOASTER", "osTypes,LINUX", "statuses,online", "limit,many", "includeTags,maybe"})
+    @CsvSource({"statuses,BOGUS", "connectivity,PENDING", "deviceTypes,TOASTER", "osTypes,LINUX", "statuses,online", "limit,many", "includeTags,maybe"})
     void unconvertibleQueryParamIs400TypeMismatch(String param, String value) throws Exception {
         mockMvc.perform(get(BASE).param(param, value))
                 .andExpect(status().isBadRequest())
@@ -267,6 +273,8 @@ class DeviceControllerTest {
         when(deviceFilterService.getDeviceFilters(any(DeviceFilterCriteria.class), any())).thenReturn(CompletableFuture.completedFuture(
                 DeviceFilters.builder()
                         .statuses(List.of(new DeviceFilterOption("ONLINE", "Online", 4)))
+                        .connectivity(List.of(new DeviceFilterOption("OFFLINE", "OFFLINE", 2)))
+                        .clientOutdated(List.of(new DeviceFilterOption("true", "true", 6), new DeviceFilterOption("false", "false", 3)))
                         .deviceTypes(List.of(new DeviceFilterOption("LAPTOP", "Laptop", 3)))
                         .osTypes(List.of(new DeviceFilterOption("WINDOWS", "Windows", 2)))
                         .organizationIds(List.of(new DeviceFilterOption("cust-1", "Acme", 5)))
@@ -276,6 +284,8 @@ class DeviceControllerTest {
 
         mockMvc.perform(get(BASE + "/filters")
                         .param("statuses", "ONLINE")
+                        .param("connectivity", "OFFLINE")
+                        .param("clientOutdated", "false")
                         .param("deviceTypes", "LAPTOP")
                         .param("osTypes", "WINDOWS", "MAC_OS")
                         .param("customerIds", "cust-1")
@@ -285,6 +295,12 @@ class DeviceControllerTest {
                 .andExpect(jsonPath("$.statuses[0].value").value("ONLINE"))
                 .andExpect(jsonPath("$.statuses[0].label").value("Online"))
                 .andExpect(jsonPath("$.statuses[0].count").value(4))
+                .andExpect(jsonPath("$.connectivity[0].value").value("OFFLINE"))
+                .andExpect(jsonPath("$.connectivity[0].count").value(2))
+                .andExpect(jsonPath("$.clientOutdated[0].value").value("true"))
+                .andExpect(jsonPath("$.clientOutdated[0].count").value(6))
+                .andExpect(jsonPath("$.clientOutdated[1].value").value("false"))
+                .andExpect(jsonPath("$.clientOutdated[1].count").value(3))
                 .andExpect(jsonPath("$.deviceTypes[0].value").value("LAPTOP"))
                 .andExpect(jsonPath("$.osTypes[0].value").value("WINDOWS"))
                 .andExpect(jsonPath("$.customerIds[0].value").value("cust-1"))
@@ -300,6 +316,8 @@ class DeviceControllerTest {
         verify(deviceFilterService).getDeviceFilters(filter.capture(), any());
         assertEquals(DeviceFilterCriteria.builder()
                 .statuses(List.of(DeviceStatus.ONLINE))
+                .connectivity(List.of(TelemetryStatus.OFFLINE))
+                .clientOutdated(false)
                 .deviceTypes(List.of(DeviceType.LAPTOP))
                 .osTypes(List.of(OsType.WINDOWS, OsType.MAC_OS))
                 .organizationIds(List.of("cust-1"))
@@ -323,6 +341,8 @@ class DeviceControllerTest {
         assertFalse(facets.getValue().contains(DeviceFilterFacet.USER_LINKS));
         assertEquals(EnumSet.of(
                 DeviceFilterFacet.STATUSES,
+                DeviceFilterFacet.CONNECTIVITY,
+                DeviceFilterFacet.CLIENT_OUTDATED,
                 DeviceFilterFacet.DEVICE_TYPES,
                 DeviceFilterFacet.OS_TYPES,
                 DeviceFilterFacet.ORGANIZATION_IDS,

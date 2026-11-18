@@ -2,6 +2,7 @@ package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundleOnlineDispatch;
@@ -88,6 +89,48 @@ class SoftwareBundleOnlineDispatchServiceTest {
         assertThat(offline.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
     }
 
+    @Test
+    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE is left NEW, nothing dispatched")
+    void statusOnlineTelemetryOffline_leftNew() {
+        // setup
+        SoftwareBundleOnlineDispatch row = sentinel("m-stale");
+        Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
+        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
+                .thenReturn(List.of(row));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
+        when(bundleRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of());
+
+        // execution
+        service.processDevicesBecameOnline();
+
+        // verifications
+        verifyNoInteractions(bundleDispatcher);
+        verify(dispatchRepository, never()).saveAll(any());
+        assertThat(row.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
+    }
+
+    @Test
+    @DisplayName("D1: a PENDING device that is online is left NEW, nothing dispatched")
+    void pendingMachineOnline_leftNew() {
+        // setup
+        SoftwareBundleOnlineDispatch row = sentinel("m-pending");
+        Machine pending = machine("m-pending", DeviceStatus.PENDING);
+        pending.setTelemetryStatus(TelemetryStatus.ONLINE);
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
+                .thenReturn(List.of(row));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(pending));
+        when(bundleRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of());
+
+        // execution
+        service.processDevicesBecameOnline();
+
+        // verifications
+        verifyNoInteractions(bundleDispatcher);
+        verify(dispatchRepository, never()).saveAll(any());
+        assertThat(row.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
+    }
+
     private static SoftwareBundleOnlineDispatch sentinel(String machineId) {
         return SoftwareBundleOnlineDispatch.builder()
                 .tenantId(TENANT).machineId(machineId).bundleId(BUNDLE_ID)
@@ -98,6 +141,7 @@ class SoftwareBundleOnlineDispatchServiceTest {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setStatus(status);
+        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
         return m;
     }
 }

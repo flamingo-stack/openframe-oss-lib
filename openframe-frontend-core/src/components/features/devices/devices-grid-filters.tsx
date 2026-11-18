@@ -45,7 +45,9 @@ export function DevicesGridFilters({
   }
 
   return (
-    <div className="sticky top-[96px] z-10 flex flex-wrap items-start gap-[var(--spacing-system-m)] bg-ods-bg px-[var(--spacing-system-m)]">
+    // Under the toolbar (`--sticky-toolbar-h`, published by `DevicesPanelView`); 96px, the
+    // desktop toolbar's, where nothing measures one.
+    <div className="sticky top-[var(--sticky-toolbar-h,96px)] z-10 flex flex-wrap items-start gap-[var(--spacing-system-m)] bg-ods-bg px-[var(--spacing-system-m)]">
       {filterableColumns.map(column => {
         const selected = currentFilters[column.key] ?? [];
         const active = selected.length > 0;

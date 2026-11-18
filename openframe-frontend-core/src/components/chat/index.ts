@@ -1,10 +1,6 @@
 'use client';
 
 // Chat components exports
-import { createElement, forwardRef, lazy, Suspense, useEffect, useState } from 'react';
-import type { EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
-import { ASK_AI_OPEN_EVENTS, askAiOpenIsHeld, holdAskAiOpens, onAskAiIntent } from './utils/ask-ai-events';
-export * from './approval-request-message';
 export * from './approval-batch-message';
 export * from './escalation-offer-message';
 export * from './ticket-escalated-message';
@@ -24,6 +20,8 @@ export * from './slash-command-suggestions';
 export * from './chat-message-enhanced';
 export * from './chat-message-list';
 export * from './chat-message-row';
+// What the user said, as a bubble: for a surface that draws a user's line outside a thread (the hero's scene).
+export { CHAT_MESSAGE_USER_BUBBLE_CLASS } from './chat-message-layout';
 export * from './chat-turn';
 export { CHAT_MESSAGE_LIST_SKELETON_MESSAGES } from './chat-message-skeleton';
 
@@ -33,6 +31,7 @@ export * from './assistant-ask-prompts';
 export * from './quick-action-marquee';
 export * from './quick-action-wall';
 export * from './mingo-quick-action-wall';
+export * from './quick-action-row';
 export * from './mingo-edge-light';
 export * from './chat-ticket-list';
 export * from './chat-typing-indicator';
@@ -66,8 +65,6 @@ export * from './chat-list-empty-state';
 export * from './chat-top-navigation';
 export * from './onboarding-carousel';
 export type { ChatRef } from './chat-ref.types';
-export { remarkCardLinks } from './remark-card-links';
-export { remarkMentionChips } from './remark-mention-chips';
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
 export {
@@ -85,9 +82,6 @@ export {
   ChatAttachmentChipStrip,
   type ChatAttachmentAddButtonProps,
   type ChatAttachmentChipStripProps,
-  type StagedAttachment,
-  CHAT_ATTACHMENT_MIME_TYPES,
-  CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER,
 } from './chat-attachment-bar';
 
 // Entity-cards (12 refactored + 4 moved + supporting primitives)
@@ -104,46 +98,14 @@ export * from './hooks';
 // + history replay).
 export * from './stream';
 
+// THE chat engine: one thread store, one chunk processor, one React binding, for every web chat.
+export * from './engine';
+
 // Chat utilities
 export * from './utils';
 
-// EmbeddableChat — THE chat. Hosts mount it once at the root after providing a
-// <ChatRuntimeContext.Provider>. Its module is loaded on its own (`lazy`), and
-// only when the visitor shows they want it: a pointer, a touch or the focus on
-// an element that opens it (`onAskAiIntent`, `ASK_AI_TRIGGER_ATTRIBUTE`), or at
-// once when something asks for it (an open event, `open` or `defaultOpen`). A
-// chat that starts closed costs a page nothing: it used to load on every page
-// once the browser was idle, about 650 KB of script most visitors never opened.
-// An open sent before it has loaded is held and delivered (`ask-ai-events`). The host's own stylesheet
-// for it loads at the same moment (`loadStyles`), so a page does not block on the chat's classes.
 export type { ChatPrefillDraft, EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
-const LoadedEmbeddableChat = lazy(() =>
-  import('./embeddable-chat').then(module => ({ default: module.EmbeddableChat })),
-);
-export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatProps>((props, ref) => {
-  const [loadRequested, setLoadRequested] = useState(false);
-  const load = loadRequested || Boolean(props.open) || Boolean(props.defaultOpen);
-  useEffect(() => holdAskAiOpens(), []);
-  const { loadStyles } = props;
-  useEffect(() => {
-    if (load) loadStyles?.();
-  }, [load, loadStyles]);
-  useEffect(() => {
-    if (load) return undefined;
-    const start = () => setLoadRequested(true);
-    // An open sent before this mounted (a deep link, an early click) is waiting: load now to deliver it.
-    if (askAiOpenIsHeld()) queueMicrotask(start);
-    for (const name of ASK_AI_OPEN_EVENTS) window.addEventListener(name, start);
-    const cancel = onAskAiIntent(start);
-    return () => {
-      cancel();
-      for (const name of ASK_AI_OPEN_EVENTS) window.removeEventListener(name, start);
-    };
-  }, [load]);
-  if (!load) return null;
-  return createElement(Suspense, { fallback: null }, createElement(LoadedEmbeddableChat, { ...props, ref }));
-});
-EmbeddableChat.displayName = 'EmbeddableChat';
+export { EmbeddableChat } from './embeddable-chat-loader';
 export { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from './chat-dimensions';
 export {
   ASK_AI_OPEN_EVENT,
@@ -153,4 +115,6 @@ export {
 } from './utils/ask-ai-events';
 export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';
-export { InlineChip } from './inline-chip';
+export { InlineChip, INLINE_CHIP_LINKED_CLASS, type InlineChipAnchor } from './inline-chip';
+export { ChatMessageSources } from './chat-message-sources';
+export { RecordActionsProvider, type RecordActionHandlers, useRecordActions } from './record-actions';

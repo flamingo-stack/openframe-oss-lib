@@ -9,9 +9,9 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import type { Message } from '../../types/message.types';
-import { awaitsDecision, mergeByTime, useWhatToAsk, type WhatToAskContent } from '../use-what-to-ask';
+import { describe, expect, it } from 'vitest';
+import { textOfParts, type ChatMessage } from '../../../../chat-protocol/chat-message';
+import { mergeByTime, useWhatToAsk, type WhatToAskContent } from '../use-what-to-ask';
 
 const content: WhatToAskContent = {
   question: 'What can I ask you?',
@@ -20,35 +20,34 @@ const content: WhatToAskContent = {
   note: 'Click one to put it in the composer, then send.',
 };
 
-const message = (id: string, at: number): Message => ({
+const message = (id: string, at: number): ChatMessage => ({
   id,
   role: 'user',
-  content: id,
-  timestamp: new Date(at),
+  metadata: { createdAt: new Date(at).toISOString() },
+  parts: [{ type: 'text', text: id }],
 });
 
-function setup(dialogId: string | null, onPick?: (prompt: string) => void) {
-  return renderHook(({ id }) => useWhatToAsk({ dialogId: id, content, onPick }), {
+function setup(dialogId: string | null) {
+  return renderHook(({ id }) => useWhatToAsk({ dialogId: id, content }), {
     initialProps: { id: dialogId },
   });
 }
 
-const ids = (messages: Message[]) => messages.map(m => m.id);
+const ids = (messages: ChatMessage[]) => messages.map(m => m.id);
 
 describe('useWhatToAsk', () => {
   it('adds the question and an answer with the suggestions to the open conversation', () => {
-    const onPick = vi.fn();
-    const { result } = setup('d-1', onPick);
+    const { result } = setup('d-1');
 
     act(() => result.current.ask('current'));
     const thread = result.current.withExchanges([]);
 
     expect(thread).toHaveLength(2);
-    expect(thread[0]).toMatchObject({ role: 'user', content: 'What can I ask you?' });
+    expect(thread[0]).toMatchObject({ role: 'user', parts: [{ type: 'text', text: 'What can I ask you?' }] });
     expect(thread[1].role).toBe('assistant');
-    expect(thread[1].content).toEqual([
+    expect(thread[1].parts).toEqual([
       { type: 'text', text: 'Try one:' },
-      { type: 'suggestions', groups: content.groups, note: content.note, onPick },
+      { type: 'data-suggestions', data: { groups: content.groups, note: content.note } },
     ]);
   });
 
@@ -114,9 +113,7 @@ describe('useWhatToAsk', () => {
     act(() => result.current.ask('current'));
     const answers = result.current.withExchanges([]).filter(m => m.role === 'assistant');
 
-    expect(
-      answers.map(m => (Array.isArray(m.content) && m.content[0].type === 'text' ? m.content[0].text : '')),
-    ).toEqual(['Built from live data:', 'Try one:']);
+    expect(answers.map(m => textOfParts(m.parts))).toEqual(['Built from live data:', 'Try one:']);
   });
 
   it('shows nothing without content', () => {
@@ -140,26 +137,7 @@ describe('mergeByTime', () => {
   });
 
   it('never moves a local message past a thread message without a time', () => {
-    const untimed: Message = { id: 'u', role: 'assistant', content: 'u' };
+    const untimed: ChatMessage = { id: 'u', role: 'assistant', parts: [{ type: 'text', text: 'u' }] };
     expect(ids(mergeByTime([untimed, message('b', 30)], [message('l', 20)]))).toEqual(['u', 'l', 'b']);
-  });
-});
-
-describe('awaitsDecision', () => {
-  const withSegment = (segment: Exclude<Message['content'], string>[number]): Message => ({
-    id: 'a',
-    role: 'assistant',
-    content: [segment],
-  });
-  const request = { requestId: 'r', command: 'c', explanation: 'e', approvalType: 'COMMAND' };
-
-  it('is true for an approval nobody has answered', () => {
-    expect(awaitsDecision([withSegment({ type: 'approval_request', data: request })])).toBe(true);
-    expect(awaitsDecision([withSegment({ type: 'approval_request', data: request, status: 'pending' })])).toBe(true);
-  });
-
-  it('is false once it is answered, and for plain text', () => {
-    expect(awaitsDecision([withSegment({ type: 'approval_request', data: request, status: 'approved' })])).toBe(false);
-    expect(awaitsDecision([message('a', 1)])).toBe(false);
   });
 });

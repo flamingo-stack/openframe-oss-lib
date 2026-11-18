@@ -17,10 +17,8 @@ import {
   ROW_MOBILE_SHELL_CLASS,
   ROW_SHELL_CLASSES,
 } from './data-table-row-classes';
+import { cancelAfterReactHandlers, isRowLinkControlClick } from './row-link-click';
 import { alignJustify, getHideClasses } from './utils';
-
-/** A control inside a row link whose click is its own: it never follows the row's link (see `preventControlNavigation`). */
-const ROW_LINK_CONTROL_SELECTOR = 'button, [role="button"]';
 
 export interface DataTableRowProps<T> {
   /** The row. `null` is a row still being read (a body's loading rows): it draws its own skeleton, as it does in a
@@ -221,27 +219,21 @@ function DataTableRowImpl<T>({
         if (isLinkMode) e.preventDefault();
         return;
       }
+      // A button's click in a row link is the button's: here, on the way up, its own handlers have run.
+      if (isLinkMode && isRowLinkControlClick(e.target, containerRef.current)) {
+        e.preventDefault();
+        return;
+      }
       onClick?.(row.original);
     },
     [onClick, row.original, isLinkMode],
   );
 
-  // Link mode, CAPTURE phase: a click on a control inside the row link (a `data-no-row-click` element, or any
-  // button) runs the control and never follows the link. The bubble handler above cannot promise that alone: a
-  // control that calls `stopPropagation` (or sits in a wrapper that does) keeps the click from ever reaching it, and
-  // the browser then follows the anchor, so the control's own action ran and the page navigated away (an Edit
-  // button opened its modal, then the row's page). A button without the marker followed the link the same way.
-  // Capture runs before any descendant handler. Only `preventDefault`, never `stopPropagation`: the control still
-  // gets its click. Left alone: a portalled descendant's click (its target is outside the anchor, so the anchor has
-  // no default action, and a link in a portalled menu must keep its own), a link nested in a cell (the innermost
-  // link is the one the browser follows), and form fields (cancelling a checkbox's click would undo its check).
+  // Link mode: a click on a control inside the row link (a `data-no-row-click` element, or any button) runs the
+  // control and never follows the link, even when the control stops the click from bubbling to `handleClick`
+  // (`cancelAfterReactHandlers`). Never cancelled here, in the capture phase: the control must see its click as it came.
   const preventControlNavigation = useCallback((e: React.MouseEvent) => {
-    const container = containerRef.current;
-    const target = e.target;
-    if (!(target instanceof Element) || !container?.contains(target)) return;
-    const nestedLink = target.closest('a');
-    if (nestedLink && nestedLink !== container && container.contains(nestedLink)) return;
-    if (!isOwnClick(target, container) || target.closest(ROW_LINK_CONTROL_SELECTOR)) e.preventDefault();
+    if (isRowLinkControlClick(e.target, containerRef.current)) cancelAfterReactHandlers(e);
   }, []);
 
   const containerClassName = cn(

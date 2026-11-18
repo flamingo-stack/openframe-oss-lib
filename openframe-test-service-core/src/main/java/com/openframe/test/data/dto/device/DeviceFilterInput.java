@@ -15,6 +15,7 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class DeviceFilterInput {
     private List<DeviceStatus> statuses;
+    private List<DeviceConnectivity> connectivity;
     private List<DeviceType> deviceTypes;
     private List<String> osTypes;
     private List<String> organizationIds;

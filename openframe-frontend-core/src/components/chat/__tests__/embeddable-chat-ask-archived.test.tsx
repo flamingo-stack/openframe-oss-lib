@@ -18,13 +18,13 @@ vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import type { ChatRef } from '../chat-ref.types';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   source: 'openframe',
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -78,8 +78,7 @@ function Host({
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
     dialogCapabilities: {
@@ -91,16 +90,17 @@ function Host({
   return (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          shell="inline"
-          appearance="v2"
-          closable={false}
-          open
-          onOpenChange={vi.fn()}
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={state}
-        />
+        <ChatEngineProvider engine={state}>
+          <EmbeddableChat
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={vi.fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>
   );

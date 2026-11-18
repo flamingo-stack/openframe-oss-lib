@@ -18,6 +18,13 @@ public class DeviceFilterResponse {
     @Schema(description = "Available device statuses with counts")
     private List<DeviceFilterItem> statuses;
 
+    @Schema(description = "Available connectivity values (ONLINE, OFFLINE) with counts")
+    private List<DeviceFilterItem> connectivity;
+
+    @Schema(description = "Outdated client values with counts: true (client below the minimum supported version) and " +
+            "false (supported or unknown version), both always listed")
+    private List<DeviceFilterItem> clientOutdated;
+
     @Schema(description = "Available device types with counts")
     private List<DeviceFilterItem> deviceTypes;
 

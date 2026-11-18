@@ -138,7 +138,7 @@ describe('PolicyConfigurationPanel', () => {
       />,
     );
     open();
-    const allow = screen.getAllByRole('button', { name: 'Allow' })[0] as HTMLElement;
+    const allow = screen.getAllByRole('button', { name: 'Allow' })[0];
     fireEvent.click(allow);
     expect(onChange).toHaveBeenCalledWith('downloads', 'web', 'ALLOW');
   });

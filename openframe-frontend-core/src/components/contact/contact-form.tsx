@@ -24,6 +24,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useForm, Controller } from 'react-hook-form';
+import type { ChatAttachment } from '../../chat-protocol/attachment';
 import { useContactSubmission } from '../../hooks/use-contact-submission';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { useRescuedForm } from '../../hooks/use-rescued-form';
@@ -38,7 +39,6 @@ import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
-import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
 import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../layout/page-heading';
 import {
   Button,

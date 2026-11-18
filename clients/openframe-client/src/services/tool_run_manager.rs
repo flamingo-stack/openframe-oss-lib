@@ -2,6 +2,7 @@ use crate::models::installed_tool::{Installation, InstalledTool, ToolRecordState
 use crate::platform::system_service;
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
+use crate::services::tool_connection_processing_manager::reap_orphaned_helpers;
 use crate::services::tool_kill_service::ToolKillService;
 use crate::services::tool_ops::ToolOps;
 use crate::utils::failure_log_backoff::FailureLogBackoff;
@@ -126,8 +127,7 @@ impl ToolRunManager {
         info!("Tool run manager: shutdown signalled, no new launches will occur");
     }
 
-    /// Reversibly stop every managed tool (kill processes / stop services) without uninstalling.
-    /// Used when the tenant is gone, to stop tools hammering their now-unreachable endpoints.
+    /// Reversibly stop every managed tool without uninstalling, while the client is paused (tenant gone or 403).
     pub async fn stop_all(&self) -> Result<()> {
         {
             // Under the supervision lock so a concurrent resume_after_update_failure cannot undo the stop
@@ -412,6 +412,7 @@ impl ToolRunManager {
                         sleep(Duration::from_secs(delay)).await;
                         continue;
                     }
+                    reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
                     kill_leftovers_now = false;
                 }
 

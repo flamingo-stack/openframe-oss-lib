@@ -5,7 +5,8 @@ import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated';
 import { InteractiveSkeleton } from '../loading/unified-skeleton';
 import { useComposerDockHeight } from '../navigation/app-layout-context';
-import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
+import type { ActionsMenuGroup, ActionsMenuItem } from './actions-menu';
+import { ActionsMenuDropdownOnDemand as ActionsMenuDropdown } from './actions-menu-on-demand';
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
 import { InertWhileLoading, useLoadingScope } from './loading-scope';
@@ -107,12 +108,13 @@ function menuRowIcon(action: PageActionButton): React.ReactNode {
 function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuItem[] {
   if (action.submenu && action.submenu.length > 0) {
     // When a split-button action collapses into the merged mobile "..." menu,
-    // its chevron disappears and its children become sibling rows. Prefix
-    // each child with the parent label.
+    // its chevron disappears and its children become sibling rows. Each child
+    // keeps its own label; the parent action is its secondary text (before any
+    // description of its own), never packed into the label.
     if (!action.label) return action.submenu;
     return action.submenu.map(item => ({
       ...item,
-      label: `${action.label} (${item.label})`,
+      description: item.description ? `${action.label} · ${item.description}` : action.label,
     }));
   }
 

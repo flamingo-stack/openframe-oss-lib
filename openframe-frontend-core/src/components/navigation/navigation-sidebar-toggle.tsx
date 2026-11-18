@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '../../utils';
-import { Chevrons03LeftIcon } from '../icons-v2-generated';
+import { Chevrons03LeftIcon, SidebarFlipIcon, SidebarIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
 
 export interface NavigationSidebarToggleProps {
@@ -14,6 +14,13 @@ export interface NavigationSidebarToggleProps {
    * beside it. Default false: the flat sidebar's 56px row with a 24px chevron.
    */
   compact?: boolean;
+  /**
+   * The sidebar's edge (`NavigationSidebarConfig.side`). A right sidebar's
+   * chevron is mirrored: it points right to hide the menu, left to show it.
+   */
+  side?: 'left' | 'right';
+  /** The border above the toggle. Default `border-ods-border`. */
+  borderClassName?: string;
 }
 
 export function NavigationSidebarToggle({
@@ -21,11 +28,14 @@ export function NavigationSidebarToggle({
   showLabel,
   onToggle,
   compact = false,
+  side = 'left',
+  borderClassName = 'border-ods-border',
 }: NavigationSidebarToggleProps) {
   return (
     <div
       className={cn(
-        'border-t border-ods-border',
+        'border-t',
+        borderClassName,
         compact && 'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]',
       )}
     >
@@ -55,7 +65,10 @@ export function NavigationSidebarToggle({
               its own. */}
           <Chevrons03LeftIcon
             className={cn(
-              'rotate-180 text-ods-text-secondary transition-transform duration-300 @[140px]/of-nav-sidebar:rotate-0',
+              'text-ods-text-secondary transition-transform duration-300',
+              side === 'right'
+                ? 'rotate-0 @[140px]/of-nav-sidebar:rotate-180'
+                : 'rotate-180 @[140px]/of-nav-sidebar:rotate-0',
               compact ? 'size-5' : 'h-6 w-6',
             )}
           />
@@ -77,6 +90,51 @@ export function NavigationSidebarToggle({
           Hide Menu
         </span>
       </Button>
+    </div>
+  );
+}
+
+export interface NavigationSidebarIconToggleProps {
+  minimized: boolean;
+  onToggle: () => void;
+  side?: 'left' | 'right';
+  /** The border above the footer. Default `border-ods-border`. */
+  borderClassName?: string;
+}
+
+/**
+ * The `toggle: 'icon'` footer: 56px, the border above it, a 32px button with the
+ * sidebar glyph (mirrored for a right sidebar) — at the left edge of the expanded
+ * sidebar, centred in the rail.
+ */
+export function NavigationSidebarIconToggle({
+  minimized,
+  onToggle,
+  side = 'left',
+  borderClassName = 'border-ods-border',
+}: NavigationSidebarIconToggleProps) {
+  const label = minimized ? 'Show Menu' : 'Hide Menu';
+  const Icon = side === 'right' ? SidebarFlipIcon : SidebarIcon;
+  return (
+    <div
+      className={cn(
+        'flex h-14 shrink-0 items-center justify-center border-t px-[var(--spacing-system-xsf)] @[140px]/of-nav-sidebar:justify-start',
+        borderClassName,
+      )}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={label}
+        title={label}
+        className={cn(
+          'flex size-8 shrink-0 items-center justify-center rounded-md text-ods-text-panel-secondary transition-colors',
+          'hover:bg-ods-bg-hover hover:text-ods-text-primary active:bg-ods-bg-active',
+          'outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
+        )}
+      >
+        <Icon size={20} />
+      </button>
     </div>
   );
 }

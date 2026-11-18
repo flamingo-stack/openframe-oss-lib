@@ -106,6 +106,24 @@ export const SingleRow: Story = {
   },
 };
 
+const previewRow = (i: number) => ({
+  id: `row-${i}`,
+  columns: [
+    { key: 'name', value: `WS-${100 + i}`, label: 'Disk 92% full' },
+    { key: 'tag', content: <Tag label="Low disk" variant="warning" />, width: 'shrink-0', align: 'right' as const },
+  ],
+});
+
+/** `previewRows`: three rows, the rest faded out under "Show N more"; the card keeps that height loading or loaded. */
+export const PreviewRows: Story = {
+  args: { title: 'Needs you', previewRows: 3, listItems: true, rows: [0, 1, 2, 3, 4].map(previewRow) },
+};
+
+/** `previewRows` while loading: three loading rows, the same height as the loaded preview. */
+export const PreviewRowsLoading: Story = {
+  args: { title: 'Needs you', previewRows: 3, listItems: true, loading: true, skeleton: { columns: 2 }, rows: [] },
+};
+
 /** Info-banner row: `leadingIcon` centers a 24px glyph against both text lines. */
 export const InfoBanner: Story = {
   args: {

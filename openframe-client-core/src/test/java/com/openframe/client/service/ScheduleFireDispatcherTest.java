@@ -7,6 +7,7 @@ import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
@@ -337,6 +338,46 @@ class ScheduleFireDispatcherTest {
     }
 
     @Test
+    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE is skipped like any offline target")
+    void dispatch_statusOnlineTelemetryOffline_notDispatched() {
+        // setup
+        Instant now = Instant.now();
+        ScheduleScript schedule = schedule(List.of("script-a"));
+        Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
+        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-stale"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
+
+        // execution
+        dispatcher.dispatch(schedule, now);
+
+        // verifications
+        verify(deliveryRouter, never()).dispatch(any());
+        verify(scheduleScriptExecutionRepository, never()).save(any());
+        verifyNoInteractions(dispatchRepository);
+    }
+
+    @Test
+    @DisplayName("a target with no telemetryStatus yet (pre-heartbeat document) is not online: skipped, nothing dispatched")
+    void dispatch_nullTelemetryStatus_notDispatched() {
+        // setup
+        Instant now = Instant.now();
+        ScheduleScript schedule = schedule(List.of("script-a"));
+        Machine noTelemetry = machine("m-new", DeviceStatus.ONLINE);
+        noTelemetry.setTelemetryStatus(null);
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-new"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(noTelemetry));
+
+        // execution
+        dispatcher.dispatch(schedule, now);
+
+        // verifications
+        verify(deliveryRouter, never()).dispatch(any());
+        verify(scheduleScriptExecutionRepository, never()).save(any());
+        verifyNoInteractions(dispatchRepository);
+    }
+
+    @Test
     @DisplayName("route before the engine, RETRY_ON_RECONNECT: OFFLINE target is held here (sentinel armed NEW + expiresAt), ONLINE target is dispatched")
     void dispatch_retryOnReconnect_armsOfflineDispatchesOnline() {
         Instant now = Instant.now();
@@ -564,6 +605,7 @@ class ScheduleFireDispatcherTest {
         m.setTenantId(TENANT);
         m.setMachineId(machineId);
         m.setStatus(status);
+        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
         return m;
     }
 }

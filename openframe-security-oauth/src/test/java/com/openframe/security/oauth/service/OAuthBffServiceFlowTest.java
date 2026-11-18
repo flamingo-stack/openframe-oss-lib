@@ -146,7 +146,8 @@ class OAuthBffServiceFlowTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"//evil.com/x", "/\\evil.com", "javascript:alert(1)", "data:text/html,x", "evil.com", "relative/path"})
+    @ValueSource(strings = {"//evil.com/x", "/\\evil.com", "javascript:alert(1)", "data:text/html,x", "evil.com", "relative/path",
+            "/\t/evil.com", "/\n/evil.com", "/\r/evil.com", "/\t\\evil.com", "/ /evil.com"})
     void shouldNotCarryUnsafeRedirects(String redirectTo) {
         assertThat(service().buildAuthorizeRedirect("acme", redirectTo, null, false, get("/")).block().redirectTo()).isNull();
     }

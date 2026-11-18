@@ -1,6 +1,7 @@
 package com.openframe.client.listener.packageupdate;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -11,6 +12,8 @@ import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.State;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -134,6 +137,46 @@ class PackageUpdateExecutionRecorderTest {
     }
 
     @Test
+    void done_withManagerOutput_keepsItUnderTheSummary() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        PackageUpdateStatusMessage done = done(Done.Result.UPGRADED, "4.36.140", false);
+        done.setStdout("==> Upgrading slack");
+
+        recorder.record(request, "m1", done);
+
+        assertThat(row.getStdout()).isEqualTo("Updated (4.36.140).\n\n==> Upgrading slack");
+        assertThat(row.getStdoutTruncated()).isFalse();
+        assertThat(row.getStderr()).isNull();
+    }
+
+    @Test
+    void failed_withManagerOutput_keepsBothStreams_longOnesCut() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        PackageUpdateStatusMessage failed = failed(Failed.Reason.MANAGER_ERROR, "brew exited 1", 1L);
+        failed.setStdout("==> Upgrading slack");
+        failed.setStderr("e".repeat(ScriptExecution.MAX_OUTPUT_BYTES + 1));
+
+        recorder.record(request, "m1", failed);
+
+        assertThat(row.getError()).isEqualTo("MANAGER_ERROR: brew exited 1");
+        assertThat(row.getStdout()).isEqualTo("==> Upgrading slack");
+        assertThat(row.getStderr()).hasSize(ScriptExecution.MAX_OUTPUT_BYTES);
+        assertThat(row.getStderrTruncated()).isTrue();
+    }
+
+    @Test
+    void waiting_afterAFailedAttemptWithOutput_clearsTheOutput() {
+        ScriptExecution row = rowFound(ExecutionStatus.FAILED);
+        row.setStderr("old output");
+        row.setStderrTruncated(true);
+
+        recorder.record(request, "m1", event(State.WAITING));
+
+        assertThat(row.getStderr()).isNull();
+        assertThat(row.getStderrTruncated()).isNull();
+    }
+
+    @Test
     void done_alreadyLatest_succeeds() {
         ScriptExecution row = rowFound(ExecutionStatus.QUEUED);
 
@@ -154,6 +197,7 @@ class PackageUpdateExecutionRecorderTest {
         assertThat(row.getWaiting()).isNull();
         assertThat(row.getFinishedAt()).isNotNull();
         assertThat(row.getError()).isEqualTo("MANAGER_ERROR: winget exited 1");
+        assertThat(row.getFailureReason()).isEqualTo(ExecutionFailureReason.SYSTEM_SCRIPT_ERROR);
         assertThat(row.getExitCode()).isEqualTo(1);
         assertThat(row.getStdout()).isNull();
     }
@@ -179,6 +223,45 @@ class PackageUpdateExecutionRecorderTest {
         assertThat(row.getError()).isEqualTo(PackageUpdateExecutionRecorder.SUPERSEDED_ERROR);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "TIMEOUT, AGENT_TIMED_OUT",
+            "MANAGER_MISSING, COULD_NOT_LAUNCH",
+            "NOT_SUPPORTED, COULD_NOT_LAUNCH",
+            "MANAGER_ERROR, SYSTEM_SCRIPT_ERROR",
+            "CLOSE_FAILED, SYSTEM_SCRIPT_ERROR",
+            "NOT_INSTALLED, SYSTEM_SCRIPT_ERROR",
+            "NOT_UPGRADABLE, SYSTEM_SCRIPT_ERROR"
+    })
+    void failed_mapsTheUpdateReasonToTheFailureReason(Failed.Reason reason, ExecutionFailureReason expected) {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        recorder.record(request, "m1", failed(reason, null, null));
+
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getFailureReason()).isEqualTo(expected);
+    }
+
+    @Test
+    void superseded_hasNoFailureReason() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        row.setFailureReason(ExecutionFailureReason.NO_ACK);
+
+        recorder.record(request, "m1", failed(Failed.Reason.SUPERSEDED, null, null));
+
+        assertThat(row.getFailureReason()).isNull();
+    }
+
+    @Test
+    void failedWithoutAReason_isASystemScriptError() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        recorder.record(request, "m1", failed(null, null, null));
+
+        assertThat(row.getError()).isEqualTo(PackageUpdateExecutionRecorder.FAILED_ERROR);
+        assertThat(row.getFailureReason()).isEqualTo(ExecutionFailureReason.SYSTEM_SCRIPT_ERROR);
+    }
+
     @Test
     void undelivered_failsTheRowWithTheDeliveryReason() {
         ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
@@ -188,6 +271,7 @@ class PackageUpdateExecutionRecorderTest {
         verify(scriptExecutionRepository).save(row);
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(row.getError()).isEqualTo("The device did not receive the update (EXHAUSTED)");
+        assertThat(row.getFailureReason()).isEqualTo(ExecutionFailureReason.NO_ACK);
         assertThat(row.getFinishedAt()).isNotNull();
         assertThat(row.getStatusChangedAt()).isNotNull();
         assertThat(row.getExitCode()).isNull();

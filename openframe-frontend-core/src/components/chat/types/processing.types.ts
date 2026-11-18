@@ -1,37 +1,9 @@
 /**
  * Message processing and transformation types
- * Contains types for message parsing, accumulation, and processing
  */
 
 import type { ChatApprovalStatus, AssistantType } from './chat.types';
-import type { ApprovalRequestField, MessageSegment, PendingToolCallData, ExecutingToolState } from './message.types';
 import type { ChunkData } from './network.types';
-
-// NOTE: the `ParsedChunkAction` union that used to live here was DELETED
-// alongside the legacy `chunk-parser`. The wire → normalized-event
-// vocabulary is now `ChatStreamEvent` in `src/chat-protocol/events.ts`,
-// produced by `decodeNatsChunk`.
-
-// ========== Accumulator State ==========
-
-export interface PendingApproval {
-  command: string;
-  explanation?: string;
-  approvalType: string;
-  /** Structured label/value rows — a card can be almost entirely
-   *  these, so a path that forgets them renders a bare title. */
-  fields?: ApprovalRequestField[];
-}
-
-export interface AccumulatorState {
-  segments: MessageSegment[];
-  pendingApprovals: Map<string, PendingApproval>;
-  executingTools: Map<string, ExecutingToolState>;
-  escalatedApprovals?: Map<
-    string,
-    { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
-  >;
-}
 
 // ========== Message Processing Options ==========
 
@@ -42,50 +14,16 @@ export interface MessageProcessingOptions {
   assistantType?: AssistantType;
   /** Avatar URL for assistant messages */
   assistantAvatar?: string;
-  /** Callback for approval actions */
-  onApprove?: (requestId?: string) => Promise<void> | void;
-  /** Callback for rejection actions */
-  onReject?: (requestId?: string) => Promise<void> | void;
   /** Filter by chat type (e.g., 'CLIENT_CHAT') */
   chatTypeFilter?: string;
-  /** Map of approval statuses by request ID */
+  /** Statuses this client already knows, by approval id: they win over what the rows say, because the row that says it
+   *  may not be on the fetched pages. */
   approvalStatuses?: Record<string, ChatApprovalStatus>;
   /**
-   * Terminal escalation-offer states by offer id, from live chunks the host
-   * has already seen. Needed because an offer and its resolution are two
-   * separate persisted rows: SUPERSEDED is published *because* the client
-   * typed, so a user message always separates them and the two rows land in
-   * different assistant envelopes.
+   * Terminal escalation-offer states by offer id, from live chunks the host has already seen. An offer and its resolution
+   * are two separate persisted rows, and the row with the resolution may not be on the fetched pages.
    */
   escalationOfferStates?: Record<string, ChatApprovalStatus>;
-  /** Escalation approve handler; distinct from `onApprove` because offers
-   *  resolve through the ticket-escalation mutations. */
-  onEscalationApprove?: (offerId?: string) => Promise<void> | void;
-  /** Escalation reject handler. See `onEscalationApprove`. */
-  onEscalationReject?: (offerId?: string) => Promise<void> | void;
-  /** Approval types to display directly (others get escalated) - defaults to all types */
-  displayApprovalTypes?: string[];
-  /**
-   * Consumer-owned. Forwarded by the host app (e.g. oss-tenant chat client
-   * reads its `'batch-approvals'` feature flag and passes it down). The lib
-   * defaults to legacy single-card rendering when this is omitted — it will
-   * not enable the batch UI on its own.
-   */
-  batchApprovalsEnabled?: boolean;
-}
-
-// NOTE: `ChunkProcessorOptions` (the options bag of the deleted
-// `ChunkProcessor`) and `MessageTransformer` were DELETED — both were left
-// behind by the chunk-processor removal with zero references in lib, hub, or
-// app.
-
-// ========== Message Transformation Types ==========
-
-export interface TransformationOptions {
-  preserveOriginal?: boolean;
-  mergeSegments?: boolean;
-  formatTimestamp?: boolean;
-  includeMetadata?: boolean;
 }
 
 // ========== Stream Processing Types ==========

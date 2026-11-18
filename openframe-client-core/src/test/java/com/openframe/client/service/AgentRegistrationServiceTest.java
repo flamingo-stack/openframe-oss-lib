@@ -31,8 +31,10 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
+import java.time.Instant;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -166,6 +168,7 @@ class AgentRegistrationServiceTest {
         assertEquals(ORGANIZATION_ID, savedMachine.getOrganizationId());
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus());
         assertNotNull(savedMachine.getLastSeen());
+        assertNotNull(savedMachine.getOrganizationAssignedAt());
 
         verify(installedAgentService).addInstalledAgent(MACHINE_ID, "openframe-client", "1.0.0", false);
     }
@@ -287,6 +290,43 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
+    void reinstall_UnderAnotherOrganization_StampsTheNewEnrollment() {
+        OAuthClient existingClient = new OAuthClient();
+        existingClient.setMachineId(MACHINE_ID);
+        Machine existingMachine = new Machine();
+        existingMachine.setMachineId(MACHINE_ID);
+        existingMachine.setOrganizationId("old-org");
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
+        stubWriterOver(existingMachine);
+        when(organizationIdResolver.resolve("org-1")).thenReturn("new-org");
+
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        Machine savedMachine = writtenOver(existingMachine);
+        assertEquals("new-org", savedMachine.getOrganizationId());
+        assertNotNull(savedMachine.getOrganizationAssignedAt());
+    }
+
+    @Test
+    void reinstall_UnderTheSameOrganization_KeepsTheEnrollment() {
+        Instant assignedAt = Instant.parse("2026-10-20T10:00:00Z");
+        OAuthClient existingClient = new OAuthClient();
+        existingClient.setMachineId(MACHINE_ID);
+        Machine existingMachine = new Machine();
+        existingMachine.setMachineId(MACHINE_ID);
+        existingMachine.setOrganizationId("same-org");
+        existingMachine.setOrganizationAssignedAt(assignedAt);
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
+        stubWriterOver(existingMachine);
+        when(organizationIdResolver.resolve("org-1")).thenReturn("same-org");
+
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        Machine savedMachine = writtenOver(existingMachine);
+        assertEquals(assignedAt, savedMachine.getOrganizationAssignedAt());
+    }
+
+    @Test
     void reinstall_WithInvalidInitialKey_FailsBeforeClientSecretCheck() {
         doThrow(new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key"))
                 .when(agentRegistrationSecretValidator).validate(INITIAL_KEY);
@@ -352,6 +392,57 @@ class AgentRegistrationServiceTest {
         request.setOsType("WINDOWS");   // agent contract: exact OsType enum name
         request.setAgentVersion("1.0.0");
         return request;
+    }
+
+    @Test
+    void registerAgent_WithAgentVersion_StoresItsComparableKey() {
+        // setup
+        stubNewMachineRegistration();
+        request.setAgentVersion("1.6.2");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getAgentVersion, Machine::getAgentVersionKey)
+                .containsExactly("1.6.2", 1_000_006_000_002L);
+    }
+
+    @Test
+    void registerAgent_WithUnparseableAgentVersion_StoresNoKey() {
+        // setup
+        stubNewMachineRegistration();
+        request.setAgentVersion("dev-build");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getAgentVersion, Machine::getAgentVersionKey)
+                .containsExactly("dev-build", null);
+    }
+
+    @Test
+    void reinstall_WithNewAgentVersion_OverwritesTheStoredKey() {
+        // setup
+        Machine existingMachine = new Machine();
+        existingMachine.setMachineId(MACHINE_ID);
+        existingMachine.setAgentVersion("1.5.9");
+        existingMachine.setAgentVersionKey(1_000_005_000_009L);
+        stubReinstallOf(existingMachine);
+        request.setAgentVersion("1.6.0");
+
+        // execution
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertThat(writtenOver(existingMachine))
+                .extracting(Machine::getAgentVersion, Machine::getAgentVersionKey)
+                .containsExactly("1.6.0", 1_000_006_000_000L);
     }
 
     @Test
@@ -443,6 +534,57 @@ class AgentRegistrationServiceTest {
         assertEquals("old-user", savedMachine.getUserId());
     }
 
+    @Test
+    void registerAgent_WhenPostProcessingFails_MarksTheMachineDeletedAndRethrows() {
+        stubNewMachineRegistration();
+        IllegalStateException failure = new IllegalStateException("post-processing failed");
+        doThrow(failure).when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        assertSame(failure, thrown);
+        Machine discarded = writtenOver(new Machine());
+        assertEquals(DeviceStatus.DELETED, discarded.getStatus());
+        verify(installedAgentService).disconnectAll(MACHINE_ID);
+    }
+
+    @Test
+    void registerAgent_RetryAfterAFailedAttempt_LeavesOneLiveDevice() {
+        when(machineIdGenerator.generate()).thenReturn("failed-machine-id", MACHINE_ID);
+        when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
+        when(organizationIdResolver.resolve(any())).thenReturn(ORGANIZATION_ID);
+        when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        doThrow(new IllegalStateException("installed agent failed"))
+                .doNothing()
+                .when(installedAgentService).addInstalledAgent(any(), any(), any(), eq(false));
+
+        assertThrows(IllegalStateException.class, () -> agentRegistrationService.register(INITIAL_KEY, request));
+        AgentRegistrationResponse response = agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertEquals(MACHINE_ID, response.getMachineId());
+        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(eq("failed-machine-id"), update.capture());
+        Machine discarded = new Machine();
+        update.getValue().applyTo(discarded);
+        assertEquals(DeviceStatus.DELETED, discarded.getStatus());
+        verify(machineWriter, never()).update(eq(MACHINE_ID), any(MachineUpdate.class));
+    }
+
+    @Test
+    void registerAgent_WhenTheDiscardItselfFails_StillThrowsTheOriginalError() {
+        stubNewMachineRegistration();
+        IllegalStateException failure = new IllegalStateException("post-processing failed");
+        doThrow(failure).when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class)))
+                .thenThrow(new IllegalStateException("mongo is down"));
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        assertSame(failure, thrown);
+    }
+
     private void stubNewMachineRegistration() {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
@@ -463,6 +605,7 @@ class AgentRegistrationServiceTest {
     }
 
     private void stubWriterOver(Machine existingMachine) {
+        lenient().when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingMachine));
         when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenAnswer(invocation -> {
             Machine after = copyOf(existingMachine);
             invocation.getArgument(1, MachineUpdate.class).applyTo(after);

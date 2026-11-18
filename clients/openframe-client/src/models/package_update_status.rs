@@ -111,6 +111,26 @@ pub enum FailReason {
     NotUpgradable,
 }
 
+impl FailReason {
+    pub fn retryable(self) -> bool {
+        matches!(self, Self::ManagerError | Self::Timeout | Self::CloseFailed)
+    }
+
+    /// The name on the wire, as the status stream carries it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::ManagerError => "MANAGER_ERROR",
+            Self::ManagerMissing => "MANAGER_MISSING",
+            Self::CloseFailed => "CLOSE_FAILED",
+            Self::Timeout => "TIMEOUT",
+            Self::NotSupported => "NOT_SUPPORTED",
+            Self::Superseded => "SUPERSEDED",
+            Self::NotInstalled => "NOT_INSTALLED",
+            Self::NotUpgradable => "NOT_UPGRADABLE",
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "package_update_status_tests.rs"]
 mod tests;

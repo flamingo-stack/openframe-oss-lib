@@ -1,25 +1,26 @@
 'use client';
 
+import type { ChatSuggestionsPart } from '../../chat-protocol/chat-message';
 import { useChatPanel } from './chat-panel-context';
 import { QuickActionChipButton } from './quick-action-chip';
-import type { SuggestionsSegment } from './types/message.types';
 
 export interface SuggestionsDisplayProps {
-  segment: SuggestionsSegment;
+  data: ChatSuggestionsPart['data'];
+  /** Where a picked prompt goes: the message's `actions.pickSuggestion`. Absent: sent in the chat panel it sits in. */
+  onPick?: (prompt: string) => void;
 }
 
 /**
- * A `suggestions` segment: each group's caption over a wrapping row of
- * sentence chips, then the optional note. A chip hands its prompt to the
- * segment's `onPick`, else sends it in the chat panel it sits in.
+ * A `data-suggestions` part: each group's caption over a wrapping row of
+ * sentence chips, then the optional note.
  */
-export function SuggestionsDisplay({ segment }: SuggestionsDisplayProps) {
+export function SuggestionsDisplay({ data, onPick }: SuggestionsDisplayProps) {
   const panel = useChatPanel();
-  const pick = segment.onPick ?? panel?.sendPrompt;
+  const pick = onPick ?? panel?.sendPrompt;
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--spacing-system-sf)]">
-      {segment.groups.map(group => (
+      {data.groups.map(group => (
         <div key={group.label} className="flex min-w-0 flex-col gap-[var(--spacing-system-xs)]">
           <p className="text-ods-text-secondary text-h5">{group.label}</p>
           <div className="flex min-w-0 flex-wrap gap-[var(--spacing-system-xs)]">
@@ -35,7 +36,7 @@ export function SuggestionsDisplay({ segment }: SuggestionsDisplayProps) {
           </div>
         </div>
       ))}
-      {segment.note && <p className="text-ods-text-secondary text-h6">{segment.note}</p>}
+      {data.note && <p className="text-ods-text-secondary text-h6">{data.note}</p>}
     </div>
   );
 }

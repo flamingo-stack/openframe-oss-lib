@@ -1,29 +1,17 @@
 /**
- * Grouped source chips: THE one owner, for every producer.
+ * The sources strip's grouping: THE one owner.
  *
- * "ClickUp Tasks (14 records)" with a per-row dropdown is built in exactly one
- * place, `buildGroupedSource`, and WHICH rows group is decided in exactly one
- * place, `groupsByTable`. Three producers call them:
+ * "ClickUp Tasks (14 records)" with a per-row dropdown is built in exactly one place, `groupSourcesByTable`, over flat
+ * source parts (`chat-protocol/chat-message`): a message's sources are flat, one part per record, and grouping is
+ * presentation, derived at render. A part's table comes from its record URI (`defaultTableIdForDocumentType`): a type
+ * names its table exactly.
  *
- *   1. the hub's web chat (`buildSourcesMeta`), server-side, over the rows it
- *      retrieved;
- *   2. the hub's side-channel chips (my-tickets / my-tasks), server-side, over
- *      rows a strategy injected;
- *   3. this chat's strip, client-side, over the FLAT sources a remote MCP tool
- *      returns (`groupSourcesByTable`).
- *
- * Why the third one is client-side: an MCP tool result is one self-describing
- * citation per record, which is what a citation contract should be, and a turn
- * that calls several tools yields several flat lists only the client ever sees
- * merged. Grouping is presentation. It is the SAME presentation everywhere
- * because it is the same two functions everywhere.
- *
- * Server-safe: no React, no browser APIs. The hub imports it from the `utils`
- * barrel next to `getSourceLabel`.
+ * Server-safe: no React, no browser APIs. The hub imports it from the `utils` barrel next to `getSourceLabel`.
  */
 
-import type { ChatSource } from '../components/chat/types/message.types';
-import { defaultDocumentTypeForTableId, getSourceLabel } from './source-icons';
+import type { ChatSourcePart } from '../chat-protocol/chat-message';
+import { parseRecordHref } from '../chat-protocol/record-link';
+import { defaultTableIdForDocumentType, getSourceLabel } from './source-icons';
 
 /**
  * Doc-table documentTypes: whole documents with their own viewer (markdown =
@@ -36,14 +24,12 @@ import { defaultDocumentTypeForTableId, getSourceLabel } from './source-icons';
 export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc', 'policy_doc'] as const;
 
 /**
- * Which tables a SERVER folds into one citation: rows of a knowledge table
- * share one number (and reach the model as one table) unless they are whole
- * documents, which each keep their own number and are read in full. Decided by
- * `documentType`, the one fact every producer has.
+ * Which tables a SERVER gives the model as one search result: rows of a knowledge
+ * table reach the model as one table unless they are whole documents, which are
+ * read in full. Decided by `documentType`, the one fact every producer has.
  *
  * This is not the strip's rule. The strip (`groupSourcesByTable`) draws ONE chip
- * per table for every source, documents included: a document keeps its own
- * citation number inside its table's chip.
+ * per table for every source, documents included.
  */
 export function groupsByTable(documentType: string | null | undefined): boolean {
   return !(DOC_TABLE_TYPES as readonly string[]).includes(documentType ?? '');
@@ -54,163 +40,62 @@ export function recordCountLabel(count: number): string {
   return `(${count} ${count === 1 ? 'record' : 'records'})`;
 }
 
-type GroupedItem = NonNullable<ChatSource['items']>[number];
+/** One row of the strip: a source part, and the number it answers to when the answer cited it. */
+export type SourceRow = ChatSourcePart & { number?: number };
 
-/** One row of a group. `index` is set only when the row was cited on its own
- *  (a flat MCP source); a server-grouped row shares the group's number. */
-export type GroupedSourceRow = GroupedItem;
+/** One chip of the strip. */
+export interface SourceGroup {
+  /** The first row's URI: unique within a strip. */
+  key: string;
+  /** The rows' table. Null for a row whose type names none: a chip of its own, never grouped. */
+  tableId: string | null;
+  /** `Blog posts (37 records)`, or a table-less row's own title. */
+  label: string;
+  rows: SourceRow[];
+}
+
+/** A source's table, from its record URI. */
+function tableIdOf(source: ChatSourcePart): string | null {
+  const record = parseRecordHref(source.sourceId);
+  return record ? defaultTableIdForDocumentType(record.type) : null;
+}
 
 /**
- * THE grouped-chip constructor. Order-preserving: a producer that wants its
- * dropdown by date sorts `rows` first.
- *
- * `items` is ALWAYS populated, rows without a public URL included: per-row
- * `id` + `documentType` is what gives every dropdown row its Ask action, and a
- * chip with `items` never navigates to `path`, which for an entity table is
- * mapper bookkeeping and not a route.
+ * Flat sources in, the strip's chips out: ONE chip per table, where its table first appeared, so the strip keeps the
+ * order it was handed (reading order for cited sources). A lone record is a chip of its table too, and each row keeps
+ * the number it was given, so `[3]` in the answer still resolves inside the group. Only a row whose type names no table
+ * stands alone. First occurrence wins per record.
  */
-export function buildGroupedSource(spec: {
-  /** The chip's citation number (and React key). */
-  index: number;
-  sourceRepo: string;
-  rows: GroupedSourceRow[];
-  /** Chip-level link, when it is not the first row's own. */
-  externalUrl?: string;
-  targetPlatform?: string | null;
-}): ChatSource {
-  const first = spec.rows[0];
-  const externalUrl = spec.externalUrl ?? first?.externalUrl;
-  const targetPlatform = spec.targetPlatform !== undefined ? spec.targetPlatform : first?.targetPlatform;
-  return {
-    index: spec.index,
-    name: `${getSourceLabel(spec.sourceRepo)} ${recordCountLabel(spec.rows.length)}`,
-    path: first?.path ?? '',
-    documentType: first?.documentType ?? '',
-    ...(externalUrl ? { externalUrl } : {}),
-    targetPlatform: targetPlatform ?? null,
-    sourceRepo: spec.sourceRepo,
-    items: spec.rows,
-  };
-}
-
-type TableSource = ChatSource & { sourceRepo: string };
-
-/** A chip the server already grouped (it carries `items`). */
-function isGroupedChip(source: ChatSource): boolean {
-  return !!source.items && source.items.length > 0;
-}
-
-/** A source's type, or its TABLE's canonical type when the row arrived without
- *  one. The table is the stronger fact: a typeless row of a doc table is still
- *  a whole document, and a typeless row of an entity table still groups. */
-function typeOf(source: TableSource): string {
-  return source.documentType || defaultDocumentTypeForTableId(source.sourceRepo) || '';
-}
-
-/** A source that belongs to its table's chip: it names its table. Whole
- *  documents join their table's chip like every other record (each keeps its
- *  own citation number as a dropdown row). Both shapes qualify, a flat row AND
- *  a chip the server already grouped, so one table is never drawn twice.
- *  Naming the table is the ONLY requirement: a row with no `id`, or no
- *  `documentType`, still joins (as the hub's server-side chips do). Leaving it
- *  out would split one table across a group AND a stray chip. What it lacks
- *  only limits its dropdown row: no `id` or no type means Open-only, no Ask. */
-function joinsTableChip(source: ChatSource): source is TableSource {
-  return !!source.sourceRepo;
-}
-
-/** A source's dropdown rows: a grouped chip's own items, or the flat row itself. */
-function rowsOf(source: TableSource): GroupedSourceRow[] {
-  if (isGroupedChip(source)) return source.items ?? [];
-  return [
-    {
-      index: source.index,
-      id: source.id ?? '',
-      documentType: typeOf(source),
-      name: source.name,
-      ...(source.externalUrl ? { externalUrl: source.externalUrl } : {}),
-      targetPlatform: source.targetPlatform ?? null,
-      path: source.path || null,
-    },
-  ];
-}
-
-/** First occurrence wins per record, so a record that arrived both inside a
- *  server chip and as a flat row is one dropdown row. Id-less rows cannot be
- *  told apart and are all kept. */
-function uniqueRows(rows: GroupedSourceRow[]): GroupedSourceRow[] {
+export function groupSourcesByTable(sources: readonly SourceRow[]): SourceGroup[] {
+  const groups: SourceGroup[] = [];
+  const byTable = new Map<string, SourceGroup>();
   const seen = new Set<string>();
-  return rows.filter(row => {
-    if (!row.id) return true;
-    const identity = `${row.documentType}:${row.id}`;
-    if (seen.has(identity)) return false;
-    seen.add(identity);
-    return true;
-  });
-}
-
-/**
- * Flat sources in, the strip's chips out: ONE chip per table.
- *
- * Every row that names its table joins that table's chip, a lone record and a
- * row missing its `id` or `documentType` included, exactly as the hub's web chat draws it. Each flat row
- * keeps the citation number it was given, so `[3]` in the answer still
- * resolves inside the group. The chip sits where its table first appeared and
- * takes that source's `index` (unique, members are disjoint), so the strip
- * keeps the order it was handed: reading order for cited sources.
- *
- * A chip the server already grouped passes through UNTOUCHED when it is its
- * table's only source. When flat rows of the same table arrive beside it (a
- * hub-injected chip plus MCP-cited rows in one answer), they merge into it:
- * its rows first, its chip-level link kept, the count restated. Whole
- * documents group under their table too, each row keeping its own citation
- * number; only a row naming no table passes through as its own chip.
- */
-export function groupSourcesByTable(sources: ChatSource[]): ChatSource[] {
-  const membersByTable = new Map<string, TableSource[]>();
   for (const source of sources) {
-    if (!joinsTableChip(source)) continue;
-    const members = membersByTable.get(source.sourceRepo) ?? [];
-    members.push(source);
-    membersByTable.set(source.sourceRepo, members);
-  }
-
-  const emitted = new Set<string>();
-  const chips: ChatSource[] = [];
-  for (const source of sources) {
-    if (!joinsTableChip(source)) {
-      chips.push(source);
+    if (seen.has(source.sourceId)) continue;
+    seen.add(source.sourceId);
+    const tableId = tableIdOf(source);
+    const group = tableId ? byTable.get(tableId) : undefined;
+    if (group) {
+      group.rows.push(source);
       continue;
     }
-    if (emitted.has(source.sourceRepo)) continue;
-    emitted.add(source.sourceRepo);
-
-    const members = membersByTable.get(source.sourceRepo) ?? [];
-    if (members.length === 1 && isGroupedChip(source)) {
-      chips.push(source);
-      continue;
-    }
-    // A server chip may carry a chip-level link that is not its first row's.
-    const serverChip = members.find(isGroupedChip);
-    chips.push(
-      buildGroupedSource({
-        index: source.index,
-        sourceRepo: source.sourceRepo,
-        rows: uniqueRows(members.flatMap(rowsOf)),
-        ...(serverChip?.externalUrl ? { externalUrl: serverChip.externalUrl } : {}),
-        ...(serverChip && serverChip.targetPlatform !== undefined ? { targetPlatform: serverChip.targetPlatform } : {}),
-      }),
-    );
+    const label = source.title ?? parseRecordHref(source.sourceId)?.id ?? source.sourceId;
+    const created: SourceGroup = { key: source.sourceId, tableId, label, rows: [source] };
+    if (tableId) byTable.set(tableId, created);
+    groups.push(created);
   }
-  return chips;
+  for (const group of groups) {
+    if (group.tableId) group.label = `${getSourceLabel(group.tableId)} ${recordCountLabel(group.rows.length)}`;
+  }
+  return groups;
 }
 
 /**
  * The citation numbers a chip answers to, as compact text: `1-3, 7`.
  *
- * A chip grouped from flat sources stands for several `[N]` markers, so it
- * shows all of them. Consecutive numbers fold into a range, which keeps a
- * 25-row group readable.
+ * A chip stands for every number its rows were cited by, so it shows all of
+ * them. Consecutive numbers fold into a range, which keeps a 25-row group
+ * readable.
  */
 export function formatCitationIndices(indices: number[]): string {
   const sorted = [...new Set(indices)].sort((a, b) => a - b);

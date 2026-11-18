@@ -7,7 +7,7 @@ use tracing::{debug, error, info, warn};
 use crate::models::AgentTokenResponse;
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::AgentAuthService;
-use crate::utils::jwt;
+use openframe_common::auth::jwt;
 
 /// Device-vs-server clock difference worth a warning.
 const SKEW_WARN: Duration = Duration::from_secs(5 * 60);
@@ -113,14 +113,10 @@ impl TokenRefreshRunManager {
             let mut schedule = RefreshSchedule::now();
 
             loop {
-                // Tenant-gone suspension: this loop is the single backoff probe. Its outcome is
-                // recorded inside AuthClient (410 -> stay gone / advance uninstall; 2xx -> recover).
+                // Suspended: this loop is the single backoff probe; AuthClient records its outcome (2xx recovers).
                 if deactivation.is_suspended() {
                     let wait = deactivation.next_probe_delay().await;
-                    debug!(
-                        "Tenant-gone suspension active; next probe in {}s",
-                        wait.as_secs()
-                    );
+                    debug!("Suspension active; next probe in {}s", wait.as_secs());
                     sleep(wait).await;
                     let (sent_wall, sent_boot) = (Utc::now().timestamp(), boot_clock::now());
                     if let Ok(Ok(response)) =
@@ -131,7 +127,14 @@ impl TokenRefreshRunManager {
                     continue;
                 }
 
-                schedule.wait(timing.wait_slice).await;
+                schedule
+                    .wait(timing.wait_slice, || deactivation.is_suspended())
+                    .await;
+                // Paused mid-wait (e.g. by NATS reauth) — hand control to the backoff probe above.
+                if deactivation.is_suspended() {
+                    schedule = RefreshSchedule::now();
+                    continue;
+                }
 
                 // Retry on the short interval until a refresh succeeds.
                 loop {
@@ -153,7 +156,7 @@ impl TokenRefreshRunManager {
                             timing.retry_interval.as_secs()
                         ),
                     }
-                    // Tenant went gone mid-retry — hand control to the backoff probe above.
+                    // Suspended mid-retry — hand control to the backoff probe above.
                     if deactivation.is_suspended() {
                         schedule = RefreshSchedule::now();
                         break;
@@ -183,16 +186,15 @@ impl RefreshSchedule {
         Self::after(boot_clock::now(), Duration::ZERO)
     }
 
-    /// Sleep until due, in slices: tokio timers run on `Instant`, which stands still through sleep on macOS and
-    /// Linux, so the boot clock is re-read after every slice and a nap costs at most one slice of lateness.
-    async fn wait(&self, slice: Duration) {
+    /// Sleep until due or `suspended()`, re-reading the boot clock every slice (tokio's `Instant` stops in sleep on macOS and Linux).
+    async fn wait(&self, slice: Duration, suspended: impl Fn() -> bool) {
         let remaining = self.due.saturating_sub(boot_clock::now());
         if !remaining.is_zero() {
             debug!("Next proactive token refresh in {}s", remaining.as_secs());
         }
         loop {
             let remaining = self.due.saturating_sub(boot_clock::now());
-            if remaining.is_zero() {
+            if remaining.is_zero() || suspended() {
                 return;
             }
             sleep(remaining.min(slice)).await;

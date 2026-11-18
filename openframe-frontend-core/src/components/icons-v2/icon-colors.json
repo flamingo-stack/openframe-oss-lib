@@ -1,4 +1,7 @@
 {
+  "brand-logos/alpaca": {
+    "color": "var(--social-alpaca)"
+  },
   "brand-logos/bash": {
     "color": "var(--color-text-primary)"
   },
@@ -44,6 +47,9 @@
   "brand-logos/openai": {
     "color": "var(--color-text-primary)"
   },
+  "brand-logos/plaid": {
+    "color": "var(--color-text-primary)"
+  },
   "brand-logos/quickbooks": {
     "color": "var(--color-text-primary)"
   },
@@ -82,6 +88,12 @@
   },
   "design/shape-circle-dash-classic": {
     "color": "var(--color-text-primary)"
+  },
+  "devices/device-offline": {
+    "secondaryColor": "var(--color-border)"
+  },
+  "devices/device-online": {
+    "secondaryColor": "var(--color-success)"
   },
   "documents/folder-shield-classic": {
     "color": "var(--color-text-primary)"

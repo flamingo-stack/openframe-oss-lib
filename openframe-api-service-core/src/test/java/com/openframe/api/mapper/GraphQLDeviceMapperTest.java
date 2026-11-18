@@ -1,26 +1,36 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.AvailableDeviceEdge;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The setup wizard's enrollment milestones are derived here, from the machine document and its tool
  * connections: registered (machine exists), connected (first NATS connection), inventory connected
- * (Fleet confirmed the host, i.e. the FLEET_MDM connection is CONNECTED with a numeric Fleet host id).
+ * (Fleet confirmed the host, i.e. the FLEET_MDM connection is CONNECTED with a numeric Fleet host id),
+ * ready (the device has left PENDING, i.e. it was promoted to MANAGED).
  */
 class GraphQLDeviceMapperTest {
 
@@ -50,6 +60,48 @@ class GraphQLDeviceMapperTest {
 
     private static ToolConnection fleet(ConnectionStatus status, String agentToolId) {
         return connection(ToolType.FLEET_MDM, status, agentToolId);
+    }
+
+    @Test
+    @DisplayName("toDeviceFilterCriteria carries connectivity next to statuses")
+    void toDeviceFilterCriteria_carriesConnectivity() {
+        // setup
+        DeviceFilterInput input = DeviceFilterInput.builder()
+                .statuses(List.of(DeviceStatus.ONLINE))
+                .connectivity(List.of(TelemetryStatus.OFFLINE))
+                .build();
+
+        // execution
+        DeviceFilterCriteria criteria = mapper.toDeviceFilterCriteria(input);
+
+        // verifications
+        assertThat(criteria.getStatuses()).containsExactly(DeviceStatus.ONLINE);
+        assertThat(criteria.getConnectivity()).containsExactly(TelemetryStatus.OFFLINE);
+    }
+
+    @Test
+    @DisplayName("available-device cursor buckets by telemetryStatus: status ONLINE with telemetry OFFLINE is the not-online bucket")
+    void toAvailableDeviceConnection_bucketReadsTelemetryStatus() {
+        // setup
+        Machine staleStatus = machine(CONNECTED);
+        staleStatus.setId("64f000000000000000000001");
+        staleStatus.setStatus(DeviceStatus.ONLINE);
+        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        Machine online = machine(CONNECTED);
+        online.setId("64f000000000000000000002");
+        online.setMachineId("m-2");
+        online.setStatus(DeviceStatus.OFFLINE);
+        online.setTelemetryStatus(TelemetryStatus.ONLINE);
+        CountedGenericQueryResult<Machine> result = CountedGenericQueryResult.<Machine>builder()
+                .items(List.of(staleStatus, online)).build();
+
+        // execution
+        CountedGenericConnection<AvailableDeviceEdge> connection = mapper.toAvailableDeviceConnection(result, Set.of("m-1"));
+
+        // verifications
+        assertThat(connection.getEdges())
+                .extracting(edge -> CursorCodec.decode(edge.getCursor()))
+                .containsExactly("1|64f000000000000000000001", "2|64f000000000000000000002");
     }
 
     @Test
@@ -83,7 +135,6 @@ class GraphQLDeviceMapperTest {
                 List.of(fleet(ConnectionStatus.CONNECTED, "0f1d4c2e-7b3a-4c1d-9e2f-5a6b7c8d9e0f")));
 
         assertThat(enrollment.getInventoryConnectedAt()).isNull();
-        assertThat(enrollment.isReady()).isFalse();
     }
 
     @Test
@@ -110,18 +161,26 @@ class GraphQLDeviceMapperTest {
         DeviceEnrollmentResponse enrollment = mapper.toEnrollment(machine(CONNECTED), null);
 
         assertThat(enrollment.getInventoryConnectedAt()).isNull();
-        assertThat(enrollment.isReady()).isFalse();
     }
 
     @Test
-    @DisplayName("ready only when both connectedAt and inventoryConnectedAt are set")
-    void toEnrollment_readyOnlyWhenBothTimestampsSet() {
+    @DisplayName("ready is false while the device is PENDING, whatever its timestamps and tool connections say")
+    void toEnrollment_pendingDevice_notReady() {
         List<ToolConnection> inventory = List.of(fleet(ConnectionStatus.CONNECTED, "42"));
+        Machine pending = machine(CONNECTED);
+        pending.setStatus(DeviceStatus.PENDING);
 
-        assertThat(mapper.toEnrollment(machine(CONNECTED), inventory).isReady()).as("both").isTrue();
-        assertThat(mapper.toEnrollment(machine(CONNECTED), List.of()).isReady()).as("connected only").isFalse();
-        assertThat(mapper.toEnrollment(machine(null), inventory).isReady()).as("inventory only").isFalse();
-        assertThat(mapper.toEnrollment(machine(null), List.of()).isReady()).as("neither").isFalse();
+        assertThat(mapper.toEnrollment(pending, inventory).isReady()).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING"}, mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("ready follows the lifecycle status: anything promoted past PENDING is ready, even without a Fleet row")
+    void toEnrollment_promotedDevice_readyRegardlessOfConnections(DeviceStatus status) {
+        Machine promoted = machine(null);
+        promoted.setStatus(status);
+
+        assertThat(mapper.toEnrollment(promoted, List.of()).isReady()).isTrue();
     }
 
     @Test

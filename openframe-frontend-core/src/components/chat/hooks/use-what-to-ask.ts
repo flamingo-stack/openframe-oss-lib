@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import type { AssistantType, AuthorType } from '../types/chat.types';
-import type { Message, SuggestionGroup } from '../types/message.types';
+import type { ChatMessage, ChatMessageAuthor, ChatSuggestionGroup } from '../../../chat-protocol/chat-message';
 
 /**
  * The "What to ask?" exchange: the question the user is shown asking, and the
@@ -13,18 +12,13 @@ export interface WhatToAskContent {
   question: string;
   /** The answer's text (markdown), above the chips. */
   reply: string;
-  groups: SuggestionGroup[];
+  groups: ChatSuggestionGroup[];
   /** A line under the chips, e.g. how picking one works. */
   note?: string;
 }
 
 /** Who a side of the exchange is shown as. */
-export interface WhatToAskAuthor {
-  name?: string;
-  avatar?: string | null;
-  authorType?: AuthorType;
-  assistantType?: AssistantType;
-}
+export type WhatToAskAuthor = ChatMessageAuthor;
 
 export interface UseWhatToAskOptions {
   /** The open conversation; `null` for a new chat that has no dialog yet. */
@@ -33,8 +27,6 @@ export interface UseWhatToAskOptions {
   content?: WhatToAskContent;
   user?: WhatToAskAuthor;
   assistant?: WhatToAskAuthor;
-  /** Where a picked prompt goes (typically: sent). Absent: sent in the surrounding chat panel. */
-  onPick?: (prompt: string) => void;
 }
 
 export interface WhatToAsk {
@@ -47,7 +39,7 @@ export interface WhatToAsk {
    */
   ask: (target: 'current' | 'draft', content?: WhatToAskContent) => void;
   /** The thread with the exchanges of the open conversation (or the new chat) merged in by time. */
-  withExchanges: (messages: Message[]) => Message[];
+  withExchanges: (messages: ChatMessage[]) => ChatMessage[];
   /** Call before sending: a new chat's exchanges then move into the dialog the send creates. */
   noteSend: () => void;
   /** Drop the new chat's exchanges (the user started over or left it). */
@@ -66,11 +58,12 @@ interface Exchange {
 /**
  * Local "What to ask?" exchanges, per conversation: never sent, never stored,
  * gone on reload. Each is a user message and an assistant message carrying a
- * `suggestions` segment, built at render from the exchange's content. A new chat holds its
+ * `data-suggestions` part, built at render from the exchange's content. Picking a chip reaches
+ * `ChatMessageActions.pickSuggestion`. A new chat holds its
  * own until a send gives it a dialog (they move there) or the user opens
  * another conversation (they are dropped).
  */
-export function useWhatToAsk({ dialogId, content, user, assistant, onPick }: UseWhatToAskOptions): WhatToAsk {
+export function useWhatToAsk({ dialogId, content, user, assistant }: UseWhatToAskOptions): WhatToAsk {
   const [byDialog, setByDialog] = useState<Record<string, Exchange[]>>({});
   const [draftSent, setDraftSent] = useState(false);
   const key = dialogId ?? DRAFT_KEY;
@@ -121,9 +114,9 @@ export function useWhatToAsk({ dialogId, content, user, assistant, onPick }: Use
   }, []);
 
   const exchanges = byDialog[key] ?? [];
-  const withExchanges = (messages: Message[]): Message[] => {
+  const withExchanges = (messages: ChatMessage[]): ChatMessage[] => {
     if (exchanges.length === 0) return messages;
-    const local = exchanges.flatMap(exchange => exchangeMessages(exchange, user, assistant, onPick));
+    const local = exchanges.flatMap(exchange => exchangeMessages(exchange, user, assistant));
     return mergeByTime(messages, local);
   };
 
@@ -134,52 +127,33 @@ function exchangeMessages(
   { id, at, content }: Exchange,
   user: WhatToAskAuthor | undefined,
   assistant: WhatToAskAuthor | undefined,
-  onPick: ((prompt: string) => void) | undefined,
-): Message[] {
+): ChatMessage[] {
   return [
     {
       id: `${id}-question`,
       role: 'user',
-      content: content.question,
-      timestamp: new Date(at),
-      name: user?.name,
-      avatar: user?.avatar,
-      authorType: user?.authorType,
+      metadata: { createdAt: new Date(at).toISOString(), ...(user ? { author: user } : {}) },
+      parts: [{ type: 'text', text: content.question }],
     },
     {
       id: `${id}-answer`,
       role: 'assistant',
-      content: [
-        { type: 'text', text: content.reply },
-        { type: 'suggestions', groups: content.groups, note: content.note, onPick },
-      ],
       // A millisecond after the question, so the pair keeps its order.
-      timestamp: new Date(at + 1),
-      name: assistant?.name,
-      avatar: assistant?.avatar,
-      authorType: assistant?.authorType,
-      assistantType: assistant?.assistantType,
+      metadata: { createdAt: new Date(at + 1).toISOString(), ...(assistant ? { author: assistant } : {}) },
+      parts: [
+        { type: 'text', text: content.reply },
+        {
+          type: 'data-suggestions',
+          data: { groups: content.groups, ...(content.note !== undefined ? { note: content.note } : {}) },
+        },
+      ],
     },
   ];
 }
 
-/**
- * Whether the thread waits on the user before it can go on: an approval or an
- * escalation offer nobody has answered. A "What to ask?" chip does not send
- * then: the conversation cannot take a message.
- */
-export function awaitsDecision(messages: readonly Message[]): boolean {
-  return messages.some(
-    message =>
-      Array.isArray(message.content) &&
-      message.content.some(
-        segment =>
-          (segment.type === 'approval_request' ||
-            segment.type === 'approval_batch' ||
-            segment.type === 'escalation_offer') &&
-          (segment.status ?? 'pending') === 'pending',
-      ),
-  );
+function timeOf(message: ChatMessage): number | undefined {
+  const createdAt = message.metadata?.createdAt;
+  return createdAt === undefined ? undefined : Date.parse(createdAt);
 }
 
 /**
@@ -187,13 +161,13 @@ export function awaitsDecision(messages: readonly Message[]): boolean {
  * than it, keeping the thread's own order. A thread message without a time
  * never moves anything past it.
  */
-export function mergeByTime(thread: Message[], local: Message[]): Message[] {
+export function mergeByTime(thread: ChatMessage[], local: ChatMessage[]): ChatMessage[] {
   if (local.length === 0) return thread;
-  const out: Message[] = [];
+  const out: ChatMessage[] = [];
   let next = 0;
   for (const message of thread) {
-    const at = message.timestamp?.getTime();
-    while (next < local.length && at !== undefined && (local[next].timestamp?.getTime() ?? 0) < at) {
+    const at = timeOf(message);
+    while (next < local.length && at !== undefined && (timeOf(local[next]) ?? 0) < at) {
       out.push(local[next]);
       next += 1;
     }

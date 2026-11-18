@@ -13,7 +13,8 @@ export type { AskAiOpenDetail } from './mingo-ai-button';
 export { MingoAiButton, openAskAi } from './mingo-ai-button';
 export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from '../chat/utils/ask-ai-events';
 export type { MingoAiButtonProps } from './mingo-ai-button';
-export { MobileNavSheet, siteNavHasMobileMenus } from './mobile-nav-sheet';
+export { MobileNavSheet } from './mobile-nav-sheet';
+export { siteNavHasMobileMenus } from './site-nav-mobile-menus';
 export { MOBILE_NAV_SHEET_ID } from './mobile-nav-sheet-id';
 export type { MobileNavSheetProps } from './mobile-nav-sheet';
 export { SiteFooter } from './site-footer';
@@ -40,7 +41,11 @@ export type { PageSectionBarProps } from './page-section-bar';
 export { useScrollSpy } from '../docs/use-scroll-spy';
 export type { UseScrollSpyOptions } from '../docs/use-scroll-spy';
 
-export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar';
+export {
+  NAVIGATION_SIDEBAR_END_WIDTH_VAR,
+  NAVIGATION_SIDEBAR_WIDTH_VAR,
+  NavigationSidebar,
+} from './navigation-sidebar';
 export type { NavigationSidebarProps } from './navigation-sidebar';
 export { NavigationSidebarActionRow } from './navigation-sidebar-grouped';
 export type { NavigationSidebarActionRowProps } from './navigation-sidebar-grouped';
@@ -69,6 +74,18 @@ export type {
   AppLayoutSidePanelRenderState,
 } from './app-layout-side-panel';
 export { SIDE_PANEL_FRAME_WIDTH } from './app-layout-side-panel';
+export {
+  AppLayoutWorkArea,
+  useWorkAreaColumn,
+  WORK_AREA_MIN_COLUMN_WIDTH,
+  WorkAreaColumnContext,
+} from './app-layout-work-area';
+export { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from '../../utils/work-area-share';
+export type { AppLayoutWorkAreaMode, AppLayoutWorkAreaProps, WorkAreaColumnState } from './app-layout-work-area';
+export { AppColumnHeader } from './app-column-header';
+export type { AppColumnHeaderLayoutAction, AppColumnHeaderProps } from './app-column-header';
+export { ColumnBackSlot, ColumnBackSlotReset, useColumnBack, useHandColumnBack } from '../layout/column-back-slot';
+export type { ColumnBack } from '../layout/column-back-slot';
 
 export {
   AppLayoutDrawer,
@@ -85,6 +102,8 @@ export type { AppLayoutDrawerContentProps } from './app-layout-drawer';
 
 export { MobileBurgerMenu } from './mobile-burger-menu';
 export type { MobileBurgerMenuProps } from './mobile-burger-menu';
+export { MOBILE_SIDE_PANEL_SWIPE_CLOSE_PX, MobileSidePanel } from './mobile-side-panel';
+export type { MobileSidePanelProps } from './mobile-side-panel';
 
 export { HeaderButton } from './header-button';
 export type { HeaderButtonProps } from './header-button';

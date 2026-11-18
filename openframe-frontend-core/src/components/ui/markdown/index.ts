@@ -17,7 +17,7 @@ export {
   SVG_TAGS,
   buildEffectiveTagSet,
   buildSanitizeSchema,
-  cardAwareUrlTransform,
+  recordAwareUrlTransform,
   escapeUnknownHtmlTags,
   rehypeStripUnsafe,
 } from './sanitize';

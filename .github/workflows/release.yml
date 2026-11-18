@@ -74,14 +74,14 @@ jobs:
                         grep -oP '<version>\K[^<]+' | \
                         grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
-          echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
+          echo "OLD_VERSION=$OLD_VERSION" >> "$GITHUB_ENV"
           echo "Found old version: $OLD_VERSION"
 
       - name: Set Snapshot Version
         if: github.event_name == 'push' || inputs.snapshot
         run: |
           NEW_VERSION="${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-SNAPSHOT"
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
           echo "$OLD_VERSION → $NEW_VERSION"
 
       - name: Set Release Version
@@ -96,7 +96,7 @@ jobs:
             "$major.$minor.$((patch + 1))"|"$major.$((minor + 1)).0"|"$((major + 1)).0.0") echo "$OLD_VERSION → $NEW_VERSION" ;;
             *) echo "Invalid version bump: $OLD_VERSION → $NEW_VERSION"; exit 1 ;;
           esac
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
 
       - name: Build and Deploy ${{ env.NEW_VERSION }}
         env:
@@ -115,7 +115,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          (echo "${{ env.REPOSITORY }}"; grep -oP '(?<=<module>)[^<]+' pom.xml) | while read MODULE; do
+          (echo "${{ env.REPOSITORY }}"; grep -oP '(?<=<module>)[^<]+' pom.xml) | while read -r MODULE; do
             ARTIFACT="${MODULE##*/}"  # Remove directory prefix
             PKG="${{ env.REGISTRY }}.${ARTIFACT//\./%2E}"
             echo "Cleaning $PKG..."
@@ -160,8 +160,9 @@ jobs:
       - name: Upgrade npm
         run: npm install -g npm@11.9.0
 
+      # A release is built from the committed lockfile, the tree its tests ran on.
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build
         run: npm run build
@@ -195,13 +196,13 @@ jobs:
       - name: Check publish manifest
         run: node scripts/check-publish-manifest.mjs package.json
 
-      # One tarball for both registries; --ignore-scripts skips a prepack rebuild.
+      # The tarball pkg.pr.new publishes; --ignore-scripts skips a prepack rebuild.
       - name: Pack ${{ env.NEW_VERSION }}
         run: |
           echo "PACKAGE_TARBALL=$PWD/$(npm pack --ignore-scripts --json | jq -r '.[0].filename')" >> "$GITHUB_ENV"
           echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
-      # Where our apps install from; the only registry a snapshot goes to. Needs the pkg.pr.new GitHub App.
+      # The one registry every release and snapshot goes to (npmjs is not published to). Needs the pkg.pr.new GitHub App.
       - name: Preview registry (pkg.pr.new) ${{ env.NEW_VERSION }} @${{ env.SHORT_SHA }}
         run: |
           npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
@@ -217,15 +218,6 @@ jobs:
           git push origin "refs/tags/$NEW_VERSION"
           gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$NEW_VERSION" -f target=node
           echo "Tagged \`$NEW_VERSION\`; https://pkg.pr.new/$GITHUB_REPOSITORY/$(jq -r '.name' package.json)@$NEW_VERSION is live when the run on that tag finishes." | tee -a "$GITHUB_STEP_SUMMARY"
-
-      # Fallback registry, releases only; last, so an npm failure leaves both pkg.pr.new addresses in place.
-      - name: Publish ${{ env.NEW_VERSION }} to npmjs
-        if: env.RELEASE == 'true'
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm publish "$PACKAGE_TARBALL" --access public
-          echo "Uploaded $NEW_VERSION to npmjs (latest); served after npm's scan." >> "$GITHUB_STEP_SUMMARY"
 
   release-rust:
     name: Release Rust
@@ -244,7 +236,7 @@ jobs:
           OLD_VERSION=$(git tag --list 'v*' | sed 's/^v//' | \
                         grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           OLD_VERSION=${OLD_VERSION:-0.0.0}
-          echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
+          echo "OLD_VERSION=$OLD_VERSION" >> "$GITHUB_ENV"
           echo "Found old version: $OLD_VERSION"
 
       - name: Set Release Version
@@ -258,7 +250,7 @@ jobs:
             "$major.$minor.$((patch + 1))"|"$major.$((minor + 1)).0"|"$((major + 1)).0.0") echo "$OLD_VERSION → $NEW_VERSION" ;;
             *) echo "Invalid version bump: $OLD_VERSION → $NEW_VERSION"; exit 1 ;;
           esac
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
 
       - name: Push Tag ${{ env.NEW_VERSION }}
         run: |

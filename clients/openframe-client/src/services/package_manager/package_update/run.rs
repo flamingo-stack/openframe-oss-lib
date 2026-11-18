@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use tracing::{info, warn};
 
 use super::managers::{ProbeState, QueryError, UpgradeOutcome, UPGRADE_TIMEOUT_SECS};
-use super::orders::Order;
+use super::orders::{Ending, Order};
 use super::status::{self, Report};
 use super::{relaunch, Worker};
 use crate::models::{
-    Done, DoneResult, FailReason, Failed, HolderInfo, UpdateMode, WaitPhase, WaitReason, Waiting,
+    Done, DoneResult, FailReason, Failed, HolderInfo, PackageUpdateStatusMessage, UpdateMode,
+    WaitPhase, WaitReason, Waiting,
 };
 use crate::services::package_manager::update_gate::{
     self, AppIdentity, BlockReason, GateDecision, Holder, Undetermined,
@@ -24,6 +25,8 @@ const BUSY_RETRY_SECS: u64 = 5 * 60;
 const BUSY_BUDGET_SECS: u64 = 60 * 60;
 /// How long a manager's presence and outdated answer stay trusted.
 const PROBE_TTL_SECS: u64 = 4 * 60 * 60;
+/// How long a woken chat takes to connect and subscribe; the prompt it missed is sent again then.
+const CHAT_START_SECS: u64 = 15;
 
 /// What the worker remembers about one order between looks; lost on restart, so a countdown restarts in full.
 #[derive(Default)]
@@ -41,6 +44,8 @@ pub(super) struct Progress {
     /// Set once a FORCE order installs without a visible gate; an in-use answer then ends it.
     blind: bool,
     last_report: Option<ReportKey>,
+    /// The open-app wait last reported, sent once more for a chat the report woke.
+    chat_repeat: Option<(u64, PackageUpdateStatusMessage)>,
     /// Unix seconds before which the order is not looked at again.
     pub(super) next_at: u64,
 }
@@ -70,7 +75,7 @@ struct ReportKey {
 
 pub(super) enum Verdict {
     Continue { next_at: u64 },
-    Finished,
+    Finished(Ending),
 }
 
 impl Worker {
@@ -83,12 +88,15 @@ impl Worker {
         now: u64,
     ) -> Verdict {
         p.held = Hold::None;
-        let verdict = self.look_inner(machine_id, order, p, now).await;
+        let mut verdict = self.look_inner(machine_id, order, p, now).await;
         if p.held != Hold::Busy {
             p.busy_since = None;
         }
         if p.held != Hold::Unseen {
             p.unseen_since = None;
+        }
+        if let (Verdict::Continue { next_at }, Some((at, _))) = (&mut verdict, &p.chat_repeat) {
+            *next_at = (*next_at).min(*at);
         }
         verdict
     }
@@ -106,6 +114,11 @@ impl Worker {
             p.last_report = None;
             p.probe = None;
             p.identity = None;
+            p.chat_repeat = None;
+        }
+        // Same event id: the backend and a chat that already showed it skip it as a duplicate.
+        if let Some((_, event)) = p.chat_repeat.take_if(|(at, _)| now >= *at) {
+            self.status.report(event).await;
         }
         let manager = ManagerId::of(&order.package);
         if self.lacks_session(manager).await {
@@ -312,7 +325,7 @@ impl Worker {
         if !self.orders.start_installing(&order.request_id) {
             info!(request_id = %order.request_id, "Superseded before the forced close, dropping it");
             self.relaunch_closed(p).await;
-            return Verdict::Finished;
+            return Verdict::Finished(Ending::Done);
         }
         let pids: Vec<u32> = holders.iter().map(|holder| holder.pid).collect();
         let survivors = self.machine.close(&pids).await;
@@ -362,7 +375,7 @@ impl Worker {
                 if !self.orders.start_installing(&order.request_id) {
                     info!(request_id = %order.request_id, "Superseded before its install, dropping it");
                     self.relaunch_closed(p).await;
-                    return Verdict::Finished;
+                    return Verdict::Finished(Ending::Done);
                 }
                 running
             }
@@ -557,6 +570,7 @@ impl Worker {
             return;
         }
         p.last_report = Some(key);
+        p.chat_repeat = None;
         let mut users = HashMap::new();
         let waiting = Waiting {
             reason,
@@ -572,9 +586,12 @@ impl Worker {
                 .collect(),
             closes_at: closes_at.map(status::rfc3339),
         };
-        self.status
-            .report(self.event(machine_id, order, p, Report::Waiting(waiting)))
-            .await;
+        let event = self.event(machine_id, order, p, Report::Waiting(waiting));
+        if reason == WaitReason::AppRunning {
+            self.machine.wake_chat();
+            p.chat_repeat = Some((super::unix_now() + CHAT_START_SECS, event.clone()));
+        }
+        self.status.report(event).await;
     }
 
     async fn done(
@@ -594,7 +611,7 @@ impl Worker {
         self.status
             .report(self.event(machine_id, order, p, Report::Done(done)))
             .await;
-        Verdict::Finished
+        Verdict::Finished(Ending::Done)
     }
 
     async fn fail(
@@ -608,6 +625,14 @@ impl Worker {
     ) -> Verdict {
         warn!(request_id = %order.request_id, ?reason, %message, "Package update failed");
         self.relaunch_closed(p).await;
+        let ending = if reason.retryable() {
+            Ending::Retry {
+                reason,
+                message: message.clone(),
+            }
+        } else {
+            Ending::Done
+        };
         let failed = Failed {
             reason,
             exit_code,
@@ -616,7 +641,7 @@ impl Worker {
         self.status
             .report(self.event(machine_id, order, p, Report::Failed(failed)))
             .await;
-        Verdict::Finished
+        Verdict::Finished(ending)
     }
 
     /// Brings back what a forced close stopped, whatever the install came to.

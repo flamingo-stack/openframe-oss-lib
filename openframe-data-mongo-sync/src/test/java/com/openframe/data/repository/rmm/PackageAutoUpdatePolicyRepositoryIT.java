@@ -24,6 +24,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @SpringBootTest(classes = RmmIntegrationTestApplication.class)
 @Tag("integration")
@@ -114,6 +115,53 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    @DisplayName("updateSettings: the enabled policies of that Software and package on these devices get the settings, lastVersion stays")
+    void updateSettings_enabledPoliciesOfThePackage_getTheSettingsKeepLastVersion() {
+        PackageAutoUpdatePolicy chrome = template("google-chrome", "title-7", WAIT, "admin@x");
+        chrome.setLastVersion("151.0.7922.98");
+        repository.enable(chrome, List.of("m1", "m2", "m3"));
+        repository.enable(template("slack", "title-7", WAIT, "admin@x"), List.of("m1"));
+        String turnedOffId = byMachine("google-chrome").get("m3").getId();
+        repository.disable(turnedOffId, "151.0.7922.98", "admin@x", Instant.now());
+
+        repository.updateSettings(template("google-chrome", "title-7", FORCE, "other@x"), List.of("m1", "m3", "m9"));
+
+        assertThat(byMachine("google-chrome").values())
+                .extracting(PackageAutoUpdatePolicy::getMachineId, PackageAutoUpdatePolicy::isEnabled,
+                        PackageAutoUpdatePolicy::getSettings, PackageAutoUpdatePolicy::getUpdatedBy,
+                        PackageAutoUpdatePolicy::getLastVersion)
+                .containsExactlyInAnyOrder(
+                        tuple("m1", true, FORCE, "other@x", "151.0.7922.98"),
+                        tuple("m2", true, WAIT, "admin@x", "151.0.7922.98"),
+                        tuple("m3", false, WAIT, "admin@x", "151.0.7922.98"));
+        assertThat(byMachine("slack").values()).extracting(PackageAutoUpdatePolicy::getSettings).containsExactly(WAIT);
+    }
+
+    @Test
+    @DisplayName("disableOthersOfSoftware: of that Software's enabled policies only the template's package on these devices stays on")
+    void disableOthersOfSoftware_keepsTheTemplatesPackageOnTheseDevices() {
+        repository.enable(template("google-chrome", "title-7", WAIT, "admin@x"), List.of("m1", "m2", "m3"));
+        repository.enable(template("google-chrome@beta", "title-7", WAIT, "admin@x"), List.of("m1"));
+        PackageAutoUpdatePolicy otherManager = template("google-chrome", "title-7", WAIT, "admin@x");
+        otherManager.setPackageManager(PackageManagerType.WINGET);
+        repository.enable(otherManager, List.of("m4"));
+        repository.enable(template("slack", "title-9", WAIT, "admin@x"), List.of("m3"));
+
+        long turnedOff = repository.disableOthersOfSoftware(
+                template("google-chrome", "title-7", WAIT, "other@x"), List.of("m1", "m4"));
+
+        assertThat(turnedOff).isEqualTo(4);
+        assertThat(byMachine("google-chrome").values())
+                .extracting(PackageAutoUpdatePolicy::getMachineId, PackageAutoUpdatePolicy::isEnabled,
+                        PackageAutoUpdatePolicy::getUpdatedBy)
+                .containsExactlyInAnyOrder(tuple("m1", true, "admin@x"), tuple("m2", false, "other@x"),
+                        tuple("m3", false, "other@x"), tuple("m4", false, "other@x"));
+        assertThat(byMachine("google-chrome@beta").values())
+                .extracting(PackageAutoUpdatePolicy::isEnabled).containsExactly(false);
+        assertThat(byMachine("slack").values()).extracting(PackageAutoUpdatePolicy::isEnabled).containsExactly(true);
+    }
+
+    @Test
     @DisplayName("lastVersion: set by enable as the starting point, moved by markOrdered; the trigger reads enabled rows only")
     void lastVersion_startsAtEnable_movesWithOrders() {
         PackageAutoUpdatePolicy chrome = template("google-chrome", null, WAIT, "admin@x");
@@ -126,17 +174,19 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(enabled).extracting(PackageAutoUpdatePolicy::getPackageName).containsOnly("google-chrome");
         assertThat(enabled).extracting(PackageAutoUpdatePolicy::getLastVersion).containsOnly("151.0.7922.98");
 
-        assertThat(repository.markOrdered(List.of(), "152.0.7977.65")).isZero();   // nothing to mark, nothing touched
-        repository.markOrdered(List.of(byMachine("google-chrome").get("m1").getId()), "152.0.7977.65");
+        assertThat(repository.markOrdered(List.of(), "152.0.7977.65", "req-2")).isZero();   // nothing to mark, nothing touched
+        repository.markOrdered(List.of(byMachine("google-chrome").get("m1").getId()), "152.0.7977.65", "req-2");
 
         Map<String, PackageAutoUpdatePolicy> chromeByMachine = byMachine("google-chrome");
         assertThat(chromeByMachine.get("m1").getLastVersion()).isEqualTo("152.0.7977.65");
+        assertThat(chromeByMachine.get("m1").getRequestId()).isEqualTo("req-2");
         assertThat(chromeByMachine.get("m2").getLastVersion()).isEqualTo("151.0.7922.98");
+        assertThat(chromeByMachine.get("m2").getRequestId()).isNull();
     }
 
     @Test
-    @DisplayName("retryRequestId: set when a retry is scheduled, found by device and package, cleared by the next order")
-    void retryRequestId_setByARetry_clearedByTheNextOrder() {
+    @DisplayName("requestId: named by a retry too, found by device and package, replaced by the next order")
+    void requestId_setByARetry_replacedByTheNextOrder() {
         PackageAutoUpdatePolicy chrome = template("google-chrome", null, WAIT, "admin@x");
         chrome.setLastVersion("151.0.7922.98");
         repository.enable(chrome, List.of("m1"));
@@ -146,12 +196,12 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
 
         assertThat(repository.findByTenantIdAndMachineIdAndPackageManagerAndPackageName(TENANT, "m1",
                 chrome.getPackageManager(), "google-chrome")).get()
-                .extracting(PackageAutoUpdatePolicy::getRetryRequestId).isEqualTo("req-1");
+                .extracting(PackageAutoUpdatePolicy::getRequestId).isEqualTo("req-1");
 
-        repository.markOrdered(List.of(id), "152.0.7977.65");
+        repository.markOrdered(List.of(id), "152.0.7977.65", "req-2");
 
         PackageAutoUpdatePolicy ordered = byMachine("google-chrome").get("m1");
-        assertThat(ordered.getRetryRequestId()).isNull();
+        assertThat(ordered.getRequestId()).isEqualTo("req-2");
         assertThat(ordered.getLastVersion()).isEqualTo("152.0.7977.65");
     }
 
@@ -181,7 +231,7 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         repository.enable(chrome, List.of("m1", "m2"));
         String m1 = byMachine("google-chrome").get("m1").getId();
         String m2 = byMachine("google-chrome").get("m2").getId();
-        repository.markOrdered(List.of(m1), "152.0.7977.65");
+        repository.markOrdered(List.of(m1), "152.0.7977.65", "req-2");
         repository.disable(m2, "151.0.7922.98", "admin@x", Instant.now());
 
         assertThat(repository.disable(m1, "151.0.7922.98", "package-auto-update", Instant.now())).isZero();
@@ -190,8 +240,23 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
 
         PackageAutoUpdatePolicy ordered = byMachine("google-chrome").get("m1");
         assertThat(ordered.isEnabled()).isTrue();
-        assertThat(ordered.getRetryRequestId()).isNull();
-        assertThat(byMachine("google-chrome").get("m2").getRetryRequestId()).isNull();
+        assertThat(ordered.getRequestId()).isEqualTo("req-2");
+        assertThat(byMachine("google-chrome").get("m2").getRequestId()).isNull();
+    }
+
+    @Test
+    @DisplayName("findSoftwareIds, findEnabledSoftwareIds: each linked Software once; other tenants and unlinked policies left out")
+    void findSoftwareIds_allOrEnabledOnly_distinctIdsOfTheTenant() {
+        repository.enable(template("google-chrome", "7", WAIT, "admin@x"), List.of("m1", "m2"));
+        repository.enable(template("slack", "9", WAIT, "admin@x"), List.of("m1"));
+        repository.enable(template("zoom", null, WAIT, "admin@x"), List.of("m1"));
+        repository.disableBySoftwareId(TENANT, "9", "admin@x");
+        PackageAutoUpdatePolicy foreign = template("firefox", "11", WAIT, "admin@x");
+        foreign.setTenantId("tenant-2");
+        repository.enable(foreign, List.of("m1"));
+
+        assertThat(repository.findEnabledSoftwareIds(TENANT)).containsExactly("7");
+        assertThat(repository.findSoftwareIds(TENANT)).containsExactlyInAnyOrder("7", "9");
     }
 
     private Map<String, PackageAutoUpdatePolicy> byMachine(String packageName) {

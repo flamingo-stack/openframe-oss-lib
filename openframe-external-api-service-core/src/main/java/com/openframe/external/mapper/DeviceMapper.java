@@ -1,19 +1,26 @@
 package com.openframe.external.mapper;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.api.dto.device.*;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.external.dto.device.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class DeviceMapper extends BaseRestMapper {
 
+    private final ClientVersionThreshold clientVersionThreshold;
+
     public DeviceResponse toDeviceResponse(Machine machine, List<Tag> deviceTags) {
+        Long agentVersionKey = machine.getAgentVersionKey();
+        boolean clientOutdated = clientVersionThreshold.isOutdated(agentVersionKey);
         return DeviceResponse.builder()
                 .id(machine.getId())
                 .machineId(machine.getMachineId())
@@ -25,6 +32,8 @@ public class DeviceMapper extends BaseRestMapper {
                 .osUuid(machine.getOsUuid())
                 .agentVersion(machine.getAgentVersion())
                 .status(machine.getStatus())
+                .connectivity(machine.getTelemetryStatus())
+                .clientOutdated(clientOutdated)
                 .lastSeen(machine.getLastSeen())
                 .customerId(machine.getOrganizationId())
                 .serialNumber(machine.getSerialNumber())
@@ -98,6 +107,8 @@ public class DeviceMapper extends BaseRestMapper {
     public DeviceFilterResponse toDeviceFilterResponse(DeviceFilters filters) {
         return DeviceFilterResponse.builder()
                 .statuses(toDeviceFilterItems(filters.getStatuses()))
+                .connectivity(toDeviceFilterItems(filters.getConnectivity()))
+                .clientOutdated(toDeviceFilterItems(filters.getClientOutdated()))
                 .deviceTypes(toDeviceFilterItems(filters.getDeviceTypes()))
                 .osTypes(toDeviceFilterItems(filters.getOsTypes()))
                 .customerIds(toDeviceFilterItems(filters.getOrganizationIds()))

@@ -1,6 +1,7 @@
 use crate::platform::DirectoryManager;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
 use anyhow::Result;
+use openframe_common::auth::shared_token;
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -34,22 +35,28 @@ impl ToolCommandParamsResolver {
     }
 
     pub fn process(&self, tool_agent_id: &str, command_args: Vec<String>) -> Result<Vec<String>> {
-        let server_url = format!(
-            "https://{}",
-            self.initial_configuration_service.get_server_url()?
-        );
+        let uses = |placeholder: &str| command_args.iter().any(|arg| arg.contains(placeholder));
+        let server_url = if uses(Self::SERVER_URL_PLACEHOLDER) {
+            format!(
+                "https://{}",
+                self.initial_configuration_service.get_server_url()?
+            )
+        } else {
+            String::new()
+        };
         let token_path = self.build_token_path();
-        let machine_id = self.agent_configuration_service.get_machine_id()?;
+        let machine_id = if uses(Self::MACHINE_ID_PLACEHOLDER) {
+            self.agent_configuration_service.get_machine_id()?
+        } else {
+            String::new()
+        };
 
         Ok(command_args
             .into_iter()
             // Resolve standard placeholders
             .map(|arg| {
                 arg.replace(Self::SERVER_URL_PLACEHOLDER, &server_url)
-                    .replace(
-                        Self::OPENFRAME_SECRET_PLACEHOLDER,
-                        "12345678901234567890123456789012",
-                    )
+                    .replace(Self::OPENFRAME_SECRET_PLACEHOLDER, shared_token::KEY)
                     .replace(Self::OPENFRAME_TOKEN_PATH_PLACEHOLDER, &token_path)
                     .replace(Self::MACHINE_ID_PLACEHOLDER, &machine_id)
             })
@@ -61,7 +68,7 @@ impl ToolCommandParamsResolver {
     fn build_token_path(&self) -> String {
         self.directory_manager
             .secured_dir()
-            .join("shared_token.enc")
+            .join(shared_token::FILE_NAME)
             .to_string_lossy()
             .to_string()
     }

@@ -5,9 +5,12 @@ import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
+import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -108,7 +111,7 @@ public class SoftwareActionDetailService {
         if (hasText(bundleId)) {
             bundleOnlineDispatchRepository.findByTenantIdAndBundleId(tenantId, bundleId).forEach(s -> {
                 if (s.getStatus() == DeviceOnlineDispatchStatus.NEW) {
-                    byMachine.put(s.getMachineId(), pending(s.getMachineId(), SoftwareActionStatus.SCHEDULED, null));
+                    byMachine.put(s.getMachineId(), pending(s.getMachineId(), SoftwareActionStatus.IN_PROGRESS, null));
                 }
                 // DISPATCHED without a leaf = the package's OS did not apply to this device → not shown.
             });
@@ -141,7 +144,13 @@ public class SoftwareActionDetailService {
                 .findByTenantIdAndRequestIdIn(tenantId, new HashSet<>(requestByMachine.values()))) {
             if (state.getStatus() == SoftwareActionStatus.WAITING
                     && state.getRequestId().equals(requestByMachine.get(state.getMachineId()))) {
-                byMachine.get(state.getMachineId()).setStatus(SoftwareActionStatus.WAITING);
+                SoftwareActionDeviceResponse row = byMachine.get(state.getMachineId());
+                row.setStatus(SoftwareActionStatus.WAITING);
+                row.setWaitingReason(state.getWaitingReason());
+                row.setWaitingPhase(state.getWaitingPhase());
+                row.setClosesAt(state.getClosesAt());
+                row.setAskAgainAt(state.getAskAgainAt());
+                row.setDeadlineAt(state.getDeadlineAt());
             }
         }
     }
@@ -174,6 +183,7 @@ public class SoftwareActionDetailService {
                 row.setOrganizationId(m.getOrganizationId());
                 row.setOrganizationName(organizationNames.get(m.getOrganizationId()));
                 row.setDeviceStatus(m.getStatus());
+                row.setConnectivity(m.getTelemetryStatus());
                 row.setLastSeen(m.getLastSeen());
             }
         });
@@ -206,8 +216,10 @@ public class SoftwareActionDetailService {
     }
 
     private static SoftwareActionDeviceResponse fromLeaf(ScriptExecution leaf) {
+        SoftwareActionKind kind = kindOf(leaf);
         return SoftwareActionDeviceResponse.builder()
                 .machineId(leaf.getMachineId())
+                .kind(kind)
                 .status(deviceStatus(leaf.getStatus()))
                 .exitCode(leaf.getExitCode())
                 .stdout(leaf.getStdout())
@@ -218,6 +230,14 @@ public class SoftwareActionDetailService {
                 .dispatchedAt(leaf.getDispatchedAt())
                 .finishedAt(leaf.getFinishedAt())
                 .build();
+    }
+
+    private static SoftwareActionKind kindOf(ScriptExecution leaf) {
+        SoftwareAction action = leaf.getSoftwareAction();
+        if (action == null) {
+            return null;
+        }
+        return leaf.getSource() == ExecutionSource.PACKAGE_AUTO_UPDATE ? SoftwareActionKind.AUTO_UPDATE : action.kind();
     }
 
     private static SoftwareActionDeviceResponse pending(String machineId, SoftwareActionStatus status, String error) {
@@ -238,7 +258,7 @@ public class SoftwareActionDetailService {
         }
         return switch (status) {
             case SUCCESS -> SoftwareActionStatus.COMPLETED;
-            case FAILED -> SoftwareActionStatus.FAILED;
+            case SCRIPT_ERROR, FAILED -> SoftwareActionStatus.FAILED;
             case QUEUED, RUNNING -> SoftwareActionStatus.IN_PROGRESS;
         };
     }

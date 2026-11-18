@@ -11,8 +11,12 @@ public class ClientTicketOwner extends TicketOwner {
 
     private String machineId;
 
-    public ClientTicketOwner(String machineId) {
+    // The customer the machine belonged to when the ticket was created; never updated, null before the backfill.
+    private String organizationId;
+
+    public ClientTicketOwner(String machineId, String organizationId) {
         this.type = TicketOwnerType.CLIENT;
         this.machineId = machineId;
+        this.organizationId = organizationId;
     }
 }

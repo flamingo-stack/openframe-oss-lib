@@ -38,7 +38,10 @@ public enum NodeType {
     TIME_ENTRY("TimeEntry", "id"),
     NOTIFICATION("Notification", "id"),
     SOFTWARE_SCHEDULE("SoftwareSchedule", "id"),
-    GUARDRAIL_POLICY("GuardrailPolicy", "id");
+    GUARDRAIL_POLICY("GuardrailPolicy", "id"),
+    MAILBOX("Mailbox", "id"),
+    HELD_EMAIL("HeldEmail", "id"),
+    EMAIL_BLOCK_LIST_ENTRY("EmailBlockListEntry", "id");
 
     private static final String UNKNOWN_NODE_TYPE = "Unknown Node type: ";
 

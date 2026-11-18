@@ -118,6 +118,12 @@ export interface MingoChatListProps {
    *  `owner.id` is taken as the viewer's. */
   currentUserId?: string | null;
   className?: string;
+  /**
+   * The rows' size. `'default'`: the 40px row with an 18px title. `'compact'`: the
+   * three-column shell's 32px row with a 14px title, the open chat on the shell's
+   * tint (Figma `nav/chat-item`), the day captions in uppercase mono.
+   */
+  density?: 'default' | 'compact';
 }
 
 /**

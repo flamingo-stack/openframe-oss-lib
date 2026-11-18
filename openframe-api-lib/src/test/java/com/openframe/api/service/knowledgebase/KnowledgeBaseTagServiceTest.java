@@ -59,9 +59,24 @@ class KnowledgeBaseTagServiceTest {
     }
 
     @Test
+    void addTagToItem_missingItem_rejectsWithoutAssignment() {
+        // setup
+        when(tagRepository.existsById(TAG_ID)).thenReturn(true);
+
+        // execution
+        NotFoundException exception = assertThrows(NotFoundException.class,
+                () -> service.addTagToItem(ITEM_ID, TAG_ID));
+
+        // verifications
+        assertThat(exception).hasMessageContaining(ITEM_ID);
+        verify(tagAssignmentRepository, never()).save(any(TagAssignment.class));
+    }
+
+    @Test
     void addTagToItem_existingTagNotYetAssigned_savesAssignment() {
         // setup
         when(tagRepository.existsById(TAG_ID)).thenReturn(true);
+        when(itemRepository.existsById(ITEM_ID)).thenReturn(true);
         when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ITEM_ID, TAG_ID, TagEntityType.KNOWLEDGE_ARTICLE))
                 .thenReturn(Optional.empty());
 
@@ -85,6 +100,7 @@ class KnowledgeBaseTagServiceTest {
                 .entityType(TagEntityType.KNOWLEDGE_ARTICLE)
                 .build();
         when(tagRepository.existsById(TAG_ID)).thenReturn(true);
+        when(itemRepository.existsById(ITEM_ID)).thenReturn(true);
         when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ITEM_ID, TAG_ID, TagEntityType.KNOWLEDGE_ARTICLE))
                 .thenReturn(Optional.of(existing));
 

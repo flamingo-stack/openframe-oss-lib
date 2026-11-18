@@ -3,31 +3,33 @@
  * Export all utilities for processing chat messages
  */
 
-// NOTE: NATS chunk parsing lives in `chat-protocol/nats-decoder`
-// (`decodeNatsChunk`) — the legacy `chunk-parser` module was deleted once the
-// reducer became the single reading path.
-
-// Segment accumulator
-export {
-  MessageSegmentAccumulator,
-  createMessageSegmentAccumulator,
-  type AccumulatorCallbacks,
-} from './message-segment-accumulator';
-
-// Where an approval card renders — one rule for both live kernels, the history
-// replay, and hosts that sort cards between their own footer and the flow.
+// Where an approval card renders: one rule, for the thread and for hosts that sort cards between their own footer and the
+// flow.
 export { approvalDisplaysInline } from './approval-display';
 
 // Historical message processing
-export {
-  processHistoricalMessages,
-  extractErrorMessages,
-  processHistoricalMessagesWithErrors,
-  decodeHistoricalMessageData,
-} from './process-historical-messages';
+export { processHistoricalMessages, type ProcessHistoricalMessagesResult } from './process-historical-messages';
 
 // Incomplete message state extraction
-export { extractIncompleteMessageState, extractIncompleteTailState } from './extract-incomplete-message-state';
+export { extractIncompleteTailState, isCompactingTail } from './extract-incomplete-message-state';
+export {
+  awaitsDecision,
+  awaitsOtherTier,
+  findLatestPendingId,
+  isForeignReply,
+  pendingApprovalIdOf,
+  pendingOfferIdOf,
+  threadForDisplay,
+  withThreadAuthor,
+  type ThreadAuthorNames,
+} from './thread-display';
+export {
+  TICKET_CREATION_SOURCE,
+  ticketHasReceipt,
+  ticketReceiptMessage,
+  ticketReceiptText,
+  type ChatTicketReceipt,
+} from './ticket-receipt';
 
 // History <-> realtime reconciliation
 export {
@@ -36,7 +38,6 @@ export {
   flattenMessagePagesChronological,
   maxPersistedStreamSeq,
   SYNTHETIC_REALTIME_ID_PREFIXES,
-  type MergeableChatMessage,
   type HistoryMergeInput,
   type HistoryPrependResult,
 } from './history-merge';
@@ -88,8 +89,7 @@ export { decideNewTab, type DecideNewTabInput, type RuntimeMode } from './decide
 // `@flamingo-stack/openframe-frontend-core/utils`.
 
 // Pure content helpers
-export { flattenAssistantContent } from './flatten-assistant-content';
-export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from './scroll-anchor';
+export { SCROLL_ANCHOR_WIRE_KEY } from './scroll-anchor';
 export { SCROLL_ANCHOR, type ScrollAnchor } from '../types/message.types';
 export {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,
@@ -108,19 +108,9 @@ export {
   buildDiscussAddendum,
 } from './slash-dispatch-utils';
 
-// Chat-attachment markdown formatter + strip parser
-export {
-  CHAT_ATTACHMENT_VIEW_URL_PREFIX,
-  CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM,
-  ANTHROPIC_SUPPORTED_IMAGE_MIME,
-  type ChatAttachment,
-  buildChatAttachmentViewUrl,
-  escapeMarkdownInline,
-  formatChatAttachmentMarkdownForBubble,
-  CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED,
-  CHAT_ATTACHMENT_MARKDOWN_PATTERN,
-  stripChatAttachmentMarkdown,
-} from './chat-attachment-markdown';
+// Chat-attachment markdown: the bubble's form of a `file` part, and the escape for a file name (the attachment
+// itself is chat-protocol/attachment.ts).
+export { escapeMarkdownInline, CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED } from './chat-attachment-markdown';
 
 // External app deep-links (chat surfaces)
 export { clickupTaskUrl } from './external-app-urls';
@@ -183,21 +173,8 @@ export {
   resolveSourceIcon,
 } from './source-row-cta';
 
-// Post-fetch enrichment for the minimal ChatRef descriptor a
-// `[card://type:id]` marker produces (the wire ships no card metadata).
-export {
-  resolveCardDestination,
-  type CardDestination,
-  type CardDestinationEntry,
-  type CardDestinationInput,
-  type CardDestinationSource,
-} from './card-destination';
-export {
-  resolveFetchedCardHref,
-  readFetchedCardPath,
-  readFetchedCardTitle,
-  type FetchedCardHrefInput,
-} from './resolve-fetched-card-href';
+// Where a card opens.
+export { resolveCardDestination, type CardDestination, type CardDestinationInput } from './card-destination';
 
 // The ONE "Ask Mingo" prompt builder — shared by the SSE adapter, the NATS
 // adapter, and hosts that inject their own Mingo state (openframe-frontend).
