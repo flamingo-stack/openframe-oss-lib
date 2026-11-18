@@ -410,7 +410,21 @@ export interface AIMetadataMessageData extends MessageDataBase {
   contextWindow?: number;
 }
 
-export interface TokenUsageData {
+/**
+ * What the backend adds to a reply's token usage once it reports the prompt cache: the reply's input split into the
+ * part read fresh, the part reused from the cache and the part written to it (the three add up to `inputTokensSize`),
+ * and the share of `contextSize` at which the chat's memory is compacted. Absent from older backends and from replies
+ * saved before the split was recorded: each field is then unset or null, never a guessed 0.
+ */
+export interface TokenUsageCacheSplit {
+  uncachedInputTokensSize?: number | null;
+  cacheReadTokensSize?: number | null;
+  cacheWriteTokensSize?: number | null;
+  /** A ratio, e.g. `0.8`: memory is compacted once the chat holds more than this share of `contextSize`. */
+  compactionThreshold?: number | null;
+}
+
+export interface TokenUsageData extends TokenUsageCacheSplit {
   inputTokensSize: number;
   outputTokensSize: number;
   totalTokensSize: number;
