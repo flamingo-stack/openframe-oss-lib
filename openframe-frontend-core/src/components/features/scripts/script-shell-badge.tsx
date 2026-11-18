@@ -43,7 +43,8 @@ export function ScriptShellGridCell({ value }: { value: string }) {
   return (
     <DataTableCell
       leading={Icon ? { type: 'icon', icon: <Icon className="size-5" /> } : undefined}
-      text={shell?.label ?? value}
+      // Empty while the shell is read (a placeholder row): the cell then draws its bar.
+      text={(shell?.label ?? value) || ''}
     />
   );
 }

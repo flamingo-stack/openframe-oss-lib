@@ -1,14 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GRID_ACTION_COLUMN_SIZE, GRID_MIN_WIDTH } from '../../ui/data-table';
+import { LoadingWhen } from '../../ui/loading-scope';
 import {
   IdleIntersectionObserver,
   SCRIPT_EXECUTIONS_TABLE,
   SCRIPT_SCHEDULES_TABLE,
   SCRIPTS_TABLE,
 } from '../feature-tables.fixtures';
+import { ExecutionDeviceGridCell, ExecutionInitiatorGridCell, ExecutionTimestampGridCell } from './execution-cells';
+import { ScheduleDateTimeGridCell, ScriptNameGridCell } from './script-cells';
 import { ScriptExecutionsTable } from './script-executions-table';
 import { ScriptSchedulesTable } from './script-schedules-table';
+import { ScriptShellGridCell } from './script-shell-badge';
 import { ScriptsTable } from './scripts-table';
 import {
   EXECUTION_COLUMNS,
@@ -83,6 +87,43 @@ describe('the Scripts tables, grid layout', () => {
       expect(actions.map(column => column.id)).toEqual(['actions', 'open']);
       expect(columns.slice(-2)).toEqual(actions);
       for (const column of actions) expect(column.size).toBe(GRID_ACTION_COLUMN_SIZE);
+    });
+  });
+
+  describe('a row still being read', () => {
+    /** A text line's loading form (`TextLineSkeleton`): one line-high bar. */
+    const BAR = 'h-[1lh]';
+    /** A field of a host's placeholder row (an id and nothing else): typed as its string, absent at run time. */
+    const absent = undefined as unknown as string;
+
+    it.each([
+      ['the script name', <ScriptNameGridCell key="name" name={absent} />],
+      ['the shell', <ScriptShellGridCell key="shell" value={absent} />],
+      ['the schedule date', <ScheduleDateTimeGridCell key="date" date={absent} time={absent} />],
+      ['the execution time', <ExecutionTimestampGridCell key="time" timestamp={absent} executionId={absent} />],
+      ['the device', <ExecutionDeviceGridCell key="device" name={absent} />],
+      ['who it ran for', <ExecutionInitiatorGridCell key="initiator" name={absent} />],
+    ])('draws %s as a bar while its field is not here yet', (_name, cell) => {
+      const { container: loading } = render(<LoadingWhen loading>{cell}</LoadingWhen>);
+      expect(loading.innerHTML).toContain(BAR);
+      // Outside a loading scope an empty field is an empty cell, not a bar that never resolves.
+      const { container: loaded } = render(cell);
+      expect(loaded.innerHTML).not.toContain(BAR);
+    });
+  });
+
+  describe('the chip of what dispatched a run', () => {
+    it.each([
+      ['SCHEDULED', 'Scheduled'],
+      ['AI_ASSISTANT', 'Mingo'],
+    ])('is the cell’s tag for a %s run', (source, label) => {
+      const { container } = render(<ExecutionInitiatorGridCell name="Maya Chen" source={source} />);
+      expect(container.innerHTML).toMatch(new RegExp(`data-part="tag"[\\s\\S]*${label}`));
+    });
+
+    it.each(['MANUAL', null, undefined])('is left out for a %s run: the cell has no tag', source => {
+      const { container } = render(<ExecutionInitiatorGridCell name="Maya Chen" source={source} />);
+      expect(container.innerHTML).not.toContain('data-part="tag"');
     });
   });
 

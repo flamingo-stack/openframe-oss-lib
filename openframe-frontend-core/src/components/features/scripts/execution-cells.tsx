@@ -18,19 +18,25 @@ import { scriptExecutionStatus } from './execution-status';
  * page, the deleted-user avatar) as slots.
  */
 
-/** How an execution was dispatched, as the chip beside the person it ran for. */
-export function ExecutionSourceBadge({ source, className }: { source: string | null | undefined; className?: string }) {
-  // A `span`: the chip sits inside a line of text. It never shrinks; the name beside it ellipsizes.
-  // Labels are sentence case here; the Tag's h5 type scale uppercases them.
-  const tagProps = { as: 'span', variant: 'outline', className: cn('shrink-0', className) } as const;
-
-  if (source === 'SCHEDULED') return <Tag {...tagProps} label="Scheduled" />;
-  if (source === 'AI_ASSISTANT') {
-    // Mingo's own mark, the way the product stamps it everywhere else.
-    return <Tag {...tagProps} label="Mingo" icon={<AgentMark agent="mingo" className="size-4" />} />;
-  }
+/**
+ * The chip a source draws beside the person an execution ran for, or `null` where it draws none. The ONE place that
+ * says which sources have a chip: the badge draws it, and a grid cell asks it whether there is a tag to make room for.
+ * Labels are sentence case here; the Tag's h5 type scale uppercases them.
+ */
+function executionSourceChip(source: string | null | undefined): { label: string; icon?: ReactNode } | null {
+  if (source === 'SCHEDULED') return { label: 'Scheduled' };
+  // Mingo's own mark, the way the product stamps it everywhere else.
+  if (source === 'AI_ASSISTANT') return { label: 'Mingo', icon: <AgentMark agent="mingo" className="size-4" /> };
   // MANUAL draws nothing: the person is the technician who clicked Run, so a chip would restate the name.
   return null;
+}
+
+/** How an execution was dispatched, as the chip beside the person it ran for. */
+export function ExecutionSourceBadge({ source, className }: { source: string | null | undefined; className?: string }) {
+  const chip = executionSourceChip(source);
+  if (!chip) return null;
+  // A `span`: the chip sits inside a line of text. It never shrinks; the name beside it ellipsizes.
+  return <Tag as="span" variant="outline" className={cn('shrink-0', className)} label={chip.label} icon={chip.icon} />;
 }
 
 /**
@@ -126,18 +132,17 @@ export function ExecutionResultCell({ result, empty = null }: { result?: string 
   return result || loading ? <TruncateText lines={2}>{result ?? ''}</TruncateText> : <>{empty}</>;
 }
 
-/* The same cells in the grid layout: one 48px line each, the second line as the secondary text beside the first. */
+/*
+ * The same cells in the grid layout: one 48px line each, the second line as the secondary text beside the first.
+ * A row still being read (a host's placeholder row in a loading scope) has no field yet: the main text is then empty,
+ * never absent, so the cell draws its bar.
+ */
 
 const GRID_ICON_CLASS = 'size-5';
 
-/** Whether a source draws a chip (`ExecutionSourceBadge`): a manual run draws none. */
-function hasSourceBadge(source: string | null | undefined): boolean {
-  return source === 'SCHEDULED' || source === 'AI_ASSISTANT';
-}
-
 /** When an execution was dispatched, with its id beside it. */
 export function ExecutionTimestampGridCell({ timestamp, executionId }: { timestamp: string; executionId: string }) {
-  return <DataTableCell text={timestamp} secondary={executionId || undefined} />;
+  return <DataTableCell text={timestamp || ''} secondary={executionId || undefined} />;
 }
 
 /** A status as its tag. */
@@ -155,7 +160,7 @@ export function ExecutionDeviceGridCell({ name, organization }: { name: string; 
   return (
     <DataTableCell
       leading={{ type: 'icon', icon: <MonitorIcon className={GRID_ICON_CLASS} /> }}
-      text={name}
+      text={name || ''}
       secondary={organization || undefined}
     />
   );
@@ -180,8 +185,9 @@ export function ExecutionInitiatorGridCell({
   return (
     <DataTableCell
       leading={leading}
-      text={name}
-      tag={hasSourceBadge(source) ? <ExecutionSourceBadge source={source} /> : undefined}
+      text={name || ''}
+      // No chip, no tag: an empty tag would still take its gap in the line.
+      tag={executionSourceChip(source) ? <ExecutionSourceBadge source={source} /> : undefined}
       secondary={scriptName || undefined}
     />
   );
