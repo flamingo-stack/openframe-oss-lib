@@ -170,7 +170,11 @@ export interface ChatSuggestionGroup {
   prompts: ChatSuggestionPrompt[];
 }
 
-/** Prompts the assistant offers as chips. Never on the wire: a host builds it locally. */
+/**
+ * Quick actions the assistant offers inline, as chips grouped under captions (`SuggestionsDisplay`); picking one sends
+ * its `prompt` (else its `label`). THE one shape for inline quick actions: a turn carries it (the hub's
+ * `/what-can-you-do`, one group per page), and a host builds it locally ("What to ask?", `useWhatToAsk`).
+ */
 export interface ChatSuggestionsPart {
   type: 'data-suggestions';
   id?: string;
@@ -522,7 +526,7 @@ function appendText(left: ChatTextPart, right: ChatTextPart, separator: string):
 }
 
 /**
- * The parts a row stores: `text`, `source-*`, `file` and `data-record-cards`. Sources lead, unique by `sourceId`; `state`
+ * The parts a row stores: `text`, `source-*`, `file`, `data-record-cards` and `data-suggestions`. Sources lead, unique by `sourceId`; `state`
  * goes; an empty text part goes, so an empty answer is `[]`.
  *
  * Text parts a dropped part (reasoning, a tool row) left adjacent become one, with their citations rebased and the
@@ -549,7 +553,7 @@ export function storablePartsOf(parts: readonly ChatPart[]): ChatPart[] {
       } else {
         body.push(text);
       }
-    } else if (part.type === 'file' || part.type === 'data-record-cards') {
+    } else if (part.type === 'file' || part.type === 'data-record-cards' || part.type === 'data-suggestions') {
       body.push(part);
     }
   }

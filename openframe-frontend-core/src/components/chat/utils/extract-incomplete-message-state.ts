@@ -101,7 +101,7 @@ function incompleteStateOfParts(parts: readonly ChatPart[]): IncompleteMessageSt
       // - `data-ticket-escalated` / `data-ticket-event` are standalone receipts delivered outside MESSAGE_START/END: there
       //   is no agent turn to continue.
       // - `data-error` ended the turn; resuming it would re-open a bubble the backend has already abandoned.
-      // - `data-suggestions` is built locally by the host and never comes from a turn.
+      // - `data-suggestions` arrives whole (a turn's fixed answer, or a host's local "What to ask?").
       case 'text':
       case 'reasoning':
       case 'source-url':

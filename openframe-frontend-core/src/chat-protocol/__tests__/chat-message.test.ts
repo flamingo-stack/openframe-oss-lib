@@ -76,6 +76,17 @@ describe('textOfParts', () => {
 });
 
 describe.skipIf(!WIRE)('storablePartsOf', () => {
+  it('keeps quick actions offered inline (`data-suggestions`), in place', () => {
+    const suggestions: ChatPart = {
+      type: 'data-suggestions',
+      data: { groups: [{ label: 'Pricing', prompts: [{ label: 'What does a device cost?' }] }], note: 'n' },
+    };
+    expect(storablePartsOf([{ type: 'text', text: 'Try one:' }, suggestions])).toEqual([
+      { type: 'text', text: 'Try one:' },
+      suggestions,
+    ]);
+  });
+
   it('keeps text, sources, files and record cards, and drops everything else', () => {
     const parts: ChatPart[] = [
       { type: 'reasoning', text: 'thinking', state: 'done' },
