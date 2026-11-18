@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -39,4 +40,6 @@ public class Tag implements TenantScoped {
     private TagEntityType entityType;
     private Instant createdAt;
     private String createdBy;
+    @Version
+    private Long version;
 }
