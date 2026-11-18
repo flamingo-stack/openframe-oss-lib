@@ -173,7 +173,7 @@ export interface ChatSuggestionGroup {
 /**
  * Quick actions the assistant offers inline, as chips grouped under captions (`SuggestionsDisplay`); picking one sends
  * its `prompt` (else its `label`). THE one shape for inline quick actions: a turn carries it (the hub's
- * `/what-can-you-do`, one group per page), and a host builds it locally ("What to ask?", `useWhatToAsk`).
+ * `/what-can-you-do`) and the chat's "What to ask?" shows the one the runtime's `whatToAskUrl` serves (`useWhatToAsk`).
  */
 export interface ChatSuggestionsPart {
   type: 'data-suggestions';

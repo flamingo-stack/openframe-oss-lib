@@ -28,7 +28,7 @@ const message = (id: string, at: number): ChatMessage => ({
 });
 
 function setup(dialogId: string | null) {
-  return renderHook(({ id }) => useWhatToAsk({ dialogId: id, content }), {
+  return renderHook(({ id }) => useWhatToAsk({ dialogId: id }), {
     initialProps: { id: dialogId },
   });
 }
@@ -39,7 +39,7 @@ describe('useWhatToAsk', () => {
   it('adds the question and an answer with the suggestions to the open conversation', () => {
     const { result } = setup('d-1');
 
-    act(() => result.current.ask('current'));
+    act(() => result.current.ask('current', content));
     const thread = result.current.withExchanges([]);
 
     expect(thread).toHaveLength(2);
@@ -54,7 +54,7 @@ describe('useWhatToAsk', () => {
   it('keeps each conversation to its own exchanges', () => {
     const { result, rerender } = setup('d-1');
 
-    act(() => result.current.ask('current'));
+    act(() => result.current.ask('current', content));
     rerender({ id: 'd-2' });
     expect(result.current.withExchanges([])).toHaveLength(0);
 
@@ -65,7 +65,7 @@ describe('useWhatToAsk', () => {
   it('moves a new chat exchange into the dialog its send creates', () => {
     const { result, rerender } = setup(null);
 
-    act(() => result.current.ask('draft'));
+    act(() => result.current.ask('draft', content));
     expect(result.current.withExchanges([])).toHaveLength(2);
 
     act(() => result.current.noteSend());
@@ -80,7 +80,7 @@ describe('useWhatToAsk', () => {
   it('drops a new chat exchange when another conversation is opened instead', () => {
     const { result, rerender } = setup(null);
 
-    act(() => result.current.ask('draft'));
+    act(() => result.current.ask('draft', content));
     rerender({ id: 'd-other' });
     expect(result.current.withExchanges([])).toHaveLength(0);
 
@@ -91,7 +91,7 @@ describe('useWhatToAsk', () => {
   it('clears the new chat on request', () => {
     const { result } = setup(null);
 
-    act(() => result.current.ask('draft'));
+    act(() => result.current.ask('draft', content));
     act(() => result.current.clearDraft());
     expect(result.current.withExchanges([])).toHaveLength(0);
   });
@@ -99,28 +99,21 @@ describe('useWhatToAsk', () => {
   it('asks into the new chat when there is no dialog, whatever the target', () => {
     const { result, rerender } = setup(null);
 
-    act(() => result.current.ask('current'));
+    act(() => result.current.ask('current', content));
     expect(result.current.withExchanges([])).toHaveLength(2);
     rerender({ id: 'd-1' });
     expect(result.current.withExchanges([])).toHaveLength(0);
   });
 
-  it("keeps each exchange's own content, over the hook's", () => {
+  it("keeps each exchange's own content", () => {
     const { result } = setup('d-1');
     const live: WhatToAskContent = { ...content, reply: 'Built from live data:' };
 
     act(() => result.current.ask('current', live));
-    act(() => result.current.ask('current'));
+    act(() => result.current.ask('current', content));
     const answers = result.current.withExchanges([]).filter(m => m.role === 'assistant');
 
     expect(answers.map(m => textOfParts(m.parts))).toEqual(['Built from live data:', 'Try one:']);
-  });
-
-  it('shows nothing without content', () => {
-    const { result } = renderHook(() => useWhatToAsk({ dialogId: 'd-1', content: undefined }));
-    act(() => result.current.ask('current'));
-    const thread = [message('a', 1)];
-    expect(result.current.withExchanges(thread)).toBe(thread);
   });
 });
 

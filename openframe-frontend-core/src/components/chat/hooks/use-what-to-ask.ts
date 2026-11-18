@@ -23,8 +23,6 @@ export type WhatToAskAuthor = ChatMessageAuthor;
 export interface UseWhatToAskOptions {
   /** The open conversation; `null` for a new chat that has no dialog yet. */
   dialogId: string | null | undefined;
-  /** What an exchange shows unless `ask` is handed its own. */
-  content?: WhatToAskContent;
   user?: WhatToAskAuthor;
   assistant?: WhatToAskAuthor;
 }
@@ -33,11 +31,9 @@ export interface WhatToAsk {
   /**
    * Show the exchange: at the end of the open conversation (`'current'`), or
    * in the new chat (`'draft'`), which then reads as a conversation until it
-   * is sent or left. `content` overrides the hook's for this exchange (e.g.
-   * prompts built from live data); each exchange keeps what it was shown
-   * with. No-op without either.
+   * is sent or left. Each exchange keeps the content it was shown with.
    */
-  ask: (target: 'current' | 'draft', content?: WhatToAskContent) => void;
+  ask: (target: 'current' | 'draft', content: WhatToAskContent) => void;
   /** The thread with the exchanges of the open conversation (or the new chat) merged in by time. */
   withExchanges: (messages: ChatMessage[]) => ChatMessage[];
   /** Call before sending: a new chat's exchanges then move into the dialog the send creates. */
@@ -63,7 +59,7 @@ interface Exchange {
  * own until a send gives it a dialog (they move there) or the user opens
  * another conversation (they are dropped).
  */
-export function useWhatToAsk({ dialogId, content, user, assistant }: UseWhatToAskOptions): WhatToAsk {
+export function useWhatToAsk({ dialogId, user, assistant }: UseWhatToAskOptions): WhatToAsk {
   const [byDialog, setByDialog] = useState<Record<string, Exchange[]>>({});
   const [draftSent, setDraftSent] = useState(false);
   const key = dialogId ?? DRAFT_KEY;
@@ -85,9 +81,7 @@ export function useWhatToAsk({ dialogId, content, user, assistant }: UseWhatToAs
   }
 
   const ask = useCallback(
-    (target: 'current' | 'draft', override?: WhatToAskContent) => {
-      const shown = override ?? content;
-      if (!shown) return;
+    (target: 'current' | 'draft', shown: WhatToAskContent) => {
       const into = target === 'current' && dialogId ? dialogId : DRAFT_KEY;
       const exchange = {
         id: `what-to-ask-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -96,7 +90,7 @@ export function useWhatToAsk({ dialogId, content, user, assistant }: UseWhatToAs
       };
       setByDialog(prev => ({ ...prev, [into]: [...(prev[into] ?? []), exchange] }));
     },
-    [content, dialogId],
+    [dialogId],
   );
 
   const noteSend = useCallback(() => {

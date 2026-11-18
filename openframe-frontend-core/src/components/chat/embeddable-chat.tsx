@@ -457,18 +457,6 @@ export interface EmbeddableChatProps {
    */
   assistantName?: string;
   /**
-   * v2: the "What to ask?" exchange the list's entry shows (when no
-   * `onWhatToAsk` takes it over): every click opens a new chat holding it,
-   * never the open conversation. Local - never sent, never stored. Picking a
-   * chip sends its prompt in that new chat, like a quick action.
-   *
-   * A function is called on each click and the exchange appears, whole, once
-   * its promise settles (prompts built from live data, e.g. the workspace's
-   * devices); clicks while one is pending are ignored. It should not reject:
-   * a rejection is logged and shows nothing.
-   */
-  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
-  /**
    * v2: items in the chat's ⋯ menu after its own, past a separator - actions
    * that are not about the chat (e.g. the host's onboarding reset). Shown in
    * every chat that is not archived, a new one included.
@@ -871,7 +859,6 @@ function EmbeddableChatInner({
   aboveComposer,
   onWhatToAsk,
   assistantName = DEFAULT_ASSISTANT_NAME,
-  whatToAsk: whatToAskProp,
   chatMenuExtraItems,
   rail = 'auto',
   threadContainer,
@@ -1608,25 +1595,26 @@ function EmbeddableChatInner({
     [rawMessages, guideUserName, guideUserAvatar, ownSendName, ownSendAvatar],
   );
 
-  // The "What to ask?" content: the host's own (`whatToAsk`), else what its runtime serves (`endpoints.whatToAskUrl`),
-  // read on each click.
+  // The "What to ask?" exchange the list's entry shows (when no `onWhatToAsk` takes it over) is the hub's: what the
+  // runtime's `endpoints.whatToAskUrl` answers, read on each click. Every click opens a new chat holding it, never the
+  // open conversation; local, never sent, never stored. With no address there is no exchange (the entry starts a new
+  // chat).
   const whatToAskUrl = runtime.endpoints.whatToAskUrl;
-  const whatToAskContent = useMemo<WhatToAskContent | (() => Promise<WhatToAskContent>) | undefined>(() => {
-    if (whatToAskProp || !whatToAskUrl) return whatToAskProp;
+  const loadWhatToAsk = useMemo<(() => Promise<WhatToAskContent>) | undefined>(() => {
+    if (!whatToAskUrl) return undefined;
     return async () => {
       // The lib's content fetch: the host's embed auth (bearer, 401 refresh) when it registered one, else a plain fetch.
       const response = await contentFetch(whatToAskUrl);
       if (!response.ok) throw new Error(`What to ask: ${response.status}`);
       return (await response.json()) as WhatToAskContent;
     };
-  }, [whatToAskProp, whatToAskUrl]);
+  }, [whatToAskUrl]);
 
-  // "What to ask?" exchanges (`whatToAsk`) are the panel's own, shown in the
+  // "What to ask?" exchanges are the panel's own, shown in the
   // thread beside the host's messages; a new chat holding one reads as a
   // conversation until it is sent or left.
   const whatToAsk = useWhatToAsk({
     dialogId: activeDialogId,
-    content: typeof whatToAskContent === 'function' ? undefined : whatToAskContent,
     user: {
       name: headerUserName ?? 'You',
       avatar: identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || null,
@@ -2196,7 +2184,7 @@ function EmbeddableChatInner({
     activeDialogStatus === 'approval' ||
     awaitsDecision(hostMessages, displayApprovalTypes);
 
-  // "What to ask Mingo?" with `whatToAsk`: every click opens a new chat with
+  // "What to ask Mingo?": every click opens a new chat with
   // the exchange - never the open conversation, whatever its state, and not
   // the new chat already holding one (its exchange is dropped for a fresh
   // one). The prompts always start a conversation of their own.
@@ -2220,7 +2208,7 @@ function EmbeddableChatInner({
       });
     };
   });
-  // An async `whatToAsk` settles renders later: by then the panel may be in
+  // The exchange's read settles renders later: by then the panel may be in
   // another state, so it is shown through the latest `showWhatToAsk`.
   const showWhatToAskRef = useRef(showWhatToAsk);
   useEffect(() => {
@@ -2228,14 +2216,9 @@ function EmbeddableChatInner({
   });
   const whatToAskPendingRef = useRef(false);
   const requestWhatToAsk = () => {
-    if (!whatToAskContent) return;
-    if (typeof whatToAskContent !== 'function') {
-      showWhatToAsk(whatToAskContent);
-      return;
-    }
-    if (whatToAskPendingRef.current) return;
+    if (!loadWhatToAsk || whatToAskPendingRef.current) return;
     whatToAskPendingRef.current = true;
-    whatToAskContent()
+    loadWhatToAsk()
       .then(content => showWhatToAskRef.current(content))
       .catch((err: unknown) => console.error('[EmbeddableChat] whatToAsk failed:', err))
       .finally(() => {
@@ -2450,7 +2433,7 @@ function EmbeddableChatInner({
   // The list's "What to ask Mingo?" entry, also the host's (`showWhatToAsk`): the
   // suggestions a new chat opens on, unless the host has a surface of its own.
   const openWhatToAsk = () => {
-    leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? requestWhatToAsk : handleNewChat))();
+    leaveArchiveThen(onWhatToAsk ?? (loadWhatToAsk ? requestWhatToAsk : handleNewChat))();
   };
   useEffect(() => {
     whatToAskEntryRef.current = openWhatToAsk;

@@ -1,5 +1,5 @@
 /**
- * `whatToAsk`: the v2 list's "What to ask Mingo?" answered in the panel.
+ * The v2 list's "What to ask Mingo?" answered in the panel, from what the runtime's `whatToAskUrl` serves.
  *
  * Every click opens a new chat holding the exchange - never the open
  * conversation - and the send from there keeps it in the dialog the send
@@ -8,7 +8,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createRef, type Ref, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,6 +32,7 @@ const runtime: ChatRuntime = {
     attachmentUploadUrl: '/api/storage/generate-upload-url',
     attachmentViewUrlPrefix: '/api/storage/view/chat-attachments/',
     identityUrl: '/api/chat/identity',
+    whatToAskUrl: '/content/api/ai-agents/mingo/what-to-ask',
   },
   navigation: { mode: 'host' },
 };
@@ -59,7 +60,6 @@ function Host({
   locked = false,
   openChat = [HELLO],
   busy = false,
-  whatToAsk = WHAT_TO_ASK,
   onWhatToAsk,
   assistantName,
   handleRef,
@@ -75,8 +75,6 @@ function Host({
   openChat?: ChatMessage[];
   /** A turn is running in the open chat. */
   busy?: boolean;
-  /** `null`: the host passes none (the runtime's `whatToAskUrl` may answer instead). */
-  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>) | null;
   /** The assistant's name in the entry and the header. */
   assistantName?: string;
   /** The host's own "What to ask?" surface. */
@@ -149,7 +147,6 @@ function Host({
         showInternalTrigger={false}
 
         composerLock={locked ? { placeholder: 'Out of balance' } : null}
-        whatToAsk={whatToAsk ?? undefined}
         onWhatToAsk={onWhatToAsk}
         assistantName={assistantName}
         chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
@@ -171,20 +168,27 @@ function renderHost(props: Parameters<typeof Host>[0] = {}, chatRuntime: ChatRun
 
 const whatToAsk = () => screen.getByRole('button', { name: 'What to ask Mingo?' });
 const editor = () => screen.getByRole('textbox');
+/** Click the entry and wait for the exchange the runtime serves. */
+const openWhatToAsk = async () => {
+  fireEvent.click(whatToAsk());
+  await screen.findByText('Describe the outcome you want.');
+};
+const answer = () => new Response(JSON.stringify(WHAT_TO_ASK));
 
 describe('EmbeddableChat - whatToAsk', () => {
   // Wide enough for the list beside the chat (jsdom measures 0 otherwise).
   beforeEach(() => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1400);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => answer());
   });
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('opens a new chat with the exchange, not the open conversation', () => {
+  it('opens a new chat with the exchange, not the open conversation', async () => {
     renderHost({ initialDialogId: 'd-1' });
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
 
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
     expect(screen.getByText('Describe the outcome you want.')).toBeInTheDocument();
@@ -195,13 +199,13 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(active.map(button => button.textContent)).toEqual(['New Chat']);
   });
 
-  it('titles the chat "What to ask Mingo?" while it holds only the answer; the list row stays "New Chat"', () => {
+  it('titles the chat "What to ask Mingo?" while it holds only the answer; the list row stays "New Chat"', async () => {
     renderHost();
     // The header's title is a `p`; the list's entry of the same name is a button's label.
     const titled = () => screen.queryAllByText('What to ask Mingo?', { selector: 'p' });
     expect(titled()).toHaveLength(0);
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
 
     expect(titled().length).toBeGreaterThan(0);
     const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
@@ -211,19 +215,20 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(titled()).toHaveLength(0);
   });
 
-  it('replaces the new chat exchange with a fresh one on another click', () => {
+  it('replaces the new chat exchange with a fresh one on another click', async () => {
     renderHost();
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
     fireEvent.click(whatToAsk());
 
-    expect(screen.getAllByText('What can I ask you?')).toHaveLength(1);
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getAllByText('What can I ask you?')).toHaveLength(1));
   });
 
-  it('opens a new chat with the exchange when no conversation is open', () => {
+  it('opens a new chat with the exchange when no conversation is open', async () => {
     renderHost();
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
 
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
     expect(screen.queryByText('hello')).not.toBeInTheDocument();
@@ -232,11 +237,11 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(active.map(button => button.textContent)).toEqual(['New Chat']);
   });
 
-  it('sends a picked prompt in the new chat and leaves the composer alone', () => {
+  it('sends a picked prompt in the new chat and leaves the composer alone', async () => {
     const onSend = vi.fn();
     renderHost({ onSend });
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
     fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
 
     expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
@@ -246,7 +251,7 @@ describe('EmbeddableChat - whatToAsk', () => {
   it('keeps a new chat exchange in the dialog a picked prompt creates', async () => {
     renderHost();
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
     fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
 
     // The send went out and made its dialog (it is in the list now).
@@ -254,24 +259,24 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
   });
 
-  it('a picked prompt goes through the panel, not past it to the adapter', () => {
+  it('a picked prompt goes through the panel, not past it to the adapter', async () => {
     const onSend = vi.fn();
     const onAdapterSend = vi.fn();
     renderHost({ onSend, onAdapterSend });
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
     fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
 
     expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
     expect(onAdapterSend).not.toHaveBeenCalled();
   });
 
-  it('a picked prompt does not go out while the chat cannot take a message', () => {
+  it('a picked prompt does not go out while the chat cannot take a message', async () => {
     const onSend = vi.fn();
     const onAdapterSend = vi.fn();
     renderHost({ onSend, onAdapterSend, locked: true });
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
     fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
 
     expect(onSend).not.toHaveBeenCalled();
@@ -292,33 +297,34 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(active.map(button => button.textContent)).toEqual(['New Chat']);
   });
 
-  it('opens a new chat while a turn runs in the open one, and a chip there sends', () => {
+  it('opens a new chat while a turn runs in the open one, and a chip there sends', async () => {
     const onSend = vi.fn();
     renderHost({ initialDialogId: 'd-1', busy: true, onSend });
 
-    fireEvent.click(whatToAsk());
+    await openWhatToAsk();
 
     expect(screen.queryByText('hello')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
     expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
   });
 
-  it('waits for an async whatToAsk and shows the exchange whole, once per pending click', async () => {
-    let settle: (content: WhatToAskContent) => void = () => {};
-    const load = vi.fn(
+  it('reads the exchange on each click and shows it whole, once per pending read', async () => {
+    let settle: (response: Response) => void = () => {};
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(
       () =>
-        new Promise<WhatToAskContent>(resolve => {
+        new Promise<Response>(resolve => {
           settle = resolve;
         }),
     );
-    renderHost({ initialDialogId: 'd-1', whatToAsk: load });
+    renderHost({ initialDialogId: 'd-1' });
 
     fireEvent.click(whatToAsk());
     fireEvent.click(whatToAsk());
-    expect(load).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/content/api/ai-agents/mingo/what-to-ask', undefined);
     expect(screen.queryByText('What can I ask you?')).not.toBeInTheDocument();
 
-    settle({ ...WHAT_TO_ASK, reply: 'Live devices:' });
+    settle(new Response(JSON.stringify({ ...WHAT_TO_ASK, reply: 'Live devices:' })));
 
     expect(await screen.findByText('Live devices:')).toBeInTheDocument();
     expect(screen.getAllByText('What can I ask you?')).toHaveLength(1);
@@ -336,14 +342,14 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
-  it("answers the host's own entry (the handle) as the list's", () => {
+  it("answers the host's own entry (the handle) as the list's", async () => {
     const handle = createRef<EmbeddableChatHandle>();
     renderHost({ initialDialogId: 'd-1', handleRef: handle });
 
     act(() => handle.current?.showWhatToAsk());
 
     // A new chat holding the exchange, as the list's entry opens.
-    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
+    expect(await screen.findByText('What can I ask you?')).toBeInTheDocument();
     expect(screen.queryByText('hello')).not.toBeInTheDocument();
   });
 
@@ -358,17 +364,16 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(screen.queryByText('What can I ask you?')).not.toBeInTheDocument();
   });
 
-  it("reads the exchange from the runtime's `whatToAskUrl` when the host passes none", async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(WHAT_TO_ASK)));
-    renderHost(
-      { whatToAsk: null },
-      { ...runtime, endpoints: { ...runtime.endpoints, whatToAskUrl: '/content/api/ai-agents/mingo/what-to-ask' } },
-    );
+  it('starts a plain new chat when the runtime serves no exchange', () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const { whatToAskUrl: _none, ...endpoints } = runtime.endpoints;
+    renderHost({ initialDialogId: 'd-1' }, { ...runtime, endpoints });
 
     fireEvent.click(whatToAsk());
 
-    expect(fetchMock).toHaveBeenCalledWith('/content/api/ai-agents/mingo/what-to-ask', undefined);
-    expect(await screen.findByRole('button', { name: 'Which devices went offline today?' })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith('/content/api/ai-agents/mingo/what-to-ask', undefined);
+    expect(screen.queryByText('What can I ask you?')).not.toBeInTheDocument();
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
   });
 
   it('names the entry after the assistant the host names', () => {
