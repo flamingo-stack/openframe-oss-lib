@@ -61,6 +61,7 @@ function Host({
   busy = false,
   whatToAsk = WHAT_TO_ASK,
   onWhatToAsk,
+  assistantName,
   handleRef,
 }: {
   initialDialogId?: string | null;
@@ -74,7 +75,10 @@ function Host({
   openChat?: ChatMessage[];
   /** A turn is running in the open chat. */
   busy?: boolean;
-  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
+  /** `null`: the host passes none (the runtime's `whatToAskUrl` may answer instead). */
+  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>) | null;
+  /** The assistant's name in the entry and the header. */
+  assistantName?: string;
   /** The host's own "What to ask?" surface. */
   onWhatToAsk?: () => void;
   handleRef?: Ref<EmbeddableChatHandle>;
@@ -145,19 +149,20 @@ function Host({
         showInternalTrigger={false}
 
         composerLock={locked ? { placeholder: 'Out of balance' } : null}
-        whatToAsk={whatToAsk}
+        whatToAsk={whatToAsk ?? undefined}
         onWhatToAsk={onWhatToAsk}
+        assistantName={assistantName}
         chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
       />
     </ChatEngineProvider>
   );
 }
 
-function renderHost(props: Parameters<typeof Host>[0] = {}) {
+function renderHost(props: Parameters<typeof Host>[0] = {}, chatRuntime: ChatRuntime = runtime) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <ChatRuntimeContext.Provider value={runtime}>
+      <ChatRuntimeContext.Provider value={chatRuntime}>
         <Host {...props} />
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
@@ -351,5 +356,23 @@ describe('EmbeddableChat - whatToAsk', () => {
 
     expect(onWhatToAsk).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('What can I ask you?')).not.toBeInTheDocument();
+  });
+
+  it("reads the exchange from the runtime's `whatToAskUrl` when the host passes none", async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(WHAT_TO_ASK)));
+    renderHost(
+      { whatToAsk: null },
+      { ...runtime, endpoints: { ...runtime.endpoints, whatToAskUrl: '/content/api/ai-agents/mingo/what-to-ask' } },
+    );
+
+    fireEvent.click(whatToAsk());
+
+    expect(fetchMock).toHaveBeenCalledWith('/content/api/ai-agents/mingo/what-to-ask', undefined);
+    expect(await screen.findByRole('button', { name: 'Which devices went offline today?' })).toBeInTheDocument();
+  });
+
+  it('names the entry after the assistant the host names', () => {
+    renderHost({ assistantName: 'Fae' });
+    expect(screen.getByRole('button', { name: 'What to ask Fae?' })).toBeInTheDocument();
   });
 });

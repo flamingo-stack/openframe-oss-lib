@@ -45,6 +45,7 @@ import { recordHref, replaceRecordLinks } from '../../chat-protocol/record-link'
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
+import { contentFetch } from '../../utils/embed-content-fetch';
 import { getSourceIconName } from '../../utils/source-icons';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
@@ -1613,7 +1614,8 @@ function EmbeddableChatInner({
   const whatToAskContent = useMemo<WhatToAskContent | (() => Promise<WhatToAskContent>) | undefined>(() => {
     if (whatToAskProp || !whatToAskUrl) return whatToAskProp;
     return async () => {
-      const response = await fetch(whatToAskUrl, { credentials: 'include' });
+      // The lib's content fetch: the host's embed auth (bearer, 401 refresh) when it registered one, else a plain fetch.
+      const response = await contentFetch(whatToAskUrl);
       if (!response.ok) throw new Error(`What to ask: ${response.status}`);
       return (await response.json()) as WhatToAskContent;
     };
