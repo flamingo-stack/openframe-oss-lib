@@ -557,4 +557,22 @@ class DeviceSoftwareHandlerTest {
         verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
         verify(projectionTrigger).cvesChanged("t1", Set.of("CVE-1"));
     }
+
+    @Test
+    void handle_reconcile_changedRowOfAConnectedDeviceStaysConnected() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenReturn(List.of(
+                titleWithCves(42L, "Google Chrome", "2.0")));
+        DeviceSoftware connected = stored("ds-42", 42L, "Google Chrome", "1.0");
+        connected.setMachineConnected(true);
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(connected));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100), COMMIT_TS, GTID_1), null);
+
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getId()).isEqualTo("ds-42");
+        assertThat(saved.isMachineConnected()).isTrue();
+        assertThat(saved.getVersions()).containsExactly("2.0");
+    }
 }

@@ -93,8 +93,9 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (hostId == null) {
             return;
         }
-        if (isUpdate(payload.getOperation())
-                && differsOnlyIn(payload.getBefore(), payload.getAfter(), UNTRACKED_COLUMNS)) {
+        JsonNode before = payload.getBefore();
+        JsonNode after = payload.getAfter();
+        if (isUpdate(payload.getOperation()) && differsOnlyIn(before, after, UNTRACKED_COLUMNS)) {
             return;
         }
         boolean snapshotRead = isSnapshotRead(payload.getOperation());
@@ -141,9 +142,12 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     }
 
     private void reconcile(FleetHostRef host, Long hostId, String commit) {
-        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId, commit);
+        String tenantId = host.tenantId();
+        String machineId = host.machineId();
+        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(tenantId, hostId, commit);
+        List<DeviceSoftware> existingRows = deviceSoftwareRepository.findByTenantIdAndMachineId(tenantId, machineId);
         Map<Long, DeviceSoftware> existingByTitle = new HashMap<>();
-        for (DeviceSoftware existing : deviceSoftwareRepository.findByTenantIdAndMachineId(host.tenantId(), host.machineId())) {
+        for (DeviceSoftware existing : existingRows) {
             existingByTitle.put(existing.getSoftwareTitleId(), existing);
         }
         Instant now = Instant.now();
@@ -164,7 +168,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             if (existing != null) {
                 reported.setId(existing.getId());
                 reported.setMachineConnected(existing.isMachineConnected());
-                affectedCves.addAll(vulnerabilitiesOf(existing));
+                List<String> previousCves = vulnerabilitiesOf(existing);
+                affectedCves.addAll(previousCves);
             } else {
                 reported.setMachineConnected(true);
             }
@@ -178,7 +183,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         for (DeviceSoftware stale : existingByTitle.values()) {
             staleIds.add(stale.getId());
             affectedTitles.add(stale.getSoftwareTitleId());
-            affectedCves.addAll(vulnerabilitiesOf(stale));
+            List<String> staleCves = vulnerabilitiesOf(stale);
+            affectedCves.addAll(staleCves);
         }
 
         if (!changed.isEmpty()) {
@@ -188,8 +194,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftwareRepository.deleteAllById(staleIds);
         }
 
-        projectionTrigger.titlesChanged(host.tenantId(), affectedTitles);
-        projectionTrigger.cvesChanged(host.tenantId(), affectedCves);
+        projectionTrigger.titlesChanged(tenantId, affectedTitles);
+        projectionTrigger.cvesChanged(tenantId, affectedCves);
     }
 
     private static DeviceSoftware reportedRow(FleetHostRef host, Long titleId, HostSoftwareTitle title) {
