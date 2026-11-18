@@ -1,11 +1,16 @@
 package com.openframe.authz.service.sso.apple;
 
+import com.google.crypto.tink.KeysetHandle;
+import com.google.crypto.tink.aead.AeadConfig;
+import com.google.crypto.tink.aead.PredefinedAeadParameters;
 import com.nimbusds.jwt.SignedJWT;
 import com.openframe.authz.config.oidc.AppleSSOProperties;
 import com.openframe.authz.service.auth.strategy.AppleClientSecretFactory;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.core.exception.EncryptionException;
 import com.openframe.data.document.auth.AppleUserToken;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.sso.SSOConfig;
@@ -14,6 +19,7 @@ import com.openframe.data.repository.auth.AppleUserTokenRepository;
 import com.openframe.data.repository.auth.AuthUserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,6 +32,7 @@ import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.time.Instant;
 import java.util.List;
@@ -37,6 +44,8 @@ import static com.openframe.authz.support.SsoTestFixtures.authentication;
 import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
 import static com.openframe.authz.support.TestTokens.ecKeyPair;
 import static com.openframe.authz.support.TestTokens.pkcs8Pem;
+import static com.openframe.core.crypto.service.SecretPurpose.APPLE_REFRESH_TOKEN;
+import static com.openframe.core.crypto.service.SecretPurpose.SSO_CLIENT_SECRET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -56,7 +65,9 @@ class AppleTokenLifecycleTest {
     private static final String REVOKE_URL = "https://appleid.apple.com/auth/revoke";
 
     private final AppleUserTokenRepository tokenRepository = mock(AppleUserTokenRepository.class);
-    private final EncryptionService encryption = new EncryptionService("0123456789abcdef0123456789abcdef", "0123456789abcdef");
+    private static final EncryptionContext TOKEN_CONTEXT = EncryptionContext.forTenant("t", APPLE_REFRESH_TOKEN);
+
+    private final EncryptionService encryption = tinkEncryption();
     private final SSOConfigService ssoConfigService = mock(SSOConfigService.class);
     private final AppleClientSecretFactory secretFactory = mock(AppleClientSecretFactory.class);
     private MockRestServiceServer apple;
@@ -70,9 +81,22 @@ class AppleTokenLifecycleTest {
                 new AppleSSOProperties(), builder);
     }
 
+    private static EncryptionService tinkEncryption() {
+        try {
+            AeadConfig.register();
+            return EncryptionService.withKeyset(KeysetHandle.generateNew(PredefinedAeadParameters.AES256_GCM), true, null, null);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private AppleUserToken storedToken() {
+        return storedToken(encryption.encrypt("apple-refresh", TOKEN_CONTEXT));
+    }
+
+    private AppleUserToken storedToken(String encryptedRefreshToken) {
         return AppleUserToken.builder().id("doc").tenantId("t").userId("u-1").clientId("com.openframe.app")
-                .refreshToken(encryption.encryptClientSecret("apple-refresh")).build();
+                .refreshToken(encryptedRefreshToken).build();
     }
 
     private void appleConfigured() {
@@ -93,8 +117,47 @@ class AppleTokenLifecycleTest {
 
         verify(tokenRepository).save(org.mockito.ArgumentMatchers.argThat(doc ->
                 !doc.getRefreshToken().equals("apple-refresh")
-                        && encryption.decryptClientSecret(doc.getRefreshToken()).equals("apple-refresh")
+                        && encryption.decrypt(doc.getRefreshToken(), TOKEN_CONTEXT).equals("apple-refresh")
                         && doc.getUserId().equals("u-1")));
+    }
+
+    @Test
+    void shouldStoreRefreshTokenOnlyReadableForItsTenantAndPurpose() {
+        when(tokenRepository.findByUserId("u-1")).thenReturn(Optional.empty());
+
+        tokenService.store("t", "u-1", "com.openframe.app", "apple-refresh");
+
+        ArgumentCaptor<AppleUserToken> saved = ArgumentCaptor.forClass(AppleUserToken.class);
+        verify(tokenRepository).save(saved.capture());
+        String stored = saved.getValue().getRefreshToken();
+        assertThat(stored).doesNotContain("apple-refresh");
+        assertThat(encryption.decrypt(stored, TOKEN_CONTEXT)).isEqualTo("apple-refresh");
+        assertThatThrownBy(() -> encryption.decrypt(stored, EncryptionContext.forTenant("other", APPLE_REFRESH_TOKEN)))
+                .isInstanceOf(EncryptionException.class);
+        assertThatThrownBy(() -> encryption.decrypt(stored, EncryptionContext.forTenant("t", SSO_CLIENT_SECRET)))
+                .isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    void shouldNotRevokeNorForgetTokenEncryptedForAnotherTenant() {
+        appleConfigured();
+        AppleUserToken token = storedToken(encryption.encrypt("apple-refresh",
+                EncryptionContext.forTenant("other", APPLE_REFRESH_TOKEN)));
+
+        assertThat(tokenService.revokeAndForget(token)).isFalse();
+        verify(tokenRepository, never()).delete(any());
+        apple.verify();
+    }
+
+    @Test
+    void shouldNotRevokeTokenEncryptedForAnotherPurpose() {
+        appleConfigured();
+        AppleUserToken token = storedToken(encryption.encrypt("apple-refresh",
+                EncryptionContext.forTenant("t", SSO_CLIENT_SECRET)));
+
+        assertThat(tokenService.revokeAndForget(token)).isFalse();
+        verify(tokenRepository, never()).delete(any());
+        apple.verify();
     }
 
     @Test

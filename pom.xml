@@ -44,6 +44,8 @@
         <tomcat.version>11.0.26</tomcat.version>
         <freemarker.version>2.3.35</freemarker.version>
         <bcprov-lts8on.version>2.73.13</bcprov-lts8on.version>
+        <tink.version>1.24.0</tink.version>
+        <tink-gcpkms.version>1.12.0</tink-gcpkms.version>
         <libthrift.version>0.25.0</libthrift.version>
         <async-http-client.version>3.0.14</async-http-client.version>
         <lz4-java.version>1.8.1</lz4-java.version>
@@ -296,6 +298,16 @@
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcprov-lts8on</artifactId>
                 <version>${bcprov-lts8on.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.crypto.tink</groupId>
+                <artifactId>tink</artifactId>
+                <version>${tink.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.crypto.tink</groupId>
+                <artifactId>tink-gcpkms</artifactId>
+                <version>${tink-gcpkms.version}</version>
             </dependency>
             <!-- No longer managed by Spring Boot 4; @Recover has no counterpart in Spring Framework 7 retry -->
             <dependency>
