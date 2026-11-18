@@ -1,6 +1,7 @@
 use crate::platform::DirectoryManager;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
 use anyhow::Result;
+use openframe_common::auth::shared_token;
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -55,10 +56,7 @@ impl ToolCommandParamsResolver {
             // Resolve standard placeholders
             .map(|arg| {
                 arg.replace(Self::SERVER_URL_PLACEHOLDER, &server_url)
-                    .replace(
-                        Self::OPENFRAME_SECRET_PLACEHOLDER,
-                        "12345678901234567890123456789012",
-                    )
+                    .replace(Self::OPENFRAME_SECRET_PLACEHOLDER, shared_token::KEY)
                     .replace(Self::OPENFRAME_TOKEN_PATH_PLACEHOLDER, &token_path)
                     .replace(Self::MACHINE_ID_PLACEHOLDER, &machine_id)
             })
@@ -70,7 +68,7 @@ impl ToolCommandParamsResolver {
     fn build_token_path(&self) -> String {
         self.directory_manager
             .secured_dir()
-            .join("shared_token.enc")
+            .join(shared_token::FILE_NAME)
             .to_string_lossy()
             .to_string()
     }

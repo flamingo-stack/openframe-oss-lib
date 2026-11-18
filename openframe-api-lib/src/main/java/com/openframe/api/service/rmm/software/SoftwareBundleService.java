@@ -1,20 +1,25 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
+import com.openframe.api.dto.rmm.software.PackageUpdateSettingsInput;
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
 import com.openframe.api.dto.rmm.software.SoftwareBundleScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
+import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
+import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdate;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
@@ -29,6 +34,7 @@ import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +52,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -61,6 +69,9 @@ public class SoftwareBundleService {
     private final MachinePlatformResolver machinePlatformResolver;
     private final TenantIdProvider tenantIdProvider;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
+    private final SoftwareInventoryService softwareInventoryService;
+    private final PackageCatalogVersions packageCatalogVersions;
 
     @Value("${openframe.rmm.software.bundle.pending-ttl}")
     private Duration pendingTtl;
@@ -148,21 +159,49 @@ public class SoftwareBundleService {
             submitScheduled(entity, input, actor);
         } else {
             entity.setMode(SoftwareBundleMode.NOW);
+            packages.forEach(this::fillLatestVersion);
             armOnlineDispatch(entity, now);
             entity.setExecutionIds(executionIds(entity));
         }
 
-        entity.setStatus(SoftwareBundleStatus.COMPLETED);
-        entity.setCompletedAt(now);
-        entity.setUpdatedAt(now);
-        entity.setExpireAt(null); // completed bundles are history — never reaped
-        bundleRepository.save(entity);
+        saveCompleted(entity, now);
 
         writeActionResults(entity, packages, deviceOsTypes, now, actor);
 
         log.info("Submitted software bundle id={} mode={} action={} devices={} packages={} actor={}",
                 entity.getId(), entity.getMode(), entity.getAction(), machineIds.size(), packages.size(), actor);
         return toResponse(entity);
+    }
+
+    public SoftwareResponse turnOnAutoUpdate(TurnOnSoftwareAutoUpdateInput input, String actor) {
+        String bundleId = input.getBundleId();
+        SoftwareBundle entity = loadPendingOrThrow(bundleId);
+        List<String> machineIds = currentMachineIds(entity);
+        if (machineIds.isEmpty()) {
+            throw new BadRequestException("Cannot turn on auto-update from software bundle " + bundleId
+                    + ": no devices assigned");
+        }
+        String softwareId = input.getSoftwareId();
+        SoftwarePackageInput softwarePackage = new SoftwarePackageInput();
+        softwarePackage.setSoftwareId(softwareId);
+        List<SoftwarePackageInput> packages = List.of(softwarePackage);
+        requireDeviceEligibility(machineIds, packages);
+        PackageUpdateSettingsInput settingsInput = input.getSettings();
+        PackageUpdateSettings settings = PackageUpdateSettingsMapper.updateSettings(SoftwareAction.UPDATE, settingsInput);
+        SoftwareResponse software = softwareInventoryService.turnOnAutoUpdate(softwareId, machineIds, settings, actor);
+        Instant now = Instant.now();
+        saveCompleted(entity, now);
+        log.info("Turned on auto-update from software bundle id={} softwareId={} devices={} actor={}",
+                bundleId, softwareId, machineIds.size(), actor);
+        return software;
+    }
+
+    private void saveCompleted(SoftwareBundle entity, Instant now) {
+        entity.setStatus(SoftwareBundleStatus.COMPLETED);
+        entity.setCompletedAt(now);
+        entity.setUpdatedAt(now);
+        entity.setExpireAt(null); // completed bundles are history — never reaped
+        bundleRepository.save(entity);
     }
 
     public void requireDeviceEligibility(List<String> machineIds, List<SoftwarePackageInput> packages) {
@@ -177,6 +216,19 @@ public class SoftwareBundleService {
         Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         rejectDevicesWithoutCompatiblePackage(machineIds, packages, deviceOsTypes);
         return deviceOsTypes;
+    }
+
+    // only an action that runs now: a scheduled run installs the latest version of its own day
+    private void fillLatestVersion(SoftwareBundlePackage pkg) {
+        String version = pkg.getVersion();
+        PackageManagerType packageManager = pkg.getPackageManager();
+        String packageName = pkg.getPackageName();
+        BrewPackageType brewPackageType = pkg.getBrewPackageType();
+        if (hasText(version) || !packageCatalogVersions.hasShownLatest(packageManager, packageName, brewPackageType)) {
+            return;
+        }
+        String latestVersion = packageCatalogVersions.shownLatest(packageManager, packageName, brewPackageType);
+        pkg.setVersion(latestVersion);
     }
 
     private void writeActionResults(SoftwareBundle bundle, List<SoftwareBundlePackage> packages,
@@ -361,10 +413,11 @@ public class SoftwareBundleService {
         return entity;
     }
 
-    private static List<SoftwareBundlePackage> toDomainPackages(List<SoftwarePackageInput> packages) {
+    private List<SoftwareBundlePackage> toDomainPackages(List<SoftwarePackageInput> packages) {
         if (packages == null) {
             return List.of();
         }
+        softwarePackageSelectionResolver.resolve(packages);
         return packages.stream()
                 .map(p -> SoftwareBundlePackage.builder()
                         .packageManager(p.getPackageManager())

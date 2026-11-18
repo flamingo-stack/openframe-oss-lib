@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SsoFlowCookieNamesContractTest {
 
     private static final List<SsoFlowHandler> HANDLERS = List.of(
-            new InviteSsoHandler(null, null, null),
+            new InviteSsoHandler(null, null, null, null),
             new LoginSsoHandler(null, null, null, null, null, null, null, null, null));
 
     @Test

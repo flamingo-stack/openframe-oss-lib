@@ -185,6 +185,7 @@ function GridHeaderCell({ column, header, sort, onSortChange, loading }: GridHea
             variant="grid"
             column={header.column}
             options={filter.options}
+            extraSections={filter.sections}
             placement={filter.placement}
             pending={filter.pending}
             label={label}

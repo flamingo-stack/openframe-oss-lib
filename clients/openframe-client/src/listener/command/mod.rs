@@ -4,6 +4,7 @@ mod handlers;
 mod package_update;
 mod restart;
 
+use std::collections::HashSet;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -15,8 +16,8 @@ use tracing::{error, info};
 
 use crate::config::update_config::RECONNECTION_DELAY_MS;
 use crate::models::DeliveryRef;
+use crate::services::delivery_results::DeliveryResults;
 use crate::services::nats_connection_manager::NatsConnectionManager;
-use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::result_store::ResultStore;
 use crate::services::AgentConfigurationService;
 
@@ -58,6 +59,14 @@ pub trait CommandHandler: Clone + Send + Sync + 'static {
         0
     }
 
+    // the delivery type it answers later (Outcome::Deferred): its Deferred rows outside `owed_deliveries` fail on start
+    const DEFERRED_TYPE: Option<&'static str> = None;
+
+    // DEFERRED_TYPE: the dispatch ids it still owes an answer, read before the listener subscribes
+    fn owed_deliveries(&self, _machine_id: &str) -> HashSet<String> {
+        HashSet::new()
+    }
+
     // REMOVES_AGENT: starts the removal once the done result is out
     fn remove_agent(&self) -> impl Future<Output = ()> + Send {
         async {}
@@ -83,6 +92,8 @@ pub enum Outcome {
     RestartRequired,
     // the command restarts the agent itself and the next start reports how it ended
     Restarting,
+    // the handler took the work on and answers itself once it ends
+    Deferred,
     Failed(String),
 }
 
@@ -109,7 +120,7 @@ impl CommandContext {
         nats_connection_manager: NatsConnectionManager,
         config_service: AgentConfigurationService,
         restart: RestartGate,
-        publisher: NatsMessagePublisher,
+        results: DeliveryResults,
         result_store: Arc<ResultStore>,
         flush_notify: Arc<Notify>,
     ) -> Self {
@@ -117,7 +128,7 @@ impl CommandContext {
             nats_connection_manager,
             config_service,
             restart,
-            delivery: Delivery::new(publisher, result_store, flush_notify),
+            delivery: Delivery::new(results, result_store, flush_notify),
             recovered: Arc::new(OnceCell::new()),
         }
     }
@@ -144,6 +155,7 @@ impl<H: CommandHandler> CommandListener<H> {
         let handle = tokio::spawn(async move {
             listener.context.recover_once().await;
             core_nats::report_restart_completion(&listener).await;
+            core_nats::fail_orphaned(&listener).await;
             loop {
                 info!(kind = H::KIND, "Starting command listener...");
                 match core_nats::listen(&listener).await {

@@ -40,15 +40,35 @@ class GatewayTrafficMetricsTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
 
-        metrics.recordSessionClosed("meshcentral-server", 1002, 0);
-        metrics.recordSessionClosed("meshcentral-server", 1002, 0);
+        metrics.recordSessionClosed("meshcentral-server", WebSocketKind.RELAY, 1002, 0);
+        metrics.recordSessionClosed("meshcentral-server", WebSocketKind.RELAY, 1002, 0);
 
         double count = registry.get("openframe.tenant.gateway.websocket.sessions.closed")
                 .tag("tool", "meshcentral-server")
+                .tag("relay", "true")
                 .tag("code", "1002")
                 .tag("lifetime", "0s")
                 .counter().count();
         assertThat(count).isEqualTo(2.0);
+    }
+
+    @Test
+    void recordSessionClosed_channel_taggedAsNotRelay() {
+        // setup
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
+
+        // execution
+        metrics.recordSessionClosed("nats", WebSocketKind.CHANNEL, 1000, 120);
+
+        // verifications
+        double count = registry.get("openframe.tenant.gateway.websocket.sessions.closed")
+                .tag("tool", "nats")
+                .tag("relay", "false")
+                .tag("code", "1000")
+                .tag("lifetime", "<10m")
+                .counter().count();
+        assertThat(count).isEqualTo(1.0);
     }
 
     @Test

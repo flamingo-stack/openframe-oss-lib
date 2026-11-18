@@ -6,10 +6,12 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 use tracing::{info, warn};
 
-use crate::models::{PackageRef, PackageUpdateMessage, SourceKind, UpdateMode, UpdateSource};
+use crate::models::{
+    DeliveryRef, FailReason, PackageRef, PackageUpdateMessage, SourceKind, UpdateMode, UpdateSource,
+};
 use crate::utils::fs::atomic_write;
 
-/// Finished requests remembered for the stale-sequence rule.
+/// Finished requests remembered for the stale-sequence rule, and failed dispatches remembered for repeats.
 const FINISHED_MEMORY: usize = 100;
 
 /// One accepted order as persisted: what to do, not how far it got.
@@ -25,6 +27,18 @@ pub struct Order {
     /// Bumped on every re-send, so a waiting order reports its state again.
     #[serde(default)]
     pub revision: u64,
+    /// Every dispatch that brought this request; each is answered once the order ends.
+    #[serde(default)]
+    pub deliveries: Vec<DeliveryRef>,
+}
+
+/// How an order ended, as far as the delivery engine is concerned.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ending {
+    /// Nothing to run again: installed, already latest, or refused for good.
+    Done,
+    /// A failure a re-run may fix; the engine re-runs it under a new dispatch.
+    Retry { reason: FailReason, message: String },
 }
 
 impl Order {
@@ -51,6 +65,9 @@ struct Orders {
     pending: Vec<Order>,
     #[serde(default)]
     finished: Vec<Finished>,
+    /// Dispatches answered FAILED, so a repeat of one without the delivery ledger does not run the order again.
+    #[serde(default)]
+    failed: Vec<String>,
     /// The request whose install is running right now; never persisted.
     #[serde(skip)]
     installing: Option<String>,
@@ -60,7 +77,11 @@ struct Orders {
 pub enum Submitted {
     /// A new request, or a known one with a new mode or countdown.
     Accepted,
-    /// A sequence the agent already applied for this request.
+    /// A pending request sent again with no newer sequence; it keeps its mode, countdown and revision.
+    Attached,
+    /// A repeat of a dispatch whose order already failed.
+    AlreadyFailed,
+    /// A sequence the agent already applied for a request that ended done.
     Stale,
     /// Accepted; the pending order for the same package was replaced by it.
     Superseded(Order),
@@ -101,11 +122,14 @@ impl OrderStore {
     pub fn submit(
         &self,
         machine_id: &str,
-        sequence: i64,
+        delivery: DeliveryRef,
         received_at: u64,
         message: PackageUpdateMessage,
         countdown_seconds: u64,
     ) -> Result<Submitted> {
+        let sequence = delivery
+            .sequence
+            .context("package update without a sequence")?;
         let mut state = self.state();
         let mut next = state.clone();
         if next.machine_id != machine_id {
@@ -119,34 +143,43 @@ impl OrderStore {
             };
         }
 
-        let known = next
+        if next.failed.contains(&delivery.dispatch_id) {
+            return Ok(Submitted::AlreadyFailed);
+        }
+        let pending = next
             .pending
             .iter()
-            .find(|order| order.request_id == message.request_id)
-            .map(|order| order.sequence)
-            .or_else(|| {
-                next.finished
-                    .iter()
-                    .find(|f| f.request_id == message.request_id)
-                    .map(|f| f.sequence)
-            });
-        if known.is_some_and(|applied| sequence <= applied) {
+            .position(|order| order.request_id == message.request_id);
+        let finished = next
+            .finished
+            .iter()
+            .find(|f| f.request_id == message.request_id)
+            .map(|f| f.sequence);
+        if pending.is_none() && finished.is_some_and(|applied| sequence <= applied) {
             return Ok(Submitted::Stale);
         }
 
-        let superseded = match next
-            .pending
-            .iter_mut()
-            .find(|order| order.request_id == message.request_id)
-        {
-            Some(order) => {
-                order.sequence = sequence;
-                order.source = message.source;
-                order.package = message.package;
-                order.mode = message.mode;
-                order.countdown_seconds = countdown_seconds;
-                order.revision += 1;
-                None
+        let submitted = match pending {
+            Some(index) => {
+                let order = &mut next.pending[index];
+                if !order
+                    .deliveries
+                    .iter()
+                    .any(|known| known.dispatch_id == delivery.dispatch_id)
+                {
+                    order.deliveries.push(delivery);
+                }
+                if sequence <= order.sequence {
+                    Submitted::Attached
+                } else {
+                    order.sequence = sequence;
+                    order.source = message.source;
+                    order.package = message.package;
+                    order.mode = message.mode;
+                    order.countdown_seconds = countdown_seconds;
+                    order.revision += 1;
+                    Submitted::Accepted
+                }
             }
             None => {
                 // An order whose install is running finishes on its own; the new one follows it.
@@ -167,8 +200,12 @@ impl OrderStore {
                     countdown_seconds,
                     received_at,
                     revision: 0,
+                    deliveries: vec![delivery],
                 });
-                replaced
+                match replaced {
+                    Some(order) => Submitted::Superseded(order),
+                    None => Submitted::Accepted,
+                }
             }
         };
 
@@ -176,10 +213,7 @@ impl OrderStore {
         *state = next;
         drop(state);
         self.changed.notify_one();
-        Ok(match superseded {
-            Some(order) => Submitted::Superseded(order),
-            None => Submitted::Accepted,
-        })
+        Ok(submitted)
     }
 
     /// The pending orders of `machine_id`, most urgent first: manual before automatic, then oldest first.
@@ -219,8 +253,9 @@ impl OrderStore {
         self.state().installing = None;
     }
 
-    /// Drops a finished request and remembers its sequence, so a late re-send is stale.
-    pub fn finish(&self, request_id: &str) -> Result<()> {
+    /// Drops an ended request and hands back the dispatches it owes an answer. A request that ended done keeps its
+    /// sequence, so a late re-send is stale; one to retry keeps its dispatches, so only a new dispatch runs it again.
+    pub fn finish(&self, request_id: &str, ending: &Ending) -> Vec<DeliveryRef> {
         let mut state = self.state();
         let mut next = state.clone();
         if next.installing.as_deref() == Some(request_id) {
@@ -232,24 +267,38 @@ impl OrderStore {
             .position(|order| order.request_id == request_id)
         else {
             state.installing = next.installing;
-            return Ok(());
+            return Vec::new();
         };
         let order = next.pending.remove(index);
         next.finished.retain(|f| f.request_id != request_id);
-        next.finished.push(Finished {
-            request_id: request_id.to_string(),
-            sequence: order.sequence,
-        });
+        match ending {
+            Ending::Done => next.finished.push(Finished {
+                request_id: request_id.to_string(),
+                sequence: order.sequence,
+            }),
+            Ending::Retry { .. } => next.failed.extend(
+                order
+                    .deliveries
+                    .iter()
+                    .map(|delivery| delivery.dispatch_id.clone()),
+            ),
+        }
         if next.finished.len() > FINISHED_MEMORY {
             let excess = next.finished.len() - FINISHED_MEMORY;
             next.finished.drain(..excess);
         }
+        if next.failed.len() > FINISHED_MEMORY {
+            let excess = next.failed.len() - FINISHED_MEMORY;
+            next.failed.drain(..excess);
+        }
         // The memory moves on even when the disk does not: a restart re-runs the order once, a loop never.
-        let persisted = self.persist(&next);
+        if let Err(e) = self.persist(&next) {
+            warn!(request_id, "Failed to persist a finished order: {:#}", e);
+        }
         *state = next;
         drop(state);
         self.changed.notify_one();
-        persisted
+        order.deliveries
     }
 
     /// Resolves once the orders have changed since the last call; a change made while nobody waits is kept.

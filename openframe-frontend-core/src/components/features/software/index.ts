@@ -31,6 +31,7 @@ export {
 export {
   SoftwareActionForm,
   type SoftwareActionFormProps,
+  type SoftwareActionTarget,
   type SoftwareActionFormValues,
   type SoftwareDeviceScope,
   type SoftwareRunMode,
@@ -45,6 +46,8 @@ export {
   SOFTWARE_UPDATE_DEADLINE_OPTIONS,
   type SoftwareUpdateMode,
   type SoftwareUpdatePolicy,
+  SoftwareUpdatePolicyFields,
+  type SoftwareUpdatePolicyFieldsProps,
   SoftwareUpdateSettingsFields,
   type SoftwareUpdateSettingsFieldsProps,
   type SoftwareUpdateSettingsValues,

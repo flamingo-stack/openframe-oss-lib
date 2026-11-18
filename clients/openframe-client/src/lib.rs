@@ -60,8 +60,8 @@ use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::deactivation_service::DeactivationService;
+use crate::services::delivery_results::DeliveryResults;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
-use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::github_download_service::GithubDownloadService;
@@ -229,7 +229,7 @@ impl Client {
         // Perform initial health check
         directory_manager.perform_health_check()?;
 
-        // Detects the gateway's 410 Gone (tenant deleted) and drives backoff / stop / self-uninstall.
+        // Pauses on the token endpoint's 410 (then self-uninstalls) or 403: backoff / stop / restart.
         let deactivation_service = DeactivationService::new(&directory_manager);
 
         // Initialize initial configuration service
@@ -294,12 +294,8 @@ impl Client {
             deactivation_service.clone(),
         );
 
-        // Initialize encryption service
-        let encryption_service = EncryptionService::new();
-
         // Initialize shared token service
-        let shared_token_service =
-            SharedTokenService::new(directory_manager.clone(), encryption_service.clone());
+        let shared_token_service = SharedTokenService::new(directory_manager.clone());
 
         // Initialize authentication service
         let auth_service = AgentAuthService::new(
@@ -538,11 +534,16 @@ impl Client {
             package_upgrades.view(),
             agent_restart.clone(),
         );
+        let delivery_results = DeliveryResults::new(
+            nats_message_publisher.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
         let command_context = CommandContext::new(
             nats_connection_manager.clone(),
             config_service.clone(),
             restart_gate.clone(),
-            nats_message_publisher.clone(),
+            delivery_results.clone(),
             result_store.clone(),
             flush_notify.clone(),
         );
@@ -556,18 +557,20 @@ impl Client {
                 flush_notify.clone(),
             );
             let listener = CommandListener::new(
-                PackageUpdateHandler::new(orders.clone(), status.clone()),
+                PackageUpdateHandler::new(orders.clone(), status.clone(), delivery_results.clone()),
                 command_context.clone(),
             );
             let manager = PackageUpdateRunManager::new(
                 orders,
                 status,
+                delivery_results,
                 config_service.clone(),
                 RestartSignals {
                     client_update: tool_run_manager.client_update_pending(),
                     agent_restart: agent_restart.view(),
                 },
                 package_upgrades.clone(),
+                tool_run_manager.clone(),
             );
             PackageUpdate { listener, manager }
         });
@@ -713,9 +716,7 @@ impl Client {
     pub async fn start(&self) -> Result<()> {
         info!("Starting OpenFrame Client");
 
-        // Tenant-gone supervisor: stops/restarts tools and self-uninstalls off the detection path.
-        // Started first so its commands are consumed even if the startup auth loop (which itself
-        // feeds the 410s) blocks below.
+        // Deactivation supervisor, started first so its commands drain even if the startup auth below blocks.
         self.deactivation_service
             .start(self.tool_run_manager.clone());
 

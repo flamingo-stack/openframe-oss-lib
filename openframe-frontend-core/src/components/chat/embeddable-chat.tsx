@@ -110,7 +110,7 @@ import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens
 import { chatDayLabel } from './utils/chat-day-label';
 import { resolveIcon } from './utils/icon-library';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
-import { awaitsDecision } from './utils/thread-display';
+import { awaitsDecision, withEmbeddedChatAuthor } from './utils/thread-display';
 
 /**
  * Split (wide) Mingo layout metrics (Figma 113:60931 / 113:63630). The
@@ -1584,27 +1584,25 @@ function EmbeddableChatInner({
       : undefined;
   const guideUserAvatar = activeMode === 'guide' ? identityUser?.avatarUrl?.trim() || undefined : undefined;
 
+  // OUTSIDE GUIDE MODE, the viewer's own just-sent message (a user row with NO author) takes the viewer's name and photo,
+  // the header's, as the What-to-ask bubble. Only that row: see `withEmbeddedChatAuthor`.
+  const ownSendName = activeMode === 'guide' ? undefined : headerUserName;
+  const ownSendAvatar =
+    activeMode === 'guide' ? undefined : identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || undefined;
+
   // The role's default name and avatar, under whatever a row says itself. A message's `parts` keep their identity, so a
   // new object here re-renders no row whose parts and names did not change.
   const hostMessages = useMemo(
     () =>
-      rawMessages.map(message => {
-        const author = message.metadata?.author;
-        const isAssistant = message.role === 'assistant';
-        return {
-          ...message,
-          metadata: {
-            ...message.metadata,
-            author: {
-              ...author,
-              name: author?.name ?? (isAssistant ? 'Mingo' : (guideUserName ?? 'You')),
-              avatar: author?.avatar ?? (message.role === 'user' ? (guideUserAvatar ?? null) : null),
-              ...(isAssistant ? { assistantType: 'mingo' as const } : {}),
-            },
-          },
-        };
-      }),
-    [rawMessages, guideUserName, guideUserAvatar],
+      rawMessages.map(message =>
+        withEmbeddedChatAuthor(message, {
+          guideName: guideUserName,
+          guideAvatar: guideUserAvatar,
+          ownName: ownSendName,
+          ownAvatar: ownSendAvatar,
+        }),
+      ),
+    [rawMessages, guideUserName, guideUserAvatar, ownSendName, ownSendAvatar],
   );
 
   // "What to ask?" exchanges (`whatToAsk`) are the panel's own, shown in the
