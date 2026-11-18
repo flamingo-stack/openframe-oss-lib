@@ -211,8 +211,24 @@ const SINGLE_CUSTOMER_TENANTS: TenantRow[] = [
 ];
 
 const DEVICES: DeviceRow[] = [
-  { id: 'd-1', machineId: 'm-1', status: 'ONLINE', hostname: 'reception-01', nickname: null, type: 'desktop' },
-  { id: 'd-2', machineId: 'm-2', status: 'OFFLINE', hostname: 'maya-mba', nickname: null, type: 'laptop' },
+  {
+    id: 'd-1',
+    machineId: 'm-1',
+    status: 'MANAGED',
+    connectivity: 'ONLINE',
+    hostname: 'reception-01',
+    nickname: null,
+    type: 'desktop',
+  },
+  {
+    id: 'd-2',
+    machineId: 'm-2',
+    status: 'MANAGED',
+    connectivity: 'OFFLINE',
+    hostname: 'maya-mba',
+    nickname: null,
+    type: 'laptop',
+  },
 ];
 
 const tenantHref = (row: { id: string }) => `/tenants/${row.id}`;

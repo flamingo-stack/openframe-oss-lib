@@ -32,7 +32,7 @@ where
 {
     let mut delay = timing.initial;
     loop {
-        // Tenant gone: don't hammer the gateway; the backoff probe drives recovery.
+        // Suspended: don't hammer the gateway; the backoff probe drives recovery.
         if deactivation.is_suspended() {
             sleep(delay).await;
             continue;

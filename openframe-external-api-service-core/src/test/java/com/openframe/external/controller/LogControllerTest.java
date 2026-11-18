@@ -408,7 +408,7 @@ class LogControllerTest {
     @Test
     void databaseFailureOnDetailsIs503() throws Exception {
         when(logDetailsService.findLogDetails(any(), any(), any(), any(), any()))
-                .thenThrow(new DataAccessResourceFailureException("cassandra down"));
+                .thenThrow(new DataAccessResourceFailureException("log store down"));
 
         mockMvc.perform(detailsRequest())
                 .andExpect(status().isServiceUnavailable())

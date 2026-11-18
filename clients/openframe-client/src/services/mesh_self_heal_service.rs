@@ -149,7 +149,7 @@ impl MeshSelfHealService {
             let sleep_started = Instant::now();
             sleep(POLL_INTERVAL).await;
 
-            // Tenant gone: agent is stopped and /generate-msh returns 410 — don't hammer it.
+            // Suspended: agent is stopped and the gateway refuses /generate-msh — don't hammer it.
             if self.deactivation.is_suspended() {
                 was_suspended = true;
                 continue;

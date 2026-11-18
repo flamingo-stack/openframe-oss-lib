@@ -45,6 +45,8 @@ public class Software implements TenantScoped {
     private List<String> packageFamilyNames;
     private Boolean systemComponent;
     private List<String> installerTypes;
+    // the ids winget installed the package under on the title's devices; empty unless the source is winget_packages
+    private List<String> wingetIds;
     // null until the projector matched the title, or when no matcher handles its source
     private SoftwarePackageMatch packageMatch;
 

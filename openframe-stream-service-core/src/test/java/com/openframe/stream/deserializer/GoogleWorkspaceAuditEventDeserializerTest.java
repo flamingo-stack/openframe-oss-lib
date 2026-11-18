@@ -3,7 +3,7 @@ package com.openframe.stream.deserializer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
-import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;

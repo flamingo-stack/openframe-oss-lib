@@ -16,6 +16,7 @@ fn order() -> Order {
         countdown_seconds: 0,
         received_at: 0,
         revision: 0,
+        deliveries: Vec::new(),
     }
 }
 
