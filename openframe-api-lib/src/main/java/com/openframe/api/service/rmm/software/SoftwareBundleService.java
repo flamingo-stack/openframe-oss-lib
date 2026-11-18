@@ -316,7 +316,7 @@ public class SoftwareBundleService {
                 .toList();
     }
 
-    private static OsType osTypeOf(PackageManagerType packageManager) {
+    static OsType osTypeOf(PackageManagerType packageManager) {
         return packageManager == PackageManagerType.BREW ? OsType.MAC_OS : OsType.WINDOWS;
     }
 

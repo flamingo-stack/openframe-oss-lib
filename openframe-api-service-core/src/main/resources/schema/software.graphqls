@@ -481,11 +481,13 @@ extend type Mutation {
     dispatched as its own RMM execution; returns one result (with its executionId) per package."""
     updateSoftware(input: SoftwareManagementInput!): [SoftwareDispatchResult!]!
 
-    """Adopt a software title on devices that have it installed manually: reinstall it with a package manager,
-    so it can be updated. Runs now; an offline device starts when it comes online. The device picker lists
-    softwareDevices(softwareId, filter: {installedBy: [UNMANAGED]}). Returns one result per package manager used
-    (each its own execution, shown as an ADOPT row in Software Actions)."""
-    adoptSoftware(input: AdoptSoftwareInput!): [SoftwareDispatchResult!]!
+    """Adopt a package on devices that have the app installed by hand: the device reinstalls it with the package
+    manager, so it can be updated later. The call only sends the order to the devices: no result of the adoption
+    is reported back and no Software Actions row is written.
+    Returns the devices (Machine global ids) the order was sent to; a device whose OS the package manager does
+    not serve is left out. BAD_REQUEST when no device is left, when a device is not managed, and when the order
+    cannot reach a device (the order is switched off or the device's agent is too old for it)."""
+    adoptSoftware(input: AdoptSoftwareInput!): [ID!]!
 
     """Save the Auto-update form: on with these settings for the bundle's devices, off for the title's other
     devices. Runs no update; the bundle becomes COMPLETED."""
@@ -501,25 +503,12 @@ extend type Mutation {
 # ────────── Adopt ──────────
 
 input AdoptSoftwareInput {
-    "The software title (Software.id) to adopt."
-    softwareId: ID!
-    """Selected devices (Machine global ids), 1..100. Devices that do not have the title installed manually are
-    skipped. Null = every device matching filter + search ("Add All Devices")."""
-    machineIds: [ID!]
-    """With machineIds null: the devices to adopt, as the picker's softwareDevices(softwareId, filter, search) lists
-    them. Always narrowed to installedBy UNMANAGED. Ignored when machineIds is set."""
-    filter: SoftwareOnDeviceFilterInput
-    search: String
-    "Package Manager for Windows. macOS devices always adopt with Brew."
-    windowsPackageManager: SoftwareAdoptionWindowsManager! = MATCH_CUSTOMER
-}
-
-"""Which package manager adopts the title on Windows devices."""
-enum SoftwareAdoptionWindowsManager {
-    "The manager each customer already uses for this app; Winget if none."
-    MATCH_CUSTOMER
-    WINGET
-    CHOCOLATEY
+    "BREW adopts on macOS, always as a cask; WINGET and CHOCO adopt on Windows."
+    packageManager: PackageManagerType!
+    "The package as package search returns it."
+    packageName: String!
+    "The devices (Machine global ids), 1..100."
+    machineIds: [ID!]!
 }
 
 """A set of catalog packages to install/update on a set of devices."""
