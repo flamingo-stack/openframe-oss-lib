@@ -237,6 +237,19 @@ class SoftwareInventoryServiceReadModelTest {
     }
 
     @Test
+    void listMachineIdsForSoftware_readModelOn_machineIdsOfTheReadModelWithoutCatalogOrSchedules() {
+        // setup
+        when(tenantSoftwareReadModelQuery.machineIdsForSoftware(TENANT, "42")).thenReturn(List.of("m1", "m2"));
+
+        // execution
+        List<String> result = service.listMachineIdsForSoftware("42");
+
+        // verifications
+        assertThat(result).containsExactly("m1", "m2");
+        verifyNoInteractions(catalogStatus, softwareScheduleRepository, hostMachineResolver);
+    }
+
+    @Test
     void listDevicesForSoftware_updateScheduledForTheSoftware_devicesOfTheScheduleAreScheduledUpdate() {
         // setup
         when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);

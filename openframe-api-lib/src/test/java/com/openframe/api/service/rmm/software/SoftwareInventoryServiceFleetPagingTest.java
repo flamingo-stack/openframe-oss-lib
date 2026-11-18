@@ -357,6 +357,20 @@ class SoftwareInventoryServiceFleetPagingTest {
     }
 
     @Test
+    void listMachineIdsForSoftware_readModelOff_readsTheReadModelAndNeverFleet() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        when(tenantSoftwareReadModelQuery.machineIdsForSoftware("t1", "42")).thenReturn(List.of());
+
+        // execution
+        List<String> result = service.listMachineIdsForSoftware("42");
+
+        // verifications
+        assertThat(result).isEmpty();
+        verifyNoInteractions(fleet, hostMachineResolver);
+    }
+
+    @Test
     void listSoftwareForDevice_noFleetCallPerRow() {
         // setup
         when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.of(

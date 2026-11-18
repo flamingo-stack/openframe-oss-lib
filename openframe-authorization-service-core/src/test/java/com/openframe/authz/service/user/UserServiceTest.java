@@ -19,9 +19,11 @@ import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -185,5 +187,21 @@ class UserServiceTest {
 
         verify(repository).updateLastLogin(eq("ada@acme.com"), eq("t"), any(Instant.class));
         verify(repository, never()).save(any(AuthUser.class));
+    }
+
+    @Test
+    void shouldRecordSsoLoginWithTheUsersOwnTenant() {
+        service.recordSsoLogin(activeUser("u", "tenant-9", "Ada@Acme.com"));
+
+        verify(repository).updateLastLogin(eq("ada@acme.com"), eq("tenant-9"), any(Instant.class));
+    }
+
+    @Test
+    void shouldNotFailTheSignInWhenRecordingSsoLoginFails() {
+        doThrow(new IllegalStateException("db down")).when(repository)
+                .updateLastLogin(eq("ada@acme.com"), eq("tenant-9"), any(Instant.class));
+
+        assertThatCode(() -> service.recordSsoLogin(activeUser("u", "tenant-9", "ada@acme.com")))
+                .doesNotThrowAnyException();
     }
 }

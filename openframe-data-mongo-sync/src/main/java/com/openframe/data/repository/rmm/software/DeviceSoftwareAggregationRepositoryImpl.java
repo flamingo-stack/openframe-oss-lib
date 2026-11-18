@@ -126,6 +126,17 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                 .toList();
     }
 
+    @Override
+    public List<String> machineIdsWithTitle(String tenantId, Long softwareTitleId) {
+        Criteria connectedWithTitle = Criteria.where("tenantId").is(tenantId)
+                .and("softwareTitleId").is(softwareTitleId)
+                .and("machineConnected").is(true);
+        Query query = new Query(connectedWithTitle);
+        return mongoTemplate.findDistinct(query, "machineId", DeviceSoftware.class, String.class).stream()
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private Document aggregateOne(List<AggregationOperation> stages) {
         Aggregation aggregation = Aggregation.newAggregation(stages);
         return mongoTemplate.aggregate(aggregation, DeviceSoftware.class, Document.class)

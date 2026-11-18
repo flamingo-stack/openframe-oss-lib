@@ -18,6 +18,7 @@ import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareAggregationRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
@@ -33,6 +34,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -70,6 +73,7 @@ class TenantSoftwareReadModelQueryTest {
 
     @Mock private SoftwareRepository softwareRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
+    @Mock private DeviceSoftwareAggregationRepository deviceSoftwareAggregationRepository;
     @Mock private VulnerabilityRepository vulnerabilityRepository;
     @Mock private MachineRepository machineRepository;
     @Mock private PackageAutoUpdatePolicyRepository packageAutoUpdatePolicyRepository;
@@ -279,6 +283,43 @@ class TenantSoftwareReadModelQueryTest {
 
         assertThat(rows).extracting(row -> row.getDevice().getMachineId()).containsExactly("m1");
         assertThat(rows.getFirst().getStatus()).isEqualTo(SoftwareOnDeviceStatus.OUTDATED);
+    }
+
+    @Test
+    void machineIdsForSoftware_titleOnConnectedDevices_machineIdsOfTheRepositoryWithoutLoadingRows() {
+        // setup
+        when(deviceSoftwareAggregationRepository.machineIdsWithTitle(TENANT, 42L)).thenReturn(List.of("m1", "m2"));
+
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, "42");
+
+        // verifications
+        assertThat(result).containsExactly("m1", "m2");
+        verifyNoInteractions(deviceSoftwareRepository, softwareRepository, machineRepository);
+    }
+
+    @Test
+    void machineIdsForSoftware_titleOnNoDevice_empty() {
+        // setup
+        when(deviceSoftwareAggregationRepository.machineIdsWithTitle(TENANT, 42L)).thenReturn(List.of());
+
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, "42");
+
+        // verifications
+        assertThat(result).isEmpty();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " ", "abc"})
+    void machineIdsForSoftware_idThatIsNotANumber_emptyWithoutQuerying(String softwareId) {
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, softwareId);
+
+        // verifications
+        assertThat(result).isEmpty();
+        verifyNoInteractions(deviceSoftwareAggregationRepository);
     }
 
     @Test

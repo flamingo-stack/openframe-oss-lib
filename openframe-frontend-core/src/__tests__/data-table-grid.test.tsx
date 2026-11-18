@@ -1,6 +1,7 @@
 import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { type UIEvent, useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ComposerDockHeightContext } from '../components/navigation/app-layout-context';
 import {
   actionColumn,
   DataTable,
@@ -494,5 +495,55 @@ describe('DataTable grid layout', () => {
     // One line, never wrapped.
     expect(label().className).toContain('whitespace-nowrap');
     expect(container.innerHTML).toContain('text-ods-accent');
+  });
+});
+
+describe('DataTable fill height under the floating composer dock', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  /** The page's scroller as `AppLayout` draws it: padded by the dock it lies under, which it is told the height of. */
+  function Page({ dock }: { dock: number }) {
+    return (
+      <ComposerDockHeightContext.Provider value={dock}>
+        <main data-testid="scroller" style={{ overflowY: 'auto', paddingBottom: `${dock}px` }}>
+          <Grid maxHeight="fill" />
+        </main>
+      </ComposerDockHeightContext.Provider>
+    );
+  }
+
+  // CU-17tkuw6633f: the dock's height now lands inside the dock's own ResizeObserver delivery. `<main>` is its sibling,
+  // so a table watching `<main>`'s content box left a notification undelivered there (the "ResizeObserver loop" error).
+  it("re-measures when the dock's height changes, watching the scroller's border box", () => {
+    const observed: Array<{ target: Element; options?: ResizeObserverOptions }> = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(target: Element, options?: ResizeObserverOptions) {
+          observed.push({ target, options });
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === 'scroller' ? 1000 : 0;
+    });
+    const { container, rerender } = render(<Page dock={143} />);
+    expect(container.innerHTML).toContain('--data-table-max-height: 857px');
+
+    // No observer fires: the new padding is measured in the commit that set it.
+    rerender(<Page dock={207} />);
+    expect(container.innerHTML).toContain('--data-table-max-height: 793px');
+
+    // Watched once, on its border box: not observed again when the dock changes (a new observation made inside the
+    // dock's delivery is one more at the same depth).
+    const scroller = screen.getByTestId('scroller');
+    expect(observed.filter(entry => entry.target === scroller).map(entry => entry.options)).toEqual([
+      { box: 'border-box' },
+    ]);
   });
 });

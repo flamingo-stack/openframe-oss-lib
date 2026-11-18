@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { ContentAreaWidthContext, contentStepFor } from '../../hooks/ui/use-content-breakpoint';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import type { NavigationSidebarConfig } from '../../types/navigation';
@@ -281,7 +282,10 @@ export function AppLayout({
     };
     update();
     const observer = new ResizeObserver(update);
-    observer.observe(mainElement);
+    // Its border box: `<main>`'s padding follows the floating dock, set inside the dock's own
+    // observer (below), and a content box changed there would be a second notification at the
+    // same depth in one delivery ("ResizeObserver loop completed with undelivered notifications").
+    observer.observe(mainElement, { box: 'border-box' });
     return () => observer.disconnect();
   }, [adaptive, mainElement]);
   const contentAreaWidth = adaptive ? contentWidth : null;
@@ -293,10 +297,20 @@ export function AppLayout({
   const hasSheet = hasDock && composerSheet != null && composerSheet !== false;
   useIsomorphicLayoutEffect(() => {
     if (!hasDock || !dockElement) return undefined;
-    const update = () => setDockHeight(dockElement.offsetHeight);
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(dockElement);
+    let last = dockElement.offsetHeight;
+    setDockHeight(last);
+    // A new height lands in the frame the dock changed in. An update set from an observer
+    // renders after that frame is painted, so for one frame the page kept the old inset and
+    // a page centred above the dock (Start Work) moved when it caught up (CU-17tkuw6633f).
+    // Rendered synchronously here, before paint; an unchanged height renders nothing.
+    const observer = new ResizeObserver(() => {
+      const height = dockElement.offsetHeight;
+      if (height === last) return;
+      last = height;
+      flushSync(() => setDockHeight(height));
+    });
+    // Its border box, what `offsetHeight` reads: a padding or border change is a new height too.
+    observer.observe(dockElement, { box: 'border-box' });
     return () => observer.disconnect();
   }, [hasDock, dockElement]);
 

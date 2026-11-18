@@ -47,14 +47,14 @@ class AgentLogKeyServiceTest {
         when(logKeyRepository.findFirstByOrderByCreatedAtDesc()).thenReturn(Optional.of(logKey));
         when(encryptionService.decrypt(ENCRYPTED_KEY)).thenReturn(PLAIN_KEY);
 
-        assertThat(service.getLogKey()).isEqualTo(new AgentLogKeyResponse(PLAIN_KEY, CREATED_AT));
+        assertThat(service.current()).isEqualTo(new AgentKeyResponse(PLAIN_KEY, CREATED_AT));
     }
 
     @Test
     void throwsWhenLogKeyMissing() {
         when(logKeyRepository.findFirstByOrderByCreatedAtDesc()).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getLogKey())
+        assertThatThrownBy(() -> service.current())
                 .isInstanceOf(AgentLogKeyNotFoundException.class);
     }
 
@@ -81,5 +81,21 @@ class AgentLogKeyServiceTest {
 
         verify(logKeyRepository, never()).save(any());
         verifyNoInteractions(keyGenerator, encryptionService);
+    }
+
+    @Test
+    void rotateSavesANewEncryptedKeyAndReturnsItsPlaintext() {
+        when(keyGenerator.generate()).thenReturn(PLAIN_KEY);
+        when(encryptionService.encrypt(PLAIN_KEY)).thenReturn(ENCRYPTED_KEY);
+        when(logKeyRepository.save(any(AgentLogKey.class))).then(returnsFirstArg());
+
+        AgentKeyResponse rotated = service.rotate();
+
+        verify(logKeyRepository).save(logKeyCaptor.capture());
+        AgentLogKey saved = logKeyCaptor.getValue();
+        assertThat(saved.getEncryptedKey()).isEqualTo(ENCRYPTED_KEY);
+        assertThat(saved.getCreatedAt()).isNotNull();
+        assertThat(rotated).isEqualTo(new AgentKeyResponse(PLAIN_KEY, saved.getCreatedAt()));
+        verify(logKeyRepository, never()).existsAny();
     }
 }
