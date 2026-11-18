@@ -1,0 +1,235 @@
+# Phones and tablets OpenFrame manages through MDM. Scripts, the shell and remote control do not run on them.
+extend enum OsType {
+    IOS
+    IPADOS
+    ANDROID
+}
+
+extend type Query {
+    """Apple and Android MDM for this workspace. The push certificate and the Android enterprise are set up once per
+    environment by OpenFrame, so this is read-only. Lists both platforms, connected or not."""
+    mdmPlatforms: [MdmPlatformStatus!]!
+
+    """Enrollment links, newest first. One active link per organization and platform."""
+    mdmEnrollmentLinks(organizationId: String, platform: MdmPlatform): [MdmEnrollmentLink!]!
+
+    """Commands sent to one device over MDM, newest first: predefined, custom and the ones OpenFrame sends itself."""
+    mdmCommands(machineId: String!, first: Int, after: String): MdmCommandConnection!
+
+    """Custom commands the team saved, sorted by name."""
+    mdmCustomCommands(platform: MdmPlatform): [MdmCustomCommand!]!
+}
+
+extend type Mutation {
+    """Returns the active link of this organization and platform, or makes one that expires in 30 days."""
+    createMdmEnrollmentLink(input: CreateMdmEnrollmentLinkInput!): MdmEnrollmentLink!
+
+    """Moves the expiry 30 days from now. The URL stays the same; an expired link works again."""
+    renewMdmEnrollmentLink(id: ID!): MdmEnrollmentLink!
+
+    """Emails the link to one person."""
+    sendMdmEnrollmentLink(input: SendMdmEnrollmentLinkInput!): MdmEnrollmentLink!
+
+    """Sends a predefined command. Only the commands in the device's mdm.availableCommands are accepted."""
+    runMdmCommand(input: RunMdmCommandInput!): MdmCommandDispatch!
+
+    """Sends a saved custom command to a device of the command's platform."""
+    runMdmCustomCommand(input: RunMdmCustomCommandInput!): MdmCommandDispatch!
+
+    """Takes OpenFrame's profiles off the device and stops managing it. An iPhone or iPad keeps everything else; an
+    Android work profile is deleted with its apps and data. The device stays listed with mdm.state UNENROLLED."""
+    removeDeviceFromMdm(machineId: String!): Machine!
+
+    createMdmCustomCommand(input: CreateMdmCustomCommandInput!): MdmCustomCommand!
+    updateMdmCustomCommand(input: UpdateMdmCustomCommandInput!): MdmCustomCommand!
+    """Past runs stay in each device's mdmCommands."""
+    deleteMdmCustomCommand(input: MutationDeleteInput!): MutationDeletePayload!
+}
+
+extend type Machine {
+    """Null for a device MDM has never managed."""
+    mdm: DeviceMdm
+}
+
+enum MdmPlatform {
+    APPLE
+    ANDROID
+}
+
+type MdmPlatformStatus {
+    platform: MdmPlatform!
+    connected: Boolean!
+    """Apple only: when the push certificate expires. Every Apple device stops taking commands on that day."""
+    expiresAt: Instant
+    """Devices of this workspace MDM manages on this platform."""
+    enrolledDevices: Int!
+}
+
+type MdmEnrollmentLink {
+    id: ID!
+    organizationId: String!
+    organization: Organization
+    platform: MdmPlatform!
+    """The public OpenFrame page the person opens on the device. The QR code encodes this URL."""
+    url: String!
+    expiresAt: Instant!
+    """An expired link enrolls nobody; devices it already enrolled stay managed."""
+    expired: Boolean!
+    enrolledDevices: Int!
+    lastUsedAt: Instant
+    lastSentTo: String
+    createdAt: Instant!
+    createdBy: String!
+}
+
+input CreateMdmEnrollmentLinkInput {
+    organizationId: String!
+    platform: MdmPlatform!
+}
+
+input SendMdmEnrollmentLinkInput {
+    id: ID!
+    email: String!
+}
+
+enum MdmEnrollmentState {
+    MANAGED
+    """Removed from management by a technician or by the device itself (profile deleted, factory reset)."""
+    UNENROLLED
+}
+
+enum MdmEnrollmentMethod {
+    """Enrolled through an organization's enrollment link."""
+    LINK
+    """A Mac whose OpenFrame agent turned MDM on."""
+    AGENT
+}
+
+type DeviceMdm {
+    state: MdmEnrollmentState!
+    method: MdmEnrollmentMethod!
+    platform: MdmPlatform!
+    """Apple only. Restart and Shut Down need a supervised iPhone or iPad; one enrolled through a link is not."""
+    supervised: Boolean!
+    enrolledAt: Instant
+    unenrolledAt: Instant
+    lastCheckInAt: Instant
+    """The link the device enrolled through; null for AGENT."""
+    enrollmentLinkId: ID
+    """The predefined commands this device accepts now, decided by platform, supervision and state. Show these and
+    no others; empty when the device is UNENROLLED."""
+    availableCommands: [MdmPredefinedCommand!]!
+    """Profiles delivered to the device, with the device's own status."""
+    profiles: [DeviceMdmProfile!]!
+}
+
+enum MdmProfileStatus {
+    VERIFIED
+    VERIFYING
+    PENDING
+    FAILED
+}
+
+type DeviceMdmProfile {
+    name: String!
+    status: MdmProfileStatus!
+    """The device's reason when status is FAILED."""
+    detail: String
+    updatedAt: Instant
+}
+
+enum MdmPredefinedCommand {
+    """Asks the device for its OS, storage and apps now."""
+    REFRESH_DEVICE_INFO
+    """Locks the screen; the user opens it with their own passcode. Takes an optional message and phone number."""
+    LOCK
+    """Supervised Apple devices and company-owned Android devices only."""
+    RESTART
+}
+
+input RunMdmCommandInput {
+    machineId: String!
+    command: MdmPredefinedCommand!
+    """LOCK only: shown on the lock screen."""
+    message: String
+    """LOCK only: shown on the lock screen with a call button."""
+    phoneNumber: String
+}
+
+input RunMdmCustomCommandInput {
+    machineId: String!
+    customCommandId: ID!
+}
+
+type MdmCommandDispatch {
+    """Null for REFRESH_DEVICE_INFO, which asks the device without a command entry."""
+    commandId: ID
+}
+
+enum MdmCommandStatus {
+    """Waiting for the device to check in."""
+    PENDING
+    ACKNOWLEDGED
+    ERROR
+    """The device was busy or locked and will take it at a later check-in."""
+    NOT_NOW
+}
+
+type MdmCommand {
+    """The MDM command UUID."""
+    id: ID!
+    """The platform's own command name, e.g. DeviceLock, RestartDevice, InstallProfile."""
+    requestType: String!
+    """The custom command's name, or the predefined command's label."""
+    name: String
+    status: MdmCommandStatus!
+    """Who sent it: a technician's name, "Mingo" or "OpenFrame"."""
+    requestedBy: String!
+    requestedAt: Instant!
+    updatedAt: Instant
+    """The device's answer as it sent it (Apple plist XML), for ACKNOWLEDGED and ERROR."""
+    result: String
+}
+
+type MdmCommandConnection {
+    edges: [MdmCommandEdge!]!
+    pageInfo: PageInfo!
+}
+
+type MdmCommandEdge {
+    node: MdmCommand!
+    cursor: String!
+}
+
+type MdmCustomCommand {
+    id: ID!
+    name: String!
+    description: String
+    platform: MdmPlatform!
+    """Sent to the device as written: an Apple MDM command plist (XML)."""
+    payload: String!
+    """The command name read from the payload, e.g. Settings or ShutDownDevice."""
+    requestType: String!
+    runs: Int!
+    lastRunAt: Instant
+    updatedAt: Instant!
+    updatedBy: String!
+}
+
+"""The payload must be a valid Apple MDM command plist. Rejected: EraseDevice, ClearPasscode, EnableLostMode,
+DisableLostMode, DeviceLocation, and RemoveProfile or RemoveApplication of what OpenFrame installed. Android custom
+commands are not accepted yet."""
+input CreateMdmCustomCommandInput {
+    name: String!
+    description: String
+    platform: MdmPlatform!
+    payload: String!
+}
+
+"""The platform is set when the command is made and cannot change."""
+input UpdateMdmCustomCommandInput {
+    id: ID!
+    name: String!
+    description: String
+    payload: String!
+}
