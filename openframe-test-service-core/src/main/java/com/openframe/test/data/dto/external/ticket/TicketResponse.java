@@ -36,7 +36,7 @@ public class TicketResponse {
 
     private List<TicketStatusResponse> availableTransitions;
 
-    /** Contract values: FAE_FORM, FAE_DIALOG, ADMIN_DASHBOARD. Kept as String so a new backend value deserializes rather than throwing. */
+    /** Contract values: FAE_FORM, FAE_DIALOG, ADMIN_DASHBOARD, EMAIL. Kept as String so a new backend value deserializes rather than throwing. */
     private String creationSource;
 
     private TicketOwnerResponse owner;
