@@ -15,7 +15,7 @@ use super::{
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{
     DeliveryRef, DeliveryResult, DeliveryResultMessage, FailReason, Feature, FeatureFlagsState,
-    InstalledAgentMessage, InstalledAsset, InstalledTool, OpenFrameClientUpdateMessage, PackageRef,
+    InstalledAsset, InstalledTool, OpenFrameClientUpdateMessage, PackageRef,
     PackageUpdateStatusMessage, ToolRecordState, UpdateStatus,
 };
 use crate::platform::{DirectoryManager, DmgExtractor};
@@ -44,6 +44,7 @@ use crate::services::{
 use crate::test_support::{connection_manager, NatsServer};
 use crate::utils::in_progress::InProgress;
 use crate::utils::latch::Latch;
+use openframe_common::protocol::InstalledAgentMessage;
 
 const MACHINE: &str = "it-machine";
 const BOUND: Duration = Duration::from_secs(10);

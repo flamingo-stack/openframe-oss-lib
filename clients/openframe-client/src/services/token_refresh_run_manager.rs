@@ -7,7 +7,7 @@ use tracing::{debug, error, info, warn};
 use crate::models::AgentTokenResponse;
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::AgentAuthService;
-use crate::utils::jwt;
+use openframe_common::auth::jwt;
 
 /// Device-vs-server clock difference worth a warning.
 const SKEW_WARN: Duration = Duration::from_secs(5 * 60);
