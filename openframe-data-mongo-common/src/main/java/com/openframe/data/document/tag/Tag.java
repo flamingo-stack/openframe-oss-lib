@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -39,7 +40,7 @@ public class Tag implements TenantScoped {
     private TagEntityType entityType;
     private Instant createdAt;
     private String createdBy;
-    // A plain field until every tenant has backfilled it; @Version comes in a later release.
-    @Builder.Default
-    private Long version = 0L;
+    // backfill-tag-version (saas-tenant) must have run first: a stored tag without version would save as a new one.
+    @Version
+    private Long version;
 }

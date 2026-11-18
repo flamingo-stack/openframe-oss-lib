@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -32,4 +33,8 @@ public interface TagRepository extends MongoRepository<Tag, String> {
 
     @Query(value = "{ 'key': ?0, 'entityType': ?1 }", fields = "{ 'values': 1 }")
     Tag findValuesByKeyAndEntityType(String key, TagEntityType entityType);
+
+    // Only the ids of a reconcile batch's tags, across tenants; only the shared stream calls it.
+    @Query(fields = "{ 'tenantId': 1 }")
+    List<Tag> findByTenantIdInAndIdIn(Collection<String> tenantIds, Collection<String> ids);
 }

@@ -6,14 +6,11 @@ import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.document.tag.TagValidation;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
-import com.openframe.data.repository.tag.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -31,7 +28,7 @@ import java.util.List;
 @Slf4j
 public class RegistrationTagAssignmentService {
 
-    private final TagRepository tagRepository;
+    private final RegistrationTagResolver tagResolver;
     private final TagAssignmentRepository tagAssignmentRepository;
 
     /**
@@ -52,7 +49,9 @@ public class RegistrationTagAssignmentService {
                 TagValidation.validateKey(tagInput.getKey());
                 TagValidation.validateValues(tagInput.getValues(), tagInput.getKey());
 
-                Tag tag = findOrCreateTag(tagInput.getKey(), tagInput.getValues(), now);
+                String key = tagInput.getKey();
+                List<String> values = tagInput.getValues();
+                Tag tag = tagResolver.resolve(key, values, now);
 
                 TagAssignment assignment = TagAssignment.builder()
                         .entityId(machineId)
@@ -69,40 +68,5 @@ public class RegistrationTagAssignmentService {
                         tagInput.getKey(), machineId, e.getMessage(), e);
             }
         }
-    }
-
-    /**
-     * Finds an existing tag by key and DEVICE entity type, or creates a new one.
-     * If the tag already exists and new values are provided, appends any new values
-     * to the tag's predefined options list (deduplicating).
-     */
-    private Tag findOrCreateTag(String key, List<String> values, Instant now) {
-        Tag existing = tagRepository.findByKeyAndEntityType(key, TagEntityType.DEVICE);
-        if (existing != null) {
-            if (values != null && !values.isEmpty()) {
-                List<String> existingValues = existing.getValues();
-                if (existingValues == null) {
-                    existingValues = new ArrayList<>();
-                }
-                HashSet<String> merged = new HashSet<>(existingValues);
-                if (merged.addAll(values)) {
-                    existing.setValues(new ArrayList<>(merged));
-                    tagRepository.save(existing);
-                    log.info("Appended values {} to existing tag '{}' during registration", values, key);
-                }
-            }
-            return existing;
-        }
-
-        Tag tag = Tag.builder()
-                .key(key)
-                .values(values)
-                .entityType(TagEntityType.DEVICE)
-                .createdAt(now)
-                .build();
-
-        Tag saved = tagRepository.save(tag);
-        log.info("Created tag '{}' (id={}) with DEVICE entity type during registration", key, saved.getId());
-        return saved;
     }
 }

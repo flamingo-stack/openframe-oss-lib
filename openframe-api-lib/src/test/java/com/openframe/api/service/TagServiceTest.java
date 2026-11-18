@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.device.MachineTag;
 import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
@@ -9,6 +10,7 @@ import com.openframe.data.repository.tag.TagRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -22,8 +24,10 @@ import static com.openframe.data.document.tag.TagEntityType.DEVICE;
 import static com.openframe.data.document.tag.TagEntityType.KNOWLEDGE_ARTICLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -352,5 +356,33 @@ class TagServiceTest {
                 .taggedAt(taggedAt)
                 .taggedBy(taggedBy)
                 .build();
+    }
+
+    @Test
+    void deleteTag_existingTag_assignmentsRemovedThenTagDeletedById() {
+        // setup
+        when(tagRepository.existsById("tag-1")).thenReturn(true);
+
+        // execution
+        tagService.deleteTag("tag-1");
+
+        // verifications
+        InOrder order = inOrder(tagAssignmentRepository, tagRepository);
+        order.verify(tagAssignmentRepository).deleteByTagId("tag-1");
+        order.verify(tagRepository).deleteById("tag-1");
+    }
+
+    @Test
+    void deleteTag_missingTag_throwsNotFoundAndDeletesNothing() {
+        // setup
+        when(tagRepository.existsById("tag-1")).thenReturn(false);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> tagService.deleteTag("tag-1"));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(NotFoundException.class).hasMessageContaining("Tag not found: tag-1");
+        verify(tagAssignmentRepository, never()).deleteByTagId("tag-1");
+        verify(tagRepository, never()).deleteById("tag-1");
     }
 }

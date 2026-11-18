@@ -7,20 +7,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TagTest {
 
     @Test
-    void builder_noVersionGiven_versionStartsAtZero() {
+    void builder_noVersionGiven_versionNullSoTheSaveInserts() {
         // execution
         Tag tag = Tag.builder().key("site").build();
 
         // verifications
-        assertThat(tag.getVersion()).isZero();
+        assertThat(tag.getVersion()).isNull();
     }
 
     @Test
-    void noArgsConstructor_asSpringDataReadsAStoredTagWithoutVersion_versionStartsAtZero() {
+    void noArgsConstructor_noVersionGiven_versionNullSoTheSaveInserts() {
         // execution
         Tag tag = new Tag();
 
         // verifications
-        assertThat(tag.getVersion()).isZero();
+        assertThat(tag.getVersion()).isNull();
     }
 }
