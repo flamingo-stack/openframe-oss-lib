@@ -3,6 +3,10 @@ package com.openframe.client.listener.packageadopt;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.client.listener.packageupdate.PackageUpdateExecutionRecorder;
+import com.openframe.client.scheduler.PackageAdoptEngineFailureScheduler;
+import com.openframe.data.nats.delivery.PackageAdoptDeliveryFailureReader;
+import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -27,8 +31,11 @@ class PackageAdoptWiringTest {
             .withBean(PackageUpdateRequestRepository.class, () -> mock(PackageUpdateRequestRepository.class))
             .withBean(PackageUpdateDeviceStateRepository.class, () -> mock(PackageUpdateDeviceStateRepository.class))
             .withBean(ScriptExecutionRepository.class, () -> mock(ScriptExecutionRepository.class))
+            .withBean(MachineDeliveryRepository.class, () -> mock(MachineDeliveryRepository.class))
+            .withBean(TenantIdProvider.class, () -> mock(TenantIdProvider.class))
             .withUserConfiguration(PackageAdoptStatusListener.class, PackageAdoptStatusProcessor.class,
-                    PackageUpdateExecutionRecorder.class);
+                    PackageUpdateExecutionRecorder.class, PackageAdoptDeliveryFailureReader.class,
+                    PackageAdoptEngineFailureSweep.class, PackageAdoptEngineFailureScheduler.class);
 
     @Test
     void softwareOff_nothingOfTheAdoptionRuns() {
@@ -37,6 +44,7 @@ class PackageAdoptWiringTest {
             assertThat(context).doesNotHaveBean(PackageAdoptStatusListener.class);
             assertThat(context).doesNotHaveBean(PackageAdoptStatusProcessor.class);
             assertThat(context).doesNotHaveBean(PackageUpdateExecutionRecorder.class);
+            assertThat(context).doesNotHaveBean(PackageAdoptEngineFailureScheduler.class);
         });
     }
 
@@ -48,6 +56,7 @@ class PackageAdoptWiringTest {
                     assertThat(context).hasSingleBean(PackageAdoptStatusListener.class);
                     assertThat(context).hasSingleBean(PackageAdoptStatusProcessor.class);
                     assertThat(context).hasSingleBean(PackageUpdateExecutionRecorder.class);
+                    assertThat(context).hasSingleBean(PackageAdoptEngineFailureScheduler.class);
                 });
     }
 }

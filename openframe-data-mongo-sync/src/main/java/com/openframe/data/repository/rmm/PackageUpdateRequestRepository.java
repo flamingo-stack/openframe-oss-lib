@@ -3,6 +3,7 @@ package com.openframe.data.repository.rmm;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -19,6 +20,9 @@ public interface PackageUpdateRequestRepository extends MongoRepository<PackageU
 
     List<PackageUpdateRequest> findByTenantIdAndActionAndSoftwareIdAndMachineIdsIn(
             String tenantId, SoftwareAction action, String softwareId, Collection<String> machineIds);
+
+    List<PackageUpdateRequest> findByTenantIdAndActionAndStatusOrderByCreatedAtAsc(
+            String tenantId, SoftwareAction action, SoftwareActionStatus status, Limit limit);
 
     long deleteByTenantIdAndRequestId(String tenantId, String requestId);
 }

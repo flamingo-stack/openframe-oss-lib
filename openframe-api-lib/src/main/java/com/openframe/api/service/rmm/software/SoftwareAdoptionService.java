@@ -2,25 +2,18 @@ package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareAdoptionResponse;
 import com.openframe.api.dto.rmm.software.SoftwareAdoptionStatus;
-import com.openframe.data.document.delivery.DeliveryFailure;
-import com.openframe.data.document.delivery.DeliveryStatus;
-import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
-import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.data.nats.delivery.PackageAdoptDeliveryFailureReader;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.delivery.track.DeliveryId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -31,20 +24,14 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.springframework.util.StringUtils.hasText;
-
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class SoftwareAdoptionService {
 
-    // the api hands the order to Kafka and the client service records its delivery row a moment later
-    static final Duration DELIVERY_ROW_GRACE = Duration.ofMinutes(2);
-    static final String NOT_DELIVERED_ERROR = "NOT_DELIVERED: the order has no delivery record";
-
     private final PackageUpdateRequestRepository packageUpdateRequestRepository;
     private final PackageUpdateDeviceStateRepository packageUpdateDeviceStateRepository;
-    private final MachineDeliveryRepository machineDeliveryRepository;
+    private final PackageAdoptDeliveryFailureReader packageAdoptDeliveryFailureReader;
     private final TenantIdProvider tenantIdProvider;
 
     // the latest adoption of the title on each device; a device whose latest adoption completed has none
@@ -69,13 +56,12 @@ public class SoftwareAdoptionService {
                 .filter(state -> pageMachineIds.contains(state.getMachineId()))
                 .collect(Collectors.toMap(PackageUpdateDeviceState::getMachineId, Function.identity(), later));
         Collection<PackageUpdateDeviceState> states = latest.values();
-        Map<String, MachineDelivery> deliveries = deliveriesOf(states);
-        Instant graceStart = Instant.now().minus(DELIVERY_ROW_GRACE);
+        Map<String, String> engineFailures = packageAdoptDeliveryFailureReader.getFailedMessagesByStateId(states);
 
         Map<String, SoftwareAdoptionResponse> adoptions = new HashMap<>();
         for (PackageUpdateDeviceState state : states) {
             PackageUpdateRequest request = requests.get(state.getRequestId());
-            SoftwareAdoptionResponse adoption = adoptionOf(state, request, deliveries, graceStart);
+            SoftwareAdoptionResponse adoption = adoptionOf(state, request, engineFailures);
             if (adoption != null) {
                 adoptions.put(state.getMachineId(), adoption);
             }
@@ -83,20 +69,8 @@ public class SoftwareAdoptionService {
         return adoptions;
     }
 
-    private Map<String, MachineDelivery> deliveriesOf(Collection<PackageUpdateDeviceState> states) {
-        List<String> ids = states.stream()
-                .filter(state -> state.getStatus() == SoftwareActionStatus.IN_PROGRESS)
-                .map(SoftwareAdoptionService::deliveryId)
-                .toList();
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-        return machineDeliveryRepository.findAllById(ids).stream()
-                .collect(Collectors.toMap(MachineDelivery::getId, Function.identity()));
-    }
-
     private static SoftwareAdoptionResponse adoptionOf(PackageUpdateDeviceState state, PackageUpdateRequest request,
-                                                       Map<String, MachineDelivery> deliveries, Instant graceStart) {
+                                                       Map<String, String> engineFailures) {
         SoftwareActionStatus status = state.getStatus();
         if (status == SoftwareActionStatus.COMPLETED) {
             return null;
@@ -104,14 +78,9 @@ public class SoftwareAdoptionService {
         if (status == SoftwareActionStatus.FAILED) {
             return failed(request, state.getFailedMessage());
         }
-        String id = deliveryId(state);
-        MachineDelivery delivery = deliveries.get(id);
-        if (delivery == null && state.getCreatedAt().isBefore(graceStart)) {
-            return failed(request, NOT_DELIVERED_ERROR);
-        }
-        if (delivery != null && delivery.getStatus() == DeliveryStatus.FAILED) {
-            String error = engineError(delivery);
-            return failed(request, error);
+        String engineFailure = engineFailures.get(state.getId());
+        if (engineFailure != null) {
+            return failed(request, engineFailure);
         }
         return SoftwareAdoptionResponse.builder()
                 .status(SoftwareAdoptionStatus.ADOPTING)
@@ -125,16 +94,5 @@ public class SoftwareAdoptionService {
                 .packageManager(request.getPackageManager())
                 .error(error)
                 .build();
-    }
-
-    private static String engineError(MachineDelivery delivery) {
-        DeliveryFailure failure = delivery.getFailure();
-        String reason = failure == null ? DeliveryStatus.FAILED.name() : failure.name();
-        String error = delivery.getError();
-        return hasText(error) ? reason + ": " + error : reason;
-    }
-
-    private static String deliveryId(PackageUpdateDeviceState state) {
-        return DeliveryId.of(DeliveryType.PACKAGE_ADOPT, state.getRequestId(), state.getMachineId());
     }
 }

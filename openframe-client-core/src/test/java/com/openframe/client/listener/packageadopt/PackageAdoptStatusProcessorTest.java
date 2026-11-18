@@ -45,6 +45,7 @@ class PackageAdoptStatusProcessorTest {
     private static final String OTHER_MACHINE_ID = "m2";
     private static final String DISPATCH_ID = "d-1";
     private static final String ERROR = "brew install --cask postman: exit 1";
+    private static final String ENGINE_ERROR = "EXHAUSTED";
     private static final DeliveryRef DELIVERY = new DeliveryRef(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, DISPATCH_ID);
 
     @Mock private MachineRepository machineRepository;
@@ -238,6 +239,70 @@ class PackageAdoptStatusProcessorTest {
         // verifications
         verifyNoInteractions(packageUpdateExecutionRecorder, deliveryTracker);
         verify(packageUpdateRequestRepository, never()).save(any(PackageUpdateRequest.class));
+    }
+
+    @Test
+    void failByEngine_inProgress_stateFailedWithTheEnginesReasonThenHistoryAndNoDeliveryCall() {
+        // setup
+        stubTransition(SoftwareActionStatus.FAILED, ENGINE_ERROR, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.FAILED));
+        InOrder stateThenHistory = inOrder(packageUpdateDeviceStateRepository, packageUpdateExecutionRecorder);
+
+        // execution
+        processor.failByEngine(request, MACHINE_ID, ENGINE_ERROR);
+
+        // verifications
+        stateThenHistory.verify(packageUpdateDeviceStateRepository)
+                .finishInProgress(TENANT, REQUEST_ID, MACHINE_ID, SoftwareActionStatus.FAILED, ENGINE_ERROR);
+        stateThenHistory.verify(packageUpdateExecutionRecorder).recordFailed(request, MACHINE_ID, ENGINE_ERROR);
+        verifyNoInteractions(deliveryTracker);
+    }
+
+    @Test
+    void failByEngine_lastDevice_requestFailed() {
+        // setup
+        stubTransition(SoftwareActionStatus.FAILED, ENGINE_ERROR, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.FAILED));
+
+        // execution
+        processor.failByEngine(request, MACHINE_ID, ENGINE_ERROR);
+
+        // verifications
+        verify(packageUpdateRequestRepository).save(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
+    }
+
+    @Test
+    void failByEngine_stateNoLongerInProgress_noOp() {
+        // setup
+        stubTransition(SoftwareActionStatus.FAILED, ENGINE_ERROR, false);
+
+        // execution
+        processor.failByEngine(request, MACHINE_ID, ENGINE_ERROR);
+
+        // verifications
+        verifyNoInteractions(packageUpdateExecutionRecorder, deliveryTracker);
+        verify(packageUpdateRequestRepository, never()).save(any(PackageUpdateRequest.class));
+    }
+
+    @Test
+    void process_doneAfterTheEngineFailureWasClosed_noOp() {
+        // setup
+        PackageAdoptStatusMessage event = status(State.DONE, null);
+        stubTransition(SoftwareActionStatus.FAILED, ENGINE_ERROR, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.FAILED));
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.COMPLETED, null, false);
+        processor.failByEngine(request, MACHINE_ID, ENGINE_ERROR);
+
+        // execution
+        processor.process(MACHINE_ID, event);
+
+        // verifications
+        verify(packageUpdateExecutionRecorder, never()).recordDone(request, MACHINE_ID,
+                PackageAdoptStatusProcessor.ADOPTED_SUMMARY);
+        verify(packageUpdateRequestRepository).save(request);
+        verifyNoInteractions(deliveryTracker);
     }
 
     @Test

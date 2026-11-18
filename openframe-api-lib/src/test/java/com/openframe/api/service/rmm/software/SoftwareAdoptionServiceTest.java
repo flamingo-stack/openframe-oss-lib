@@ -2,20 +2,15 @@ package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareAdoptionResponse;
 import com.openframe.api.dto.rmm.software.SoftwareAdoptionStatus;
-import com.openframe.data.document.delivery.DeliveryFailure;
-import com.openframe.data.document.delivery.DeliveryStatus;
-import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
-import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.data.nats.delivery.PackageAdoptDeliveryFailureReader;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.delivery.track.DeliveryId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,14 +20,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -48,10 +42,14 @@ class SoftwareAdoptionServiceTest {
     private static final String OTHER_MAC = "mac-2";
     private static final List<String> PAGE = List.of(MAC);
     private static final String ERROR = "brew install --cask postman: exit 1";
+    private static final String ENGINE_ERROR = "EXHAUSTED";
+    private static final String STATE_ID = "state-1";
+    private static final String OTHER_STATE_ID = "state-2";
+    private static final String LATER_STATE_ID = "state-3";
 
     @Mock private PackageUpdateRequestRepository packageUpdateRequestRepository;
     @Mock private PackageUpdateDeviceStateRepository packageUpdateDeviceStateRepository;
-    @Mock private MachineDeliveryRepository machineDeliveryRepository;
+    @Mock private PackageAdoptDeliveryFailureReader packageAdoptDeliveryFailureReader;
     @Mock private TenantIdProvider tenantIdProvider;
 
     @InjectMocks private SoftwareAdoptionService service;
@@ -79,7 +77,8 @@ class SoftwareAdoptionServiceTest {
 
         // verifications
         assertThat(adoptions).isEmpty();
-        verifyNoInteractions(packageUpdateRequestRepository, packageUpdateDeviceStateRepository, machineDeliveryRepository);
+        verifyNoInteractions(packageUpdateRequestRepository, packageUpdateDeviceStateRepository,
+                packageAdoptDeliveryFailureReader);
     }
 
     @Test
@@ -94,14 +93,16 @@ class SoftwareAdoptionServiceTest {
 
         // verifications
         assertThat(adoptions).isEmpty();
-        verifyNoInteractions(packageUpdateDeviceStateRepository, machineDeliveryRepository);
+        verifyNoInteractions(packageUpdateDeviceStateRepository, packageAdoptDeliveryFailureReader);
     }
 
     @Test
-    void getAdoptionsByMachineId_inProgressWithAnOpenDelivery_adopting() {
+    void getAdoptionsByMachineId_inProgressAndNoEngineFailure_adopting() {
         // setup
-        stubStates(List.of(request), state(REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS, longAgo));
-        stubDeliveries(Set.of(deliveryId(REQUEST_ID, MAC)), delivery(REQUEST_ID, MAC, DeliveryStatus.ACKED, null, null));
+        PackageUpdateDeviceState inProgress = state(STATE_ID, REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS,
+                longAgo);
+        stubStates(List.of(request), inProgress);
+        stubEngineFailures(inProgress, Map.of());
 
         // execution
         Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, PAGE);
@@ -115,11 +116,12 @@ class SoftwareAdoptionServiceTest {
     }
 
     @Test
-    void getAdoptionsByMachineId_inProgressButTheEngineFailedTheDelivery_failedWithTheEnginesReason() {
+    void getAdoptionsByMachineId_inProgressButTheEngineFailedIt_failedWithTheEnginesReason() {
         // setup
-        stubStates(List.of(request), state(REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS, longAgo));
-        stubDeliveries(Set.of(deliveryId(REQUEST_ID, MAC)),
-                delivery(REQUEST_ID, MAC, DeliveryStatus.FAILED, DeliveryFailure.EXHAUSTED, null));
+        PackageUpdateDeviceState inProgress = state(STATE_ID, REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS,
+                longAgo);
+        stubStates(List.of(request), inProgress);
+        stubEngineFailures(inProgress, Map.of(STATE_ID, ENGINE_ERROR));
 
         // execution
         Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, PAGE);
@@ -127,58 +129,16 @@ class SoftwareAdoptionServiceTest {
         // verifications
         assertThat(adoptions.get(MAC))
                 .extracting(SoftwareAdoptionResponse::getStatus, SoftwareAdoptionResponse::getError)
-                .containsExactly(SoftwareAdoptionStatus.FAILED, "EXHAUSTED");
+                .containsExactly(SoftwareAdoptionStatus.FAILED, ENGINE_ERROR);
     }
 
     @Test
-    void getAdoptionsByMachineId_engineFailedWithTheAgentsError_failedWithReasonAndError() {
+    void getAdoptionsByMachineId_failedByTheDevice_failedWithItsTextNotTheEngines() {
         // setup
-        stubStates(List.of(request), state(REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS, longAgo));
-        stubDeliveries(Set.of(deliveryId(REQUEST_ID, MAC)),
-                delivery(REQUEST_ID, MAC, DeliveryStatus.FAILED, DeliveryFailure.AGENT_ERROR, "unknown type"));
-
-        // execution
-        Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, PAGE);
-
-        // verifications
-        assertThat(adoptions.get(MAC).getError()).isEqualTo("AGENT_ERROR: unknown type");
-    }
-
-    @Test
-    void getAdoptionsByMachineId_freshAdoptWithoutADeliveryRowYet_adopting() {
-        // setup
-        stubStates(List.of(request), state(REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS, now));
-        stubDeliveries(Set.of(deliveryId(REQUEST_ID, MAC)));
-
-        // execution
-        Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, PAGE);
-
-        // verifications
-        assertThat(adoptions.get(MAC).getStatus()).isEqualTo(SoftwareAdoptionStatus.ADOPTING);
-    }
-
-    @Test
-    void getAdoptionsByMachineId_adoptOlderThanTheGraceWithoutADeliveryRow_failedAsNotDelivered() {
-        // setup
-        Instant pastTheGrace = now.minus(SoftwareAdoptionService.DELIVERY_ROW_GRACE).minusSeconds(5);
-        stubStates(List.of(request), state(REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS, pastTheGrace));
-        stubDeliveries(Set.of(deliveryId(REQUEST_ID, MAC)));
-
-        // execution
-        Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, PAGE);
-
-        // verifications
-        assertThat(adoptions.get(MAC))
-                .extracting(SoftwareAdoptionResponse::getStatus, SoftwareAdoptionResponse::getError)
-                .containsExactly(SoftwareAdoptionStatus.FAILED, SoftwareAdoptionService.NOT_DELIVERED_ERROR);
-    }
-
-    @Test
-    void getAdoptionsByMachineId_failedByTheDevice_failedWithItsTextAndNoEngineRead() {
-        // setup
-        PackageUpdateDeviceState failed = state(REQUEST_ID, MAC, SoftwareActionStatus.FAILED, longAgo);
+        PackageUpdateDeviceState failed = state(STATE_ID, REQUEST_ID, MAC, SoftwareActionStatus.FAILED, longAgo);
         failed.setFailedMessage(ERROR);
         stubStates(List.of(request), failed);
+        stubEngineFailures(failed, Map.of(STATE_ID, ENGINE_ERROR));
 
         // execution
         Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, PAGE);
@@ -187,28 +147,27 @@ class SoftwareAdoptionServiceTest {
         assertThat(adoptions.get(MAC))
                 .extracting(SoftwareAdoptionResponse::getStatus, SoftwareAdoptionResponse::getError)
                 .containsExactly(SoftwareAdoptionStatus.FAILED, ERROR);
-        verifyNoInteractions(machineDeliveryRepository);
     }
 
     @Test
     void getAdoptionsByMachineId_completed_none() {
         // setup
-        stubStates(List.of(request), state(REQUEST_ID, MAC, SoftwareActionStatus.COMPLETED, longAgo));
+        stubStates(List.of(request), state(STATE_ID, REQUEST_ID, MAC, SoftwareActionStatus.COMPLETED, longAgo));
 
         // execution
         Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, PAGE);
 
         // verifications
         assertThat(adoptions).isEmpty();
-        verify(machineDeliveryRepository, never()).findAllById(anyIterable());
     }
 
     @Test
     void getAdoptionsByMachineId_repeatAdoptAfterAFailure_theLatestShows() {
         // setup
-        PackageUpdateDeviceState failedEarlier = state(REQUEST_ID, MAC, SoftwareActionStatus.FAILED, longAgo);
+        PackageUpdateDeviceState failedEarlier = state(STATE_ID, REQUEST_ID, MAC, SoftwareActionStatus.FAILED, longAgo);
         failedEarlier.setFailedMessage(ERROR);
-        PackageUpdateDeviceState completedLater = state(LATER_REQUEST_ID, MAC, SoftwareActionStatus.COMPLETED, now);
+        PackageUpdateDeviceState completedLater = state(LATER_STATE_ID, LATER_REQUEST_ID, MAC,
+                SoftwareActionStatus.COMPLETED, now);
         stubStates(List.of(request, laterRequest), failedEarlier, completedLater);
 
         // execution
@@ -221,8 +180,8 @@ class SoftwareAdoptionServiceTest {
     @Test
     void getAdoptionsByMachineId_stateOfADeviceOffThePage_left() {
         // setup
-        stubStates(List.of(request), state(REQUEST_ID, MAC, SoftwareActionStatus.COMPLETED, longAgo),
-                state(REQUEST_ID, OTHER_MAC, SoftwareActionStatus.FAILED, longAgo));
+        stubStates(List.of(request), state(STATE_ID, REQUEST_ID, MAC, SoftwareActionStatus.COMPLETED, longAgo),
+                state(OTHER_STATE_ID, REQUEST_ID, OTHER_MAC, SoftwareActionStatus.FAILED, longAgo));
 
         // execution
         Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, PAGE);
@@ -235,19 +194,22 @@ class SoftwareAdoptionServiceTest {
     void getAdoptionsByMachineId_severalDevicesInProgress_engineReadOnceForAllOfThem() {
         // setup
         List<String> page = List.of(MAC, OTHER_MAC);
+        PackageUpdateDeviceState first = state(STATE_ID, REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS, now);
+        PackageUpdateDeviceState second = state(OTHER_STATE_ID, REQUEST_ID, OTHER_MAC,
+                SoftwareActionStatus.IN_PROGRESS, now);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
         when(packageUpdateRequestRepository.findByTenantIdAndActionAndSoftwareIdAndMachineIdsIn(
                 TENANT, SoftwareAction.ADOPT, SOFTWARE_ID, page)).thenReturn(List.of(request));
         when(packageUpdateDeviceStateRepository.findByTenantIdAndRequestIdIn(TENANT, Set.of(REQUEST_ID)))
-                .thenReturn(List.of(state(REQUEST_ID, MAC, SoftwareActionStatus.IN_PROGRESS, now),
-                        state(REQUEST_ID, OTHER_MAC, SoftwareActionStatus.IN_PROGRESS, now)));
-        stubDeliveries(Set.of(deliveryId(REQUEST_ID, MAC), deliveryId(REQUEST_ID, OTHER_MAC)));
+                .thenReturn(List.of(first, second));
 
         // execution
         Map<String, SoftwareAdoptionResponse> adoptions = service.getAdoptionsByMachineId(SOFTWARE_ID, page);
 
         // verifications
         assertThat(adoptions).containsOnlyKeys(MAC, OTHER_MAC);
+        verify(packageAdoptDeliveryFailureReader).getFailedMessagesByStateId(argThat(
+                (Collection<PackageUpdateDeviceState> given) -> given.containsAll(List.of(first, second))));
     }
 
     private void stubStates(List<PackageUpdateRequest> requests, PackageUpdateDeviceState... states) {
@@ -259,10 +221,10 @@ class SoftwareAdoptionServiceTest {
                 .thenReturn(List.of(states));
     }
 
-    private void stubDeliveries(Set<String> ids, MachineDelivery... deliveries) {
-        when(machineDeliveryRepository.findAllById(argThat(
-                (Iterable<String> given) -> Set.copyOf((List<String>) given).equals(ids))))
-                .thenReturn(List.of(deliveries));
+    private void stubEngineFailures(PackageUpdateDeviceState state, Map<String, String> failures) {
+        when(packageAdoptDeliveryFailureReader.getFailedMessagesByStateId(argThat(
+                (Collection<PackageUpdateDeviceState> given) -> given.contains(state))))
+                .thenReturn(failures);
     }
 
     private static PackageUpdateRequest adoptRequest(String requestId) {
@@ -276,31 +238,15 @@ class SoftwareAdoptionServiceTest {
                 .build();
     }
 
-    private static PackageUpdateDeviceState state(String requestId, String machineId, SoftwareActionStatus status,
-                                                  Instant createdAt) {
+    private static PackageUpdateDeviceState state(String id, String requestId, String machineId,
+                                                  SoftwareActionStatus status, Instant createdAt) {
         return PackageUpdateDeviceState.builder()
+                .id(id)
                 .tenantId(TENANT)
                 .requestId(requestId)
                 .machineId(machineId)
                 .status(status)
                 .createdAt(createdAt)
                 .build();
-    }
-
-    private static MachineDelivery delivery(String requestId, String machineId, DeliveryStatus status,
-                                            DeliveryFailure failure, String error) {
-        return MachineDelivery.builder()
-                .id(deliveryId(requestId, machineId))
-                .type(DeliveryType.PACKAGE_ADOPT)
-                .targetId(requestId)
-                .machineId(machineId)
-                .status(status)
-                .failure(failure)
-                .error(error)
-                .build();
-    }
-
-    private static String deliveryId(String requestId, String machineId) {
-        return DeliveryId.of(DeliveryType.PACKAGE_ADOPT, requestId, machineId);
     }
 }

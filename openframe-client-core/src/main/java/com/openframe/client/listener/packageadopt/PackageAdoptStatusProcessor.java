@@ -58,6 +58,17 @@ public class PackageAdoptStatusProcessor {
         fail(request, machineId, error);
     }
 
+    public void failByEngine(PackageUpdateRequest request, String machineId, String error) {
+        String requestId = request.getRequestId();
+        if (!failInProgress(request, machineId, error)) {
+            log.info("[package-adopt] engine failure for requestId={} machineId={} not adopting any more — ignored",
+                    requestId, machineId);
+            return;
+        }
+        log.warn("[package-adopt] adoption failed by the engine requestId={} machineId={} softwareId={} error={}",
+                requestId, machineId, request.getSoftwareId(), error);
+    }
+
     private PackageUpdateRequest adoptRequestOf(String machineId, String requestId) {
         Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
         if (machine == null) {
@@ -88,15 +99,11 @@ public class PackageAdoptStatusProcessor {
 
     private void fail(PackageUpdateRequest request, String machineId, String error) {
         String requestId = request.getRequestId();
-        boolean failed = packageUpdateDeviceStateRepository.finishInProgress(request.getTenantId(), requestId,
-                machineId, SoftwareActionStatus.FAILED, error);
-        if (!failed) {
+        if (!failInProgress(request, machineId, error)) {
             log.info("[package-adopt] FAILED for requestId={} machineId={} that is not adopting any more — ignored",
                     requestId, machineId);
             return;
         }
-        packageUpdateExecutionRecorder.recordFailed(request, machineId, error);
-        rollUp(request);
         deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, requestId, machineId)
                 .map(MachineDelivery::getDispatchId)
                 .map(dispatchId -> new DeliveryRef(DeliveryType.PACKAGE_ADOPT, requestId, dispatchId))
@@ -105,7 +112,17 @@ public class PackageAdoptStatusProcessor {
                 requestId, machineId, request.getSoftwareId(), error);
     }
 
-    private void rollUp(PackageUpdateRequest request) {
+    private boolean failInProgress(PackageUpdateRequest request, String machineId, String error) {
+        boolean failed = packageUpdateDeviceStateRepository.finishInProgress(request.getTenantId(),
+                request.getRequestId(), machineId, SoftwareActionStatus.FAILED, error);
+        if (failed) {
+            packageUpdateExecutionRecorder.recordFailed(request, machineId, error);
+            rollUp(request);
+        }
+        return failed;
+    }
+
+    public void rollUp(PackageUpdateRequest request) {
         String tenantId = request.getTenantId();
         String requestId = request.getRequestId();
         List<PackageUpdateDeviceState> all = packageUpdateDeviceStateRepository.findByTenantIdAndRequestId(tenantId, requestId);
