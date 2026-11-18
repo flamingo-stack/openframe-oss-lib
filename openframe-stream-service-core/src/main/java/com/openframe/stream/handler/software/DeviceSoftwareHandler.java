@@ -24,14 +24,19 @@ import tools.jackson.databind.JsonNode;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
+import static com.openframe.stream.handler.software.FleetRowFields.differsOnlyIn;
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.isSnapshotRead;
+import static com.openframe.stream.handler.software.FleetRowFields.isUpdate;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -46,6 +51,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     static final Duration RECONCILED_COMMIT_WINDOW = Duration.ofHours(1);
     static final long RECONCILED_COMMIT_CAPACITY = 100_000;
     static final String NO_COMMIT = "0";
+    static final Set<String> UNTRACKED_COLUMNS = Set.of("last_opened_at", "updated_at");
 
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -85,6 +91,10 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         }
         Long hostId = longOrNull(row, "host_id");
         if (hostId == null) {
+            return;
+        }
+        if (isUpdate(payload.getOperation())
+                && differsOnlyIn(payload.getBefore(), payload.getAfter(), UNTRACKED_COLUMNS)) {
             return;
         }
         boolean snapshotRead = isSnapshotRead(payload.getOperation());
@@ -132,62 +142,91 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
 
     private void reconcile(FleetHostRef host, Long hostId, String commit) {
         List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId, commit);
+        Map<Long, DeviceSoftware> existingByTitle = new HashMap<>();
+        for (DeviceSoftware existing : deviceSoftwareRepository.findByTenantIdAndMachineId(host.tenantId(), host.machineId())) {
+            existingByTitle.put(existing.getSoftwareTitleId(), existing);
+        }
         Instant now = Instant.now();
-        Set<Long> present = new HashSet<>();
+        List<DeviceSoftware> changed = new ArrayList<>();
         Set<Long> affectedTitles = new HashSet<>();
         Set<String> affectedCves = new HashSet<>();
-
-        List<DeviceSoftware> existingRows = deviceSoftwareRepository
-                .findByTenantIdAndMachineId(host.tenantId(), host.machineId());
-        for (DeviceSoftware existing : existingRows) {
-            if (existing.getVulnerabilities() != null) {
-                affectedCves.addAll(existing.getVulnerabilities());
-            }
-        }
 
         for (HostSoftwareTitle title : titles) {
             Long titleId = title.getId();
             if (titleId == null) {
                 continue;
             }
-            present.add(titleId);
-            List<String> vulnerabilities = vulnerabilitiesOf(title);
-            DeviceSoftware deviceSoftware = deviceSoftwareRepository
-                    .findByTenantIdAndMachineIdAndSoftwareTitleId(host.tenantId(), host.machineId(), titleId)
-                    .orElseGet(DeviceSoftware::new);
-            boolean newRow = deviceSoftware.getId() == null;
-            deviceSoftware.setTenantId(host.tenantId());
-            deviceSoftware.setMachineId(host.machineId());
-            deviceSoftware.setSoftwareTitleId(titleId);
-            deviceSoftware.setName(title.getName());
-            deviceSoftware.setSource(title.getSource());
-            deviceSoftware.setVersions(versionsOf(title));
-            deviceSoftware.setUpgradeCode(title.getUpgradeCode());
-            deviceSoftware.setVendor(firstOf(title, HostSoftwareInstalledVersion::getVendor));
-            deviceSoftware.setArpKeys(valuesOf(title, HostSoftwareInstalledVersion::getArpKey));
-            deviceSoftware.setPackageFamilyNames(valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName));
-            deviceSoftware.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
-            deviceSoftware.setSystemComponent(systemComponentOf(title));
-            deviceSoftware.setWingetId(firstOf(title, HostSoftwareInstalledVersion::getWingetId));
-            deviceSoftware.setVulnerabilities(vulnerabilities);
-            deviceSoftware.setUpdatedAt(now);
-            if (newRow) {
-                deviceSoftware.setMachineConnected(true);
+            DeviceSoftware existing = existingByTitle.remove(titleId);
+            DeviceSoftware reported = reportedRow(host, titleId, title);
+            if (existing != null && sameContent(existing, reported)) {
+                continue;
             }
-            deviceSoftwareRepository.save(deviceSoftware);
+            if (existing != null) {
+                reported.setId(existing.getId());
+                reported.setMachineConnected(existing.isMachineConnected());
+                affectedCves.addAll(vulnerabilitiesOf(existing));
+            } else {
+                reported.setMachineConnected(true);
+            }
+            reported.setUpdatedAt(now);
+            changed.add(reported);
             affectedTitles.add(titleId);
-            affectedCves.addAll(vulnerabilities);
+            affectedCves.addAll(reported.getVulnerabilities());
         }
 
-        for (DeviceSoftware existing : existingRows) {
-            if (!present.contains(existing.getSoftwareTitleId())) {
-                deviceSoftwareRepository.delete(existing);
-                affectedTitles.add(existing.getSoftwareTitleId());
-            }
+        List<String> staleIds = new ArrayList<>();
+        for (DeviceSoftware stale : existingByTitle.values()) {
+            staleIds.add(stale.getId());
+            affectedTitles.add(stale.getSoftwareTitleId());
+            affectedCves.addAll(vulnerabilitiesOf(stale));
+        }
+
+        if (!changed.isEmpty()) {
+            deviceSoftwareRepository.saveAll(changed);
+        }
+        if (!staleIds.isEmpty()) {
+            deviceSoftwareRepository.deleteAllById(staleIds);
         }
 
         projectionTrigger.titlesChanged(host.tenantId(), affectedTitles);
         projectionTrigger.cvesChanged(host.tenantId(), affectedCves);
+    }
+
+    private static DeviceSoftware reportedRow(FleetHostRef host, Long titleId, HostSoftwareTitle title) {
+        DeviceSoftware row = new DeviceSoftware();
+        row.setTenantId(host.tenantId());
+        row.setMachineId(host.machineId());
+        row.setSoftwareTitleId(titleId);
+        row.setName(title.getName());
+        row.setSource(title.getSource());
+        row.setVersions(versionsOf(title));
+        row.setUpgradeCode(title.getUpgradeCode());
+        row.setVendor(firstOf(title, HostSoftwareInstalledVersion::getVendor));
+        row.setArpKeys(valuesOf(title, HostSoftwareInstalledVersion::getArpKey));
+        row.setPackageFamilyNames(valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName));
+        row.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
+        row.setSystemComponent(systemComponentOf(title));
+        row.setWingetId(firstOf(title, HostSoftwareInstalledVersion::getWingetId));
+        row.setVulnerabilities(vulnerabilitiesOf(title));
+        return row;
+    }
+
+    private static boolean sameContent(DeviceSoftware existing, DeviceSoftware reported) {
+        return Objects.equals(existing.getName(), reported.getName())
+                && Objects.equals(existing.getSource(), reported.getSource())
+                && Objects.equals(existing.getVersions(), reported.getVersions())
+                && Objects.equals(existing.getUpgradeCode(), reported.getUpgradeCode())
+                && Objects.equals(existing.getVendor(), reported.getVendor())
+                && Objects.equals(existing.getArpKeys(), reported.getArpKeys())
+                && Objects.equals(existing.getPackageFamilyNames(), reported.getPackageFamilyNames())
+                && Objects.equals(existing.getInstallerTypes(), reported.getInstallerTypes())
+                && Objects.equals(existing.getSystemComponent(), reported.getSystemComponent())
+                && Objects.equals(existing.getWingetId(), reported.getWingetId())
+                && Objects.equals(existing.getVulnerabilities(), reported.getVulnerabilities());
+    }
+
+    private static List<String> vulnerabilitiesOf(DeviceSoftware row) {
+        return row.getVulnerabilities() == null ? List.of() : row.getVulnerabilities();
     }
 
     private static List<String> versionsOf(HostSoftwareTitle title) {
