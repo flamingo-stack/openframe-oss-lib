@@ -9,7 +9,6 @@ pub mod execution;
 pub mod feature_flags;
 pub mod hostname_report_message;
 pub mod initial_configuration;
-pub mod installed_agent_message;
 pub mod installed_tool;
 pub mod machine_heartbeat_message;
 pub mod machine_timezone_message;
@@ -50,7 +49,6 @@ pub use feature_flags::{
 };
 pub use hostname_report_message::HostnameReportMessage;
 pub use initial_configuration::InitialConfiguration;
-pub use installed_agent_message::InstalledAgentMessage;
 pub use installed_tool::{
     Installation, InstalledAsset, InstalledTool, ToolRecordState, CHAT_TOOL_AGENT_ID,
 };

@@ -101,8 +101,6 @@ zip = "0.6"
 tempfile = "3.10"
 semver = "1.0"
 sys-info = "0.9"
-aes-gcm = "0.10"
-base64 = "0.21"
 log = "0.4.27"
 clap = { version = "4.5", features = ["derive", "env", "std", "cargo", "string"] }
 whoami = "1.4"
@@ -119,6 +117,7 @@ async-nats = { git = "https://github.com/flamingo-stack/nats.rs.git", rev = "3cf
 rustls-pemfile = "1.0"
 redb = "2"
 regex = "1.11.1"
+openframe-common = { path = "../openframe-common", features = ["shared-token"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
@@ -130,6 +129,9 @@ windows = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Thre
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 nix = { version = "0.29", features = ["user"] }
+
+[dev-dependencies]
+base64 = "0.21"
 
 [build-dependencies]
 embed-resource = "2.4"

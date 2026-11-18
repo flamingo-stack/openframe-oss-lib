@@ -10,7 +10,6 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::clients::AuthClient;
 use crate::platform::directories::DirectoryManager;
 use crate::services::backend_call_retry::RetryTiming;
-use crate::services::encryption_service::EncryptionService;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::shared_token_service::SharedTokenService;
@@ -124,7 +123,7 @@ pub(crate) fn connection_manager(
             deactivation.clone(),
         ),
         config.clone(),
-        SharedTokenService::new(directories.clone(), EncryptionService::new()),
+        SharedTokenService::new(directories.clone()),
     );
     NatsConnectionManager::new(
         url,

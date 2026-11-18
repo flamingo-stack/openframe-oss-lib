@@ -2,6 +2,7 @@ package com.openframe.graphql.relay;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -52,5 +53,20 @@ class NodeTypeTest {
 
         // verifications
         assertThat(exception.getMessage()).isEqualTo("Unknown Node type: Foo");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "Mailbox, MAILBOX",
+            "HeldEmail, HELD_EMAIL",
+            "EmailBlockListEntry, EMAIL_BLOCK_LIST_ENTRY"
+    })
+    void fromTypeName_emailToTicketTypeNames_entryWithIdRawProperty(String typeName, String entryName) {
+        // execution
+        NodeType type = NodeType.fromTypeName(typeName);
+
+        // verifications
+        assertThat(type.name()).isEqualTo(entryName);
+        assertThat(type.getRawIdProperty()).isEqualTo("id");
     }
 }

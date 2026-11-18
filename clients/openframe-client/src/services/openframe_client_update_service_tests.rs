@@ -2,7 +2,6 @@ use super::*;
 use crate::clients::AuthClient;
 use crate::models::DownloadConfiguration;
 use crate::platform::DmgExtractor;
-use crate::services::encryption_service::EncryptionService;
 use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::nats_connection_manager::NatsConnectionManager;
@@ -50,7 +49,7 @@ fn fixture() -> Fixture {
             deactivation.clone(),
         ),
         config.clone(),
-        SharedTokenService::new(directories.clone(), EncryptionService::new()),
+        SharedTokenService::new(directories.clone()),
     );
     let nats = NatsConnectionManager::new(
         "nats://127.0.0.1:9".into(),
