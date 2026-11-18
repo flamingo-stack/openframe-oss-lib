@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
+import { loadActionsMenuDropdown } from '../actions-menu-on-demand';
 import { PageActions } from '../page-actions';
 
 /** Open the mobile "…" menu (jsdom applies no media queries; the mobile trigger is the last "More actions"). */
@@ -7,6 +8,11 @@ function openMobileMenu() {
   const triggers = screen.getAllByLabelText('More actions');
   fireEvent.pointerDown(triggers[triggers.length - 1], { button: 0, pointerType: 'mouse' });
 }
+
+// The "…" menu's module loads on demand; loaded once here, every menu below renders at once.
+beforeAll(async () => {
+  await loadActionsMenuDropdown();
+});
 
 describe('PageActions: a split action collapsed into the mobile menu', () => {
   it('keeps each child its own label and gives it the parent action as secondary text', () => {

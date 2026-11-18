@@ -280,6 +280,22 @@ public class UserService {
     }
 
     /**
+     * Stamp lastLogin for a user an SSO flow has just signed in with its real tenant, after
+     * AuthSuccessHandler ran under the onboarding pseudo-tenant or before the account existed.
+     * Best effort like AuthSuccessHandler: a failed write must not fail a sign-in already allowed.
+     */
+    public void recordSsoLogin(AuthUser user) {
+        String email = user.getEmail();
+        String tenantId = user.getTenantId();
+        try {
+            touchLastLogin(email, tenantId);
+        } catch (RuntimeException e) {
+            String userId = user.getId();
+            log.warn("Failed to update lastLogin after SSO sign-in for user {}", userId, e);
+        }
+    }
+
+    /**
      * Mark user's email as verified.
      */
     @RetryOnOptimisticLockingFailure

@@ -179,13 +179,10 @@ fn interpret(result: &ExecResult) -> UpgradeOutcome {
             UpgradeOutcome::Busy("a reboot is required before installing".to_string())
         }
         COULD_NOT_LAUNCH if crate::executor::cannot_elevate(&result.stderr) => {
-            UpgradeOutcome::Failed {
-                exit_code: i64::from(code),
-                message: format!(
-                    "the console user cannot run elevated: {}",
-                    result.stderr.trim()
-                ),
-            }
+            UpgradeOutcome::NotUpgradable(format!(
+                "the console user cannot run elevated: {}",
+                result.stderr.trim()
+            ))
         }
         COULD_NOT_LAUNCH => UpgradeOutcome::Busy(format!(
             "could not run in the console user's session: {}",

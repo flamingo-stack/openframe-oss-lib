@@ -19,7 +19,7 @@ import java.util.Optional;
  * <p>Routing is static (see {@code MessageType.COMMAND_EXECUTED}): every command
  * result feeds ALL of its destinations — the generic event-log + Pinot (so it shows
  * up in the Logs UI exactly like a script) AND the command-specific sinks
- * (Cassandra {@code command_results} + the Mongo {@code CommandExecution} write-back).
+ * (the Mongo {@code CommandExecution} write-back).
  * The command-specific handlers correlate on {@code (machineId, executionId)}
  * themselves, so no per-message routing decision is made here.
  */

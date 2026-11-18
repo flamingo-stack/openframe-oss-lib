@@ -2,18 +2,23 @@ package com.openframe.gateway.config.ws;
 
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
+import com.openframe.gateway.metrics.WebSocketKind;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.server.WebSocketService;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.Disposable;
+import reactor.core.Disposables;
 import reactor.core.publisher.Mono;
+import reactor.util.context.ContextView;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -28,12 +33,16 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
 
     public static final long CLOCK_SKEW_SECONDS = 60; // align with Spring Security default skew
 
+    private static final String RELAY_ENDPOINT = "/meshrelay.ashx";
+
     private final WebSocketService defaultWebSocketService;
     private final RequestJwtClaimsReader requestJwtReader;
     private final GatewayTrafficMetrics gatewayTrafficMetrics;
     private final WebSocketLoggingProperties loggingProperties;
     private final MeshControlCommandProperties meshControlProperties;
     private final ObjectMapper objectMapper;
+    private final RelayAccessWatcher relayAccessWatcher;
+    private final RemoteSessionCapProperties remoteSessionCapProperties;
 
     private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
     private record SessionInfo(Instant createdAt, String path, String sub) {}
@@ -43,48 +52,73 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
         String path = exchange.getRequest().getPath().value();
 
         if (isSecuredEndpoint(path)) {
-            return defaultWebSocketService.handleRequest(exchange, session -> {
-                String sessionId = session.getId();
-                String sub = requestJwtReader.getSubject(exchange).orElse("-");
-                boolean debugPath = loggingProperties.isDebugPath(path);
-
-                sessionRegistry.put(sessionId, new SessionInfo(Instant.now(), path, sub));
-
-                try {
-                    Instant expiresAt = requestJwtReader.getExpiration(exchange);
-
-                    gatewayTrafficMetrics.webSocketOpened(sessionId, path, sub);
-                    if (debugPath) {
-                        log.debug(LOG_PREFIX + "session opened, scheduling JWT expiry close", sessionId, path, sub);
-                    }
-
-                    long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
-                    long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
-
-                    Disposable disposable = scheduleSessionRemoveJob(session, path, sub, debugPath, effectiveSeconds);
-                    processSessionClosedEvent(session, path, sub, disposable);
-
-                    WebSocketSession sessionToHandle = session;
-                    // Command allowlist first, so the logging tap (when on) records what actually
-                    // reaches the tool rather than what the browser attempted.
-                    if (meshControlProperties.isEnabled() && meshControlProperties.isControlPath(path)) {
-                        sessionToHandle = new MeshControlFilteringWebSocketSessionDecorator(
-                                sessionToHandle, path, tenantId(exchange), meshControlProperties, objectMapper);
-                    }
-                    if (loggingProperties.isFramePath(path)) {
-                        sessionToHandle = new LoggingWebSocketSessionDecorator(
-                                sessionToHandle, path, tenantId(exchange), loggingProperties);
-                    }
-                    return defaultWebSocketHandler.handle(sessionToHandle);
-                } catch (Exception e) {
-                    log.warn(LOG_PREFIX + "JWT expiration read failed, closing", sessionId, path, sub, e);
-                    sessionRegistry.remove(sessionId);
-                    return session.close();
-                }
-            });
+            return defaultWebSocketService.handleRequest(exchange, session -> Mono.deferContextual(context ->
+                    handleSecuredSession(exchange, session, path, defaultWebSocketHandler, context)));
         } else {
             return defaultWebSocketService.handleRequest(exchange, defaultWebSocketHandler);
         }
+    }
+
+    private Mono<Void> handleSecuredSession(ServerWebExchange exchange, WebSocketSession session, String path,
+                                            WebSocketHandler defaultWebSocketHandler, ContextView context) {
+        String sessionId = session.getId();
+        String sub = requestJwtReader.getSubject(exchange).orElse("-");
+        boolean debugPath = loggingProperties.isDebugPath(path);
+
+        sessionRegistry.put(sessionId, new SessionInfo(Instant.now(), path, sub));
+        SecuredWebSocket socket = new SecuredWebSocket(exchange, session, path, sub, debugPath);
+
+        try {
+            Instant expiresAt = requestJwtReader.getExpiration(exchange);
+            WebSocketKind kind = isRelayPath(path) ? WebSocketKind.RELAY : WebSocketKind.CHANNEL;
+
+            gatewayTrafficMetrics.webSocketOpened(sessionId, path, sub);
+            Disposable disposable = kind == WebSocketKind.RELAY
+                    ? guardRelay(socket, expiresAt, context)
+                    : scheduleExpiryClose(socket, expiresAt);
+            processSessionClosedEvent(session, path, sub, kind, disposable);
+
+            WebSocketSession sessionToHandle = session;
+            // Command allowlist first, so the logging tap (when on) records what actually
+            // reaches the tool rather than what the browser attempted.
+            if (meshControlProperties.isEnabled() && meshControlProperties.isControlPath(path)) {
+                sessionToHandle = new MeshControlFilteringWebSocketSessionDecorator(
+                        sessionToHandle, path, tenantId(exchange), meshControlProperties, objectMapper);
+            }
+            if (loggingProperties.isFramePath(path)) {
+                sessionToHandle = new LoggingWebSocketSessionDecorator(
+                        sessionToHandle, path, tenantId(exchange), loggingProperties);
+            }
+            return defaultWebSocketHandler.handle(sessionToHandle);
+        } catch (Exception e) {
+            log.warn(LOG_PREFIX + "WebSocket session setup failed, closing", sessionId, path, sub, e);
+            sessionRegistry.remove(sessionId);
+            return session.close();
+        }
+    }
+
+    private Disposable guardRelay(SecuredWebSocket socket, Instant expiresAt, ContextView context) {
+        if (socket.isDebugPath()) {
+            log.debug(LOG_PREFIX + "relay session opened, closing at the remote session cap",
+                    socket.getSessionId(), socket.getPath(), socket.getSub());
+        }
+        long capSeconds = remoteSessionCapProperties.getMaxDurationSeconds();
+        Disposable capClose = scheduleSessionRemoveJob(socket, capSeconds, CloseReason.SESSION_CAP);
+        Disposable deviceWatch = watchRelayDevice(socket, expiresAt, context);
+        return Disposables.composite(capClose, deviceWatch);
+    }
+
+    private Disposable watchRelayDevice(SecuredWebSocket socket, Instant expiresAt, ContextView context) {
+        Instant firstCheckAt = expiresAt.plusSeconds(CLOCK_SKEW_SECONDS);
+        return requestJwtReader.getMachineId(socket.getExchange())
+                .map(machineId -> relayDevice(socket, machineId))
+                .map(device -> relayAccessWatcher.watch(socket.getSession(), device, firstCheckAt, context))
+                .orElseGet(Disposables::disposed);
+    }
+
+    private static RelayDevice relayDevice(SecuredWebSocket socket, String machineId) {
+        String tenantId = tenantId(socket.getExchange());
+        return new RelayDevice(tenantId, machineId);
     }
 
     /* TODO: avoid hardcoded paths.
@@ -97,19 +131,42 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 .anyMatch(path::startsWith);
     }
 
+    public static boolean isRelayPath(String path) {
+        if (path == null || !path.startsWith(TOOLS_API_WS_ENDPOINT_PREFIX + "/")) {
+            return false;
+        }
+        String endpoint = StringUtils.stripEnd(path, "/").toLowerCase(Locale.ROOT);
+        return endpoint.endsWith(RELAY_ENDPOINT);
+    }
+
+    private Disposable scheduleExpiryClose(SecuredWebSocket socket, Instant expiresAt) {
+        if (socket.isDebugPath()) {
+            log.debug(LOG_PREFIX + "session opened, scheduling JWT expiry close",
+                    socket.getSessionId(), socket.getPath(), socket.getSub());
+        }
+        long secondsUntilExpiration = Duration.between(Instant.now(), expiresAt).getSeconds();
+        long effectiveSeconds = secondsUntilExpiration + CLOCK_SKEW_SECONDS;
+        return scheduleSessionRemoveJob(socket, effectiveSeconds, CloseReason.JWT_EXPIRY);
+    }
+
     private static String tenantId(ServerWebExchange exchange) {
         return exchange.getRequest().getHeaders().getFirst(TenantRoutingHeaders.TENANT_ID_HEADER);
     }
 
-    private Disposable scheduleSessionRemoveJob(WebSocketSession session, String path, String sub, boolean debugPath, long secondsUntilExpiration) {
-        String sessionId = session.getId();
+    private Disposable scheduleSessionRemoveJob(SecuredWebSocket socket, long delaySeconds, CloseReason reason) {
+        WebSocketSession session = socket.getSession();
+        String sessionId = socket.getSessionId();
+        String path = socket.getPath();
+        String sub = socket.getSub();
+        boolean debugPath = socket.isDebugPath();
         if (debugPath) {
-            log.debug(LOG_PREFIX + "scheduling session remove job in {}s", sessionId, path, sub, secondsUntilExpiration);
+            log.debug(LOG_PREFIX + "scheduling session remove job ({}) in {}s",
+                    sessionId, path, sub, reason.getLabel(), delaySeconds);
         }
-        return Mono.delay(Duration.ofSeconds(secondsUntilExpiration))
+        return Mono.delay(Duration.ofSeconds(delaySeconds))
                 .flatMap(__ -> {
                     if (debugPath) {
-                        log.debug(LOG_PREFIX + "executing session remove job (JWT expiry)", sessionId, path, sub);
+                        log.debug(LOG_PREFIX + "executing session remove job ({})", sessionId, path, sub, reason.getLabel());
                     }
                     return session.close()
                             .doOnSuccess(___ -> {
@@ -126,7 +183,8 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 );
     }
 
-    private void processSessionClosedEvent(WebSocketSession session, String path, String sub, Disposable disposable) {
+    private void processSessionClosedEvent(WebSocketSession session, String path, String sub, WebSocketKind kind,
+                                           Disposable disposable) {
         String sessionId = session.getId();
         session.closeStatus()
                 .subscribe(
@@ -137,7 +195,8 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                                     : -1;
                             String logSub = info != null ? info.sub() : sub;
                             gatewayTrafficMetrics.webSocketClosed(sessionId, path, logSub);
-                            gatewayTrafficMetrics.recordSessionClosed(toolFromPath(path), status.getCode(), lifetimeSec);
+                            String tool = toolFromPath(path);
+                            gatewayTrafficMetrics.recordSessionClosed(tool, kind, status.getCode(), lifetimeSec);
                             if (loggingProperties.isDebugPath(path)) {
                                 log.debug(LOG_PREFIX + "session closed code={} reason={} lifetime={}",
                                         sessionId, path, logSub, status.getCode(), status.getReason(), formatLifetime(lifetimeSec));
