@@ -59,10 +59,12 @@ export interface MingoChatListProps {
    *  "Chat archive" in its ⋯ menu. */
   onOpenArchive?: () => void;
   /**
-   * "What to ask Mingo?": the suggestions a chat starts from. The rail draws it as an
-   * action under the logo, the section as an item of its ⋯ menu.
+   * "What to ask?": the `/what-can-you-do` command (`useWhatToAskCommand`). The rail draws it as an action under the
+   * logo, the section as an item of its ⋯ menu; only with `whatToAskLabel`.
    */
   onWhatToAsk?: () => void;
+  /** The entry's label: the command's, as the server's catalog names it (`whatToAskLabelOf`). No label, no entry. */
+  whatToAskLabel?: string;
   /**
    * The host's own actions at the end of the section's ⋯ menu, after "Chat archive" and
    * "What to ask Mingo?" (e.g. "Reset Onboarding"). The section only: the rail has no ⋯ of its own.

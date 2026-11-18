@@ -367,8 +367,11 @@ export type { FaqHashTarget } from './faq-anchor';
 export {
   deepestTopic,
   isPagePathTopic,
+  normalizeTopic,
   pageTopicFor,
   type PageTopicOptions,
+  sectionTopicFor,
+  splitTopic,
   topicCandidates,
   topicMatchesPath,
 } from './page-topics';
