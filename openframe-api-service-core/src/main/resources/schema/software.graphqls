@@ -180,6 +180,11 @@ type Software {
     Sortable as adoptionCount."""
     adoptionCount: Int
 
+    """The package Adopt reinstalls this title with, shown to the admin for confirmation: the best match of a
+    package manager that updates only what it installed itself. softwareId is not set.
+    Null = no package to adopt into, or a package manager already manages the title."""
+    adoptionPackage: SoftwareBundlePackage
+
     "Devices that have this title installed."
     devicesCount: Int
 }

@@ -31,6 +31,8 @@ import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareTitleQuery;
 import com.openframe.data.repository.rmm.software.SoftwareTitleQuery.SoftwareTitleQueryBuilder;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -66,6 +68,7 @@ public class TenantSoftwareReadModelQuery {
     private final VulnerabilityRepository vulnerabilityRepository;
     private final MachineRepository machineRepository;
     private final PackageAutoUpdatePolicyRepository packageAutoUpdatePolicyRepository;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     public boolean exists(String tenantId, String softwareId) {
         Long titleId = parseLong(softwareId);
@@ -275,9 +278,11 @@ public class TenantSoftwareReadModelQuery {
         List<String> softwareIds = packageAutoUpdatePolicyRepository.findSoftwareIds(tenantId);
         Set<Long> enabledPolicyTitleIds = titleIds(enabledSoftwareIds);
         Set<Long> policyTitleIds = titleIds(softwareIds);
+        List<PackageManagerType> adoptionManagers = packageManagerAvailability.enabledManagers();
         titles.autoUpdateStatuses(autoUpdateStatuses)
                 .enabledPolicyTitleIds(enabledPolicyTitleIds)
-                .policyTitleIds(policyTitleIds);
+                .policyTitleIds(policyTitleIds)
+                .adoptionManagers(adoptionManagers);
     }
 
     // a policy names the Software by its id as text; the read model keys a title by the same id as a number
@@ -319,7 +324,11 @@ public class TenantSoftwareReadModelQuery {
         row.setProductCodes(sw.getArpKeys());
         row.setPackageFamilyNames(sw.getPackageFamilyNames());
         row.setSystemComponent(sw.getSystemComponent());
+        row.setBundleIdentifier(sw.getBundleIdentifier());
+        row.setAppFileNames(sw.getAppFileNames());
+        row.setTopLevelApp(sw.getTopLevelApp());
         row.setPackageMatch(sw.getPackageMatch());
+        row.setAdoptionMatch(sw.getAdoptionMatch());
         row.setType(type);
         row.setCurrentVersion(sw.getCurrentVersion());
         row.setLatestVersion(sw.getLatestVersion());

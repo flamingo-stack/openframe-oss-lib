@@ -375,7 +375,7 @@ class SoftwareInventoryServiceReadModelTest {
         assertThat(result.items()).extracting(SoftwareResponse::getId).containsExactly("1");
         InOrder order = inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq("m1"), anyList());
-        order.verify(catalogStatus).apply(anyList());
+        order.verify(catalogStatus).applyOnDevice(eq("m1"), anyList());
         verifyNoInteractions(deviceHostInventoryLoader, deviceCountEnricher);
     }
 
@@ -387,7 +387,7 @@ class SoftwareInventoryServiceReadModelTest {
 
         InOrder order = inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq("m1"), anyList());
-        order.verify(catalogStatus).apply(anyList());
+        order.verify(catalogStatus).applyOnDevice(eq("m1"), anyList());
     }
 
     @Test
