@@ -6,9 +6,11 @@
  *
  * - A page asks with its path: query and hash dropped, trailing slash dropped,
  *   lowercased, decoded (`/Blog/My-Post/?x` asks `/blog/my-post`).
- * - A host that mounts the hub's pages under a path states it (`basePath`):
- *   `/help-center/roadmap` asks `/roadmap`, the hub page it mirrors. A path
- *   outside the mount is asked as it is (`/devices`).
+ * - A page asks with the path it is shown at, whoever renders it: the product
+ *   app's Help Center page `/help-center/roadmap` asks `/help-center/roadmap`,
+ *   never the website's `/roadmap`. Which page that address borrows is the
+ *   host's to know: the hub's place rule offers a borrowed page's content where
+ *   nothing is written for the address itself.
  * - A tag is written for a page when it is the page's path or a parent of it
  *   (`/blog` is written for `/blog` and `/blog/my-post`); `/` only for the home
  *   page. A page takes its DEEPEST matching tag (`deepestTopic`), so a record
@@ -45,23 +47,14 @@ function normalizePath(pathname: string): string {
   return segments.length === 0 ? HOME_PATH : `/${segments.join('/')}`;
 }
 
-export interface PageTopicOptions {
-  /** Where the host mounts the hub's pages (`/help-center`): a path under it is asked without it. */
-  basePath?: string;
-}
-
-/** The topic the page at `pathname` asks with: its path, without the host's mount. */
-export function pageTopicFor(pathname: string, options: PageTopicOptions = {}): string {
-  const path = normalizePath(pathname);
-  const base = options.basePath ? normalizePath(options.basePath) : HOME_PATH;
-  if (base === HOME_PATH) return path;
-  if (path === base) return HOME_PATH;
-  return path.startsWith(`${base}/`) ? path.slice(base.length) : path;
+/** The topic the page at `pathname` asks with: its path. */
+export function pageTopicFor(pathname: string): string {
+  return normalizePath(pathname);
 }
 
 /** The topic of a section of a page: the page's path (as `pageTopicFor` reads it) and the section's anchor. */
-export function sectionTopicFor(pathname: string, section: string, options: PageTopicOptions = {}): string {
-  return `${pageTopicFor(pathname, options)}#${section.trim().toLowerCase()}`;
+export function sectionTopicFor(pathname: string, section: string): string {
+  return `${pageTopicFor(pathname)}#${section.trim().toLowerCase()}`;
 }
 
 /** A topic's page and its section anchor (null for a whole page). */

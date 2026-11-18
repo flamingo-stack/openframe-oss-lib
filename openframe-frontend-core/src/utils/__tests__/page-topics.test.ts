@@ -21,13 +21,10 @@ describe('pageTopicFor: a page asks with its path', () => {
     expect(pageTopicFor('/blog/%E0%A4%A')).toBe('/blog/%e0%a4%a');
   });
 
-  it("asks without the host's mount, and leaves a path outside it as it is", () => {
-    const options = { basePath: '/help-center' };
-    expect(pageTopicFor('/help-center/roadmap', options)).toBe('/roadmap');
-    expect(pageTopicFor('/help-center/releases/detail?slug=x', options)).toBe('/releases/detail');
-    expect(pageTopicFor('/help-center', options)).toBe('/');
-    expect(pageTopicFor('/devices', options)).toBe('/devices');
-    expect(pageTopicFor('/help-centerx/roadmap', options)).toBe('/help-centerx/roadmap');
+  it('asks with the path a page is shown at, a mounted page included', () => {
+    expect(pageTopicFor('/help-center/roadmap')).toBe('/help-center/roadmap');
+    expect(pageTopicFor('/help-center/releases/detail?slug=x')).toBe('/help-center/releases/detail');
+    expect(pageTopicFor('/help-center')).toBe('/help-center');
   });
 });
 

@@ -362,7 +362,6 @@ export {
   isPagePathTopic,
   normalizeTopic,
   pageTopicFor,
-  type PageTopicOptions,
   sectionTopicFor,
   splitTopic,
   topicCandidates,

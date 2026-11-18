@@ -25,15 +25,15 @@ describe('usePageTopic', () => {
     expect(screen.getByText('/pricing/calculator')).toBeInTheDocument();
   });
 
-  it("asks without the host's mount, inherited by a nested provider", () => {
+  it('asks with the path a mounted page is shown at', () => {
     render(
-      <PageTopicsProvider basePath="/help-center">
+      <PageTopicsProvider showTopic>
         <PageTopicsProvider pathname="/help-center/legal/privacy">
           <Topic />
         </PageTopicsProvider>
       </PageTopicsProvider>,
     );
-    expect(screen.getByText('/legal/privacy')).toBeInTheDocument();
+    expect(screen.getByText('/help-center/legal/privacy')).toBeInTheDocument();
   });
 
   it('has no topic where the host gave no provider', () => {
