@@ -93,12 +93,13 @@ public class BrewCatalogFetcher {
                 .build();
     }
 
-    private static PackageCatalogEntry toCaskEntry(BrewCaskJson cask, Map<String, Integer> installs) {
+    static PackageCatalogEntry toCaskEntry(BrewCaskJson cask, Map<String, Integer> installs) {
         String token = cask.getToken();
         List<String> names = cask.getName();
         String displayName = names == null || names.isEmpty() ? token : names.getFirst();
         List<String> aliases = concat(cask.getOldTokens(), null);
         Integer popularity = installs.get(token);
+        BrewCaskKeys keys = BrewCaskKeys.of(cask);
         return PackageCatalogEntry.builder()
                 .manager(PackageManagerType.BREW)
                 .packageId(token)
@@ -109,6 +110,10 @@ public class BrewCatalogFetcher {
                 .brewType(BrewPackageType.CASK)
                 .popularity(popularity)
                 .aliases(aliases)
+                .appNames(keys.getAppNames())
+                .weakAppNames(keys.getWeakAppNames())
+                .bundleIds(keys.getBundleIds())
+                .bundleIdPrefixes(keys.getBundleIdPrefixes())
                 .build();
     }
 

@@ -25,10 +25,14 @@ import static org.springframework.util.StringUtils.hasText;
 public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
 
     private static final String SOURCE = "source";
+    private static final String MATCH = "packageMatch";
     private static final String MATCH_STATE = "packageMatch.state";
     private static final String MATCH_MANAGER = "packageMatch.manager";
+    private static final String ADOPTION_STATE = "adoptionMatch.state";
+    private static final String ADOPTION_MANAGER = "adoptionMatch.manager";
     private static final String TITLE_ID = "softwareTitleId";
-    private static final String BREW_SOURCE = FleetSource.HOMEBREW_PACKAGES.getFleetName();
+    private static final List<String> BREW_SOURCES =
+            List.of(FleetSource.HOMEBREW_PACKAGES.getFleetName(), FleetSource.HOMEBREW_CASKS.getFleetName());
 
     private final MongoTemplate mongoTemplate;
 
@@ -115,10 +119,27 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
                     Criteria.where(TITLE_ID).in(titles.getPolicyTitleIds()).nin(titles.getEnabledPolicyTitleIds()),
                     withoutPolicy(titles).orOperator(
                             Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED),
-                            Criteria.where(SOURCE).is(BREW_SOURCE).and(MATCH_STATE).ne(PackageMatchState.NO_PACKAGE)));
-            case NO_PACKAGE -> withoutPolicy(titles).and(MATCH_STATE).is(PackageMatchState.NO_PACKAGE);
-            case NEEDS_ADOPTION -> Criteria.where(TITLE_ID).in(List.of());
+                            Criteria.where(SOURCE).in(BREW_SOURCES).and(MATCH_STATE).ne(PackageMatchState.NO_PACKAGE)));
+            case NO_PACKAGE -> new Criteria().andOperator(
+                    withoutPolicy(titles),
+                    withoutPackage(),
+                    new Criteria().norOperator(adoptable(titles)));
+            case NEEDS_ADOPTION -> new Criteria().andOperator(
+                    withoutPolicy(titles).and(MATCH_STATE).ne(PackageMatchState.MATCHED),
+                    adoptable(titles));
         };
+    }
+
+    // no matcher of a managing package takes a Mac app: without a packageMatch its adoption match is the answer
+    private static Criteria withoutPackage() {
+        return new Criteria().orOperator(
+                Criteria.where(MATCH_STATE).is(PackageMatchState.NO_PACKAGE),
+                Criteria.where(MATCH).isNull().and(ADOPTION_STATE).is(PackageMatchState.NO_PACKAGE));
+    }
+
+    private static Criteria adoptable(SoftwareTitleQuery titles) {
+        return Criteria.where(ADOPTION_STATE).is(PackageMatchState.MATCHED)
+                .and(ADOPTION_MANAGER).in(titles.getAdoptionManagers());
     }
 
     private static Criteria withoutPolicy(SoftwareTitleQuery titles) {

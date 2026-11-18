@@ -11,6 +11,7 @@ import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
+import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
@@ -40,6 +41,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,12 +76,14 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Mock private SoftwareInventoryService softwareInventoryService;
     @Mock private SoftwareActionResultRepository softwareActionResultRepository;
 
+    private final PackageManagerProperties packageManagerProperties = new PackageManagerProperties();
+
     private SoftwareInstallUpdateManagementService service;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
         PackageManagerAvailability packageManagerAvailability =
-                new PackageManagerAvailability(new PackageManagerProperties(), machineRepository, tenantIdProvider);
+                new PackageManagerAvailability(packageManagerProperties, machineRepository, tenantIdProvider);
         MachinePlatformResolver platformResolver =
                 new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
@@ -143,6 +147,32 @@ class SoftwareInstallUpdateManagementServiceTest {
                 eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.AI_ASSISTANT),
                 eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.UPDATE));
         verifyNoInteractions(packageUpdateDispatchService);
+    }
+
+    @Test
+    @DisplayName("install: a winget package skips the Windows device that cannot run winget, even though Chocolatey manages that device")
+    void install_deviceThatCannotRunTheManager_isNotATarget() {
+        packageManagerProperties.setChocoEnabled(true);
+        Machine server = machine("m-server", OsType.WINDOWS);
+        server.setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.UNSUPPORTED,
+                PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        when(registry.handlerFor(PackageManagerType.WINGET)).thenReturn(new WingetPackageManagerHandler());
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-mac", OsType.MAC_OS), machine("m-win", OsType.WINDOWS), server));
+        ScriptResponse brew = script("brew-install-id", OsType.MAC_OS);
+        ScriptResponse winget = script("winget-install-id", OsType.WINDOWS);
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(brew);
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.WINGET_INSTALL)).thenReturn(winget);
+        SoftwareManagementInput mixed = new SoftwareManagementInput();
+        mixed.setMachineIds(List.of("m-mac", "m-win", "m-server"));
+        mixed.setPackages(List.of(
+                pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK),
+                pkg(PackageManagerType.WINGET, "vscode", null)));
+
+        service.install(mixed, USER, ExecutionSource.MANUAL);
+
+        verify(softwareDispatchService).dispatch(any(), eq(winget), eq(List.of("m-win")), anyList(), eq(USER),
+                eq(ExecutionSource.MANUAL), eq(PackageManagerType.WINGET), eq("vscode"), eq(SoftwareAction.INSTALL));
     }
 
     @Test
