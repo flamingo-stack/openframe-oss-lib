@@ -31,14 +31,6 @@ public class AuthUser extends User {
      */
     private String imageUrl;
     public String getFullName() {
-        if (super.getFirstName() != null && super.getLastName() != null) {
-            return super.getFirstName() + " " + super.getLastName();
-        } else if (super.getFirstName() != null) {
-            return super.getFirstName();
-        } else if (super.getLastName() != null) {
-            return super.getLastName();
-        } else {
-            return super.getEmail();
-        }
+        return nameOrEmail();
     }
 }
