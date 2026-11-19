@@ -18,10 +18,14 @@ impl TestKey {
         TestKey(format!(r"Software\OpenFrameTests\{}", unique(name)))
     }
 
-    fn app_id_value(&self, id: &str, name: &str) -> std::io::Result<String> {
+    fn value(&self, subkey: &str, name: &str) -> std::io::Result<String> {
         RegKey::predef(HKEY_CURRENT_USER)
-            .open_subkey(format!(r"{}\AppUserModelId\{id}", self.0))?
+            .open_subkey(format!(r"{}\{subkey}", self.0))?
             .get_value(name)
+    }
+
+    fn app_id_value(&self, id: &str, name: &str) -> std::io::Result<String> {
+        self.value(&format!(r"AppUserModelId\{id}"), name)
     }
 }
 
@@ -91,6 +95,28 @@ fn register_app_id_writes_only_the_values_it_is_given() {
         assert!(
             key.app_id_value(app.id, name).is_err(),
             "{name} was written"
+        );
+    }
+}
+
+#[test]
+fn register_url_scheme_points_the_command_at_the_latest_exe() {
+    let key = TestKey::new("url-scheme");
+
+    for exe in [
+        r"C:\Program Files\OpenFrame\old\openframe-chat.exe",
+        r"C:\Program Files\OpenFrame\openframe-chat.exe",
+    ] {
+        register_url_scheme_in(&key.0, "openframe-chat", "OpenFrame Chat", Path::new(exe)).unwrap();
+
+        assert_eq!(
+            key.value("openframe-chat", "").unwrap(),
+            "URL:OpenFrame Chat"
+        );
+        assert_eq!(key.value("openframe-chat", "URL Protocol").unwrap(), "");
+        assert_eq!(
+            key.value(r"openframe-chat\shell\open\command", "").unwrap(),
+            format!("\"{exe}\" \"%1\"")
         );
     }
 }

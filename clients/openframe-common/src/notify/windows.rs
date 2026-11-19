@@ -120,6 +120,10 @@ pub fn register_app_id(app: &AppId) -> Result<(), Error> {
     register_app_id_in(CLASSES, app)
 }
 
+pub fn register_url_scheme(scheme: &str, display_name: &str, exe: &Path) -> Result<(), Error> {
+    register_url_scheme_in(CLASSES, scheme, display_name, exe)
+}
+
 pub fn ensure_icon(dir: &Path, file_name: &str, bytes: &[u8]) -> Result<PathBuf, Error> {
     let path = dir.join(file_name);
     if std::fs::read(&path).is_ok_and(|existing| existing == bytes) {
@@ -148,6 +152,21 @@ fn register_app_id_in(classes: &str, app: &AppId) -> Result<(), Error> {
     if let Some(clsid) = app.custom_activator {
         key.set_value("CustomActivator", &clsid)?;
     }
+    Ok(())
+}
+
+fn register_url_scheme_in(
+    classes: &str,
+    scheme: &str,
+    display_name: &str,
+    exe: &Path,
+) -> Result<(), Error> {
+    let (key, _) =
+        RegKey::predef(HKEY_CURRENT_USER).create_subkey(format!(r"{classes}\{scheme}"))?;
+    let _ = key.set_value("", &format!("URL:{display_name}"));
+    key.set_value("URL Protocol", &"")?;
+    let (command, _) = key.create_subkey(r"shell\open\command")?;
+    command.set_value("", &format!("\"{}\" \"%1\"", exe.display()))?;
     Ok(())
 }
 

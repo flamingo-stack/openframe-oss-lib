@@ -42,6 +42,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
+pub const BODY_CHARS: usize = 140;
+
 pub fn truncate(text: &str, max: usize) -> String {
     if text.chars().count() <= max {
         return text.to_string();
