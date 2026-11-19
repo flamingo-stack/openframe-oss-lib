@@ -314,6 +314,12 @@ export interface ChatStreamReducer {
    * takes that message over instead of opening a second one.
    */
   armAdoptTrailingAssistant(value: boolean): void;
+  /**
+   * Whether the live tail can deliver again what the history already holds (default true). A replaying tail that opened
+   * on new messages only (the history held no stream seq to resume after) cannot, so an echo that repeats the trailing
+   * prompt is a new send, never that prompt's replay. Set at each hydration; a dialog switch restores the default.
+   */
+  setTailReplaysHistory(value: boolean): void;
 
   // ── Cross-side projections (dialog-store fan-out) ───────────────────────
   projectApprovalResolution(requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null): void;
@@ -538,6 +544,8 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   // Adapter-armed flags.
   let suppressAgentBusy = 0;
   let adoptTrailingAssistant = false;
+  /** See `setTailReplaysHistory`: false only while the tail opened on new messages only. */
+  let tailReplaysHistory = true;
   /** A message a replay took over: the first chunk that writes to its body replaces it. Until then the old copy stays. */
   let adoptedMessageId: string | null = null;
 
@@ -701,9 +709,11 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
    * user row with no stream seq, so after a reload mid-reply the history has the prompt but its seq cannot move the
    * live tail past the echo: the tail replays it. Its twin is the trailing persisted user row with the same text, when
    * nothing in the thread reached the echo's seq. A new send that repeats an answered prompt is not one: the answer,
-   * stamped with its seq, sits after the older twin.
+   * stamped with its seq, sits after the older twin. Nor is any echo of a tail that opened on new messages only
+   * (`setTailReplaysHistory(false)`): it cannot replay what the history holds.
    */
   function isReplayOfTrailingPrompt(text: string, authorType: 'admin' | 'user', seq: number): boolean {
+    if (!tailReplaysHistory) return false;
     const last = messages[messages.length - 1];
     if (!last || last.role !== 'user' || isClientMinted(last.id)) return false;
     // A direct or system row carries its persisted seq: seq coverage, not text, decides those.
@@ -1029,6 +1039,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
    */
   function resetForDialogSwitch(): void {
     messages = [];
+    tailReplaysHistory = true;
     streamingPhase = 'idle';
     dialogTokenUsage = null;
     liveModel = null;
@@ -1229,6 +1240,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     },
     armAdoptTrailingAssistant(value) {
       adoptTrailingAssistant = value;
+    },
+    setTailReplaysHistory(value) {
+      tailReplaysHistory = value;
     },
 
     projectApprovalResolution(requestId, status, resolvedByName) {

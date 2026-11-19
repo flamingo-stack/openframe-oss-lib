@@ -88,6 +88,11 @@ export interface ChatThreadHydrateOptions {
    * (a page, an idle refetch, a re-seed after eviction).
    */
   expectingReplay?: boolean;
+  /**
+   * Whether the live tail can deliver again what this history holds (default true). False for a replaying tail that
+   * opens on new messages only because the history held no stream seq: see the reducer's `setTailReplaysHistory`.
+   */
+  tailReplaysHistory?: boolean;
 }
 
 /** One key's handle, curried and memoized: identity-stable until the key is evicted or dropped. */
@@ -333,6 +338,7 @@ export function createChatThreadStore<K extends string>(config: ChatThreadStoreC
       // restores with no turn open, and a second hydrate of that tail must seed and arm like the first.
       const turnOpen = reducer.state.streamingPhase === 'streaming';
       reducer.initializeWithState([...messages]);
+      reducer.setTailReplaysHistory(hydrateOptions?.tailReplaysHistory !== false);
       if (turnOpen) {
         armAdopt = false;
         disarmAdopt(key, reducer);
