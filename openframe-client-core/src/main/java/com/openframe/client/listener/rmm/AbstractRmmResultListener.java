@@ -58,9 +58,8 @@ public abstract class AbstractRmmResultListener<T extends RmmResultMessage> {
 
             rmmResultService.processResult(machineId, resultMessage);
         } catch (Exception e) {
-            // Log metadata only — the raw payload may contain sensitive script/command output.
-            log.error("Unexpected error processing {} result from subject {} (payloadSize={} bytes)",
-                    label(), subject, data.length, e);
+            log.error("Unexpected error processing {} result from subject {} (payloadSize={} bytes, errorType={})",
+                    label(), subject, data.length, e.getClass().getSimpleName());
         }
     }
 

@@ -1,8 +1,12 @@
 package com.openframe.client.integration;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.AppenderBase;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.integration.support.CommandResultIntegrationTestApplication;
+import com.openframe.client.listener.rmm.AbstractRmmResultListener;
 import com.openframe.client.listener.rmm.CommandResultListener;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.model.enums.MessageType;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -25,9 +30,12 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -129,6 +137,110 @@ class CommandResultListenerIT {
     }
 
     @Test
+    @DisplayName("Command diagnostics mask the launch credential before forwarding the result")
+    void commandResult_masksLaunchCredentialBeforePublishing() {
+        // setup
+        CommandResultMessage payload = CommandResultMessage.builder()
+                .executionId("exec-redaction")
+                .stdout("""
+                        State     : Running
+                        StartMode : Auto
+                        PathName  : "C:\\Program Files\\Example Agent\\agent.exe" --openframe-mode --openframe-secret "fixture-a181 stdout" --service
+                        Details   : --openframe-secret=fixture-a181-repeat --openframe-secret-file sample.txt
+                        Name      : FirstWrappedAgent
+                        PathName  : "C:\\First Agent\\agent.exe" --openframe-secret\s
+                                    "fixture-a181-next-line" --service
+                        State     : Paused
+                        StartMode : Disabled
+                        Name      : SecondWrappedAgent
+                        PathName  : "C:\\Second Agent\\agent.exe" --openframe-secret "fixture-a181-wrap-
+                                    second-line-of-credential" --service
+                        State     : Stopped
+                        StartMode : Manual
+                        Previous  : --OpenFrame-Secret "fixture-a181-escape\\"escaped-tail" --previous
+                        """)
+                .stderr("Probe failed for --openframe-secret='fixture-a181-stderr' at step 2")
+                .error("Could not start --openframe-secret fixture-a181-error --retry\n"
+                        + "Earlier invocation: --openframe-secret \"fixture-a181-truncated")
+                .failureReason("BLOCKED --openframe-secret=\"fixture-a181-reason\"")
+                .exitCode(1)
+                .executionTimeMs(28L)
+                .timedOut(false)
+                .build();
+        org.mockito.ArgumentCaptor<CommonDebeziumMessage> envelope =
+                org.mockito.ArgumentCaptor.forClass(CommonDebeziumMessage.class);
+
+        // execution
+        natsConnection.publish("machine.redaction-device.command-execution.result",
+                objectMapper.writeValueAsBytes(payload));
+        assertDoesNotThrow(() -> natsConnection.flush(Duration.ofSeconds(2)));
+
+        // verifications
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                verify(eventLogsPublisher).publish(eq("redaction-device"), envelope.capture(),
+                        eq(Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.COMMAND_EXECUTED.name()))));
+
+        JsonNode after = envelope.getValue().getPayload().getAfter();
+        assertThat(after.get("stdout").asString())
+                .doesNotContain("fixture-a181 stdout", "fixture-a181-repeat", "fixture-a181-next-line",
+                        "fixture-a181-wrap-", "second-line-of-credential", "fixture-a181-escape", "escaped-tail")
+                .contains("State     : Running", "StartMode : Auto", "State     : Paused", "StartMode : Disabled",
+                        "State     : Stopped", "StartMode : Manual",
+                        "PathName  : \"C:\\Program Files\\Example Agent\\agent.exe\" --openframe-mode",
+                        "\"C:\\First Agent\\agent.exe\"", "\"C:\\Second Agent\\agent.exe\"",
+                        "--service", "--openframe-secret-file sample.txt", "--previous");
+        assertThat(after.get("stderr").asString())
+                .doesNotContain("fixture-a181-stderr")
+                .startsWith("Probe failed for ")
+                .endsWith(" at step 2");
+        assertThat(after.get("error").asString())
+                .doesNotContain("fixture-a181-error", "fixture-a181-truncated")
+                .startsWith("Could not start ")
+                .contains(" --retry\nEarlier invocation: ");
+        assertThat(after.get("failureReason").asString())
+                .doesNotContain("fixture-a181-reason")
+                .startsWith("BLOCKED ");
+        assertThat(after.get("exitCode").asInt()).isEqualTo(1);
+        assertThat(after.get("executionTimeMs").asLong()).isEqualTo(28L);
+        assertThat(after.get("timedOut").asBoolean()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Malformed command results retain routing context in logs without exposing the rejected value")
+    void malformedCommandResult_logsRoutingWithoutRejectedValue() {
+        // setup
+        String subject = "machine.malformed-result.command-execution.result";
+        String rejectedValue = "fixture-a181-malformed";
+        byte[] invalid = objectMapper.writeValueAsBytes(Map.of(
+                "execution_id", "exec-malformed",
+                "exit_code", "--openframe-secret " + rejectedValue));
+        byte[] valid = objectMapper.writeValueAsBytes(CommandResultMessage.builder()
+                .executionId("exec-next")
+                .exitCode(0)
+                .build());
+        Queue<ILoggingEvent> loggedResults = new ConcurrentLinkedQueue<>();
+        AppenderBase<ILoggingEvent> appender = new AppenderBase<>() {
+            @Override
+            protected void append(ILoggingEvent event) {
+                if (event.getFormattedMessage().contains(subject)) {
+                    loggedResults.add(event);
+                }
+            }
+        };
+        Logger listenerLogger = (Logger) LoggerFactory.getLogger(AbstractRmmResultListener.class);
+        appender.start();
+        listenerLogger.addAppender(appender);
+
+        try {
+            publishMalformedAndSentinel(subject, invalid, valid);
+            assertRejectedResultLoggedSafely(loggedResults, subject, invalid.length, rejectedValue);
+        } finally {
+            listenerLogger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
     @DisplayName("A command-result on a different machine subject is keyed by that machineId — per-machine routing is preserved")
     void commandResult_perMachineKey() throws Exception {
         CommandResultMessage payload = CommandResultMessage.builder()
@@ -171,5 +283,25 @@ class CommandResultListenerIT {
         // Exactly one publish total — only the sentinel — proving the heartbeat was filtered out.
         verify(eventLogsPublisher, times(1)).publish(anyString(), any(CommonDebeziumMessage.class), anyMap());
         verify(eventLogsPublisher, never()).publish(eq("ghost"), any(CommonDebeziumMessage.class), anyMap());
+    }
+
+    private void publishMalformedAndSentinel(String subject, byte[] invalid, byte[] valid) {
+        natsConnection.publish(subject, invalid);
+        natsConnection.publish("machine.after-malformed.command-execution.result", valid);
+        assertDoesNotThrow(() -> natsConnection.flush(Duration.ofSeconds(2)));
+    }
+
+    private void assertRejectedResultLoggedSafely(Queue<ILoggingEvent> loggedResults, String subject, int payloadSize,
+                                                String rejectedValue) {
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                verify(eventLogsPublisher).publish(eq("after-malformed"),
+                        any(CommonDebeziumMessage.class), anyMap()));
+        verify(eventLogsPublisher, never()).publish(eq("malformed-result"),
+                any(CommonDebeziumMessage.class), anyMap());
+        assertThat(loggedResults).hasSize(1);
+        ILoggingEvent event = loggedResults.element();
+        assertThat(event.getArgumentArray()).containsExactly("command", subject, payloadSize, "InvalidFormatException");
+        assertThat(event.getFormattedMessage()).doesNotContain(rejectedValue);
+        assertThat(event.getThrowableProxy()).isNull();
     }
 }
