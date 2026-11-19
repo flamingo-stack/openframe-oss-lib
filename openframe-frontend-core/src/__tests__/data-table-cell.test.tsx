@@ -60,6 +60,30 @@ describe('DataTable.Cell', () => {
     expect(screen.getByText(/Legal hold/).className).toContain('truncate');
   });
 
+  it('keeps a secondary text of 8 characters whole and cuts one of 9', () => {
+    const { container, rerender } = render(<DataTable.Cell text="Romans-MacBook-Pro.local" secondary="12:34:56" />);
+    expect(partClasses(container, 'secondary')).toContain('shrink-0');
+    expect(screen.getByText('Romans-MacBook-Pro.local').parentElement?.className ?? '').toContain('flex-1');
+
+    rerender(<DataTable.Cell text="Romans-MacBook-Pro.local" secondary="12:34:567" />);
+    expect(partClasses(container, 'secondary')).not.toContain('shrink-0');
+    expect(screen.getByText('12:34:567').className).toContain('truncate');
+    expect(screen.getByText('Romans-MacBook-Pro.local').parentElement?.className ?? '').toContain('flex-[1_9999_auto]');
+  });
+
+  it('never shrinks a main text of 9 characters beside a long secondary text, and shrinks one of 10', () => {
+    const secondary = 'roman.khutornoy@greenvalleymanufacturing.com';
+    const { rerender } = render(<DataTable.Cell text="123456789" secondary={secondary} />);
+    const nine = screen.getByText('123456789').parentElement?.className ?? '';
+    expect(nine).toContain('flex-[1_0_auto]');
+    expect(nine).not.toContain('min-w-[9ch]');
+
+    rerender(<DataTable.Cell text="1234567890" secondary={secondary} />);
+    const ten = screen.getByText('1234567890').parentElement?.className ?? '';
+    expect(ten).toContain('flex-[1_9999_auto]');
+    expect(ten).toContain('min-w-[9ch]');
+  });
+
   it('lets the main text take the line when there is no secondary text', () => {
     render(<DataTable.Cell text="Dell OptiPlex 7090 Small Form Factor" />);
     const mainBox = screen.getByText('Dell OptiPlex 7090 Small Form Factor').parentElement?.className ?? '';
