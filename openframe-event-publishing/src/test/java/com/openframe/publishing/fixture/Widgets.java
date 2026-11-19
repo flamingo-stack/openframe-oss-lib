@@ -3,6 +3,7 @@ package com.openframe.publishing.fixture;
 import com.openframe.data.document.TenantScoped;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult;
+import com.openframe.publishing.api.spec.AggregateOrdering;
 import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.api.spec.PublishedEvent;
@@ -88,6 +89,22 @@ public final class Widgets {
         @Override
         public List<Projection<WidgetEvent, ?>> projections() {
             return List.of(new WidgetProjection("unversioned-widget-copies"));
+        }
+    }
+
+    // Published like a tag: no @Version, every event final.
+    public static class UnorderedWidgetSpec extends UnversionedWidgetSpec {
+        @Override
+        public AggregateOrdering ordering() {
+            return AggregateOrdering.UNORDERED;
+        }
+    }
+
+    // A versioned document published as UNORDERED: its stored version is ignored.
+    public static class UnorderedVersionedWidgetSpec extends WidgetSpec {
+        @Override
+        public AggregateOrdering ordering() {
+            return AggregateOrdering.UNORDERED;
         }
     }
 

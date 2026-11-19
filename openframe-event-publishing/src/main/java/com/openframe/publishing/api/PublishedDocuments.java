@@ -44,11 +44,15 @@ public class PublishedDocuments {
         return specType.getGeneric(EVENT_TYPE_ARGUMENT).resolve();
     }
 
-    // Only the fields a tombstone needs: the id, the version and the tenant.
+    // Only the fields a tombstone needs: the id, the version when the document has one (an UNORDERED type need not) and the tenant.
     public void includeDeleteFields(Class<?> documentClass, Query query) {
         MongoPersistentEntity<?> entity = entityOf(documentClass);
-        String versionField = entity.getRequiredVersionProperty().getFieldName();
-        query.fields().include(ID_FIELD, versionField);
+        query.fields().include(ID_FIELD);
+        MongoPersistentProperty versionProperty = entity.getVersionProperty();
+        if (versionProperty != null) {
+            String versionField = versionProperty.getFieldName();
+            query.fields().include(versionField);
+        }
         MongoPersistentProperty tenantProperty = entity.getPersistentProperty(TENANT_PROPERTY);
         if (tenantProperty != null) {
             String tenantField = tenantProperty.getFieldName();
@@ -73,7 +77,7 @@ public class PublishedDocuments {
         return versionProperty.getFieldName();
     }
 
-    // The startup check refuses a published document without @Version.
+    // Only for a VERSIONED type: the startup check refuses its document without @Version.
     public long versionOf(Object document) {
         Class<?> documentClass = document.getClass();
         MongoPersistentEntity<?> entity = entityOf(documentClass);

@@ -6,6 +6,9 @@ import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.api.spec.PublishedEvent;
 import com.openframe.publishing.config.PublishedAggregateTopics;
+import com.openframe.publishing.fixture.Widgets.UnorderedVersionedWidgetSpec;
+import com.openframe.publishing.fixture.Widgets.UnorderedWidgetSpec;
+import com.openframe.publishing.fixture.Widgets.UnversionedWidget;
 import com.openframe.publishing.fixture.Widgets.Widget;
 import com.openframe.publishing.fixture.Widgets.WidgetSpec;
 import com.openframe.publishing.persistence.OutboxEvent;
@@ -60,8 +63,10 @@ class OutboxPublisherTest {
     @Mock private MongoTransactionRunner runner;
     @Mock private ObjectProvider<MongoTransactionRunner> runnerProvider;
     @Captor private ArgumentCaptor<Collection<OutboxEvent>> rows;
+    @Captor private ArgumentCaptor<Query> queryCaptor;
 
     private final WidgetSpec spec = new WidgetSpec();
+    private final UnorderedWidgetSpec unordered = new UnorderedWidgetSpec();
     private OutboxPublisher publisher;
 
     @BeforeEach
@@ -215,6 +220,127 @@ class OutboxPublisherTest {
         order.verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
         assertThat(increment.getValue().getUpdateObject().get("$inc")).isEqualTo(new Document("version", 1));
         assertThat(versionOf(onlyRow().getPayload())).isEqualTo(5L);
+    }
+
+    @Test
+    void anUnorderedChangedDocument_writesVersionZero_withoutAVersionField() {
+        // setup
+        UnversionedWidget saved = new UnversionedWidget("t-1", "Printers");
+
+        // execution
+        publisher.publishChanged(unordered, () -> saved);
+
+        // verifications
+        verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        Map<String, Object> payload = onlyRow().getPayload();
+        assertThat(payload)
+                .containsEntry("deleted", false)
+                .containsEntry("schemaVersion", 1)
+                .containsEntry("event", Map.of("name", "Printers"));
+        assertThat(versionOf(payload)).isZero();
+    }
+
+    @Test
+    void anUnorderedSpecOfAVersionedDocument_writesVersionZero_notTheStoredVersion() {
+        // setup
+        Widget saved = widget("w-1", 7L);
+
+        // execution
+        publisher.publishChanged(new UnorderedVersionedWidgetSpec(), () -> saved);
+
+        // verifications
+        verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        assertThat(versionOf(onlyRow().getPayload())).isZero();
+    }
+
+    @Test
+    void anUnorderedDelete_writesTheDeleteEnvelopeWithVersionZero_thenATombstoneRow() {
+        // setup
+        UnversionedWidget deleted = new UnversionedWidget("t-1", "Printers");
+
+        // execution
+        publisher.publishDeleted(unordered, () -> deleted);
+
+        // verifications
+        verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        List<OutboxEvent> written = List.copyOf(rows.getValue());
+        assertThat(written).hasSize(2).allSatisfy(row -> assertThat(row.getAggregateId()).isEqualTo("t-1"));
+        Map<String, Object> envelope = written.getFirst().getPayload();
+        assertThat(envelope).containsEntry("deleted", true).containsEntry("event", null);
+        assertThat(versionOf(envelope)).isZero();
+        assertThat(written.getLast().getPayload()).isNull();
+    }
+
+    @Test
+    void anUnorderedSpecOfAVersionedDocument_deletesWithVersionZero_notOneAboveTheStoredVersion() {
+        // setup
+        Widget deleted = widget("w-1", 4L);
+
+        // execution
+        publisher.publishDeleted(new UnorderedVersionedWidgetSpec(), () -> deleted);
+
+        // verifications
+        verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        Map<String, Object> envelope = rows.getValue().iterator().next().getPayload();
+        assertThat(versionOf(envelope)).isZero();
+    }
+
+    @Test
+    void anUnorderedDeleteByIds_readsOnlyTheId_ofADocumentWithoutVersionOrTenant() {
+        // setup
+        UnversionedWidget stored = new UnversionedWidget("t-1", "Printers");
+        when(mongoOperations.find(queryCaptor.capture(), eq(UnversionedWidget.class))).thenReturn(List.of(stored));
+
+        // execution
+        publisher.publishDeletedByIds(unordered, List.of("t-1"), () -> null);
+
+        // verifications
+        assertThat(queryCaptor.getValue().getFieldsObject()).containsOnlyKeys("_id");
+        verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        assertThat(rows.getValue()).hasSize(2);
+        Map<String, Object> envelope = rows.getValue().iterator().next().getPayload();
+        assertThat(versionOf(envelope)).isZero();
+    }
+
+    @Test
+    void anUnorderedRepublish_raisesNoVersion_andPublishesVersionZero() {
+        // setup
+        UnversionedWidget stored = new UnversionedWidget("t-1", "Printers");
+        when(mongoOperations.find(any(Query.class), eq(UnversionedWidget.class))).thenReturn(List.of(stored));
+
+        // execution
+        long linked = publisher.republishByIds(unordered, List.of("t-1"), () -> 1L);
+
+        // verifications
+        assertThat(linked).isEqualTo(1L);
+        verify(mongoOperations, never()).updateMulti(any(Query.class), any(Update.class), any(Class.class));
+        verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        assertThat(versionOf(onlyRow().getPayload())).isZero();
+    }
+
+    @Test
+    void anUnorderedPublishCurrent_returnsVersionZeroForEachRow() {
+        // setup
+        UnversionedWidget stored = new UnversionedWidget("t-1", "Printers");
+        when(mongoOperations.find(any(Query.class), eq(UnversionedWidget.class))).thenReturn(List.of(stored));
+
+        // execution
+        Map<String, Long> versions = publisher.publishCurrent(unordered, List.of("t-1"));
+
+        // verifications
+        assertThat(versions).containsExactly(Map.entry("t-1", 0L));
+    }
+
+    @Test
+    void aVersionedPublishCurrent_returnsTheStoredVersionOfEachRow() {
+        // setup
+        when(mongoOperations.find(any(Query.class), eq(Widget.class))).thenReturn(List.of(widget("w-1", 6L)));
+
+        // execution
+        Map<String, Long> versions = publisher.publishCurrent(spec, List.of("w-1"));
+
+        // verifications
+        assertThat(versions).containsExactly(Map.entry("w-1", 6L));
     }
 
     @Test

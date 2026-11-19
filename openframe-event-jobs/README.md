@@ -112,6 +112,8 @@ libraries it scans.
 **Start** a backfill of a type: set a run id for it under `backfill.runs`, then restart the stream. Any string works;
 a date is easy to read. The log shows `Backfill of <type> started, run <id>`, then `done` at the end.
 
+An `UNORDERED` type cannot be backfilled: a run id for it stops the service at startup.
+
 **Repeat** it: set a new run id and restart. The new run starts again from the first document. Leaving the same run id
 changes nothing: a DONE run stays done. A run id the job already had is never started again, so pods that still have
 the old config during a rolling restart leave the new run alone; always use a new value.

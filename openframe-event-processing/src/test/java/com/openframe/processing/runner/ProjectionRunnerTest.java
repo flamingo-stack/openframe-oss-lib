@@ -14,6 +14,7 @@ import com.openframe.processing.fixture.Transactions;
 import com.openframe.processing.version.ProjectionVersionRepository;
 import com.openframe.publishing.transaction.MongoTransactionRunner;
 import com.openframe.publishing.api.model.PublishedRecord;
+import com.openframe.publishing.api.spec.AggregateOrdering;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -373,6 +374,25 @@ class ProjectionRunnerTest {
                 });
     }
 
+    // The transaction stored this event's own version just before, so the check after it sees an equal one.
+    @Test
+    void anEventWhoseVersionIsStoredByTheTransaction_stillOpensItsTask() {
+        // setup
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1"))
+                .thenReturn(ProjectionVersionRepository.NO_VERSION, 3L);
+        PublishedRecord<WidgetEvent> record = record(false);
+
+        // execution and verifications
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .run(context -> {
+                    process(context, onTickets, record);
+
+                    verify(tasks).submit(ON_TICKETS, ORGANIZATIONS, "organization-document-1", record);
+                });
+    }
+
     @Test
     void aHandOverThatKeepsConflicting_isRetriedLikeAnyConflict() {
         onTickets.changes = 5000;
@@ -425,6 +445,96 @@ class ProjectionRunnerTest {
 
             assertThat(onTickets.deletedAggregateIds).isEmpty();
         });
+    }
+
+    @Test
+    void anUnorderedEvent_belowAStoredVersion_isStillApplied() {
+        // setup
+        PublishedRecord<WidgetEvent> record = unorderedRecord(false);
+
+        // execution and verifications
+        unorderedRunnerWith(onTickets).run(context -> {
+            process(context, onTickets, record);
+
+            assertThat(onTickets.records).containsExactly(record);
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_APPLIED)).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void anUnorderedEvent_neitherReadsNorStoresAVersion() {
+        // setup
+        PublishedRecord<WidgetEvent> record = unorderedRecord(false);
+
+        // execution and verifications
+        unorderedRunnerWith(onTickets).run(context -> {
+            process(context, onTickets, record);
+
+            verify(versions, never()).findStoredVersion(any(), any(), any());
+            verify(versions, never()).saveVersionIfHigher(any(), any(), any(), anyLong());
+        });
+    }
+
+    @Test
+    void anUnorderedDelete_reachesTheProjection_withoutStoringAVersion() {
+        // setup
+        PublishedRecord<WidgetEvent> record = unorderedRecord(true);
+
+        // execution and verifications
+        unorderedRunnerWith(onTickets).run(context -> {
+            process(context, onTickets, record);
+
+            assertThat(onTickets.deletedAggregateIds).containsExactly("organization-document-1");
+            verify(versions, never()).saveVersionIfHigher(any(), any(), any(), anyLong());
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_DELETED)).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void anUnorderedEventHandedOver_opensItsTask_withoutReadingAStoredVersion() {
+        // setup
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        PublishedRecord<WidgetEvent> record = unorderedRecord(false);
+
+        // execution and verifications
+        unorderedRunnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .run(context -> {
+                    process(context, onTickets, record);
+
+                    verify(tasks).submit(ON_TICKETS, ORGANIZATIONS, "organization-document-1", record);
+                    verify(versions, never()).findStoredVersion(any(), any(), any());
+                });
+    }
+
+    @SafeVarargs
+    private ApplicationContextRunner unorderedRunnerWith(Projection<WidgetEvent, ?>... projections) {
+        List<Projection<WidgetEvent, ?>> specProjections = List.of(projections);
+        return new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(EventProcessingAutoConfiguration.class))
+                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withPropertyValues("openframe.events.enabled=true")
+                .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(WidgetSpec.class, () -> new WidgetSpec(specProjections, AggregateOrdering.UNORDERED))
+                .withBean(ProjectionVersionRepository.class, () -> versions)
+                .withBean(MongoTransactionRunner.class, () -> transactions);
+    }
+
+    // Version 0 below a stored 4: a VERSIONED type would skip it.
+    private PublishedRecord<WidgetEvent> unorderedRecord(boolean deleted) {
+        stubStoredVersionAboveZero();
+        WidgetEvent event = deleted ? null : new WidgetEvent();
+        return PublishedRecord.<WidgetEvent>builder()
+                .tenantId("tenant-1")
+                .version(PublishedRecord.UNORDERED_VERSION)
+                .deleted(deleted)
+                .schemaVersion(1)
+                .event(event)
+                .build();
+    }
+
+    private void stubStoredVersionAboveZero() {
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
     }
 
     @SafeVarargs

@@ -21,4 +21,9 @@ public interface AggregateSpec<D, E extends PublishedEvent> {
      * registry adds it.
      */
     List<Projection<E, ?>> projections();
+
+    // UNORDERED only for a type whose every event is final, such as a hard delete of an id that is never reused.
+    default AggregateOrdering ordering() {
+        return AggregateOrdering.VERSIONED;
+    }
 }

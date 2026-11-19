@@ -2,6 +2,7 @@ package com.openframe.processing.fixture;
 
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult;
+import com.openframe.publishing.api.spec.AggregateOrdering;
 import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.api.spec.PublishedEvent;
@@ -22,9 +23,20 @@ public final class Widgets {
     public static class WidgetSpec implements AggregateSpec<Object, WidgetEvent> {
 
         private final List<Projection<WidgetEvent, ?>> projections;
+        private final AggregateOrdering ordering;
 
         public WidgetSpec(List<Projection<WidgetEvent, ?>> projections) {
+            this(projections, AggregateOrdering.VERSIONED);
+        }
+
+        public WidgetSpec(List<Projection<WidgetEvent, ?>> projections, AggregateOrdering ordering) {
             this.projections = projections;
+            this.ordering = ordering;
+        }
+
+        @Override
+        public AggregateOrdering ordering() {
+            return ordering;
         }
 
         @Override

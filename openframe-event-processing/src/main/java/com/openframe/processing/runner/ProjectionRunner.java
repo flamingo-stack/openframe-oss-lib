@@ -7,8 +7,11 @@ import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.exception.ProjectionConflictException;
 import com.openframe.processing.version.ProjectionVersionRepository;
 import com.openframe.publishing.api.model.PublishedRecord;
+import com.openframe.publishing.api.spec.AggregateOrdering;
+import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.api.util.MongoUnavailability;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
 import com.openframe.publishing.transaction.MongoTransactionRunner;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
@@ -30,15 +33,17 @@ public class ProjectionRunner {
     private final int inlineLimit;
     private final ProjectionVersionRepository versions;
     private final MongoTransactionRunner transactions;
+    private final AggregateSpecRegistry specRegistry;
 
     public ProjectionRunner(EventProcessingMetrics metrics, ObjectProvider<ProjectionTaskService> projectionTasks,
                             LargeUpdateProperties largeUpdateProperties, ProjectionVersionRepository versions,
-                            MongoTransactionRunner transactions) {
+                            MongoTransactionRunner transactions, AggregateSpecRegistry specRegistry) {
         this.metrics = metrics;
         this.projectionTasks = projectionTasks;
         this.inlineLimit = largeUpdateProperties.getInlineLimit();
         this.versions = versions;
         this.transactions = transactions;
+        this.specRegistry = specRegistry;
     }
 
     public void process(String type, Projection<?, ?> projection, String aggregateId, PublishedRecord<?> record) {
@@ -48,15 +53,18 @@ public class ProjectionRunner {
             throw new IllegalStateException("Schema version " + schemaVersion + " of " + type + " " + aggregateId
                     + " is newer than the supported " + PublishedRecord.CURRENT_SCHEMA_VERSION);
         }
-        applyProjection(projection, type, aggregateId, record);
+        AggregateSpec<?, ?> spec = specRegistry.specOf(type);
+        AggregateOrdering ordering = spec.ordering();
+        applyProjection(projection, type, ordering, aggregateId, record);
     }
 
     // Mongo down and a lasting conflict are retried; any other failure, any Error but a broken JVM, sends the record to the DLT.
-    private void applyProjection(Projection<?, ?> projection, String type, String aggregateId, PublishedRecord<?> record) {
+    private void applyProjection(Projection<?, ?> projection, String type, AggregateOrdering ordering, String aggregateId,
+                                 PublishedRecord<?> record) {
         String name = projection.name();
         Timer.Sample sample = metrics.start();
         try {
-            Outcome outcome = applyIfNotOlder(projection, type, aggregateId, record);
+            Outcome outcome = applyIfNotOlder(projection, type, ordering, aggregateId, record);
             recordOutcome(sample, name, outcome, aggregateId, record);
         } catch (OutOfMemoryError | InternalError | UnknownError brokenJvm) {
             throw brokenJvm;
@@ -74,12 +82,13 @@ public class ProjectionRunner {
         }
     }
 
-    private Outcome applyIfNotOlder(Projection<?, ?> projection, String type, String aggregateId, PublishedRecord<?> record) {
+    private Outcome applyIfNotOlder(Projection<?, ?> projection, String type, AggregateOrdering ordering, String aggregateId,
+                                    PublishedRecord<?> record) {
         for (int attempt = 1; ; attempt++) {
             try {
-                Outcome outcome = transactions.run(() -> applyInTransaction(projection, aggregateId, record));
+                Outcome outcome = transactions.run(() -> applyInTransaction(projection, ordering, aggregateId, record));
                 if (outcome == Outcome.HANDED_OVER) {
-                    return handOver(projection, type, aggregateId, record);
+                    return handOver(projection, type, ordering, aggregateId, record);
                 }
                 return outcome;
             } catch (OptimisticLockingFailureException | DuplicateKeyException conflict) {
@@ -104,15 +113,19 @@ public class ProjectionRunner {
     }
 
     // An older event is skipped and an equal one applied, so a backfill still repairs drift; the version is written first.
-    private Outcome applyInTransaction(Projection<?, ?> projection, String aggregateId, PublishedRecord<?> record) {
-        String name = projection.name();
+    // An UNORDERED type's events carry no version: each is applied and none is stored.
+    private Outcome applyInTransaction(Projection<?, ?> projection, AggregateOrdering ordering, String aggregateId,
+                                       PublishedRecord<?> record) {
         String tenantId = record.getTenantId();
-        long version = record.getVersion();
-        long storedVersion = versions.findStoredVersion(name, tenantId, aggregateId);
-        if (version < storedVersion) {
-            return Outcome.SKIPPED;
+        if (isVersioned(ordering)) {
+            String name = projection.name();
+            long version = record.getVersion();
+            long storedVersion = versions.findStoredVersion(name, tenantId, aggregateId);
+            if (version < storedVersion) {
+                return Outcome.SKIPPED;
+            }
+            versions.saveVersionIfHigher(name, tenantId, aggregateId, version);
         }
-        versions.saveVersionIfHigher(name, tenantId, aggregateId, version);
         // The version is kept after a delete, so a late older event is skipped.
         if (record.isDeleted()) {
             projection.applyDelete(tenantId, aggregateId);
@@ -160,16 +173,25 @@ public class ProjectionRunner {
     }
 
     // After the commit; a newer version stored meanwhile by another consumer keeps this older event from opening a task.
-    private Outcome handOver(Projection<?, ?> projection, String type, String aggregateId, PublishedRecord<?> record) {
+    private Outcome handOver(Projection<?, ?> projection, String type, AggregateOrdering ordering, String aggregateId,
+                             PublishedRecord<?> record) {
         String name = projection.name();
-        String tenantId = record.getTenantId();
-        long storedVersion = versions.findStoredVersion(name, tenantId, aggregateId);
-        if (record.getVersion() < storedVersion) {
+        if (isVersioned(ordering) && isOlderThanStored(name, aggregateId, record)) {
             return Outcome.SKIPPED;
         }
         ProjectionTaskService tasks = projectionTasks.getObject();
         tasks.submit(name, type, aggregateId, record);
         return Outcome.HANDED_OVER;
+    }
+
+    private boolean isOlderThanStored(String name, String aggregateId, PublishedRecord<?> record) {
+        String tenantId = record.getTenantId();
+        long storedVersion = versions.findStoredVersion(name, tenantId, aggregateId);
+        return record.getVersion() < storedVersion;
+    }
+
+    private static boolean isVersioned(AggregateOrdering ordering) {
+        return ordering == AggregateOrdering.VERSIONED;
     }
 
     private enum Outcome {

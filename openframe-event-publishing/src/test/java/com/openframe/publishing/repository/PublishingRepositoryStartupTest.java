@@ -6,6 +6,7 @@ import com.openframe.publishing.config.EventsAutoConfiguration;
 import com.openframe.publishing.config.EventsConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.config.OutboxIndexAutoConfiguration;
+import com.openframe.publishing.fixture.Widgets.UnorderedWidgetSpec;
 import com.openframe.publishing.fixture.Widgets.UnversionedWidget;
 import com.openframe.publishing.fixture.Widgets.UnversionedWidgetSpec;
 import com.openframe.publishing.fixture.Widgets.Widget;
@@ -151,6 +152,31 @@ class PublishingRepositoryStartupTest {
     }
 
     @Test
+    void anUnorderedSpecsDocumentWithoutVersion_starts() {
+        runner.withUserConfiguration(UnversionedWidgetRepositories.class)
+                .withBean(UnorderedWidgetSpec.class)
+                .run(context -> assertThat(context).hasNotFailed().hasSingleBean(UnversionedWidgetRepository.class));
+    }
+
+    @Test
+    void anUnorderedSpecsRepository_stillGetsTheInterceptor() {
+        runner.withUserConfiguration(UnversionedWidgetRepositories.class)
+                .withBean(UnorderedWidgetSpec.class)
+                .run(context -> {
+                    Object repository = context.getBean(UnversionedWidgetRepository.class);
+                    assertThat(repository).isInstanceOfSatisfying(Advised.class, advised -> assertThat(advised.getAdvisors())
+                            .anyMatch(advisor -> advisor.getAdvice() instanceof PublishingRepositoryInterceptor));
+                });
+    }
+
+    @Test
+    void anUnorderedSpecsRepository_isStillRefusedAnUpdateMethod() {
+        runner.withUserConfiguration(UnorderedUpdateMethodRepositories.class)
+                .withBean(UnorderedWidgetSpec.class)
+                .run(failsWith("@Update method"));
+    }
+
+    @Test
     void anUpdateMethod_stopsTheServiceFromStarting() {
         runner.withUserConfiguration(UpdateMethodRepositories.class)
                 .withBean(WidgetSpec.class)
@@ -219,6 +245,12 @@ class PublishingRepositoryStartupTest {
 
     @Configuration
     @EnableMongoRepositories(basePackageClasses = PublishingRepositoryStartupTest.class, considerNestedRepositories = true,
+            includeFilters = @Filter(type = FilterType.ASSIGNABLE_TYPE, classes = UnorderedUpdateMethodRepository.class))
+    static class UnorderedUpdateMethodRepositories {
+    }
+
+    @Configuration
+    @EnableMongoRepositories(basePackageClasses = PublishingRepositoryStartupTest.class, considerNestedRepositories = true,
             includeFilters = @Filter(type = FilterType.ASSIGNABLE_TYPE, classes = CountingDeleteRepository.class))
     static class CountingDeleteRepositories {
     }
@@ -242,6 +274,13 @@ class PublishingRepositoryStartupTest {
     }
 
     interface UpdateMethodRepository extends MongoRepository<Widget, String> {
+
+        @org.springframework.data.mongodb.repository.Query("{ '_id': ?0 }")
+        @Update("{ '$set': { 'name': ?1 } }")
+        long renameById(String id, String name);
+    }
+
+    interface UnorderedUpdateMethodRepository extends MongoRepository<UnversionedWidget, String> {
 
         @org.springframework.data.mongodb.repository.Query("{ '_id': ?0 }")
         @Update("{ '$set': { 'name': ?1 } }")

@@ -16,6 +16,9 @@ public class PublishedRecord<E extends PublishedEvent> {
     // What this build writes and can read; a consumer refuses a newer one.
     public static final int CURRENT_SCHEMA_VERSION = 1;
 
+    // The version of every event of an UNORDERED type, so the schema stays the same.
+    public static final long UNORDERED_VERSION = 0;
+
     private String tenantId;
     private long version;
     private boolean deleted;

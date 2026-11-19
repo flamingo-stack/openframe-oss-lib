@@ -57,7 +57,9 @@ transactions need one.
 
 Organization is the example; its files are in `openframe-data-mongo-sync`, next to `OrganizationRepository`.
 
-1. Give the document a `@Version Long version` field. The version orders the events for consumers.
+1. Give the document a `@Version Long version` field. The version orders the events for consumers. A type whose
+   every event is final, such as a hard delete of an id that is never reused, may instead override
+   `AggregateSpec.ordering()` to return `UNORDERED` (see [Unordered types](#unordered-types)).
 2. Write the event, only the public fields that consumers need. Never the Mongo document, never secrets:
 
    ```java
@@ -163,6 +165,21 @@ The outbox connector needs two settings for this (stage 5):
 **Rows for every write.** The interceptor does not compare with the stored document, so a save that changes only an
 unpublished field still writes its row. Consumers apply events by version, so extra rows do no harm.
 
+## Unordered types
+
+A spec is `VERSIONED` unless it overrides `ordering()`. An `UNORDERED` spec:
+
+- needs no `@Version` on its document; the startup check does not ask for one;
+- writes `version: 0` in every envelope, changed and delete rows alike, still followed by the tombstone row; a
+  `@Version` the document may have is ignored;
+- `republishByIds` raises no version (the rows alone repair the projections, which apply every event);
+- its consumers apply every event, read no stored version and store none, so its projections must be idempotent;
+- cannot be backfilled: a `backfill.runs` id for it stops the service. Reconciliation and projection tasks work as for
+  any type.
+
+Use it only when the order of a document's events does not matter, for example a tag that is hard-deleted and whose
+id is never reused. The envelope schema does not change (`schemaVersion: 1`).
+
 ## Custom writes
 
 A write outside the repository's base methods publishes itself. Each `OutboxPublisher` helper takes the write as a
@@ -206,7 +223,7 @@ These writes produce no outbox row, and nothing warns about them:
 | Problem | Fix |
 |---|---|
 | A published document class has more than one repository | Keep at most one repository per document class. A document with no repository in a service, such as tickets in the shared stream, is fine: that service logs INFO and publishes no writes of it. |
-| Its document has no `@Version` field | Add `@Version Long version`. |
+| Its document has no `@Version` field and its spec is `VERSIONED` | Add `@Version Long version`. |
 | It has no `PublishingRepositoryInterceptor` | The repository was created outside Spring Data's normal setup; let the auto-configuration create it. |
 | It has an `@Update` method | It returns no documents to publish; write a custom method with `publishChanged` or `publishChangedByIds`. |
 | A derived delete returns a count, `void` or `boolean` | Return the deleted documents, for example as a `List`. |
@@ -225,7 +242,7 @@ Collection `event_outbox`, document [`OutboxEvent`](src/main/java/com/openframe/
 | `aggregateType` | The type name, for example `organizations`. |
 | `aggregateId` | The document's `_id`; the Kafka key, once Debezium sends the rows. |
 | `tenantId` | The document's tenant, if it has one. |
-| `version` | The saved version, or the stored version + 1 for both delete rows. |
+| `version` | The saved version, or the stored version + 1 for both delete rows; `0` for an `UNORDERED` type. |
 | `deleted` | `true` for both delete rows. |
 | `schemaVersion` | `1`. |
 | `occurredAt` | When the row was written. |

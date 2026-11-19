@@ -48,6 +48,8 @@ events.organizations ──> ProjectionListener                one per projectio
   hand-over that keeps conflicting is retried like any conflict; any other failure sends the record to the DLT, and its
   replay passes the equal stored version. This makes the backfill race, a connector re-snapshot, a DLT replay and a group
   reset harmless.
+- An `UNORDERED` type (its spec's `ordering()`) has no versions: the runner applies every event, reads no stored
+  version and stores none, so its projections must be idempotent.
 - Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
   writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
   `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. Without that

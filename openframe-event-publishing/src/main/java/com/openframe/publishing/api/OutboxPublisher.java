@@ -1,6 +1,7 @@
 package com.openframe.publishing.api;
 
 import com.openframe.publishing.api.model.PublishedRecord;
+import com.openframe.publishing.api.spec.AggregateOrdering;
 import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.PublishedEvent;
 import com.openframe.publishing.config.PublishedAggregateTopics;
@@ -147,15 +148,15 @@ public class OutboxPublisher {
         return whenPublishing(spec, Map::of, () -> {
             List<?> current = findByIds(spec, ids);
             insertChangedRows(spec, current);
-            return versionsById(current);
+            return versionsById(spec, current);
         });
     }
 
-    private Map<String, Long> versionsById(List<?> documentsWritten) {
+    private Map<String, Long> versionsById(AggregateSpec<?, ?> spec, List<?> documentsWritten) {
         Map<String, Long> versions = new LinkedHashMap<>();
         for (Object document : documentsWritten) {
             String id = documents.idOf(document);
-            long version = documents.versionOf(document);
+            long version = changedVersionOf(spec, document);
             versions.put(id, version);
         }
         return versions;
@@ -176,7 +177,7 @@ public class OutboxPublisher {
         List<OutboxEvent> rows = new ArrayList<>();
         for (Object document : changed) {
             PublishedEvent event = eventOf(spec, document);
-            long version = documents.versionOf(document);
+            long version = changedVersionOf(spec, document);
             String tenantId = PublishedDocuments.tenantOf(document);
             Map<String, Object> payload = payloadOf(tenantId, version, false, event);
             OutboxEvent row = rowOf(spec, document).payload(payload).build();
@@ -189,7 +190,7 @@ public class OutboxPublisher {
     private void insertDeletedRows(AggregateSpec<?, ?> spec, Collection<?> deleted) {
         List<OutboxEvent> rows = new ArrayList<>();
         for (Object document : deleted) {
-            long version = documents.versionOf(document) + 1;
+            long version = deletedVersionOf(spec, document);
             String tenantId = PublishedDocuments.tenantOf(document);
             Map<String, Object> payload = payloadOf(tenantId, version, true, null);
             OutboxEvent deleteRow = rowOf(spec, document).payload(payload).build();
@@ -198,6 +199,24 @@ public class OutboxPublisher {
             rows.add(tombstoneRow);
         }
         insertRows(rows);
+    }
+
+    private long changedVersionOf(AggregateSpec<?, ?> spec, Object document) {
+        if (isUnordered(spec)) {
+            return PublishedRecord.UNORDERED_VERSION;
+        }
+        return documents.versionOf(document);
+    }
+
+    private long deletedVersionOf(AggregateSpec<?, ?> spec, Object document) {
+        if (isUnordered(spec)) {
+            return PublishedRecord.UNORDERED_VERSION;
+        }
+        return documents.versionOf(document) + 1;
+    }
+
+    private static boolean isUnordered(AggregateSpec<?, ?> spec) {
+        return spec.ordering() == AggregateOrdering.UNORDERED;
     }
 
     private static Map<String, Object> payloadOf(String tenantId, long version, boolean deleted, PublishedEvent event) {
@@ -241,8 +260,13 @@ public class OutboxPublisher {
         return spec.toEvent(document);
     }
 
+    // Skipped, not refused, for an UNORDERED type: its consumers apply every event, so the republished rows alone repair them.
     private void increaseVersions(AggregateSpec<?, ?> spec, Collection<?> ids) {
         if (ids.isEmpty()) {
+            return;
+        }
+        if (isUnordered(spec)) {
+            log.debug("{} is UNORDERED: republishing {} id(s) without raising a version", spec.getType(), ids.size());
             return;
         }
         Class<?> documentClass = PublishedDocuments.classOf(spec);

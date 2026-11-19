@@ -1,6 +1,7 @@
 package com.openframe.publishing.repository;
 
 import com.openframe.publishing.api.PublishedDocuments;
+import com.openframe.publishing.api.spec.AggregateOrdering;
 import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
@@ -33,7 +34,7 @@ import java.util.Set;
  *   <li>at most one repository per published document class; none is valid in a service that never writes the document,
  *       such as the shared stream without the tenant-aware {@code TicketRepository}; a subclass document, such as
  *       {@code AuthUser} of {@code User}, publishes with its parent's spec through its own repository;</li>
- *   <li>its document has a {@code @Version} field, because the version orders the events;</li>
+ *   <li>its document has a {@code @Version} field, because the version orders the events, unless its spec is UNORDERED;</li>
  *   <li>{@link PublishingRepositoryInterceptor} is inside the repository's proxy;</li>
  *   <li>it has no {@code @Update} method, which returns no documents to publish;</li>
  *   <li>no derived delete returns a count instead of the deleted documents;</li>
@@ -106,9 +107,12 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
     private void check(RepositoryFactoryInformation<?, ?> factory, RepositoryInformation information) {
         Class<?> repositoryInterface = information.getRepositoryInterface();
         EntityInformation<?, ?> entity = factory.getEntityInformation();
-        requireVersioned(entity, repositoryInterface);
-        requireInterceptor(factory, repositoryInterface);
         Class<?> domainType = information.getDomainType();
+        AggregateSpec<?, ?> spec = specRegistry.specOfDocument(domainType);
+        if (isVersioned(spec)) {
+            requireVersioned(entity, repositoryInterface);
+        }
+        requireInterceptor(factory, repositoryInterface);
         for (Method method : information.getQueryMethods()) {
             requirePublishableQueryMethod(method, domainType);
         }
@@ -122,6 +126,10 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
             }
         }
         log.debug("Publishing repository {} passed the startup checks", repositoryInterface.getName());
+    }
+
+    private static boolean isVersioned(AggregateSpec<?, ?> spec) {
+        return spec.ordering() == AggregateOrdering.VERSIONED;
     }
 
     // The version orders a document's events for consumers.
