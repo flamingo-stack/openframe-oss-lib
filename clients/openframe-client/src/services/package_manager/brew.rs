@@ -1,5 +1,7 @@
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::sync::{Mutex, OwnedMutexGuard};
 
 /// Apple silicon first, then Intel.
 pub(crate) const PATHS: [&str; 2] = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"];
@@ -41,6 +43,15 @@ pub(crate) fn script(body: &str) -> String {
     )
 }
 
+#[derive(Clone, Default)]
+pub(crate) struct BrewLock(Arc<Mutex<()>>);
+
+impl BrewLock {
+    pub(crate) async fn turn(&self) -> OwnedMutexGuard<()> {
+        self.0.clone().lock_owned().await
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct CaskInfo {
     pub(crate) casks: Vec<Cask>,
@@ -61,6 +72,7 @@ pub(crate) struct Cask {
     #[serde(default)]
     old_tokens: Vec<String>,
     pub(crate) installed: Option<String>,
+    pub(crate) version: Option<String>,
     #[serde(default)]
     artifacts: Vec<serde_json::Map<String, serde_json::Value>>,
 }

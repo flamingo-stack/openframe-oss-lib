@@ -79,6 +79,7 @@ use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::package_manager::adopt::PackageAdoptRunner;
+use crate::services::package_manager::brew::BrewLock;
 use crate::services::package_manager::package_update::{
     OrderStore, PackageUpdateRunManager, RestartSignals, StatusReporter,
 };
@@ -554,16 +555,17 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let brew_lock = BrewLock::default();
         let package_adopt_runner = Arc::new(PackageAdoptRunner::new(
             nats_message_publisher.clone(),
             result_store.clone(),
             flush_notify.clone(),
-            delivery_results.clone(),
             RestartSignals {
                 client_update: tool_run_manager.client_update_pending(),
                 agent_restart: agent_restart.view(),
             },
             package_upgrades.clone(),
+            brew_lock.clone(),
         ));
         let package_adopt = PackageAdopt {
             listener: CommandListener::new(
@@ -596,6 +598,7 @@ impl Client {
                 },
                 package_upgrades.clone(),
                 tool_run_manager.clone(),
+                brew_lock,
             );
             PackageUpdate { listener, manager }
         });

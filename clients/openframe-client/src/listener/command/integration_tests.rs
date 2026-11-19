@@ -31,6 +31,7 @@ use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::package_manager::adopt::PackageAdoptRunner;
+use crate::services::package_manager::brew::BrewLock;
 use crate::services::package_manager::package_update::{
     OrderStore, RestartSignals, StatusReporter,
 };
@@ -1336,16 +1337,12 @@ async fn launch_package_adopt(agent: &mut Agent) -> async_nats::Subscriber {
         agent.publisher.clone(),
         agent.store.clone(),
         agent.flush.clone(),
-        DeliveryResults::new(
-            agent.publisher.clone(),
-            agent.store.clone(),
-            agent.flush.clone(),
-        ),
         RestartSignals {
             client_update: agent.tool_run_manager.client_update_pending(),
             agent_restart: Latch::default().view(),
         },
         InProgress::default(),
+        BrewLock::default(),
     ));
     runner.start();
     agent.launch_command(PackageAdoptHandler::new(runner)).await;
@@ -1367,7 +1364,7 @@ fn adopt_order(dispatch_id: &str, request_id: &str) -> serde_json::Value {
 }
 
 #[tokio::test]
-async fn an_adopt_order_is_acked_then_answered_with_its_status_and_done() {
+async fn an_adopt_order_is_acked_then_answered_with_its_status_only() {
     let Some((mut agent, _gate)) = Agent::start().await else {
         return;
     };
@@ -1388,11 +1385,14 @@ async fn an_adopt_order_is_acked_then_answered_with_its_status_and_done() {
     assert_eq!(status["machineId"], MACHINE);
     assert_eq!(status["state"], "FAILED");
     assert_eq!(status["reason"], "NOT_SUPPORTED");
-    let done = agent.expect("a1", DeliveryResult::Done).await;
     agent.until_flushed().await;
-    assert_eq!(
-        agent.store.delivery_state("a1".to_string()).await.unwrap(),
-        Some(LedgerState::Settled(done))
+    agent.expect_silence("a1").await;
+    assert!(
+        matches!(
+            agent.store.delivery_state("a1".to_string()).await.unwrap(),
+            Some(LedgerState::Settled(ref kept)) if kept.result == DeliveryResult::Done
+        ),
+        "the handled order is kept for repeats"
     );
 
     agent.send_to(subject, adopt_order("a1", "req-1")).await;

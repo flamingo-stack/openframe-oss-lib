@@ -1,4 +1,4 @@
-use super::{AppIdentity, MainImages, Undetermined, RESOLVE_TIMEOUT_SECS};
+use super::{app_bundle, AppIdentity, Undetermined, RESOLVE_TIMEOUT_SECS};
 use crate::executor::{execute_script, Privilege, ScriptParams};
 use crate::services::package_manager::brew::{
     self, Cask, CaskApp, CaskInfo, APPLICATIONS, CASK_INFO,
@@ -48,27 +48,7 @@ fn identity(cask: &Cask, applications: &Path) -> Result<AppIdentity, Undetermine
         CaskApp::Unknown => return Err(Undetermined::NoInstallLocation),
     };
 
-    // Main images sit directly in Contents/MacOS; nested helper bundles never match.
-    let mut names: Vec<String> = std::fs::read_dir(install_dir.join("Contents").join("MacOS"))
-        .map(|entries| {
-            entries
-                .flatten()
-                .filter(|entry| entry.file_type().is_ok_and(|t| t.is_file()))
-                .map(|entry| entry.file_name().to_string_lossy().into_owned())
-                .collect()
-        })
-        .unwrap_or_default();
-    names.sort();
-
-    let main_images = if names.is_empty() {
-        MainImages::Unknown
-    } else {
-        MainImages::Derived(names)
-    };
-    Ok(AppIdentity::App {
-        install_dir,
-        main_images,
-    })
+    Ok(app_bundle(install_dir))
 }
 
 #[cfg(test)]

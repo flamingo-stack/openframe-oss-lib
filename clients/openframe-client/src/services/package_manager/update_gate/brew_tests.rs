@@ -1,4 +1,5 @@
 use super::*;
+use crate::services::package_manager::update_gate::MainImages;
 use std::path::PathBuf;
 
 /// Homebrew 7.0.9 cask info, trimmed; zoom's installed field set by hand, fork pre-target shape.

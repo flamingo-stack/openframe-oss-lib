@@ -1,4 +1,5 @@
 use super::*;
+use crate::platform::process_snapshot::RunningProcess;
 use plist::{Dictionary, Value};
 use serde_json::json;
 
@@ -169,5 +170,104 @@ fn an_install_counts_only_once_brew_manages_the_same_app() {
         let verified = verify(&cask, app, FIREFOX, AdoptOutcome::Reinstalled)
             .map_err(|refusal| refusal.reason);
         assert_eq!(verified, expected, "{case}");
+    }
+}
+
+fn app_with_version(dir: &Path, version: Option<&str>) -> PathBuf {
+    let app = dir.join("Firefox.app");
+    std::fs::create_dir_all(app.join("Contents").join("MacOS")).unwrap();
+    std::fs::write(app.join("Contents").join("MacOS").join("firefox"), b"").unwrap();
+    let mut info = Dictionary::new();
+    info.insert(
+        "CFBundleIdentifier".to_string(),
+        Value::String(FIREFOX.into()),
+    );
+    if let Some(version) = version {
+        info.insert(
+            "CFBundleShortVersionString".to_string(),
+            Value::String(version.into()),
+        );
+    }
+    Value::Dictionary(info)
+        .to_file_xml(app.join("Contents").join("Info.plist"))
+        .unwrap();
+    app
+}
+
+fn cask_at_version(version: Option<&str>) -> Cask {
+    serde_json::from_value(json!({
+        "token": "firefox",
+        "installed": null,
+        "version": version,
+        "artifacts": [{"app": ["Firefox.app"]}],
+    }))
+    .unwrap()
+}
+
+#[test]
+fn force_replaces_only_an_app_strictly_older_than_the_cask() {
+    let cases = [
+        (Some("1.0"), Some("2.0"), Ok(())),
+        (Some("1.2"), Some("1.2.1"), Ok(())),
+        (Some("4.51.1"), Some("4.52.0,210994"), Ok(())),
+        (Some("2.0"), Some("1.0"), Err(AdoptFailReason::NotOlder)),
+        (Some("1.2.0"), Some("1.2"), Err(AdoptFailReason::NotOlder)),
+        (
+            Some("1.0"),
+            Some("latest"),
+            Err(AdoptFailReason::VersionUnknown),
+        ),
+        (
+            Some("1.0b2"),
+            Some("1.0"),
+            Err(AdoptFailReason::VersionUnknown),
+        ),
+        (Some("1.0"), None, Err(AdoptFailReason::VersionUnknown)),
+        (None, Some("2.0"), Err(AdoptFailReason::VersionUnknown)),
+    ];
+
+    for (installed, available, expected) in cases {
+        let dir = tempfile::tempdir().unwrap();
+        let app = app_with_version(dir.path(), installed);
+        let allowed =
+            may_force(&cask_at_version(available), &app).map_err(|refusal| refusal.reason);
+        assert_eq!(allowed, expected, "{installed:?} over {available:?}");
+    }
+}
+
+#[test]
+fn force_waits_for_nobody_and_refuses_an_open_app() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = app_with_version(dir.path(), Some("1.0"));
+    let process = |image: PathBuf| RunningProcess {
+        pid: 42,
+        image,
+        parent_image: None,
+        is_service: false,
+        session: None,
+    };
+    let cases = [
+        (Ok(Vec::new()), Ok(())),
+        (
+            Ok(vec![process(PathBuf::from(
+                "/Applications/Other.app/Contents/MacOS/other",
+            ))]),
+            Ok(()),
+        ),
+        (
+            Ok(vec![process(
+                app.join("Contents").join("MacOS").join("firefox"),
+            )]),
+            Err(AdoptFailReason::AppRunning),
+        ),
+        (
+            Err(Undetermined::Snapshot("no process list".to_string())),
+            Err(AdoptFailReason::RunningUnknown),
+        ),
+    ];
+
+    for (processes, expected) in cases {
+        let allowed = not_running(&app, &processes).map_err(|refusal| refusal.reason);
+        assert_eq!(allowed, expected, "{processes:?}");
     }
 }

@@ -2,8 +2,12 @@ use std::path::{Path, PathBuf};
 
 use super::Refusal;
 use crate::models::{AdoptFailReason, AdoptOutcome};
-use crate::platform::app_bundle::bundle_id;
+use crate::platform::app_bundle::{bundle_id, short_version};
+use crate::platform::process_snapshot::RunningProcess;
 use crate::services::package_manager::brew::{Cask, CaskApp};
+use crate::services::package_manager::update_gate::{
+    self, BlockReason, GateDecision, Undetermined,
+};
 
 pub(super) enum Plan<'a> {
     AlreadyManaged,
@@ -78,6 +82,70 @@ pub(super) fn verify(
     }
     same_app(app, bundle_id)?;
     Ok(outcome)
+}
+
+pub(super) fn may_force(cask: &Cask, app: &Path) -> Result<(), Refusal> {
+    let installed = short_version(app)
+        .map_err(|e| Refusal::new(AdoptFailReason::VersionUnknown, format!("{e:#}")))?;
+    let available = cask.version.as_deref().unwrap_or_default();
+    match older(&installed, available) {
+        Some(true) => Ok(()),
+        Some(false) => Err(Refusal::new(
+            AdoptFailReason::NotOlder,
+            format!(
+                "the installed app is {installed}, not older than the cask's {available}; it was not reinstalled"
+            ),
+        )),
+        None => Err(Refusal::new(
+            AdoptFailReason::VersionUnknown,
+            format!(
+                "the installed {installed} cannot be compared with the cask's {available}; it was not reinstalled"
+            ),
+        )),
+    }
+}
+
+pub(super) fn not_running(
+    app: &Path,
+    processes: &Result<Vec<RunningProcess>, Undetermined>,
+) -> Result<(), Refusal> {
+    match update_gate::check(&Ok(update_gate::app_bundle(app.to_path_buf())), processes) {
+        GateDecision::Clear => Ok(()),
+        GateDecision::Blocked(BlockReason::Running { holders }) => {
+            let pids: Vec<String> = holders
+                .iter()
+                .map(|holder| holder.pid.to_string())
+                .collect();
+            Err(Refusal::new(
+                AdoptFailReason::AppRunning,
+                format!(
+                    "the app is open (pid {}); it was not reinstalled",
+                    pids.join(", ")
+                ),
+            ))
+        }
+        GateDecision::Blocked(BlockReason::Undetermined(reason)) => Err(Refusal::new(
+            AdoptFailReason::RunningUnknown,
+            format!("cannot tell whether the app is open: {reason}; it was not reinstalled"),
+        )),
+    }
+}
+
+fn older(installed: &str, cask: &str) -> Option<bool> {
+    let mut installed = dotted(installed)?;
+    let mut cask = dotted(cask.split(',').next()?)?;
+    let len = installed.len().max(cask.len());
+    installed.resize(len, 0);
+    cask.resize(len, 0);
+    Some(installed < cask)
+}
+
+fn dotted(version: &str) -> Option<Vec<u64>> {
+    version
+        .trim()
+        .split('.')
+        .map(|part| part.parse().ok())
+        .collect()
 }
 
 fn same_app(app: &Path, expected: &str) -> Result<(), Refusal> {
