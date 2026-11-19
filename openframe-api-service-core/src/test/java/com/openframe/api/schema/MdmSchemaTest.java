@@ -142,6 +142,21 @@ class MdmSchemaTest {
     }
 
     @Test
+    void revokeMdmEnrollmentLink_returnsTheLinkWithItsRevocationTime() {
+        // setup
+        GraphQLFieldDefinition mutation = schema.getMutationType().getFieldDefinition("revokeMdmEnrollmentLink");
+
+        // execution
+        String type = GraphQLTypeUtil.simplePrint(mutation.getType());
+        GraphQLType revokedAt = schema.getObjectType("MdmEnrollmentLink").getFieldDefinition("revokedAt").getType();
+
+        // verifications
+        assertThat(type).isEqualTo("MdmEnrollmentLink!");
+        assertThat(GraphQLTypeUtil.simplePrint(mutation.getArgument("id").getType())).isEqualTo("ID!");
+        assertThat(GraphQLTypeUtil.simplePrint(revokedAt)).isEqualTo("Instant");
+    }
+
+    @Test
     void mdmPlatforms_nonNullList() {
         // setup
         GraphQLFieldDefinition query = schema.getQueryType().getFieldDefinition("mdmPlatforms");

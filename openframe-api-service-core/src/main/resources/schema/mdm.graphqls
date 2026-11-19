@@ -1,7 +1,13 @@
 # Phones and tablets OpenFrame manages through MDM. Scripts, the shell and remote control do not run on them.
 extend enum OsType {
+    """A device's OS only. Script platforms (supportedPlatforms of scripts and script schedules) and the software
+    filter (osTypes) reject it."""
     IOS
+    """A device's OS only. Script platforms (supportedPlatforms of scripts and script schedules) and the software
+    filter (osTypes) reject it."""
     IPADOS
+    """A device's OS only. Script platforms (supportedPlatforms of scripts and script schedules) and the software
+    filter (osTypes) reject it."""
     ANDROID
 }
 
@@ -21,11 +27,17 @@ extend type Query {
 }
 
 extend type Mutation {
-    """Returns the active link of this organization and platform, or makes one that expires in 30 days."""
+    """Returns the active link of this organization and platform, or makes one with a new URL that expires in 30 days.
+    A link is active while it is neither expired nor revoked."""
     createMdmEnrollmentLink(input: CreateMdmEnrollmentLinkInput!): MdmEnrollmentLink!
 
-    """Moves the expiry 30 days from now. The URL stays the same; an expired link works again."""
+    """Moves the expiry 30 days from now. The URL stays the same; an expired link works again. Rejected for a revoked
+    link, and for an expired one when the organization already has another active link for the platform."""
     renewMdmEnrollmentLink(id: ID!): MdmEnrollmentLink!
+
+    """Stops the link for good, e.g. when the URL reached the wrong person: it enrolls nobody from now on and cannot be
+    renewed. Devices it already enrolled stay managed. createMdmEnrollmentLink then makes a link with a new URL."""
+    revokeMdmEnrollmentLink(id: ID!): MdmEnrollmentLink!
 
     """Emails the link to one person."""
     sendMdmEnrollmentLink(input: SendMdmEnrollmentLinkInput!): MdmEnrollmentLink!
@@ -75,6 +87,8 @@ type MdmEnrollmentLink {
     expiresAt: Instant!
     """An expired link enrolls nobody; devices it already enrolled stay managed."""
     expired: Boolean!
+    """Set once the link is revoked; a revoked link enrolls nobody and cannot be renewed."""
+    revokedAt: Instant
     enrolledDevices: Int!
     lastUsedAt: Instant
     lastSentTo: String
@@ -216,9 +230,10 @@ type MdmCustomCommand {
     updatedBy: String!
 }
 
-"""The payload must be a valid Apple MDM command plist. Rejected: EraseDevice, ClearPasscode, EnableLostMode,
-DisableLostMode, DeviceLocation, and RemoveProfile or RemoveApplication of what OpenFrame installed. Android custom
-commands are not accepted yet."""
+"""The payload must be a valid Apple MDM command plist whose RequestType is one of: DeviceInformation, SecurityInfo,
+InstalledApplicationList, ManagedApplicationList, ProfileList, CertificateList, ProvisioningProfileList, UserList,
+AvailableOSUpdates, OSUpdateStatus, ScheduleOSUpdateScan, ScheduleOSUpdate, Settings, RestartDevice, ShutDownDevice.
+Every other request type is rejected. Android custom commands are not accepted yet."""
 input CreateMdmCustomCommandInput {
     name: String!
     description: String
@@ -226,7 +241,8 @@ input CreateMdmCustomCommandInput {
     payload: String!
 }
 
-"""The platform is set when the command is made and cannot change."""
+"""The platform is set when the command is made and cannot change. The payload follows the rules of
+CreateMdmCustomCommandInput."""
 input UpdateMdmCustomCommandInput {
     id: ID!
     name: String!
