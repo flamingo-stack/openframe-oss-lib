@@ -83,7 +83,8 @@ export function DataTableGridHeader({
 
   if (scroll.mode === 'fixed') {
     return (
-      <div data-grid-header className={cn('sticky top-0 z-[3] w-max min-w-full', className)}>
+      // Over everything that scrolls under it, the rows' sub-rows included (the layers: `GRID_SUB_ROW_CLASS`).
+      <div data-grid-header className={cn('sticky top-0 z-[5] w-max min-w-full', className)}>
         {row}
       </div>
     );
