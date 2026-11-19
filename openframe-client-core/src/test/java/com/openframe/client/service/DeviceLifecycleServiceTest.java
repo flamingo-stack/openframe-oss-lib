@@ -9,6 +9,7 @@ import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
+import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
@@ -51,6 +52,7 @@ class DeviceLifecycleServiceTest {
     @Mock private ToolConnectionRepository toolConnectionRepository;
     @Mock private MachineWriter machineWriter;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private ToolOsSupportService toolOsSupportService;
 
     @Captor private ArgumentCaptor<Criteria> guardCaptor;
     @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
@@ -63,7 +65,7 @@ class DeviceLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, true);
+        service = new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, toolOsSupportService, true);
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setStatus(DeviceStatus.PENDING);
@@ -237,7 +239,7 @@ class DeviceLifecycleServiceTest {
     void promoteIfReady_flagOffSeenAndBothToolsConnected_noop() {
         // setup
         DeviceLifecycleService managedStatusOff =
-                new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, false);
+                new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, toolOsSupportService, false);
 
         // execution
         managedStatusOff.promoteIfReady(MACHINE_ID);

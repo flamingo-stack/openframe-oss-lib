@@ -20,6 +20,7 @@ import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
+import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
@@ -153,7 +154,7 @@ class FleetRegistrationRecoveryIT {
         FleetHostFactsWriter facts = new FleetHostFactsWriter(machines, writer);
         FleetMdmAgentIdTransformer transformer = new FleetMdmAgentIdTransformer(clients, facts);
         events = mock(ApplicationEventPublisher.class);
-        DeviceLifecycleService lifecycle = new DeviceLifecycleService(machines, connections, writer, events, true);
+        DeviceLifecycleService lifecycle = new DeviceLifecycleService(machines, connections, writer, events, mock(ToolOsSupportService.class), true);
         service = new ToolConnectionService(connections, machines,
                 new ToolAgentIdTransformerService(List.of(transformer)), lifecycle);
         THREADS.add(Thread.currentThread().getName());
