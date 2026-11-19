@@ -91,6 +91,8 @@ export * from './ai-enrich';
 export * from './approval-level';
 export * from './policy-configuration-panel';
 export * from './policies';
+// What a host's own grid table shares with the feature tables: the bare action button, the two-lines-on-one cell.
+export * from './feature-table-grid-cells';
 export * from './cloud-tenants';
 export * from './waitlist-form';
 export * from './notifications';
