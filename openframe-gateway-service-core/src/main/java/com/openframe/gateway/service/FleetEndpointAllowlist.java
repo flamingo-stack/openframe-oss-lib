@@ -5,6 +5,8 @@ import com.openframe.gateway.config.prop.FleetMultiTenancyProperties;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * Global endpoint allowlist for the Fleet MDM browser proxy ({@code /tools/fleetmdm-server/**}).
  *
@@ -37,8 +39,9 @@ public class FleetEndpointAllowlist {
     private final FleetEndpointMatcher fleetEndpoints;
 
     public FleetEndpointAllowlist(FleetMultiTenancyProperties properties) {
+        List<String> configuredEndpoints = properties.getAllowedEndpoints();
         this.multiTenancyEnabled = properties.isEnabled();
-        this.fleetEndpoints = new FleetEndpointMatcher(properties.getAllowedEndpoints());
+        this.fleetEndpoints = new FleetEndpointMatcher(configuredEndpoints);
     }
 
     /**

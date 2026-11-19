@@ -10,7 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -20,23 +22,25 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public class FleetProxyGuard {
 
     private static final Set<String> DOT_SEGMENTS = Set.of(".", "..");
+    private static final Set<String> SEPARATORS = Set.of("/", "\\");
 
     private final boolean multiTenancyEnabled;
     private final FleetEndpointMatcher allowedEndpoints;
     private final TenantIdProvider tenantIdProvider;
 
     public FleetProxyGuard(FleetProxyProperties properties, TenantIdProvider tenantIdProvider) {
+        List<String> configuredEndpoints = properties.getAllowedEndpoints();
         this.multiTenancyEnabled = properties.isEnabled();
-        this.allowedEndpoints = new FleetEndpointMatcher(properties.getAllowedEndpoints());
+        this.allowedEndpoints = new FleetEndpointMatcher(configuredEndpoints);
         this.tenantIdProvider = tenantIdProvider;
     }
 
-    public boolean appliesTo(String toolId) {
-        return multiTenancyEnabled && FleetEndpointMatcher.FLEET_TOOL_ID.equals(toolId);
+    public boolean shouldGuard(String toolId) {
+        return multiTenancyEnabled && isFleet(toolId);
     }
 
     public void requireAllowed(String method, String toolPath) {
-        if (!hasPlainSegmentsOnly(toolPath) || !allowedEndpoints.matches(HttpMethod.valueOf(method), toolPath)) {
+        if (!isAllowed(method, toolPath)) {
             log.warn("Fleet endpoint not allowed for API keys: {} {}", method, toolPath);
             throw new ForbiddenException(ErrorCode.ENDPOINT_NOT_ALLOWED,
                     "Fleet endpoint not allowed: " + method + " " + toolPath);
@@ -51,8 +55,21 @@ public class FleetProxyGuard {
         return tenantId;
     }
 
+    private boolean isAllowed(String method, String toolPath) {
+        if (!hasPlainSegmentsOnly(toolPath)) {
+            return false;
+        }
+        HttpMethod httpMethod = HttpMethod.valueOf(method);
+        return allowedEndpoints.matches(httpMethod, toolPath);
+    }
+
+    private static boolean isFleet(String toolId) {
+        return FleetEndpointMatcher.FLEET_TOOL_ID.equals(toolId);
+    }
+
     private static boolean hasPlainSegmentsOnly(String toolPath) {
-        return PathContainer.parsePath(toolPath).elements().stream()
+        PathContainer container = PathContainer.parsePath(toolPath);
+        return container.elements().stream()
                 .filter(PathContainer.PathSegment.class::isInstance)
                 .map(PathContainer.PathSegment.class::cast)
                 .allMatch(FleetProxyGuard::isPlainSegment);
@@ -60,9 +77,15 @@ public class FleetProxyGuard {
 
     private static boolean isPlainSegment(PathContainer.PathSegment segment) {
         String value = segment.valueToMatch();
-        return !DOT_SEGMENTS.contains(value)
-                && !value.contains("/")
-                && !value.contains("\\")
-                && segment.parameters().isEmpty();
+        MultiValueMap<String, String> parameters = segment.parameters();
+        return !isDotSegment(value) && !hasSeparator(value) && parameters.isEmpty();
+    }
+
+    private static boolean isDotSegment(String value) {
+        return DOT_SEGMENTS.contains(value);
+    }
+
+    private static boolean hasSeparator(String value) {
+        return SEPARATORS.stream().anyMatch(value::contains);
     }
 }

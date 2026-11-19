@@ -12,22 +12,17 @@ import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.ToolUrlService;
 import com.openframe.external.exception.ToolProxyException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.ConnectTimeoutException;
 import org.apache.hc.client5.http.classic.methods.*;
-import org.apache.hc.client5.http.config.ConnectionConfig;
-import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.Method;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
-import org.apache.hc.core5.util.Timeout;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -36,7 +31,6 @@ import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -47,42 +41,18 @@ import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class RestProxyService {
 
     private static final String MASKED_VALUE = "****";
-
-    static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
-    static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(25);
-    static final Duration CONNECTION_REQUEST_TIMEOUT = Duration.ofSeconds(3);
-    static final int MAX_CONNECTIONS_PER_ROUTE = 20;
     private static final String TOOLS_PREFIX = "/tools";
+    private static final String PATH_SEPARATOR = "/";
 
     private final IntegratedToolRepository toolRepository;
     private final ProxyUrlResolver proxyUrlResolver;
     private final ToolUrlService toolUrlService;
     private final FleetProxyGuard fleetProxyGuard;
-    private final CloseableHttpClient httpClient;
-
-    @Autowired
-    public RestProxyService(IntegratedToolRepository toolRepository,
-                           ProxyUrlResolver proxyUrlResolver,
-                           ToolUrlService toolUrlService,
-                           FleetProxyGuard fleetProxyGuard) {
-        this(toolRepository, proxyUrlResolver, toolUrlService, fleetProxyGuard, CONNECT_TIMEOUT, RESPONSE_TIMEOUT);
-    }
-
-    RestProxyService(IntegratedToolRepository toolRepository,
-                     ProxyUrlResolver proxyUrlResolver,
-                     ToolUrlService toolUrlService,
-                     FleetProxyGuard fleetProxyGuard,
-                     Duration connectTimeout,
-                     Duration responseTimeout) {
-        this.toolRepository = toolRepository;
-        this.proxyUrlResolver = proxyUrlResolver;
-        this.toolUrlService = toolUrlService;
-        this.fleetProxyGuard = fleetProxyGuard;
-        this.httpClient = createHttpClient(connectTimeout, responseTimeout);
-    }
+    private final CloseableHttpClient toolProxyHttpClient;
 
     public ResponseEntity<String> proxyApiRequest(String toolId, HttpServletRequest request, String body) {
         log.info("Received proxy request for tool: {}, method: {}, path: {}", toolId, request.getMethod(), request.getRequestURI());
@@ -120,7 +90,9 @@ public class RestProxyService {
             ToolUrl toolUrl = optionalToolUrl.get();
             log.info("Tool URL: {}", toolUrl.getUrl());
 
-            targetUri = proxyUrlResolver.resolvePreservingEncoding(toolId, toolUrl.getUrl(), toolUrl.getPort(), originalUri, TOOLS_PREFIX);
+            String url = toolUrl.getUrl();
+            String port = toolUrl.getPort();
+            targetUri = proxyUrlResolver.resolvePreservingEncoding(toolId, url, port, originalUri, TOOLS_PREFIX);
             log.info("Target URI resolved to: {}", targetUri);
         } catch (URISyntaxException e) {
             log.error("Invalid URI syntax for tool: {}", toolId, e);
@@ -132,22 +104,30 @@ public class RestProxyService {
 
         Map<String, String> headers = buildApiRequestHeaders(tool);
         fleetTenantId.ifPresent(tenantId -> headers.put(X_TENANT_ID, tenantId));
-        return proxy(tool, targetUri, request.getMethod(), headers, body);
+        String method = request.getMethod();
+        return proxy(tool, targetUri, method, headers, body);
     }
 
     private Optional<String> fleetTenantId(String toolId, HttpServletRequest request) {
-        if (!fleetProxyGuard.appliesTo(toolId)) {
+        if (!fleetProxyGuard.shouldGuard(toolId)) {
             return Optional.empty();
         }
-        fleetProxyGuard.requireAllowed(request.getMethod(), toolPath(toolId, request.getRequestURI()));
-        return Optional.of(fleetProxyGuard.tenantId());
+        String method = request.getMethod();
+        String requestUri = request.getRequestURI();
+        String path = toolPath(toolId, requestUri);
+        fleetProxyGuard.requireAllowed(method, path);
+        String tenantId = fleetProxyGuard.tenantId();
+        return Optional.of(tenantId);
     }
 
     private static String toolPath(String toolId, String requestUri) {
-        String toolRoot = TOOLS_PREFIX + "/" + toolId;
-        int start = requestUri.indexOf(toolRoot);
-        String path = start < 0 ? requestUri : requestUri.substring(start + toolRoot.length());
-        return path.isEmpty() ? "/" : path;
+        String toolRoot = TOOLS_PREFIX + PATH_SEPARATOR + toolId;
+        int toolRootStart = requestUri.indexOf(toolRoot);
+        if (toolRootStart < 0) {
+            return requestUri;
+        }
+        int pathStart = toolRootStart + toolRoot.length();
+        return requestUri.substring(pathStart);
     }
 
     Map<String, String> buildApiRequestHeaders(IntegratedTool tool) {
@@ -168,7 +148,8 @@ public class RestProxyService {
     private ResponseEntity<String> proxy(IntegratedTool tool, URI targetUri, String method, 
                                        Map<String, String> proxyHeaders, String body) {
         log.info("Starting proxy request to {} - method: {}, URI: {}", tool.getName(), method, targetUri);
-        
+        String toolKey = tool.getKey();
+
         try {
             HttpUriRequestBase httpRequest = createHttpRequest(method, targetUri);
             log.debug("Created HTTP request: {} {}", method, targetUri);
@@ -186,7 +167,7 @@ public class RestProxyService {
             
             log.info("Executing HTTP request to {}", targetUri);
 
-            return httpClient.execute(httpRequest, response -> {
+            return toolProxyHttpClient.execute(httpRequest, response -> {
                 int statusCode = response.getCode();
                 HttpEntity entity = response.getEntity();
                 String responseBody = entity != null ? EntityUtils.toString(entity) : "";
@@ -197,23 +178,24 @@ public class RestProxyService {
                 ResponseEntity.BodyBuilder builder = ResponseEntity.status(statusCode);
                 Header contentType = response.getFirstHeader(CONTENT_TYPE);
                 if (contentType != null) {
-                    builder.header(CONTENT_TYPE, contentType.getValue());
+                    String contentTypeValue = contentType.getValue();
+                    builder.header(CONTENT_TYPE, contentTypeValue);
                 }
                 return builder.body(responseBody);
             });
             
         } catch (ConnectTimeoutException e) {
             log.error("Timed out connecting to {} at {}: {}", tool.getName(), targetUri, e.getMessage(), e);
-            throw ToolProxyException.unreachable(tool.getKey(), e);
+            throw ToolProxyException.unreachable(toolKey, e);
         } catch (SocketTimeoutException e) {
             log.error("Timed out waiting for {} at {}: {}", tool.getName(), targetUri, e.getMessage(), e);
-            throw ToolProxyException.timeout(tool.getKey(), e);
+            throw ToolProxyException.timeout(toolKey, e);
         } catch (IOException e) {
             log.error("IOException while proxying request to {} at {}: {}", tool.getName(), targetUri, e.getMessage(), e);
-            throw ToolProxyException.unreachable(tool.getKey(), e);
+            throw ToolProxyException.unreachable(toolKey, e);
         } catch (Exception e) {
             log.error("Unexpected error proxying request to {} at {}: {}", tool.getName(), targetUri, e.getMessage(), e);
-            throw new InternalException("Failed to proxy the request to tool " + tool.getKey());
+            throw new InternalException("Failed to proxy the request to tool " + toolKey);
         }
     }
 
@@ -258,23 +240,5 @@ public class RestProxyService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unsupported HTTP method: " + method, e);
         }
-    }
-
-    private static CloseableHttpClient createHttpClient(Duration connectTimeout, Duration responseTimeout) {
-        RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectionRequestTimeout(Timeout.of(CONNECTION_REQUEST_TIMEOUT))
-                .setResponseTimeout(Timeout.of(responseTimeout))
-                .build();
-        ConnectionConfig connectionConfig = ConnectionConfig.custom()
-                .setConnectTimeout(Timeout.of(connectTimeout))
-                .build();
-
-        return HttpClients.custom()
-                .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
-                        .setDefaultConnectionConfig(connectionConfig)
-                        .setMaxConnPerRoute(MAX_CONNECTIONS_PER_ROUTE)
-                        .build())
-                .setDefaultRequestConfig(requestConfig)
-                .build();
     }
 } 

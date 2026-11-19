@@ -12,8 +12,10 @@ import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.ToolUrlService;
+import com.openframe.external.config.ToolProxyHttpClientConfig;
 import com.openframe.external.exception.ToolProxyException;
 import com.sun.net.httpserver.Headers;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -85,7 +87,8 @@ class RestProxyServiceTest {
 
     @BeforeEach
     void createService() {
-        service = new RestProxyService(toolRepository, proxyUrlResolver, toolUrlService, fleetProxyGuard);
+        CloseableHttpClient httpClient = new ToolProxyHttpClientConfig().toolProxyHttpClient();
+        service = new RestProxyService(toolRepository, proxyUrlResolver, toolUrlService, fleetProxyGuard, httpClient);
     }
 
     @AfterEach
@@ -444,7 +447,9 @@ class RestProxyServiceTest {
         when(toolRepository.findByKey(TOOL_ID)).thenReturn(Optional.of(tool));
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("test");
-        return new RestProxyService(toolRepository, new ProxyUrlResolver(environment), new ToolUrlService(), fleetProxyGuard);
+        ProxyUrlResolver resolver = new ProxyUrlResolver(environment);
+        CloseableHttpClient httpClient = new ToolProxyHttpClientConfig().toolProxyHttpClient();
+        return new RestProxyService(toolRepository, resolver, new ToolUrlService(), fleetProxyGuard, httpClient);
     }
 
     private void startUpstream(int status, String responseBody) throws IOException {

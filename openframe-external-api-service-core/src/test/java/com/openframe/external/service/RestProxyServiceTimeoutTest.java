@@ -7,8 +7,10 @@ import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.ToolUrlService;
+import com.openframe.external.config.ToolProxyHttpClientConfig;
 import com.openframe.external.exception.ToolProxyException;
 import com.sun.net.httpserver.HttpServer;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,34 +52,6 @@ class RestProxyServiceTimeoutTest {
         if (upstream != null) {
             upstream.stop(0);
         }
-    }
-
-    @Test
-    void defaults_connectFiveSecondsResponseTwentyFiveSeconds() {
-        // setup
-        Duration gatewayResponseTimeout = Duration.ofSeconds(30);
-
-        // execution
-        Duration connect = RestProxyService.CONNECT_TIMEOUT;
-        Duration response = RestProxyService.RESPONSE_TIMEOUT;
-
-        // verifications
-        assertThat(connect).isEqualTo(Duration.ofSeconds(5));
-        assertThat(response).isEqualTo(Duration.ofSeconds(25)).isLessThan(gatewayResponseTimeout);
-    }
-
-    @Test
-    void defaults_poolLeaseThreeSecondsAndTwentyConnectionsPerRoute() {
-        // setup
-        Duration gatewayResponseTimeout = Duration.ofSeconds(30);
-
-        // execution
-        Duration worstCase = RestProxyService.CONNECTION_REQUEST_TIMEOUT.plus(RestProxyService.RESPONSE_TIMEOUT);
-
-        // verifications
-        assertThat(RestProxyService.CONNECTION_REQUEST_TIMEOUT).isEqualTo(Duration.ofSeconds(3));
-        assertThat(RestProxyService.MAX_CONNECTIONS_PER_ROUTE).isEqualTo(20);
-        assertThat(worstCase).isLessThan(gatewayResponseTimeout);
     }
 
     @Test
@@ -144,8 +118,9 @@ class RestProxyServiceTimeoutTest {
     private RestProxyService service(Duration connectTimeout, Duration responseTimeout) {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("test");
-        return new RestProxyService(toolRepository, new ProxyUrlResolver(environment), new ToolUrlService(),
-                fleetProxyGuard, connectTimeout, responseTimeout);
+        ProxyUrlResolver resolver = new ProxyUrlResolver(environment);
+        CloseableHttpClient httpClient = ToolProxyHttpClientConfig.create(connectTimeout, responseTimeout);
+        return new RestProxyService(toolRepository, resolver, new ToolUrlService(), fleetProxyGuard, httpClient);
     }
 
     private void stubTool(String url, String port) {

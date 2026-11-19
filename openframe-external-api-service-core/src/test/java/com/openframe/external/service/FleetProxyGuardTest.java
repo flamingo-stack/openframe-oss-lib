@@ -37,51 +37,51 @@ class FleetProxyGuardTest {
     private TenantIdProvider tenantIdProvider;
 
     @Test
-    void appliesTo_fleetToolAndEnabled_true() {
+    void shouldGuard_fleetToolAndEnabled_true() {
         // setup
         FleetProxyGuard guard = guard(true, ALLOWED);
 
         // execution
-        boolean applies = guard.appliesTo(FLEET);
+        boolean shouldGuard = guard.shouldGuard(FLEET);
 
         // verifications
-        assertThat(applies).isTrue();
+        assertThat(shouldGuard).isTrue();
     }
 
     @Test
-    void appliesTo_otherTool_false() {
+    void shouldGuard_otherTool_false() {
         // setup
         FleetProxyGuard guard = guard(true, ALLOWED);
 
         // execution
-        boolean applies = guard.appliesTo("tactical-rmm");
+        boolean shouldGuard = guard.shouldGuard("tactical-rmm");
 
         // verifications
-        assertThat(applies).isFalse();
+        assertThat(shouldGuard).isFalse();
     }
 
     @Test
-    void appliesTo_multiTenancyDisabled_false() {
+    void shouldGuard_multiTenancyDisabled_false() {
         // setup
         FleetProxyGuard guard = guard(false, ALLOWED);
 
         // execution
-        boolean applies = guard.appliesTo(FLEET);
+        boolean shouldGuard = guard.shouldGuard(FLEET);
 
         // verifications
-        assertThat(applies).isFalse();
+        assertThat(shouldGuard).isFalse();
     }
 
     @Test
-    void appliesTo_defaultProperties_false() {
+    void shouldGuard_defaultProperties_false() {
         // setup
         FleetProxyGuard guard = new FleetProxyGuard(new FleetProxyProperties(), tenantIdProvider);
 
         // execution
-        boolean applies = guard.appliesTo(FLEET);
+        boolean shouldGuard = guard.shouldGuard(FLEET);
 
         // verifications
-        assertThat(applies).isFalse();
+        assertThat(shouldGuard).isFalse();
     }
 
     @ParameterizedTest
@@ -137,7 +137,11 @@ class FleetProxyGuardTest {
             "/api/v1/fleet/hosts/./software",
             "/api/v1/fleet/hosts/1%2F..%2Fqueries/software",
             "/api/v1/fleet/hosts/1%5C..%5Cqueries/software",
-            "/api/v1/fleet/hosts/42;x=1/software"
+            "/api/v1/fleet/hosts/42;x=1/software",
+            "/api/v1/fleet/hosts/identifier/..",
+            "/api/v1/fleet/hosts/identifier/.",
+            "/api/v1/fleet/hosts/identifier/a%2F..%2F..%2Fsoftware",
+            "/api/v1/fleet/hosts/identifier/a%5C..%5Csoftware"
     })
     void requireAllowed_dotOrEncodedSeparatorSegment_throwsEndpointNotAllowed(String toolPath) {
         // setup

@@ -15,8 +15,10 @@ import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.ToolUrlService;
 import com.openframe.external.config.FleetProxyProperties;
+import com.openframe.external.config.ToolProxyHttpClientConfig;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -161,6 +163,7 @@ class RestProxyServiceFleetTest {
 
         // verifications
         assertEndpointNotAllowed(thrown);
+        assertThat(thrown).hasMessageContaining("GET /tools/fleetmdm%2Dserver/api/v1/fleet/queries");
         verifyNoInteractions(toolRepository);
     }
 
@@ -279,8 +282,10 @@ class RestProxyServiceFleetTest {
         properties.setAllowedEndpoints(ALLOWED);
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("test");
-        return new RestProxyService(toolRepository, new ProxyUrlResolver(environment), new ToolUrlService(),
-                new FleetProxyGuard(properties, tenantIdProvider));
+        ProxyUrlResolver resolver = new ProxyUrlResolver(environment);
+        FleetProxyGuard guard = new FleetProxyGuard(properties, tenantIdProvider);
+        CloseableHttpClient httpClient = new ToolProxyHttpClientConfig().toolProxyHttpClient();
+        return new RestProxyService(toolRepository, resolver, new ToolUrlService(), guard, httpClient);
     }
 
     private void stubFleetTool() {
