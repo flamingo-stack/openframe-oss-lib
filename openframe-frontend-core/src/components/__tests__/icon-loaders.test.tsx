@@ -11,7 +11,7 @@ import {
 } from '../../../scripts/generate-icon-loaders.mjs';
 import { AVAILABLE_SVG_ICONS } from '../../types/announcement';
 import { findIcon, ICON_OPTIONS, resolveIcon } from '../chat/utils/icon-library';
-import { normalizeIconKey, registryIcon } from '../chat/utils/icon-registry';
+import { ICON_REGISTRY, normalizeIconKey } from '../chat/utils/icon-refs';
 import { ICON_LOADERS } from '../icons-v2-generated/icon-loaders';
 import { ICON_SET_NAMES, LUCIDE_ICON_NAMES } from '../icons-v2-generated/icon-names';
 
@@ -103,7 +103,8 @@ describe('an icon resolved by name from the set', () => {
       'XLogo',
       'YouTubeIcon',
     ];
-    for (const name of stored) expect(registryIcon(normalizeIconKey(name)), name).toBeDefined();
+    for (const name of stored)
+      expect(Object.prototype.hasOwnProperty.call(ICON_REGISTRY, normalizeIconKey(name)), name).toBe(true);
   });
 
   it('is not found for a name the set does not hold', () => {
