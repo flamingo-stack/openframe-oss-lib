@@ -6,6 +6,7 @@ import io.nats.client.api.StreamConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,6 +27,7 @@ class NatsStreamConfigurationInitializerTest {
 
     @Mock private NatsStreamManagementService streams;
     @Mock private AdditionalStreamConfigurationProvider additional;
+    @Captor private ArgumentCaptor<StreamConfiguration> streamCaptor;
     @InjectMocks private NatsStreamConfigurationInitializer initializer;
 
     @Test
@@ -56,5 +58,21 @@ class NatsStreamConfigurationInitializerTest {
 
         // verifications
         verify(streams).deleteIfExists("TOOL_UPDATE");
+    }
+
+    @Test
+    void run_machineOsInfoStream_savedWithOsInfoSubject() {
+        // setup
+        when(additional.provide()).thenReturn(List.of());
+
+        // execution
+        initializer.run(null);
+
+        // verifications
+        verify(streams, atLeastOnce()).save(streamCaptor.capture());
+        assertThat(streamCaptor.getAllValues())
+                .filteredOn(configuration -> "MACHINE_OS_INFO".equals(configuration.getName()))
+                .extracting(StreamConfiguration::getSubjects)
+                .containsExactly(List.of("machine.*.os-info"));
     }
 }

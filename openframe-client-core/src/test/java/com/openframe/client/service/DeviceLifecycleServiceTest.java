@@ -29,8 +29,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -246,6 +248,54 @@ class DeviceLifecycleServiceTest {
 
         // verifications
         verifyNoInteractions(machineRepository, toolConnectionRepository, machineWriter, eventPublisher);
+    }
+
+    @Test
+    void promoteIfReady_fleetUnsupportedOnThisOs_promotedWithOnlyMeshConnected() {
+        // setup
+        stubMachineFound();
+        when(toolOsSupportService.unsupportedToolTypes(machine)).thenReturn(EnumSet.of(ToolType.FLEET_MDM));
+        when(toolConnectionRepository.findByMachineIdAndToolTypeInAndStatus(
+                MACHINE_ID, EnumSet.of(ToolType.MESHCENTRAL), ConnectionStatus.CONNECTED))
+                .thenReturn(List.of(mesh("mesh-node")));
+        stubWriteWins();
+
+        // execution
+        service.promoteIfReady(MACHINE_ID);
+
+        // verifications
+        verify(machineWriter).update(eq(MACHINE_ID), any(Criteria.class), any(MachineUpdate.class));
+        verify(eventPublisher).publishEvent(any(DeviceFirstConnectedEvent.class));
+    }
+
+    @Test
+    void promoteIfReady_everyToolSupportedAndOnlyMeshConnected_noop() {
+        // setup
+        stubMachineFound();
+        when(toolOsSupportService.unsupportedToolTypes(machine)).thenReturn(Set.of());
+        stubRequiredTools(mesh("mesh-node"));
+
+        // execution
+        service.promoteIfReady(MACHINE_ID);
+
+        // verifications
+        verifyNoInteractions(machineWriter, eventPublisher);
+    }
+
+    @Test
+    void promoteIfReady_fleetUnsupportedAndMeshNotConnected_noop() {
+        // setup
+        stubMachineFound();
+        when(toolOsSupportService.unsupportedToolTypes(machine)).thenReturn(EnumSet.of(ToolType.FLEET_MDM));
+        when(toolConnectionRepository.findByMachineIdAndToolTypeInAndStatus(
+                MACHINE_ID, EnumSet.of(ToolType.MESHCENTRAL), ConnectionStatus.CONNECTED))
+                .thenReturn(List.of());
+
+        // execution
+        service.promoteIfReady(MACHINE_ID);
+
+        // verifications
+        verifyNoInteractions(machineWriter, eventPublisher);
     }
 
     private void stubMachineFound() {
