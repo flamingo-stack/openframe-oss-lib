@@ -98,6 +98,7 @@ class DeliveryRolloutServiceTest {
         doReturn(spec).when(registry).require(DeliveryType.CLIENT_UPDATE);
         doReturn(DELIVERABLE).when(spec).getDeliverableStatuses();
         lenient().doReturn(TestPayload.class).when(spec).getPayloadClass();
+        lenient().doReturn(true).when(spec).admits(any(), any());
         lenient().when(floors.of(DeliveryType.CLIENT_UPDATE)).thenReturn(AgentVersionFloor.EVERY_VERSION);
     }
 
