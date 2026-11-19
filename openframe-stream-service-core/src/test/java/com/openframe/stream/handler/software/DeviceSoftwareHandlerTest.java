@@ -8,6 +8,7 @@ import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
 import com.openframe.stream.handler.software.FleetHostResolver.FleetHostRef;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -15,7 +16,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.JsonNode;
@@ -42,6 +42,7 @@ class DeviceSoftwareHandlerTest {
     private static final long COMMIT_TS = 1_793_700_000_000L;
     private static final String GTID_1 = "3e11fa47-71ca-11e1-9e33-c80aa9429562:101";
     private static final String GTID_2 = "3e11fa47-71ca-11e1-9e33-c80aa9429562:102";
+    private static final long SKIPPED_HOST = 4806L;
 
     @Mock private FleetHostResolver fleetHostResolver;
     @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -50,7 +51,13 @@ class DeviceSoftwareHandlerTest {
 
     @Captor private ArgumentCaptor<List<DeviceSoftware>> savedCaptor;
 
-    @InjectMocks private DeviceSoftwareHandler handler;
+    private DeviceSoftwareHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        handler = new DeviceSoftwareHandler(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository,
+                projectionTrigger, Set.of(SKIPPED_HOST));
+    }
 
     private DeserializedDebeziumMessage msg(String op, JsonNode before, JsonNode after) {
         return msgAt(op, before, after, COMMIT_TS);
@@ -125,6 +132,22 @@ class DeviceSoftwareHandlerTest {
         m.setPayload(null);
         handler.handle(m, null);
         verifyNoInteractions(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"c", "u", "d", "r"})
+    void handle_eventOfASkippedHost_isDroppedBeforeAnyLookup(String op) {
+        // setup
+        ObjectNode row = row().put("host_id", SKIPPED_HOST).put("software_id", 7);
+        JsonNode before = "c".equals(op) || "r".equals(op) ? null : row;
+        JsonNode after = "d".equals(op) ? null : row;
+        DeserializedDebeziumMessage message = msgIn(op, before, after, COMMIT_TS, GTID_1);
+
+        // execution
+        handler.handle(message, null);
+
+        // verifications
+        verifyNoInteractions(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository, projectionTrigger);
     }
 
     @Test
