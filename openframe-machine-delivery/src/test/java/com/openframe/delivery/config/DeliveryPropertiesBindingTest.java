@@ -60,43 +60,28 @@ class DeliveryPropertiesBindingTest {
     }
 
     @Test
-    void bind_noEnabledKeys_onlyPackageAdoptIsOn() {
+    void bind_noEnabledKeys_packageAdoptOff() {
         // setup
         Map<String, String> config = fullDefaults();
-
-        // execution
-        DeliveryProperties properties = bind(config);
-
-        // verifications
-        assertThat(properties.isEnabled(DeliveryType.PACKAGE_ADOPT)).isTrue();
-        assertThat(properties.isEnabled(DeliveryType.PACKAGE_UPDATE)).isFalse();
-    }
-
-    @Test
-    void bind_anotherTypeSwitchedOn_packageAdoptStaysOn() {
-        // setup
-        Map<String, String> config = fullDefaults();
-        config.put(PREFIX + ".enabled.PACKAGE_UPDATE", "true");
-
-        // execution
-        DeliveryProperties properties = bind(config);
-
-        // verifications
-        assertThat(properties.isEnabled(DeliveryType.PACKAGE_ADOPT)).isTrue();
-        assertThat(properties.isEnabled(DeliveryType.PACKAGE_UPDATE)).isTrue();
-    }
-
-    @Test
-    void bind_packageAdoptSwitchedOff_off() {
-        // setup
-        Map<String, String> config = fullDefaults();
-        config.put(PREFIX + ".enabled.PACKAGE_ADOPT", "false");
 
         // execution
         DeliveryProperties properties = bind(config);
 
         // verifications
         assertThat(properties.isEnabled(DeliveryType.PACKAGE_ADOPT)).isFalse();
+    }
+
+    @Test
+    void bind_packageAdoptSwitchedOn_on() {
+        // setup
+        Map<String, String> config = fullDefaults();
+        config.put(PREFIX + ".enabled.PACKAGE_ADOPT", "true");
+
+        // execution
+        DeliveryProperties properties = bind(config);
+
+        // verifications
+        assertThat(properties.isEnabled(DeliveryType.PACKAGE_ADOPT)).isTrue();
     }
 
     @Test

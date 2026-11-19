@@ -42,7 +42,6 @@ import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
-import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -202,13 +201,12 @@ public class SoftwareInventoryService {
         return software;
     }
 
-    public SoftwareBundlePackage getAdoptionPackage(String softwareId) {
+    public SoftwareResponse getAdoptableSoftware(String softwareId) {
         SoftwareResponse software = getSoftware(softwareId);
-        SoftwareBundlePackage adoptionPackage = software.getAdoptionPackage();
-        if (adoptionPackage == null) {
+        if (software.getAdoptionPackage() == null) {
             throw new BadRequestException("No package to adopt " + software.getName() + " into");
         }
-        return adoptionPackage;
+        return software;
     }
 
     private SoftwareResponse getSoftware(String softwareId) {

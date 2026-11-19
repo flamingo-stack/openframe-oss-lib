@@ -45,6 +45,7 @@ class PackageUpdateDispatchServiceAdoptTest {
     private static final String EXECUTION_ID = "exec-1";
     private static final String SOFTWARE_ID = "42";
     private static final String CASK = "postman";
+    private static final String BUNDLE_ID = "com.postmanlabs.mac";
     private static final String MAC = "mac-1";
     private static final String OTHER_MAC = "mac-2";
 
@@ -83,7 +84,7 @@ class PackageUpdateDispatchServiceAdoptTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
-        String requestId = service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID);
+        String requestId = service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID, BUNDLE_ID);
 
         // verifications
         verify(requestRepository).save(requestCaptor.capture());
@@ -107,7 +108,7 @@ class PackageUpdateDispatchServiceAdoptTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
-        String requestId = service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID);
+        String requestId = service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID, BUNDLE_ID);
 
         // verifications
         verify(deviceStateRepository).saveAll(statesCaptor.capture());
@@ -127,7 +128,7 @@ class PackageUpdateDispatchServiceAdoptTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
-        String requestId = service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID);
+        String requestId = service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID, BUNDLE_ID);
 
         // verifications
         verify(scriptExecutionRepository).saveQueued(rowsCaptor.capture());
@@ -152,7 +153,7 @@ class PackageUpdateDispatchServiceAdoptTest {
                 deliveryRouter);
 
         // execution
-        String requestId = service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID);
+        String requestId = service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID, BUNDLE_ID);
 
         // verifications
         recordsThenOrders.verify(scriptExecutionRepository).saveQueued(rowsCaptor.capture());
@@ -161,9 +162,10 @@ class PackageUpdateDispatchServiceAdoptTest {
         recordsThenOrders.verify(deliveryRouter, times(2)).dispatch(seedCaptor.capture());
         assertThat(seedCaptor.getAllValues())
                 .extracting(PackageAdoptDeliverySeed::getType, PackageAdoptDeliverySeed::getTargetId,
-                        PackageAdoptDeliverySeed::getMachineId, PackageAdoptDeliverySeed::getPackageRef)
-                .containsExactly(tuple(DeliveryType.PACKAGE_ADOPT, requestId, MAC, caskRef),
-                        tuple(DeliveryType.PACKAGE_ADOPT, requestId, OTHER_MAC, caskRef));
+                        PackageAdoptDeliverySeed::getMachineId, PackageAdoptDeliverySeed::getPackageRef,
+                        PackageAdoptDeliverySeed::getBundleId)
+                .containsExactly(tuple(DeliveryType.PACKAGE_ADOPT, requestId, MAC, caskRef, BUNDLE_ID),
+                        tuple(DeliveryType.PACKAGE_ADOPT, requestId, OTHER_MAC, caskRef, BUNDLE_ID));
     }
 
     @Test
@@ -181,7 +183,7 @@ class PackageUpdateDispatchServiceAdoptTest {
                 .build();
 
         // execution
-        service.dispatchAdopt(chocoRows, null, SOFTWARE_ID);
+        service.dispatchAdopt(chocoRows, null, SOFTWARE_ID, null);
 
         // verifications
         verify(deliveryRouter).dispatch(seedCaptor.capture());
@@ -194,7 +196,7 @@ class PackageUpdateDispatchServiceAdoptTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
-        service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID);
+        service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID, BUNDLE_ID);
 
         // verifications
         verify(deliveryRouter, never()).reachable(any(DeliveryType.class), anyCollection());

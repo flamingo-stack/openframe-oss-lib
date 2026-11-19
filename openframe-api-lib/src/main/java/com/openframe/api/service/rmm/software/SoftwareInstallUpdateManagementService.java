@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.software.AdoptSoftwareInput;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
+import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.core.exception.BadRequestException;
@@ -73,18 +74,23 @@ public class SoftwareInstallUpdateManagementService {
 
     public List<String> adopt(AdoptSoftwareInput input, String initiatedBy) {
         String softwareId = input.getSoftwareId();
-        SoftwareBundlePackage adoptionPackage = softwareInventoryService.getAdoptionPackage(softwareId);
+        SoftwareResponse software = softwareInventoryService.getAdoptableSoftware(softwareId);
+        SoftwareBundlePackage adoptionPackage = software.getAdoptionPackage();
         PackageManagerType packageManager = adoptionPackage.getPackageManager();
         String packageName = adoptionPackage.getPackageName();
         if (packageManager == PackageManagerType.WINGET) {
             throw new BadRequestException("A program is not adopted into WINGET: winget updates it as it is installed");
         }
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
-        List<String> targets = adoptableMachines(machineIds, packageManager);
-        if (targets.isEmpty()) {
+        List<String> adoptable = adoptableMachines(machineIds, packageManager);
+        if (adoptable.isEmpty()) {
             throw new BadRequestException("None of the given devices can adopt " + packageName + " with " + packageManager);
         }
-        requireAdoptOrderReaches(targets);
+        List<String> targets = reachedByTheAdoptOrder(adoptable);
+        if (targets.isEmpty()) {
+            throw new BadRequestException("The adopt order reaches none of the given devices: "
+                    + DeliveryType.PACKAGE_ADOPT + " is switched off or their agent is too old for it");
+        }
         deviceService.verifyDispatchable(targets);
 
         String executionId = UUID.randomUUID().toString();
@@ -102,7 +108,7 @@ public class SoftwareInstallUpdateManagementService {
                 .packageManager(packageManager)
                 .packageName(packageName)
                 .softwareAction(SoftwareAction.ADOPT)
-                .build(), brewPackageType, softwareId);
+                .build(), brewPackageType, softwareId, software.getBundleIdentifier());
         SoftwarePackageInput pkg = new SoftwarePackageInput();
         pkg.setPackageManager(packageManager);
         pkg.setPackageName(packageName);
@@ -121,13 +127,10 @@ public class SoftwareInstallUpdateManagementService {
         return packageManagerAvailability.adoptableOn(compatible, packageManager);
     }
 
-    private void requireAdoptOrderReaches(List<String> machineIds) {
+    // an offline device is reachable: its order waits for it
+    private List<String> reachedByTheAdoptOrder(List<String> machineIds) {
         Set<String> reachable = deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, machineIds);
-        List<String> unreachable = machineIds.stream().filter(machineId -> !reachable.contains(machineId)).toList();
-        if (!unreachable.isEmpty()) {
-            throw new BadRequestException("The adopt order cannot reach devices " + unreachable + ": "
-                    + DeliveryType.PACKAGE_ADOPT + " is switched off or their agent is too old for it");
-        }
+        return machineIds.stream().filter(reachable::contains).toList();
     }
 
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,

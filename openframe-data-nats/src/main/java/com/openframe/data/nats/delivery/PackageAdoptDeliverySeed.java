@@ -13,6 +13,7 @@ public class PackageAdoptDeliverySeed implements DeliverySeed {
     private final String machineId;
     private final String requestId;
     private final PackageReference packageRef;
+    private final String bundleId;
 
     @Override
     public DeliveryType getType() {

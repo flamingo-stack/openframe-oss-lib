@@ -14,6 +14,8 @@ import static java.lang.String.format;
 public class PackageAdoptDeliverySpec implements DeliverySpec<PackageAdoptDeliverySeed, PackageAdoptMessage> {
 
     private static final String SUBJECT_TEMPLATE = "machine.%s.package-adopt";
+    // a reinstall downloads the whole app: the usual 600 s closes a slow one as TIMEOUT while it still runs
+    private static final long RESULT_TIMEOUT_SECONDS = 1800;
 
     @Override
     public DeliveryType getType() {
@@ -30,12 +32,18 @@ public class PackageAdoptDeliverySpec implements DeliverySpec<PackageAdoptDelive
         PackageAdoptMessage message = new PackageAdoptMessage();
         message.setRequestId(seed.getRequestId());
         message.setPackageRef(seed.getPackageRef());
+        message.setBundleId(seed.getBundleId());
         return DeliveryRequest.<PackageAdoptMessage>builder()
                 .type(DeliveryType.PACKAGE_ADOPT)
                 .targetId(seed.getTargetId())
                 .machineId(seed.getMachineId())
                 .payload(message)
                 .build();
+    }
+
+    @Override
+    public Long getResultTimeoutSeconds() {
+        return RESULT_TIMEOUT_SECONDS;
     }
 
     @Override

@@ -21,4 +21,6 @@ public class PackageAdoptMessage implements DeliveryPayload {
 
     @JsonProperty("package")
     private PackageReference packageRef;
+
+    private String bundleId;
 }

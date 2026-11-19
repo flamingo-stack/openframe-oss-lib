@@ -95,7 +95,8 @@ public class PackageUpdateDispatchService {
 
     // the caller checks that the PACKAGE_ADOPT order reaches every device; the agent reports no progress, only the
     // outcome, so the request starts IN_PROGRESS
-    public String dispatchAdopt(RunningExecutionRows execution, BrewPackageType brewPackageType, String softwareId) {
+    public String dispatchAdopt(RunningExecutionRows execution, BrewPackageType brewPackageType, String softwareId,
+                                String bundleId) {
         List<String> targets = execution.getMachineIds().stream().distinct().toList();
         PackageUpdateRequest request = newRequest(execution, targets, SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS)
                 .brewPackageType(brewPackageType)
@@ -112,6 +113,7 @@ public class PackageUpdateDispatchService {
                         .machineId(machineId)
                         .requestId(requestId)
                         .packageRef(packageRef)
+                        .bundleId(bundleId)
                         .build())
                 .forEach(deliveryRouter::dispatch);
 

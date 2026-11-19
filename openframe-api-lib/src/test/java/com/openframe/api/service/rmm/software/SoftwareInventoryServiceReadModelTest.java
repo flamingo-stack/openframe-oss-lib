@@ -204,7 +204,7 @@ class SoftwareInventoryServiceReadModelTest {
     }
 
     @Test
-    void getAdoptionPackage_titleWithAnAdoptionPackage_returnsThePackage() {
+    void getAdoptableSoftware_titleWithAnAdoptionPackage_returnsTheTitle() {
         // setup
         SoftwareBundlePackage firefox = SoftwareBundlePackage.builder()
                 .packageManager(PackageManagerType.BREW)
@@ -219,32 +219,34 @@ class SoftwareInventoryServiceReadModelTest {
         }).when(catalogStatus).apply(anyList());
 
         // execution
-        SoftwareBundlePackage adoptionPackage = service.getAdoptionPackage("42");
+        SoftwareResponse title = service.getAdoptableSoftware("42");
 
         // verifications
-        assertThat(adoptionPackage).isSameAs(firefox);
+        assertThat(title)
+                .extracting(SoftwareResponse::getId, SoftwareResponse::getAdoptionPackage)
+                .containsExactly("42", firefox);
     }
 
     @Test
-    void getAdoptionPackage_titleWithoutAnAdoptionPackage_badRequestNamingTheTitle() {
+    void getAdoptableSoftware_titleWithoutAnAdoptionPackage_badRequestNamingTheTitle() {
         // setup
         when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
         when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.UNMANAGED));
 
         // execution
-        BadRequestException refused = assertThrows(BadRequestException.class, () -> service.getAdoptionPackage("42"));
+        BadRequestException refused = assertThrows(BadRequestException.class, () -> service.getAdoptableSoftware("42"));
 
         // verifications
         assertThat(refused.getMessage()).isEqualTo("No package to adopt app-42 into");
     }
 
     @Test
-    void getAdoptionPackage_unknownSoftware_notFound() {
+    void getAdoptableSoftware_unknownSoftware_notFound() {
         // setup
         when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(false);
 
         // execution
-        NotFoundException notFound = assertThrows(NotFoundException.class, () -> service.getAdoptionPackage("42"));
+        NotFoundException notFound = assertThrows(NotFoundException.class, () -> service.getAdoptableSoftware("42"));
 
         // verifications
         assertThat(notFound.getMessage()).isEqualTo("Software not found: 42");

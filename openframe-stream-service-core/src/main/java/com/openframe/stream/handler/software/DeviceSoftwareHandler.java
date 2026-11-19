@@ -50,8 +50,10 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     static final String NO_COMMIT = "0";
 
     private static final Pattern APP_PATH = Pattern.compile("(?:.*/)?([^/]+)\\.app", Pattern.CASE_INSENSITIVE);
+    // not /Users/<user>/Applications: brew installs a cask into /Applications, adopting a copy from the user's folder
+    // leaves two; a false here keeps the app out of package matching
     private static final Pattern TOP_LEVEL_APP_PATH = Pattern.compile(
-            "(/Users/[^/]+)?/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
+            "/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
 
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;

@@ -508,13 +508,13 @@ class DeviceSoftwareHandlerTest {
     @ParameterizedTest
     @CsvSource({
             "/Applications/Slack.app, true",
-            "/Users/alice/Applications/Slack.app, true",
+            "/Users/alice/Applications/Slack.app, false",
             "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app, false",
             "/Users/alice/Applications/Chrome Apps.localized/Gmail.app, false",
             "/Applications/Utilities/Slack.app, false",
             "/Library/Application Support/Slack/Slack.app, false"
     })
-    void handle_macAppByItsInstalledPath_topLevelOnlyDirectlyInAnApplicationsFolder(String path, boolean topLevel) {
+    void handle_macAppByItsInstalledPath_topLevelOnlyDirectlyInTheSystemApplicationsFolder(String path, boolean topLevel) {
         // setup
         HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap", path);
         stubHostSoftware(slack);

@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.AdoptSoftwareInput;
+import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.delivery.DeliveryType;
@@ -57,6 +58,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     private static final String OTHER_MAC = "mac-2";
     private static final String WINDOWS = "win-1";
     private static final String CASK = "postman";
+    private static final String BUNDLE_ID = "com.postmanlabs.mac";
     private static final String CHOCO_PACKAGE = "googlechrome";
     private static final List<String> MACS = List.of(MAC, OTHER_MAC);
     private static final Set<OsType> MAC_OS = Set.of(OsType.MAC_OS);
@@ -79,6 +81,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
 
     private AdoptSoftwareInput macsInput;
     private SoftwareBundlePackage cask;
+    private SoftwareResponse caskTitle;
 
     @BeforeEach
     void setUp() {
@@ -88,13 +91,14 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
                 .packageName(CASK)
                 .brewPackageType(BrewPackageType.CASK)
                 .build();
+        caskTitle = title(cask, BUNDLE_ID);
     }
 
     @Test
     void adopt_titleWithABrewCask_oneAdoptRequestForTheDevicesWithTheCask() {
         // setup
         stubCaskAdoptableOnMacs();
-        stubAdoptDispatch(BrewPackageType.CASK);
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
@@ -102,7 +106,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
 
         // verifications
         verify(deviceService).verifyDispatchable(MACS);
-        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID));
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
         assertThat(rowsCaptor.getValue())
                 .extracting(RunningExecutionRows::getMachineIds, RunningExecutionRows::getPackageManager,
                         RunningExecutionRows::getPackageName, RunningExecutionRows::getSoftwareAction,
@@ -117,14 +121,14 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     void adopt_titleWithABrewCask_historyRowsCarryTheBrewAdoptIdOfNoScript() {
         // setup
         stubCaskAdoptableOnMacs();
-        stubAdoptDispatch(BrewPackageType.CASK);
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
         service.adopt(macsInput, USER);
 
         // verifications
-        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID));
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
         assertThat(rowsCaptor.getValue())
                 .extracting(RunningExecutionRows::getScriptId, RunningExecutionRows::getPrivilegeLevel,
                         RunningExecutionRows::getTimeoutSeconds)
@@ -135,14 +139,14 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     void adopt_orderSent_softwareActionsRowOfKindAdoptUnderTheHistoryExecution() {
         // setup
         stubCaskAdoptableOnMacs();
-        stubAdoptDispatch(BrewPackageType.CASK);
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
         service.adopt(macsInput, USER);
 
         // verifications
-        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID));
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
         verify(softwareActionResultRepository).save(actionResultCaptor.capture());
         assertThat(actionResultCaptor.getValue())
                 .extracting(SoftwareActionResult::getTenantId, SoftwareActionResult::getExecutionId,
@@ -165,19 +169,19 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
                 .packageName(CHOCO_PACKAGE)
                 .build();
         AdoptSoftwareInput input = input(machineIds);
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(chocoPackage);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(title(chocoPackage, null));
         when(machinePlatformResolver.osTypesByMachineId(machineIds)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(machineIds, osTypes, WINDOWS_OS)).thenReturn(machineIds);
         when(packageManagerAvailability.adoptableOn(machineIds, PackageManagerType.CHOCO)).thenReturn(machineIds);
         when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, machineIds)).thenReturn(Set.of(WINDOWS));
-        stubAdoptDispatch(null);
+        stubAdoptDispatch(null, null);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
         List<String> ordered = service.adopt(input, USER);
 
         // verifications
-        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(null), eq(SOFTWARE_ID));
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(null), eq(SOFTWARE_ID), eq(null));
         assertThat(rowsCaptor.getValue())
                 .extracting(RunningExecutionRows::getPackageManager, RunningExecutionRows::getPackageName,
                         RunningExecutionRows::getScriptId, RunningExecutionRows::getPrivilegeLevel)
@@ -193,19 +197,19 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         List<String> macOnly = List.of(MAC);
         Map<String, OsType> osTypes = Map.of(MAC, OsType.MAC_OS, WINDOWS, OsType.WINDOWS);
         AdoptSoftwareInput input = input(machineIds);
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(cask);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
         when(machinePlatformResolver.osTypesByMachineId(machineIds)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(machineIds, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
         when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, macOnly)).thenReturn(Set.of(MAC));
-        stubAdoptDispatch(BrewPackageType.CASK);
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
         List<String> ordered = service.adopt(input, USER);
 
         // verifications
-        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID));
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
         assertThat(rowsCaptor.getValue().getMachineIds()).containsExactly(MAC);
         assertThat(ordered).containsExactly(MAC);
     }
@@ -214,19 +218,19 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     void adopt_managerNotAdoptableOnADevice_leftOutAndTheRestOrdered() {
         // setup
         List<String> macOnly = List.of(MAC);
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(cask);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(macOnly);
         when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, macOnly)).thenReturn(Set.of(MAC));
-        stubAdoptDispatch(BrewPackageType.CASK);
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
         List<String> ordered = service.adopt(macsInput, USER);
 
         // verifications
-        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID));
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
         assertThat(rowsCaptor.getValue().getMachineIds()).containsExactly(MAC);
         assertThat(ordered).containsExactly(MAC);
     }
@@ -237,19 +241,19 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         List<String> macOnly = List.of(MAC);
         Map<String, OsType> osTypes = Map.of(MAC, OsType.MAC_OS);
         AdoptSoftwareInput input = input(List.of(MAC, MAC));
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(cask);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
         when(machinePlatformResolver.osTypesByMachineId(macOnly)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(macOnly, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
         when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, macOnly)).thenReturn(Set.of(MAC));
-        stubAdoptDispatch(BrewPackageType.CASK);
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
         List<String> ordered = service.adopt(input, USER);
 
         // verifications
-        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID));
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
         assertThat(rowsCaptor.getValue().getMachineIds()).containsExactly(MAC);
         assertThat(ordered).containsExactly(MAC);
     }
@@ -260,12 +264,12 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         List<String> macOnly = List.of(MAC);
         Map<String, OsType> osTypes = Map.of(MAC, OsType.MAC_OS);
         AdoptSoftwareInput input = input(macOnly);
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(cask);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
         when(machinePlatformResolver.osTypesByMachineId(macOnly)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(macOnly, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
         when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, macOnly)).thenReturn(Set.of(MAC));
-        stubAdoptDispatch(BrewPackageType.CASK);
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
         // execution
@@ -274,7 +278,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
 
         // verifications
         verify(packageUpdateDispatchService, times(2))
-                .dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID));
+                .dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
         assertThat(rowsCaptor.getAllValues())
                 .extracting(RunningExecutionRows::getExecutionId)
                 .doesNotContainNull()
@@ -286,7 +290,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     void adopt_titleWithoutAnAdoptionPackage_refusedAndNothingSent() {
         // setup
         BadRequestException noPackage = new BadRequestException("No package to adopt Postman into");
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenThrow(noPackage);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenThrow(noPackage);
 
         // execution
         BadRequestException refused = assertThrows(BadRequestException.class, () -> service.adopt(macsInput, USER));
@@ -303,7 +307,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
                 .packageManager(PackageManagerType.WINGET)
                 .packageName("Google.Chrome")
                 .build();
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(wingetPackage);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(title(wingetPackage, null));
 
         // execution
         BadRequestException refused = assertThrows(BadRequestException.class, () -> service.adopt(macsInput, USER));
@@ -319,7 +323,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         // setup
         Map<String, OsType> noOsTypes = Map.of();
         List<String> noMachines = List.of();
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(cask);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(noOsTypes);
         when(machinePlatformResolver.compatible(MACS, noOsTypes, MAC_OS)).thenReturn(noMachines);
         when(packageManagerAvailability.adoptableOn(noMachines, PackageManagerType.BREW)).thenReturn(noMachines);
@@ -333,21 +337,56 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     }
 
     @Test
-    void adopt_orderDoesNotReachADevice_refusedAndNothingSent() {
+    void adopt_orderDoesNotReachADevice_thatDeviceLeftOutAndTheRestOrdered() {
         // setup
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(cask);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, MACS)).thenReturn(Set.of(MAC));
+        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, MACS)).thenReturn(Set.of(OTHER_MAC));
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+
+        // execution
+        List<String> ordered = service.adopt(macsInput, USER);
+
+        // verifications
+        verify(deviceService).verifyDispatchable(List.of(OTHER_MAC));
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
+        assertThat(rowsCaptor.getValue().getMachineIds()).containsExactly(OTHER_MAC);
+        assertThat(ordered).containsExactly(OTHER_MAC);
+    }
+
+    @Test
+    void adopt_orderReachesNoDevice_refusedAndNothingSent() {
+        // setup
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
+        when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
+        when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
+        when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
+        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, MACS)).thenReturn(Set.of());
 
         // execution
         BadRequestException refused = assertThrows(BadRequestException.class, () -> service.adopt(macsInput, USER));
 
         // verifications
-        assertThat(refused.getMessage())
-                .isEqualTo("The adopt order cannot reach devices [mac-2]: PACKAGE_ADOPT is switched off or their agent is too old for it");
+        assertThat(refused.getMessage()).isEqualTo("The adopt order reaches none of the given devices: "
+                + "PACKAGE_ADOPT is switched off or their agent is too old for it");
         verifyNoInteractions(deviceService, packageUpdateDispatchService, softwareActionResultRepository);
+    }
+
+    @Test
+    void adopt_titleWithABundleIdentifier_orderCarriesIt() {
+        // setup
+        stubCaskAdoptableOnMacs();
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+
+        // execution
+        service.adopt(macsInput, USER);
+
+        // verifications
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
     }
 
     @Test
@@ -366,16 +405,25 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     }
 
     private void stubCaskAdoptableOnMacs() {
-        when(softwareInventoryService.getAdoptionPackage(SOFTWARE_ID)).thenReturn(cask);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
         when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, MACS)).thenReturn(Set.of(MAC, OTHER_MAC));
     }
 
-    private void stubAdoptDispatch(BrewPackageType brewPackageType) {
-        when(packageUpdateDispatchService.dispatchAdopt(any(RunningExecutionRows.class), eq(brewPackageType), eq(SOFTWARE_ID)))
-                .thenReturn(REQUEST_ID);
+    private void stubAdoptDispatch(BrewPackageType brewPackageType, String bundleId) {
+        when(packageUpdateDispatchService.dispatchAdopt(any(RunningExecutionRows.class), eq(brewPackageType),
+                eq(SOFTWARE_ID), eq(bundleId))).thenReturn(REQUEST_ID);
+    }
+
+    private static SoftwareResponse title(SoftwareBundlePackage adoptionPackage, String bundleIdentifier) {
+        SoftwareResponse title = new SoftwareResponse();
+        title.setId(SOFTWARE_ID);
+        title.setName("Postman");
+        title.setBundleIdentifier(bundleIdentifier);
+        title.setAdoptionPackage(adoptionPackage);
+        return title;
     }
 
     private static AdoptSoftwareInput input(List<String> machineIds) {

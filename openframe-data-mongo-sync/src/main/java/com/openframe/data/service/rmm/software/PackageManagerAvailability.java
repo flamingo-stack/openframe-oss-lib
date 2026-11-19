@@ -58,13 +58,14 @@ public class PackageManagerAvailability {
         return reported == null || reported.get(manager) == PackageManagerState.PRESENT;
     }
 
-    // a program can be adopted into a manager the device has or can still get
+    // unlike isPresentOn, a device that never reported its managers cannot adopt: only a manager known PRESENT may
+    // reinstall a program, a MISSING or UNKNOWN one would leave it removed and not installed
     public boolean isAdoptableOn(Machine machine, PackageManagerType manager) {
         if (!isEnabled(manager)) {
             return false;
         }
         Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
-        return isEmpty(reported) || PackageManagerState.MANAGEABLE.contains(reported.get(manager));
+        return !isEmpty(reported) && reported.get(manager) == PackageManagerState.PRESENT;
     }
 
     // in the order of machineIds; a machine that is not found is left out
