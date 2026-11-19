@@ -4,7 +4,6 @@
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
-import type { ActionsMenuItem } from '../../ui/actions-menu';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
@@ -670,10 +669,6 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
   /** Makes the provider icon + model name a button (e.g. the host's AI
    *  settings, where the model is chosen). The token tail stays plain text. */
   onModelClick?: () => void;
-  /** Menu anchored to the model label; takes precedence over the legacy click handler. */
-  modelMenuItems?: ActionsMenuItem[];
-  /** Subject identity: changing it cancels any pending selection focus return. */
-  modelMenuScopeKey?: string | null;
   /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
   modelTooltip?: string;
   /**

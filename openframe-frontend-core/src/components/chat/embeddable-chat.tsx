@@ -526,8 +526,6 @@ export interface EmbeddableChatProps {
   showModel?: boolean;
   /** Makes the model name in that row a button (e.g. to the AI settings). */
   onModelClick?: () => void;
-  /** Optional menu anchored to the current model label. */
-  modelMenuItems?: ActionsMenuItem[];
   /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
   modelTooltip?: string;
   /** The composer's own ⋯ menu, at the end of its input row (e.g. "Compact
@@ -867,7 +865,6 @@ function EmbeddableChatInner({
   threadContentClassName,
   showModel = true,
   onModelClick,
-  modelMenuItems,
   modelTooltip,
   composerMenuItems,
   composerFooterActions,
@@ -2760,8 +2757,6 @@ function EmbeddableChatInner({
               breakdown: currentUsageBreakdown ?? undefined,
               usagePanel: usagePanel ?? undefined,
               onModelClick,
-              modelMenuItems,
-              modelMenuScopeKey: activeDialogId,
               modelTooltip,
             }
           : undefined

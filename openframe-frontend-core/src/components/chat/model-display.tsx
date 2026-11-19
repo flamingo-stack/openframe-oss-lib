@@ -6,11 +6,8 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
 import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '../popover';
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
-import { Button } from '../ui/button';
 import { CircularProgress } from '../ui/circular-progress';
 import { useLoadingScope } from '../ui/loading-scope';
-import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { useChatAppearance } from './chat-appearance-context';
 import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
@@ -127,105 +124,6 @@ const MODEL_DISPLAY_ROW_CLASS = 'flex items-center gap-1 text-h6';
 /** The provider's mark: 16px, as the loaded icons. */
 const PROVIDER_ICON_BOX_CLASS = 'flex shrink-0 items-center justify-center';
 
-interface ModelMenuReturn {
-  closeReady: boolean;
-  cancelled: boolean;
-  stopListening: () => void;
-}
-
-function ModelMenuButton({
-  items,
-  disabled,
-  children,
-}: {
-  items: ActionsMenuItem[];
-  disabled: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const triggerRef = React.useRef<HTMLButtonElement>(null);
-  const pendingReturn = React.useRef<ModelMenuReturn | null>(null);
-  const clearReturn = React.useCallback(() => {
-    const pending = pendingReturn.current;
-    pendingReturn.current = null;
-    pending?.stopListening();
-  }, []);
-  const returnFocus = React.useCallback(() => {
-    const pending = pendingReturn.current;
-    if (!pending?.closeReady) return;
-    const trigger = triggerRef.current;
-    const neutral = document.activeElement === document.body || document.activeElement === document.documentElement;
-    if (pending.cancelled || !trigger?.isConnected || !neutral) {
-      clearReturn();
-      return;
-    }
-    if (trigger.disabled) return;
-    clearReturn();
-    trigger.focus({ preventScroll: true });
-  }, [clearReturn]);
-  React.useLayoutEffect(() => {
-    returnFocus();
-  }, [disabled, returnFocus]);
-  React.useLayoutEffect(() => () => clearReturn(), [clearReturn]);
-
-  if (disabled && open) setOpen(false);
-
-  return (
-    <PortalContainerContext.Provider value={null}>
-      <CollisionBoundaryContext.Provider value={null}>
-        <ActionsMenuDropdown
-          groups={[{ items }]}
-          side="top"
-          align="start"
-          open={open && !disabled}
-          onOpenChange={next => setOpen(next && !disabled)}
-          onItemClick={item => {
-            if (item.type === 'checkbox' || item.type === 'submenu' || item.closeOnSelect === false) return;
-            clearReturn();
-            const pending: ModelMenuReturn = {
-              closeReady: false,
-              cancelled: false,
-              stopListening: () => document.removeEventListener('focusin', onFocus, true),
-            };
-            function onFocus(event: FocusEvent) {
-              if (
-                event.target === triggerRef.current ||
-                event.target === document.body ||
-                event.target === document.documentElement
-              )
-                return;
-              pending.cancelled = true;
-              pending.stopListening();
-              if (pending.closeReady) pendingReturn.current = null;
-            }
-            pendingReturn.current = pending;
-            document.addEventListener('focusin', onFocus, true);
-          }}
-          onCloseAutoFocus={event => {
-            const pending = pendingReturn.current;
-            if (!pending) return;
-            event.preventDefault();
-            pending.closeReady = true;
-            returnFocus();
-          }}
-          customTrigger={
-            <Button
-              ref={triggerRef}
-              type="button"
-              variant="bare"
-              size="wrap"
-              disabled={disabled}
-              className="justify-start gap-[var(--spacing-system-xxs)] whitespace-normal text-left text-h6 [&_svg]:h-4 [&_svg]:w-4"
-            >
-              {children}
-            </Button>
-          }
-        />
-      </CollisionBoundaryContext.Provider>
-    </PortalContainerContext.Provider>
-  );
-}
-
 const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
   (
     {
@@ -240,8 +138,6 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       inputTokens,
       outputTokens,
       onModelClick,
-      modelMenuItems,
-      modelMenuScopeKey,
       modelTooltip,
       usagePanel,
       loading = false,
@@ -253,8 +149,6 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // mark box (only when the provider has a mark), the name as a bar, and the "context budget" tail as a bar when the
     // loaded row would draw it (once the context window is known).
     const isLoading = useLoadingScope() || loading;
-    const hasModelMenu = modelMenuItems !== undefined;
-    const modelMenuDisabled = hasModelMenu && !modelMenuItems.some(item => item.type !== 'separator' && !item.disabled);
     const icon = getProviderIcon(provider);
     const name = displayName || modelName;
     // v2 spells the counts out ("372 / 50,000 context budget"); classic keeps them short.
@@ -283,11 +177,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
         <span className="font-body">{name}</span>
       </>
     );
-    const label = modelMenuItems ? (
-      <ModelMenuButton key={modelMenuScopeKey} items={modelMenuItems} disabled={modelMenuDisabled}>
-        {labelContent}
-      </ModelMenuButton>
-    ) : onModelClick ? (
+    const label = onModelClick ? (
       <button
         type="button"
         onClick={onModelClick}
@@ -305,9 +195,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     const labelWithTooltip = modelTooltip ? (
       <TooltipProvider delayDuration={300}>
         <Tooltip>
-          <TooltipTrigger asChild>
-            {modelMenuItems ? <span className="inline-flex">{label}</span> : label}
-          </TooltipTrigger>
+          <TooltipTrigger asChild>{label}</TooltipTrigger>
           <TooltipContent side="top" align="start">
             {modelTooltip}
           </TooltipContent>
