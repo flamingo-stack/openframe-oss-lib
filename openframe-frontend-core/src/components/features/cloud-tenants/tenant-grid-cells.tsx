@@ -8,6 +8,7 @@ import { MediaSkeleton } from '../../loading/unified-skeleton';
 import { DataTable } from '../../ui/data-table';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { Tag } from '../../ui/tag';
+import { GridTextWithDetailCell } from '../feature-table-grid-cells';
 import {
   accessStateTag,
   formatLastRead,
@@ -23,24 +24,25 @@ import type { TenantCustomer, TenantLicenseSummary } from './tenant-row';
 /** The provider's mark in a grid cell: the design's 20px leading icon. */
 const GRID_PROVIDER_MARK_SIZE = 20;
 
-/** TENANT: the provider's mark, the name, the domain after it. */
+/**
+ * TENANT: the provider's mark, the name, the domain after it. A domain is as long as the name, so the name keeps its
+ * width and the domain is the part cut (`GridTextWithDetailCell`), where `DataTable.Cell` would cut the name first.
+ */
 export function TenantGridCell({ provider, name, domain }: { provider: string; name: string; domain?: string | null }) {
   const { Logo, label } = providerMark(provider);
   // While the tenant is read (a loading scope) the mark is a box and the name a bar.
   const loading = useLoadingScope();
   return (
-    <DataTable.Cell
-      leading={{
-        type: 'icon',
-        icon: loading ? (
+    <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]">
+      <span data-part="leading" className="flex size-5 shrink-0 items-center justify-center">
+        {loading ? (
           <MediaSkeleton.Icon size="sm" />
         ) : (
           <Logo size={GRID_PROVIDER_MARK_SIZE} role="img" aria-label={label} />
-        ),
-      }}
-      text={name}
-      secondary={domain ?? undefined}
-    />
+        )}
+      </span>
+      <GridTextWithDetailCell text={name} detail={domain ?? undefined} />
+    </div>
   );
 }
 

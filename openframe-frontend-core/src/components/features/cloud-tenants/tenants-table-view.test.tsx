@@ -179,8 +179,9 @@ describe('TenantsTableView in the grid layout', () => {
       />,
     );
 
-    // The domain follows the name, the customers past the first are one "+N", the warnings keep their words.
-    expect(secondaryText('acme.onmicrosoft.com')).toBeInTheDocument();
+    // The customers past the first are one "+N", and the warnings keep their words.
+    // The tenant's name keeps its width and the domain after it is the part cut: both are on the row.
+    expect(screen.getByText('acme.onmicrosoft.com')).toBeInTheDocument();
     expect(screen.getByText('+2')).toBeInTheDocument();
     expect(screen.getByText('30 of 412 unattributed')).toHaveClass('text-ods-warning');
     expect(screen.getByText('100 of 120')).toBeInTheDocument();

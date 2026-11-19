@@ -21,6 +21,7 @@ import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { GRID_ACTION_BUTTON_CLASS } from '../feature-table-grid-cells';
 import { dataTableLayoutProps, type FeatureTableLayoutProps } from '../feature-table-layout';
 import { TenantCell } from './tenant-cell';
 import { TenantAccessGridCell, TenantCustomerGridCell, TenantGridCell } from './tenant-grid-cells';
@@ -110,7 +111,7 @@ function OpenTenantButton({ href, name, grid = false }: { href: string; name: st
         size="icon"
         leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
         aria-label={`Open ${name} in new tab`}
-        className={grid ? 'size-10 border-0 md:size-10' : 'bg-ods-card'}
+        className={grid ? GRID_ACTION_BUTTON_CLASS : 'bg-ods-card'}
       />
     </div>
   );
