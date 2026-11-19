@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ColumnDef, useDataTable } from '../../ui/data-table';
 import { GRID_ACTION_COLUMN_SIZE } from '../../ui/data-table/data-table-grid-columns';
 import { GRID_MIN_WIDTH } from '../../ui/data-table/data-table-grid-resize';
+import { LoadingScope } from '../../ui/loading-scope';
 import type { MultiCustomerTenantRow, TenantRow } from './tenant-row';
 import { type TenantsTableFilters, TenantsTableView } from './tenants-table-view';
 
@@ -179,9 +180,11 @@ describe('TenantsTableView in the grid layout', () => {
       />,
     );
 
+    // The tenant's name keeps its width (the primary tone, no flex share) and the domain after it is the part cut:
+    // the secondary tone, taking the width that is left.
+    expect(screen.getByText('acme.onmicrosoft.com')).toHaveClass('text-ods-text-secondary', 'truncate');
+    expect(screen.getByText('Acme', { selector: '[data-grid-col="tenant"] *' })).toHaveClass('text-ods-text-primary');
     // The customers past the first are one "+N", and the warnings keep their words.
-    // The tenant's name keeps its width and the domain after it is the part cut: both are on the row.
-    expect(screen.getByText('acme.onmicrosoft.com')).toBeInTheDocument();
     expect(screen.getByText('+2')).toBeInTheDocument();
     expect(screen.getByText('30 of 412 unattributed')).toHaveClass('text-ods-warning');
     expect(screen.getByText('100 of 120')).toBeInTheDocument();
@@ -196,6 +199,76 @@ describe('TenantsTableView in the grid layout', () => {
 
     expect(secondaryText('227 Users')).toBeInTheDocument();
     expect(secondaryText('Last read: —')).toBeInTheDocument();
+  });
+
+  it('multi-customer: a tenant never read, with no customer and no licence numbers, says so on one line', () => {
+    const NEVER_READ: MultiCustomerTenantRow = { ...ROW, name: 'New directory', customers: [] };
+    render(
+      <TenantsTableView
+        variant="multi-customer"
+        layout="grid"
+        rows={[NEVER_READ]}
+        now={NOW}
+        getHref={row => `/tenants/${row.id}`}
+      />,
+    );
+
+    // No customer: the empty mark, then "Never read" in the secondary tone (nothing to warn about).
+    expect(secondaryText('Never read')).toBeInTheDocument();
+    expect(screen.getByText('Never read')).not.toHaveClass('text-ods-warning');
+    // Customers and licences both print the empty mark; no last read is printed for a tenant never read.
+    expect(screen.getAllByText('—')).toHaveLength(2);
+    expect(screen.queryByText(/^Last read: /)).not.toBeInTheDocument();
+  });
+
+  it('multi-customer: a paused sync is said in place of the last read, and seats with no total say so', () => {
+    const PAUSED: MultiCustomerTenantRow = {
+      ...FULL_ROW,
+      unattributedUserCount: 0,
+      syncPaused: true,
+      licenses: { assigned: 88, purchased: null },
+    };
+    render(
+      <TenantsTableView
+        variant="multi-customer"
+        layout="grid"
+        rows={[PAUSED]}
+        now={NOW}
+        getHref={row => `/tenants/${row.id}`}
+      />,
+    );
+
+    expect(secondaryText('Sync paused')).toBeInTheDocument();
+    expect(screen.queryByText(/^Last read: /)).not.toBeInTheDocument();
+    // Every user is attributed: the plain count, not a warning.
+    expect(screen.getByText('412 users')).not.toHaveClass('text-ods-warning');
+    expect(screen.getByText('88 assigned')).toBeInTheDocument();
+    expect(screen.getByText('Total not available')).not.toHaveClass('text-ods-warning');
+  });
+
+  it('in a loading scope the grid draws no count, no last read and no licence text: bars only', () => {
+    render(
+      <LoadingScope>
+        <TenantsTableView
+          variant="multi-customer"
+          layout="grid"
+          rows={[FULL_ROW]}
+          now={NOW}
+          skeletonRows={2}
+          getHref={row => `/tenants/${row.id}`}
+        />
+      </LoadingScope>,
+    );
+
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument();
+    expect(screen.queryByText(/users$/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Never read')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Last read: /)).not.toBeInTheDocument();
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+    // The open buttons are drawn for real, and inert (the loading rows are decoration, hidden from assistive tech).
+    const buttons = screen.getAllByRole('button', { name: /in new tab$/, hidden: true });
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) expect(button).toBeDisabled();
   });
 
   it('cards (the default): the open button keeps its outline and the cells their two lines', () => {
