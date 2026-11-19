@@ -40,7 +40,7 @@ class MachineFleetMembershipTest {
         stubMachineIn(status);
 
         // execution
-        boolean inFleet = membership.inFleet(HOST);
+        boolean inFleet = membership.isInFleet(HOST);
 
         // verifications
         assertThat(inFleet).isTrue();
@@ -53,7 +53,7 @@ class MachineFleetMembershipTest {
         stubMachineIn(status);
 
         // execution
-        boolean inFleet = membership.inFleet(HOST);
+        boolean inFleet = membership.isInFleet(HOST);
 
         // verifications
         assertThat(inFleet).isFalse();
@@ -65,7 +65,7 @@ class MachineFleetMembershipTest {
         when(machineRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(Optional.empty());
 
         // execution
-        boolean inFleet = membership.inFleet(HOST);
+        boolean inFleet = membership.isInFleet(HOST);
 
         // verifications
         assertThat(inFleet).isFalse();
@@ -77,7 +77,7 @@ class MachineFleetMembershipTest {
         stubMachineIn(null);
 
         // execution
-        boolean inFleet = membership.inFleet(HOST);
+        boolean inFleet = membership.isInFleet(HOST);
 
         // verifications
         assertThat(inFleet).isFalse();
@@ -89,8 +89,8 @@ class MachineFleetMembershipTest {
         stubMachineIn(DeviceStatus.MANAGED);
 
         // execution
-        membership.inFleet(HOST);
-        boolean again = membership.inFleet(HOST);
+        membership.isInFleet(HOST);
+        boolean again = membership.isInFleet(HOST);
 
         // verifications
         assertThat(again).isTrue();
@@ -103,8 +103,8 @@ class MachineFleetMembershipTest {
         when(machineRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(Optional.empty());
 
         // execution
-        membership.inFleet(HOST);
-        membership.inFleet(HOST);
+        membership.isInFleet(HOST);
+        membership.isInFleet(HOST);
 
         // verifications
         verify(machineRepository, times(1)).findByTenantIdAndMachineId("t1", "m1");

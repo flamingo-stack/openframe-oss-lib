@@ -28,7 +28,7 @@ public class MachineFleetMembership {
             .maximumSize(CAPACITY)
             .build();
 
-    public boolean inFleet(FleetHostRef host) {
+    public boolean isInFleet(FleetHostRef host) {
         return inFleetByHost.get(host, this::lookUp);
     }
 
@@ -37,10 +37,10 @@ public class MachineFleetMembership {
         String machineId = host.machineId();
         Optional<DeviceStatus> status = machineRepository.findByTenantIdAndMachineId(tenantId, machineId)
                 .map(Machine::getStatus);
-        return status.filter(MachineFleetMembership::inFleet).isPresent();
+        return status.filter(MachineFleetMembership::isCounted).isPresent();
     }
 
-    private static boolean inFleet(DeviceStatus status) {
+    private static boolean isCounted(DeviceStatus status) {
         return !DeviceStatus.FROZEN.contains(status);
     }
 }

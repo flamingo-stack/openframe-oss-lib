@@ -134,7 +134,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
-        if (machineFleetMembership.inFleet(host)) {
+        if (machineFleetMembership.isInFleet(host)) {
             reconcile(host, hostId, commit);
         } else {
             log.debug("[software-cdc] host_software for Fleet host {} of machine {} out of the fleet — skipping",

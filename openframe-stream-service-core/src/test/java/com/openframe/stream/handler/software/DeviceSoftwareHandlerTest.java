@@ -59,7 +59,7 @@ class DeviceSoftwareHandlerTest {
     void setUp() {
         handler = new DeviceSoftwareHandler(fleetHostResolver, machineFleetMembership, fleetHostSoftwareCache,
                 deviceSoftwareRepository, projectionTrigger, Set.of(SKIPPED_HOST));
-        lenient().when(machineFleetMembership.inFleet(any())).thenReturn(true);
+        lenient().when(machineFleetMembership.isInFleet(any())).thenReturn(true);
     }
 
     private DeserializedDebeziumMessage msg(String op, JsonNode before, JsonNode after) {
@@ -718,7 +718,7 @@ class DeviceSoftwareHandlerTest {
         // setup
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(machineFleetMembership.inFleet(new FleetHostRef("t1", "m1"))).thenReturn(false);
+        when(machineFleetMembership.isInFleet(new FleetHostRef("t1", "m1"))).thenReturn(false);
 
         // execution
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
@@ -732,14 +732,14 @@ class DeviceSoftwareHandlerTest {
         // setup
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(machineFleetMembership.inFleet(new FleetHostRef("t1", "m1"))).thenReturn(false);
+        when(machineFleetMembership.isInFleet(new FleetHostRef("t1", "m1"))).thenReturn(false);
         handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 1), COMMIT_TS, GTID_1), null);
 
         // execution
         handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 2), COMMIT_TS, GTID_1), null);
 
         // verifications
-        verify(machineFleetMembership, times(1)).inFleet(new FleetHostRef("t1", "m1"));
+        verify(machineFleetMembership, times(1)).isInFleet(new FleetHostRef("t1", "m1"));
     }
 
     @ParameterizedTest
