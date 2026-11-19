@@ -131,8 +131,8 @@ public class AuditedMethodRunner {
             LoadedTarget after = read(call, rereadCandidates, targetIdBeforeCall);
             Map<String, AuditChange> changes = isVersionConflict(failure)
                     ? null : changesBetween(call, compares, before, after);
-            if (record(call, context, () -> entry(call, targetIdBeforeCall, firstNonNull(after, before), changes,
-                    detailsOf(call, null), null, outcomeResolver.ofFailure(failure)).id(eventId).build())) {
+            if (record(call, context, () -> entry(call, targetIdBeforeCall, firstNonNull(after, before), before,
+                    changes, detailsOf(call, null), null, outcomeResolver.ofFailure(failure)).id(eventId).build())) {
                 RecordedFailures.add(failure);
             }
             throw failure;
@@ -160,15 +160,15 @@ public class AuditedMethodRunner {
         if (changedNothing(changes, outcome) && !hasChildren) {
             return result;
         }
-        boolean stored = record(call, context, () -> entry(call, targetId, current, changes, details, result, outcome)
-                .id(eventId).build());
+        boolean stored = record(call, context,
+                () -> entry(call, targetId, current, before, changes, details, result, outcome).id(eventId).build());
         if (stored && readKey != null) {
             markSensitiveReadRecorded(readKey);
         }
         List<AuditAction> childActions = tryGet("child events", call,
                 () -> childActionsToRecord(call, compares, before, after, outcome));
         Objects.requireNonNullElse(childActions, List.<AuditAction>of()).forEach(action -> record(call, declared,
-                () -> entry(call.withAction(action), targetId, current, null, details, result, outcome).build()));
+                () -> entry(call.withAction(action), targetId, current, before, null, details, result, outcome).build()));
         return result;
     }
 
@@ -302,8 +302,8 @@ public class AuditedMethodRunner {
         }
     }
 
-    private AuditEntry.AuditEntryBuilder entry(AuditCall call, String targetId,
-                                               LoadedTarget current, Map<String, AuditChange> changes,
+    private AuditEntry.AuditEntryBuilder entry(AuditCall call, String targetId, LoadedTarget current,
+                                               LoadedTarget before, Map<String, AuditChange> changes,
                                                Map<String, Object> details, Object result, ActionOutcome outcome) {
         AuditEntry.AuditEntryBuilder entry = AuditEntry.builder()
                 .action(call.action())
@@ -315,13 +315,23 @@ public class AuditedMethodRunner {
                 .targetTenantId(current == null ? null : current.tenantId())
                 .details(CollectionUtils.isEmpty(details) ? null : details)
                 .changes(CollectionUtils.isEmpty(changes) ? null : changes);
-        return entry.targetName(fromTargetOrResult(current, LoadedTarget::name, "target name", call, call.targetNameOf(), result))
-                .organizationId(fromTargetOrResult(current, LoadedTarget::organizationId, "organization id", call, call.organizationIdOf(), result))
-                .deviceId(fromTargetOrResult(current, LoadedTarget::deviceId, "device id", call, call.deviceIdOf(), result));
+        String organizationId = firstNonNull(fromTarget(current, LoadedTarget::organizationId, "organization id", call),
+                fromTarget(before, LoadedTarget::organizationId, "organization id", call));
+        String deviceId = firstNonNull(fromTarget(current, LoadedTarget::deviceId, "device id", call),
+                fromTarget(before, LoadedTarget::deviceId, "device id", call));
+        return entry.targetName(orFromResult(fromTarget(current, LoadedTarget::name, "target name", call),
+                        "target name", call, call.targetNameOf(), result))
+                .organizationId(orFromResult(organizationId, "organization id", call, call.organizationIdOf(), result))
+                .deviceId(orFromResult(deviceId, "device id", call, call.deviceIdOf(), result));
     }
 
-    private static String fromTargetOrResult(LoadedTarget current, Function<LoadedTarget, String> fromTarget, String what, AuditCall call, Function<Object, String> fromResult, Object result) {
-        String loaded = current == null ? null : tryGet(what, call, () -> fromTarget.apply(current));
+    private static String fromTarget(LoadedTarget target, Function<LoadedTarget, String> field, String what,
+                                     AuditCall call) {
+        return target == null ? null : tryGet(what, call, () -> field.apply(target));
+    }
+
+    private static String orFromResult(String loaded, String what, AuditCall call,
+                                       Function<Object, String> fromResult, Object result) {
         return loaded != null ? loaded : tryGet(what, call, () -> fromResult.apply(result));
     }
 

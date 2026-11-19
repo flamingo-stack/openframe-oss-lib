@@ -168,7 +168,7 @@ public class TicketService {
 
     @Transactional
     @Audited(action = TICKET_CREATE, targetId = "#result.id",
-            details = {"statusId=#input.statusId", "tagIds=#input.tagIds",
+            details = {"statusId=#input.statusId", "assigneeId=#input.assigneeId", "tagIds=#input.tagIds",
                     "organizationIds=#input.assignedOrganizationIds", "deviceIds=#input.assignedDeviceIds",
                     "ticketIds=#input.assignedTicketIds", "articleIds=#input.assignedKnowledgeArticleIds",
                     "insightId=#input.insightId"})

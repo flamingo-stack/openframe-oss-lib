@@ -341,7 +341,7 @@ public class KnowledgeBaseService {
     private static Map<String, Object> updateDetails(UpdateArticleCommand cmd) {
         Map<String, Object> details = new HashMap<>();
         details.put("parentId", cmd.getParentId());
-        details.put("moveToRoot", cmd.isMoveToRoot());
+        details.put("moveToRoot", cmd.isMoveToRoot() ? Boolean.TRUE : null);
         details.put("status", cmd.getStatus());
         details.put("tagIds", cmd.getTagIds());
         details.put("assignedOrganizationIds", cmd.getAssignedOrganizationIds());

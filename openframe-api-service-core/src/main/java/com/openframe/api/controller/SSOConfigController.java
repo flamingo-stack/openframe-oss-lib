@@ -5,8 +5,9 @@ import com.openframe.api.dto.SSOConfigResponse;
 import com.openframe.api.dto.SSOConfigStatusResponse;
 import com.openframe.api.dto.SSOProviderInfo;
 import com.openframe.api.service.SSOConfigService;
-import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.document.audit.AuditAction;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -90,7 +91,11 @@ public class SSOConfigController {
         boolean passwordLogin = isOpenframeLogin(provider);
         AuditAction action = passwordLogin ? AUTH_PASSWORD_LOGIN_TOGGLE : SSO_CONFIG_DELETE;
         Map<String, Object> details = passwordLogin ? Map.of("enabled", true) : Map.of();
-        auditedMethodRunner.runWhenChanged(action, action.getTargetType(), passwordLogin ? OPENFRAME_PROVIDER : provider,
-                details, () -> ssoConfigService.deleteConfig(provider));
+        String targetId = passwordLogin ? OPENFRAME_PROVIDER : provider;
+        AuditCall call = AuditCall.of(action, action.getTargetType(), targetId, details)
+                .withCompare(false)
+                .withRecordsResult(Boolean.TRUE::equals)
+                .withTargetNameOf(_ -> targetId);
+        auditedMethodRunner.run(call, () -> ssoConfigService.deleteConfig(provider));
     }
 }

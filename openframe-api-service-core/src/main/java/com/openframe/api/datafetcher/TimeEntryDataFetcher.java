@@ -179,7 +179,7 @@ public class TimeEntryDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = TIME_ENTRY_DELETE, targetId = "rawId(#id)")
+    @Audited(action = TIME_ENTRY_DELETE, targetId = "rawId(#id)", condition = "#result")
     public boolean deleteTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
         String rawId = relayIdCodec.decode(id, TIME_ENTRY);
