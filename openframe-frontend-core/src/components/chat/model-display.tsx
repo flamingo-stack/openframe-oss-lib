@@ -139,6 +139,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       outputTokens,
       onModelClick,
       modelTooltip,
+      renderLabel,
       usagePanel,
       loading = false,
       ...props
@@ -222,7 +223,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
 
     const inline = (
       <div ref={ref} className={cn(MODEL_DISPLAY_ROW_CLASS, 'text-ods-text-secondary', className)} {...props}>
-        {labelWithTooltip}
+        {renderLabel ? renderLabel({ name, provider }) : labelWithTooltip}
         {usagePanel ? (
           <UsagePanelTrigger
             usagePanel={usagePanel}

@@ -108,7 +108,13 @@ import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { type QuickActionAccent, accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { RecordActionsProvider } from './record-actions';
 import { CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
-import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
+import type {
+  SlashCommandSummary,
+  ChatInputRef,
+  DialogItem,
+  ModelDisplayProps,
+  SlashCommandActionId,
+} from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { ChatDialogCapabilities, UnifiedSendMessageOptions } from './types/unified-chat-state.types';
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
@@ -528,6 +534,8 @@ export interface EmbeddableChatProps {
   onModelClick?: () => void;
   /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
   modelTooltip?: string;
+  /** Replaces the composer’s model label, leaving its usage details in place. */
+  renderComposerModelLabel?: ModelDisplayProps['renderLabel'];
   /** The composer's own ⋯ menu, at the end of its input row (e.g. "Compact
    *  Chat Memory", disabled when there is nothing to compact). */
   composerMenuItems?: ActionsMenuItem[];
@@ -866,6 +874,7 @@ function EmbeddableChatInner({
   showModel = true,
   onModelClick,
   modelTooltip,
+  renderComposerModelLabel,
   composerMenuItems,
   composerFooterActions,
   composerContextLeading,
@@ -2758,6 +2767,7 @@ function EmbeddableChatInner({
               usagePanel: usagePanel ?? undefined,
               onModelClick,
               modelTooltip,
+              renderLabel: renderComposerModelLabel,
             }
           : undefined
       }

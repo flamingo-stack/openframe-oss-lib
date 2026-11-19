@@ -14,6 +14,25 @@ describe('ModelDisplay context budget', () => {
     expect(screen.getByText('12.3K/150K context budget')).toBeInTheDocument();
   });
 
+  it('renders a host model control alongside the context budget', () => {
+    render(
+      <ModelDisplay
+        provider="anthropic"
+        modelName="claude"
+        displayName="Claude"
+        usedTokens={12_300}
+        contextWindow={150_000}
+        renderLabel={({ name, provider }) => (
+          <button type="button">
+            {provider} {name}
+          </button>
+        )}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'anthropic Claude' })).toBeInTheDocument();
+    expect(screen.getByText('12.3K/150K context budget')).toBeInTheDocument();
+  });
+
   it('shows the budget before the first usage arrives', () => {
     render(<ModelDisplay provider="anthropic" modelName="Claude" contextWindow={150_000} />);
     expect(screen.getByText('—/150K context budget')).toBeInTheDocument();

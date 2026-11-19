@@ -671,6 +671,8 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
   onModelClick?: () => void;
   /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
   modelTooltip?: string;
+  /** Replaces the model label with a host control while keeping the context budget and usage panel. */
+  renderLabel?: (model: { name: string | undefined; provider: string | undefined }) => ReactNode;
   /**
    * The Usage panel's data (Mingo). When set, the token tail becomes a button with a ring in the chat context's colour
    * that opens the panel above it, and the hover-card breakdown is not drawn. Unset: the row is unchanged.
