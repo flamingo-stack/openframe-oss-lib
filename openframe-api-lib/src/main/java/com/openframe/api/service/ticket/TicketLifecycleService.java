@@ -235,6 +235,7 @@ public class TicketLifecycleService {
     public List<String> archiveResolvedTickets(AuthPrincipal principal, TicketFilterInput filterInput) {
         AuditCall call = AuditCall.of(TICKET_ARCHIVE, null)
                 .withCompare(false)
+                .withRecordsResult(archived -> !((List<?>) archived).isEmpty())
                 .withDetailsFromResult(archived -> archiveDetails(filterInput, archived));
         return auditedMethodRunner.run(call, () -> archiveResolved(principal, filterInput));
     }
