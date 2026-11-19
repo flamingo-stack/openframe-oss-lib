@@ -1,5 +1,6 @@
 package com.openframe.external.service;
 
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.document.apikey.APIKeyType;
 import com.openframe.data.document.tool.IntegratedTool;
@@ -9,16 +10,17 @@ import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.ToolUrlService;
+import com.openframe.external.exception.ToolProxyException;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -44,9 +46,11 @@ import static com.openframe.core.constants.HttpHeaders.AUTHORIZATION;
 import static com.openframe.core.constants.HttpHeaders.CONTENT_TYPE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -69,11 +73,18 @@ class RestProxyServiceTest {
     @Mock
     private ToolUrlService toolUrlService;
 
-    @InjectMocks
+    @Mock
+    private FleetProxyGuard fleetProxyGuard;
+
     private RestProxyService service;
 
     private HttpServer upstream;
     private final AtomicReference<ReceivedRequest> received = new AtomicReference<>();
+
+    @BeforeEach
+    void createService() {
+        service = new RestProxyService(toolRepository, proxyUrlResolver, toolUrlService, fleetProxyGuard);
+    }
 
     @AfterEach
     void stopUpstream() {
@@ -249,14 +260,13 @@ class RestProxyServiceTest {
     }
 
     @Test
-    void unsupportedTargetSchemeIs500ProxyError() {
+    void unsupportedTargetSchemeIs502ToolUnreachable() {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("ftp://rmm-api", "21", ToolUrlType.API));
         when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenReturn(URI.create("ftp://127.0.0.1:21/api"));
 
-        ResponseEntity<String> response = service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api", null), null);
+        Throwable thrown = catchThrowable(() -> service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api", null), null));
 
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        assertTrue(response.getBody().startsWith("Proxy error: "), response.getBody());
+        assertToolUnreachable(thrown);
     }
 
     @Test
@@ -411,15 +421,14 @@ class RestProxyServiceTest {
     }
 
     @Test
-    void connectionDroppedByTheToolIs500ProxyError() throws IOException {
+    void connectionDroppedByTheToolIs502ToolUnreachable() throws IOException {
         startUpstream(exchange -> exchange.close());
         RestProxyService forwarding = forwardingService(enabledTool(null));
 
-        ResponseEntity<String> response = forwarding.proxyApiRequest(TOOL_ID,
-                request("POST", "/tools/tactical-rmm/api/v1/agents", null), null);
+        Throwable thrown = catchThrowable(() -> forwarding.proxyApiRequest(TOOL_ID,
+                request("POST", "/tools/tactical-rmm/api/v1/agents", null), null));
 
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        assertTrue(response.getBody().startsWith("Proxy error: "), response.getBody());
+        assertToolUnreachable(thrown);
     }
 
     /** Service wired with the real URL resolver and URL lookup, pointing the tool's API url at the loopback upstream. */
@@ -431,7 +440,7 @@ class RestProxyServiceTest {
         when(toolRepository.findByKey(TOOL_ID)).thenReturn(Optional.of(tool));
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("test");
-        return new RestProxyService(toolRepository, new ProxyUrlResolver(environment), new ToolUrlService());
+        return new RestProxyService(toolRepository, new ProxyUrlResolver(environment), new ToolUrlService(), fleetProxyGuard);
     }
 
     private void startUpstream(int status, String responseBody) throws IOException {
@@ -488,6 +497,13 @@ class RestProxyServiceTest {
         assertEquals("en-US,en;q=0.9", headers.get(ACCEPT_LANGUAGE));
         assertEquals(APPLICATION_JSON, headers.get(CONTENT_TYPE));
         assertEquals(APPLICATION_JSON, headers.get(ACCEPT));
+    }
+
+    private static void assertToolUnreachable(Throwable thrown) {
+        assertInstanceOf(ToolProxyException.class, thrown);
+        assertEquals(ErrorCode.TOOL_UNREACHABLE, ((ToolProxyException) thrown).getErrorCode());
+        assertEquals(HttpStatus.BAD_GATEWAY, ((ToolProxyException) thrown).getHttpStatus());
+        assertFalse(thrown.getMessage().contains("127.0.0.1"), thrown.getMessage());
     }
 
     private record ReceivedRequest(String method, String uri, Headers headers, String body) {
