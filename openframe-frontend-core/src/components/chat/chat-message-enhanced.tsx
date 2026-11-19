@@ -15,6 +15,7 @@ import {
 } from '../../chat-protocol/chat-message';
 import { parseCitationHref, textWithCitationChips } from '../../chat-protocol/citations';
 import { normalizeRecordUri, parseRecordHref, recordHref, recordLinksInParts } from '../../chat-protocol/record-link';
+import { withToolAnswer } from '../../chat-protocol/tool-answer';
 import {
   CHAT_INTERRUPTED_AFTER_RUN_NOTICE,
   CHAT_INTERRUPTED_NOTICE,
@@ -213,12 +214,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
     // What the renderer maps over: source parts are not drawn in the body, and a source arriving mid-answer (a cited
     // collection) must not shift an index and remount every part after it. A system row's words are its name line.
+    // A finished turn that ends on a tool's result shows that result (a slash command's MCP answer, returned as is).
+    const shownParts = useMemo(() => (isTyping ? parts : withToolAnswer(parts)), [isTyping, parts]);
     const bodyParts = useMemo(
-      () => (isSystemRow ? [] : parts.filter(part => !isSourcePart(part))),
-      [isSystemRow, parts],
+      () => (isSystemRow ? [] : shownParts.filter(part => !isSourcePart(part))),
+      [isSystemRow, shownParts],
     );
 
-    const citations = useMessageCitations(parts);
+    const citations = useMessageCitations(shownParts);
     const { sources, numbers } = citations;
 
     const askRuns = useMemo(() => groupAskRuns(bodyParts), [bodyParts]);
@@ -402,7 +405,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const showName =
       isSystem || isOtherPerson || (authorType === 'admin' && !isUser) || (nameEveryTurn && role === 'assistant');
     const showSelfName = nameEveryTurn && isUser && !isSystem;
-    const systemLine = isSystemRow ? textOfParts(parts) : '';
+    const systemLine = isSystemRow ? textOfParts(shownParts) : '';
     const displayName = systemLine || name || (isHuman ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
     const nameLabel = <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>;
     const faceBox = 'h-5 w-5 flex-shrink-0';
