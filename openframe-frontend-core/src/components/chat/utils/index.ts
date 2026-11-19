@@ -155,7 +155,8 @@ export {
 // Library icon resolver — `icons-v2-generated`-backed, shared by the chat
 // empty-state chips, the slash-command autocomplete, AND the admin icon picker
 // (`ICON_OPTIONS`), so picked icons always display.
-export { resolveIcon, findIcon, ICON_ALIASES, ICON_OPTIONS, type IconOption } from './icon-library';
+export { resolveIcon, findIcon, ICON_OPTIONS, type IconOption } from './icon-library';
+export { ICON_ALIASES, iconRefOfName } from './icon-refs';
 export { type IconComponent } from './icon-loading';
 export {
   SOURCE_ICON_NAMES,
