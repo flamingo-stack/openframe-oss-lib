@@ -5,6 +5,9 @@ import com.openframe.api.dto.rmm.software.SoftwareActionFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareActionFilters;
 import com.openframe.api.dto.rmm.software.SoftwareActionResponse;
 import com.openframe.api.dto.shared.PageResult;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
@@ -17,6 +20,7 @@ import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareActionSummary;
+import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.repository.rmm.SoftwareActionAggregationRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
@@ -36,16 +40,23 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SoftwareActionServiceTest {
 
     private static final String TENANT = "t1";
+    private static final Instant T0 = Instant.parse("2026-10-28T23:30:00Z");
+    private static final Instant HOUR_AHEAD = Instant.now().plusSeconds(3600);
+    private static final String SCHEDULED_EXECUTION =
+            SoftwareExecutionId.forSchedule("s1", PackageManagerType.BREW, "slack");
 
     @Mock private SoftwareActionAggregationRepository aggregationRepository;
     @Mock private SoftwareScheduleRepository scheduleRepository;
@@ -61,13 +72,12 @@ class SoftwareActionServiceTest {
     void setUp() {
         service = new SoftwareActionService(aggregationRepository, scheduleRepository, assignedRepository, optionMapper, tenantIdProvider,
                 softwareScheduleTargetResolver);
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+        lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
 
     @Test
     @DisplayName("list: executed rows come from the leaf aggregation with derived status + X/Y")
     void list_executedRows() {
-        when(aggregationRepository.getDefaultSortField()).thenReturn("dispatchedAt");
         when(scheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(eq(TENANT), eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of());
         when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(1L);
@@ -94,8 +104,8 @@ class SoftwareActionServiceTest {
     }
 
     @Test
-    @DisplayName("list: upcoming schedules appear as SCHEDULED rows (0/Y) on top, merged with executed")
-    void list_mergesScheduledOnTop() {
+    @DisplayName("list: upcoming schedules appear as SCHEDULED rows (0/Y), merged with executed")
+    void list_mergesScheduledRows() {
         SoftwareSchedule schedule = SoftwareSchedule.builder()
                 .id("s1").tenantId(TENANT).createdBy("user-1").action(SoftwareAction.INSTALL)
                 .nextRunAt(Instant.now().plusSeconds(3600))
@@ -106,7 +116,7 @@ class SoftwareActionServiceTest {
                 .thenReturn(List.of(schedule));
         when(assignedRepository.countByTenantIdAndSoftwareScheduleId(TENANT, "s1")).thenReturn(7L);
         when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(0L);
-        when(aggregationRepository.findPage(eq(TENANT), any(), any(), any(), any(), eq(0), eq(24)))
+        when(aggregationRepository.findPage(eq(TENANT), any(), any(), any(), any(), eq(0), eq(25)))
                 .thenReturn(List.of());
 
         PageResult<SoftwareActionResponse> result = service.list(null, null, null, 0, 25);
@@ -171,7 +181,6 @@ class SoftwareActionServiceTest {
                 ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)).thenReturn(List.of(ran));
         when(softwareScheduleTargetResolver.resolveMachineIdsAwaitingDeviceTime(List.of(ran)))
                 .thenReturn(Map.of("ran", List.of()));
-        when(aggregationRepository.getDefaultSortField()).thenReturn("dispatchedAt");
         when(aggregationRepository.count(TENANT, null, null)).thenReturn(0L);
         when(aggregationRepository.findPage(TENANT, null, null, "dispatchedAt", Sort.Direction.DESC, 0, 25))
                 .thenReturn(List.of());
@@ -218,7 +227,7 @@ class SoftwareActionServiceTest {
                 eq(ScriptStatus.ACTIVE), any(Instant.class))).thenReturn(List.of(serverTime));
         when(assignedRepository.countByTenantIdAndSoftwareScheduleId(TENANT, "s1")).thenReturn(1L);
         when(aggregationRepository.count(TENANT, null, null)).thenReturn(0L);
-        when(aggregationRepository.findPage(TENANT, null, null, null, Sort.Direction.DESC, 0, 24))
+        when(aggregationRepository.findPage(TENANT, null, null, "dispatchedAt", Sort.Direction.DESC, 0, 25))
                 .thenReturn(List.of());
 
         // execution
@@ -288,7 +297,6 @@ class SoftwareActionServiceTest {
                 .build();
         when(scheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(eq(TENANT), eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(install));
-        when(aggregationRepository.getDefaultSortField()).thenReturn("dispatchedAt");
         when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(0L);
         when(aggregationRepository.findPage(eq(TENANT), any(), any(), any(), any(), eq(0), eq(25))).thenReturn(List.of());
         SoftwareActionFilterInput filter = new SoftwareActionFilterInput();
@@ -300,6 +308,219 @@ class SoftwareActionServiceTest {
         ArgumentCaptor<SoftwareActionQueryFilter> query = ArgumentCaptor.forClass(SoftwareActionQueryFilter.class);
         verify(aggregationRepository).count(eq(TENANT), query.capture(), any());
         assertThat(query.getValue().getKinds()).containsExactly(SoftwareActionKind.UPDATE);
+    }
+
+    @Test
+    void list_unknownSortField_rejected() {
+        // setup
+        SortInput sort = sort("hostname", SortDirection.ASC);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> service.list(null, null, sort, 0, 25));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(BadRequestException.class).hasMessageContaining("hostname");
+        verifyNoInteractions(aggregationRepository);
+    }
+
+    @Test
+    void list_processedDevicesSort_sortsExecutedRowsByRespondedMachineCount() {
+        // setup
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(0L);
+        SortInput sort = sort("processedDevices", SortDirection.ASC);
+
+        // execution
+        service.list(null, null, sort, 0, 25);
+
+        // verifications
+        verify(aggregationRepository).findPage(TENANT, null, null, "respondedMachineCount", Sort.Direction.ASC, 0, 25);
+    }
+
+    @Test
+    void list_statusSortAscending_scheduledRowBetweenInProgressAndCompleted() {
+        // setup
+        upcoming(schedule("s1", "slack", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(4L);
+        when(aggregationRepository.findPage(TENANT, null, null, "status", Sort.Direction.ASC, 0, 25)).thenReturn(List.of(
+                executed("exec-failed", "slack", SoftwareActionStatus.FAILED, 1, 1, T0),
+                executed("exec-waiting", "slack", SoftwareActionStatus.WAITING, 0, 1, T0),
+                executed("exec-progress", "slack", SoftwareActionStatus.IN_PROGRESS, 0, 1, T0),
+                executed("exec-completed", "slack", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("status", SortDirection.ASC), 0, 25);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getStatus).containsExactly(
+                SoftwareActionStatus.FAILED, SoftwareActionStatus.WAITING, SoftwareActionStatus.IN_PROGRESS,
+                SoftwareActionStatus.SCHEDULED, SoftwareActionStatus.COMPLETED);
+    }
+
+    @Test
+    void list_statusSortDescending_scheduledRowAfterCompleted() {
+        // setup
+        upcoming(schedule("s1", "slack", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(2L);
+        when(aggregationRepository.findPage(TENANT, null, null, "status", Sort.Direction.DESC, 0, 25)).thenReturn(List.of(
+                executed("exec-completed", "slack", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-failed", "slack", SoftwareActionStatus.FAILED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("status", SortDirection.DESC), 0, 25);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getStatus).containsExactly(
+                SoftwareActionStatus.COMPLETED, SoftwareActionStatus.SCHEDULED, SoftwareActionStatus.FAILED);
+    }
+
+    @Test
+    void list_processedDevicesSort_scheduledRowOrderedByProcessedThenTotal() {
+        // setup
+        upcoming(schedule("s1", "slack", HOUR_AHEAD));
+        when(assignedRepository.countByTenantIdAndSoftwareScheduleId(TENANT, "s1")).thenReturn(7L);
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(3L);
+        when(aggregationRepository.findPage(TENANT, null, null, "respondedMachineCount", Sort.Direction.ASC, 0, 25))
+                .thenReturn(List.of(
+                        executed("exec-0-of-3", "slack", SoftwareActionStatus.IN_PROGRESS, 0, 3, T0),
+                        executed("exec-0-of-9", "slack", SoftwareActionStatus.IN_PROGRESS, 0, 9, T0),
+                        executed("exec-2-of-5", "slack", SoftwareActionStatus.IN_PROGRESS, 2, 5, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("processedDevices", SortDirection.ASC), 0, 25);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getExecutionId).containsExactly(
+                "exec-0-of-3", SCHEDULED_EXECUTION, "exec-0-of-9", "exec-2-of-5");
+    }
+
+    @Test
+    void list_softwareSortTie_brokenOnDispatchTimeInRequestedDirection() {
+        // setup
+        upcoming(schedule("s1", "slack", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(1L);
+        when(aggregationRepository.findPage(TENANT, null, null, "packageName", Sort.Direction.ASC, 0, 25))
+                .thenReturn(List.of(executed("exec-slack", "slack", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("software", SortDirection.ASC), 0, 25);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getExecutionId)
+                .containsExactly("exec-slack", SCHEDULED_EXECUTION);
+    }
+
+    @Test
+    void list_secondPageScheduledRowSortedBeforeIt_pageHoldsTheNextExecutedRows() {
+        // setup
+        upcoming(schedule("s1", "b", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(4L);
+        when(aggregationRepository.findPage(TENANT, null, null, "packageName", Sort.Direction.ASC, 1, 3)).thenReturn(List.of(
+                executed("exec-c", "c", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-d", "d", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-e", "e", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("software", SortDirection.ASC), 1, 2);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getSoftware).containsExactly("c", "d");
+        assertThat(result.filteredCount()).isEqualTo(5);
+        assertThat(result.hasNext()).isTrue();
+    }
+
+    @Test
+    void list_secondPageScheduledRowSortedAfterIt_pageHoldsExecutedRowsOnly() {
+        // setup
+        upcoming(schedule("s1", "z", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(4L);
+        when(aggregationRepository.findPage(TENANT, null, null, "packageName", Sort.Direction.ASC, 1, 3)).thenReturn(List.of(
+                executed("exec-c", "c", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-d", "d", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-e", "e", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("software", SortDirection.ASC), 1, 2);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getSoftware).containsExactly("d", "e");
+    }
+
+    @Test
+    void list_thirdPageScheduledRowsBeforeAndInsideIt_pageHoldsTheRowsAtItsPosition() {
+        // setup
+        upcoming(schedule("s1", "d", HOUR_AHEAD), schedule("s2", "b", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(4L);
+        when(aggregationRepository.findPage(TENANT, null, null, "packageName", Sort.Direction.ASC, 2, 4)).thenReturn(List.of(
+                executed("exec-e", "e", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-f", "f", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("software", SortDirection.ASC), 2, 2);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getSoftware).containsExactly("e", "f");
+        assertThat(result.filteredCount()).isEqualTo(6);
+        assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void list_secondPageScheduledRowsAroundTheWindow_pageHoldsTheRowsAtItsPosition() {
+        // setup
+        upcoming(schedule("s1", "z", HOUR_AHEAD), schedule("s2", "b", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(4L);
+        when(aggregationRepository.findPage(TENANT, null, null, "packageName", Sort.Direction.ASC, 0, 4)).thenReturn(List.of(
+                executed("exec-a", "a", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-c", "c", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-d", "d", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-e", "e", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("software", SortDirection.ASC), 1, 2);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getSoftware).containsExactly("c", "d");
+    }
+
+    @Test
+    void list_firstPageScheduledRowInsideIt_pageMergesBothKinds() {
+        // setup
+        upcoming(schedule("s1", "b", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(4L);
+        when(aggregationRepository.findPage(TENANT, null, null, "packageName", Sort.Direction.ASC, 0, 2)).thenReturn(List.of(
+                executed("exec-a", "a", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-c", "c", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("software", SortDirection.ASC), 0, 2);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getSoftware).containsExactly("a", "b");
+    }
+
+    private void upcoming(SoftwareSchedule... schedules) {
+        when(scheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(eq(TENANT),
+                eq(ScriptStatus.ACTIVE), any(Instant.class))).thenReturn(List.of(schedules));
+    }
+
+    private static SoftwareSchedule schedule(String id, String packageName, Instant nextRunAt) {
+        return SoftwareSchedule.builder()
+                .id(id).tenantId(TENANT).action(SoftwareAction.INSTALL)
+                .nextRunAt(nextRunAt)
+                .packages(List.of(SoftwareSchedulePackage.builder()
+                        .packageManager(PackageManagerType.BREW).packageName(packageName).build()))
+                .build();
+    }
+
+    private static SoftwareActionSummary executed(String executionId, String name, SoftwareActionStatus status,
+                                                  int responded, int total, Instant dispatchedAt) {
+        SoftwareActionSummary row = summary(executionId, PackageManagerType.BREW, name, SoftwareAction.INSTALL,
+                status, total, responded);
+        row.setDispatchedAt(dispatchedAt);
+        return row;
+    }
+
+    private static SortInput sort(String field, SortDirection direction) {
+        return SortInput.builder().field(field).direction(direction).build();
     }
 
     private static int count(List<ScriptFilterOption> options, String value) {
