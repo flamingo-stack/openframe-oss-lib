@@ -6,7 +6,7 @@
  */
 
 import { platformAccentVarName } from '../../../utils/platform-identity';
-import { ICON_SET_NAMES } from '../../icons-v2-generated/icon-names';
+import { ICON_SET_NAMES, LUCIDE_ICON_NAMES } from '../../icons-v2-generated/icon-names';
 import type { IconRef } from './icon-loading';
 
 // A sister platform's mark is drawn in THAT platform's brand colour (the
@@ -125,6 +125,19 @@ export function iconRefOfName(iconName: string | null | undefined): IconRef | nu
   if (!iconName) return null;
   if (Object.prototype.hasOwnProperty.call(ICON_ALIASES, iconName)) return ICON_ALIASES[iconName] ?? null;
   return conventionIconRef(iconName);
+}
+
+/**
+ * The icon a name DRAWS (the design variant every chip, row and image uses): `iconRefOfName`, else lucide's icon by
+ * that name (`git-pull-request`), else `null` (the browser then draws the file glyph that says "no such icon"). ONE
+ * chain: `resolveIcon` draws it in the browser and `loadNamedIcon` on a server, so an icon image is never missing for
+ * a name the chat draws.
+ */
+export function drawnIconRefOfName(iconName: string | null | undefined): IconRef | null {
+  const ref = iconRefOfName(iconName);
+  if (ref || !iconName) return ref;
+  const lucide = iconName.trim().toLowerCase();
+  return LUCIDE_ICON_NAMES.has(lucide) ? { lucide } : null;
 }
 
 /**

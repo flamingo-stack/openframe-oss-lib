@@ -28,8 +28,8 @@
  * misconfigured row still renders.
  */
 
-import { iconFromSet, iconOf, lucideIcon, setIcon, type IconComponent } from './icon-loading';
-import { ICON_ALIASES, conventionIconRef } from './icon-refs';
+import { iconFromSet, iconOf, setIcon, type IconComponent } from './icon-loading';
+import { ICON_ALIASES, conventionIconRef, drawnIconRefOfName } from './icon-refs';
 import { getIconComponent, normalizeIconKey, registryIcon } from './icon-registry';
 
 /** The icon an alias names, or `undefined` for a name that is not an alias. */
@@ -101,15 +101,10 @@ export function resolveIcon(
     const design = iconName ? (aliasIcon(iconName) ?? resolveFromLibrary(iconName)) : undefined;
     return design ?? getIconComponent(iconName);
   }
-  if (!iconName) return setIcon('FileIcon');
-  // A stored name the set does not hold is still drawn when lucide has an icon by that name
-  // (`git-pull-request`), before the file glyph that says "no such icon".
-  return (
-    aliasIcon(iconName) ??
-    resolveFromLibrary(iconName) ??
-    lucideIcon(iconName.trim().toLowerCase()) ??
-    setIcon('FileIcon')
-  );
+  // The one chain (`drawnIconRefOfName`, which the server's icon images read too), then the file glyph that says
+  // "no such icon".
+  const ref = drawnIconRefOfName(iconName);
+  return (ref ? iconOf(ref) : null) ?? setIcon('FileIcon');
 }
 
 /** The icon a name resolves to, or `null` when the set holds none: for a caller that draws nothing in that case (`resolveIcon` draws a fallback glyph). */
