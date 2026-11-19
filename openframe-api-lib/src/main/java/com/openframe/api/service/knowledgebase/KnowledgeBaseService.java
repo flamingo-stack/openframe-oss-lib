@@ -705,12 +705,7 @@ public class KnowledgeBaseService {
         List<AuditEntry> archived = new ArrayList<>();
         for (KnowledgeBaseItem child : children) {
             if (child.getType() == KnowledgeBaseItemType.ARTICLE) {
-                archived.add(subChange(KB_ARTICLE_ARCHIVE, child.getId())
-                        .targetName(child.getName())
-                        .changes(Map.of(
-                                "status", new AuditChange(child.getStatus(), KnowledgeBaseArticleStatus.ARCHIVED),
-                                "parentId", new AuditChange(folderId, null)))
-                        .build());
+                archived.add(archivedChild(child, folderId));
                 child.setStatus(KnowledgeBaseArticleStatus.ARCHIVED);
                 child.setParentId(null);
                 toArchive.add(child);
@@ -722,8 +717,24 @@ public class KnowledgeBaseService {
         }
         if (!toArchive.isEmpty()) {
             repository.saveAll(toArchive);
-            auditRecorder.recordAll(archived);
+            auditRecorder.recordAllWithTargetFields(archived);
         }
+    }
+
+    private static AuditEntry archivedChild(KnowledgeBaseItem article, String folderId) {
+        AuditChange parentChange = new AuditChange(folderId, null);
+        KnowledgeBaseArticleStatus status = article.getStatus();
+        if (status == KnowledgeBaseArticleStatus.ARCHIVED) {
+            return subChange(KB_ITEM_MOVE, article.getId())
+                    .targetName(article.getName())
+                    .changes(Map.of("parentId", parentChange))
+                    .build();
+        }
+        return subChange(KB_ARTICLE_ARCHIVE, article.getId())
+                .targetName(article.getName())
+                .changes(Map.of("status", new AuditChange(status, KnowledgeBaseArticleStatus.ARCHIVED),
+                        "parentId", parentChange))
+                .build();
     }
 
     private boolean isDescendantOf(String candidateId, String ancestorId) {

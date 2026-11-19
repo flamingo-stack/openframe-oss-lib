@@ -11,7 +11,6 @@ import com.openframe.api.service.knowledgebase.KnowledgeBaseTagService;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
-import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.external.dto.knowledgebase.*;
 import com.openframe.external.mapper.KnowledgeBaseMapper;
@@ -463,8 +462,8 @@ public class KnowledgeBaseController {
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.debug("Generating KB attachment download URL for {} - userId: {}, apiKeyId: {}", attachmentId, caller.userId(), caller.apiKeyId());
-        KnowledgeBaseItemAttachment attachment = knowledgeBaseReadService.requireAttachment(attachmentId);
-        String downloadUrl = knowledgeBaseAttachmentService.generateDownloadUrl(attachment);
+        String downloadUrl = knowledgeBaseAttachmentService.generateDownloadUrl(attachmentId,
+                () -> knowledgeBaseReadService.requireAttachment(attachmentId));
         return new KnowledgeBaseAttachmentDownloadResponse(downloadUrl);
     }
 
@@ -481,7 +480,8 @@ public class KnowledgeBaseController {
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.info("Deleting KB attachment {} - userId: {}, apiKeyId: {}", attachmentId, caller.userId(), caller.apiKeyId());
-        knowledgeBaseAttachmentService.deleteAttachment(knowledgeBaseReadService.requireAttachment(attachmentId));
+        knowledgeBaseAttachmentService.deleteAttachment(attachmentId,
+                () -> knowledgeBaseReadService.requireAttachment(attachmentId));
     }
 
     // -------------------------------------------------------------- helpers

@@ -93,12 +93,39 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void addTagToItem(String itemId, String tagId) {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
-        Tag tag = tagRepository.findById(tagId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId));
-        KnowledgeBaseItem item = requireItem(itemId);
-        auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_ADD, KnowledgeBaseService.targetTypeOf(item), itemId,
-                Map.of("tagId", tagId, "tagKey", tag.getKey()),
-                () -> assignTag(itemId, tagId));
+        KnowledgeBaseItem item = itemRepository.findById(itemId).orElse(null);
+        Tag tag = tagRepository.findById(tagId).orElse(null);
+        auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_ADD, targetTypeOf(item), itemId, tagDetails(tagId, tag),
+                () -> {
+                    if (tag == null) {
+                        throw tagNotFound(tagId);
+                    }
+                    if (item == null) {
+                        throw itemNotFound(itemId);
+                    }
+                    return assignTag(itemId, tagId);
+                });
+    }
+
+    private static AuditTargetType targetTypeOf(KnowledgeBaseItem item) {
+        return item == null ? AuditTargetType.KB_ARTICLE : KnowledgeBaseService.targetTypeOf(item);
+    }
+
+    private static Map<String, Object> tagDetails(String tagId, Tag tag) {
+        Map<String, Object> details = new HashMap<>(Map.of("tagId", tagId));
+        if (tag != null) {
+            details.put("tagKey", tag.getKey());
+        }
+        return details;
+    }
+
+    private static NotFoundException tagNotFound(String tagId) {
+        return new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId);
+    }
+
+    private static NotFoundException itemNotFound(String itemId) {
+        return new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND,
+                "Knowledge base item not found: " + itemId);
     }
 
     private boolean assignTag(String itemId, String tagId) {
@@ -115,11 +142,9 @@ public class KnowledgeBaseTagService {
     }
 
     private boolean unassignTag(String itemId, String tagId) {
-        if (!isAssigned(itemId, tagId)) {
-            return false;
-        }
+        boolean assigned = isAssigned(itemId, tagId);
         tagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE);
-        return true;
+        return assigned;
     }
 
     private boolean isAssigned(String itemId, String tagId) {
@@ -139,24 +164,20 @@ public class KnowledgeBaseTagService {
     }
 
     private KnowledgeBaseItem requireItem(String itemId) {
-        return itemRepository.findById(itemId).orElseThrow(() -> new NotFoundException(
-                ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Knowledge base item not found: " + itemId));
+        return itemRepository.findById(itemId).orElseThrow(() -> itemNotFound(itemId));
     }
 
     private void requireExistingTag(String tagId) {
         if (!tagRepository.existsById(tagId)) {
-            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId);
+            throw tagNotFound(tagId);
         }
     }
 
     @Transactional
     public void removeTagFromItem(String itemId, String tagId) {
         log.info("Removing tag {} from KB item {}", tagId, itemId);
-        AuditTargetType targetType = itemRepository.findById(itemId)
-                .map(KnowledgeBaseService::targetTypeOf)
-                .orElse(AuditTargetType.KB_ARTICLE);
-        Map<String, Object> details = new HashMap<>(Map.of("tagId", tagId));
-        tagRepository.findById(tagId).ifPresent(tag -> details.put("tagKey", tag.getKey()));
+        AuditTargetType targetType = targetTypeOf(itemRepository.findById(itemId).orElse(null));
+        Map<String, Object> details = tagDetails(tagId, tagRepository.findById(tagId).orElse(null));
         auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_REMOVE, targetType, itemId, details,
                 () -> unassignTag(itemId, tagId));
     }

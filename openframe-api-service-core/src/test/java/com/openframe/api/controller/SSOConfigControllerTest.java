@@ -13,6 +13,7 @@ import java.util.Map;
 import static com.openframe.data.document.audit.AuditAction.AUTH_PASSWORD_LOGIN_TOGGLE;
 import static com.openframe.data.document.audit.AuditAction.SSO_CONFIG_DELETE;
 import static com.openframe.data.document.audit.AuditAction.SSO_CONFIG_TOGGLE;
+import static com.openframe.data.document.audit.AuditTargetType.SSO_CONFIG;
 import static com.openframe.data.document.sso.SSOConfig.OPENFRAME_PROVIDER;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -29,30 +30,31 @@ class SSOConfigControllerTest {
     void toggleEnabled_passwordSignInByItsShortName_recordedAsAPasswordSignInToggle() {
         controller.toggleEnabled("openframe", false);
 
-        verify(auditedMethodRunner).run(eq(AUTH_PASSWORD_LOGIN_TOGGLE), eq(OPENFRAME_PROVIDER),
-                eq(Map.of("enabled", false)), any(Runnable.class));
+        verify(auditedMethodRunner).runWhenChanged(eq(AUTH_PASSWORD_LOGIN_TOGGLE), eq(SSO_CONFIG), eq(OPENFRAME_PROVIDER),
+                eq(Map.of("enabled", false)), any());
     }
 
     @Test
     void toggleEnabled_ssoProvider_recordedAsAnSsoToggleOfThatProvider() {
         controller.toggleEnabled("google", true);
 
-        verify(auditedMethodRunner).run(eq(SSO_CONFIG_TOGGLE), eq("google"), eq(Map.of("enabled", true)),
-                any(Runnable.class));
+        verify(auditedMethodRunner).runWhenChanged(eq(SSO_CONFIG_TOGGLE), eq(SSO_CONFIG), eq("google"),
+                eq(Map.of("enabled", true)), any());
     }
 
     @Test
     void deleteConfig_passwordSignIn_recordedAsTurningPasswordSignInBackOn() {
         controller.deleteConfig(OPENFRAME_PROVIDER);
 
-        verify(auditedMethodRunner).run(eq(AUTH_PASSWORD_LOGIN_TOGGLE), eq(OPENFRAME_PROVIDER),
-                eq(Map.of("enabled", true)), any(Runnable.class));
+        verify(auditedMethodRunner).runWhenChanged(eq(AUTH_PASSWORD_LOGIN_TOGGLE), eq(SSO_CONFIG), eq(OPENFRAME_PROVIDER),
+                eq(Map.of("enabled", true)), any());
     }
 
     @Test
     void deleteConfig_ssoProvider_recordedAsAnSsoDeleteOfThatProvider() {
         controller.deleteConfig("microsoft");
 
-        verify(auditedMethodRunner).run(eq(SSO_CONFIG_DELETE), eq("microsoft"), eq(Map.of()), any(Runnable.class));
+        verify(auditedMethodRunner).runWhenChanged(eq(SSO_CONFIG_DELETE), eq(SSO_CONFIG), eq("microsoft"), eq(Map.of()),
+                any());
     }
 }

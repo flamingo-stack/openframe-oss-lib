@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -117,7 +118,7 @@ public class ScriptTagService {
         Set<String> before = tagAssignmentRepository.findByEntityIdAndEntityType(scriptId, ENTITY_TYPE).stream()
                 .map(TagAssignment::getTagId)
                 .collect(Collectors.toSet());
-        Set<String> after = tagIds == null ? Set.of() : Set.copyOf(tagIds);
+        Set<String> after = tagIds == null ? Set.of() : new HashSet<>(tagIds);
         applyTags(scriptId, tagIds);
         recordTagChanges(scriptId, before, after);
     }

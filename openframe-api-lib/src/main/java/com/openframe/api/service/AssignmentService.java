@@ -172,13 +172,18 @@ public class AssignmentService {
     @Transactional
     public void unassignItem(String itemId, AssignmentTargetType targetType, String targetId) {
         log.info("Unassigning {}:{} from item {}", targetType, targetId, itemId);
-        repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
-                .ifPresent(assignment -> auditedMethodRunner.run(linkCall(LINK_DELETE, assignment.getItemType(),
-                                itemId, targetType, targetId, assignment.getDisplayName()),
-                        () -> {
-                            repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
-                            return assignment;
-                        }));
+        ItemAssignment assignment = repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
+                .orElse(null);
+        if (assignment == null) {
+            repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+            return;
+        }
+        AuditCall call = linkCall(LINK_DELETE, assignment.getItemType(), itemId, targetType, targetId,
+                assignment.getDisplayName());
+        auditedMethodRunner.run(call, () -> {
+            repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+            return assignment;
+        });
     }
 
     /**
@@ -220,6 +225,7 @@ public class AssignmentService {
         log.info("Unassigning all {} from item {}", targetType, itemId);
         List<ItemAssignment> links = repository.findByItemIdAndTargetType(itemId, targetType);
         if (links.isEmpty()) {
+            repository.deleteByItemIdAndTargetType(itemId, targetType);
             return;
         }
         Map<String, Object> details = Map.of("targetType", targetType,

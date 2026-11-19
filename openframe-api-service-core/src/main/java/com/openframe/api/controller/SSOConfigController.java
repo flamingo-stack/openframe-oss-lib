@@ -80,8 +80,8 @@ public class SSOConfigController {
     public void toggleEnabled(@PathVariable String provider, @RequestParam boolean enabled) {
         boolean passwordLogin = isOpenframeLogin(provider);
         AuditAction action = passwordLogin ? AUTH_PASSWORD_LOGIN_TOGGLE : SSO_CONFIG_TOGGLE;
-        auditedMethodRunner.run(action, passwordLogin ? OPENFRAME_PROVIDER : provider, Map.of("enabled", enabled),
-                () -> ssoConfigService.toggleEnabled(provider, enabled));
+        auditedMethodRunner.runWhenChanged(action, action.getTargetType(), passwordLogin ? OPENFRAME_PROVIDER : provider,
+                Map.of("enabled", enabled), () -> ssoConfigService.toggleEnabled(provider, enabled));
     }
 
     @DeleteMapping("/{provider}")
@@ -90,7 +90,7 @@ public class SSOConfigController {
         boolean passwordLogin = isOpenframeLogin(provider);
         AuditAction action = passwordLogin ? AUTH_PASSWORD_LOGIN_TOGGLE : SSO_CONFIG_DELETE;
         Map<String, Object> details = passwordLogin ? Map.of("enabled", true) : Map.of();
-        auditedMethodRunner.run(action, passwordLogin ? OPENFRAME_PROVIDER : provider, details,
-                () -> ssoConfigService.deleteConfig(provider));
+        auditedMethodRunner.runWhenChanged(action, action.getTargetType(), passwordLogin ? OPENFRAME_PROVIDER : provider,
+                details, () -> ssoConfigService.deleteConfig(provider));
     }
 }

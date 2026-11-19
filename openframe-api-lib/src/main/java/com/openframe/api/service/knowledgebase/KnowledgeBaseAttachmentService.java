@@ -1,8 +1,11 @@
 package com.openframe.api.service.knowledgebase;
 
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseAttachmentUpload;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ValidationException;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemAttachmentRepository;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
@@ -17,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_ADD;
@@ -43,6 +47,7 @@ public class KnowledgeBaseAttachmentService {
     private final KnowledgeBaseItemAttachmentRepository attachmentRepository;
     private final KnowledgeBaseItemRepository articleRepository;
     private final GcsPresignedUrlService gcsPresignedUrlService;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     public List<List<KnowledgeBaseItemAttachment>> getAttachmentsByArticleIds(List<String> articleIds) {
         log.debug("Batch loading attachments for {} articles", articleIds.size());
@@ -62,15 +67,35 @@ public class KnowledgeBaseAttachmentService {
                 .orElseThrow(() -> new IllegalArgumentException("Attachment not found: " + attachmentId));
     }
 
-    @Audited(action = KB_ATTACHMENT_DOWNLOAD, targetId = "#attachment.itemId",
-            details = {"attachmentId=#attachment.id", "fileName=#attachment.fileName"})
-    public String generateDownloadUrl(KnowledgeBaseItemAttachment attachment) {
-        log.info("Generating download URL for Knowledge Base attachment: {}", attachment.getId());
+    public String generateDownloadUrl(String attachmentId, Supplier<KnowledgeBaseItemAttachment> lookup) {
+        return onAttachment(KB_ATTACHMENT_DOWNLOAD, attachmentId, () -> {
+            KnowledgeBaseItemAttachment attachment = lookup.get();
+            log.info("Generating download URL for Knowledge Base attachment: {}", attachmentId);
+            String url = gcsPresignedUrlService.generateDownloadUrl(
+                    attachment.getStoragePath(),
+                    Duration.ofMinutes(presignedUrlExpirationMinutes)
+            );
+            return new AttachmentResult<>(url, attachment);
+        });
+    }
 
-        return gcsPresignedUrlService.generateDownloadUrl(
-                attachment.getStoragePath(),
-                Duration.ofMinutes(presignedUrlExpirationMinutes)
-        );
+    private record AttachmentResult<T>(T value, KnowledgeBaseItemAttachment attachment) {
+    }
+
+    private <T> T onAttachment(AuditAction action, String attachmentId, Supplier<AttachmentResult<T>> work) {
+        AuditCall call = AuditCall.of(action, null)
+                .withCompare(false)
+                .withTargetIdInResult(true)
+                .withTargetIdFromResult(result -> ((AttachmentResult<?>) result).attachment().getItemId())
+                .withDetailsFromResult(result -> attachmentDetails(attachmentId, (AttachmentResult<?>) result));
+        return auditedMethodRunner.run(call, work::get).value();
+    }
+
+    private static Map<String, Object> attachmentDetails(String attachmentId, AttachmentResult<?> result) {
+        if (result == null) {
+            return Map.of("attachmentId", attachmentId);
+        }
+        return Map.of("attachmentId", attachmentId, "fileName", result.attachment().getFileName());
     }
 
     @Transactional
@@ -115,13 +140,15 @@ public class KnowledgeBaseAttachmentService {
     }
 
     @Transactional
-    @Audited(action = KB_ATTACHMENT_DELETE, targetId = "#attachment.itemId", compare = false,
-            details = {"attachmentId=#attachment.id", "fileName=#attachment.fileName"})
-    public void deleteAttachment(KnowledgeBaseItemAttachment attachment) {
-        log.info("Deleting Knowledge Base attachment: {}", attachment.getId());
-        gcsPresignedUrlService.deleteFile(attachment.getStoragePath());
-        attachmentRepository.delete(attachment);
-        log.info("Knowledge Base Attachment deleted: {}", attachment.getId());
+    public void deleteAttachment(String attachmentId, Supplier<KnowledgeBaseItemAttachment> lookup) {
+        onAttachment(KB_ATTACHMENT_DELETE, attachmentId, () -> {
+            KnowledgeBaseItemAttachment attachment = lookup.get();
+            log.info("Deleting Knowledge Base attachment: {}", attachmentId);
+            gcsPresignedUrlService.deleteFile(attachment.getStoragePath());
+            attachmentRepository.delete(attachment);
+            log.info("Knowledge Base Attachment deleted: {}", attachmentId);
+            return new AttachmentResult<>(attachmentId, attachment);
+        });
     }
 
     /**

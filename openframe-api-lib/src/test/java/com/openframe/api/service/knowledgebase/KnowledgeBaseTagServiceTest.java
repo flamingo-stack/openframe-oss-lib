@@ -172,7 +172,7 @@ class KnowledgeBaseTagServiceTest {
     }
 
     @Test
-    void removeTagFromItem_tagNotAssigned_nothingRemovedAndNoChangeReported() {
+    void removeTagFromItem_tagNotAssigned_noChangeReported() {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(KnowledgeBaseItem.builder().id(ITEM_ID).build()));
         when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ITEM_ID, TAG_ID, TagEntityType.KNOWLEDGE_ARTICLE))
                 .thenReturn(Optional.empty());
@@ -181,7 +181,6 @@ class KnowledgeBaseTagServiceTest {
         service.removeTagFromItem(ITEM_ID, TAG_ID);
 
         assertThat(changed).isFalse();
-        verify(tagAssignmentRepository, never()).deleteByEntityIdAndTagIdAndEntityType(ITEM_ID, TAG_ID, TagEntityType.KNOWLEDGE_ARTICLE);
     }
 
     @Test

@@ -150,15 +150,14 @@ public class SoftwareBundleService {
         Map<String, Object> details = new HashMap<>();
         details.put("bundleId", input.getId());
         details.put("softwareAction", input.getAction());
-        details.put("packages", packageNamesOf(entity));
         List<String> machineIds = currentMachineIds(entity);
         details.put("machineIds", machineIds);
         return auditedMethodRunner.run(submitCall(input, machineIds, details),
                 () -> doSubmit(entity, input, actor, details));
     }
 
-    private static List<String> packageNamesOf(SoftwareBundle entity) {
-        return Objects.requireNonNullElse(entity.getPackages(), List.<SoftwareBundlePackage>of()).stream()
+    private static List<String> packageNamesOf(List<SoftwareBundlePackage> packages) {
+        return packages.stream()
                 .map(bundlePackage -> ObjectUtils.firstNonNull(bundlePackage.getPackageName(),
                         bundlePackage.getSoftwareId()))
                 .filter(Objects::nonNull)
@@ -185,7 +184,7 @@ public class SoftwareBundleService {
             throw new BadRequestException("Cannot submit software bundle " + input.getId() + ": no devices assigned");
         }
         List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
-        details.put("packages", packages.stream().map(SoftwareBundlePackage::getPackageName).toList());
+        details.put("packages", packageNamesOf(packages));
         validatePackages(packages);
         Map<String, OsType> deviceOsTypes = requireEligibleDeviceOsTypes(machineIds, packages);
         PackageUpdateSettings updateSettings = PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings());

@@ -60,12 +60,10 @@ public class TicketNoteService {
         auditedMethodRunner.runWhenChanged(TICKET_NOTE_UPDATE, TICKET, note.getTicketId(), Map.of("noteId", noteId),
                 () -> {
                     requireAuthor(note, principal, "Only the author can update this note");
-                    if (content.equals(note.getContent())) {
-                        return false;
-                    }
+                    boolean changed = !content.equals(note.getContent());
                     note.setContent(content);
                     noteRepository.save(note);
-                    return true;
+                    return changed;
                 });
         return note;
     }

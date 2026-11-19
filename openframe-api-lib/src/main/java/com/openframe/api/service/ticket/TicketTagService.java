@@ -112,11 +112,9 @@ public class TicketTagService {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);
         log.info("Removing tag {} from ticket {} by: {}", tagId, ticketId, principal.getDisplayName());
-        if (!isAssigned(ticketId, tagId)) {
-            return false;
-        }
+        boolean assigned = isAssigned(ticketId, tagId);
         tagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(ticketId, tagId, TagEntityType.TICKET);
-        return true;
+        return assigned;
     }
 
     private boolean isAssigned(String ticketId, String tagId) {
