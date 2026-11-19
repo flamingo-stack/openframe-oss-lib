@@ -15,6 +15,7 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -46,6 +47,7 @@ public class SoftwareCatalogStatus {
     private final PackageCatalogRepository catalogRepository;
     private final SoftwarePackageMatcher packageMatcher;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final PackageAdoptReach packageAdoptReach;
     private final MachineRepository machineRepository;
     private final TenantIdProvider tenantIdProvider;
 
@@ -62,8 +64,10 @@ public class SoftwareCatalogStatus {
     }
 
     private void applyOn(Machine device, List<SoftwareResponse> rows) {
+        String machineId = device.getMachineId();
+        boolean reachable = packageAdoptReach.isReachable(machineId);
         apply(rows, manager -> PackageManagerAvailability.isPresentOn(device, manager),
-                manager -> packageManagerAvailability.isAdoptableOn(device, manager));
+                manager -> reachable && packageManagerAvailability.isAdoptableOn(device, manager));
     }
 
     private void apply(List<SoftwareResponse> rows, Predicate<PackageManagerType> manages,

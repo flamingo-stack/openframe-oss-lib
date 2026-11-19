@@ -14,6 +14,7 @@ import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -42,6 +43,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,12 +57,13 @@ class SoftwareCatalogStatusTest {
     @Mock private PackageCatalogRepository catalogRepository;
     @Mock private SoftwarePackageMatcher packageMatcher;
     @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private PackageAdoptReach packageAdoptReach;
     @Mock private MachineRepository machineRepository;
     @Mock private TenantIdProvider tenantIdProvider;
 
     private SoftwareCatalogStatus status() {
-        return new SoftwareCatalogStatus(catalogRepository, packageMatcher, packageManagerAvailability, machineRepository,
-                tenantIdProvider);
+        return new SoftwareCatalogStatus(catalogRepository, packageMatcher, packageManagerAvailability,
+                packageAdoptReach, machineRepository, tenantIdProvider);
     }
 
     @Test
@@ -544,6 +547,7 @@ class SoftwareCatalogStatusTest {
         device.setPackageManagers(packageManagers);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Optional.of(device));
+        when(packageAdoptReach.isReachable(MACHINE_ID)).thenReturn(true);
         return device;
     }
 
@@ -698,6 +702,29 @@ class SoftwareCatalogStatusTest {
                 .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getManagingPackage,
                         SoftwareResponse::getAdoptionPackage)
                 .containsExactly(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, adoptionIntoCask("slack", "4.41"));
+    }
+
+    @Test
+    void applyOnDevice_macAppOnADeviceTheAdoptOrderCannotReach_manuallyInstalledWithoutTheOffer() {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "4.40");
+        Machine mac = new Machine();
+        mac.setMachineId(MACHINE_ID);
+        mac.setPackageManagers(Map.of(PackageManagerType.BREW, PackageManagerState.PRESENT));
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Optional.of(mac));
+        when(packageAdoptReach.isReachable(MACHINE_ID)).thenReturn(false);
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(slack));
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getAdoptionPackage,
+                        SoftwareResponse::getLatestVersion)
+                .containsExactly(SoftwareAutoUpdateStatus.NO_PACKAGE, null, "4.41");
+        verify(packageManagerAvailability, never()).isAdoptableOn(mac, PackageManagerType.BREW);
     }
 
     @Test

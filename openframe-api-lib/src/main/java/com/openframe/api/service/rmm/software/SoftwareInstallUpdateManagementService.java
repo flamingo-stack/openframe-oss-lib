@@ -22,7 +22,7 @@ import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
-import com.openframe.data.nats.delivery.route.DeliveryRouter;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -60,7 +60,7 @@ public class SoftwareInstallUpdateManagementService {
     private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
     private final SoftwareActionResultRepository softwareActionResultRepository;
     private final TenantIdProvider tenantIdProvider;
-    private final DeliveryRouter deliveryRouter;
+    private final PackageAdoptReach packageAdoptReach;
     private final SoftwareInventoryService softwareInventoryService;
     private final PackageManagerAvailability packageManagerAvailability;
 
@@ -86,7 +86,7 @@ public class SoftwareInstallUpdateManagementService {
         if (adoptable.isEmpty()) {
             throw new BadRequestException("None of the given devices can adopt " + packageName + " with " + packageManager);
         }
-        List<String> targets = reachedByTheAdoptOrder(adoptable);
+        List<String> targets = packageAdoptReach.filterReachable(adoptable);
         if (targets.isEmpty()) {
             throw new BadRequestException("The adopt order reaches none of the given devices: "
                     + DeliveryType.PACKAGE_ADOPT + " is switched off or their agent is too old for it");
@@ -125,12 +125,6 @@ public class SoftwareInstallUpdateManagementService {
         Set<OsType> packageOsTypes = Set.of(packageOs);
         List<String> compatible = machinePlatformResolver.compatible(machineIds, osTypes, packageOsTypes);
         return packageManagerAvailability.adoptableOn(compatible, packageManager);
-    }
-
-    // an offline device is reachable: its order waits for it
-    private List<String> reachedByTheAdoptOrder(List<String> machineIds) {
-        Set<String> reachable = deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, machineIds);
-        return machineIds.stream().filter(reachable::contains).toList();
     }
 
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,

@@ -9,6 +9,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage;
+import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage.Outcome;
 import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage.State;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
@@ -18,6 +19,9 @@ import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
@@ -27,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -99,6 +104,43 @@ class PackageAdoptStatusProcessorTest {
         stateThenHistoryThenDelivery.verify(packageUpdateExecutionRecorder)
                 .recordDone(request, MACHINE_ID, PackageAdoptStatusProcessor.ADOPTED_SUMMARY);
         stateThenHistoryThenDelivery.verify(deliveryTracker).done(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID);
+    }
+
+    @ParameterizedTest
+    @MethodSource("doneReports")
+    void process_doneWithOutcomeAndRestart_historySaysWhatHappened(Outcome outcome, Boolean restartRequired,
+                                                                   String summary) {
+        // setup
+        PackageAdoptStatusMessage event = status(State.DONE, null);
+        event.setOutcome(outcome);
+        event.setRestartRequired(restartRequired);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.COMPLETED, null, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.COMPLETED));
+
+        // execution
+        processor.process(MACHINE_ID, event);
+
+        // verifications
+        verify(packageUpdateExecutionRecorder).recordDone(request, MACHINE_ID, summary);
+    }
+
+    @ParameterizedTest
+    @MethodSource("failedReports")
+    void process_failedWithOrWithoutAReason_errorShapedAsAnEngineError(String reason, String message, String error) {
+        // setup
+        PackageAdoptStatusMessage event = status(State.FAILED, message);
+        event.setReason(reason);
+        stubAdoptRequest();
+        stubTransition(SoftwareActionStatus.FAILED, error, true);
+        stubDeviceStates(state(MACHINE_ID, SoftwareActionStatus.FAILED));
+        when(deliveryTracker.find(DeliveryType.PACKAGE_ADOPT, REQUEST_ID, MACHINE_ID)).thenReturn(Optional.empty());
+
+        // execution
+        processor.process(MACHINE_ID, event);
+
+        // verifications
+        verify(packageUpdateExecutionRecorder).recordFailed(request, MACHINE_ID, error);
     }
 
     @Test
@@ -345,6 +387,24 @@ class PackageAdoptStatusProcessorTest {
         // verifications
         verifyNoInteractions(packageUpdateRequestRepository, packageUpdateDeviceStateRepository,
                 packageUpdateExecutionRecorder, deliveryTracker);
+    }
+
+    private static Stream<Arguments> doneReports() {
+        return Stream.of(
+                Arguments.of(null, null, "Adopted."),
+                Arguments.of(Outcome.ADOPTED_IN_PLACE, false, "Adopted in place."),
+                Arguments.of(Outcome.REINSTALLED, null, "Reinstalled."),
+                Arguments.of(Outcome.REINSTALLED, true, "Reinstalled. Restart the app."),
+                Arguments.of(null, true, "Adopted. Restart the app."));
+    }
+
+    private static Stream<Arguments> failedReports() {
+        return Stream.of(
+                Arguments.of("INSTALL_FAILED", ERROR, "INSTALL_FAILED: " + ERROR),
+                Arguments.of("MANAGER_MISSING", null, "MANAGER_MISSING"),
+                Arguments.of(null, ERROR, ERROR),
+                Arguments.of(" ", ERROR, ERROR),
+                Arguments.of(null, null, PackageAdoptStatusProcessor.FAILED_ERROR));
     }
 
     private void stubAdoptRequest() {

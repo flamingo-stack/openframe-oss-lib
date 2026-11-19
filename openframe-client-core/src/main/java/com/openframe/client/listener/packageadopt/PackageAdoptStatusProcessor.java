@@ -10,6 +10,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage;
+import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage.Outcome;
 import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage.State;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
@@ -33,6 +34,9 @@ import static org.springframework.util.StringUtils.hasText;
 public class PackageAdoptStatusProcessor {
 
     static final String ADOPTED_SUMMARY = "Adopted.";
+    static final String ADOPTED_IN_PLACE_SUMMARY = "Adopted in place.";
+    static final String REINSTALLED_SUMMARY = "Reinstalled.";
+    static final String RESTART_HINT = " Restart the app.";
     static final String FAILED_ERROR = "Adoption failed";
 
     private final MachineRepository machineRepository;
@@ -50,11 +54,11 @@ public class PackageAdoptStatusProcessor {
             return;
         }
         if (event.getState() == State.DONE) {
-            complete(request, machineId);
+            String summary = doneSummaryOf(event);
+            complete(request, machineId, summary);
             return;
         }
-        String message = event.getMessage();
-        String error = hasText(message) ? message : FAILED_ERROR;
+        String error = failedErrorOf(event);
         fail(request, machineId, error);
     }
 
@@ -81,7 +85,26 @@ public class PackageAdoptStatusProcessor {
                 .orElse(null);
     }
 
-    private void complete(PackageUpdateRequest request, String machineId) {
+    private static String doneSummaryOf(PackageAdoptStatusMessage event) {
+        Outcome outcome = event.getOutcome();
+        String summary = outcome == null ? ADOPTED_SUMMARY : switch (outcome) {
+            case ADOPTED_IN_PLACE -> ADOPTED_IN_PLACE_SUMMARY;
+            case REINSTALLED -> REINSTALLED_SUMMARY;
+        };
+        return Boolean.TRUE.equals(event.getRestartRequired()) ? summary + RESTART_HINT : summary;
+    }
+
+    // the shape of an engine error: "<reason>: <text>", or the reason alone
+    private static String failedErrorOf(PackageAdoptStatusMessage event) {
+        String message = event.getMessage();
+        String reason = event.getReason();
+        if (!hasText(reason)) {
+            return hasText(message) ? message : FAILED_ERROR;
+        }
+        return hasText(message) ? reason + ": " + message : reason;
+    }
+
+    private void complete(PackageUpdateRequest request, String machineId, String summary) {
         String requestId = request.getRequestId();
         boolean completed = packageUpdateDeviceStateRepository.finishInProgress(request.getTenantId(), requestId,
                 machineId, SoftwareActionStatus.COMPLETED, null);
@@ -90,7 +113,7 @@ public class PackageAdoptStatusProcessor {
                     requestId, machineId);
             return;
         }
-        packageUpdateExecutionRecorder.recordDone(request, machineId, ADOPTED_SUMMARY);
+        packageUpdateExecutionRecorder.recordDone(request, machineId, summary);
         rollUp(request);
         deliveryTracker.done(DeliveryType.PACKAGE_ADOPT, requestId, machineId);
         log.info("[package-adopt] adopted requestId={} machineId={} softwareId={}", requestId, machineId,

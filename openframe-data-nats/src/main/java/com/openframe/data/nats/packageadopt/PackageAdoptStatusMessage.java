@@ -25,8 +25,22 @@ public class PackageAdoptStatusMessage {
 
     private String message;
 
+    // DONE only; absent from older agents
+    @JsonFormat(with = JsonFormat.Feature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+    private Outcome outcome;
+    private Boolean restartRequired;
+
+    // FAILED only: the agent's code (MANAGER_MISSING, IDENTITY_MISMATCH, INSTALL_FAILED, ...), a string as the agent owns
+    // the list
+    private String reason;
+
     public enum State {
         DONE,
         FAILED
+    }
+
+    public enum Outcome {
+        ADOPTED_IN_PLACE,
+        REINSTALLED
     }
 }

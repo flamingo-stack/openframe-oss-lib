@@ -4,7 +4,6 @@ import com.openframe.api.dto.rmm.software.AdoptSoftwareInput;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
@@ -17,7 +16,7 @@ import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
-import com.openframe.data.nats.delivery.route.DeliveryRouter;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -69,7 +68,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     @Mock private MachinePlatformResolver machinePlatformResolver;
     @Mock private PackageManagerAvailability packageManagerAvailability;
     @Mock private DeviceService deviceService;
-    @Mock private DeliveryRouter deliveryRouter;
+    @Mock private PackageAdoptReach packageAdoptReach;
     @Mock private PackageUpdateDispatchService packageUpdateDispatchService;
     @Mock private SoftwareActionResultRepository softwareActionResultRepository;
     @Mock private TenantIdProvider tenantIdProvider;
@@ -173,7 +172,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(machineIds)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(machineIds, osTypes, WINDOWS_OS)).thenReturn(machineIds);
         when(packageManagerAvailability.adoptableOn(machineIds, PackageManagerType.CHOCO)).thenReturn(machineIds);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, machineIds)).thenReturn(Set.of(WINDOWS));
+        when(packageAdoptReach.filterReachable(machineIds)).thenReturn(List.of(WINDOWS));
         stubAdoptDispatch(null, null);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
@@ -201,7 +200,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(machineIds)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(machineIds, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, macOnly)).thenReturn(Set.of(MAC));
+        when(packageAdoptReach.filterReachable(macOnly)).thenReturn(List.of(MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
@@ -222,7 +221,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(macOnly);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, macOnly)).thenReturn(Set.of(MAC));
+        when(packageAdoptReach.filterReachable(macOnly)).thenReturn(List.of(MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
@@ -245,7 +244,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(macOnly)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(macOnly, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, macOnly)).thenReturn(Set.of(MAC));
+        when(packageAdoptReach.filterReachable(macOnly)).thenReturn(List.of(MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
@@ -268,7 +267,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(macOnly)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(macOnly, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, macOnly)).thenReturn(Set.of(MAC));
+        when(packageAdoptReach.filterReachable(macOnly)).thenReturn(List.of(MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
@@ -297,7 +296,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
 
         // verifications
         assertThat(refused.getMessage()).isEqualTo("No package to adopt Postman into");
-        verifyNoInteractions(machinePlatformResolver, deliveryRouter, deviceService, packageUpdateDispatchService);
+        verifyNoInteractions(machinePlatformResolver, packageAdoptReach, deviceService, packageUpdateDispatchService);
     }
 
     @Test
@@ -315,7 +314,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         // verifications
         assertThat(refused.getMessage())
                 .isEqualTo("A program is not adopted into WINGET: winget updates it as it is installed");
-        verifyNoInteractions(machinePlatformResolver, deliveryRouter, deviceService, packageUpdateDispatchService);
+        verifyNoInteractions(machinePlatformResolver, packageAdoptReach, deviceService, packageUpdateDispatchService);
     }
 
     @Test
@@ -333,7 +332,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
 
         // verifications
         assertThat(refused.getMessage()).isEqualTo("None of the given devices can adopt postman with BREW");
-        verifyNoInteractions(deliveryRouter, deviceService, packageUpdateDispatchService);
+        verifyNoInteractions(packageAdoptReach, deviceService, packageUpdateDispatchService);
     }
 
     @Test
@@ -343,7 +342,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, MACS)).thenReturn(Set.of(OTHER_MAC));
+        when(packageAdoptReach.filterReachable(MACS)).thenReturn(List.of(OTHER_MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
 
@@ -364,7 +363,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, MACS)).thenReturn(Set.of());
+        when(packageAdoptReach.filterReachable(MACS)).thenReturn(List.of());
 
         // execution
         BadRequestException refused = assertThrows(BadRequestException.class, () -> service.adopt(macsInput, USER));
@@ -409,7 +408,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
-        when(deliveryRouter.reachable(DeliveryType.PACKAGE_ADOPT, MACS)).thenReturn(Set.of(MAC, OTHER_MAC));
+        when(packageAdoptReach.filterReachable(MACS)).thenReturn(List.of(MAC, OTHER_MAC));
     }
 
     private void stubAdoptDispatch(BrewPackageType brewPackageType, String bundleId) {
