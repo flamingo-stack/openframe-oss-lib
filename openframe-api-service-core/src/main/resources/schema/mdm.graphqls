@@ -123,7 +123,8 @@ type DeviceMdm {
     state: MdmEnrollmentState!
     method: MdmEnrollmentMethod!
     platform: MdmPlatform!
-    """Apple only. Restart and Shut Down need a supervised iPhone or iPad; one enrolled through a link is not."""
+    """Restart and Shut Down need a supervised iPhone or iPad; one enrolled through a link is not. Always false on
+    Android, which has no supervision: show it for Apple devices only."""
     supervised: Boolean!
     enrolledAt: Instant
     unenrolledAt: Instant
