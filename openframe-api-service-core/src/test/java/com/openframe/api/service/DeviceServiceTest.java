@@ -529,8 +529,9 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: archiving a PENDING device was never CONNECTED, so the counters are not touched")
-    void archivingPending_noConnectivitySync() {
+    @DisplayName("updateStatusByMachineId: a PENDING device counts in Software, so archiving it takes it out of the counters")
+    void archivingPending_syncsConnectivityOff() {
+        // setup
         Machine m = new Machine();
         m.setMachineId("m-pen");
         m.setTenantId("t-1");
@@ -538,10 +539,30 @@ class DeviceServiceTest {
         when(machineRepository.findByMachineId("m-pen")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
+        // execution
         service().updateStatusByMachineId("m-pen", DeviceStatus.ARCHIVED);
 
+        // verifications
+        verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-pen", false);
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: archiving a DELETED device has nothing left in Software to take out")
+    void archivingDeleted_noConnectivitySync() {
+        // setup
+        Machine m = new Machine();
+        m.setMachineId("m-del");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.DELETED);
+        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
+
+        // execution
+        service().updateStatusByMachineId("m-del", DeviceStatus.ARCHIVED);
+
+        // verifications
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
-        verify(machineWriter).update(eq("m-pen"), any(MachineUpdate.class));
+        verify(machineWriter).update(eq("m-del"), any(MachineUpdate.class));
     }
 
     @ParameterizedTest

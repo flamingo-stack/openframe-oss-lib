@@ -2,6 +2,7 @@ package com.openframe.stream.handler.software;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.openframe.core.util.SoftwareNames;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetSource;
@@ -63,6 +64,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             "(/Users/[^/]+)?/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
 
     private final FleetHostResolver fleetHostResolver;
+    private final MachineFleetMembership machineFleetMembership;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
@@ -132,7 +134,12 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
-        reconcile(host, hostId, commit);
+        if (machineFleetMembership.inFleet(host)) {
+            reconcile(host, hostId, commit);
+        } else {
+            log.debug("[software-cdc] host_software for Fleet host {} of machine {} out of the fleet — skipping",
+                    hostId, host.machineId());
+        }
         recentlyReconciledHosts.put(hostId, Boolean.TRUE);
         if (snapshotRead) {
             snapshotReconciledHosts.put(hostId, Boolean.TRUE);
@@ -190,11 +197,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             }
             if (existing != null) {
                 reported.setId(existing.getId());
-                reported.setMachineConnected(existing.isMachineConnected());
                 List<String> previousCves = vulnerabilitiesOf(existing);
                 affectedCves.addAll(previousCves);
-            } else {
-                reported.setMachineConnected(true);
             }
             reported.setUpdatedAt(now);
             changed.add(reported);
@@ -225,7 +229,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private static DeviceSoftware reportedRow(FleetHostRef host, Long titleId, HostSoftwareTitle title) {
         String tenantId = host.tenantId();
         String machineId = host.machineId();
-        String name = title.getName();
+        String reportedName = title.getName();
+        String name = SoftwareNames.displayable(reportedName);
         String source = title.getSource();
         List<String> versions = versionsOf(title);
         String upgradeCode = title.getUpgradeCode();
@@ -260,11 +265,13 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         row.setAppFileNames(appFileNames);
         row.setTopLevelApp(topLevelApp);
         row.setVulnerabilities(vulnerabilities);
+        row.setMachineConnected(true);
         return row;
     }
 
     private static boolean sameContent(DeviceSoftware existing, DeviceSoftware reported) {
-        return Objects.equals(existing.getName(), reported.getName())
+        return existing.isMachineConnected() == reported.isMachineConnected()
+                && Objects.equals(existing.getName(), reported.getName())
                 && Objects.equals(existing.getSource(), reported.getSource())
                 && Objects.equals(existing.getVersions(), reported.getVersions())
                 && Objects.equals(existing.getUpgradeCode(), reported.getUpgradeCode())

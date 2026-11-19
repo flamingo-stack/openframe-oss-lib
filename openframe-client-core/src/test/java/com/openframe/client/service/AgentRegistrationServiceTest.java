@@ -16,6 +16,7 @@ import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
+import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
@@ -92,6 +93,9 @@ class AgentRegistrationServiceTest {
     @Mock
     private AgentRegistrationClientUpdateService agentRegistrationClientUpdateService;
 
+    @Mock
+    private DeletedMachineCleanup deletedMachineCleanup;
+
     @Captor
     private ArgumentCaptor<OAuthClient> oauthClientCaptor;
 
@@ -123,7 +127,8 @@ class AgentRegistrationServiceTest {
                 installedAgentService,
                 toolConnectionService,
                 agentRegistrationClientFeatureFlagsService,
-                agentRegistrationClientUpdateService
+                agentRegistrationClientUpdateService,
+                deletedMachineCleanup
         );
         request = createTestRequest();
     }
@@ -550,6 +555,54 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
+    void registerAgent_WhenPostProcessingFails_CleansUpTheDiscardedMachine() {
+        // setup
+        stubNewMachineRegistration();
+        doThrow(new IllegalStateException("post-processing failed"))
+                .when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+        stubWriterOver(savedMachineOf("tenant-1"));
+
+        // execution
+        assertThrows(IllegalStateException.class, () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        // verifications
+        verify(deletedMachineCleanup).cleanUpDeletedMachine("tenant-1", MACHINE_ID);
+    }
+
+    @Test
+    void registerAgent_WhenTheDiscardedMachineIsGone_NothingToCleanUp() {
+        // setup
+        stubNewMachineRegistration();
+        doThrow(new IllegalStateException("post-processing failed"))
+                .when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        // execution
+        assertThrows(IllegalStateException.class, () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        // verifications
+        verifyNoInteractions(deletedMachineCleanup);
+    }
+
+    @Test
+    void registerAgent_WhenTheCleanupFails_StillThrowsTheOriginalError() {
+        // setup
+        stubNewMachineRegistration();
+        IllegalStateException failure = new IllegalStateException("post-processing failed");
+        doThrow(failure).when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+        stubWriterOver(savedMachineOf("tenant-1"));
+        doThrow(new IllegalStateException("mongo is down"))
+                .when(deletedMachineCleanup).cleanUpDeletedMachine("tenant-1", MACHINE_ID);
+
+        // execution
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        // verifications
+        assertSame(failure, thrown);
+    }
+
+    @Test
     void registerAgent_RetryAfterAFailedAttempt_LeavesOneLiveDevice() {
         when(machineIdGenerator.generate()).thenReturn("failed-machine-id", MACHINE_ID);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
@@ -621,6 +674,14 @@ class AgentRegistrationServiceTest {
         Machine after = copyOf(existingMachine);
         update.getValue().applyTo(after);
         return after;
+    }
+
+    private static Machine savedMachineOf(String tenantId) {
+        Machine machine = new Machine();
+        machine.setTenantId(tenantId);
+        machine.setMachineId(MACHINE_ID);
+        machine.setStatus(DeviceStatus.PENDING);
+        return machine;
     }
 
     private static Machine copyOf(Machine source) {
