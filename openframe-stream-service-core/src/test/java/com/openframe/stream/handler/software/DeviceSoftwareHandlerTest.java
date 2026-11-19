@@ -83,6 +83,10 @@ class DeviceSoftwareHandlerTest {
                 .put("updated_at", "2026-11-17T22:00:00.000000Z");
     }
 
+    private ObjectNode lastOpened(long hostId, String time) {
+        return row().put("host_id", hostId).put("software_id", 7).put("last_opened_at", "2026-11-17T" + time + ":00Z");
+    }
+
     private HostSoftwareTitle title(long id, String name, String source, String... versions) {
         HostSoftwareTitle t = new HostSoftwareTitle();
         t.setId(id);
@@ -480,22 +484,90 @@ class DeviceSoftwareHandlerTest {
     }
 
     @Test
-    void handle_updateOfLastOpenedAtOnly_isSkipped() {
-        ObjectNode before = row().put("host_id", 100).put("software_id", 7).put("last_opened_at", "2026-11-17T21:00:00Z");
-        ObjectNode after = row().put("host_id", 100).put("software_id", 7).put("last_opened_at", "2026-11-17T22:00:00Z");
+    void handle_updateOfLastOpenedAtOnly_ofAHostNotReconciledRecently_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
 
-        handler.handle(msgIn("u", before, after, COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS, GTID_1), null);
 
-        verifyNoInteractions(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository, projectionTrigger);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
     }
 
     @Test
-    void handle_updateOfWindowsDetailsTimestampOnly_isSkipped() {
+    void handle_updateOfLastOpenedAtOnly_afterAReconcileOfTheHost_isSkipped() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 7), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache, never()).hostSoftware("t1", 100L, GTID_2);
+        verify(fleetHostResolver, times(1)).resolve("100");
+    }
+
+    @Test
+    void handle_updateOfLastOpenedAtOnly_afterALastOpenedAtReconcileOfTheHost_isSkipped() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache, never()).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_updateOfWindowsDetailsTimestampOnly_afterAReconcileOfTheHost_isSkipped() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         ObjectNode after = detailsRow(100, "A").put("updated_at", "2026-11-17T22:05:00.000000Z");
 
-        handler.handle(msgIn("u", detailsRow(100, "A"), after, COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("c", null, detailsRow(100, "A"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", detailsRow(100, "A"), after, COMMIT_TS + 1, GTID_2), null);
 
-        verifyNoInteractions(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository, projectionTrigger);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache, never()).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_updateOfLastOpenedAtOnly_ofAnotherHost_reconcilesThatHost() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.isResolvable("101")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostResolver.resolve("101")).thenReturn(new FleetHostRef("t1", "m2"));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 7), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(101, "21:00"), lastOpened(101, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 101L, GTID_2);
+    }
+
+    @Test
+    void handle_updateOfLastOpenedAtOnly_afterAFailedReconcileOfTheHost_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenThrow(new IllegalStateException("Fleet 503"));
+
+        assertThatThrownBy(() -> handler.handle(
+                msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null))
+                .isInstanceOf(IllegalStateException.class);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_realChangeAfterAReconcileOfTheHost_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", detailsRow(100, "A"), detailsRow(100, "B"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
     }
 
     @Test

@@ -54,6 +54,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     static final long RECONCILED_COMMIT_CAPACITY = 100_000;
     static final String NO_COMMIT = "0";
     static final Set<String> UNTRACKED_COLUMNS = Set.of("last_opened_at", "updated_at");
+    static final Duration HOST_REFRESH_WINDOW = Duration.ofHours(6);
+    static final long HOST_REFRESH_CAPACITY = 100_000;
 
     private static final Pattern APP_PATH = Pattern.compile("(?:.*/)?([^/]+)\\.app", Pattern.CASE_INSENSITIVE);
     private static final Pattern TOP_LEVEL_APP_PATH = Pattern.compile(
@@ -73,6 +75,10 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private final Cache<HostCommit, Boolean> reconciledCommits = Caffeine.newBuilder()
             .expireAfterWrite(RECONCILED_COMMIT_WINDOW)
             .maximumSize(RECONCILED_COMMIT_CAPACITY)
+            .build();
+    private final Cache<Long, Boolean> recentlyReconciledHosts = Caffeine.newBuilder()
+            .expireAfterWrite(HOST_REFRESH_WINDOW)
+            .maximumSize(HOST_REFRESH_CAPACITY)
             .build();
 
     @Override
@@ -100,7 +106,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (hostId == null) {
             return;
         }
-        if (onlyUntrackedColumnsChanged(payload)) {
+        if (onlyUntrackedColumnsChanged(payload) && recentlyReconciledHosts.getIfPresent(hostId) != null) {
             return;
         }
         boolean snapshotRead = isSnapshotRead(operation);
@@ -123,6 +129,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
         reconcile(host, hostId, commit);
+        recentlyReconciledHosts.put(hostId, Boolean.TRUE);
         if (snapshotRead) {
             snapshotReconciledHosts.put(hostId, Boolean.TRUE);
         }
