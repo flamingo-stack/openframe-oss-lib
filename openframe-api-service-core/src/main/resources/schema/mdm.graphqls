@@ -39,7 +39,7 @@ extend type Mutation {
     renewed. Devices it already enrolled stay managed. createMdmEnrollmentLink then makes a link with a new URL."""
     revokeMdmEnrollmentLink(id: ID!): MdmEnrollmentLink!
 
-    """Emails the link to one person."""
+    """Emails the link to one person. Rejected for an expired or revoked link."""
     sendMdmEnrollmentLink(input: SendMdmEnrollmentLinkInput!): MdmEnrollmentLink!
 
     """Sends a predefined command. Only the commands in the device's mdm.availableCommands are accepted."""
@@ -233,7 +233,8 @@ type MdmCustomCommand {
 """The payload must be a valid Apple MDM command plist whose RequestType is one of: DeviceInformation, SecurityInfo,
 InstalledApplicationList, ManagedApplicationList, ProfileList, CertificateList, ProvisioningProfileList, UserList,
 AvailableOSUpdates, OSUpdateStatus, ScheduleOSUpdateScan, ScheduleOSUpdate, Settings, RestartDevice, ShutDownDevice.
-Every other request type is rejected. Android custom commands are not accepted yet."""
+Every other request type is rejected, and so is a Settings command with an MDMOptions item: it could let the user turn
+on Activation Lock with a personal Apple ID. Android custom commands are not accepted yet."""
 input CreateMdmCustomCommandInput {
     name: String!
     description: String
