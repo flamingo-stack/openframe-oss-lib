@@ -2,8 +2,8 @@
  * A tool row the server marked as the turn's answer (`toolMetadata.resultIsAnswer`) shows its result, as the tool
  * returned it, right after the row.
  *
- * An OpenFrame slash command forces one MCP tool and returns its result as is: the model is not asked to rewrite it, and
- * the agent marks that row. Its result is the MCP tool's structured content, drawn with the parts the chat already has,
+ * A command whose declared response mode is direct returns its tool result as is: the model is not asked to rewrite
+ * it, and the agent marks that row. Its result is the MCP tool's structured content, drawn with the parts the chat has,
  * in this order:
  * - `text` (a string) as text;
  * - `groups` (quick actions: `label` over `prompts` of `label`, `prompt` and standard MCP `icons`) as `data-suggestions`;
@@ -88,21 +88,25 @@ function sourcePartOf(value: unknown): ChatSourcePart | null {
 function sourcePartsOf(result: JsonObject): ChatSourcePart[] {
   const seen = new Set<string>();
   const out: ChatSourcePart[] = [];
-  for (const value of Object.values(result)) {
-    for (const item of Array.isArray(value) ? value : [value]) {
-      const source = sourcePartOf(item);
-      if (!source || seen.has(source.sourceId)) continue;
-      seen.add(source.sourceId);
-      out.push(source);
-    }
+  for (const item of Object.values(result).flatMap(value =>
+    Array.isArray(value) ? Array.from<unknown>(value) : [value],
+  )) {
+    appendSource(item, seen, out);
   }
   return out;
 }
 
-/** The parts a tool's structured result is drawn with. Empty for a result that holds nothing to draw. */
+function appendSource(value: unknown, seen: Set<string>, sources: ChatSourcePart[]): void {
+  const source = sourcePartOf(value);
+  if (!source || seen.has(source.sourceId)) return;
+  seen.add(source.sourceId);
+  sources.push(source);
+}
+
+/** Known presentation fields use native parts; an unknown answer remains visible as its original text or JSON. */
 export function toolAnswerParts(output: unknown): ChatPart[] {
   const result = structuredResultOf(output);
-  if (!result) return [];
+  if (!result) return typeof output === 'string' && str(output) ? [{ type: 'text', text: output }] : [];
   const parts: ChatPart[] = [];
   const text = str(result.text);
   if (text) parts.push({ type: 'text', text });
@@ -114,7 +118,7 @@ export function toolAnswerParts(output: unknown): ChatPart[] {
   }
   const note = str(result.note);
   if (note) parts.push({ type: 'text', text: note });
-  return parts;
+  return parts.length > 0 ? parts : [{ type: 'text', text: JSON.stringify(result, null, 2) }];
 }
 
 function isAnswerRow(part: ChatPart): part is Extract<ChatToolPart, { state: 'output-available' }> {
@@ -126,11 +130,7 @@ function isAnswerRow(part: ChatPart): part is Extract<ChatToolPart, { state: 'ou
  * no row is marked, or a marked result holds nothing to draw.
  */
 export function withToolAnswer(parts: readonly ChatPart[]): readonly ChatPart[] {
-  if (!parts.some(isAnswerRow)) return parts;
-  const shown: ChatPart[] = [];
-  for (const part of parts) {
-    shown.push(part);
-    if (isAnswerRow(part)) shown.push(...toolAnswerParts(part.output));
-  }
+  if (parts.some(part => part.type === 'data-error') || !parts.some(isAnswerRow)) return parts;
+  const shown = parts.flatMap(part => (isAnswerRow(part) ? [part, ...toolAnswerParts(part.output)] : [part]));
   return shown.length === parts.length ? parts : shown;
 }

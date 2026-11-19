@@ -44,7 +44,7 @@ function toolPart(output: unknown, resultIsAnswer = true): ChatPart {
     input: {},
     output,
     ...(resultIsAnswer ? { toolMetadata: { resultIsAnswer: true } } : {}),
-  } as ChatPart;
+  };
 }
 
 describe('toolAnswerParts', () => {
@@ -81,10 +81,11 @@ describe('toolAnswerParts', () => {
     ]);
   });
 
-  it('draws nothing for a result that is not a structured object', () => {
-    expect(toolAnswerParts('plain words')).toEqual([]);
+  it('keeps text and unfamiliar provider answers visible without inventing presentation fields', () => {
+    expect(toolAnswerParts('plain words')).toEqual([{ type: 'text', text: 'plain words' }]);
+    expect(toolAnswerParts({ status: 'Ready' })).toEqual([{ type: 'text', text: '{\n  "status": "Ready"\n}' }]);
     expect(toolAnswerParts(null)).toEqual([]);
-    expect(toolAnswerParts('[1,2]')).toEqual([]);
+    expect(toolAnswerParts('[1,2]')).toEqual([{ type: 'text', text: '[1,2]' }]);
   });
 });
 
@@ -103,7 +104,12 @@ describe('withToolAnswer', () => {
   });
 
   it('leaves a marked row whose result holds nothing to draw', () => {
-    const parts = [toolPart('plain words')];
+    const parts = [toolPart(null)];
+    expect(withToolAnswer(parts)).toBe(parts);
+  });
+
+  it('does not promote a successful marked result after the turn failed', () => {
+    const parts: ChatPart[] = [toolPart(quickActions), { type: 'data-error', data: { title: 'Provider unavailable' } }];
     expect(withToolAnswer(parts)).toBe(parts);
   });
 });
