@@ -54,6 +54,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -170,6 +171,32 @@ class TenantSoftwareReadModelQueryTest {
 
         assertThatThrownBy(() -> query.get(TENANT, "7")).isInstanceOf(NotFoundException.class);
         assertThatThrownBy(() -> query.get(TENANT, "x")).isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void getTitles_theTenantsTitlesShapedAsTheSoftwareListRows() {
+        // setup
+        List<Long> titleIds = List.of(42L, 99L);
+        List<Software> stored = List.of(software(42L, "programs"), software(99L, "homebrew_packages"));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleIdIn(TENANT, titleIds)).thenReturn(stored);
+
+        // execution
+        List<SoftwareResponse> rows = query.getTitles(TENANT, titleIds);
+
+        // verifications
+        assertThat(rows).extracting(SoftwareResponse::getId, SoftwareResponse::getSource, SoftwareResponse::getFleetSource)
+                .containsExactly(tuple("42", SoftwareSource.UNMANAGED, FleetSource.PROGRAMS),
+                        tuple("99", SoftwareSource.BREW, FleetSource.HOMEBREW_PACKAGES));
+    }
+
+    @Test
+    void getTitles_noTitle_noneWithoutQuerying() {
+        // execution
+        List<SoftwareResponse> rows = query.getTitles(TENANT, List.of());
+
+        // verifications
+        assertThat(rows).isEmpty();
+        verifyNoInteractions(softwareRepository);
     }
 
     @Test

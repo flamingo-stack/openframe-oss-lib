@@ -83,9 +83,12 @@ extend type Query {
 
     """Devices affected by a given CVE — the hosts that have an affected software version, correlated
     to their OpenFrame Machine. Powers the vulnerability-detail "Devices" table. Each node is a Machine
-    (same shape as the top-level `devices` query)."""
+    (same shape as the top-level `devices` query). With the software read model on, `filter`, `search` and
+    `sort` work as on `devices` (deleted devices hidden unless `filter.statuses` asks for them; sortable fields
+    as on `devices`, default hostname ASC). With it off, Fleet lists the devices: `filter` and `sort` are ignored."""
     vulnerabilityDevices(
         cveId: String!,
+        filter: DeviceFilterInput,
         first: Int,
         after: String,
         last: Int,
@@ -93,6 +96,11 @@ extend type Query {
         search: String,
         sort: SortInput
     ): DeviceConnection!
+
+    """Faceted filter-option counts for a CVE's Devices table — the Customer and Status dropdowns, same scope as
+    vulnerabilityDevices(cveId, filter, search). `tagKeys`, `directorySources` and `userLinks` are []. With the
+    software read model off every option list is [] and filteredCount is 0."""
+    vulnerabilityDeviceFilters(cveId: String!, filter: DeviceFilterInput, search: String): DeviceFilters!
 
     """Software installed on one device. One row = one installed title, the same node as `softwares`.
     Version fields are read in this device's scope: `currentVersion` is the version installed here.
