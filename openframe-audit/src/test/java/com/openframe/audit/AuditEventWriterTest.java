@@ -263,6 +263,24 @@ class AuditEventWriterTest {
     }
 
     @Test
+    void write_deviceWithoutCustomer_takesTheCustomerOfTheDevice() {
+        mapsToAnEvent();
+        AuditTarget<Machine> deviceTarget = AuditTarget.of(AuditTargetType.DEVICE, Machine.class, Machine::deviceName)
+                .withOrganizationId(Machine::getOrganizationId);
+        Machine device = new Machine();
+        device.setOrganizationId("org-9");
+        when(targetRepository.load(List.of(deviceTarget), MACHINE_ID))
+                .thenReturn(Optional.of(new LoadedTarget(deviceTarget, device)));
+
+        writer(targetsOf(deviceTarget)).write(List.of(entry(AuditAction.SCRIPT_RUN).toBuilder()
+                .targetId("script-1")
+                .deviceId(MACHINE_ID)
+                .build()), JOB_CONTEXT, false);
+
+        assertThat(mappedEntry().getOrganizationId()).isEqualTo("org-9");
+    }
+
+    @Test
     void write_targetReadFails_passesTheEntryOnWithoutItsName() {
         mapsToAnEvent();
         when(targetRepository.load(List.of(TICKET_TARGET), "ticket-1"))
