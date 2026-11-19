@@ -181,25 +181,26 @@ class CommandResultListenerIT {
                         eq(Map.of(KafkaHeader.MESSAGE_TYPE_HEADER, MessageType.COMMAND_EXECUTED.name()))));
 
         JsonNode after = envelope.getValue().getPayload().getAfter();
-        assertThat(after.get("stdout").asString())
-                .doesNotContain("fixture-a181 stdout", "fixture-a181-repeat", "fixture-a181-next-line",
-                        "fixture-a181-wrap-", "second-line-of-credential", "fixture-a181-escape", "escaped-tail")
-                .contains("State     : Running", "StartMode : Auto", "State     : Paused", "StartMode : Disabled",
-                        "State     : Stopped", "StartMode : Manual",
-                        "PathName  : \"C:\\Program Files\\Example Agent\\agent.exe\" --openframe-mode",
-                        "\"C:\\First Agent\\agent.exe\"", "\"C:\\Second Agent\\agent.exe\"",
-                        "--service", "--openframe-secret-file sample.txt", "--previous");
-        assertThat(after.get("stderr").asString())
-                .doesNotContain("fixture-a181-stderr")
-                .startsWith("Probe failed for ")
-                .endsWith(" at step 2");
-        assertThat(after.get("error").asString())
-                .doesNotContain("fixture-a181-error", "fixture-a181-truncated")
-                .startsWith("Could not start ")
-                .contains(" --retry\nEarlier invocation: ");
-        assertThat(after.get("failureReason").asString())
-                .doesNotContain("fixture-a181-reason")
-                .startsWith("BLOCKED ");
+        assertThat(after.get("stdout").asString()).isEqualTo("""
+                State     : Running
+                StartMode : Auto
+                PathName  : "C:\\Program Files\\Example Agent\\agent.exe" --openframe-mode --openframe-secret "[REDACTED]" --service
+                Details   : --openframe-secret=[REDACTED] --openframe-secret-file sample.txt
+                Name      : FirstWrappedAgent
+                PathName  : "C:\\First Agent\\agent.exe" --openframe-secret\s
+                            "[REDACTED]" --service
+                State     : Paused
+                StartMode : Disabled
+                Name      : SecondWrappedAgent
+                PathName  : "C:\\Second Agent\\agent.exe" --openframe-secret "[REDACTED]" --service
+                State     : Stopped
+                StartMode : Manual
+                Previous  : --OpenFrame-Secret "[REDACTED]" --previous
+                """);
+        assertThat(after.get("stderr").asString()).isEqualTo("Probe failed for --openframe-secret='[REDACTED]' at step 2");
+        assertThat(after.get("error").asString()).isEqualTo("Could not start --openframe-secret [REDACTED] --retry\n"
+                + "Earlier invocation: --openframe-secret \"[REDACTED]");
+        assertThat(after.get("failureReason").asString()).isEqualTo("BLOCKED --openframe-secret=\"[REDACTED]\"");
         assertThat(after.get("exitCode").asInt()).isEqualTo(1);
         assertThat(after.get("executionTimeMs").asLong()).isEqualTo(28L);
         assertThat(after.get("timedOut").asBoolean()).isFalse();

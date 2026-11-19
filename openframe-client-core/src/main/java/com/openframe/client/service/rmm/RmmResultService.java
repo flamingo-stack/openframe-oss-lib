@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Transforms an RMM execution-result message (a command or a saved script)
@@ -61,21 +60,13 @@ public class RmmResultService {
         data.setTenantId(tenantIdProvider.getTenantId());
         data.setMachineId(machineId);
         data.setExecutionId(message.getExecutionId());
-        Optional.ofNullable(message.getStdout())
-                .map(OpenFrameSecretRedactor::redactOpenFrameSecret)
-                .ifPresent(data::setStdout);
-        Optional.ofNullable(message.getStderr())
-                .map(OpenFrameSecretRedactor::redactOpenFrameSecret)
-                .ifPresent(data::setStderr);
+        data.setStdout(message.getStdout());
+        data.setStderr(message.getStderr());
         data.setExitCode(message.getExitCode());
         data.setExecutionTimeMs(message.getExecutionTimeMs());
         data.setTimedOut(message.getTimedOut());
-        Optional.ofNullable(message.getError())
-                .map(OpenFrameSecretRedactor::redactOpenFrameSecret)
-                .ifPresent(data::setError);
-        Optional.ofNullable(message.getFailureReason())
-                .map(OpenFrameSecretRedactor::redactOpenFrameSecret)
-                .ifPresent(data::setFailureReason);
+        data.setError(message.getError());
+        data.setFailureReason(message.getFailureReason());
         data.setEventTimestamp(now);
         // Script-only ids: a command result has no saved script or schedule behind it.
         if (message instanceof ScriptResultMessage script) {

@@ -2,7 +2,9 @@ package com.openframe.kafka.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.kafka.model.redaction.OpenFrameSecretRedactor;
 import lombok.Data;
+import tools.jackson.databind.annotation.JsonSerialize;
 
 /**
  * Kafka event carrying the result of a dispatched RMM execution — an ad-hoc
@@ -22,12 +24,16 @@ public class RmmResultEvent extends DebeziumMessage<RmmResultEvent> implements K
     private String executionId;
     private String scriptId;
     private String scheduleId;
+    @JsonSerialize(converter = OpenFrameSecretRedactor.class)
     private String stdout;
+    @JsonSerialize(converter = OpenFrameSecretRedactor.class)
     private String stderr;
     private Integer exitCode;
     private Long executionTimeMs;
     private Boolean timedOut;
+    @JsonSerialize(converter = OpenFrameSecretRedactor.class)
     private String error;
+    @JsonSerialize(converter = OpenFrameSecretRedactor.class)
     private String failureReason;
     private Long eventTimestamp;
 }
