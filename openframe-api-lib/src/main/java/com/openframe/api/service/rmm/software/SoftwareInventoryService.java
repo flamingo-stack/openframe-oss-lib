@@ -105,6 +105,7 @@ public class SoftwareInventoryService {
     private static final String SORTABLE_FIELDS = "name, devicesCount, cveCount, highestSeverity";
     private static final String DEFAULT_SORT_FIELD = "name";
     private static final String DEVICE_SORT_FIELD = "softwareVersion";
+    private static final String DEFAULT_VULNERABILITY_SORT_FIELD = "cveId";
     private static final int TITLES_FETCH_PAGE = 500;
     private static final int TITLES_FETCH_CAP = 5000;
     private static final Map<String, String> FLEET_ORDER_KEY = Map.of(
@@ -227,13 +228,17 @@ public class SoftwareInventoryService {
     }
 
     // manageable: the titles a package manager manages (true) or the others (false). A Fleet page cannot be narrowed
-    // by it, sources, autoUpdateStatuses or osTypes and leaves them out; the read model and the full fetch apply them
+    // by it, sources, autoUpdateStatuses, osTypes or versionStatuses and leaves them out; the read model and the full
+    // fetch apply them
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
                                                      SortInput sort, Boolean vulnerable, SoftwareFilterInput filter) {
         String field = sort == null ? null : sort.getField();
         boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
         if (field != null && !SORTABLE.contains(field)) {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
+        }
+        if (softwareReadModel && hasVersionStatuses(filter)) {
+            return readModelSoftwareOfVersionStatuses(search, page, perPage, field, desc, vulnerable, filter);
         }
         if (softwareReadModel) {
             String tenantId = tenantIdProvider.getTenantId();
@@ -268,9 +273,41 @@ public class SoftwareInventoryService {
         return statusesOnEveryRow ? result : withStatuses(result);
     }
 
+    private PageResult<SoftwareResponse> readModelSoftwareOfVersionStatuses(String search, int page, Integer perPage,
+                                                                            String field, boolean desc,
+                                                                            Boolean vulnerable,
+                                                                            SoftwareFilterInput filter) {
+        List<SoftwareResponse> chosen = readModelTitles(search, vulnerable, filter);
+        String sortField = field == null ? DEFAULT_SORT_FIELD : field;
+        Comparator<SoftwareResponse> order = comparatorFor(sortField, desc);
+        List<SoftwareResponse> ordered = chosen.stream().sorted(order).toList();
+        return paginateList(ordered, page, perPage);
+    }
+
+    private List<SoftwareResponse> readModelTitles(String search, Boolean vulnerable, SoftwareFilterInput filter) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<SoftwareResponse> titles = tenantSoftwareReadModelQuery.allTitles(tenantId, search, vulnerable, filter);
+        applyStatuses(titles);
+        return titles.stream()
+                .filter(row -> matchesVersionStatus(row, filter))
+                .toList();
+    }
+
+    public static Boolean vulnerableOnly(SoftwareFilterInput filter) {
+        return filter == null || isNoCutoff(filter.getMinSeverity()) ? null : Boolean.TRUE;
+    }
+
+    private static boolean hasVersionStatuses(SoftwareFilterInput filter) {
+        return filter != null && !isEmpty(filter.getVersionStatuses());
+    }
+
     private static boolean hasStatusFilter(SoftwareFilterInput filter) {
         return filter != null && (filter.getManageable() != null || !isEmpty(filter.getSources())
-                || !isEmpty(filter.getAutoUpdateStatuses()));
+                || !isEmpty(filter.getAutoUpdateStatuses()) || !isEmpty(filter.getVersionStatuses()));
+    }
+
+    private static boolean matchesVersionStatus(SoftwareResponse row, SoftwareFilterInput filter) {
+        return filter == null || selected(filter.getVersionStatuses(), row.getVersionStatus());
     }
 
     private PageResult<SoftwareResponse> withStatuses(PageResult<SoftwareResponse> page) {
@@ -435,6 +472,8 @@ public class SoftwareInventoryService {
             return tenantSoftwareReadModelQuery.listVulnerabilitiesForSoftware(
                     tenantIdProvider.getTenantId(), softwareId, search, page, perPage, sortField, sortAsc);
         }
+        Comparator<SoftwareVulnerabilityResponse> order =
+                SoftwareVulnerabilityOrder.of(sortField, DEFAULT_VULNERABILITY_SORT_FIELD, sortAsc);
         Optional<Long> parsed = parseNumericId(softwareId);
         if (parsed.isEmpty()) {
             return PageResult.empty(page);
@@ -463,7 +502,7 @@ public class SoftwareInventoryService {
                 .filter(Objects::nonNull)
                 .filter(v -> matchesSearch(v, search))
                 .filter(v -> filter == null || selected(filter.getSeverities(), v.getSeverity()))
-                .sorted(comparator(sortField, sortAsc))
+                .sorted(order)
                 .toList();
         return paginate(all, page, perPage);
     }
@@ -473,13 +512,20 @@ public class SoftwareInventoryService {
                                                                        String search, int page, Integer perPage,
                                                                        SortInput sort) {
         Comparator<SoftwareOnDeviceResponse> order = deviceOrder(sort);
-        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
-        Set<String> tagged = taggedMachines(rows, filter);
-        List<SoftwareOnDeviceResponse> all = rows.stream()
-                .filter(row -> matchesDeviceFilter(row, filter, tagged))
+        List<SoftwareOnDeviceResponse> chosen = chosenDevices(softwareId, filter, search);
+        List<SoftwareOnDeviceResponse> all = chosen.stream()
                 .sorted(order)
                 .toList();
         return paginateList(all, page, perPage);
+    }
+
+    private List<SoftwareOnDeviceResponse> chosenDevices(String softwareId, SoftwareOnDeviceFilterInput filter,
+                                                         String search) {
+        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
+        Set<String> tagged = taggedMachines(rows, filter);
+        return rows.stream()
+                .filter(row -> matchesDeviceFilter(row, filter, tagged))
+                .toList();
     }
 
     // the filters read auto-update, so it is set on every row, not only on the page
@@ -754,6 +800,7 @@ public class SoftwareInventoryService {
                 || (selected(filter.getSources(), row.getSource())
                 && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate())
                 && selected(filter.getOsTypes(), osOf(row))
+                && selected(filter.getVersionStatuses(), row.getVersionStatus())
                 && manageable(filter.getManageable(), row.getSource()));
     }
 
@@ -779,8 +826,9 @@ public class SoftwareInventoryService {
                 || containsIgnoreCase(row.getPublisher(), search);
     }
 
-    public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, String search) {
-        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
+    public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, SoftwareOnDeviceFilterInput filter,
+                                                            String search) {
+        List<SoftwareOnDeviceResponse> rows = chosenDevices(softwareId, filter, search);
         return SoftwareOnDeviceFilters.builder()
                 .statuses(facet(rows, SoftwareOnDeviceResponse::getStatus))
                 .installedBy(facet(rows, SoftwareOnDeviceResponse::getInstalledBy))
@@ -931,11 +979,10 @@ public class SoftwareInventoryService {
     private record HostVersion(Host host, String version) {
     }
 
-    public SoftwareFilters getSoftwareFilters(String search) {
+    public SoftwareFilters getSoftwareFilters(SoftwareFilterInput filter, String search) {
+        Boolean vulnerable = vulnerableOnly(filter);
         if (softwareReadModel) {
-            String tenantId = tenantIdProvider.getTenantId();
-            List<SoftwareResponse> titles = tenantSoftwareReadModelQuery.allForFilters(tenantId, search);
-            applyStatuses(titles);
+            List<SoftwareResponse> titles = readModelTitles(search, vulnerable, filter);
             return softwareFilters(titles);
         }
         if (fleetPaging) {
@@ -945,10 +992,13 @@ public class SoftwareInventoryService {
         }
         // Facet counts don't depend on the enriched devicesCount, so bypass enrichRealDevicesCount
         // here — it would fire N Fleet /hosts lookups just to produce numbers we don't use.
-        List<SoftwareTitle> fetched = fetchAllTitles(search, null);
+        List<SoftwareTitle> fetched = fetchAllTitles(search, vulnerable);
         List<SoftwareResponse> titles = mapTitles(fetched);
         applyStatuses(titles);
-        return softwareFilters(titles);
+        List<SoftwareResponse> chosen = titles.stream()
+                .filter(row -> matchesCatalogFilter(row, filter))
+                .toList();
+        return softwareFilters(chosen);
     }
 
     private static SoftwareFilters softwareFilters(List<SoftwareResponse> titles) {
@@ -958,6 +1008,7 @@ public class SoftwareInventoryService {
                 .severities(facet(titles, row -> row.getVulnerabilitySummary() == null
                         ? null : row.getVulnerabilitySummary().getHighestSeverity()))
                 .autoUpdateStatuses(facet(titles, SoftwareResponse::getAutoUpdate))
+                .osTypes(facet(titles, SoftwareInventoryService::osOf))
                 .build();
     }
 
@@ -1047,21 +1098,6 @@ public class SoftwareInventoryService {
         }
         String needle = search.toLowerCase(Locale.ROOT);
         return row.getCveId() != null && row.getCveId().toLowerCase(Locale.ROOT).contains(needle);
-    }
-
-    private static Comparator<SoftwareVulnerabilityResponse> comparator(String field, boolean ascending) {
-        Comparator<SoftwareVulnerabilityResponse> base = switch (field == null ? "" : field) {
-            case "severity", "cvssScore" -> Comparator.comparing(
-                    SoftwareVulnerabilityResponse::getCvssScore,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "discoveredAt", "discovered" -> Comparator.comparing(
-                    SoftwareVulnerabilityResponse::getDiscoveredAt,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            default -> Comparator.comparing(
-                    SoftwareVulnerabilityResponse::getCveId,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-        };
-        return ascending ? base : base.reversed();
     }
 
     private static PageResult<SoftwareVulnerabilityResponse> paginate(List<SoftwareVulnerabilityResponse> all,
