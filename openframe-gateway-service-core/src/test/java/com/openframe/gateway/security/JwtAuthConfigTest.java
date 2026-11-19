@@ -9,6 +9,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import com.openframe.gateway.security.revocation.RevokedKeyRegistry;
 import com.openframe.gateway.security.tenant.IssuerUrlProvider;
 import com.openframe.security.jwt.JwtConfig;
 import com.sun.net.httpserver.HttpExchange;
@@ -100,7 +101,8 @@ class JwtAuthConfigTest {
         ReflectionTestUtils.setField(config, "discoveryFailureTtl", Duration.ofMinutes(1));
 
         LoadingCache<String, ReactiveAuthenticationManager> cache =
-                config.issuerManagersCache(new ReactiveJwtAuthenticationConverter(), jwtConfig, issuerUrlProvider);
+                config.issuerManagersCache(new ReactiveJwtAuthenticationConverter(), jwtConfig, issuerUrlProvider,
+                        new RevokedKeyRegistry(Duration.ofHours(1)));
         resolver = config.jwtIssuerAuthenticationManagerResolver(cache, jwtConfig, issuerUrlProvider);
     }
 

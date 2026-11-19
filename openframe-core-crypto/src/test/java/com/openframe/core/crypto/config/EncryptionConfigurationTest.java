@@ -13,11 +13,15 @@ import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.core.crypto.service.SecretPurpose;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import com.openframe.core.exception.EncryptionException;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.security.GeneralSecurityException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EncryptionConfigurationTest {
 
@@ -131,8 +135,7 @@ class EncryptionConfigurationTest {
         runner.withPropertyValues(
                         "security.encryption.keyset=" + cleartextKeyset,
                         "security.encryption.cleartext-keyset-allowed=true",
-                        "security.encryption.tink-write.enabled=true",
-                        "security.encryption.required=true")
+                        "security.encryption.tink-write.enabled=true")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     EncryptionService service = context.getBean(EncryptionService.class);
@@ -166,5 +169,51 @@ class EncryptionConfigurationTest {
                     EncryptionService service = context.getBean(EncryptionService.class);
                     assertThat(service.isLegacy(service.encrypt("secret", CONTEXT))).isTrue();
                 });
+    }
+
+    @Test
+    void refusesCleartextKeysetWhenRequired() {
+        // setup
+        EncryptionConfiguration configuration = new EncryptionConfiguration();
+        ObjectProvider<KmsClient> noKms = noKmsClient();
+
+        // execution / verifications
+        assertThatThrownBy(() -> configuration.encryptionService(
+                cleartextKeyset, "", true, true, true, true, PASSWORD, SALT, noKms))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("kms-key-uri");
+    }
+
+    @Test
+    void legacyReadOffRefusesLegacyValuesButReadsTink() {
+        // setup
+        EncryptionService service = new EncryptionConfiguration().encryptionService(
+                cleartextKeyset, "", true, false, true, false, PASSWORD, SALT, noKmsClient());
+        String legacyValue = new EncryptionService(PASSWORD, SALT).encrypt("secret", CONTEXT);
+
+        // execution
+        String tinkValue = service.encrypt("secret", CONTEXT);
+
+        // verifications
+        assertThat(service.decrypt(tinkValue, CONTEXT)).isEqualTo("secret");
+        assertThatThrownBy(() -> service.decrypt(legacyValue, CONTEXT))
+                .isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    void legacyReadOffWithTinkWriteOffFailsAtStartup() {
+        // setup
+        EncryptionConfiguration configuration = new EncryptionConfiguration();
+        ObjectProvider<KmsClient> noKms = noKmsClient();
+
+        // execution / verifications
+        assertThatThrownBy(() -> configuration.encryptionService(
+                cleartextKeyset, "", true, false, false, false, PASSWORD, SALT, noKms))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("legacy-read");
+    }
+
+    private static ObjectProvider<KmsClient> noKmsClient() {
+        return new StaticListableBeanFactory().getBeanProvider(KmsClient.class);
     }
 }
