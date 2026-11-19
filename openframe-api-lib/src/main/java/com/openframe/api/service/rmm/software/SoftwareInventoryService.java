@@ -227,6 +227,19 @@ public class SoftwareInventoryService {
         return inFleet || autoUpdateService.hasPolicy(softwareId);
     }
 
+    private PageResult<SoftwareResponse> readModelSoftware(String search, int page, Integer perPage, SortInput sort,
+                                                           Boolean vulnerable, SoftwareFilterInput filter) {
+        if (hasVersionStatuses(filter)) {
+            String field = sort == null ? null : sort.getField();
+            boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
+            return readModelSoftwareOfVersionStatuses(search, page, perPage, field, desc, vulnerable, filter);
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        PageResult<SoftwareResponse> readModelPage = tenantSoftwareReadModelQuery.listSoftware(tenantId, search,
+                page, perPage, sort, vulnerable, filter);
+        return withStatuses(readModelPage);
+    }
+
     // manageable: the titles a package manager manages (true) or the others (false). A Fleet page cannot be narrowed
     // by it, sources, autoUpdateStatuses, osTypes or versionStatuses and leaves them out; the read model and the full
     // fetch apply them
@@ -237,14 +250,8 @@ public class SoftwareInventoryService {
         if (field != null && !SORTABLE.contains(field)) {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
-        if (softwareReadModel && hasVersionStatuses(filter)) {
-            return readModelSoftwareOfVersionStatuses(search, page, perPage, field, desc, vulnerable, filter);
-        }
         if (softwareReadModel) {
-            String tenantId = tenantIdProvider.getTenantId();
-            PageResult<SoftwareResponse> readModelPage = tenantSoftwareReadModelQuery.listSoftware(tenantId, search,
-                    page, perPage, sort, vulnerable, filter);
-            return withStatuses(readModelPage);
+            return readModelSoftware(search, page, perPage, sort, vulnerable, filter);
         }
         if (fleetPaging) {
             return withStatuses(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
