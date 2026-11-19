@@ -9,16 +9,20 @@ import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
 import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.InternalException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.exception.ValidationException;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -70,6 +74,7 @@ public class TicketLifecycleService {
     private final TicketStatusHistoryService historyService;
     private final List<TicketEventListener> listeners;
     private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
 
     @Transactional
     public Ticket transition(AuthPrincipal principal, @Valid TransitionTicketInput input) {
@@ -251,13 +256,27 @@ public class TicketLifecycleService {
         List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filterInput);
 
         Query idsQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
-        List<String> resolvedIds = ticketRepository.findTicketsWithCursor(idsQuery, null, 0, "order", "ASC")
-                .stream().map(Ticket::getId).toList();
+        List<Ticket> resolvedTickets = ticketRepository.findTicketsWithCursor(idsQuery, null, 0, "order", "ASC");
 
         Query updateQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
         ticketRepository.reassignTicketsToStatus(updateQuery, archived.getId(), archived.getKind());
-        log.info("Archived {} resolved tickets (lifecycle)", resolvedIds.size());
-        return resolvedIds;
+        log.info("Archived {} resolved tickets (lifecycle)", resolvedTickets.size());
+        auditRecorder.recordAll(resolvedTickets.stream()
+                .map(ticket -> archivedEntry(ticket, archived.getId()))
+                .toList());
+        return resolvedTickets.stream().map(Ticket::getId).toList();
+    }
+
+    private static AuditEntry archivedEntry(Ticket ticket, String archivedStatusId) {
+        return AuditEntry.builder()
+                .action(TICKET_ARCHIVE)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(ticket.getId())
+                .targetName(ticket.getTitle())
+                .organizationId(ticket.getOrganizationId())
+                .deviceId(ticket.getDeviceId())
+                .changes(Map.of("statusId", new AuditChange(ticket.getStatusId(), archivedStatusId)))
+                .build();
     }
 
     @Transactional

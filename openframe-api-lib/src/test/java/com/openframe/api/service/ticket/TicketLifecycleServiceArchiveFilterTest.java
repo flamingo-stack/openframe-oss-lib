@@ -1,13 +1,17 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -24,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.data.document.audit.AuditAction.TICKET_ARCHIVE;
@@ -59,8 +64,10 @@ class TicketLifecycleServiceArchiveFilterTest {
     private final TicketStatusDefinition resolved = definition("st-resolved", TicketStatusKind.RESOLVED);
     private final TicketStatusDefinition archived = definition("st-archived", TicketStatusKind.ARCHIVED);
     private final Query query = new Query();
+    private List<Ticket> resolvedTickets = List.of();
 
     private final AuditedMethodRunner auditedMethodRunner = mock(AuditedMethodRunner.class, CALLS_REAL_METHODS);
+    private final AuditRecorder auditRecorder = mock(AuditRecorder.class);
 
     private TicketLifecycleService service;
 
@@ -68,11 +75,12 @@ class TicketLifecycleServiceArchiveFilterTest {
     void setUp() {
         service = new TicketLifecycleService(ticketRepository, statusRepository, transitionPolicy,
                 tenantIdProvider, ticketTagService, ticketIdsForFilter, ticketResolverStamp,
-                historyService, List.of(listener), auditedMethodRunner);
+                historyService, List.of(listener), auditedMethodRunner, auditRecorder);
         when(statusRepository.findByKind(TicketStatusKind.RESOLVED)).thenReturn(Optional.of(resolved));
         when(statusRepository.findByKind(TicketStatusKind.ARCHIVED)).thenReturn(Optional.of(archived));
         when(ticketRepository.buildTicketQuery(any(), isNull(), any(), isNull())).thenReturn(query);
-        when(ticketRepository.findTicketsWithCursor(eq(query), isNull(), anyInt(), any(), any())).thenReturn(List.of());
+        when(ticketRepository.findTicketsWithCursor(eq(query), isNull(), anyInt(), any(), any()))
+                .thenAnswer(_ -> resolvedTickets);
     }
 
     @Test
@@ -85,6 +93,26 @@ class TicketLifecycleServiceArchiveFilterTest {
         assertThat(call.getValue().recordsResult())
                 .rejects(List.of())
                 .accepts(List.of("t-1"));
+    }
+
+    @Test
+    void archiveResolvedTickets_eachArchivedTicket_recordedWithItsCustomerDeviceAndStatusChange() {
+        Ticket printer = Ticket.builder().id("t-1").title("Printer offline").organizationId("org-1")
+                .deviceId("machine-1").statusId("st-resolved").build();
+        resolvedTickets = List.of(printer);
+
+        List<String> archivedIds = service.archiveResolvedTickets(admin, null);
+
+        assertThat(archivedIds).containsExactly("t-1");
+        ArgumentCaptor<List<AuditEntry>> entries = ArgumentCaptor.captor();
+        verify(auditRecorder).recordAll(entries.capture());
+        assertThat(entries.getValue()).singleElement()
+                .returns(TICKET_ARCHIVE, AuditEntry::getAction)
+                .returns("t-1", AuditEntry::getTargetId)
+                .returns("Printer offline", AuditEntry::getTargetName)
+                .returns("org-1", AuditEntry::getOrganizationId)
+                .returns("machine-1", AuditEntry::getDeviceId)
+                .returns(Map.of("statusId", new AuditChange("st-resolved", "st-archived")), AuditEntry::getChanges);
     }
 
     @Test

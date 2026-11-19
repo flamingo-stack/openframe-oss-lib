@@ -150,6 +150,7 @@ public class LogController {
     @GetMapping("/details")
     @ResponseStatus(OK)
     @Audited(action = AUDIT_LOG_EVENT_VIEW, targetId = "#toolEventId",
+            organizationId = "#result?.customerId", deviceId = "#result?.deviceId",
             details = {"ingestDay=#ingestDay", "toolType=#toolType", "eventType=#eventType"})
     public LogDetailsResponse getLogDetails(
             @Parameter(description = "Ingest day of the log entry", required = true)

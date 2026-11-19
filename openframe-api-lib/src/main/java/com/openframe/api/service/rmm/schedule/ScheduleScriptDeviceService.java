@@ -103,12 +103,12 @@ public class ScheduleScriptDeviceService {
      */
     @Transactional
     @Audited(action = SCRIPT_SCHEDULE_DEVICES_ADD, targetId = "#scheduleId", compare = false,
-            details = "machineIds=#machineIds")
-    public void addDevices(String scheduleId, List<String> machineIds, String actorUserId) {
+            condition = "!#result.isEmpty()", details = "machineIds=#result")
+    public List<String> addDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
         ScheduleScript schedule = requireVisibleSchedule(tenantId, scheduleId);
         if (machineIds == null || machineIds.isEmpty()) {
-            return;
+            return List.of();
         }
         Set<String> requested = new LinkedHashSet<>(machineIds);
         validateDevices(tenantId, schedule.getSupportedPlatforms(), requested);
@@ -133,23 +133,29 @@ public class ScheduleScriptDeviceService {
             armDeviceOnline(tenantId, schedule, rows.stream().map(ScheduleScriptMachineAssigned::getMachineId).collect(toSet()));
         }
         log.info("Added {} device(s) to script schedule id={} tenantId={}", rows.size(), scheduleId, tenantId);
+        return rows.stream().map(ScheduleScriptMachineAssigned::getMachineId).toList();
     }
 
     /** Incrementally unassign devices from a schedule (missing ids are simply no-ops). */
     @Transactional
     @Audited(action = SCRIPT_SCHEDULE_DEVICES_REMOVE, targetId = "#scheduleId", compare = false,
-            details = "machineIds=#machineIds")
-    public void removeDevices(String scheduleId, List<String> machineIds, String actorUserId) {
+            condition = "!#result.isEmpty()", details = "machineIds=#result")
+    public List<String> removeDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
         requireVisibleSchedule(tenantId, scheduleId);
         if (machineIds == null || machineIds.isEmpty()) {
-            return;
+            return List.of();
         }
         Set<String> ids = new LinkedHashSet<>(machineIds);
-        long removed = assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(tenantId, scheduleId, ids);
+        Set<String> assigned = assignedRepository.findByTenantIdAndScriptScheduleId(tenantId, scheduleId).stream()
+                .map(ScheduleScriptMachineAssigned::getMachineId)
+                .collect(toSet());
+        List<String> removed = ids.stream().filter(assigned::contains).toList();
+        assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(tenantId, scheduleId, ids);
         disarmDeviceOnline(tenantId, scheduleId, ids);
         deliveryRefresher.cancelForMachines(scheduleId, ids, DEVICE_REMOVED);
-        log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
+        log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed.size(), scheduleId, tenantId);
+        return removed;
     }
 
     public void requireExistingDevices(Collection<String> machineIds) {

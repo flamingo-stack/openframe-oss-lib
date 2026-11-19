@@ -34,6 +34,7 @@ public class SoftwareInstallUpdatedDataFetcher {
 
     @DgsMutation
     @Audited(action = SOFTWARE_INSTALL, compare = false,
+            targetId = "#input.machineIds.size() == 1 ? rawId(#input.machineIds[0]) : null",
             details = {"machineIds=#input.machineIds", "packages=#input.packages.![packageName ?: softwareId]"})
     public List<SoftwareDispatchResult> installSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.install(input, getCurrentUserId(), ExecutionSource.PACKAGE_INSTALLATION);
@@ -41,6 +42,7 @@ public class SoftwareInstallUpdatedDataFetcher {
 
     @DgsMutation
     @Audited(action = SOFTWARE_UPDATE, compare = false,
+            targetId = "#input.machineIds.size() == 1 ? rawId(#input.machineIds[0]) : null",
             details = {"machineIds=#input.machineIds", "packages=#input.packages.![packageName ?: softwareId]"})
     public List<SoftwareDispatchResult> updateSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.update(input, getCurrentUserId(), ExecutionSource.PACKAGE_UPDATE);

@@ -274,7 +274,8 @@ public class KnowledgeBaseDataFetcher {
 
     @DgsMutation
     @Audited(action = KB_ATTACHMENT_ADD, targetId = "rawId(#input.articleId)", compare = false,
-            details = "tempIds=#input.tempIds")
+            condition = "!#result.isEmpty()",
+            details = {"tempIds=#input.tempIds", "attachmentIds=#result.![id]", "fileNames=#result.![fileName]"})
     public List<KnowledgeBaseItemAttachment> linkKnowledgeBaseTempAttachmentsToArticle(@InputArgument @Valid LinkKnowledgeBaseTempAttachmentsInput input) {
         String currentUserId = getCurrentUserId();
         String articleId = input.getArticleId();

@@ -6,19 +6,27 @@ import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.TestRunPolicy;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.data.document.rmm.command.CommandExecution;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.openframe.data.document.audit.AuditAction.COMMAND_RUN;
+import static com.openframe.data.document.audit.AuditAction.EXECUTION_CANCEL;
 
 @Slf4j
 @Service
@@ -30,6 +38,9 @@ public class CommandDispatchService {
     private final DeviceService deviceService;
     private final CommandExecutionService commandExecutionService;
     private final TestRunPolicy testRunPolicy;
+    private final ScriptExecutionRepository scriptExecutionRepository;
+    private final CommandExecutionRepository commandExecutionRepository;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     @Audited(action = COMMAND_RUN, targetId = "rawId(#input.machineId)", compare = false,
             details = {"command=#input.command", "shell=#input.shell", "privilegeLevel=#input.privilegeLevel",
@@ -105,6 +116,24 @@ public class CommandDispatchService {
      * Dispatch a cancel request for an in-flight execution.
      */
     public DispatchResponse cancelExecution(CancelExecutionInput input) {
+        String machineId = input.getMachineId();
+        String executionId = input.getExecutionId();
+        AuditCall call = AuditCall.of(EXECUTION_CANCEL, executionRowId(machineId, executionId),
+                        Map.of("executionId", executionId))
+                .withCompare(false)
+                .withDeviceIdOf(_ -> machineId);
+        return auditedMethodRunner.run(call, () -> publishCancel(input));
+    }
+
+    private String executionRowId(String machineId, String executionId) {
+        return scriptExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
+                .map(ScriptExecution::getId)
+                .or(() -> commandExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
+                        .map(CommandExecution::getId))
+                .orElse(executionId);
+    }
+
+    private DispatchResponse publishCancel(CancelExecutionInput input) {
         CancelMessage message = CancelMessage.builder()
                 .executionId(input.getExecutionId())
                 .build();

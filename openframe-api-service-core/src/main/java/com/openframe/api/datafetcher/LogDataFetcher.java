@@ -75,7 +75,8 @@ public class LogDataFetcher {
     }
 
     @DgsQuery
-    @Audited(action = AUDIT_LOG_EVENT_VIEW, targetId = "#toolEventId",
+    @Audited(action = AUDIT_LOG_EVENT_VIEW, targetId = "#toolEventId", condition = "#result != null",
+            organizationId = "#result?.organizationId", deviceId = "#result?.deviceId",
             details = {"toolType=#toolType", "eventType=#eventType", "ingestDay=#ingestDay"})
     public LogDetails logDetails(
             @InputArgument @NotBlank String ingestDay,

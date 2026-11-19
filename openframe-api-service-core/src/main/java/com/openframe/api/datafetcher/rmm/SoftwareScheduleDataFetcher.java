@@ -49,8 +49,6 @@ import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_AR
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CRITERIA_SET;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DELETE;
-import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_ADD;
-import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_REMOVE;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_SET;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_UNARCHIVE;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_UPDATE;
@@ -140,8 +138,6 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_ADD, targetId = "rawId(#scheduleId)", compare = false,
-            details = "machineIds=#machineIds.![#root.rawId(#this)]")
     public SoftwareScheduleResponse addDevicesToSoftwareSchedule(@InputArgument @NotBlank String scheduleId,
                                                                 @InputArgument List<String> machineIds,
                                                                 @AuthenticationPrincipal AuthPrincipal principal) {
@@ -153,8 +149,6 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_REMOVE, targetId = "rawId(#scheduleId)", compare = false,
-            details = "machineIds=#machineIds.![#root.rawId(#this)]")
     public SoftwareScheduleResponse removeDevicesFromSoftwareSchedule(@InputArgument @NotBlank String scheduleId,
                                                                      @InputArgument List<String> machineIds,
                                                                      @AuthenticationPrincipal AuthPrincipal principal) {

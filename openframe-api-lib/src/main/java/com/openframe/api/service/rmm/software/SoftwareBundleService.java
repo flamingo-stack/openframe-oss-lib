@@ -149,18 +149,22 @@ public class SoftwareBundleService {
         Map<String, Object> details = new HashMap<>();
         details.put("bundleId", input.getId());
         details.put("softwareAction", input.getAction());
-        details.put("machineIds", currentMachineIds(entity));
-        return auditedMethodRunner.run(submitCall(input, details), () -> doSubmit(entity, input, actor, details));
+        List<String> machineIds = currentMachineIds(entity);
+        details.put("machineIds", machineIds);
+        return auditedMethodRunner.run(submitCall(input, machineIds, details),
+                () -> doSubmit(entity, input, actor, details));
     }
 
-    private static AuditCall submitCall(SubmitSoftwareBundleInput input, Map<String, Object> details) {
+    private static AuditCall submitCall(SubmitSoftwareBundleInput input, List<String> machineIds,
+                                        Map<String, Object> details) {
         if (input.getSchedule() != null) {
             return AuditCall.of(SOFTWARE_SCHEDULE_CREATE, null, details)
                     .withCompare(false)
                     .withTargetIdInResult(true)
                     .withTargetIdFromResult(result -> ((SoftwareBundleResponse) result).getScheduleId());
         }
-        return AuditCall.of(input.getAction().select(SOFTWARE_INSTALL, SOFTWARE_UPDATE), null, details);
+        String machineId = machineIds.size() == 1 ? machineIds.getFirst() : null;
+        return AuditCall.of(input.getAction().select(SOFTWARE_INSTALL, SOFTWARE_UPDATE), machineId, details);
     }
 
     private SoftwareBundleResponse doSubmit(SoftwareBundle entity, SubmitSoftwareBundleInput input, String actor,

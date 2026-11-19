@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
 import com.openframe.api.service.rmm.schedule.ScheduleGrid;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -32,6 +33,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_ADD;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_REMOVE;
 
 @Slf4j
 @Service
@@ -175,11 +179,13 @@ public class SoftwareScheduleService {
         return toResponse(entity);
     }
 
-    public void addDevices(String scheduleId, List<String> machineIds, String actor) {
+    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_ADD, targetId = "#scheduleId", compare = false,
+            condition = "!#result.isEmpty()", details = "machineIds=#result")
+    public List<String> addDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
         if (machineIds == null || machineIds.isEmpty()) {
-            return;
+            return List.of();
         }
         List<PackageManagerType> managers = managersOf(entity.getPackages());
         packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
@@ -193,15 +199,21 @@ public class SoftwareScheduleService {
         if (!rows.isEmpty()) {
             assignedRepository.saveAll(rows);
         }
+        return rows.stream().map(SoftwareScheduleMachineAssigned::getMachineId).toList();
     }
 
-    public void removeDevices(String scheduleId, List<String> machineIds, String actor) {
+    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_REMOVE, targetId = "#scheduleId", compare = false,
+            condition = "!#result.isEmpty()", details = "machineIds=#result")
+    public List<String> removeDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         loadVisibleOrThrow(tenantId, scheduleId);
         if (machineIds == null || machineIds.isEmpty()) {
-            return;
+            return List.of();
         }
+        Set<String> assigned = new HashSet<>(assignedMachineIds(tenantId, scheduleId));
+        List<String> removed = machineIds.stream().distinct().filter(assigned::contains).toList();
         assignedRepository.deleteByTenantIdAndSoftwareScheduleIdAndMachineIdIn(tenantId, scheduleId, machineIds);
+        return removed;
     }
 
     public SoftwareScheduleResponse setDeviceCriteria(String scheduleId, ScheduleDeviceCriteria criteria, String actor) {

@@ -1,5 +1,6 @@
 package com.openframe.api.config;
 
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
@@ -51,8 +52,12 @@ public class DataInitializer {
                                 client.setClientSecret(clientSecret);
                                 client.setGrantTypes(new String[]{"password", "refresh_token"});
                                 client.setScopes(new String[]{"read", "write"});
-                                auditedMethodRunner.run(PLATFORM_OAUTH_CLIENT_REGISTER, null,
-                                        Map.of("clientId", clientId), () -> clientRepository.save(client));
+                                AuditCall call = AuditCall.of(PLATFORM_OAUTH_CLIENT_REGISTER, null,
+                                                Map.of("clientId", clientId))
+                                        .withCompare(false)
+                                        .withTargetIdInResult(true)
+                                        .withTargetIdFromResult(saved -> ((OAuthClient) saved).getId());
+                                auditedMethodRunner.run(call, () -> clientRepository.save(client));
                                 log.info("Created OAuth client: {}", clientId);
                             }
                     );

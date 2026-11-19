@@ -123,7 +123,8 @@ public class AuditEventWriter {
     }
 
     private AuditEntry withDeviceOrganization(AuditEntry entry) {
-        if (entry.getOrganizationId() != null || entry.getDeviceId() == null) {
+        boolean deviceIsTheTarget = entry.targetTypeOrDefault() == AuditTargetType.DEVICE;
+        if (entry.getOrganizationId() != null || entry.getDeviceId() == null || deviceIsTheTarget) {
             return entry;
         }
         try {
