@@ -15,7 +15,6 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
-import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
@@ -27,7 +26,6 @@ import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.organization.OrganizationRepository;
-import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
@@ -78,7 +76,6 @@ class SoftwareInventoryServiceReadModelTest {
     @Mock private OrganizationRepository organizationRepository;
     @Mock private SoftwareScheduleRepository softwareScheduleRepository;
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
-    @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
 
     private SoftwareInventoryService service;
 
@@ -87,8 +84,7 @@ class SoftwareInventoryServiceReadModelTest {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
-                softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository);
+                softwareScheduleRepository, softwareScheduleTargetResolver);
         ReflectionTestUtils.setField(service, "softwareReadModel", true);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
@@ -117,11 +113,6 @@ class SoftwareInventoryServiceReadModelTest {
     private void stubDeviceTimeSchedules(SoftwareSchedule... schedules) {
         when(softwareScheduleRepository.findByTenantIdAndStatusAndTriggerAndTimeReference(TENANT, ScriptStatus.ACTIVE,
                 ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)).thenReturn(List.of(schedules));
-    }
-
-    private static ScheduleLocalMachineTimeDispatch ranOn(String machineId) {
-        return ScheduleLocalMachineTimeDispatch.builder()
-                .machineId(machineId).lastOccurrenceAt(Instant.parse("2026-11-01T09:00:00Z")).build();
     }
 
     private static SoftwareSchedule schedule(SoftwareAction action, SoftwareSchedulePackage scheduledPackage) {
@@ -294,7 +285,7 @@ class SoftwareInventoryServiceReadModelTest {
     }
 
     @Test
-    void listDevicesForSoftware_oneOffUpdateAtDeviceTime_onlyDevicesWithoutARecordedRunAreScheduledUpdate() {
+    void listDevicesForSoftware_updateAtDeviceTime_onlyDevicesStillAwaitingTheRunAreScheduledUpdate() {
         // setup
         when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
         when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
@@ -304,9 +295,8 @@ class SoftwareInventoryServiceReadModelTest {
         update.setId("s1");
         SoftwareSchedule install = schedule(SoftwareAction.INSTALL, scheduledPackage("42", "xz"));
         stubDeviceTimeSchedules(update, install);
-        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m1", "m2"));
-        when(scheduleDeviceLocalDispatchRepository.findByScheduleIdAndMachineIdIn("s1", List.of("m1", "m2")))
-                .thenReturn(List.of(ranOn("m2")));
+        when(softwareScheduleTargetResolver.resolveMachineIdsAwaitingDeviceTime(List.of(update)))
+                .thenReturn(Map.of("s1", List.of("m1")));
 
         // execution
         PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 20, null);
@@ -316,28 +306,6 @@ class SoftwareInventoryServiceReadModelTest {
                 .containsExactly(tuple("m1", SoftwareOnDeviceStatus.SCHEDULED_UPDATE),
                         tuple("m2", SoftwareOnDeviceStatus.UP_TO_DATE),
                         tuple("m3", SoftwareOnDeviceStatus.UP_TO_DATE));
-        verify(softwareScheduleTargetResolver, never()).resolveMachineIds(install);
-    }
-
-    @Test
-    void listDevicesForSoftware_repeatingUpdateAtDeviceTime_aDeviceThatAlreadyRanStaysScheduledUpdate() {
-        // setup
-        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
-        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
-        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
-                .thenReturn(List.of(onDevice("m1")));
-        SoftwareSchedule update = schedule(SoftwareAction.UPDATE, scheduledPackage("42", "xz"));
-        update.setRepeat(86400L);
-        stubDeviceTimeSchedules(update);
-        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m1"));
-
-        // execution
-        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 20, null);
-
-        // verifications
-        assertThat(result.items()).extracting(SoftwareOnDeviceResponse::getStatus)
-                .containsExactly(SoftwareOnDeviceStatus.SCHEDULED_UPDATE);
-        verifyNoInteractions(scheduleDeviceLocalDispatchRepository);
     }
 
     @Test
