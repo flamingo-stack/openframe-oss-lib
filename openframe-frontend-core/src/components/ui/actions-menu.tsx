@@ -1,5 +1,6 @@
 'use client';
 
+import { autoUpdate } from '@floating-ui/react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { Check } from 'lucide-react';
@@ -55,6 +56,8 @@ export interface ActionsMenuItem {
    */
   closeOnSelect?: boolean;
   submenu?: ActionsMenuItem[];
+  /** Submenu placement boundary, inherited by descendants. Defaults to the owning surface. */
+  submenuBoundary?: 'surface' | 'viewport';
   /** Render the row in the error/destructive color (label + icon). */
   danger?: boolean;
   /** Optional URL for navigation items */
@@ -121,9 +124,18 @@ interface ActionsMenuRowContextValue {
 /** What a menu's rows read from the menu they are in (a submenu's rows included). */
 const ActionsMenuRowContext = React.createContext<ActionsMenuRowContextValue>({ variant: 'default' });
 
+interface OpenSubmenu {
+  depth: number;
+  close: () => void;
+}
+
+const OpenSubmenusContext = React.createContext<Map<string, OpenSubmenu> | null>(null);
+
 interface MenuItemProps {
   item: ActionsMenuItem;
   onItemClick?: (item: ActionsMenuItem) => void;
+  depth?: number;
+  submenuBoundary?: 'surface' | 'viewport';
 }
 
 // A row's glyphs, the leading one and the trailing action's: 16px, 24px from md (the menu
@@ -209,7 +221,25 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
   );
 };
 
-const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
+function useViewportSubmenuOffset(trigger: React.RefObject<HTMLDivElement | null>, content: HTMLDivElement | null) {
+  const [offset, setOffset] = React.useState(4);
+  React.useLayoutEffect(() => {
+    const anchor = trigger.current;
+    if (!anchor || !content) return undefined;
+    const viewport = window.visualViewport;
+    const measure = () => {
+      const bounds = anchor.getBoundingClientRect();
+      const left = viewport?.offsetLeft ?? 0;
+      const right = left + (viewport?.width ?? document.documentElement.clientWidth);
+      const space = Math.max(bounds.left - left, right - bounds.right);
+      setOffset(Math.min(4, space - content.getBoundingClientRect().width));
+    };
+    return autoUpdate(anchor, content, measure);
+  }, [trigger, content]);
+  return offset;
+}
+
+const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, submenuBoundary = 'surface' }) => {
   // Submenus below portal + collide against the OWNING surface, matching the
   // root menu (`DropdownMenuContent`). Read unconditionally — hooks first.
   const portalContainer = usePortalContainer();
@@ -217,6 +247,40 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
   const viewportPadding = useViewportCollisionPadding();
   const { variant, keyboardMoved } = React.useContext(ActionsMenuRowContext);
   const skin = MENU_SKIN[variant];
+  const boundary = item.submenuBoundary ?? submenuBoundary;
+  const viewport = boundary === 'viewport';
+  const [subOpen, setSubOpen] = React.useState(false);
+  const submenuKeyboardMoved = React.useRef(false);
+  const submenuRowContext = React.useMemo(() => ({ variant, keyboardMoved: submenuKeyboardMoved }), [variant]);
+  React.useEffect(() => {
+    if (!subOpen) submenuKeyboardMoved.current = false;
+  }, [subOpen]);
+  const subTriggerRef = React.useRef<HTMLDivElement>(null);
+  const [subContent, setSubContent] = React.useState<HTMLDivElement | null>(null);
+  const viewportSideOffset = useViewportSubmenuOffset(subTriggerRef, subContent);
+  const submenuId = React.useId();
+  const openSubmenus = React.useContext(OpenSubmenusContext);
+  React.useEffect(() => {
+    if (!subOpen || !openSubmenus) return undefined;
+    openSubmenus.set(submenuId, {
+      depth,
+      close: () => {
+        setSubOpen(false);
+        subTriggerRef.current?.focus();
+      },
+    });
+    return () => {
+      openSubmenus.delete(submenuId);
+    };
+  }, [subOpen, openSubmenus, submenuId, depth]);
+  const registerRow = (row: React.ReactElement) =>
+    depth > 0 ? (
+      <DropdownMenuPrimitive.Item asChild disabled={item.disabled} onSelect={event => event.preventDefault()}>
+        {row}
+      </DropdownMenuPrimitive.Item>
+    ) : (
+      row
+    );
   const activate = useCallback(() => {
     if (item.disabled) return;
     if (item.type === 'checkbox') {
@@ -335,18 +399,20 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
   if (renderAsLink && item.href) {
     return (
       <div className={skin.wrapper}>
-        <Link
-          href={item.href}
-          prefetch={false}
-          target={item.openInNewTab ? '_blank' : undefined}
-          rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
-          className={itemClasses}
-          onClick={handleLinkClick}
-          aria-disabled={item.disabled}
-          tabIndex={item.disabled ? -1 : undefined}
-        >
-          {rowContent}
-        </Link>
+        {registerRow(
+          <Link
+            href={item.href}
+            prefetch={false}
+            target={item.openInNewTab ? '_blank' : undefined}
+            rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
+            className={itemClasses}
+            onClick={handleLinkClick}
+            aria-disabled={item.disabled}
+            tabIndex={item.disabled ? -1 : undefined}
+          >
+            {rowContent}
+          </Link>,
+        )}
         {item.iconAction && <SecondaryAction action={item.iconAction} />}
       </div>
     );
@@ -355,28 +421,59 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
   if (item.type === 'submenu' && item.submenu) {
     return (
       <div className={skin.wrapper}>
-        <DropdownMenuPrimitive.Sub>
-          <DropdownMenuPrimitive.SubTrigger disabled={item.disabled} className={subTriggerClasses}>
+        <DropdownMenuPrimitive.Sub open={subOpen} onOpenChange={setSubOpen}>
+          <DropdownMenuPrimitive.SubTrigger
+            ref={subTriggerRef}
+            disabled={item.disabled}
+            className={subTriggerClasses}
+            onPointerLeave={event => {
+              if (
+                viewport &&
+                subOpen &&
+                event.relatedTarget instanceof Node &&
+                subContent?.contains(event.relatedTarget)
+              )
+                event.preventDefault();
+            }}
+          >
             {rowContent}
           </DropdownMenuPrimitive.SubTrigger>
-          <DropdownMenuPrimitive.Portal container={portalContainer ?? undefined}>
+          <DropdownMenuPrimitive.Portal container={viewport ? undefined : (portalContainer ?? undefined)}>
             <DropdownMenuPrimitive.SubContent
-              sideOffset={4}
+              ref={viewport ? setSubContent : undefined}
+              sideOffset={viewport ? viewportSideOffset : 4}
+              onKeyDownCapture={() => {
+                submenuKeyboardMoved.current = true;
+              }}
+              onPointerMoveCapture={() => {
+                submenuKeyboardMoved.current = false;
+              }}
               // Confine flip/shift (and the available-height this menu sizes
               // itself by) to the owning surface — see `useCollisionBoundary`.
-              collisionBoundary={collisionBoundary ?? undefined}
+              collisionBoundary={viewport ? undefined : (collisionBoundary ?? undefined)}
               collisionPadding={
-                collisionBoundary ? COLLISION_PADDING_PX : withViewportPadding(undefined, viewportPadding)
+                !viewport && collisionBoundary ? COLLISION_PADDING_PX : withViewportPadding(undefined, viewportPadding)
               }
               hideWhenDetached
               className={cn(
-                'z-[1500] max-h-[var(--radix-popper-available-height)] min-w-[256px] overflow-y-auto rounded-md border p-0 shadow-xl',
+                'z-[1500] max-h-[var(--radix-popper-available-height)] overflow-y-auto rounded-md border p-0 shadow-xl',
+                viewport
+                  ? 'min-w-[min(256px,calc((100vw-var(--spacing-system-mf)*3)/2))] max-w-[calc((100vw-var(--spacing-system-mf)*3)/2)]'
+                  : 'min-w-[256px]',
                 skin.frame,
               )}
             >
-              {item.submenu.map((subItem, index) => (
-                <MenuItem key={subItem.id || index} item={subItem} onItemClick={onItemClick} />
-              ))}
+              <ActionsMenuRowContext.Provider value={submenuRowContext}>
+                {item.submenu.map((subItem, index) => (
+                  <MenuItem
+                    key={subItem.id || index}
+                    item={subItem}
+                    onItemClick={onItemClick}
+                    depth={depth + 1}
+                    submenuBoundary={boundary}
+                  />
+                ))}
+              </ActionsMenuRowContext.Provider>
             </DropdownMenuPrimitive.SubContent>
           </DropdownMenuPrimitive.Portal>
         </DropdownMenuPrimitive.Sub>
@@ -387,24 +484,26 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
 
   return (
     <div className={skin.wrapper}>
-      <div
-        role={item.type === 'radio' ? 'menuitemradio' : 'menuitem'}
-        aria-checked={item.type === 'radio' ? !!item.checked : undefined}
-        tabIndex={item.disabled ? -1 : 0}
-        aria-disabled={item.disabled}
-        className={itemClasses}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        onMouseEnter={item.onHoverStart}
-        onMouseLeave={item.onHoverEnd}
-        // Focus previews a row only when the user moved it there (see `ActionsMenuItem.onHoverStart`).
-        onFocus={() => {
-          if (keyboardMoved?.current) item.onHoverStart?.();
-        }}
-        onBlur={item.onHoverEnd}
-      >
-        {rowContent}
-      </div>
+      {registerRow(
+        <div
+          role={item.type === 'radio' ? 'menuitemradio' : 'menuitem'}
+          aria-checked={item.type === 'radio' ? !!item.checked : undefined}
+          tabIndex={item.disabled ? -1 : 0}
+          aria-disabled={item.disabled}
+          className={itemClasses}
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+          onMouseEnter={item.onHoverStart}
+          onMouseLeave={item.onHoverEnd}
+          // Focus previews a row only when the user moved it there (see `ActionsMenuItem.onHoverStart`).
+          onFocus={() => {
+            if (keyboardMoved?.current) item.onHoverStart?.();
+          }}
+          onBlur={item.onHoverEnd}
+        >
+          {rowContent}
+        </div>,
+      )}
       {item.iconAction && <SecondaryAction action={item.iconAction} />}
     </div>
   );
@@ -632,18 +731,23 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
   // dialog's listener runs first, on the document, and closes the chat's panel with the menu inside it. So the menu hears
   // the key first, before the document does.
   const closedByEscape = React.useRef(false);
+  const openSubmenus = React.useMemo(() => new Map<string, OpenSubmenu>(), []);
   React.useEffect(() => {
     if (!open || loading) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
       event.stopPropagation();
-      closedByEscape.current = true;
-      setOpen(false);
+      const deepest = [...openSubmenus.values()].sort((a, b) => b.depth - a.depth)[0];
+      if (deepest) deepest.close();
+      else {
+        closedByEscape.current = true;
+        setOpen(false);
+      }
     };
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [open, loading, setOpen]);
+  }, [open, loading, setOpen, openSubmenus]);
 
   const handleItemClick = useCallback(
     (item: ActionsMenuItem) => {
@@ -687,6 +791,8 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
           keyboardMoved.current = true;
         }}
         onKeyDown={event => {
+          if (event.defaultPrevented || event.currentTarget !== (event.target as HTMLElement).closest('[role="menu"]'))
+            return;
           const move = MENU_ROW_KEYS[event.key];
           if (!move) return;
           const rows = menuRows(contentRef.current);
@@ -705,16 +811,18 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
         }}
         className={cn('overflow-visible border-0 bg-transparent p-0 shadow-none', contentClassName)}
       >
-        <ActionsMenuRowContext.Provider value={rowContext}>
-          <ActionsMenu
-            groups={groups}
-            onItemClick={handleItemClick}
-            className={className}
-            header={header}
-            variant={variant}
-            scrollFade={scrollFade}
-          />
-        </ActionsMenuRowContext.Provider>
+        <OpenSubmenusContext.Provider value={openSubmenus}>
+          <ActionsMenuRowContext.Provider value={rowContext}>
+            <ActionsMenu
+              groups={groups}
+              onItemClick={handleItemClick}
+              className={className}
+              header={header}
+              variant={variant}
+              scrollFade={scrollFade}
+            />
+          </ActionsMenuRowContext.Provider>
+        </OpenSubmenusContext.Provider>
       </DropdownMenuContent>
     </DropdownMenu>
   );
