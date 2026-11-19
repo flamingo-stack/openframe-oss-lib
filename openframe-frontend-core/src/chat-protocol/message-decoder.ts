@@ -338,7 +338,13 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         if (raw.success === false) {
           out.push({ type: 'tool-output-error', toolCallId, dynamic: true, errorText: str(raw.result) ?? '' });
         } else {
-          out.push({ type: 'tool-output-available', toolCallId, dynamic: true, output: raw.result ?? null });
+          out.push({
+            type: 'tool-output-available',
+            toolCallId,
+            dynamic: true,
+            output: raw.result ?? null,
+            ...(raw.resultIsAnswer === true ? { toolMetadata: { resultIsAnswer: true } } : {}),
+          });
         }
         break;
       }

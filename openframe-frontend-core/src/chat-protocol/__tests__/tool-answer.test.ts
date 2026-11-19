@@ -35,7 +35,7 @@ const searchResult = {
   totalCount: 2,
 };
 
-function toolPart(output: unknown): ChatPart {
+function toolPart(output: unknown, resultIsAnswer = true): ChatPart {
   return {
     type: 'dynamic-tool',
     toolName: 'list_quick_actions',
@@ -43,6 +43,7 @@ function toolPart(output: unknown): ChatPart {
     state: 'output-available',
     input: {},
     output,
+    ...(resultIsAnswer ? { toolMetadata: { resultIsAnswer: true } } : {}),
   } as ChatPart;
 }
 
@@ -88,21 +89,21 @@ describe('toolAnswerParts', () => {
 });
 
 describe('withToolAnswer', () => {
-  it('adds the result of the tool a turn ends on after its row', () => {
-    const parts = [toolPart(JSON.stringify(quickActions))];
+  it('draws the result of a row the server marked as the answer right after that row', () => {
+    const text: ChatPart = { type: 'text', text: 'Before.' };
+    const parts = [text, toolPart(JSON.stringify(quickActions))];
     const shown = withToolAnswer(parts);
-    expect(shown[0]).toBe(parts[0]);
-    expect(shown.map(part => part.type)).toEqual(['dynamic-tool', 'text', 'data-suggestions', 'text']);
+    expect(shown[1]).toBe(parts[1]);
+    expect(shown.map(part => part.type)).toEqual(['text', 'dynamic-tool', 'text', 'data-suggestions', 'text']);
   });
 
-  it('leaves a turn the model answered in words: its tools are steps of that answer', () => {
-    const parts: ChatPart[] = [toolPart(JSON.stringify(quickActions)), { type: 'text', text: 'Here you go.' }];
+  it('leaves a row the server did not mark, even when the turn ends on it', () => {
+    const parts = [toolPart(JSON.stringify(quickActions), false)];
     expect(withToolAnswer(parts)).toBe(parts);
   });
 
-  it('leaves a turn whose last tool has not answered', () => {
-    const running = { ...toolPart(null), state: 'input-available' } as ChatPart;
-    const parts = [running];
+  it('leaves a marked row whose result holds nothing to draw', () => {
+    const parts = [toolPart('plain words')];
     expect(withToolAnswer(parts)).toBe(parts);
   });
 });

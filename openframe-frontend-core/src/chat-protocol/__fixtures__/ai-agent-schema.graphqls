@@ -701,6 +701,7 @@ type ExecutedToolData implements MessageData {
     integratedToolType: ToolType
     toolFunction: String!
     result: String
+  resultIsAnswer: Boolean
     success: Boolean
     requiredApproval: Boolean
     approvalStatus: ToolApprovalStatus

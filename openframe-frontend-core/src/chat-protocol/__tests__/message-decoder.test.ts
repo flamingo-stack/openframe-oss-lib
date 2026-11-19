@@ -283,6 +283,20 @@ describe('createMingoDecoder: the table', () => {
     ).toEqual([{ type: 'tool-output-error', toolCallId: 'x', dynamic: true, errorText: 'bad' }]);
   });
 
+  it('a result the server marked as the answer carries the mark on its row', () => {
+    const chunks = decodeAll({
+      type: 'EXECUTED_TOOL',
+      toolExecutionRequestId: 'x',
+      toolFunction: 'list_quick_actions',
+      result: '{"text":"Hi"}',
+      success: true,
+      resultIsAnswer: true,
+    });
+    expect(partsOf(chunks)).toMatchObject([
+      { type: 'dynamic-tool', toolCallId: 'x', state: 'output-available', toolMetadata: { resultIsAnswer: true } },
+    ]);
+  });
+
   it('a result that reached this reader alone still has a row to land on', () => {
     const chunks = decodeAll({
       type: 'EXECUTED_TOOL',

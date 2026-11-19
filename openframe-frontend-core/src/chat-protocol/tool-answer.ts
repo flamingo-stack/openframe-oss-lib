@@ -1,16 +1,17 @@
 /**
- * A turn that ends on a tool's result shows that result as the answer, as the tool returned it.
+ * A tool row the server marked as the turn's answer (`toolMetadata.resultIsAnswer`) shows its result, as the tool
+ * returned it, right after the row.
  *
- * An OpenFrame slash command forces one MCP tool and returns its result as is (the model is not asked to rewrite it),
- * so the turn ends on the tool part with no text after it. Its result is the MCP tool's structured content, drawn with
- * the parts the chat already has, in this order:
+ * An OpenFrame slash command forces one MCP tool and returns its result as is: the model is not asked to rewrite it, and
+ * the agent marks that row. Its result is the MCP tool's structured content, drawn with the parts the chat already has,
+ * in this order:
  * - `text` (a string) as text;
  * - `groups` (quick actions: `label` over `prompts` of `label`, `prompt` and standard MCP `icons`) as `data-suggestions`;
  * - every record it lists (a source part: `source-url` or `source-document` with a `record://` `sourceId`) as
  *   `data-record-cards`, beside its source part, which gives the card its title and link;
  * - `note` (a string) as text.
  *
- * A turn with text after its last tool part is an answer the model wrote: its tools stay tool rows.
+ * Every other tool row stays a row: only the server says a result is the answer.
  */
 import type { ChatPart, ChatSourcePart, ChatSuggestionGroup, ChatSuggestionPrompt, ChatToolPart } from './chat-message';
 import { isToolPart } from './chat-message';
@@ -116,23 +117,20 @@ export function toolAnswerParts(output: unknown): ChatPart[] {
   return parts;
 }
 
-function endsOnToolResult(parts: readonly ChatPart[]): ChatToolPart | null {
-  for (let index = parts.length - 1; index >= 0; index -= 1) {
-    const part = parts[index];
-    // Words after the tool: the model answered, so the tool is a step of that answer.
-    if (part.type === 'text' && part.text.trim() !== '') return null;
-    if (isToolPart(part)) return part.state === 'output-available' ? part : null;
-  }
-  return null;
+function isAnswerRow(part: ChatPart): part is Extract<ChatToolPart, { state: 'output-available' }> {
+  return isToolPart(part) && part.state === 'output-available' && part.toolMetadata?.resultIsAnswer === true;
 }
 
 /**
- * The message's parts, with the result of the tool it ends on drawn after that tool's row. The same array when the
- * message does not end on a tool result, or the result holds nothing to draw.
+ * The message's parts, with the result of each row marked as the answer drawn right after that row. The same array when
+ * no row is marked, or a marked result holds nothing to draw.
  */
 export function withToolAnswer(parts: readonly ChatPart[]): readonly ChatPart[] {
-  const last = endsOnToolResult(parts);
-  if (!last || last.state !== 'output-available') return parts;
-  const answer = toolAnswerParts(last.output);
-  return answer.length > 0 ? [...parts, ...answer] : parts;
+  if (!parts.some(isAnswerRow)) return parts;
+  const shown: ChatPart[] = [];
+  for (const part of parts) {
+    shown.push(part);
+    if (isAnswerRow(part)) shown.push(...toolAnswerParts(part.output));
+  }
+  return shown.length === parts.length ? parts : shown;
 }

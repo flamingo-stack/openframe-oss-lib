@@ -214,8 +214,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
     // What the renderer maps over: source parts are not drawn in the body, and a source arriving mid-answer (a cited
     // collection) must not shift an index and remount every part after it. A system row's words are its name line.
-    // A finished turn that ends on a tool's result shows that result (a slash command's MCP answer, returned as is).
-    const shownParts = useMemo(() => (isTyping ? parts : withToolAnswer(parts)), [isTyping, parts]);
+    // A tool row the server marked as the answer shows its result (a slash command's MCP answer, returned as is).
+    const shownParts = useMemo(() => withToolAnswer(parts), [parts]);
     const bodyParts = useMemo(
       () => (isSystemRow ? [] : shownParts.filter(part => !isSourcePart(part))),
       [isSystemRow, shownParts],
