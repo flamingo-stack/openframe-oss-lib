@@ -13,14 +13,15 @@ import java.time.Instant;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class PackageMatch {
 
-    private static final PackageMatch NO_PACKAGE = new PackageMatch(null, false);
-    private static final PackageMatch AMBIGUOUS = new PackageMatch(null, true);
+    private static final PackageMatch NO_PACKAGE = new PackageMatch(null, false, null);
+    private static final PackageMatch AMBIGUOUS = new PackageMatch(null, true, null);
 
     private final PackageCatalogEntry entry;
     private final boolean candidatesFound;
+    private final PackageCatalogEntry bestCandidate;
 
     public static PackageMatch of(PackageCatalogEntry entry) {
-        return new PackageMatch(entry, true);
+        return new PackageMatch(entry, true, null);
     }
 
     public static PackageMatch noPackage() {
@@ -30,6 +31,15 @@ public class PackageMatch {
     // several unrelated packages answer the program: which one is not known
     public static PackageMatch ambiguous() {
         return AMBIGUOUS;
+    }
+
+    // the same, with the candidate that fits best: an adoption offers it to the admin instead of giving up
+    public static PackageMatch ambiguous(PackageCatalogEntry bestCandidate) {
+        return new PackageMatch(null, true, bestCandidate);
+    }
+
+    public PackageMatch orBestCandidate() {
+        return bestCandidate == null ? this : of(bestCandidate);
     }
 
     public boolean isMatched() {

@@ -291,6 +291,7 @@ impl ToolConnectionProcessingManager {
                         } else {
                             info!(
                                 tool_id = %tool.tool_id,
+                                stderr = %String::from_utf8_lossy(&output.stderr).trim(),
                                 "agentId command returned empty output - retrying"
                             );
                             reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;

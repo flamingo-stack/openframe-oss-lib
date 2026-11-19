@@ -16,6 +16,7 @@ class FleetSoftwareTypeTest {
             "chrome_extensions, BROWSER_EXTENSION",
             "firefox_addons, BROWSER_EXTENSION",
             "homebrew_packages, PACKAGE",
+            "homebrew_casks, PACKAGE",
             "chocolatey_packages, PACKAGE",
             "winget_packages, PACKAGE",
             "deb_packages, PACKAGE",

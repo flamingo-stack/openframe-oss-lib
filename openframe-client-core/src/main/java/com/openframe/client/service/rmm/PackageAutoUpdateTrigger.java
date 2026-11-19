@@ -23,6 +23,7 @@ import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
+import com.openframe.data.service.rmm.MachinePlatformResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -56,6 +57,7 @@ public class PackageAutoUpdateTrigger {
     private final PackageUpdateDispatchService packageUpdateDispatchService;
     private final PackageAutoUpdateWithdrawal withdrawal;
     private final TenantIdProvider tenantIdProvider;
+    private final MachinePlatformResolver machinePlatformResolver;
 
     public void run() {
         String tenantId = tenantIdProvider.getTenantId();
@@ -81,9 +83,11 @@ public class PackageAutoUpdateTrigger {
         if (outdated.isEmpty()) {
             return;
         }
-        // a device whose agent cannot take the order yet stays outdated and is ordered once it can
-        Set<String> eligible = packageUpdateEligibility.eligibleConnectedMachines(SoftwareAction.UPDATE,
-                machineIds(outdated));
+        // a device whose agent cannot take the order yet stays outdated and is ordered once it can; one that cannot run
+        // the manager is never ordered
+        List<String> outdatedMachines = machineIds(outdated);
+        List<String> supporting = machinePlatformResolver.supporting(outdatedMachines, pkg.manager());
+        Set<String> eligible = packageUpdateEligibility.eligibleConnectedMachines(SoftwareAction.UPDATE, supporting);
         List<PackageAutoUpdatePolicy> due = outdated.stream()
                 .filter(policy -> eligible.contains(policy.getMachineId()))
                 .toList();

@@ -251,6 +251,11 @@ export function displayCommandFor(
   return formatSingularLookupInvocation(`${command.id} ${DISPLAY_ACTION_ID}`, value);
 }
 
+/** A context budget, or null when there is none to show (absent, 0 for "not reported"). */
+function budgetOrNull(size: number | null | undefined): number | null {
+  return typeof size === 'number' && size > 0 ? size : null;
+}
+
 /** The newest answer that has reported usage: the live turn's, or until it reports, the one before it. */
 function latestUsageOf(messages: readonly ChatMessage[]): NonNullable<ChatMessageMetadata['usage']> | null {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -738,6 +743,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
 
   // The back-fill of a tail that does not replay: chunks emitted while the engine was inactive or before the tail came up.
   const backfills = liveTail !== null && !liveTail.replays;
+  /** A tail that replays from the history's last seq itself (JetStream). */
+  const tailReplays = liveTail !== null && liveTail.replays === true;
   const {
     processChunk: catchupProcessChunk,
     catchUpChunks,
@@ -807,22 +814,37 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
           approvalStatuses: store.snapshotOf(key).state.approvalStatuses,
         }).messages;
       if (cursor === undefined) {
+        const historyMaxSeq = maxStreamSeq(processed);
         if (isStream && store.snapshotOf(key).messages.length > 0) {
           // A send that went out before the history landed: nothing typed is lost, the history goes before it.
           store.mutate(key, r => r.prependMessages(processed));
         } else {
           // The first page: THE hydration door. Adoption is armed only while a back-fill is still buffering, the replay
-          // that would consume it.
-          store.hydrate(key, processed, { expectingReplay: backfills && isBufferingActive() });
+          // that would consume it. A replaying tail with no seq to resume after opens on new messages only, so it can
+          // never deliver again a prompt this history holds.
+          store.hydrate(key, processed, {
+            expectingReplay: backfills && isBufferingActive(),
+            tailReplaysHistory: !(tailReplays && historyMaxSeq === null),
+          });
         }
-        setHistorySeq({ dialogId: id, seq: maxStreamSeq(processed) });
+        setHistorySeq({ dialogId: id, seq: historyMaxSeq });
       } else {
         store.mutate(key, r => r.prependMessages(processed));
       }
       if (page.tokenUsage !== undefined) store.mutate(key, r => r.setDialogTokenUsage(page.tokenUsage ?? null));
       setCursorEntry({ dialogId: id, cursor: page.nextCursor });
     },
-    [store, assistantName, assistantAvatar, assistantType, chatTypeFilter, isBufferingActive, backfills, isStream],
+    [
+      store,
+      assistantName,
+      assistantAvatar,
+      assistantType,
+      chatTypeFilter,
+      isBufferingActive,
+      backfills,
+      tailReplays,
+      isStream,
+    ],
   );
 
   const loadDialogHistory = useCallback(
@@ -1289,6 +1311,25 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   }, [canDisplay, slashCommands, tableIdForDocumentType, sendMessage, logSendFailure]);
 
   const { streamingPhase, dialogTokenUsage = null, liveModel = null } = state;
+
+  // ─── The context budget ───────────────────────────────────────────────────
+  // The budget is the current model's. The dialog's record says it (the backend resolves it from the model selected
+  // now, and the record is read again when the host's model changes). A token usage only says the budget of the model
+  // that answered, and a live tail replays the last one after a reload, so it stands in only until the record has a
+  // budget (a new chat). The model's own window comes last, for a host that reports no usage at all.
+  const recordBudget = budgetOrNull(openRecord?.record?.tokenUsage?.contextSize);
+  const idleBudget =
+    recordBudget ?? budgetOrNull(dialogTokenUsage?.contextSize) ?? budgetOrNull(liveModel?.contextWindowMaxTokens);
+  // A turn keeps the budget it started with: a model saved while it is answered counts from its end.
+  const answering = streamingPhase !== 'idle';
+  const [turnBudget, setTurnBudget] = useState<{ dialogId: string | null; budget: number | null } | null>(null);
+  if (answering && turnBudget?.dialogId !== dialogId) {
+    setTurnBudget({ dialogId, budget: idleBudget });
+  } else if (!answering && turnBudget !== null) {
+    setTurnBudget(null);
+  }
+  const contextBudget =
+    answering && turnBudget?.dialogId === dialogId && turnBudget.budget != null ? turnBudget.budget : idleBudget;
   // The model of the newest answer in the history, labelled by the host, when it asks for one.
   const historyModel = useMemo(() => {
     if (!historyModelLabel) return null;
@@ -1473,7 +1514,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       // the host's baseline.
       currentProvider: liveModel?.provider ?? historyModel?.provider ?? modelProvider ?? null,
       currentModelLabel: liveModel?.modelLabel ?? historyModel?.modelLabel ?? modelLabel ?? null,
-      currentContextWindowMaxTokens: dialogTokenUsage?.contextSize ?? liveModel?.contextWindowMaxTokens ?? null,
+      currentContextWindowMaxTokens: contextBudget,
       currentInputTokens: turnUsage ? (turnUsage.inputTokens ?? null) : (dialogTokenUsage?.inputTokensSize ?? null),
       currentOutputTokens: turnUsage ? (turnUsage.outputTokens ?? null) : (dialogTokenUsage?.outputTokensSize ?? null),
       currentContextTokens: turnUsage?.contextTokens ?? null,
@@ -1543,6 +1584,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       dialogTokenUsage,
       liveModel,
       historyModel,
+      contextBudget,
       modelProvider,
       modelLabel,
       turnUsage,

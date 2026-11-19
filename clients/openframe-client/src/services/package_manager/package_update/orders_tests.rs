@@ -635,3 +635,16 @@ async fn a_change_wakes_a_waiter_even_when_it_arrives_first() {
         .await
         .expect("the submit before the wait was lost");
 }
+
+#[test]
+fn a_corrupt_file_starts_empty_and_is_moved_aside() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("package_updates.json");
+    std::fs::write(&path, b"{ not json").unwrap();
+
+    let store = OrderStore::load(path.clone());
+
+    assert!(store.pending(MACHINE).is_empty());
+    assert!(!path.exists());
+    assert!(dir.path().join("package_updates.json.corrupt").exists());
+}

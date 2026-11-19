@@ -261,12 +261,14 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         const model = str(raw.modelName);
         if (model !== undefined && provider) {
           const modelLabel = str(raw.modelDisplayName);
+          // No `contextWindowMaxTokens`: the ai-agent's `contextWindow` is the model's whole window (1,000,000 for
+          // Claude Opus 5.5), not the chat's context budget (200,000). The budget comes with the token usage (the
+          // stream's `TOKEN_USAGE`, the dialog's `tokenUsage`); until it does the counter says "—", never the window.
           out.push({
             type: 'message-metadata',
             messageMetadata: {
               model,
               provider,
-              contextWindowMaxTokens: numOr(raw.contextWindow),
               ...(modelLabel !== undefined ? { modelLabel } : {}),
             },
           });

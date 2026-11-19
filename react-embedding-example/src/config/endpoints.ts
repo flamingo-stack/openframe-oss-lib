@@ -37,6 +37,8 @@ export const EP = {
   askPrompts: `${CONTENT}/faqs/questions`,
   // The FAQ list: every <FaqSection> without a base of its own, and the shared pages' own FAQ blocks.
   faqs: `${CONTENT}/faqs`,
+  // Icon images: `<icons>/<name>?theme=light|dark` draws a library icon as a PNG (`entityIconImages` builds the urls).
+  icons: `${CONTENT}/icons`,
   docsSearch: `${CONTENT}/docs/search`,
   // doc sources (knowledge-base mounts <DocsHubPage> against these)
   docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,

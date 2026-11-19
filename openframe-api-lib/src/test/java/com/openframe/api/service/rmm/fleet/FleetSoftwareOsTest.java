@@ -21,6 +21,7 @@ class FleetSoftwareOsTest {
             "IE_EXTENSIONS, WINDOWS",
             "APPS, MAC_OS",
             "HOMEBREW_PACKAGES, MAC_OS",
+            "HOMEBREW_CASKS, MAC_OS",
             "SAFARI_EXTENSIONS, MAC_OS",
             "PKG_PACKAGES, MAC_OS",
             "DEB_PACKAGES,",
@@ -67,6 +68,7 @@ class FleetSoftwareOsTest {
         assertThat(windowsSources)
                 .containsExactlyInAnyOrder("programs", "chocolatey_packages", "winget_packages", "ie_extensions");
         assertThat(macOsSources)
-                .containsExactlyInAnyOrder("apps", "homebrew_packages", "safari_extensions", "pkg_packages");
+                .containsExactlyInAnyOrder("apps", "homebrew_packages", "homebrew_casks", "safari_extensions",
+                        "pkg_packages");
     }
 }

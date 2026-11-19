@@ -37,6 +37,18 @@ export type AppLayoutWorkAreaMode = 'chat' | 'split' | 'page';
 
 /** The narrowest either column gets in `split`. */
 export const WORK_AREA_MIN_COLUMN_WIDTH = 360;
+
+/**
+ * Put on an element inside the page column while that element covers the window
+ * (a `fixed inset-0` overlay in document fullscreen, such as a remote screen): the
+ * page column then paints above the chrome beside it, the divider's handle and the
+ * sidebars around the row. The page column is a stacking context (`isolate`), so a
+ * z-index inside it never reaches past the column, and without the raise the
+ * handle and the right sidebar paint over the overlay. The raise lasts exactly as
+ * long as the marked element is in the page: take the attribute off, or unmount
+ * the element, and the column stacks as before.
+ */
+export const WORK_AREA_RAISE_ATTRIBUTE = 'data-work-area-raise';
 /** Where the divider starts until the user moves it: the middle. */
 const DEFAULT_CHAT_SHARE = 0.5;
 
@@ -490,6 +502,9 @@ export function AppLayoutWorkArea({
         className={cn(
           // `group/work-area-page`: `AppLayout`'s `<main>` widens its content while squeezed.
           'group/work-area-page relative isolate flex min-h-0 min-w-0 flex-1',
+          // `WORK_AREA_RAISE_ATTRIBUTE` inside: over the handle (z-20) and the sidebars (up to
+          // z-[45]) at the header's layer; a modal opened over it still wins by DOM order.
+          'has-[[data-work-area-raise]]:z-50',
           shown === 'split' && 'border-l border-ods-border',
           pageHidden && (pageKeptWidth === null ? 'hidden' : cn(KEPT_HIDDEN_CLASS, 'right-0')),
           pageClassName,

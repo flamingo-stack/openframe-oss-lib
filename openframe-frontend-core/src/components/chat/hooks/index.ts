@@ -14,7 +14,6 @@ export * from './use-chat-attachment-image-gallery';
 export * from './use-chat-identity';
 export * from './use-chat-card-item';
 export * from './use-close-on-navigation';
-export * from './use-what-to-ask';
 
 // Unified chat surface — single public hook + two transport adapters.
 // Consumers typically use `useUnifiedChat({ modes, activeMode })`; the

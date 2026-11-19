@@ -51,6 +51,7 @@ import {
 } from '../../../chat-protocol/ui-chunks';
 import { OWNER_TYPE, type ChatApprovalStatus } from '../types/chat.types';
 import type { DialogTokenUsage, StreamingPhase } from '../types/unified-chat-state.types';
+import { SYNTHETIC_REALTIME_ID_PREFIXES } from '../utils/history-merge';
 import {
   CONTENT_DEDUP_WINDOW,
   SYSTEM_DEDUP_WINDOW,
@@ -313,6 +314,12 @@ export interface ChatStreamReducer {
    * takes that message over instead of opening a second one.
    */
   armAdoptTrailingAssistant(value: boolean): void;
+  /**
+   * Whether the live tail can deliver again what the history already holds (default true). A replaying tail that opened
+   * on new messages only (the history held no stream seq to resume after) cannot, so an echo that repeats the trailing
+   * prompt is a new send, never that prompt's replay. Set at each hydration; a dialog switch restores the default.
+   */
+  setTailReplaysHistory(value: boolean): void;
 
   // ── Cross-side projections (dialog-store fan-out) ───────────────────────
   projectApprovalResolution(requestId: string, status: ChatApprovalStatus, resolvedByName?: string | null): void;
@@ -367,6 +374,11 @@ function writesBody(chunk: UiChunk): boolean {
 /** Is this chunk content the backend persists? Never the control chunks: a row's coverage must not outrun its content. */
 function raisesCoverage(chunk: UiChunk): boolean {
   return writesBody(chunk) || chunk.type === 'tool-output-available' || chunk.type === 'tool-output-error';
+}
+
+/** A row this client minted (a live synthetic or an optimistic send), not one read from the history. */
+function isClientMinted(id: string): boolean {
+  return id.startsWith('optimistic-') || SYNTHETIC_REALTIME_ID_PREFIXES.some(prefix => id.startsWith(prefix));
 }
 
 /**
@@ -532,6 +544,8 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   // Adapter-armed flags.
   let suppressAgentBusy = 0;
   let adoptTrailingAssistant = false;
+  /** See `setTailReplaysHistory`: false only while the tail opened on new messages only. */
+  let tailReplaysHistory = true;
   /** A message a replay took over: the first chunk that writes to its body replaces it. Until then the old copy stays. */
   let adoptedMessageId: string | null = null;
 
@@ -690,6 +704,24 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   /** MESSAGE_REQUEST echo: a user message from THIS or another session.
    *  Dedup layers in priority order: seq identity → one-shot optimistic-echo
    *  consumption → same-author content window (seq-less transports only). */
+  /**
+   * A replayed `MESSAGE_REQUEST` echo of the prompt the thread already holds as its last row. The backend persists a
+   * user row with no stream seq, so after a reload mid-reply the history has the prompt but its seq cannot move the
+   * live tail past the echo: the tail replays it. Its twin is the trailing persisted user row with the same text, when
+   * nothing in the thread reached the echo's seq. A new send that repeats an answered prompt is not one: the answer,
+   * stamped with its seq, sits after the older twin. Nor is any echo of a tail that opened on new messages only
+   * (`setTailReplaysHistory(false)`): it cannot replay what the history holds.
+   */
+  function isReplayOfTrailingPrompt(text: string, authorType: 'admin' | 'user', seq: number): boolean {
+    if (!tailReplaysHistory) return false;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'user' || isClientMinted(last.id)) return false;
+    // A direct or system row carries its persisted seq: seq coverage, not text, decides those.
+    if (typeof last.metadata?.streamSeq === 'number') return false;
+    if ((last.metadata?.author?.authorType ?? 'user') !== authorType || textOfParts(last.parts) !== text) return false;
+    return !messages.some(m => typeof m.metadata?.streamSeq === 'number' && m.metadata.streamSeq >= seq);
+  }
+
   function applyUserMessage(data: ChatParticipantChunk['data'], seq: number | undefined): void {
     const { text } = data;
     if (!text) return;
@@ -716,6 +748,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     const authorEchoAllowed = selfUserId === undefined || !authorDeclared || authorMatched;
     if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text, authorMatched)) return;
     const authorType = data.ownerType === OWNER_TYPE.ADMIN ? ('admin' as const) : ('user' as const);
+    if (typeof seq === 'number' && isReplayOfTrailingPrompt(text, authorType, seq)) return;
     if (
       typeof seq !== 'number' &&
       hasRecentMessage(
@@ -1006,6 +1039,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
    */
   function resetForDialogSwitch(): void {
     messages = [];
+    tailReplaysHistory = true;
     streamingPhase = 'idle';
     dialogTokenUsage = null;
     liveModel = null;
@@ -1206,6 +1240,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     },
     armAdoptTrailingAssistant(value) {
       adoptTrailingAssistant = value;
+    },
+    setTailReplaysHistory(value) {
+      tailReplaysHistory = value;
     },
 
     projectApprovalResolution(requestId, status, resolvedByName) {

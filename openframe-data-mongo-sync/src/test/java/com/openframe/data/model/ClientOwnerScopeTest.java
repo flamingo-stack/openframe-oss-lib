@@ -2,6 +2,7 @@ package com.openframe.data.model;
 
 import com.openframe.data.document.ticket.AdminTicketOwner;
 import com.openframe.data.document.ticket.ClientTicketOwner;
+import com.openframe.data.document.ticket.EmailTicketOwner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -52,5 +53,17 @@ class ClientOwnerScopeTest {
         assertThat(UNDER_ORG_B.allows(new ClientTicketOwner("machine-1", "org-a"), null)).isFalse();
         assertThat(UNDER_ORG_B.allows(new AdminTicketOwner("user-1"), null)).isFalse();
         assertThat(UNDER_ORG_B.allows(null, null)).isFalse();
+    }
+
+    // guard: green before implementation
+    @Test
+    void allows_emailTicketOwner_denied() {
+        Instant assignedAt = Instant.parse("2026-10-20T10:00:00Z");
+        EmailTicketOwner owner = new EmailTicketOwner("ann@acme.com");
+
+        assertThat(UNDER_ORG_B.allows(owner, null)).isFalse();
+        assertThat(new ClientOwnerScope("machine-1", null, null).allows(owner, null)).isFalse();
+        assertThat(new ClientOwnerScope("machine-1", "org-b", assignedAt).allows(owner, assignedAt.plusSeconds(1)))
+                .isFalse();
     }
 }

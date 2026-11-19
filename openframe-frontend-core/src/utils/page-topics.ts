@@ -13,6 +13,10 @@
  *   (`/blog` is written for `/blog` and `/blog/my-post`); `/` only for the home
  *   page. A page takes its DEEPEST matching tag (`deepestTopic`), so a record
  *   page shares its list page's topic until something is tagged for it alone.
+ * - A SECTION of a page is the page's path and the section's anchor
+ *   (`/pricing#ai-token-rates`, `sectionTopicFor`). A section asks with it; a tag
+ *   with an anchor is written for that section only, and the page's own tags
+ *   cover its sections too. There is no other kind of topic.
  *
  * A zero-import leaf: a server read and the browser resolve through the same
  * functions.
@@ -28,6 +32,9 @@ function decodeSegment(segment: string): string {
     return segment;
   }
 }
+
+/** A section anchor as topics carry it: lowercased letters, digits and `-` or `_`. */
+const SECTION_ANCHOR = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 /** A path in the one form topics are compared in: leading slash, no trailing slash, lowercased, decoded. */
 function normalizePath(pathname: string): string {
@@ -52,23 +59,65 @@ export function pageTopicFor(pathname: string, options: PageTopicOptions = {}): 
   return path.startsWith(`${base}/`) ? path.slice(base.length) : path;
 }
 
-/** Whether a tag names a page (a path), as opposed to a section of a page (a word). */
+/** The topic of a section of a page: the page's path (as `pageTopicFor` reads it) and the section's anchor. */
+export function sectionTopicFor(pathname: string, section: string, options: PageTopicOptions = {}): string {
+  return `${pageTopicFor(pathname, options)}#${section.trim().toLowerCase()}`;
+}
+
+/** A topic's page and its section anchor (null for a whole page). */
+export function splitTopic(topic: string): { page: string; section: string | null } {
+  const hash = topic.indexOf('#');
+  return hash < 0 ? { page: topic, section: null } : { page: topic.slice(0, hash), section: topic.slice(hash + 1) };
+}
+
+/** A topic in its one form (`/pricing`, `/pricing#ai-token-rates`), or null when the value is not one. */
+export function normalizeTopic(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  if (!isPagePathTopic(raw)) return null;
+  const { page, section } = splitTopic(raw);
+  if (section === null) return pageTopicFor(page);
+  const anchor = section.toLowerCase();
+  return SECTION_ANCHOR.test(anchor) ? `${pageTopicFor(page)}#${anchor}` : null;
+}
+
+/** Whether a tag is a topic: every topic starts with a page's path. */
 export function isPagePathTopic(tag: string): boolean {
   return tag.startsWith(HOME_PATH);
 }
 
-/** Whether `tag` is written for the page at `path` (`pageTopicFor`'s answer): the path itself or a parent of it. */
-export function topicMatchesPath(tag: string, path: string): boolean {
-  if (!isPagePathTopic(tag)) return tag === path;
-  if (tag === HOME_PATH || path === HOME_PATH) return tag === path;
-  return path === tag || path.startsWith(`${tag}/`);
+/** Whether a page's tag (no anchor) covers the page `path`: the path itself or a parent of it. */
+function pageCovers(tagPage: string, page: string): boolean {
+  if (tagPage === HOME_PATH || page === HOME_PATH) return tagPage === page;
+  return page === tagPage || page.startsWith(`${tagPage}/`);
 }
 
-/** Every tag that can be written for the page at `path`, deepest first: what a host queries its rows by. */
-export function topicCandidates(path: string): string[] {
-  if (!isPagePathTopic(path) || path === HOME_PATH) return [path];
-  const segments = path.split('/').filter(Boolean);
-  return segments.map((_, i) => `/${segments.slice(0, segments.length - i).join('/')}`);
+/**
+ * Whether `tag` is written for the place `place` (a page, or a section of one): a page's tag covers that page, the
+ * pages under it and all their sections; a section's tag covers that section only. A value that is not a topic (a bare
+ * word: there is no other kind of topic) is written for no place and matches nothing, itself included.
+ */
+export function topicMatchesPath(tag: string, place: string): boolean {
+  if (!isPagePathTopic(tag) || !isPagePathTopic(place)) return false;
+  const t = splitTopic(tag);
+  const p = splitTopic(place);
+  if (t.section !== null) return t.section === p.section && t.page === p.page;
+  return pageCovers(t.page, p.page);
+}
+
+/** Every tag that can be written for `place`, deepest first (a section, then its page and the pages above it): what a
+ *  host queries its rows by. A value that is not a topic has none (`[]`): a host normalizes the place first. */
+export function topicCandidates(place: string): string[] {
+  if (!isPagePathTopic(place)) return [];
+  const { page, section } = splitTopic(place);
+  const pages =
+    page === HOME_PATH
+      ? [HOME_PATH]
+      : page
+          .split('/')
+          .filter(Boolean)
+          .map((_, i, segments) => `/${segments.slice(0, segments.length - i).join('/')}`);
+  return section === null ? pages : [place, ...pages];
 }
 
 /** The deepest of `tags` written for the page at `path`, or null when none is. */

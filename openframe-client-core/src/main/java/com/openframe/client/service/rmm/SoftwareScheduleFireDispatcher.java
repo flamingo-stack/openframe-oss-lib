@@ -75,9 +75,10 @@ public class SoftwareScheduleFireDispatcher {
         }
         Script script = found.get();
 
-        List<String> targets = machinePlatformResolver.compatible(machineIds, osTypes, script.getSupportedPlatforms());
+        List<String> compatible = machinePlatformResolver.compatible(machineIds, osTypes, script.getSupportedPlatforms());
+        List<String> targets = machinePlatformResolver.supporting(compatible, pkg.getPackageManager());
         if (targets.isEmpty()) {
-            log.warn("Software schedule scheduleId={} package {}/{}: no OS-compatible device among {} target(s) (supports {}) — skipped",
+            log.warn("Software schedule scheduleId={} package {}/{}: no compatible device among {} target(s) (supports {}) — skipped",
                     schedule.getId(), pkg.getPackageManager(), pkg.getPackageName(), machineIds.size(),
                     script.getSupportedPlatforms());
             return;

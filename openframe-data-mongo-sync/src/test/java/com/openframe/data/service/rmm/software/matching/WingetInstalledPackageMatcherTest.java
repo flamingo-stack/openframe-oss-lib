@@ -29,6 +29,11 @@ class WingetInstalledPackageMatcherTest {
     }
 
     @Test
+    void isForAdoption_wingetUpdatesWhatItInstalled_false() {
+        assertThat(matcher.isForAdoption()).isFalse();
+    }
+
+    @Test
     void match_idInTheCatalog_matched_idMissing_noPackage() {
         PackageCatalogEntry chrome = entry("Google.Chrome");
         when(catalogRepository.findByManagerAndPackageIdIn(PackageManagerType.WINGET, Set.of("Google.Chrome", "9NBLGGH4NNS1")))

@@ -1,5 +1,6 @@
 package com.openframe.api.dto.ticket;
 
+import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.filter.TicketActivityFilter;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -34,6 +35,8 @@ public class TicketFilterInput {
     private Boolean escalatedByUser;
     /** true keeps only tickets whose chat waits on an approval request; false keeps the others; null does not filter. */
     private Boolean hasPendingApproval;
+    /** Keeps only tickets created through one of these sources; null and empty do not filter. */
+    private List<TicketCreationSource> creationSources;
     //TODO Backward compatibility alias. Remove after FE alignment
     @Deprecated
     private List<String> labelIds;

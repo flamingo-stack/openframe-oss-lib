@@ -78,6 +78,7 @@ export {
   AppLayoutWorkArea,
   useWorkAreaColumn,
   WORK_AREA_MIN_COLUMN_WIDTH,
+  WORK_AREA_RAISE_ATTRIBUTE,
   WorkAreaColumnContext,
 } from './app-layout-work-area';
 export { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from '../../utils/work-area-share';

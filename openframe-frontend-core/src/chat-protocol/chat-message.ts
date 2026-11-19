@@ -170,7 +170,11 @@ export interface ChatSuggestionGroup {
   prompts: ChatSuggestionPrompt[];
 }
 
-/** Prompts the assistant offers as chips. Never on the wire: a host builds it locally. */
+/**
+ * Quick actions the assistant offers inline, as chips grouped under captions (`SuggestionsDisplay`); picking one sends
+ * its `prompt` (else its `label`). THE one shape for inline quick actions: a turn carries it (the server's answer to
+ * `/what-can-you-do`, the command the chat's "What to ask?" sends).
+ */
 export interface ChatSuggestionsPart {
   type: 'data-suggestions';
   id?: string;
@@ -522,8 +526,8 @@ function appendText(left: ChatTextPart, right: ChatTextPart, separator: string):
 }
 
 /**
- * The parts a row stores: `text`, `source-*`, `file` and `data-record-cards`. Sources lead, unique by `sourceId`; `state`
- * goes; an empty text part goes, so an empty answer is `[]`.
+ * The parts a row stores: the types `STORED_PART_READERS` reads back. Sources lead, unique by `sourceId`; `state` goes; an
+ * empty text part goes, so an empty answer is `[]`.
  *
  * Text parts a dropped part (reasoning, a tool row) left adjacent become one, with their citations rebased and the
  * paragraph break {@link textOfParts} draws there, so the row reads as the live message read: two parts, two paragraphs,
@@ -549,7 +553,7 @@ export function storablePartsOf(parts: readonly ChatPart[]): ChatPart[] {
       } else {
         body.push(text);
       }
-    } else if (part.type === 'file' || part.type === 'data-record-cards') {
+    } else if (isStoredPartType(part.type)) {
       body.push(part);
     }
   }
@@ -642,48 +646,87 @@ export function parseCitations(raw: unknown): ChatCitation[] {
   return out;
 }
 
+/** A part a row may hold, read back from its stored value; null when the value is not a valid one. */
+type StoredPartReader<T extends ChatPart['type']> = (
+  raw: Record<string, unknown>,
+) => Extract<ChatPart, { type: T }> | null;
+
+type StoredPartType = 'text' | 'source-url' | 'source-document' | 'file' | 'data-record-cards' | 'data-suggestions';
+
+/**
+ * Every part a row stores, by type, with how its stored value is read back. The AI SDK's convention: a message's data
+ * parts are validated per `data-*` name against `dataPartSchemas` (`validateUIMessages`); this is that map for every
+ * stored part, written as readers because this module carries no schema library. A type not listed is not stored
+ * (`storablePartsOf`) and not read back (`parseStoredParts`); a new stored part is one entry here.
+ */
+const STORED_PART_READERS: { [T in StoredPartType]: StoredPartReader<T> } = {
+  text: raw => {
+    if (typeof raw.text !== 'string') return null;
+    const citations = parseCitations(raw.citations);
+    return { type: 'text', text: raw.text, ...(citations.length > 0 ? { citations } : {}) };
+  },
+  'source-url': raw => {
+    if (typeof raw.sourceId !== 'string' || typeof raw.url !== 'string') return null;
+    const title = optionalString(raw.title);
+    return { type: 'source-url', sourceId: normalizeSourceId(raw.sourceId), url: raw.url, ...(title ? { title } : {}) };
+  },
+  'source-document': raw => {
+    if (typeof raw.sourceId !== 'string' || typeof raw.title !== 'string') return null;
+    const filename = optionalString(raw.filename);
+    return {
+      type: 'source-document',
+      sourceId: normalizeSourceId(raw.sourceId),
+      mediaType: optionalString(raw.mediaType) ?? 'text/plain',
+      title: raw.title,
+      ...(filename ? { filename } : {}),
+    };
+  },
+  file: raw => {
+    if (typeof raw.url !== 'string' || typeof raw.mediaType !== 'string') return null;
+    const filename = optionalString(raw.filename);
+    return { type: 'file', mediaType: raw.mediaType, url: raw.url, ...(filename ? { filename } : {}) };
+  },
+  'data-record-cards': raw => {
+    const records = normalizeRecordUris(isRecord(raw.data) ? raw.data.records : undefined);
+    return records.length > 0 ? { type: 'data-record-cards', data: { records } } : null;
+  },
+  'data-suggestions': raw => {
+    const groups = parseSuggestionGroups(isRecord(raw.data) ? raw.data.groups : undefined);
+    if (groups.length === 0) return null;
+    const note = isRecord(raw.data) ? optionalString(raw.data.note) : undefined;
+    return { type: 'data-suggestions', data: { groups, ...(note ? { note } : {}) } };
+  },
+};
+
+function isStoredPartType(type: string): type is StoredPartType {
+  return Object.prototype.hasOwnProperty.call(STORED_PART_READERS, type);
+}
+
 /** One stored part, or null when it is not one a row may hold. */
 function parseStoredPart(raw: unknown): ChatPart | null {
-  if (!isRecord(raw)) return null;
-  switch (raw.type) {
-    case 'text': {
-      if (typeof raw.text !== 'string') return null;
-      const citations = parseCitations(raw.citations);
-      return { type: 'text', text: raw.text, ...(citations.length > 0 ? { citations } : {}) };
+  if (!isRecord(raw) || typeof raw.type !== 'string' || !isStoredPartType(raw.type)) return null;
+  return STORED_PART_READERS[raw.type](raw);
+}
+
+/** A stored suggestions part's groups: each with a caption and at least one chip with a label. */
+function parseSuggestionGroups(raw: unknown): ChatSuggestionGroup[] {
+  if (!Array.isArray(raw)) return [];
+  const groups: ChatSuggestionGroup[] = [];
+  for (const item of raw) {
+    if (!isRecord(item) || typeof item.label !== 'string' || !Array.isArray(item.prompts)) continue;
+    const prompts: ChatSuggestionPrompt[] = [];
+    for (const chip of item.prompts) {
+      if (!isRecord(chip) || typeof chip.label !== 'string') continue;
+      const prompt = optionalString(chip.prompt);
+      prompts.push({
+        label: chip.label,
+        ...(prompt ? { prompt } : {}),
+        ...(isRecord(chip.icon) ? { icon: chip.icon } : {}),
+      });
     }
-    case 'source-url': {
-      if (typeof raw.sourceId !== 'string' || typeof raw.url !== 'string') return null;
-      const title = optionalString(raw.title);
-      return {
-        type: 'source-url',
-        sourceId: normalizeSourceId(raw.sourceId),
-        url: raw.url,
-        ...(title ? { title } : {}),
-      };
-    }
-    case 'source-document': {
-      if (typeof raw.sourceId !== 'string' || typeof raw.title !== 'string') return null;
-      const filename = optionalString(raw.filename);
-      return {
-        type: 'source-document',
-        sourceId: normalizeSourceId(raw.sourceId),
-        mediaType: optionalString(raw.mediaType) ?? 'text/plain',
-        title: raw.title,
-        ...(filename ? { filename } : {}),
-      };
-    }
-    case 'file': {
-      if (typeof raw.url !== 'string' || typeof raw.mediaType !== 'string') return null;
-      const filename = optionalString(raw.filename);
-      return { type: 'file', mediaType: raw.mediaType, url: raw.url, ...(filename ? { filename } : {}) };
-    }
-    case 'data-record-cards': {
-      const records = normalizeRecordUris(isRecord(raw.data) ? raw.data.records : undefined);
-      return records.length > 0 ? { type: 'data-record-cards', data: { records } } : null;
-    }
-    default:
-      return null;
+    if (prompts.length > 0) groups.push({ label: item.label, prompts });
   }
+  return groups;
 }
 
 /** The parts of a stored row, in order. One a row may not hold is left out. */
