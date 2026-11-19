@@ -2,10 +2,11 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::platform::DirectoryManager;
+use crate::utils::fs::atomic_write;
 
 pub const MACHINE_ID_HEADER: &str = "x-machine-id";
 
@@ -30,10 +31,16 @@ impl MachineIdService {
             return Ok(id);
         }
 
-        if let Ok(id) = self.read() {
-            debug!("Using existing machine ID: {}", id);
-            *self.cached_id.write().unwrap() = Some(id.clone());
-            return Ok(id);
+        match self.read() {
+            Ok(id) => {
+                debug!("Using existing machine ID: {}", id);
+                *self.cached_id.write().unwrap() = Some(id.clone());
+                return Ok(id);
+            }
+            Err(e) if self.file_path.exists() => {
+                warn!("{:#}; generating a new machine ID", e);
+            }
+            Err(_) => {}
         }
 
         let id = Uuid::new_v4().to_string();
@@ -53,21 +60,17 @@ impl MachineIdService {
             .with_context(|| format!("Failed to read {}", self.file_path.display()))?;
 
         let id = content.trim();
-        if id.is_empty() {
-            anyhow::bail!("Machine ID file is empty");
-        }
+        Uuid::parse_str(id).with_context(|| {
+            format!(
+                "{} does not hold a valid machine ID",
+                self.file_path.display()
+            )
+        })?;
         Ok(id.to_string())
     }
 
     fn write(&self, id: &str) -> Result<()> {
-        if let Some(parent) = self.file_path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create {}", parent.display()))?;
-        }
-
-        fs::write(&self.file_path, id)
-            .with_context(|| format!("Failed to write {}", self.file_path.display()))?;
-
-        Ok(())
+        atomic_write(&self.file_path, id)
+            .with_context(|| format!("Failed to write {}", self.file_path.display()))
     }
 }

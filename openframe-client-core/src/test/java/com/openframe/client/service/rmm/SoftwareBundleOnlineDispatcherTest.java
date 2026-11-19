@@ -2,6 +2,7 @@ package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -143,6 +145,26 @@ class SoftwareBundleOnlineDispatcherTest {
         bundle.setPackages(List.of(SoftwareBundlePackage.builder()
                 .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome").build()));
         dispatcher.dispatch(bundle, mac);
+
+        verifyNoInteractions(packageUpdateDispatchService, scriptExecutionRepository, softwareNatsPublisher);
+    }
+
+    @Test
+    @DisplayName("a winget package is skipped on a Windows device that cannot run winget")
+    void update_deviceThatCannotRunTheManager_packageSkipped() {
+        Machine server = machine("m-server", OsType.WINDOWS);
+        server.setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.UNSUPPORTED,
+                PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        when(packageManagerAvailability.isSoftwareManageable(server)).thenReturn(true);
+        when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__winget-update", ScriptType.SOFTWARE))
+                .thenReturn(Optional.of(Script.builder().id("winget-update-id").type(ScriptType.SOFTWARE)
+                        .supportedPlatforms(List.of(OsType.WINDOWS)).build()));
+        when(packageUpdateEligibility.isEligible(SoftwareAction.UPDATE, server)).thenReturn(true);
+        SoftwareBundle bundle = bundle(SoftwareAction.UPDATE);
+        bundle.setPackages(List.of(SoftwareBundlePackage.builder()
+                .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome").build()));
+
+        dispatcher.dispatch(bundle, server);
 
         verifyNoInteractions(packageUpdateDispatchService, scriptExecutionRepository, softwareNatsPublisher);
     }

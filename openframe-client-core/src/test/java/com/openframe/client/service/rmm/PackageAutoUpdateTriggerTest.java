@@ -27,6 +27,7 @@ import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.nats.packageupdate.PackageUpdateEligibilityService;
 import com.openframe.data.service.rmm.software.WingetPackageManagerHandler;
 import com.openframe.delivery.track.DeliveryTracker;
+import com.openframe.data.service.rmm.MachinePlatformResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -67,21 +69,41 @@ class PackageAutoUpdateTriggerTest {
     private final PackageUpdateDispatchService dispatchService = mock(PackageUpdateDispatchService.class);
     private final DeliveryTracker deliveryTracker = mock(DeliveryTracker.class);
     private final TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
+    private final MachinePlatformResolver machinePlatformResolver = mock(MachinePlatformResolver.class);
 
     private final PackageAutoUpdateTrigger trigger = new PackageAutoUpdateTrigger(policyRepository, catalogVersions,
             eligibility,
             new PackageManagerRegistry(List.of(new BrewPackageManagerHandler(), new WingetPackageManagerHandler())),
-            scriptRepository, actionResultRepository, dispatchService, new PackageAutoUpdateWithdrawal(deliveryTracker), tenantIdProvider);
+            scriptRepository, actionResultRepository, dispatchService, new PackageAutoUpdateWithdrawal(deliveryTracker), tenantIdProvider,
+            machinePlatformResolver);
 
     @BeforeEach
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+        when(machinePlatformResolver.supporting(anyList(), any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(catalogVersions.hasLatest(PackageManagerType.BREW, "google-chrome", BrewPackageType.CASK)).thenReturn(true);
         when(catalogVersions.latest(PackageManagerType.BREW, "google-chrome", BrewPackageType.CASK)).thenReturn(LATEST);
         when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__brew-update", ScriptType.SOFTWARE))
                 .thenReturn(Optional.of(Script.builder().id("brew-update-id").privilegeLevel(PrivilegeLevel.USER)
                         .defaultTimeoutSeconds(1800).build()));
         when(actionResultRepository.findByTenantIdAndExecutionId(TENANT, JOB)).thenReturn(Optional.empty());
+    }
+
+    @Test
+    @DisplayName("a device that cannot run the package's manager is not offered to the order at all")
+    void deviceThatCannotRunTheManager_neverOrdered() {
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(
+                chrome("p1", "m1", "151.0.7922.98", WAIT),
+                chrome("p2", "m2", "151.0.7922.98", WAIT)));
+        when(machinePlatformResolver.supporting(List.of("m1", "m2"), PackageManagerType.BREW)).thenReturn(List.of("m1"));
+        when(eligibility.eligibleConnectedMachines(SoftwareAction.UPDATE, List.of("m1"))).thenReturn(Set.of("m1"));
+        when(dispatchService.dispatchAutoUpdate(any(), any(), any())).thenReturn("req-new");
+
+        trigger.run();
+
+        ArgumentCaptor<RunningExecutionRows> rows = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(dispatchService).dispatchAutoUpdate(rows.capture(), any(), any());
+        assertThat(rows.getValue().getMachineIds()).containsExactly("m1");
     }
 
     @Test

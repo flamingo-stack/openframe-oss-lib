@@ -7,6 +7,7 @@ import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-p
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
+import type { ChatUsagePanelData } from '../usage/chat-usage';
 import type { ApprovalBlockVariant, AssistantType, AuthorType, ChatAppearance, ConnectionStatus } from './chat.types';
 import type { ChatContextItem } from './context-item.types';
 import type { AskOptionData, ChatMessageActions, ToolExecutionData } from './message.types';
@@ -670,6 +671,11 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
   onModelClick?: () => void;
   /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
   modelTooltip?: string;
+  /**
+   * The Usage panel's data (Mingo). When set, the token tail becomes a button with a ring in the chat context's colour
+   * that opens the panel above it, and the hover-card breakdown is not drawn. Unset: the row is unchanged.
+   */
+  usagePanel?: ChatUsagePanelData;
 }
 
 /**

@@ -18,9 +18,10 @@
 import type { ChatAttachment } from '../../../chat-protocol/attachment';
 import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import type { ChatRef } from '../chat-ref.types';
+import type { ChatUsagePanelData } from '../usage/chat-usage';
 import type { DialogItem } from './component.types';
 import type { ChatContextItem } from './context-item.types';
-import type { ChatMessageActions } from './message.types';
+import type { ChatMessageActions, TokenUsageCacheSplit } from './message.types';
 
 // ─── Dialog-list host contract (shared by the NATS + SSE adapters) ───────────
 
@@ -102,7 +103,7 @@ export const EMPTY_DIALOG_CAPABILITIES: ChatDialogCapabilities = Object.freeze({
  * usage yet, or when the active mode is Guide (SSE telemetry surfaces via
  * `currentInputTokens`/`currentOutputTokens` instead).
  */
-export interface DialogTokenUsage {
+export interface DialogTokenUsage extends TokenUsageCacheSplit {
   /** Backend chat-type discriminator, e.g. `ADMIN_AI_CHAT`. Free-form. */
   chatType?: string;
   /** Total input tokens consumed so far in this dialog. */
@@ -327,6 +328,13 @@ export interface UnifiedChatState {
    * arrives. Always null in Mingo mode.
    */
   currentUsageBreakdown: UnifiedUsageBreakdown | null;
+
+  /**
+   * The Usage panel behind the composer's token counter (Mingo). Set, the counter opens it on click; unset or null,
+   * the counter is plain text as before (Fae, Guide). The counter's own figures (`currentContextTokens`,
+   * `currentContextWindowMaxTokens`) are the panel's Chat Context.
+   */
+  usagePanel?: ChatUsagePanelData | null;
 
   // ─── Dialog management (Mingo: backend; Guide: localStorage) ──────────────
   //

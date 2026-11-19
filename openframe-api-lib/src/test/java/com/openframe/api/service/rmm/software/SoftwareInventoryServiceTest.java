@@ -562,7 +562,7 @@ class SoftwareInventoryServiceTest {
         stubInventory(
                 List.of(title(10L, "Google Chrome", "programs", "141.0"), title(11L, "Contoso Tool", "programs", "1.0")),
                 List.of());
-        catalogMatchesWinget("Google Chrome");
+        catalogMatchesWingetOnDevice("Google Chrome");
         SoftwareFilterInput filter = new SoftwareFilterInput();
         filter.setSources(List.of(SoftwareSource.WINGET));
 
@@ -581,7 +581,7 @@ class SoftwareInventoryServiceTest {
                 List.of(title(10L, "Google Chrome", "programs", "141.0"), title(11L, "Contoso Tool", "programs", "1.0"),
                         title(12L, "node", "homebrew_packages", "20.1")),
                 List.of());
-        catalogMatchesWinget("Google Chrome");
+        catalogMatchesWingetOnDevice("Google Chrome");
         SoftwareFilterInput filter = new SoftwareFilterInput();
         filter.setManageable(true);
 
@@ -600,7 +600,7 @@ class SoftwareInventoryServiceTest {
                 List.of(title(10L, "Google Chrome", "programs", "141.0"), title(11L, "Contoso Tool", "programs", "1.0"),
                         title(12L, "node", "homebrew_packages", "20.1")),
                 List.of());
-        catalogMatchesWinget("Google Chrome");
+        catalogMatchesWingetOnDevice("Google Chrome");
         SoftwareFilterInput filter = new SoftwareFilterInput();
         filter.setManageable(false);
 
@@ -1103,9 +1103,9 @@ class SoftwareInventoryServiceTest {
 
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
-        order.verify(catalogStatus).apply(anyList());
+        order.verify(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList());
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
-        order.verify(catalogStatus).apply(anyList());
+        order.verify(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList());
     }
 
     // null matches every row
@@ -1116,6 +1116,15 @@ class SoftwareInventoryServiceTest {
                     .forEach(row -> row.setSource(SoftwareSource.WINGET));
             return null;
         }).when(catalogStatus).apply(anyList());
+    }
+
+    private void catalogMatchesWingetOnDevice(String name) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(1);
+            rows.stream().filter(row -> name == null || name.equals(row.getName()))
+                    .forEach(row -> row.setSource(SoftwareSource.WINGET));
+            return null;
+        }).when(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList());
     }
 
     private void catalogManagesWith(PackageCatalogEntry managingPackage) {

@@ -64,6 +64,11 @@ function numOr(value: unknown, fallback = 0): number {
   return typeof value === 'number' ? value : fallback;
 }
 
+/** `{ [key]: value }` when the value is a finite number, else nothing: a field the sender left out stays out. */
+function numField<K extends string>(key: K, value: unknown): Partial<Record<K, number>> {
+  return typeof value === 'number' && Number.isFinite(value) ? ({ [key]: value } as Record<K, number>) : {};
+}
+
 /** Decode an error's `details`: a JSON envelope (`{ error: { message } }`) or an already human string. */
 function errorDetails(details: unknown): string | undefined {
   if (typeof details !== 'string' || details === '') return undefined;
@@ -256,12 +261,14 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         const model = str(raw.modelName);
         if (model !== undefined && provider) {
           const modelLabel = str(raw.modelDisplayName);
+          // No `contextWindowMaxTokens`: the ai-agent's `contextWindow` is the model's whole window (1,000,000 for
+          // Claude Opus 5.5), not the chat's context budget (200,000). The budget comes with the token usage (the
+          // stream's `TOKEN_USAGE`, the dialog's `tokenUsage`); until it does the counter says "—", never the window.
           out.push({
             type: 'message-metadata',
             messageMetadata: {
               model,
               provider,
-              contextWindowMaxTokens: numOr(raw.contextWindow),
               ...(modelLabel !== undefined ? { modelLabel } : {}),
             },
           });
@@ -490,6 +497,10 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
             outputTokensSize: numOr(raw.outputTokensSize),
             totalTokensSize: numOr(raw.totalTokensSize),
             contextSize: numOr(raw.contextSize),
+            ...numField('uncachedInputTokensSize', raw.uncachedInputTokensSize),
+            ...numField('cacheReadTokensSize', raw.cacheReadTokensSize),
+            ...numField('cacheWriteTokensSize', raw.cacheWriteTokensSize),
+            ...numField('compactionThreshold', raw.compactionThreshold),
           },
         });
         break;

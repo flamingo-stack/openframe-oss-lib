@@ -13,6 +13,9 @@ import type { DialogItem } from '../types/component.types';
 
 const NOW = new Date(2026, 9, 15, 12, 0); // 15 Oct 2026, local noon
 
+/** The entry's label, as the server's command catalog names it. */
+const WHAT_TO_ASK = 'What can you do?';
+
 const DIALOGS: DialogItem[] = [
   { id: 'a', title: 'osquery check', timestamp: new Date(2026, 9, 15, 9, 30) },
   { id: 'b', title: '', timestamp: new Date(2026, 9, 15, 0, 5) },
@@ -157,15 +160,20 @@ describe('MingoChatRail variant="section"', () => {
     expect(onOpenArchive).toHaveBeenCalledTimes(1);
   });
 
-  it('offers "What to ask Mingo?" in the ⋯ menu, after the archive', () => {
+  it('offers "What to ask?" in the ⋯ menu, after the archive, under the label it is given', () => {
     const onWhatToAsk = vi.fn();
-    render(<MingoChatRail variant="section" dialogs={DIALOGS} onOpenArchive={vi.fn()} onWhatToAsk={onWhatToAsk} />);
+    render(
+      <MingoChatRail
+        variant="section"
+        dialogs={DIALOGS}
+        onOpenArchive={vi.fn()}
+        onWhatToAsk={onWhatToAsk}
+        whatToAskLabel={WHAT_TO_ASK}
+      />,
+    );
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More' }), { button: 0, pointerType: 'mouse' });
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      'Chat archive',
-      'What to ask Mingo?',
-    ]);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'What to ask Mingo?' }));
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Chat archive', WHAT_TO_ASK]);
+    fireEvent.click(screen.getByRole('menuitem', { name: WHAT_TO_ASK }));
     expect(onWhatToAsk).toHaveBeenCalledTimes(1);
   });
 
@@ -177,13 +185,14 @@ describe('MingoChatRail variant="section"', () => {
         dialogs={DIALOGS}
         onOpenArchive={vi.fn()}
         onWhatToAsk={vi.fn()}
+        whatToAskLabel={WHAT_TO_ASK}
         moreMenuItems={[{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }]}
       />,
     );
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More' }), { button: 0, pointerType: 'mouse' });
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
       'Chat archive',
-      'What to ask Mingo?',
+      WHAT_TO_ASK,
       'Reset Onboarding',
     ]);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Reset Onboarding' }));
@@ -499,17 +508,22 @@ describe('MingoChatRail variant="section"', () => {
       />,
     );
     expect(screen.queryByRole('button', { name: 'Start New Chat' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'What to ask Mingo?' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: WHAT_TO_ASK })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Expand chat' })).not.toBeInTheDocument();
   });
 });
 
 describe('MingoChatRail default variant', () => {
-  it('is still the v2 rail', () => {
+  it('draws no "What to ask?" entry without a label from the server', () => {
     render(<MingoChatRail dialogs={DIALOGS} onNewChat={vi.fn()} onWhatToAsk={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: WHAT_TO_ASK })).not.toBeInTheDocument();
+  });
+
+  it('is still the v2 rail', () => {
+    render(<MingoChatRail dialogs={DIALOGS} onNewChat={vi.fn()} onWhatToAsk={vi.fn()} whatToAskLabel={WHAT_TO_ASK} />);
     expect(screen.getByRole('complementary', { name: 'Mingo chats' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start New Chat' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'What to ask Mingo?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: WHAT_TO_ASK })).toBeInTheDocument();
     expect(screen.getByText('Your Current Chats')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Chat history' })).not.toBeInTheDocument();
     // One flat list, no day groups; an untitled chat keeps the rail's own name.

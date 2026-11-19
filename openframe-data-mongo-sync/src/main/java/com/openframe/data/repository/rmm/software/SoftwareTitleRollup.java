@@ -15,6 +15,9 @@ public record SoftwareTitleRollup(
         List<String> packageFamilyNames,
         List<String> installerTypes,
         List<String> wingetIds,
+        String bundleIdentifier,
+        List<String> appFileNames,
+        Boolean topLevelApp,
         boolean systemComponent,
         Map<String, Integer> devicesByVersion) {
 }

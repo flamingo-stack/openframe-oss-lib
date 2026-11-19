@@ -23,9 +23,6 @@ import static java.util.stream.Collectors.toSet;
 @RequiredArgsConstructor
 public class BrewPackageMatcher implements PackageMatcher {
 
-    private static final Comparator<PackageCatalogEntry> FORMULA_FIRST =
-            Comparator.comparing(entry -> entry.getBrewType() != BrewPackageType.FORMULA);
-
     private final PackageCatalogRepository catalogRepository;
 
     @Override
@@ -34,7 +31,17 @@ public class BrewPackageMatcher implements PackageMatcher {
     }
 
     @Override
+    public boolean isForAdoption() {
+        return false;
+    }
+
+    @Override
     public List<PackageMatch> match(List<InstalledProgram> programs) {
+        return match(programs, BrewPackageType.FORMULA);
+    }
+
+    // a formula and a cask can share a token: the type brew reported the program under decides
+    List<PackageMatch> match(List<InstalledProgram> programs, BrewPackageType reportedType) {
         Set<String> tokens = programs.stream()
                 .map(BrewPackageMatcher::tokenOf)
                 .filter(Objects::nonNull)
@@ -48,15 +55,17 @@ public class BrewPackageMatcher implements PackageMatcher {
                 .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)));
         return programs.stream()
                 .map(BrewPackageMatcher::tokenOf)
-                .map(token -> matchOf(entriesByToken.get(token)))
+                .map(token -> matchOf(entriesByToken.get(token), reportedType))
                 .toList();
     }
 
-    private static PackageMatch matchOf(List<PackageCatalogEntry> entries) {
+    private static PackageMatch matchOf(List<PackageCatalogEntry> entries, BrewPackageType reportedType) {
         if (entries == null) {
             return PackageMatch.noPackage();
         }
-        PackageCatalogEntry entry = entries.stream().min(FORMULA_FIRST).orElseThrow();
+        Comparator<PackageCatalogEntry> reportedTypeFirst =
+                Comparator.comparing(entry -> entry.getBrewType() != reportedType);
+        PackageCatalogEntry entry = entries.stream().min(reportedTypeFirst).orElseThrow();
         return PackageMatch.of(entry);
     }
 
