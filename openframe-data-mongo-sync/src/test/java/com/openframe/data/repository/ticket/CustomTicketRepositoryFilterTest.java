@@ -1,5 +1,6 @@
 package com.openframe.data.repository.ticket;
 
+import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
@@ -8,6 +9,8 @@ import com.openframe.publishing.api.OutboxPublisher;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import com.openframe.data.document.ticket.Ticket;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -33,6 +36,7 @@ class CustomTicketRepositoryFilterTest {
 
     private static final String ESCALATED_BY_USER = "escalatedByUser";
     private static final String HAS_PENDING_APPROVAL = "hasPendingApproval";
+    private static final String CREATION_SOURCE = "creationSource";
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
     @Mock private ObjectProvider<OutboxPublisher> outboxPublisher;
@@ -95,6 +99,35 @@ class CustomTicketRepositoryFilterTest {
 
         // verifications
         assertThat(query.get(HAS_PENDING_APPROVAL, Document.class)).containsEntry("$ne", true);
+    }
+
+    // guard: green before implementation
+    @Test
+    void buildTicketQuery_creationSources_inClauseOnCreationSource() {
+        // setup
+        List<TicketCreationSource> sources =
+                List.of(TicketCreationSource.FAE_FORM, TicketCreationSource.ADMIN_DASHBOARD);
+        TicketQueryFilter filter = TicketQueryFilter.builder().creationSources(sources).build();
+
+        // execution
+        Document query = repository.buildTicketQuery(filter, null, null, null).getQueryObject();
+
+        // verifications
+        assertThat(query.get(CREATION_SOURCE, Document.class)).isEqualTo(new Document("$in", sources));
+    }
+
+    // guard: green before implementation
+    @ParameterizedTest
+    @NullAndEmptySource
+    void buildTicketQuery_creationSourcesNullOrEmpty_noNarrowing(List<TicketCreationSource> sources) {
+        // setup
+        TicketQueryFilter filter = TicketQueryFilter.builder().creationSources(sources).build();
+
+        // execution
+        Document query = repository.buildTicketQuery(filter, null, null, null).getQueryObject();
+
+        // verifications
+        assertThat(query).doesNotContainKey(CREATION_SOURCE);
     }
 
     @Test

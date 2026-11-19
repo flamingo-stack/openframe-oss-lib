@@ -134,4 +134,5 @@ enum TicketCreationSource {
     FAE_FORM
     FAE_DIALOG
     ADMIN_DASHBOARD
+    EMAIL
 }

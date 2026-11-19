@@ -4,6 +4,7 @@ import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
 import com.openframe.api.exception.ticket.TicketStatusLockedByApprovalException;
 import com.openframe.api.service.ticket.spi.TicketClientConversationGate;
 import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketResolver;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusHistory;
@@ -13,6 +14,8 @@ import com.openframe.data.repository.ticket.TicketStatusHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -234,6 +237,44 @@ class TicketTransitionPolicyValidatorTest {
         // verifications
         assertThat(next).isEmpty();
         verifyNoInteractions(statusRepository);
+    }
+
+    // guard: green before implementation
+    @ParameterizedTest
+    @EnumSource(value = TicketStatusKind.class, names = {"TECH_REQUIRED", "CUSTOM", "RESOLVED", "ARCHIVED"})
+    void allowedNext_emailTicket_neverOffersAiAssistance(TicketStatusKind kind) {
+        // setup
+        when(statusRepository.findAllByOrderByPositionAsc())
+                .thenReturn(List.of(aiAssistance, inProgress, techRequired, resolved, archived));
+        TicketStatusDefinition current = switch (kind) {
+            case TECH_REQUIRED -> techRequired;
+            case CUSTOM -> inProgress;
+            case RESOLVED -> resolved;
+            default -> archived;
+        };
+        List<TicketStatusDefinition> expected = switch (kind) {
+            case TECH_REQUIRED -> List.of(inProgress, resolved);
+            case CUSTOM -> List.of(techRequired, resolved);
+            case RESOLVED -> List.of(inProgress, techRequired, archived);
+            default -> List.of(inProgress, techRequired, resolved);
+        };
+
+        // execution
+        List<TicketStatusDefinition> next = validator.allowedNext(emailTicket(current));
+
+        // verifications
+        assertThat(next).containsExactlyElementsOf(expected);
+        assertThat(next).extracting(TicketStatusDefinition::getKind).doesNotContain(TicketStatusKind.AI_ASSISTANCE);
+        verifyNoInteractions(historyRepository);
+    }
+
+    private Ticket emailTicket(TicketStatusDefinition status) {
+        return Ticket.builder()
+                .id(TICKET_ID)
+                .statusId(status.getId())
+                .statusKind(status.getKind())
+                .creationSource(TicketCreationSource.EMAIL)
+                .build();
     }
 
     private Ticket closedTicket(TicketStatusDefinition status) {

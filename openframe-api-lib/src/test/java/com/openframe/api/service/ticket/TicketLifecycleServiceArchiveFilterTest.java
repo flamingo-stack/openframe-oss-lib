@@ -2,6 +2,7 @@ package com.openframe.api.service.ticket;
 
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
@@ -13,6 +14,8 @@ import com.openframe.security.authentication.AuthPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -88,6 +91,42 @@ class TicketLifecycleServiceArchiveFilterTest {
         assertThat(captured.getStatusIds()).containsExactly(resolved.getId());
         assertThat(captured.getDeviceIds()).isNull();
         assertThat(captured.getOrganizationIds()).isNull();
+    }
+
+    @Test
+    void archiveResolved_narrowsToTheRequestedCreationSources() {
+        TicketFilterInput filter = TicketFilterInput.builder()
+                .creationSources(List.of(TicketCreationSource.EMAIL))
+                .build();
+
+        service.archiveResolvedTickets(admin, filter);
+
+        TicketQueryFilter captured = capturedFilter();
+        assertThat(captured.getCreationSources()).containsExactly(TicketCreationSource.EMAIL);
+        assertThat(captured.getStatusIds()).containsExactly(resolved.getId());
+    }
+
+    // guard: green before implementation
+    @ParameterizedTest
+    @NullAndEmptySource
+    void archiveResolved_creationSourcesNullOrEmpty_noSourceNarrowing(List<TicketCreationSource> creationSources) {
+        TicketFilterInput filter = TicketFilterInput.builder().creationSources(creationSources).build();
+
+        service.archiveResolvedTickets(admin, filter);
+
+        TicketQueryFilter captured = capturedFilter();
+        assertThat(captured.getCreationSources()).isNullOrEmpty();
+        assertThat(captured.getStatusIds()).containsExactly(resolved.getId());
+    }
+
+    // guard: green before implementation
+    @Test
+    void archiveResolved_withoutFilter_noSourceNarrowing() {
+        service.archiveResolvedTickets(admin, null);
+
+        TicketQueryFilter captured = capturedFilter();
+        assertThat(captured.getCreationSources()).isNullOrEmpty();
+        assertThat(captured.getStatusIds()).containsExactly(resolved.getId());
     }
 
     private TicketQueryFilter capturedFilter() {

@@ -1,5 +1,6 @@
 import type { CellContext, RowData } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
+import type { DateFilterResult } from '../date-picker';
 
 export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl';
 
@@ -53,6 +54,21 @@ export function splitFilterSectionValues(
 }
 
 /**
+ * A date column's applied sort and range, and how a new one is committed: see `meta.dateFilter`. The shape the hosts'
+ * own date headers already hold (the applied values come from the URL), so one object feeds both.
+ */
+export interface DataTableDateFilter {
+  /** The applied sort direction. */
+  sortDirection: 'asc' | 'desc';
+  /** The list's own order: what Reset goes back to, and the direction that does not count as applied. Default `desc`. */
+  defaultSortDirection?: 'asc' | 'desc';
+  /** The applied range. */
+  range: DateFilterResult['range'];
+  /** Fired on Apply with the drafted values, and on Reset with the defaults. */
+  onApply: (result: DateFilterResult) => void;
+}
+
+/**
  * The options a filter UI has selected, per column: the option ids `FiltersDropdown` emits, keyed by column id. What
  * `FilterModal` and `ListPageLayout`'s mobile filters take and hand back.
  */
@@ -96,6 +112,14 @@ declare module '@tanstack/react-table' {
       /** Options are in flight — draw the funnel, inert, instead of hiding it. */
       pending?: boolean;
     };
+    /**
+     * The column sorts and filters by date. GRID layout only: the header draws its label and a calendar, and opens
+     * the date menu (a sort direction and a range, committed on Apply). While a range is set or the direction is not
+     * the default, the label is primary and the calendar takes the accent, as an applied filter's funnel does. The
+     * menu owns the column's sort and filter, so the header draws neither `filter` nor the sort arrows beside it.
+     * Card headers do not read it: a cards table passes its own control as the column's `header`.
+     */
+    dateFilter?: DataTableDateFilter;
     /**
      * Opt-in: header renders the sort indicator and clicks toggle column sort.
      * Default `false` — columns are not sortable from the UI even though

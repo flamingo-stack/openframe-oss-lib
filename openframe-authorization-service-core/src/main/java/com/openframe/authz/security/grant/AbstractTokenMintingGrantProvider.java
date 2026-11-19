@@ -70,7 +70,7 @@ public abstract class AbstractTokenMintingGrantProvider implements Authenticatio
                                                   Authentication grant,
                                                   OAuth2Authorization.Builder authorizationBuilder) {
         OAuth2Token generated = tokenGenerator.generate(tokenContext(
-                registeredClient, userPrincipal, grantType, grant, OAuth2TokenType.ACCESS_TOKEN));
+                registeredClient, userPrincipal, grantType, grant, authorizationBuilder, OAuth2TokenType.ACCESS_TOKEN));
         if (generated == null) {
             throw error(OAuth2ErrorCodes.SERVER_ERROR, "Failed to generate access token.");
         }
@@ -95,7 +95,8 @@ public abstract class AbstractTokenMintingGrantProvider implements Authenticatio
             return null;
         }
         OAuth2Token generated = tokenGenerator.generate(tokenContext(
-                registeredClient, userPrincipal, grantType, grant, OAuth2TokenType.REFRESH_TOKEN));
+                registeredClient, userPrincipal, grantType, grant, authorizationBuilder,
+                OAuth2TokenType.REFRESH_TOKEN));
         if (!(generated instanceof OAuth2RefreshToken refreshToken)) {
             return null;
         }
@@ -107,10 +108,12 @@ public abstract class AbstractTokenMintingGrantProvider implements Authenticatio
                                             Authentication userPrincipal,
                                             AuthorizationGrantType grantType,
                                             Authentication grant,
+                                            OAuth2Authorization.Builder authorizationBuilder,
                                             OAuth2TokenType tokenType) {
         return DefaultOAuth2TokenContext.builder()
                 .registeredClient(registeredClient)
                 .principal(userPrincipal)
+                .authorization(authorizationBuilder.build())
                 .authorizationServerContext(AuthorizationServerContextHolder.getContext())
                 .authorizedScopes(registeredClient.getScopes())
                 .tokenType(tokenType)

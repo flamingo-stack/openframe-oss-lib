@@ -11,6 +11,7 @@ class FleetSoftwareCategoryTest {
     void of_managerTable_itsManager() {
         assertThat(FleetSoftwareCategory.of("chocolatey_packages").source()).isEqualTo(SoftwareSource.CHOCOLATEY);
         assertThat(FleetSoftwareCategory.of("homebrew_packages").source()).isEqualTo(SoftwareSource.BREW);
+        assertThat(FleetSoftwareCategory.of("homebrew_casks").source()).isEqualTo(SoftwareSource.BREW);
         assertThat(FleetSoftwareCategory.of("winget_packages").source()).isEqualTo(SoftwareSource.WINGET);
     }
 
@@ -23,6 +24,7 @@ class FleetSoftwareCategoryTest {
     @Test
     void managerSources_theManagerTablesOnly() {
         assertThat(FleetSoftwareCategory.managerSources())
-                .containsExactlyInAnyOrder("chocolatey_packages", "homebrew_packages", "winget_packages");
+                .containsExactlyInAnyOrder("chocolatey_packages", "homebrew_packages", "homebrew_casks",
+                        "winget_packages");
     }
 }

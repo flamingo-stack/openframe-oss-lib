@@ -74,9 +74,10 @@ public class SoftwareInstallUpdateManagementService {
             SoftwareScriptCode code = handler.scriptCode(action);
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
 
-            List<String> targets = machinePlatformResolver.compatible(machineIds, osTypes, script.getSupportedPlatforms());
+            List<String> compatible = machinePlatformResolver.compatible(machineIds, osTypes, script.getSupportedPlatforms());
+            List<String> targets = machinePlatformResolver.supporting(compatible, pkg.getPackageManager());
             if (targets.isEmpty()) {
-                log.warn("Software {} skipped package {}/{}: no OS-compatible device among {} target(s) (supports {})",
+                log.warn("Software {} skipped package {}/{}: no compatible device among {} target(s) (supports {})",
                         action, pkg.getPackageManager(), pkg.getPackageName(), machineIds.size(),
                         script.getSupportedPlatforms());
                 continue;

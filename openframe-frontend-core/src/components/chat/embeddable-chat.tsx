@@ -42,6 +42,7 @@ import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, us
 import { createPortal } from 'react-dom';
 import { type ChatMessage, writingMessageIndex } from '../../chat-protocol/chat-message';
 import { recordHref, replaceRecordLinks } from '../../chat-protocol/record-link';
+import { WHAT_CAN_YOU_DO_MESSAGE } from '../../chat-protocol/what-can-you-do';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
@@ -87,10 +88,14 @@ import { useChatDialogManager } from './hooks/use-chat-dialog-manager';
 import { useChatIdentity } from './hooks/use-chat-identity';
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation';
 import { useEmptyStateConfig } from './hooks/use-empty-state-config';
-import { fetchSlashCommands, useSlashCommandRegistry } from './hooks/use-slash-commands';
+import {
+  fetchSlashCommands,
+  useSlashCommandRegistry,
+  useWhatToAskCommand,
+  whatToAskLabelOf,
+} from './hooks/use-slash-commands';
 import type { UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
-import { useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
 import { MingoChatHeader, type MingoChatHeaderAction } from './mingo-chat-header';
 import type { MingoDialogStatus } from './mingo-chat-list-shared';
@@ -102,7 +107,7 @@ import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { type QuickActionAccent, accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { RecordActionsProvider } from './record-actions';
-import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
+import { CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { ChatDialogCapabilities, UnifiedSendMessageOptions } from './types/unified-chat-state.types';
@@ -445,23 +450,11 @@ export interface EmbeddableChatProps {
    */
   aboveComposer?: React.ReactNode;
   /**
-   * v2: what the list's "What to ask Mingo?" opens. Default: a new chat, the
-   * same as "Start New Chat"; a host with its own suggestions surface (a
-   * guided tour in a conversation of its own) points it there instead.
+   * v2: what the list's "What to ask?" entry opens, for a host that shows it on a page of its own (which then calls the
+   * handle's `showWhatToAsk`). Default: a new chat that sends the `/what-can-you-do` command. The entry is shown only
+   * when the chat's command catalog lists that command, under the command's label.
    */
   onWhatToAsk?: () => void;
-  /**
-   * v2: the "What to ask?" exchange the list's entry shows (when no
-   * `onWhatToAsk` takes it over): every click opens a new chat holding it,
-   * never the open conversation. Local - never sent, never stored. Picking a
-   * chip sends its prompt in that new chat, like a quick action.
-   *
-   * A function is called on each click and the exchange appears, whole, once
-   * its promise settles (prompts built from live data, e.g. the workspace's
-   * devices); clicks while one is pending are ignored. It should not reject:
-   * a rejection is logged and shows nothing.
-   */
-  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
   /**
    * v2: items in the chat's ⋯ menu after its own, past a separator - actions
    * that are not about the chat (e.g. the host's onboarding reset). Shown in
@@ -615,9 +608,6 @@ const withoutRecordLink = (value: string, href: string): string =>
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
-
-/** The header over a new chat holding only the "What to ask Mingo?" answer. */
-const WHAT_TO_ASK_TITLE = 'What to ask Mingo?';
 
 /** One shared empty list, so "nothing staged" keeps a stable identity. */
 const NO_CONTEXT_ITEMS: ChatContextItem[] = [];
@@ -799,10 +789,8 @@ export interface EmbeddableChatHandle {
    */
   prefillDraft: (draft: ChatPrefillDraft) => void;
   /**
-   * Same as the v2 list's "What to ask Mingo?", for a host that draws its own entry
-   * (a link beside its quick actions, an item in its own chat-history menu): the
-   * host's `onWhatToAsk` when it has one, else the `whatToAsk` exchange in a new
-   * chat, else a new chat. Leaves the archive.
+   * "What to ask?" itself: a new chat that sends the `/what-can-you-do` command (the server answers it as a turn), for
+   * a host that draws its own entry or page. Leaves the archive.
    */
   showWhatToAsk: () => void;
   /**
@@ -867,7 +855,6 @@ function EmbeddableChatInner({
   contextMemory,
   aboveComposer,
   onWhatToAsk,
-  whatToAsk: whatToAskContent,
   chatMenuExtraItems,
   rail = 'auto',
   threadContainer,
@@ -1182,6 +1169,7 @@ function EmbeddableChatInner({
     currentContextTokens,
     currentCacheHitRatePct,
     currentUsageBreakdown,
+    usagePanel,
     displayRef,
     // ─── Dialog management (Mingo-mode inline history) ───
     dialogs,
@@ -1503,7 +1491,7 @@ function EmbeddableChatInner({
   // `sendPrompt` goes through a ref: what it sends with is declared further
   // down (`sendPromptRef.current` is set next to `handleSend`).
   const sendPromptRef = useRef<(text: string) => void>(() => {});
-  // The "What to ask?" entry as of the last render, for the handle (`showWhatToAsk`).
+  // "What to ask?" as of the last render, for the handle (`showWhatToAsk`).
   const whatToAskEntryRef = useRef<() => void>(() => {});
   const chatPanelHandle = useMemo<ChatPanelHandle>(
     () => ({
@@ -1604,30 +1592,16 @@ function EmbeddableChatInner({
     [rawMessages, guideUserName, guideUserAvatar, ownSendName, ownSendAvatar],
   );
 
-  // "What to ask?" exchanges (`whatToAsk`) are the panel's own, shown in the
-  // thread beside the host's messages; a new chat holding one reads as a
-  // conversation until it is sent or left.
-  const whatToAsk = useWhatToAsk({
-    dialogId: activeDialogId,
-    content: typeof whatToAskContent === 'function' ? undefined : whatToAskContent,
-    user: {
-      name: headerUserName ?? 'You',
-      avatar: identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || null,
-      authorType: AUTHOR_TYPE.ADMIN,
-    },
-    assistant: { name: 'Mingo', assistantType: 'mingo' },
-  });
-  const noteWhatToAskSend = whatToAsk.noteSend;
-  const messages = whatToAsk.withExchanges(hostMessages);
-  // A new chat whose only messages are those exchanges: no dialog yet.
-  const isWhatToAskDraft = activeDialogId == null && hostMessages.length === 0 && messages.length > 0;
+  // "What to ask?" is the `/what-can-you-do` slash command: the server answers it as a turn. The entry is the
+  // catalog's: shown only when the chat's commands list it, under its label.
+  const whatToAskCommand = useWhatToAskCommand(commandsUrl);
+  const messages = hostMessages;
 
   const handleSend = useCallback(
     (text: string) => {
       // Locked: the disabled editor cannot submit, but a queued Enter or a
       // stale ref call still lands here — refused at the seam, not by luck.
       if (composerLock) return;
-      noteWhatToAskSend();
       // The unified `sendMessage` delegates to the ACTIVE adapter: the SSE one
       // settles its own failures into an error row, but the Mingo/NATS one
       // rejects on a failed publish. There is no composer promise for that
@@ -1647,7 +1621,7 @@ function EmbeddableChatInner({
         setContextItems([]);
       }
     },
-    [composerLock, noteWhatToAskSend, sendMessage, readyAttachments, clearAttachments, contextItems],
+    [composerLock, sendMessage, readyAttachments, clearAttachments, contextItems],
   );
 
   /**
@@ -1672,8 +1646,8 @@ function EmbeddableChatInner({
   );
 
   // What the thread's cards do. An ask card is gated on `chatLoading` for the same reason the composer is: no second
-  // send while a turn is in flight. Passive demo hosts (previewMode) stay read-only. A "What to ask?" chip goes out the
-  // way the panel sends a prompt, not the adapter's: that send knows a blocked chat, and keeps a new chat's exchange.
+  // send while a turn is in flight. Passive demo hosts (previewMode) stay read-only. A suggestion chip goes out the
+  // way the panel sends a prompt, not the adapter's: that send knows a blocked chat.
   const messageActions = useMemo(
     () => ({
       ...chatActions,
@@ -2115,23 +2089,14 @@ function EmbeddableChatInner({
    * assistant name; anywhere else a draft is a "New Chat".
    */
   const freshConversationTitle = isGuideEmpty ? (headerAssistantName ?? 'Mingo Guide') : 'New Chat';
-  // The chat's own header over a new chat that holds only "What to ask?" exchanges: it is that
-  // answer, not a chat the user started. The list's draft row keeps `freshConversationTitle`.
-  const draftHeaderTitle = isWhatToAskDraft ? WHAT_TO_ASK_TITLE : freshConversationTitle;
+  const draftHeaderTitle = freshConversationTitle;
   const headerTitle = hasConversation
     ? activeDialog?.title || draftHeaderTitle
     : isGuideEmpty
       ? freshConversationTitle
       : 'Current Chats';
   const headerBackAriaLabel = hasConversation ? (isViewingArchived ? 'Back to archive' : 'Back') : 'Back to Mingo';
-  const clearWhatToAskDraft = whatToAsk.clearDraft;
-  const headerOnBack = hasConversation
-    ? () => {
-        // Leaving a new chat that only holds "What to ask?" exchanges drops them.
-        if (activeDialogId == null) clearWhatToAskDraft();
-        handleBack();
-      }
-    : () => handleActiveModeChange('mingo');
+  const headerOnBack = hasConversation ? handleBack : () => handleActiveModeChange('mingo');
   const headerOnRestore =
     isViewingArchived && unarchiveDialog && activeDialog ? () => setRestoreTarget(activeDialog) : undefined;
   const headerOnRename =
@@ -2165,9 +2130,8 @@ function EmbeddableChatInner({
   // dedicated reset (not `handleBack`, which would reopen the archive when the
   // open conversation is archived) so it always lands on a fresh chat.
   const handleNewChat = useCallback(() => {
-    clearWhatToAskDraft();
     resetToNewChat();
-  }, [clearWhatToAskDraft, resetToNewChat]);
+  }, [resetToNewChat]);
 
   // The open chat cannot take a message now: the composer is locked, a turn is
   // running, or it waits on an approval / escalation nobody has answered.
@@ -2179,52 +2143,37 @@ function EmbeddableChatInner({
     activeDialogStatus === 'approval' ||
     awaitsDecision(hostMessages, displayApprovalTypes);
 
-  // "What to ask Mingo?" with `whatToAsk`: every click opens a new chat with
-  // the exchange - never the open conversation, whatever its state, and not
-  // the new chat already holding one (its exchange is dropped for a fresh
-  // one). The prompts always start a conversation of their own.
-  const showWhatToAsk = (content: WhatToAskContent) => {
-    whatToAsk.clearDraft();
+  // "What to ask?": a new chat that sends `/what-can-you-do`, never into the open conversation. From an open chat the
+  // send waits for the new chat (no dialog, no turn running), so it is the first message of a conversation of its own.
+  const whatToAskQueuedRef = useRef(false);
+  const sendWhatToAsk = useCallback(() => {
+    void sendMessage(WHAT_CAN_YOU_DO_MESSAGE).catch((err: unknown) => {
+      console.error('[EmbeddableChat] what to ask failed:', err);
+    });
+  }, [sendMessage]);
+  const runWhatToAsk = () => {
+    const alreadyNew = activeDialogId == null && !chatLoading;
     resetToNewChat();
     setComposeOpen(true);
-    whatToAsk.ask('draft', content);
+    if (alreadyNew) sendWhatToAsk();
+    else whatToAskQueuedRef.current = true;
   };
+  useEffect(() => {
+    if (!whatToAskQueuedRef.current || chatLoading || activeDialogId != null) return;
+    whatToAskQueuedRef.current = false;
+    sendWhatToAsk();
+  });
 
-  // A "What to ask?" chip: its prompt goes out on its own, like a quick action
-  // (whatever is staged in the composer stays staged), into the chat the chip
-  // sits in - not while that chat is blocked. The first send from the new chat
-  // creates the dialog the exchange moves to.
+  // A suggestion chip: its prompt goes out on its own, like a quick action (whatever is staged in the composer stays
+  // staged), into the chat the chip sits in - not while that chat is blocked.
   useEffect(() => {
     sendPromptRef.current = text => {
       if (isChatBlocked) return;
-      noteWhatToAskSend();
       void sendMessage(text).catch((err: unknown) => {
         console.error('[EmbeddableChat] sendPrompt failed:', err);
       });
     };
   });
-  // An async `whatToAsk` settles renders later: by then the panel may be in
-  // another state, so it is shown through the latest `showWhatToAsk`.
-  const showWhatToAskRef = useRef(showWhatToAsk);
-  useEffect(() => {
-    showWhatToAskRef.current = showWhatToAsk;
-  });
-  const whatToAskPendingRef = useRef(false);
-  const requestWhatToAsk = () => {
-    if (!whatToAskContent) return;
-    if (typeof whatToAskContent !== 'function') {
-      showWhatToAsk(whatToAskContent);
-      return;
-    }
-    if (whatToAskPendingRef.current) return;
-    whatToAskPendingRef.current = true;
-    whatToAskContent()
-      .then(content => showWhatToAskRef.current(content))
-      .catch((err: unknown) => console.error('[EmbeddableChat] whatToAsk failed:', err))
-      .finally(() => {
-        whatToAskPendingRef.current = false;
-      });
-  };
 
   // "Ask Mingo" from an archived chat: the conversation is read-only (the
   // backend refuses writes), so the question starts a new chat instead. It is
@@ -2430,13 +2379,15 @@ function EmbeddableChatInner({
       if (archiveOpen) closeArchive();
       action();
     };
-  // The list's "What to ask Mingo?" entry, also the host's (`showWhatToAsk`): the
-  // suggestions a new chat opens on, unless the host has a surface of its own.
-  const openWhatToAsk = () => {
-    leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? requestWhatToAsk : handleNewChat))();
-  };
+  // The list's "What to ask?" entry: the host's page when it has one, else the command here. The handle's
+  // `showWhatToAsk` always runs the command (a host page calls it).
+  const openWhatToAsk = whatToAskCommand
+    ? () => {
+        leaveArchiveThen(onWhatToAsk ?? runWhatToAsk)();
+      }
+    : undefined;
   useEffect(() => {
-    whatToAskEntryRef.current = openWhatToAsk;
+    whatToAskEntryRef.current = () => leaveArchiveThen(runWhatToAsk)();
   });
   const mingoRailProps = {
     dialogs,
@@ -2445,13 +2396,13 @@ function EmbeddableChatInner({
     activeDialogId: archiveOpen ? undefined : (activeDialogId ?? undefined),
     // Beside a new chat (wide only: narrow, the list is its own screen).
     // A new chat holding only "What to ask?" exchanges is still that new chat.
-    draftTitle:
-      wideMingo && (!hasConversation || isWhatToAskDraft) && !archiveOpen ? freshConversationTitle : undefined,
+    draftTitle: wideMingo && !hasConversation && !archiveOpen ? freshConversationTitle : undefined,
     onSelectDialog: (id: string) => leaveArchiveThen(() => handleSelectDialog(id))(),
     onNewChat: leaveArchiveThen(handleNewChat),
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
     onWhatToAsk: openWhatToAsk,
+    whatToAskLabel: whatToAskCommand ? whatToAskLabelOf(whatToAskCommand) : undefined,
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,
@@ -2804,6 +2755,7 @@ function EmbeddableChatInner({
               outputTokens: currentOutputTokens ?? undefined,
               hitRatePct: currentCacheHitRatePct ?? undefined,
               breakdown: currentUsageBreakdown ?? undefined,
+              usagePanel: usagePanel ?? undefined,
               onModelClick,
               modelTooltip,
             }

@@ -479,7 +479,7 @@ exports[`chat stream reducer — what the thread holds after a wire > normal tur
     "totalTokensSize": 120,
   },
   "liveModel": {
-    "contextWindowMaxTokens": 200000,
+    "contextWindowMaxTokens": null,
     "modelLabel": "Claude Sonnet",
     "provider": "anthropic",
   },
@@ -487,7 +487,6 @@ exports[`chat stream reducer — what the thread holds after a wire > normal tur
     {
       "id": "stream-1",
       "metadata": {
-        "contextWindowMaxTokens": 200000,
         "createdAt": "<time>",
         "finishReason": "stop",
         "model": "claude-sonnet-x",

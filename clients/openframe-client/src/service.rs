@@ -10,6 +10,7 @@ use crate::platform::machine_info_persistence::{self, PersistedMachineInfo};
 use crate::platform::permissions::{Capability, PermissionUtils};
 use crate::service_adapter::{CrossPlatformServiceManager, RecoveryConfig, ServiceConfig};
 use crate::services::{AgentConfigurationService, AgentRegistrationService, DeregistrationService};
+use crate::utils::fs::CorruptJson;
 use crate::{platform::DirectoryManager, Client};
 
 #[cfg(windows)]
@@ -609,6 +610,13 @@ impl Service {
             crate::services::InitialConfigurationService::new(dir_manager.clone())
                 .context("Failed to initialize initial configuration service")?;
         if !initial_config_service.is_configured() {
+            match initial_config_service.get_server_url() {
+                Err(e) if e.is::<CorruptJson>() => error!(
+                    "{:#}; replace it by running 'openframe-client auth' with your tenant parameters",
+                    e
+                ),
+                _ => {}
+            }
             info!(
                 "Not authenticated yet — waiting for configuration (run 'openframe-client auth' with your tenant parameters)"
             );

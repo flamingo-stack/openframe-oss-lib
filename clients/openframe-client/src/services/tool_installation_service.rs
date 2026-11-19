@@ -135,14 +135,21 @@ impl ToolInstallationService {
                     .directory_manager
                     .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
                     .await;
-                if binary_present {
+                if !binary_present {
+                    warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
+                } else if let Some(asset_path) = self
+                    .command_params_resolver
+                    .missing_command_asset(installed_tool)
+                    .await
+                {
+                    warn!("Tool {} has a registry record (version {}) but its asset is missing at {} — repairing via install", tool_agent_id, installed_tool.version, asset_path.display());
+                } else {
                     info!(
                         "Tool {} is already installed with version {}, skipping installation",
                         tool_agent_id, installed_tool.version
                     );
                     return Ok(());
                 }
-                warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
             }
         }
 
@@ -269,16 +276,16 @@ impl ToolInstallationService {
                 // Match the tool folder path (not just agent.exe) so child processes like the
                 // orbit-spawned osqueryd are killed too; on Windows their locked binaries would
                 // otherwise block the directory removal below with "Access is denied".
-                if let Err(e) = self
-                    .tool_kill_service
+                self.tool_kill_service
                     .stop_tool_by_path(&tool_folder_path.to_string_lossy())
                     .await
-                {
-                    warn!(
-                        "Failed to kill processes locking tool directory for {}: {:#}",
-                        tool_agent_id, e
-                    );
-                }
+                    .with_context(|| {
+                        format!(
+                            "Aborting reinstall of {}: processes under {} could not be stopped; the tool is stopped and its directory kept, will retry",
+                            tool_agent_id,
+                            tool_folder_path.display()
+                        )
+                    })?;
 
                 info!(
                     "Removing existing tool directory: {}",
@@ -508,7 +515,12 @@ impl ToolInstallationService {
                 // On reinstall, always refresh server-generated config assets (e.g. the mesh .msh).
                 let refresh_config_asset =
                     reinstall && matches!(asset.source, AssetSource::ToolApi);
-                if !asset_path.exists() || refresh_config_asset {
+                if !self
+                    .directory_manager
+                    .tool_artifact_present(&asset_path, false)
+                    .await
+                    || refresh_config_asset
+                {
                     if is_executable {
                         if let Err(e) = self
                             .tool_kill_service

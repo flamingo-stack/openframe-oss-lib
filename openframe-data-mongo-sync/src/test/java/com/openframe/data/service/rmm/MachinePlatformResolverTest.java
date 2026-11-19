@@ -1,6 +1,7 @@
 package com.openframe.data.service.rmm;
 
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -91,6 +92,20 @@ class MachinePlatformResolverTest {
                 .containsExactly("m-mac");
         assertThat(resolver().compatible(ids, osTypes, List.of(OsType.MAC_OS, OsType.WINDOWS)))
                 .containsExactly("m-win", "m-mac");
+    }
+
+    @Test
+    @DisplayName("supporting: the machines PackageManagerAvailability names for the same ids and manager")
+    void supporting_machineIdsAndAManager_whatPackageManagerAvailabilityReturns() {
+        // setup
+        List<String> machineIds = List.of("m1", "m2", "m3");
+        when(packageManagerAvailability.supporting(machineIds, PackageManagerType.BREW)).thenReturn(List.of("m1", "m3"));
+
+        // execution
+        List<String> supporting = resolver().supporting(machineIds, PackageManagerType.BREW);
+
+        // verifications
+        assertThat(supporting).containsExactly("m1", "m3");
     }
 
     private static Machine machine(String machineId, OsType osType) {

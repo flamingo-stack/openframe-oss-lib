@@ -5,6 +5,7 @@ import com.openframe.api.service.AssignmentService;
 import com.openframe.api.service.device.ClientOwnerScopeResolver;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
 import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.model.ClientOwnerScope;
@@ -16,6 +17,8 @@ import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -91,6 +94,41 @@ class TicketServiceStatusFilterTest {
         service.getTickets(admin, null, null, null, null);
 
         assertThat(capturedFilter().getStatusIds()).isNull();
+    }
+
+    @Test
+    void getTickets_forwardsCreationSourcesToTheQuery() {
+        List<TicketCreationSource> creationSources =
+                List.of(TicketCreationSource.EMAIL, TicketCreationSource.FAE_FORM);
+        givenRepositoryReturns(List.of(ticket("ticket-1")));
+
+        service.getTickets(admin, TicketFilterInput.builder().creationSources(creationSources).build(),
+                null, null, null);
+
+        assertThat(capturedFilter().getCreationSources())
+                .containsExactly(TicketCreationSource.EMAIL, TicketCreationSource.FAE_FORM);
+    }
+
+    // guard: green before implementation
+    @ParameterizedTest
+    @NullAndEmptySource
+    void getTickets_creationSourcesNullOrEmpty_noSourceNarrowing(List<TicketCreationSource> creationSources) {
+        givenRepositoryReturns(List.of(ticket("ticket-1")));
+
+        service.getTickets(admin, TicketFilterInput.builder().creationSources(creationSources).build(),
+                null, null, null);
+
+        assertThat(capturedFilter().getCreationSources()).isNullOrEmpty();
+    }
+
+    // guard: green before implementation
+    @Test
+    void getTickets_withoutFilter_noSourceNarrowing() {
+        givenRepositoryReturns(List.of(ticket("ticket-1")));
+
+        service.getTickets(admin, null, null, null, null);
+
+        assertThat(capturedFilter().getCreationSources()).isNullOrEmpty();
     }
 
     @Test

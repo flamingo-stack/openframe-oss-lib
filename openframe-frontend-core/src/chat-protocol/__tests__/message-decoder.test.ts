@@ -59,7 +59,7 @@ describe('createMingoDecoder: the table', () => {
     ]);
   });
 
-  it('AI_METADATA is message metadata', () => {
+  it("AI_METADATA is message metadata, without the model's window: it is not the chat's context budget", () => {
     expect(
       decodeAll({
         type: 'AI_METADATA',
@@ -71,7 +71,7 @@ describe('createMingoDecoder: the table', () => {
     ).toEqual([
       {
         type: 'message-metadata',
-        messageMetadata: { model: 'm', provider: 'anthropic', contextWindowMaxTokens: 9, modelLabel: 'M' },
+        messageMetadata: { model: 'm', provider: 'anthropic', modelLabel: 'M' },
       },
     ]);
     expect(decodeAll({ type: 'AI_METADATA', modelName: 'm' })).toEqual([]);
@@ -532,6 +532,46 @@ describe('createMingoDecoder: the table', () => {
       },
       { type: 'data-dialog-closed', transient: true, data: {} },
     ]);
+  });
+
+  it('TOKEN_USAGE carries the cache split and compaction ratio when the backend sends them, and only then', () => {
+    expect(
+      decodeAll({
+        type: 'TOKEN_USAGE',
+        inputTokensSize: 11_860,
+        outputTokensSize: 940,
+        totalTokensSize: 12_800,
+        contextSize: 150_000,
+        uncachedInputTokensSize: 1_200,
+        cacheReadTokensSize: 10_100,
+        cacheWriteTokensSize: 560,
+        compactionThreshold: 0.8,
+      }),
+    ).toEqual([
+      {
+        type: 'data-token-usage',
+        transient: true,
+        data: {
+          inputTokensSize: 11_860,
+          outputTokensSize: 940,
+          totalTokensSize: 12_800,
+          contextSize: 150_000,
+          uncachedInputTokensSize: 1_200,
+          cacheReadTokensSize: 10_100,
+          cacheWriteTokensSize: 560,
+          compactionThreshold: 0.8,
+        },
+      },
+    ]);
+    const [legacy] = decodeAll({
+      type: 'TOKEN_USAGE',
+      inputTokensSize: 1,
+      outputTokensSize: 2,
+      totalTokensSize: 3,
+      cacheReadTokensSize: null,
+    });
+    expect(legacy).toMatchObject({ type: 'data-token-usage' });
+    expect('cacheReadTokensSize' in (legacy as { data: object }).data).toBe(false);
   });
 
   it('a persisted text row is whole: what it opens it closes, and adjacent rows coalesce', () => {

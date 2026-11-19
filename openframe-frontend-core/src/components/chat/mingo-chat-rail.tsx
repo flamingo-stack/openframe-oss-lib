@@ -78,6 +78,7 @@ function MingoChatRailPanel({
   onOpenArchive,
   archiveActive = false,
   onWhatToAsk,
+  whatToAskLabel,
   statusOf,
   onRequestRename,
   onRequestArchive,
@@ -119,8 +120,8 @@ function MingoChatRailPanel({
       onClick: onOpenArchive,
     });
   }
-  if (onWhatToAsk)
-    items.push({ id: 'ask', label: 'What to ask Mingo?', icon: <ChatQuestionIcon />, onClick: onWhatToAsk });
+  if (onWhatToAsk && whatToAskLabel)
+    items.push({ id: 'ask', label: whatToAskLabel, icon: <ChatQuestionIcon />, onClick: onWhatToAsk });
 
   const listMenu: ActionsMenuItem[] = [];
   if (scope && onScopeChange) {
