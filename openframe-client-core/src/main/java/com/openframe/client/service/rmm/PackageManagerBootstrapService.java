@@ -2,6 +2,7 @@ package com.openframe.client.service.rmm;
 
 import java.util.List;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -18,6 +19,7 @@ import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
+import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +29,8 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
 
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.package-manager-bootstrap.enabled", havingValue = "true")
@@ -39,6 +43,7 @@ public class PackageManagerBootstrapService {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
     private final EncryptionService encryptionService;
+    private final TenantIdProvider tenantIdProvider;
 
     @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds}")
     private long cooldownSeconds;
@@ -120,7 +125,8 @@ public class PackageManagerBootstrapService {
 
         // the agent gets a stored secret in the clear
         List<ScriptEnvVar> storedEnvVars = script.getEnvVars();
-        List<ScriptEnvVar> envVars = ScriptEnvVar.revealAll(storedEnvVars, encryptionService::decrypt);
+        List<ScriptEnvVar> envVars = ScriptEnvVar.revealAll(storedEnvVars, value ->
+                encryptionService.decrypt(value, EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SCRIPT_ENV_VAR)));
         scriptBootstrapNatsPublisher.publishBootstrapScript(machineId, ScriptMessage.builder()
                 .executionId(executionId)
                 .scriptId(script.getId())

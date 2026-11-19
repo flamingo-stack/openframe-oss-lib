@@ -3,15 +3,18 @@ package com.openframe.client.service.validator;
 import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
 import com.openframe.client.exception.AgentRegistrationSecretValidationException;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
+import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
+import static com.openframe.core.crypto.service.SecretPurpose.AGENT_REGISTRATION_SECRET;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
@@ -20,6 +23,7 @@ public class AgentRegistrationSecretValidator {
 
     private final AgentRegistrationSecretRepository secretRepository;
     private final EncryptionService encryptionService;
+    private final TenantIdProvider tenantIdProvider;
 
     public void validate(String initialKey) {
         if (isBlank(initialKey)) {
@@ -29,7 +33,8 @@ public class AgentRegistrationSecretValidator {
         AgentRegistrationSecret secret = secretRepository.findByActiveTrue()
                 .orElseThrow(() -> new AgentRegistrationSecretValidationErrorException("No active agent secret found"));
 
-        String decryptedSecretKey = encryptionService.decrypt(secret.getSecretKey());
+        String decryptedSecretKey = encryptionService.decrypt(secret.getSecretKey(),
+                EncryptionContext.forTenant(tenantIdProvider.getTenantId(), AGENT_REGISTRATION_SECRET));
         boolean matches = MessageDigest.isEqual(
                 decryptedSecretKey.getBytes(StandardCharsets.UTF_8),
                 initialKey.getBytes(StandardCharsets.UTF_8));

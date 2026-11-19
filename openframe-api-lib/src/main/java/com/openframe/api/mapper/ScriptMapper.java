@@ -4,17 +4,21 @@ import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
 
 /**
  * Pure entity &harr; DTO mapping for scripts. Lives in {@code openframe-api-lib}
@@ -31,6 +35,7 @@ public class ScriptMapper {
     // ObjectProvider: a service that never reads a stored secret boots without the encryption config
     private final ObjectProvider<EncryptionService> encryptionService;
     private final ObjectProvider<ScriptSecretSealer> secretSealer;
+    private final TenantIdProvider tenantIdProvider;
 
     public Script toEntity(String tenantId, CreateScriptInput input) {
         List<ScriptEnvVarInput> envVarsInput = input.getEnvVars();
@@ -102,7 +107,7 @@ public class ScriptMapper {
 
     private String decrypt(String ciphertext) {
         EncryptionService service = encryptionService.getObject();
-        return service.decrypt(ciphertext);
+        return service.decrypt(ciphertext, EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SCRIPT_ENV_VAR));
     }
 
     private List<ScriptEnvVar> seal(List<ScriptEnvVar> envVars) {
