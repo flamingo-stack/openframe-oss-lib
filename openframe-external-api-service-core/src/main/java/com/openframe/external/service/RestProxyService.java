@@ -20,6 +20,7 @@ import org.apache.hc.core5.http.Method;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -41,17 +43,33 @@ public class RestProxyService {
 
     private static final String MASKED_VALUE = "****";
 
+    static final Duration CONNECT_TIMEOUT = Duration.ofMinutes(3);
+    static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(60);
+
     private final IntegratedToolRepository toolRepository;
     private final ProxyUrlResolver proxyUrlResolver;
     private final ToolUrlService toolUrlService;
+    private final FleetProxyGuard fleetProxyGuard;
     private final CloseableHttpClient httpClient;
 
+    @Autowired
     public RestProxyService(IntegratedToolRepository toolRepository,
                            ProxyUrlResolver proxyUrlResolver,
-                           ToolUrlService toolUrlService) {
+                           ToolUrlService toolUrlService,
+                           FleetProxyGuard fleetProxyGuard) {
+        this(toolRepository, proxyUrlResolver, toolUrlService, fleetProxyGuard, CONNECT_TIMEOUT, RESPONSE_TIMEOUT);
+    }
+
+    RestProxyService(IntegratedToolRepository toolRepository,
+                     ProxyUrlResolver proxyUrlResolver,
+                     ToolUrlService toolUrlService,
+                     FleetProxyGuard fleetProxyGuard,
+                     Duration connectTimeout,
+                     Duration responseTimeout) {
         this.toolRepository = toolRepository;
         this.proxyUrlResolver = proxyUrlResolver;
         this.toolUrlService = toolUrlService;
+        this.fleetProxyGuard = fleetProxyGuard;
         this.httpClient = createHttpClient();
     }
 
