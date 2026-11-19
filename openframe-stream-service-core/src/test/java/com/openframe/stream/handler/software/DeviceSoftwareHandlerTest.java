@@ -10,6 +10,9 @@ import com.openframe.stream.handler.software.FleetHostResolver.FleetHostRef;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -103,7 +106,7 @@ class DeviceSoftwareHandlerTest {
         return DeviceSoftware.builder().id(id).tenantId("t1").machineId("m1").softwareTitleId(titleId)
                 .name(name).source("apps").versions(List.of(version)).vulnerabilities(List.of(cves))
                 .arpKeys(List.of()).packageFamilyNames(List.of()).installerTypes(List.of())
-                .machineConnected(false).build();
+                .appFileNames(List.of()).machineConnected(false).build();
     }
 
     private HostSoftwareTitle titleWithCves(long id, String name, String version, String... cves) {
@@ -431,13 +434,15 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getWingetId()).isNull();
     }
 
-    @Test
-    void handle_homebrewFormulaWithOldVersionsInTheCellar_onlyTheNewestVersionKept() {
+    @ParameterizedTest
+    @ValueSource(strings = {"homebrew_packages", "homebrew_casks"})
+    void handle_homebrewPackageWithOldVersionsLeftByBrew_onlyTheNewestVersionKept(String source) {
         // setup
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        HostSoftwareTitle libnghttp2 = title(44L, "libnghttp2", "homebrew_packages", "1.70.0", "1.68.0", "1.71.0");
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(libnghttp2));
+        HostSoftwareTitle libnghttp2 = title(44L, "libnghttp2", source, "1.70.0", "1.68.0", "1.71.0");
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
+                .thenReturn(List.of(libnghttp2));
         DeserializedDebeziumMessage message = msg("c", null, row().put("host_id", 100));
 
         // execution
@@ -574,5 +579,178 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getId()).isEqualTo("ds-42");
         assertThat(saved.isMachineConnected()).isTrue();
         assertThat(saved.getVersions()).containsExactly("2.0");
+    }
+
+    @Test
+    void handle_macAppWithInstalledPaths_keepsBundleIdAndSortedAppFileNames() {
+        // setup
+        HostSoftwareTitle code = app("com.microsoft.VSCode", "/Applications/Visual Studio Code.app",
+                "/Users/alice/Applications/Code.app", "/Applications/Visual Studio Code.app", " ");
+        stubHostSoftware(code);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getBundleIdentifier()).isEqualTo("com.microsoft.VSCode");
+        assertThat(saved.getAppFileNames()).containsExactly("Code", "Visual Studio Code");
+        assertThat(saved.getTopLevelApp()).isTrue();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "/Applications/Slack.app, true",
+            "/Users/alice/Applications/Slack.app, true",
+            "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app, false",
+            "/Users/alice/Applications/Chrome Apps.localized/Gmail.app, false",
+            "/Applications/Utilities/Slack.app, false",
+            "/Library/Application Support/Slack/Slack.app, false"
+    })
+    void handle_macAppByItsInstalledPath_topLevelOnlyDirectlyInAnApplicationsFolder(String path, boolean topLevel) {
+        // setup
+        HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap", path);
+        stubHostSoftware(slack);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        assertThat(savedRow().getTopLevelApp()).isEqualTo(topLevel);
+    }
+
+    @Test
+    void handle_macAppNestedAndTopLevel_topLevel() {
+        // setup
+        HostSoftwareTitle helper = app("com.example.helper",
+                "/Applications/Suite.app/Contents/Helpers/Helper.app", "/Applications/Helper.app");
+        stubHostSoftware(helper);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getAppFileNames()).containsExactly("Helper");
+        assertThat(saved.getTopLevelApp()).isTrue();
+    }
+
+    @Test
+    void handle_macAppWithoutInstalledPaths_topLevelUnknownAndNoAppFileNames() {
+        // setup
+        HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap");
+        stubHostSoftware(slack);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    void handle_macAppWithABlankInstalledPath_topLevelUnknownAndNoAppFileNames(String blankPath) {
+        // setup
+        HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap", blankPath);
+        stubHostSoftware(slack);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isNull();
+    }
+
+    @Test
+    void handle_macAppPathThatIsNotAnApp_noAppFileNameAndNotTopLevel() {
+        // setup
+        HostSoftwareTitle tool = app("com.example.tool", "/usr/local/bin/tool");
+        stubHostSoftware(tool);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isFalse();
+    }
+
+    @Test
+    void handle_otherSourceWithBundleIdAndPaths_keepsNoAppKeys() {
+        // setup
+        HostSoftwareTitle cask = app("com.tinyspeck.slackmacgap", "/Applications/Slack.app");
+        cask.setSource("homebrew_packages");
+        stubHostSoftware(cask);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getBundleIdentifier()).isNull();
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isNull();
+    }
+
+    @Test
+    void handle_reconcile_storedAppWithTheSameAppKeys_isNotWritten() {
+        // setup
+        stubHostSoftware(app("com.tinyspeck.slackmacgap", "/Applications/Slack.app"));
+        DeviceSoftware slack = storedApp(true);
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(slack));
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void handle_reconcile_storedAppMovedToTheApplicationsFolder_isWritten() {
+        // setup
+        stubHostSoftware(app("com.tinyspeck.slackmacgap", "/Applications/Slack.app"));
+        DeviceSoftware slack = storedApp(false);
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(slack));
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getId()).isEqualTo("ds-42");
+        assertThat(saved.getTopLevelApp()).isTrue();
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
+    }
+
+    private DeviceSoftware storedApp(boolean topLevelApp) {
+        DeviceSoftware app = stored("ds-42", 42L, "App", "1.0");
+        app.setBundleIdentifier("com.tinyspeck.slackmacgap");
+        app.setAppFileNames(List.of("Slack"));
+        app.setTopLevelApp(topLevelApp);
+        return app;
+    }
+
+    private void stubHostSoftware(HostSoftwareTitle hostSoftwareTitle) {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
+                .thenReturn(List.of(hostSoftwareTitle));
+    }
+
+    private HostSoftwareTitle app(String bundleIdentifier, String... installedPaths) {
+        HostSoftwareTitle app = title(42L, "App", "apps", "1.0");
+        app.setBundleIdentifier(bundleIdentifier);
+        if (installedPaths.length > 0) {
+            app.getInstalledVersions().getFirst().setInstalledPaths(List.of(installedPaths));
+        }
+        return app;
     }
 }

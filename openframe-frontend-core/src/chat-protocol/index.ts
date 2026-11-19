@@ -27,6 +27,8 @@ export { isRecord, unwrapEnvelope } from './wire-narrow';
 export * from './record-link';
 // Record cards: the records an answer shows, a typed part drawn where it sits (never read from the text).
 export * from './record-cards';
+// The slash command "What to ask?" sends.
+export * from './what-can-you-do';
 // The `[N]` grammar: what a stream removes from a model's text.
 export * from './citation-chip';
 // One row of the docs search, as the hub writes it and the search bar reads it.

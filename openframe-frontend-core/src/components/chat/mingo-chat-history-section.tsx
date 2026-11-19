@@ -244,6 +244,7 @@ export function MingoChatHistorySection({
   draftTitle,
   onOpenArchive,
   onWhatToAsk,
+  whatToAskLabel,
   moreMenuItems = [],
   statusOf,
   onRequestRename,
@@ -304,11 +305,11 @@ export function MingoChatHistorySection({
           },
         ]
       : []),
-    ...(onWhatToAsk
+    ...(onWhatToAsk && whatToAskLabel
       ? [
           {
             id: 'what-to-ask',
-            label: 'What to ask Mingo?',
+            label: whatToAskLabel,
             icon: <QuestionCircleIcon className={chatMenuIconClassName} />,
             onClick: onWhatToAsk,
           },

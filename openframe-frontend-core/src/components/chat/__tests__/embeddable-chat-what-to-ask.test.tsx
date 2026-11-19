@@ -1,33 +1,38 @@
 /**
- * `whatToAsk`: the v2 list's "What to ask Mingo?" answered in the panel.
- *
- * Every click opens a new chat holding the exchange - never the open
- * conversation - and the send from there keeps it in the dialog the send
- * creates. A chip sends its prompt in that new chat, like a quick action.
- * The ⋯ menu takes the host's extra items after the chat's own.
+ * The v2 list's "What to ask?" is the `/what-can-you-do` slash command. The entry is the command catalog's: shown only
+ * when the chat's commands list it, under the command's label. A click opens a new chat - never the open conversation -
+ * and sends the command there; the server answers it as a turn. A suggestion chip in that answer sends its prompt through
+ * the panel. The ⋯ menu takes the host's extra items after the chat's own.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createRef, type Ref, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** What the chat's command catalog lists (`commandsUrl`), per test. */
+let catalog: unknown[] = [];
 vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  embedAuthedFetch: vi.fn(() => new Promise(() => {})),
+  embedAuthedFetch: vi.fn((url: string) =>
+    String(url).includes('/api/docs/commands')
+      ? Promise.resolve(new Response(JSON.stringify({ commands: catalog })))
+      : new Promise(() => {}),
+  ),
 }));
 
 import type { ChatMessage } from '../../../chat-protocol/chat-message';
+import { WHAT_CAN_YOU_DO_COMMAND, WHAT_CAN_YOU_DO_MESSAGE } from '../../../chat-protocol/what-can-you-do';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
 import { ChatEngineProvider } from '../engine/chat-engine-context';
-import type { WhatToAskContent } from '../hooks/use-what-to-ask';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    commandsUrl: '/api/docs/commands',
+    // Absolute: this test's page has no origin to resolve a relative address against.
+    commandsUrl: 'https://hub.test/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
     attachmentViewUrlPrefix: '/api/storage/view/chat-attachments/',
@@ -36,11 +41,11 @@ const runtime: ChatRuntime = {
   navigation: { mode: 'host' },
 };
 
-const WHAT_TO_ASK: WhatToAskContent = {
-  question: 'What can I ask you?',
-  reply: 'Describe the outcome you want.',
-  groups: [{ label: 'Check', prompts: [{ label: 'Which devices went offline today?' }] }],
-  note: 'A note under the chips.',
+const COMMAND = {
+  id: WHAT_CAN_YOU_DO_COMMAND,
+  label: 'What can you do?',
+  description: 'Every quick action.',
+  actions: [],
 };
 
 const HELLO: ChatMessage = {
@@ -48,6 +53,20 @@ const HELLO: ChatMessage = {
   role: 'user',
   metadata: { createdAt: new Date(0).toISOString() },
   parts: [{ type: 'text', text: 'hello' }],
+};
+
+/** The server's answer to the command, as a stored turn: a line and the chips. */
+const ANSWER: ChatMessage = {
+  id: 'm-2',
+  role: 'assistant',
+  metadata: { createdAt: new Date(1).toISOString() },
+  parts: [
+    { type: 'text', text: 'Here is what you can ask me.' },
+    {
+      type: 'data-suggestions',
+      data: { groups: [{ label: 'Check', prompts: [{ label: 'Which devices went offline today?' }] }] },
+    },
+  ],
 };
 
 /** A host that owns the dialogs; a send from a new chat creates `d-new`. */
@@ -59,7 +78,6 @@ function Host({
   locked = false,
   openChat = [HELLO],
   busy = false,
-  whatToAsk = WHAT_TO_ASK,
   onWhatToAsk,
   handleRef,
 }: {
@@ -74,7 +92,6 @@ function Host({
   openChat?: ChatMessage[];
   /** A turn is running in the open chat. */
   busy?: boolean;
-  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
   /** The host's own "What to ask?" surface. */
   onWhatToAsk?: () => void;
   handleRef?: Ref<EmbeddableChatHandle>;
@@ -122,7 +139,7 @@ function Host({
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    // What every real adapter hands the thread: a send that knows nothing of the panel's exchange or its lock.
+    // What every real adapter hands the thread: a send that knows nothing of the panel's lock.
     actions: {
       selectAsk: adapterSend,
       pickSuggestion: adapterSend,
@@ -145,7 +162,6 @@ function Host({
         showInternalTrigger={false}
 
         composerLock={locked ? { placeholder: 'Out of balance' } : null}
-        whatToAsk={whatToAsk}
         onWhatToAsk={onWhatToAsk}
         chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
       />
@@ -153,170 +169,92 @@ function Host({
   );
 }
 
-function renderHost(props: Parameters<typeof Host>[0] = {}) {
+function renderHost(props: Parameters<typeof Host>[0] = {}, chatRuntime: ChatRuntime = runtime) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <ChatRuntimeContext.Provider value={runtime}>
+      <ChatRuntimeContext.Provider value={chatRuntime}>
         <Host {...props} />
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
   );
 }
 
-const whatToAsk = () => screen.getByRole('button', { name: 'What to ask Mingo?' });
-const editor = () => screen.getByRole('textbox');
+const entry = () => screen.findByRole('button', { name: COMMAND.label });
+const currentRows = () =>
+  screen
+    .getAllByRole('button')
+    .filter(button => button.getAttribute('aria-current') === 'true')
+    .map(button => button.textContent);
 
-describe('EmbeddableChat - whatToAsk', () => {
+describe('EmbeddableChat - What to ask', () => {
   // Wide enough for the list beside the chat (jsdom measures 0 otherwise).
   beforeEach(() => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1400);
+    catalog = [COMMAND];
   });
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('opens a new chat with the exchange, not the open conversation', () => {
+  it('opens a new chat and sends the command there, not in the open conversation', async () => {
+    const onSend = vi.fn();
+    renderHost({ initialDialogId: 'd-1', onSend });
+
+    fireEvent.click(await entry());
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(WHAT_CAN_YOU_DO_MESSAGE));
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
+  });
+
+  it('shows no entry when the catalog lists no such command', async () => {
+    catalog = [{ id: 'blogs', label: 'Blogs', description: 'Blog posts.', actions: [] }];
     renderHost({ initialDialogId: 'd-1' });
 
-    fireEvent.click(whatToAsk());
-
-    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
-    expect(screen.getByText('Describe the outcome you want.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Which devices went offline today?' })).toBeInTheDocument();
-    // The open conversation is left behind; the list marks the new chat.
-    expect(screen.queryByText('hello')).not.toBeInTheDocument();
-    const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
-    expect(active.map(button => button.textContent)).toEqual(['New Chat']);
+    await screen.findByRole('button', { name: 'Chat Archive' });
+    await waitFor(() => expect(screen.queryByRole('button', { name: COMMAND.label })).not.toBeInTheDocument());
   });
 
-  it('titles the chat "What to ask Mingo?" while it holds only the answer; the list row stays "New Chat"', () => {
-    renderHost();
-    // The header's title is a `p`; the list's entry of the same name is a button's label.
-    const titled = () => screen.queryAllByText('What to ask Mingo?', { selector: 'p' });
-    expect(titled()).toHaveLength(0);
-
-    fireEvent.click(whatToAsk());
-
-    expect(titled().length).toBeGreaterThan(0);
-    const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
-    expect(active.map(button => button.textContent)).toEqual(['New Chat']);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
-    expect(titled()).toHaveLength(0);
-  });
-
-  it('replaces the new chat exchange with a fresh one on another click', () => {
-    renderHost();
-
-    fireEvent.click(whatToAsk());
-    fireEvent.click(whatToAsk());
-
-    expect(screen.getAllByText('What can I ask you?')).toHaveLength(1);
-  });
-
-  it('opens a new chat with the exchange when no conversation is open', () => {
-    renderHost();
-
-    fireEvent.click(whatToAsk());
-
-    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
-    expect(screen.queryByText('hello')).not.toBeInTheDocument();
-    // The list keeps the new chat as the active row.
-    const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
-    expect(active.map(button => button.textContent)).toEqual(['New Chat']);
-  });
-
-  it('sends a picked prompt in the new chat and leaves the composer alone', () => {
-    const onSend = vi.fn();
-    renderHost({ onSend });
-
-    fireEvent.click(whatToAsk());
-    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
-
-    expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
-    expect(editor()).toHaveTextContent('');
-  });
-
-  it('keeps a new chat exchange in the dialog a picked prompt creates', async () => {
-    renderHost();
-
-    fireEvent.click(whatToAsk());
-    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
-
-    // The send went out and made its dialog (it is in the list now).
-    expect((await screen.findAllByText('Sent')).length).toBeGreaterThan(0);
-    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
-  });
-
-  it('a picked prompt goes through the panel, not past it to the adapter', () => {
-    const onSend = vi.fn();
-    const onAdapterSend = vi.fn();
-    renderHost({ onSend, onAdapterSend });
-
-    fireEvent.click(whatToAsk());
-    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
-
-    expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
-    expect(onAdapterSend).not.toHaveBeenCalled();
-  });
-
-  it('a picked prompt does not go out while the chat cannot take a message', () => {
-    const onSend = vi.fn();
-    const onAdapterSend = vi.fn();
-    renderHost({ onSend, onAdapterSend, locked: true });
-
-    fireEvent.click(whatToAsk());
-    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
-
-    expect(onSend).not.toHaveBeenCalled();
-    expect(onAdapterSend).not.toHaveBeenCalled();
-  });
-
-  it('opens a new chat from the archive list, not into the chat open before it', async () => {
-    renderHost({ initialDialogId: 'd-1' });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Chat Archive' }));
-    // The archive list is up (the chat open before it is still the active dialog).
-    await screen.findAllByText(/archived/i);
-    fireEvent.click(whatToAsk());
-
-    expect(await screen.findByText('What can I ask you?')).toBeInTheDocument();
-    expect(screen.queryByText('hello')).not.toBeInTheDocument();
-    const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
-    expect(active.map(button => button.textContent)).toEqual(['New Chat']);
-  });
-
-  it('opens a new chat while a turn runs in the open one, and a chip there sends', () => {
+  it('sends the command from a new chat while a turn runs in the open one', async () => {
     const onSend = vi.fn();
     renderHost({ initialDialogId: 'd-1', busy: true, onSend });
 
-    fireEvent.click(whatToAsk());
+    fireEvent.click(await entry());
 
-    expect(screen.queryByText('hello')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
-    expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(WHAT_CAN_YOU_DO_MESSAGE));
   });
 
-  it('waits for an async whatToAsk and shows the exchange whole, once per pending click', async () => {
-    let settle: (content: WhatToAskContent) => void = () => {};
-    const load = vi.fn(
-      () =>
-        new Promise<WhatToAskContent>(resolve => {
-          settle = resolve;
-        }),
-    );
-    renderHost({ initialDialogId: 'd-1', whatToAsk: load });
+  it('opens a new chat from the archive list, not into the chat open before it', async () => {
+    const onSend = vi.fn();
+    renderHost({ initialDialogId: 'd-1', onSend });
 
-    fireEvent.click(whatToAsk());
-    fireEvent.click(whatToAsk());
-    expect(load).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('What can I ask you?')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Chat Archive' }));
+    await screen.findAllByText(/archived/i);
+    fireEvent.click(await entry());
 
-    settle({ ...WHAT_TO_ASK, reply: 'Live devices:' });
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(WHAT_CAN_YOU_DO_MESSAGE));
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByText('Live devices:')).toBeInTheDocument();
-    expect(screen.getAllByText('What can I ask you?')).toHaveLength(1);
+  it('sends a picked chip of the answer through the panel, not past it to the adapter', async () => {
+    const onSend = vi.fn();
+    const onAdapterSend = vi.fn();
+    renderHost({ initialDialogId: 'd-1', openChat: [HELLO, ANSWER], onSend, onAdapterSend });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Which devices went offline today?' }));
+
+    expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
+    expect(onAdapterSend).not.toHaveBeenCalled();
+  });
+
+  it('does not send a picked chip while the chat cannot take a message', async () => {
+    const onSend = vi.fn();
+    renderHost({ initialDialogId: 'd-1', openChat: [HELLO, ANSWER], onSend, locked: true });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Which devices went offline today?' }));
+
+    expect(onSend).not.toHaveBeenCalled();
   });
 
   it("lists the host's extra items after the chat's own in the ⋯ menu", () => {
@@ -331,25 +269,28 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
-  it("answers the host's own entry (the handle) as the list's", () => {
-    const handle = createRef<EmbeddableChatHandle>();
-    renderHost({ initialDialogId: 'd-1', handleRef: handle });
-
-    act(() => handle.current?.showWhatToAsk());
-
-    // A new chat holding the exchange, as the list's entry opens.
-    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
-    expect(screen.queryByText('hello')).not.toBeInTheDocument();
-  });
-
-  it("hands the host's entry to the host's own surface when it has one", () => {
-    const handle = createRef<EmbeddableChatHandle>();
+  it("hands the list's entry to the host's own page when it has one", async () => {
+    const onSend = vi.fn();
     const onWhatToAsk = vi.fn();
-    renderHost({ initialDialogId: 'd-1', handleRef: handle, onWhatToAsk });
+    renderHost({ initialDialogId: 'd-1', onSend, onWhatToAsk });
 
-    act(() => handle.current?.showWhatToAsk());
+    fireEvent.click(await entry());
 
     expect(onWhatToAsk).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('What can I ask you?')).not.toBeInTheDocument();
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("runs the command from the handle (the host's page), even when the host takes the entry", async () => {
+    const handle = createRef<EmbeddableChatHandle>();
+    const onSend = vi.fn();
+    const onWhatToAsk = vi.fn();
+    renderHost({ initialDialogId: 'd-1', handleRef: handle, onSend, onWhatToAsk });
+
+    act(() => handle.current?.showWhatToAsk());
+
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith(WHAT_CAN_YOU_DO_MESSAGE));
+    expect(onWhatToAsk).not.toHaveBeenCalled();
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
+    expect(currentRows()).not.toContain('First');
   });
 });

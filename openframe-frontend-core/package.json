@@ -292,6 +292,12 @@
       "require": "./dist/utils/page-topics.cjs",
       "default": "./dist/utils/page-topics.js"
     },
+    "./utils/named-icon": {
+      "types": "./dist/utils/named-icon.d.ts",
+      "import": "./dist/utils/named-icon.js",
+      "require": "./dist/utils/named-icon.cjs",
+      "default": "./dist/utils/named-icon.js"
+    },
     "./utils/mobile-app": {
       "types": "./dist/utils/mobile-app.d.ts",
       "import": "./dist/utils/mobile-app.js",

@@ -22,6 +22,7 @@ public class FleetSoftwareOs {
             FleetSource.IE_EXTENSIONS, OsType.WINDOWS,
             FleetSource.APPS, OsType.MAC_OS,
             FleetSource.HOMEBREW_PACKAGES, OsType.MAC_OS,
+            FleetSource.HOMEBREW_CASKS, OsType.MAC_OS,
             FleetSource.SAFARI_EXTENSIONS, OsType.MAC_OS,
             FleetSource.PKG_PACKAGES, OsType.MAC_OS);
 

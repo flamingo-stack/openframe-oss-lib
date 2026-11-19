@@ -29,6 +29,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,6 +59,7 @@ class ToolConnectionServiceTest {
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         existing = new ToolConnection();
+        existing.setId("connection-1");
         existing.setMachineId(MACHINE_ID);
         existing.setToolType(ToolType.FLEET_MDM);
         existing.setAgentToolId(AGENT_TOOL_ID);
@@ -75,7 +77,7 @@ class ToolConnectionServiceTest {
         service.addToolConnection(MACHINE_ID, "fleet_mdm", RAW_AGENT_TOOL_ID, false);
 
         // verifications
-        verify(toolConnectionRepository).save(connectionCaptor.capture());
+        verify(toolConnectionRepository).insert(connectionCaptor.capture());
         ToolConnection saved = connectionCaptor.getValue();
         assertThat(saved.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(saved.getToolType()).isEqualTo(ToolType.FLEET_MDM);
@@ -93,15 +95,16 @@ class ToolConnectionServiceTest {
         existing.setStatus(ConnectionStatus.DISCONNECTED);
         existing.setDisconnectedAt(Instant.now());
         stubExisting();
+        when(toolConnectionRepository.updateRegistrationIfUnchanged(eq(existing), any(ToolConnection.class))).thenReturn(1L);
 
         // execution
         service.addToolConnection(MACHINE_ID, "FLEET_MDM", RAW_AGENT_TOOL_ID, false);
 
         // verifications
-        verify(toolConnectionRepository).save(existing);
-        assertThat(existing.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
-        assertThat(existing.getDisconnectedAt()).isNull();
-        assertThat(existing.getConnectedAt()).isNotNull();
+        verify(toolConnectionRepository).updateRegistrationIfUnchanged(eq(existing), connectionCaptor.capture());
+        assertThat(connectionCaptor.getValue()).extracting(ToolConnection::getStatus, ToolConnection::getDisconnectedAt)
+                .containsExactly(ConnectionStatus.CONNECTED, null);
+        assertThat(connectionCaptor.getValue().getConnectedAt()).isNotNull();
         verify(deviceLifecycleService).promoteIfReady(MACHINE_ID);
     }
 
@@ -116,7 +119,8 @@ class ToolConnectionServiceTest {
         service.addToolConnection(MACHINE_ID, "FLEET_MDM", RAW_AGENT_TOOL_ID, false);
 
         // verifications
-        verify(toolConnectionRepository, never()).save(any(ToolConnection.class));
+        verify(toolConnectionRepository, never()).insert(any(ToolConnection.class));
+        verify(toolConnectionRepository, never()).updateRegistrationIfUnchanged(eq(existing), any(ToolConnection.class));
         verify(deviceLifecycleService).promoteIfReady(MACHINE_ID);
     }
 
@@ -127,14 +131,15 @@ class ToolConnectionServiceTest {
         stubTransform();
         existing.setAgentToolId("old-id");
         stubExisting();
+        when(toolConnectionRepository.updateRegistrationIfUnchanged(eq(existing), any(ToolConnection.class))).thenReturn(1L);
 
         // execution
         service.addToolConnection(MACHINE_ID, "FLEET_MDM", RAW_AGENT_TOOL_ID, false);
 
         // verifications
-        verify(toolConnectionRepository).save(existing);
-        assertThat(existing.getAgentToolId()).isEqualTo(AGENT_TOOL_ID);
-        assertThat(existing.getLastSyncAt()).isNotNull();
+        verify(toolConnectionRepository).updateRegistrationIfUnchanged(eq(existing), connectionCaptor.capture());
+        assertThat(connectionCaptor.getValue().getAgentToolId()).isEqualTo(AGENT_TOOL_ID);
+        assertThat(connectionCaptor.getValue().getLastSyncAt()).isNotNull();
         verify(deviceLifecycleService).promoteIfReady(MACHINE_ID);
     }
 
