@@ -21,6 +21,7 @@ import com.openframe.data.repository.rmm.SoftwareActionAggregationRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -65,6 +66,7 @@ public class SoftwareActionService {
     private final SoftwareScheduleMachineAssignedRepository assignedRepository;
     private final ScriptFilterOptionMapper optionMapper;
     private final TenantIdProvider tenantIdProvider;
+    private final SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
 
     public PageResult<SoftwareActionResponse> list(SoftwareActionFilterInput filter, String search,
                                                    SortInput sort, int page, Integer perPage) {
@@ -148,11 +150,16 @@ public class SoftwareActionService {
         Instant now = Instant.now();
         List<SoftwareSchedule> upcoming = new ArrayList<>(scheduleRepository
                 .findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(tenantId, ScriptStatus.ACTIVE, now));
-        scheduleRepository
+        List<SoftwareSchedule> atDeviceTime = scheduleRepository
                 .findByTenantIdAndStatusAndTriggerAndTimeReference(tenantId, ScriptStatus.ACTIVE,
                         ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)
                 .stream()
                 .filter(schedule -> isAheadAtDeviceTime(schedule, now))
+                .toList();
+        Map<String, List<String>> awaitingMachineIds =
+                softwareScheduleTargetResolver.resolveMachineIdsAwaitingDeviceTime(atDeviceTime);
+        atDeviceTime.stream()
+                .filter(schedule -> !awaitingMachineIds.get(schedule.getId()).isEmpty())
                 .forEach(upcoming::add);
         List<SoftwareActionResponse> rows = new ArrayList<>();
         for (SoftwareSchedule schedule : upcoming) {
