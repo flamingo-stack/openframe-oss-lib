@@ -726,6 +726,7 @@ public class KnowledgeBaseService {
         KnowledgeBaseArticleStatus status = article.getStatus();
         if (status == KnowledgeBaseArticleStatus.ARCHIVED) {
             return subChange(KB_ITEM_MOVE, article.getId())
+                    .targetType(AuditTargetType.KB_ARTICLE)
                     .targetName(article.getName())
                     .changes(Map.of("parentId", parentChange))
                     .build();

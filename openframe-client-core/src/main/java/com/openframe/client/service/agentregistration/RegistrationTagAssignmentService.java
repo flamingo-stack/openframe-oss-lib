@@ -96,7 +96,7 @@ public class RegistrationTagAssignmentService {
                 }
                 HashSet<String> merged = new HashSet<>(existingValues);
                 if (merged.addAll(values)) {
-                    List<String> valuesBefore = List.copyOf(existingValues);
+                    List<String> valuesBefore = new ArrayList<>(existingValues);
                     existing.setValues(new ArrayList<>(merged));
                     tagRepository.save(existing);
                     log.info("Appended values {} to existing tag '{}' during registration", values, key);

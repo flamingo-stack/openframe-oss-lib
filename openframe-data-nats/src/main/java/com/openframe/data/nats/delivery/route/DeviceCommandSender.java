@@ -31,10 +31,11 @@ public class DeviceCommandSender {
         boolean sent = auditedMethodRunner.runWhenChanged(action, DEVICE, machineId, details,
                 () -> deliveryRouter.dispatch(command.get()));
         if (!sent) {
+            boolean everyMachine = machineId == null;
             auditRecorder.record(AuditEntry.builder()
                     .action(action)
-                    .outcome(AuditOutcome.REFUSED)
-                    .reason(machineId == null ? NOT_CARRIED_TO_EVERY_MACHINE : UNREACHABLE)
+                    .outcome(everyMachine ? AuditOutcome.FAILURE : AuditOutcome.REFUSED)
+                    .reason(everyMachine ? NOT_CARRIED_TO_EVERY_MACHINE : UNREACHABLE)
                     .targetType(DEVICE)
                     .targetId(machineId)
                     .details(details)

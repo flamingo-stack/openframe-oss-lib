@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
@@ -70,6 +71,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.hostSoftware;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.vulnerability;
@@ -123,7 +125,7 @@ class SoftwareInventoryServiceTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository);
+                scheduleDeviceLocalDispatchRepository, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }

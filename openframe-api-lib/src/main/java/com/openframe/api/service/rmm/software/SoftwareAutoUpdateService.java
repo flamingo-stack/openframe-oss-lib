@@ -101,13 +101,14 @@ public class SoftwareAutoUpdateService {
                 softwareId, packageManager, packageName, kept.size(), added.size(), turnedOff, actor);
     }
 
-    public void turnOff(String softwareId, String actor) {
+    public long turnOff(String softwareId, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         long turnedOff = policyRepository.disableBySoftwareId(tenantId, softwareId, actor);
         // read after the update: from here on a failed device schedules no retry, so none can slip past this
         policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, List.of(softwareId))
                 .forEach(this::withdrawTurnedOff);
         log.info("Auto-update turned off softwareId={} policies={} actor={}", softwareId, turnedOff, actor);
+        return turnedOff;
     }
 
     public boolean hasPolicy(String softwareId) {

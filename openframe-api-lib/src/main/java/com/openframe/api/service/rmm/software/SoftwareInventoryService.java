@@ -16,7 +16,8 @@ import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
-import com.openframe.audit.Audited;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
@@ -131,6 +132,7 @@ public class SoftwareInventoryService {
     private final SoftwareScheduleRepository softwareScheduleRepository;
     private final SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
     private final ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -214,19 +216,32 @@ public class SoftwareInventoryService {
 
     // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there
     // while a policy already names it: the policy is enough to turn off, and nothing is written for an unknown id.
-    @Audited(action = SOFTWARE_AUTO_UPDATE_DISABLE, targetId = "#softwareId", targetName = "#result.name",
-            compare = false)
     public SoftwareResponse turnOffAutoUpdate(String softwareId, String actor) {
+        AuditCall call = AuditCall.of(SOFTWARE_AUTO_UPDATE_DISABLE, softwareId)
+                .withCompare(false)
+                .withTargetNameOf(SoftwareInventoryService::nameOf)
+                .withRecordsResult(result -> ((TurnedOff) result).policies() > 0);
+        return auditedMethodRunner.run(call, () -> disableAutoUpdate(softwareId, actor)).software();
+    }
+
+    private record TurnedOff(SoftwareResponse software, long policies) {
+    }
+
+    private static String nameOf(Object result) {
+        return result instanceof TurnedOff turnedOff ? turnedOff.software().getName() : null;
+    }
+
+    private TurnedOff disableAutoUpdate(String softwareId, String actor) {
         Optional<SoftwareResponse> title = findById(softwareId);
         boolean inFleet = title.isPresent();
         if (!isKnown(softwareId, inFleet)) {
             throw new NotFoundException("Software not found: " + softwareId);
         }
-        autoUpdateService.turnOff(softwareId, actor);
+        long policies = autoUpdateService.turnOff(softwareId, actor);
         SoftwareResponse software = title.orElseGet(() -> autoUpdateService.titleFromPolicies(softwareId));
         List<SoftwareResponse> rows = List.of(software);
         applyStatuses(rows);
-        return software;
+        return new TurnedOff(software, policies);
     }
 
     private boolean isKnown(String softwareId, boolean inFleet) {

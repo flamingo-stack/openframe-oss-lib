@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
@@ -46,6 +47,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -88,7 +91,7 @@ class SoftwareInventoryServiceReadModelTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository);
+                scheduleDeviceLocalDispatchRepository, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         ReflectionTestUtils.setField(service, "softwareReadModel", true);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
