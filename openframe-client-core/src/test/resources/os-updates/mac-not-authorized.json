@@ -1,0 +1,27 @@
+{
+  "osState": {
+    "osVersion": "26.2",
+    "osBuild": "25C56",
+    "architecture": "ARM64",
+    "restartPending": false,
+    "lastScanAt": "2026-11-19T10:14:40Z",
+    "lastScanError": null,
+    "managementState": "MANAGED",
+    "osUpdateAuthorization": "NOT_AUTHORIZED",
+    "scheduleOwned": false,
+    "windows": null
+  },
+  "pendingUpdates": [
+    {
+      "updateKey": "MSU_UPDATE_25G342_patch_26.7.3_minor",
+      "title": "macOS Tahoe 26.7.3",
+      "version": "26.7.3",
+      "browseOnly": false,
+      "sizeBytes": 3481600000,
+      "isDownloaded": false,
+      "restartBehaviour": "ALWAYS",
+      "requiresExclusiveInstall": false
+    }
+  ],
+  "installHistory": []
+}

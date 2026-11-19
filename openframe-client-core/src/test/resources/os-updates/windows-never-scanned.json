@@ -1,0 +1,41 @@
+{
+  "osState": {
+    "osVersion": "Windows 11 Pro",
+    "osBuild": "26100.4061",
+    "architecture": "X86_64",
+    "restartPending": false,
+    "lastScanAt": null,
+    "lastScanError": "0x8024402C",
+    "managementState": "MANAGED",
+    "osUpdateAuthorization": "NOT_REQUIRED",
+    "scheduleOwned": false,
+    "windows": {
+      "osEdition": "Professional",
+      "osDisplayVersion": "24H2",
+      "installationType": "Client",
+      "domainJoined": false,
+      "serverRoles": {
+        "domainController": false,
+        "clusterNode": false
+      },
+      "bitLockerPreBootPin": false,
+      "managementSignals": {
+        "wsusConfigured": false,
+        "wuServer": null,
+        "scanSourcePerClass": null,
+        "wuPolicyKeysPresent": false,
+        "mdmEnrolled": false,
+        "configMgrPresent": false,
+        "writeFilterEnabled": false
+      },
+      "defender": {
+        "signatureVersion": "1.421.112.0",
+        "signaturesUpdatedAt": "2026-11-19T04:02:00Z",
+        "amRunningMode": "Normal",
+        "fallbackOrderConfigured": false,
+        "lastRepairAt": null
+      },
+      "microsoftUpdateRegistered": false
+    }
+  }
+}

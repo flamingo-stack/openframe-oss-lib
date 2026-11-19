@@ -1,5 +1,6 @@
 package com.openframe.audit.targets;
 
+import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.User;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,16 @@ class OssAuditTargetsTest {
                 .filter(masked -> masked.contains("."))
                 .forEach(masked -> assertThat(fieldsHeldBy(target.documentType(), masked.split("\\.")[0]))
                         .contains(masked.substring(masked.indexOf('.') + 1))));
+    }
+
+    @Test
+    void targets_deviceFieldsTheAgentOsReportWrites_ignored() {
+        Set<String> ignoredOnDevice = provider.targets().stream()
+                .filter(target -> target.type() == AuditTargetType.DEVICE)
+                .flatMap(target -> target.ignoredFields().stream())
+                .collect(Collectors.toSet());
+
+        assertThat(ignoredOnDevice).contains("osState", "osVersion", "osBuild");
     }
 
     private static Set<String> namedFieldsOf(AuditTarget<?> target) {

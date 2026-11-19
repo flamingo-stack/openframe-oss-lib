@@ -1,0 +1,60 @@
+{
+  "osState": {
+    "osVersion": "Windows 11 Pro",
+    "osBuild": "26100.4061",
+    "architecture": "X86_64",
+    "restartPending": true,
+    "lastScanAt": "2026-11-20T02:43:07Z",
+    "lastScanError": null,
+    "managementState": "MANAGED",
+    "osUpdateAuthorization": "NOT_REQUIRED",
+    "scheduleOwned": false,
+    "windows": {
+      "osEdition": "Professional",
+      "osDisplayVersion": "24H2",
+      "installationType": "Client",
+      "domainJoined": false,
+      "serverRoles": {
+        "domainController": false,
+        "clusterNode": false
+      },
+      "bitLockerPreBootPin": false,
+      "managementSignals": {
+        "wsusConfigured": false,
+        "wuServer": null,
+        "scanSourcePerClass": null,
+        "wuPolicyKeysPresent": false,
+        "mdmEnrolled": false,
+        "configMgrPresent": false,
+        "writeFilterEnabled": false
+      },
+      "defender": {
+        "signatureVersion": "1.421.112.0",
+        "signaturesUpdatedAt": "2026-11-19T04:02:00Z",
+        "amRunningMode": "Normal",
+        "fallbackOrderConfigured": false,
+        "lastRepairAt": null
+      },
+      "microsoftUpdateRegistered": false
+    }
+  },
+  "pendingUpdates": [],
+  "installHistory": [
+    {
+      "updateKey": "7d2f1c0e-3b0a-4c59-9d53-0c8f4d1f6a21:201",
+      "title": "2026-11 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5068861)",
+      "installedAt": "2026-11-20T02:41:10Z",
+      "operation": "INSTALL",
+      "result": "SUCCEEDED",
+      "hresult": "0x00000000"
+    },
+    {
+      "updateKey": "b0a7e1d4-52c3-4f0e-8a6d-91f3c2e4d7aa:200",
+      "title": "2026-10 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5066835)",
+      "installedAt": "2026-10-16T02:41:10Z",
+      "operation": "INSTALL",
+      "result": "SUCCEEDED",
+      "hresult": "0x00000000"
+    }
+  ]
+}

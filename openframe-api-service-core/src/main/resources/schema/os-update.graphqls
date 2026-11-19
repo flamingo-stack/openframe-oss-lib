@@ -1,0 +1,73 @@
+extend type Query {
+    """OS updates the device's OS currently offers it, newest discovered first, then by title.
+    Unknown machineId → DEVICE_NOT_FOUND; a device that never reported → empty list."""
+    deviceOsUpdates(machineId: String!): [DeviceOsUpdate!]!
+
+    """OS updates the device installed or failed to install, newest first.
+    `first`: 1-100, default 20. Unknown machineId → DEVICE_NOT_FOUND."""
+    deviceOsUpdateHistory(machineId: String!, first: Int, after: String): DeviceOsUpdateHistoryConnection!
+}
+
+type DeviceOsUpdate {
+    updateKey: String!
+    title: String!
+    version: String
+    kbArticleIds: [String!]!
+    """The vendor's own severity. Null = the vendor gave none."""
+    severity: OsUpdateSeverity
+    """The vendor's category names, verbatim."""
+    categories: [String!]!
+    """An optional or preview update."""
+    browseOnly: Boolean
+    """When the vendor last published the update to devices, as the agent reports it; not the release date."""
+    publishedAt: Instant
+    sizeBytes: Long
+    restartBehaviour: OsUpdateRestartBehaviour
+    discoveredAt: Instant!
+}
+
+enum OsUpdateSeverity {
+    CRITICAL
+    IMPORTANT
+    MODERATE
+    LOW
+}
+
+enum OsUpdateRestartBehaviour {
+    NEVER
+    MAY_REQUIRE
+    ALWAYS
+}
+
+type DeviceOsUpdateHistoryConnection {
+    edges: [DeviceOsUpdateHistoryEdge!]!
+    pageInfo: PageInfo!
+}
+
+type DeviceOsUpdateHistoryEdge {
+    node: DeviceOsUpdateHistoryEntry!
+    cursor: String!
+}
+
+type DeviceOsUpdateHistoryEntry {
+    updateKey: String
+    title: String!
+    version: String
+    installedAt: Instant!
+    operation: OsUpdateOperation
+    result: OsUpdateInstallResult
+    """Windows HRESULT, verbatim."""
+    errorCode: String
+}
+
+enum OsUpdateOperation {
+    INSTALL
+    UNINSTALL
+}
+
+enum OsUpdateInstallResult {
+    SUCCEEDED
+    SUCCEEDED_WITH_ERRORS
+    FAILED
+    ABORTED
+}

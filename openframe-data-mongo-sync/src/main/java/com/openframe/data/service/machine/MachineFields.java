@@ -8,6 +8,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.script.OsType;
 
 import java.time.Instant;
@@ -38,6 +39,9 @@ public final class MachineFields {
     public static final MachineField<Instant> STUCK_NOTIFIED_AT = field("stuckNotifiedAt", Machine::setStuckNotifiedAt);
     public static final MachineField<Map<PackageManagerType, PackageManagerState>> PACKAGE_MANAGERS =
             field("packageManagers", Machine::setPackageManagers);
+    public static final MachineField<String> OS_VERSION = field("osVersion", Machine::setOsVersion);
+    public static final MachineField<String> OS_BUILD = field("osBuild", Machine::setOsBuild);
+    public static final MachineField<DeviceOsState> OS_STATE = field("osState", Machine::setOsState);
 
     // Hardware facts: copied from the registration request, then filled from the Fleet host where still blank
     public static final MachineField<String> SERIAL_NUMBER = field("serialNumber", Machine::setSerialNumber);
