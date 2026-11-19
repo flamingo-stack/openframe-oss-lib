@@ -13,6 +13,13 @@
  */
 export const COLUMN_HEADER_CELL = 'w-14 border-l border-ods-border text-ods-text-primary [&_svg]:h-5 [&_svg]:w-5';
 
+/**
+ * The page's Back, the first cell of a column header (`AppColumnHeader` `back`): the close cell
+ * mirrored. Flush with the column's start edge (no border there, so no double line against the
+ * column's own edge), the divider after it, between it and the title.
+ */
+export const COLUMN_HEADER_BACK_CELL = 'w-14 border-r border-ods-border text-ods-text-primary [&_svg]:h-5 [&_svg]:w-5';
+
 /** Gone while squeezed (an avatar, a ⋯ menu, a host's extra cells). */
 export const SQUEEZED_HIDDEN =
   'group-data-[squeezed]/work-area-chat:hidden group-data-[squeezed]/work-area-page:hidden';

@@ -111,7 +111,7 @@ class FleetMdmAgentIdTransformerTest {
     }
 
     @Test
-    void transform_uuidHostWithoutOsqueryVersionLastAttempt_rawIdReturnedAndNothingFilled() {
+    void transform_uuidHostWithoutOsqueryVersionLastAttempt_throwsWithoutFillingFacts() {
         // setup
         stubClient();
         Host withoutVersion = host(10L, HARDWARE_UUID, HARDWARE_UUID, null, ENROLLED_JANUARY);
@@ -119,10 +119,12 @@ class FleetMdmAgentIdTransformerTest {
         when(fleetClient.getHostByIdentifier(HARDWARE_UUID)).thenReturn(withoutVersion);
 
         // execution
-        String result = transformer.transform(MACHINE_ID, HARDWARE_UUID, true);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> transformer.transform(MACHINE_ID, HARDWARE_UUID, true));
 
         // verifications
-        assertThat(result).isEqualTo(HARDWARE_UUID);
+        assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause().getMessage()).contains(NO_HOST_FOUND);
         verifyNoInteractions(fleetHostFactsWriter);
     }
 
@@ -176,7 +178,7 @@ class FleetMdmAgentIdTransformerTest {
     }
 
     @Test
-    void transform_identifierOsqueryHostIdDiffersLastAttempt_returnsRawId() {
+    void transform_identifierOsqueryHostIdDiffersLastAttempt_throwsWithoutFillingFacts() {
         // setup
         stubClient();
         when(fleetClient.searchHosts(INSTANCE_ID, 0, 2)).thenReturn(List.of());
@@ -184,15 +186,17 @@ class FleetMdmAgentIdTransformerTest {
                 .thenReturn(host(30L, HARDWARE_UUID, OTHER_UUID, OSQUERY_VERSION, ENROLLED_JANUARY));
 
         // execution
-        String result = transformer.transform(MACHINE_ID, INSTANCE_ID, true);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> transformer.transform(MACHINE_ID, INSTANCE_ID, true));
 
         // verifications
-        assertThat(result).isEqualTo(INSTANCE_ID);
+        assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause().getMessage()).contains(NO_HOST_FOUND);
         verifyNoInteractions(fleetHostFactsWriter);
     }
 
     @Test
-    void transform_identifierHostWithoutOsqueryVersionLastAttempt_returnsRawId() {
+    void transform_identifierHostWithoutOsqueryVersionLastAttempt_throws() {
         // setup
         stubClient();
         when(fleetClient.searchHosts(INSTANCE_ID, 0, 2)).thenReturn(List.of());
@@ -200,10 +204,12 @@ class FleetMdmAgentIdTransformerTest {
                 .thenReturn(host(20L, HARDWARE_UUID, INSTANCE_ID, null, ENROLLED_JANUARY));
 
         // execution
-        String result = transformer.transform(MACHINE_ID, INSTANCE_ID, true);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> transformer.transform(MACHINE_ID, INSTANCE_ID, true));
 
         // verifications
-        assertThat(result).isEqualTo(INSTANCE_ID);
+        assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause().getMessage()).contains(NO_HOST_FOUND);
     }
 
     @Test
@@ -257,14 +263,15 @@ class FleetMdmAgentIdTransformerTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", " "})
-    void transform_blankAgentToolId_returnedUnchangedWithoutFleetCall(String agentToolId) {
+    void transform_blankAgentToolId_rejectedWithoutFleetCall(String agentToolId) {
         // setup
 
         // execution
-        String result = transformer.transform(MACHINE_ID, agentToolId, false);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> transformer.transform(MACHINE_ID, agentToolId, false));
 
         // verifications
-        assertThat(result).isEqualTo(agentToolId);
+        assertThat(ex.getMessage()).contains("must not be blank");
         verifyNoInteractions(fleetMdmClients, fleetClient, fleetHostFactsWriter);
     }
 

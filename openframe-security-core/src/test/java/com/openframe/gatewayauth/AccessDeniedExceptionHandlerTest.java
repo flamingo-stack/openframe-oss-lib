@@ -3,12 +3,9 @@ package com.openframe.gatewayauth;
 import com.openframe.core.dto.ErrorResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -16,14 +13,20 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
-@ExtendWith(OutputCaptureExtension.class)
 class AccessDeniedExceptionHandlerTest {
 
     private static final String REASON = "Denied by hasAuthority('OWNER')";
 
-    private final AccessDeniedExceptionHandler handler = new AccessDeniedExceptionHandler();
+    private final List<String> told = new ArrayList<>();
+    private final AccessDeniedObserver observer = denied -> told.add(denied.getMessage());
+    private final AccessDeniedExceptionHandler handler = new AccessDeniedExceptionHandler(
+            new StaticListableBeanFactory(Map.of("observer", observer)).getBeanProvider(AccessDeniedObserver.class));
 
     @AfterEach
     void signOut() {
@@ -46,28 +49,12 @@ class AccessDeniedExceptionHandlerTest {
     }
 
     @Test
-    void handleAccessDenied_anonymousCallerRefused_answersUnauthorizedWithAFixedMessage() {
-        SecurityContextHolder.getContext().setAuthentication(new AnonymousAuthenticationToken("key", "anonymousUser",
-                AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
-
-        ResponseEntity<ErrorResponse> response = handler.handleAccessDenied(refused());
-
-        assertThat(response)
-                .returns(HttpStatus.UNAUTHORIZED, ResponseEntity::getStatusCode)
-                .extracting(ResponseEntity::getBody)
-                .returns("UNAUTHORIZED", ErrorResponse::getCode)
-                .returns("Access denied", ErrorResponse::getMessage);
-    }
-
-    @Test
-    void handleAccessDenied_signedInCallerRefused_logsTheReasonWithoutAStackTrace(CapturedOutput output) {
+    void handleAccessDenied_signedInCallerRefused_tellsTheObserversTheRefusal() {
         signIn();
 
         handler.handleAccessDenied(refused());
 
-        assertThat(output.getOut())
-                .containsPattern("WARN .*Access denied \\(FORBIDDEN\\): Denied by hasAuthority\\('OWNER'\\)")
-                .doesNotContain("AuthorizationDeniedException");
+        assertThat(told).containsExactly(REASON);
     }
 
     private static AuthorizationDeniedException refused() {

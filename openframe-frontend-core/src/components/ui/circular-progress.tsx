@@ -22,6 +22,10 @@ interface CircularProgressProps {
   showLabel?: boolean; // Show percentage text in center (default: true)
   labelFormat?: 'percent' | 'value'; // 'percent' = "70%", 'value' = "70" (default: 'percent')
   overflow?: CircularProgressOverflow; // Default: 'clamp'
+  /** A fixed ring colour (a CSS colour value), overriding the variant's: for a host that colours by its own rule. */
+  color?: string;
+  /** A fixed track colour, overriding the variant's. */
+  trackColor?: string;
   className?: string;
 }
 
@@ -60,6 +64,8 @@ export function CircularProgress({
   showLabel = true,
   labelFormat = 'percent',
   overflow = 'clamp',
+  color,
+  trackColor,
   className,
 }: CircularProgressProps) {
   const safePercentage = Math.max(0, percentage);
@@ -81,7 +87,8 @@ export function CircularProgress({
   const circumference = radius * 2 * Math.PI;
   const ringOffset = circumference - (ringPercentage / 100) * circumference;
 
-  const { progress, track } = variantColors[variant];
+  const progress = color ?? variantColors[variant].progress;
+  const track = trackColor ?? variantColors[variant].track;
 
   return (
     <div className={cn('relative', className)} style={{ width: size, height: size }}>

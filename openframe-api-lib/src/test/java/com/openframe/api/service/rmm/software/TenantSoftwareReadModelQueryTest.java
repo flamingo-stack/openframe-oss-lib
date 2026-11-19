@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
@@ -16,15 +17,25 @@ import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareAggregationRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareTitleQuery;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.PackageMatchState;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -39,6 +50,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -53,14 +65,25 @@ import static org.mockito.Mockito.when;
 class TenantSoftwareReadModelQueryTest {
 
     private static final String TENANT = "t1";
-    private static final Set<String> MANAGER_SOURCES = Set.of("homebrew_packages", "chocolatey_packages", "winget_packages");
+    private static final Set<String> MANAGER_SOURCES =
+            Set.of("homebrew_packages", "homebrew_casks", "chocolatey_packages", "winget_packages");
+
+    private static final List<PackageManagerType> ENABLED_MANAGERS =
+            List.of(PackageManagerType.WINGET, PackageManagerType.CHOCO);
 
     @Mock private SoftwareRepository softwareRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
+    @Mock private DeviceSoftwareAggregationRepository deviceSoftwareAggregationRepository;
     @Mock private VulnerabilityRepository vulnerabilityRepository;
     @Mock private MachineRepository machineRepository;
+    @Mock private PackageAutoUpdatePolicyRepository packageAutoUpdatePolicyRepository;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
 
     @InjectMocks private TenantSoftwareReadModelQuery query;
+
+    private static SoftwareTitleQuery.SoftwareTitleQueryBuilder titles() {
+        return SoftwareTitleQuery.builder().tenantId(TENANT).managerSources(MANAGER_SOURCES);
+    }
 
     private static Software software(long titleId, String source) {
         return software(titleId, source, 0);
@@ -161,7 +184,7 @@ class TenantSoftwareReadModelQueryTest {
         PageResult<SoftwareResponse> result = query.listSoftware(TENANT, "JQ", 1, 1, sort, true, null);
 
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(softwareRepository).findTitles(eq(new SoftwareTitleQuery(TENANT, "jq", true, null, MANAGER_SOURCES)),
+        verify(softwareRepository).findTitles(eq(titles().nameLower("jq").vulnerableOnly(true).build()),
                 pageable.capture());
         assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "devicesCount"));
         assertThat(pageable.getValue().getPageSize()).isEqualTo(1);
@@ -178,7 +201,7 @@ class TenantSoftwareReadModelQueryTest {
         query.listSoftware(TENANT, null, 0, null, null, null, null);
 
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(softwareRepository).findTitles(eq(new SoftwareTitleQuery(TENANT, null, false, null, MANAGER_SOURCES)),
+        verify(softwareRepository).findTitles(eq(titles().build()),
                 pageable.capture());
         assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.ASC, "nameLower"));
         assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
@@ -189,12 +212,17 @@ class TenantSoftwareReadModelQueryTest {
     void listSoftware_blankSearch_manageableFlag_passedToTheQuery() {
         when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
 
-        query.listSoftware(TENANT, " ", 0, 10, null, false, true);
-        query.listSoftware(TENANT, "jq", 0, 10, null, null, false);
+        SoftwareFilterInput manageable = new SoftwareFilterInput();
+        manageable.setManageable(true);
+        SoftwareFilterInput notManageable = new SoftwareFilterInput();
+        notManageable.setManageable(false);
 
-        verify(softwareRepository).findTitles(eq(new SoftwareTitleQuery(TENANT, null, false, true, MANAGER_SOURCES)),
+        query.listSoftware(TENANT, " ", 0, 10, null, false, manageable);
+        query.listSoftware(TENANT, "jq", 0, 10, null, null, notManageable);
+
+        verify(softwareRepository).findTitles(eq(titles().manageable(true).build()),
                 any(Pageable.class));
-        verify(softwareRepository).findTitles(eq(new SoftwareTitleQuery(TENANT, "jq", false, false, MANAGER_SOURCES)),
+        verify(softwareRepository).findTitles(eq(titles().nameLower("jq").manageable(false).build()),
                 any(Pageable.class));
     }
 
@@ -258,6 +286,43 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
+    void machineIdsForSoftware_titleOnConnectedDevices_machineIdsOfTheRepositoryWithoutLoadingRows() {
+        // setup
+        when(deviceSoftwareAggregationRepository.machineIdsWithTitle(TENANT, 42L)).thenReturn(List.of("m1", "m2"));
+
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, "42");
+
+        // verifications
+        assertThat(result).containsExactly("m1", "m2");
+        verifyNoInteractions(deviceSoftwareRepository, softwareRepository, machineRepository);
+    }
+
+    @Test
+    void machineIdsForSoftware_titleOnNoDevice_empty() {
+        // setup
+        when(deviceSoftwareAggregationRepository.machineIdsWithTitle(TENANT, 42L)).thenReturn(List.of());
+
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, "42");
+
+        // verifications
+        assertThat(result).isEmpty();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " ", "abc"})
+    void machineIdsForSoftware_idThatIsNotANumber_emptyWithoutQuerying(String softwareId) {
+        // execution
+        List<String> result = query.machineIdsForSoftware(TENANT, softwareId);
+
+        // verifications
+        assertThat(result).isEmpty();
+        verifyNoInteractions(deviceSoftwareAggregationRepository);
+    }
+
+    @Test
     void listVulnerabilitiesForSoftware_searchSortAndAffectedVersion() {
         Vulnerability older = Vulnerability.builder().cveId("CVE-2024-1").discoveredAt(Instant.parse("2024-01-01T00:00:00Z"))
                 .affectedSoftware(List.of(Vulnerability.AffectedSoftware.builder().softwareTitleId(99L).installedVersion("x").build(),
@@ -279,11 +344,110 @@ class TenantSoftwareReadModelQueryTest {
         assertThat(query.listVulnerabilitiesForSoftware(TENANT, "x", null, 0, 10, null, true).items()).isEmpty();
     }
 
+    @ParameterizedTest
+    @MethodSource("sourcesAndTheirQuery")
+    void listSoftware_sourcesFilter_installerSourcesAndMatchedAndUnmanagedReachTheQuery(
+            List<SoftwareSource> sources, Set<String> installerSources, boolean matchedChosen, boolean unmanagedChosen) {
+        // setup
+        when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(sources);
+        SoftwareTitleQuery expected = titles().installerSources(installerSources).matchedChosen(matchedChosen)
+                .unmanagedChosen(unmanagedChosen).build();
+
+        // execution
+        query.listSoftware(TENANT, null, 0, 10, null, null, filter);
+
+        // verifications
+        verify(softwareRepository).findTitles(eq(expected), any(Pageable.class));
+    }
+
+    @ParameterizedTest
+    @MethodSource("osTypesAndTheirSources")
+    void listSoftware_osTypesFilter_fleetSourcesOfTheSystemsReachTheQuery(List<OsType> osTypes, Set<String> osSources) {
+        // setup
+        when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setOsTypes(osTypes);
+        SoftwareTitleQuery expected = titles().osSources(osSources).build();
+
+        // execution
+        query.listSoftware(TENANT, null, 0, 10, null, null, filter);
+
+        // verifications
+        verify(softwareRepository).findTitles(eq(expected), any(Pageable.class));
+    }
+
+    @Test
+    void listSoftware_autoUpdateStatusesFilter_titleIdsOfThePoliciesReachTheQuery() {
+        // setup
+        when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
+        when(packageAutoUpdatePolicyRepository.findEnabledSoftwareIds(TENANT)).thenReturn(List.of("7"));
+        when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT)).thenReturn(List.of("7", "9", "not-a-title"));
+        when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
+        List<SoftwareAutoUpdateStatus> statuses = List.of(SoftwareAutoUpdateStatus.ON, SoftwareAutoUpdateStatus.OFF);
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setAutoUpdateStatuses(statuses);
+        SoftwareTitleQuery expected = titles().autoUpdateStatuses(statuses)
+                .enabledPolicyTitleIds(Set.of(7L)).policyTitleIds(Set.of(7L, 9L))
+                .adoptionManagers(ENABLED_MANAGERS).build();
+
+        // execution
+        query.listSoftware(TENANT, null, 0, 10, null, null, filter);
+
+        // verifications
+        verify(softwareRepository).findTitles(eq(expected), any(Pageable.class));
+    }
+
+    @Test
+    void listSoftware_everyFilterWithManageable_allReachTheQuery() {
+        // setup
+        when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
+        when(packageAutoUpdatePolicyRepository.findEnabledSoftwareIds(TENANT)).thenReturn(List.of());
+        when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT)).thenReturn(List.of("9"));
+        when(packageManagerAvailability.enabledManagers()).thenReturn(ENABLED_MANAGERS);
+        List<SoftwareAutoUpdateStatus> statuses = List.of(SoftwareAutoUpdateStatus.NO_PACKAGE);
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setManageable(false);
+        filter.setSources(List.of(SoftwareSource.UNMANAGED));
+        filter.setOsTypes(List.of(OsType.MAC_OS));
+        filter.setAutoUpdateStatuses(statuses);
+        SoftwareTitleQuery expected = titles().manageable(false)
+                .installerSources(Set.of()).unmanagedChosen(true)
+                .osSources(Set.of("apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages"))
+                .autoUpdateStatuses(statuses).enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of(9L))
+                .adoptionManagers(ENABLED_MANAGERS).build();
+
+        // execution
+        query.listSoftware(TENANT, null, 0, 10, null, null, filter);
+
+        // verifications
+        verify(softwareRepository).findTitles(eq(expected), any(Pageable.class));
+    }
+
+    @Test
+    void listSoftware_nothingChosenInTheFilter_queryLeftOpenWithoutReadingPolicies() {
+        // setup
+        when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(List.of());
+        filter.setOsTypes(List.of());
+        filter.setAutoUpdateStatuses(List.of());
+        SoftwareTitleQuery expected = titles().build();
+
+        // execution
+        query.listSoftware(TENANT, null, 0, 10, null, null, filter);
+
+        // verifications
+        verify(softwareRepository).findTitles(eq(expected), any(Pageable.class));
+        verifyNoInteractions(packageAutoUpdatePolicyRepository);
+    }
+
     @Test
     void allForFilters_withAndWithoutSearch() {
-        when(softwareRepository.findTitles(new SoftwareTitleQuery(TENANT, null, false, null, MANAGER_SOURCES), Pageable.unpaged()))
+        when(softwareRepository.findTitles(titles().build(), Pageable.unpaged()))
                 .thenReturn(new PageImpl<>(List.of(software(1L, "apps", 1))));
-        when(softwareRepository.findTitles(new SoftwareTitleQuery(TENANT, "jq", false, null, MANAGER_SOURCES), Pageable.unpaged()))
+        when(softwareRepository.findTitles(titles().nameLower("jq").build(), Pageable.unpaged()))
                 .thenReturn(Page.empty());
 
         assertThat(query.allForFilters(TENANT, null)).extracting(SoftwareResponse::getType).containsExactly(SoftwareType.APPLICATION);
@@ -293,10 +457,12 @@ class TenantSoftwareReadModelQueryTest {
     @Test
     void get_carriesTheProgramKeysAndTheStoredMatch() {
         SoftwarePackageMatch stored = new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.WINGET, "Google.Chrome", null);
+        SoftwarePackageMatch storedAdoption =
+                new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.CHOCO, "googlechrome", null);
         Software chrome = Software.builder().tenantId(TENANT).softwareTitleId(7L).name("Google Chrome").source("programs")
                 .vendor("Google LLC").upgradeCode("{UPGRADE}").arpKeys(List.of("Google Chrome"))
                 .packageFamilyNames(List.of("google.chrome_x")).systemComponent(false)
-                .packageMatch(stored).build();
+                .packageMatch(stored).adoptionMatch(storedAdoption).build();
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 7L)).thenReturn(Optional.of(chrome));
 
         SoftwareResponse row = query.get(TENANT, "7");
@@ -308,5 +474,43 @@ class TenantSoftwareReadModelQueryTest {
         assertThat(row.getPackageFamilyNames()).containsExactly("google.chrome_x");
         assertThat(row.getSystemComponent()).isFalse();
         assertThat(row.getPackageMatch()).isEqualTo(stored);
+        assertThat(row.getAdoptionMatch()).isEqualTo(storedAdoption);
+    }
+
+    @Test
+    void get_macApp_carriesItsBundleIdAppFileNamesAndTopLevelFlag() {
+        // setup
+        Software slack = Software.builder().tenantId(TENANT).softwareTitleId(8L).name("Slack").source("apps")
+                .bundleIdentifier("com.tinyspeck.slackmacgap").appFileNames(List.of("Slack")).topLevelApp(true).build();
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 8L)).thenReturn(Optional.of(slack));
+
+        // execution
+        SoftwareResponse row = query.get(TENANT, "8");
+
+        // verifications
+        assertThat(row.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(row.getAppFileNames()).containsExactly("Slack");
+        assertThat(row.getTopLevelApp()).isTrue();
+    }
+
+    private static Stream<Arguments> sourcesAndTheirQuery() {
+        return Stream.of(
+                Arguments.of(List.of(SoftwareSource.WINGET), Set.of("winget_packages"), true, false),
+                Arguments.of(List.of(SoftwareSource.BREW), Set.of("homebrew_packages", "homebrew_casks"), false, false),
+                Arguments.of(List.of(SoftwareSource.CHOCOLATEY), Set.of("chocolatey_packages"), false, false),
+                Arguments.of(List.of(SoftwareSource.UNMANAGED), Set.of(), false, true),
+                Arguments.of(List.of(SoftwareSource.WINGET, SoftwareSource.BREW, SoftwareSource.UNMANAGED),
+                        Set.of("winget_packages", "homebrew_packages", "homebrew_casks"), true, true));
+    }
+
+    private static Stream<Arguments> osTypesAndTheirSources() {
+        Set<String> windows = Set.of("programs", "chocolatey_packages", "winget_packages", "ie_extensions");
+        Set<String> macOs = Set.of("apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages");
+        Set<String> both = Set.of("programs", "chocolatey_packages", "winget_packages", "ie_extensions",
+                "apps", "homebrew_packages", "homebrew_casks", "safari_extensions", "pkg_packages");
+        return Stream.of(
+                Arguments.of(List.of(OsType.WINDOWS), windows),
+                Arguments.of(List.of(OsType.MAC_OS), macOs),
+                Arguments.of(List.of(OsType.WINDOWS, OsType.MAC_OS), both));
     }
 }

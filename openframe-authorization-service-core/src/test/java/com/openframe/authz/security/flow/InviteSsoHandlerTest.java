@@ -6,6 +6,7 @@ import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.security.SsoRegistrationConstants;
 import com.openframe.authz.service.user.InvitationRegistrationService;
+import com.openframe.authz.service.user.UserService;
 import com.openframe.core.constants.SsoFlowCookieNames;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
@@ -42,6 +43,8 @@ class InviteSsoHandlerTest {
     private InvitationRegistrationService invitationRegistrationService;
     @Mock
     private SessionPrincipalBinder sessionPrincipalBinder;
+    @Mock
+    private UserService userService;
 
     private final SsoCookieCodec codec = cookieCodec();
     private InviteSsoHandler handler;
@@ -50,7 +53,7 @@ class InviteSsoHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new InviteSsoHandler(codec, invitationRegistrationService, sessionPrincipalBinder);
+        handler = new InviteSsoHandler(codec, invitationRegistrationService, sessionPrincipalBinder, userService);
     }
 
     @AfterEach
@@ -75,6 +78,7 @@ class InviteSsoHandlerTest {
         handler.handle(request, response, authentication);
 
         verify(sessionPrincipalBinder).bind(authentication, invited, request, response);
+        verify(userService).recordSsoLogin(invited);
         ArgumentCaptor<InvitationRegistrationRequest> req = ArgumentCaptor.forClass(InvitationRegistrationRequest.class);
         verify(invitationRegistrationService).registerByInvitation(req.capture());
         assertThat(req.getValue().getInvitationId()).isEqualTo("inv-1");

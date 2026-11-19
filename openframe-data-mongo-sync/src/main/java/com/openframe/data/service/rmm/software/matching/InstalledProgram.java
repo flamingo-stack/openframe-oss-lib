@@ -22,6 +22,14 @@ public class InstalledProgram {
     @Builder.Default
     private final List<String> packageFamilyNames = List.of();
     private final boolean systemComponent;
+    // the ids winget installed the package under on the program's devices; empty unless winget itself reports the row
+    @Builder.Default
+    private final List<String> wingetIds = List.of();
+    private final String bundleIdentifier;
+    @Builder.Default
+    private final List<String> appFileNames = List.of();
+    private final Boolean topLevelApp;
     // what the read model stored for the program when it was projected; null when it was never matched
     private final SoftwarePackageMatch storedMatch;
+    private final SoftwarePackageMatch storedAdoptionMatch;
 }

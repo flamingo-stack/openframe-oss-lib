@@ -251,6 +251,11 @@ export function displayCommandFor(
   return formatSingularLookupInvocation(`${command.id} ${DISPLAY_ACTION_ID}`, value);
 }
 
+/** A context budget, or null when there is none to show (absent, 0 for "not reported"). */
+function budgetOrNull(size: number | null | undefined): number | null {
+  return typeof size === 'number' && size > 0 ? size : null;
+}
+
 /** The newest answer that has reported usage: the live turn's, or until it reports, the one before it. */
 function latestUsageOf(messages: readonly ChatMessage[]): NonNullable<ChatMessageMetadata['usage']> | null {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -674,10 +679,24 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   const openRecord = recordEntry && recordEntry.dialogId === dialogId ? recordEntry : null;
   /** How many times the open record was asked for again (the refresh timer): each one reads it once more. */
   const [recordReads, setRecordReads] = useState(0);
+  // The host's model changed (its settings): the open dialog's budget is the new model's, which only its record says
+  // until the next reply streams. Read it again, and let that read replace the usage the stream left.
+  const [usageModel, setUsageModel] = useState(modelLabel);
+  /** The read whose usage replaces the stream's: the one the model change asked for, of the dialog open then. A later
+   *  read (the timer) or another dialog's read is not it, so it never overwrites what streamed since. */
+  const [usageReread, setUsageReread] = useState<{ dialogId: string; read: number } | null>(null);
+  if (usageModel !== modelLabel) {
+    setUsageModel(modelLabel);
+    if (usageModel != null && dialogId) {
+      setUsageReread({ dialogId, read: recordReads + 1 });
+      setRecordReads(recordReads + 1);
+    }
+  }
   useEffect(() => {
     if (!active || !dialogId || !fetchDialog) return undefined;
     let current = true;
     const key = keyOfDialogRef.current(dialogId);
+    const replacesUsage = usageReread?.dialogId === dialogId && usageReread.read === recordReads;
     fetchDialog(dialogId)
       .then(record => {
         if (!current) return;
@@ -685,7 +704,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         // A title the list does not have yet (generated since the list was read).
         if (record) patchDialog(dialogId, { title: record.dialog.title });
         // The dialog's usage until the stream says more.
-        if (record?.tokenUsage && !store.snapshotOf(key).state.dialogTokenUsage) {
+        // After a model change the record's answer wins, none included: the old model's budget is no longer this
+        // dialog's.
+        if (record && replacesUsage) {
+          store.mutate(key, r => r.setDialogTokenUsage(record.tokenUsage ?? null));
+        } else if (record?.tokenUsage && !store.snapshotOf(key).state.dialogTokenUsage) {
           store.mutate(key, r => r.setDialogTokenUsage(record.tokenUsage ?? null));
         }
       })
@@ -700,7 +723,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     return () => {
       current = false;
     };
-  }, [active, dialogId, fetchDialog, store, patchDialog, recordReads]);
+  }, [active, dialogId, fetchDialog, store, patchDialog, recordReads, usageReread]);
 
   // The list's scope follows the open dialog once: someone else's dialog is on no tab but everyone's. Reconciled during
   // render, so the tab that cannot list it never shows for a frame; never back, which would fight a person's own pick.
@@ -1271,6 +1294,25 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   }, [canDisplay, slashCommands, tableIdForDocumentType, sendMessage, logSendFailure]);
 
   const { streamingPhase, dialogTokenUsage = null, liveModel = null } = state;
+
+  // ─── The context budget ───────────────────────────────────────────────────
+  // The budget is the current model's. The dialog's record says it (the backend resolves it from the model selected
+  // now, and the record is read again when the host's model changes). A token usage only says the budget of the model
+  // that answered, and a live tail replays the last one after a reload, so it stands in only until the record has a
+  // budget (a new chat). The model's own window comes last, for a host that reports no usage at all.
+  const recordBudget = budgetOrNull(openRecord?.record?.tokenUsage?.contextSize);
+  const idleBudget =
+    recordBudget ?? budgetOrNull(dialogTokenUsage?.contextSize) ?? budgetOrNull(liveModel?.contextWindowMaxTokens);
+  // A turn keeps the budget it started with: a model saved while it is answered counts from its end.
+  const answering = streamingPhase !== 'idle';
+  const [turnBudget, setTurnBudget] = useState<{ dialogId: string | null; budget: number | null } | null>(null);
+  if (answering && turnBudget?.dialogId !== dialogId) {
+    setTurnBudget({ dialogId, budget: idleBudget });
+  } else if (!answering && turnBudget !== null) {
+    setTurnBudget(null);
+  }
+  const contextBudget =
+    answering && turnBudget?.dialogId === dialogId && turnBudget.budget != null ? turnBudget.budget : idleBudget;
   // The model of the newest answer in the history, labelled by the host, when it asks for one.
   const historyModel = useMemo(() => {
     if (!historyModelLabel) return null;
@@ -1455,7 +1497,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       // the host's baseline.
       currentProvider: liveModel?.provider ?? historyModel?.provider ?? modelProvider ?? null,
       currentModelLabel: liveModel?.modelLabel ?? historyModel?.modelLabel ?? modelLabel ?? null,
-      currentContextWindowMaxTokens: dialogTokenUsage?.contextSize ?? liveModel?.contextWindowMaxTokens ?? null,
+      currentContextWindowMaxTokens: contextBudget,
       currentInputTokens: turnUsage ? (turnUsage.inputTokens ?? null) : (dialogTokenUsage?.inputTokensSize ?? null),
       currentOutputTokens: turnUsage ? (turnUsage.outputTokens ?? null) : (dialogTokenUsage?.outputTokensSize ?? null),
       currentContextTokens: turnUsage?.contextTokens ?? null,
@@ -1525,6 +1567,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       dialogTokenUsage,
       liveModel,
       historyModel,
+      contextBudget,
       modelProvider,
       modelLabel,
       turnUsage,

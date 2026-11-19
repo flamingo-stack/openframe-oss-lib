@@ -100,17 +100,10 @@ export {
   TICKET_OPEN_PARAM,
   buildTicketOpenHref,
 } from './dev-sections/dev-section-param-keys';
-// Dynamic icon registry — single source of truth lives at
-// components/chat/utils/icon-registry. Re-exported here so existing
-// `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
-// distribution-channel screens) keep working without changing their import path.
-export {
-  getDynamicIcon,
-  type DynamicIconSize,
-  ICON_REGISTRY,
-  getIconComponent,
-  normalizeIconKey,
-} from '../components/chat/utils/icon-registry';
+// Icons by name, for `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin distribution-channel screens).
+// What a name draws is decided in components/chat/utils/icon-refs; icon-registry draws it.
+export { getDynamicIcon, type DynamicIconSize, getIconComponent } from '../components/chat/utils/icon-registry';
+export { ICON_REGISTRY, normalizeIconKey } from '../components/chat/utils/icon-refs';
 export { getPlatformIconComponent as getPlatformLogo } from './platform-config';
 // Tool type utilities
 export * from './tool-utils';
@@ -367,8 +360,11 @@ export type { FaqHashTarget } from './faq-anchor';
 export {
   deepestTopic,
   isPagePathTopic,
+  normalizeTopic,
   pageTopicFor,
   type PageTopicOptions,
+  sectionTopicFor,
+  splitTopic,
   topicCandidates,
   topicMatchesPath,
 } from './page-topics';
@@ -478,3 +474,6 @@ export * from './motion-timeline';
 export * from './identity-tint';
 export { createFenceTracker, isBlankLine } from './markdown-fences';
 export type { FenceTracker, FenceLineRole } from './markdown-fences';
+
+// The work area's chat-column share before paint: server-safe, for a host's root-layout seed script.
+export { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from './work-area-share';

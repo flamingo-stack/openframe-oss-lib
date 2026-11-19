@@ -14,7 +14,10 @@ import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -26,6 +29,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,6 +46,8 @@ class SoftwareProjectorTest {
     @Mock private SoftwareRepository softwareRepository;
     @Mock private DeviceSoftwareAggregationRepository aggregationRepository;
     @Mock private SoftwarePackageMatcher packageMatcher;
+
+    @Captor private ArgumentCaptor<Software> softwareCaptor;
 
     @InjectMocks private SoftwareProjector projector;
 
@@ -152,6 +158,28 @@ class SoftwareProjectorTest {
     }
 
     @Test
+    void project_packageWingetInstalled_matchedByTheIdsOfItsDevices() {
+        when(aggregationRepository.rollUpTitle("t1", 9L)).thenReturn(Optional.of(rollup()
+                .name("Google Chrome").source("winget_packages").wingetIds(List.of("Google.Chrome")).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 9L)).thenReturn(Optional.empty());
+        PackageCatalogEntry chrome = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.WINGET).packageId("Google.Chrome").version("130.0").build();
+        List<InstalledProgram> asked = stubMatch(PackageMatch.of(chrome));
+
+        projector.project("t1", 9L);
+
+        InstalledProgram program = asked.getFirst();
+        assertThat(program.getFleetSource()).isEqualTo(FleetSource.WINGET_PACKAGES);
+        assertThat(program.getWingetIds()).containsExactly("Google.Chrome");
+        ArgumentCaptor<Software> captor = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(captor.capture());
+        Software saved = captor.getValue();
+        assertThat(saved.getWingetIds()).containsExactly("Google.Chrome");
+        assertThat(saved.getPackageMatch().getState()).isEqualTo(PackageMatchState.MATCHED);
+        assertThat(saved.getPackageMatch().getPackageId()).isEqualTo("Google.Chrome");
+    }
+
+    @Test
     void project_windowsProgram_storesItsKeysAndTheMatch() {
         when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(rollup()
                 .name("Google Chrome").source("programs").vendor("Google LLC").upgradeCode("{UPGRADE}")
@@ -233,6 +261,51 @@ class SoftwareProjectorTest {
     }
 
     @Test
+    void project_windowsProgram_storesThePackageToAdoptItInto() {
+        // setup
+        PackageCatalogEntry choco7zip = PackageCatalogEntry.builder().manager(PackageManagerType.CHOCO).packageId("7zip").build();
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup().build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.empty());
+        stubMatch(PackageMatch.noPackage());
+        when(packageMatcher.matchForAdoption(anyList())).thenAnswer(invocation -> {
+            List<InstalledProgram> programs = invocation.getArgument(0);
+            Map<InstalledProgram, PackageMatch> matches = new IdentityHashMap<>();
+            matches.put(programs.getFirst(), PackageMatch.of(choco7zip));
+            return matches;
+        });
+
+        // execution
+        projector.project("t1", 7L);
+
+        // verifications
+        ArgumentCaptor<Software> captor = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(captor.capture());
+        Software saved = captor.getValue();
+        assertThat(saved.getPackageMatch().getState()).isEqualTo(PackageMatchState.NO_PACKAGE);
+        assertThat(saved.getAdoptionMatch().getState()).isEqualTo(PackageMatchState.MATCHED);
+        assertThat(saved.getAdoptionMatch().getManager()).isEqualTo(PackageManagerType.CHOCO);
+        assertThat(saved.getAdoptionMatch().getPackageId()).isEqualTo("7zip");
+        assertThat(saved.getAdoptionMatch().getMatchedAt()).isEqualTo(saved.getPackageMatch().getMatchedAt());
+    }
+
+    @Test
+    void project_onlyTheAdoptionMatchIsFresh_keepsBothWithoutAsking() {
+        // setup
+        Instant fresh = Instant.now().minus(Duration.ofHours(1));
+        Software stored = chromeProjected(null);
+        stored.setPackageMatch(null);
+        stored.setAdoptionMatch(new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.CHOCO, "googlechrome", fresh));
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup().build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.of(stored));
+
+        // execution
+        projector.project("t1", 7L);
+
+        // verifications
+        verifyNoInteractions(packageMatcher);
+    }
+
+    @Test
     void project_sameKeysButStaleMatch_matchesAgain() {
         Software stored = chromeProjected(Instant.now().minus(SoftwareProjector.MATCH_TTL).minus(Duration.ofMinutes(1)));
         when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup().build()));
@@ -260,6 +333,124 @@ class SoftwareProjectorTest {
         ArgumentCaptor<Software> captor = ArgumentCaptor.forClass(Software.class);
         verify(softwareRepository).save(captor.capture());
         assertThat(captor.getValue().getPackageMatch().getState()).isEqualTo(PackageMatchState.AMBIGUOUS);
+    }
+
+    @Test
+    void project_wingetIdsOfTheDevicesChanged_matchesAgain() {
+        Software stored = chromeProjected(Instant.now());
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup()
+                .wingetIds(List.of("Google.Chrome")).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.of(stored));
+        List<InstalledProgram> asked = stubMatch(PackageMatch.noPackage());
+
+        projector.project("t1", 7L);
+
+        assertThat(asked.getFirst().getWingetIds()).containsExactly("Google.Chrome");
+    }
+
+    @Test
+    void project_macApp_storesItsKeysAndAsksTheMatcherWithThem() {
+        // setup
+        SoftwareTitleRollup slack = slackRollup().build();
+        when(aggregationRepository.rollUpTitle("t1", 8L)).thenReturn(Optional.of(slack));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 8L)).thenReturn(Optional.empty());
+        List<InstalledProgram> asked = stubMatch(PackageMatch.noPackage());
+
+        // execution
+        projector.project("t1", 8L);
+
+        // verifications
+        InstalledProgram program = asked.getFirst();
+        assertThat(program.getFleetSource()).isEqualTo(FleetSource.APPS);
+        assertThat(program.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(program.getAppFileNames()).containsExactly("Slack");
+        assertThat(program.getTopLevelApp()).isTrue();
+        verify(softwareRepository).save(softwareCaptor.capture());
+        Software saved = softwareCaptor.getValue();
+        assertThat(saved.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(saved.getAppFileNames()).containsExactly("Slack");
+        assertThat(saved.getTopLevelApp()).isTrue();
+    }
+
+    @Test
+    void project_programWithoutAppKeys_storesNoneAndAsksTheMatcherWithNone() {
+        // setup
+        SoftwareTitleRollup chrome = chromeRollup().build();
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chrome));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.empty());
+        List<InstalledProgram> asked = stubMatch(PackageMatch.noPackage());
+
+        // execution
+        projector.project("t1", 7L);
+
+        // verifications
+        InstalledProgram program = asked.getFirst();
+        assertThat(program.getBundleIdentifier()).isNull();
+        assertThat(program.getAppFileNames()).isEmpty();
+        assertThat(program.getTopLevelApp()).isNull();
+        verify(softwareRepository).save(softwareCaptor.capture());
+        Software saved = softwareCaptor.getValue();
+        assertThat(saved.getBundleIdentifier()).isNull();
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isNull();
+    }
+
+    @Test
+    void project_macAppWithTheSameKeysAndAFreshMatch_keepsTheStoredMatchWithoutAsking() {
+        // setup
+        Instant fresh = Instant.now().minus(Duration.ofHours(1));
+        Software stored = slackProjected(fresh);
+        SoftwareTitleRollup slack = slackRollup().build();
+        when(aggregationRepository.rollUpTitle("t1", 8L)).thenReturn(Optional.of(slack));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 8L)).thenReturn(Optional.of(stored));
+
+        // execution
+        projector.project("t1", 8L);
+
+        // verifications
+        verifyNoInteractions(packageMatcher);
+    }
+
+    @ParameterizedTest
+    @MethodSource("slackRollupsWithAChangedAppKey")
+    void project_appKeyOfAMacAppChanged_matchesAgain(SoftwareTitleRollup changed) {
+        // setup
+        Software stored = slackProjected(Instant.now());
+        when(aggregationRepository.rollUpTitle("t1", 8L)).thenReturn(Optional.of(changed));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 8L)).thenReturn(Optional.of(stored));
+        List<InstalledProgram> asked = stubMatch(PackageMatch.noPackage());
+
+        // execution
+        projector.project("t1", 8L);
+
+        // verifications
+        assertThat(asked).hasSize(1);
+        verify(softwareRepository).save(softwareCaptor.capture());
+        Software saved = softwareCaptor.getValue();
+        assertThat(saved.getBundleIdentifier()).isEqualTo(changed.bundleIdentifier());
+        assertThat(saved.getAppFileNames()).isEqualTo(changed.appFileNames());
+        assertThat(saved.getTopLevelApp()).isEqualTo(changed.topLevelApp());
+    }
+
+    private static Stream<SoftwareTitleRollup> slackRollupsWithAChangedAppKey() {
+        return Stream.of(
+                slackRollup().bundleIdentifier("com.tinyspeck.slackmacgap.beta").build(),
+                slackRollup().appFileNames(List.of("Slack", "Slack Beta")).build(),
+                slackRollup().topLevelApp(false).build(),
+                slackRollup().topLevelApp(null).build());
+    }
+
+    private static RollupBuilder slackRollup() {
+        return rollup().name("Slack").source("apps").bundleIdentifier("com.tinyspeck.slackmacgap")
+                .appFileNames(List.of("Slack")).topLevelApp(true);
+    }
+
+    private static Software slackProjected(Instant matchedAt) {
+        return Software.builder().tenantId("t1").softwareTitleId(8L).name("Slack").source("apps")
+                .arpKeys(List.of()).packageFamilyNames(List.of()).systemComponent(false)
+                .bundleIdentifier("com.tinyspeck.slackmacgap").appFileNames(List.of("Slack")).topLevelApp(true)
+                .packageMatch(new SoftwarePackageMatch(PackageMatchState.NO_PACKAGE, null, null, matchedAt))
+                .build();
     }
 
     private static RollupBuilder chromeRollup() {
@@ -302,6 +493,10 @@ class SoftwareProjectorTest {
         private List<String> arpKeys = List.of();
         private List<String> packageFamilyNames = List.of();
         private List<String> installerTypes = List.of();
+        private List<String> wingetIds = List.of();
+        private String bundleIdentifier;
+        private List<String> appFileNames = List.of();
+        private Boolean topLevelApp;
         private boolean systemComponent;
         private Map<String, Integer> devicesByVersion = Map.of("1.0", 1);
 
@@ -315,12 +510,17 @@ class SoftwareProjectorTest {
         RollupBuilder arpKeys(List<String> value) { arpKeys = value; return this; }
         RollupBuilder packageFamilyNames(List<String> value) { packageFamilyNames = value; return this; }
         RollupBuilder installerTypes(List<String> value) { installerTypes = value; return this; }
+        RollupBuilder wingetIds(List<String> value) { wingetIds = value; return this; }
+        RollupBuilder bundleIdentifier(String value) { bundleIdentifier = value; return this; }
+        RollupBuilder appFileNames(List<String> value) { appFileNames = value; return this; }
+        RollupBuilder topLevelApp(Boolean value) { topLevelApp = value; return this; }
         RollupBuilder systemComponent(boolean value) { systemComponent = value; return this; }
         RollupBuilder devicesByVersion(Map<String, Integer> value) { devicesByVersion = value; return this; }
 
         SoftwareTitleRollup build() {
             return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
-                    arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion);
+                    arpKeys, packageFamilyNames, installerTypes, wingetIds, bundleIdentifier, appFileNames,
+                    topLevelApp, systemComponent, devicesByVersion);
         }
     }
 }

@@ -46,9 +46,10 @@ describe('unified resolveIcon — brand variant preserves getIconComponent exact
     });
   }
 
-  it('a name the brand set does not hold is drawn from the design set, never as the file fallback', () => {
+  it('a name the brand set does not hold is drawn from the design set, by every brand drawer alike', () => {
     expect(resolveIcon('discord', { variant: 'brand' })).toBe(resolveIcon('discord'));
-    expect(resolveIcon('discord', { variant: 'brand' })).not.toBe(getIconComponent('discord'));
+    // One rule (`iconRefFor`): `getIconComponent` draws exactly what the brand variant draws.
+    expect(getIconComponent('discord')).toBe(resolveIcon('discord', { variant: 'brand' }));
   });
 
   it('tiktok resolves to its own mark, not the file fallback', () => {

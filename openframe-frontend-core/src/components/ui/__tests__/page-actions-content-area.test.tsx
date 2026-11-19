@@ -1,9 +1,15 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeAll } from 'vitest';
+import { loadActionsMenuDropdown } from '../actions-menu-on-demand';
 import { PageActions } from '../page-actions';
 
 // jsdom applies no media or container queries, so every breakpoint branch renders
 // at once: these pin WHAT each branch holds, the variants test pins WHEN it shows.
+// The "…" menu's module loads on demand; loaded once here, every menu below renders at once.
+beforeAll(async () => {
+  await loadActionsMenuDropdown();
+});
+
 describe('PageActions primary-buttons in a narrow content area', () => {
   it('keeps the accent action a button and folds the other labelled ones into "..."', () => {
     render(

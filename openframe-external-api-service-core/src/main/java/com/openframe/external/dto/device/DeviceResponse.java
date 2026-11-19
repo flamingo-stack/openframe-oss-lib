@@ -52,6 +52,10 @@ public class DeviceResponse {
     @Schema(description = "Whether the agent is talking to us right now (ONLINE or OFFLINE), independent of status. Null until the first heartbeat.")
     private TelemetryStatus connectivity;
 
+    @Schema(description = "Whether the client runs a version below the minimum supported one (1.6.0 by default). " +
+            "False when the version is unknown. Sort field `clientOutdated` DESC lists these devices first.")
+    private boolean clientOutdated;
+
     @Schema(description = "Last seen timestamp")
     private Instant lastSeen;
 

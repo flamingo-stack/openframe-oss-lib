@@ -58,6 +58,108 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
     }
 
     @Test
+    @DisplayName("title: the distinct winget ids of its machines, without the machines that report none")
+    void title_wingetIds() {
+        save(row(TENANT, "m1", CHROME).wingetId("Google.Chrome").build());
+        save(row(TENANT, "m2", CHROME).wingetId("Google.Chrome").build());
+        save(row(TENANT, "m3", CHROME).wingetId("Google.Chrome.EXE").build());
+        save(row(TENANT, "m4", CHROME).wingetId(" ").build());
+        save(row(TENANT, "m5", CHROME).build());
+
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        assertThat(rollup.wingetIds()).containsExactly("Google.Chrome", "Google.Chrome.EXE");
+    }
+
+    @Test
+    @DisplayName("title: the smallest bundle id its machines report, without the blank ones")
+    void rollUpTitle_machinesDisagreeOnTheBundleId_smallestNonBlank() {
+        // setup
+        save(row(TENANT, "m1", CHROME).bundleIdentifier("com.google.Chrome.canary").build());
+        save(row(TENANT, "m2", CHROME).bundleIdentifier("com.google.Chrome").build());
+        save(row(TENANT, "m3", CHROME).bundleIdentifier(" ").build());
+        save(row(TENANT, "m4", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.bundleIdentifier()).isEqualTo("com.google.Chrome");
+    }
+
+    @Test
+    @DisplayName("title: no machine reports a bundle id -> none")
+    void rollUpTitle_noBundleId_null() {
+        // setup
+        save(row(TENANT, "m1", CHROME).bundleIdentifier("").build());
+        save(row(TENANT, "m2", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.bundleIdentifier()).isNull();
+    }
+
+    @Test
+    @DisplayName("title: unions the app file names of its machines, without blanks, sorted")
+    void rollUpTitle_appFileNamesOnSeveralMachines_sortedUnionWithoutBlanks() {
+        // setup
+        save(row(TENANT, "m1", CHROME).appFileNames(List.of("Google Chrome", " ")).build());
+        save(row(TENANT, "m2", CHROME).appFileNames(List.of("Chrome", "Google Chrome")).build());
+        save(row(TENANT, "m3", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.appFileNames()).containsExactly("Chrome", "Google Chrome");
+    }
+
+    @Test
+    @DisplayName("title: top level when one machine has the app top level")
+    void rollUpTitle_oneMachineHasTheAppTopLevel_topLevel() {
+        // setup
+        save(row(TENANT, "m1", CHROME).topLevelApp(false).build());
+        save(row(TENANT, "m2", CHROME).topLevelApp(true).build());
+        save(row(TENANT, "m3", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.topLevelApp()).isTrue();
+    }
+
+    @Test
+    @DisplayName("title: not top level when the machines that sent paths have it nested")
+    void rollUpTitle_noMachineHasTheAppTopLevel_notTopLevel() {
+        // setup
+        save(row(TENANT, "m1", CHROME).topLevelApp(false).build());
+        save(row(TENANT, "m2", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.topLevelApp()).isFalse();
+    }
+
+    @Test
+    @DisplayName("title: no machine sent paths -> top level unknown")
+    void rollUpTitle_noMachineSentPaths_topLevelUnknown() {
+        // setup
+        save(row(TENANT, "m1", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.topLevelApp()).isNull();
+        assertThat(rollup.appFileNames()).isEmpty();
+    }
+
+    @Test
     @DisplayName("title: unions versions, CVEs and Windows keys across machines, without blanks, sorted")
     void title_unionsAcrossMachines() {
         save(row(TENANT, "m1", CHROME)
@@ -190,6 +292,27 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
 
         assertThat(repository.machineIdsWithCve(TENANT, "CVE-1")).isEmpty();
         assertThat(repository.machineIdsWithCve(TENANT, "CVE-404")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("title machines: each connected machine of this tenant that has the title, once")
+    void titleMachines_distinctConnectedMachinesOfTheTenant() {
+        save(row(TENANT, "m1", CHROME).build());
+        save(row(TENANT, "m2", CHROME).build());
+        save(row(TENANT, "m3", CHROME).machineConnected(false).build());
+        save(row(TENANT, "m4", FIREFOX).build());
+        save(row(OTHER_TENANT, "m9", CHROME).build());
+
+        assertThat(repository.machineIdsWithTitle(TENANT, CHROME)).containsExactlyInAnyOrder("m1", "m2");
+    }
+
+    @Test
+    @DisplayName("title machines: no connected row has the title -> empty")
+    void titleMachines_none() {
+        save(row(TENANT, "m1", CHROME).machineConnected(false).build());
+
+        assertThat(repository.machineIdsWithTitle(TENANT, CHROME)).isEmpty();
+        assertThat(repository.machineIdsWithTitle(TENANT, 404L)).isEmpty();
     }
 
     private void save(DeviceSoftware row) {

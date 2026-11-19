@@ -127,8 +127,7 @@ impl ToolRunManager {
         info!("Tool run manager: shutdown signalled, no new launches will occur");
     }
 
-    /// Reversibly stop every managed tool (kill processes / stop services) without uninstalling.
-    /// Used when the tenant is gone, to stop tools hammering their now-unreachable endpoints.
+    /// Reversibly stop every managed tool without uninstalling, while the client is paused (tenant gone or 403).
     pub async fn stop_all(&self) -> Result<()> {
         {
             // Under the supervision lock so a concurrent resume_after_update_failure cannot undo the stop
@@ -262,6 +261,11 @@ impl ToolRunManager {
 
             if !binary_present {
                 warn!(tool_id = %tool.tool_agent_id, "Record left Installing and binary missing/empty at {} — awaiting reinstall", path.display());
+                continue;
+            }
+
+            if let Some(asset_path) = self.params_processor.missing_command_asset(tool).await {
+                warn!(tool_id = %tool.tool_agent_id, "Record left Installing and asset missing/empty at {} — awaiting reinstall", asset_path.display());
                 continue;
             }
 

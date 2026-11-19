@@ -25,7 +25,6 @@ import { Fragment, type ComponentType, type ReactNode } from 'react';
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { useRouter } from '../../embed-shims';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
-import type { VideoTeaser } from '../../types/video-processing';
 import { resolveContentHref } from '../../utils/content-href';
 import { buildOgPlaceholderUrl } from '../../utils/og-placeholder';
 import { EntityAuthorCard } from '../chat/entity-cards/entity-author-card';
@@ -310,7 +309,7 @@ export function OnboardingGuideDetailView({
       {loading ? null : (
         <div className="contents" data-loading-optional="">
           <VideoBitesStrip
-            bites={(view.video_bites as VideoTeaser[] | null) ?? []}
+            bites={view.video_bites ?? []}
             filterPublished={true}
             showTitle={false}
             profile={toStripProfile(view.author)}

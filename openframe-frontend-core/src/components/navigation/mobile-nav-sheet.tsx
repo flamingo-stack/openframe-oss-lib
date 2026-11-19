@@ -41,15 +41,6 @@ export interface MobileNavSheetProps {
   backgroundClassName?: string;
 }
 
-/**
- * Would the sheet list anything from this navigation? The header's menu button
- * and the sheet read this one answer (plus whatever the host adds: a profile
- * entry, a sign-up button), so a button never opens an empty sheet.
- */
-export function siteNavHasMobileMenus(nav: Pick<SiteNav, 'menus' | 'mobileMenus'>): boolean {
-  return (nav.mobileMenus ?? nav.menus).length > 0;
-}
-
 const GROUP_ROW_CLASS =
   'flex min-h-14 w-full items-center justify-between gap-[var(--spacing-system-sf)] text-left text-ods-text-primary text-h4';
 

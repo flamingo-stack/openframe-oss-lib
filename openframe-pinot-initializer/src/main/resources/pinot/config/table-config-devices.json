@@ -43,6 +43,9 @@
       "directorySources",
       "directoryUserLink"
     ],
+    "rangeIndexColumns": [
+      "agentVersionKey"
+    ],
 
     "streamConfigs": {
       "streamType": "kafka",

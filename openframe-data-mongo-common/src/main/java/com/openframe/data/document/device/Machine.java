@@ -11,9 +11,11 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @Data
 @Document(collection = "machines")
@@ -29,6 +31,8 @@ public class Machine implements TenantScoped {
     private String macAddress;
     private String osUuid;
     private String agentVersion;
+    // agentVersion as ClientVersionKey; null when the version is unknown or unparseable
+    private Long agentVersionKey;
     @Indexed
     private DeviceStatus status;
     // connectivity, kept moving while status is frozen in PENDING_DELETION; null until the first heartbeat after this field appeared
@@ -78,5 +82,9 @@ public class Machine implements TenantScoped {
 
     public String preferredName() {
         return MachineName.preferred(nickname, hostname);
+    }
+
+    public String deviceName() {
+        return Stream.of(nickname, displayName, hostname).filter(StringUtils::hasText).findFirst().orElse(null);
     }
 }

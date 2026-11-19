@@ -3,6 +3,7 @@ package com.openframe.data.repository.rmm.software;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageMatchState;
 import com.openframe.data.document.rmm.software.Software;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
@@ -72,16 +73,179 @@ class SoftwareRepositoryIT extends BaseMongoIntegrationTest {
         Pageable firstTwo = PageRequest.of(0, 2, Sort.by(Sort.Direction.ASC, "nameLower"));
 
         Page<Software> page = repository.findTitles(
-                new SoftwareTitleQuery(TENANT, null, false, null, MANAGER_SOURCES), firstTwo);
+                titles().build(), firstTwo);
 
         assertThat(page.getTotalElements()).isEqualTo(6);
         assertThat(names(page)).containsExactly("Contoso Tool", "Ghost");
         assertThat(page.hasNext()).isTrue();
     }
 
+    @Test
+    @DisplayName("sources: winget takes the matched titles, brew and choco the ones they installed, unmanaged the rest; several are any of them")
+    void findTitles_sources_eachValueAndTheirUnion() {
+        SoftwareTitleQuery winget = titles().installerSources(Set.of("winget_packages")).matchedChosen(true).build();
+        SoftwareTitleQuery brew = titles().installerSources(Set.of("homebrew_packages")).build();
+        SoftwareTitleQuery chocolatey = titles().installerSources(Set.of("chocolatey_packages")).build();
+        SoftwareTitleQuery unmanaged = titles().installerSources(Set.of()).unmanagedChosen(true).build();
+        SoftwareTitleQuery brewOrUnmanaged = titles().installerSources(Set.of("homebrew_packages")).unmanagedChosen(true).build();
+
+        assertThat(names(winget)).containsExactly("Google Chrome");
+        assertThat(names(brew)).containsExactly("node");
+        assertThat(names(chocolatey)).containsExactly("git");
+        assertThat(names(unmanaged)).containsExactlyInAnyOrder("Contoso Tool", "Ghost", "Visual C++ 2015");
+        assertThat(names(brewOrUnmanaged)).containsExactlyInAnyOrder("node", "Contoso Tool", "Ghost", "Visual C++ 2015");
+    }
+
+    @Test
+    @DisplayName("sources with manageable: both must hold, and the total follows")
+    void findTitles_sourcesWithManageable_bothNarrow() {
+        SoftwareTitleQuery manageableBrewOrUnmanaged = titles().manageable(true)
+                .installerSources(Set.of("homebrew_packages")).unmanagedChosen(true).build();
+        SoftwareTitleQuery manageableUnmanaged = titles().manageable(true)
+                .installerSources(Set.of()).unmanagedChosen(true).build();
+        Pageable firstOne = PageRequest.of(0, 1, Sort.by(Sort.Direction.ASC, "nameLower"));
+
+        assertThat(names(manageableBrewOrUnmanaged)).containsExactly("node");
+        assertThat(names(manageableUnmanaged)).isEmpty();
+        assertThat(repository.findTitles(manageableBrewOrUnmanaged, firstOne).getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("os: the titles of the Fleet sources of the chosen systems")
+    void findTitles_osSources_titlesOfThoseSources() {
+        SoftwareTitleQuery windows = titles().osSources(Set.of("programs", "chocolatey_packages")).build();
+        SoftwareTitleQuery macOs = titles().osSources(Set.of("apps", "homebrew_packages")).build();
+        SoftwareTitleQuery manageableMacOs = titles().manageable(true).osSources(Set.of("apps", "homebrew_packages")).build();
+
+        assertThat(names(windows)).containsExactlyInAnyOrder("Google Chrome", "Contoso Tool", "git", "Visual C++ 2015");
+        assertThat(names(macOs)).containsExactlyInAnyOrder("node", "Ghost");
+        assertThat(names(manageableMacOs)).containsExactly("node");
+    }
+
+    @Test
+    @DisplayName("auto-update: ON has an enabled policy, OFF has policies all off or none and a package, NO_PACKAGE none and no package")
+    void findTitles_autoUpdateStatuses_eachValueAndTheirUnion() {
+        // Contoso Tool (2) has an enabled policy, git (4) only turned-off ones
+        assertThat(names(autoUpdate(SoftwareAutoUpdateStatus.ON))).containsExactly("Contoso Tool");
+        assertThat(names(autoUpdate(SoftwareAutoUpdateStatus.OFF))).containsExactlyInAnyOrder("git", "Google Chrome", "node");
+        assertThat(names(autoUpdate(SoftwareAutoUpdateStatus.NO_PACKAGE))).isEmpty();
+        assertThat(names(autoUpdate(SoftwareAutoUpdateStatus.NEEDS_ADOPTION))).isEmpty();
+        assertThat(names(autoUpdate(SoftwareAutoUpdateStatus.ON, SoftwareAutoUpdateStatus.OFF)))
+                .containsExactlyInAnyOrder("Contoso Tool", "git", "Google Chrome", "node");
+    }
+
+    @Test
+    @DisplayName("auto-update NO_PACKAGE: a title without a policy whose match found no package; with manageable both must hold")
+    void findTitles_autoUpdateNoPackage_noPolicyAndNoPackage() {
+        SoftwareTitleQuery noPackage = titles().autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.NO_PACKAGE))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+        SoftwareTitleQuery manageableOff = titles().manageable(true)
+                .autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.OFF))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+
+        assertThat(names(noPackage)).containsExactly("Contoso Tool");
+        assertThat(names(manageableOff)).containsExactlyInAnyOrder("Google Chrome", "node");
+    }
+
+    @Test
+    @DisplayName("brew titles: one the brew catalog lacks is NO_PACKAGE and not OFF; a matched one is OFF and is not a winget title")
+    void findTitles_brewTitles_followTheirStoredMatch() {
+        repository.saveAll(List.of(
+                title(TENANT, 8L, "tapped-tool", "homebrew_packages", brewMatch(PackageMatchState.NO_PACKAGE), 1, 0),
+                title(TENANT, 9L, "wget", "homebrew_packages", brewMatch(PackageMatchState.MATCHED), 1, 0)));
+        SoftwareTitleQuery noPackage = titles().autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.NO_PACKAGE))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+        SoftwareTitleQuery off = titles().autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.OFF))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+        SoftwareTitleQuery winget = titles().installerSources(Set.of("winget_packages")).matchedChosen(true).build();
+
+        assertThat(names(noPackage)).containsExactlyInAnyOrder("Contoso Tool", "tapped-tool");
+        assertThat(names(off)).containsExactlyInAnyOrder("Google Chrome", "node", "wget");
+        assertThat(names(winget)).containsExactly("Google Chrome");
+    }
+
+    @Test
+    @DisplayName("cask titles: OFF like any brew title, also before their first match; one the catalog lacks is not")
+    void findTitles_caskTitles_offUnlessTheCatalogLacksTheCask() {
+        repository.saveAll(List.of(
+                title(TENANT, 10L, "slack", "homebrew_casks", null, 1, 0),
+                title(TENANT, 11L, "tapped-app", "homebrew_casks", brewMatch(PackageMatchState.NO_PACKAGE), 1, 0)));
+        SoftwareTitleQuery off = titles().autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.OFF))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+
+        assertThat(names(off)).containsExactlyInAnyOrder("Google Chrome", "node", "slack");
+    }
+
+    @Test
+    @DisplayName("auto-update NEEDS_ADOPTION: no policy, no package that manages the title, and a package of an adoption manager; such a title is not NO_PACKAGE")
+    void findTitles_autoUpdateNeedsAdoption_aPackageToAdoptIntoAndNoneThatManages() {
+        Software sevenZip = title(TENANT, 8L, "7-Zip", "programs", match(PackageMatchState.NO_PACKAGE), 1, 0);
+        Software vlc = title(TENANT, 9L, "VLC media player", "programs", match(PackageMatchState.AMBIGUOUS), 1, 0);
+        Software firefox = title(TENANT, 10L, "Mozilla Firefox", "programs", match(PackageMatchState.MATCHED), 1, 0);
+        List.of(sevenZip, vlc, firefox).forEach(title -> title.setAdoptionMatch(chocoMatch()));
+        repository.saveAll(List.of(sevenZip, vlc, firefox));
+        List<PackageManagerType> chocoOn = List.of(PackageManagerType.WINGET, PackageManagerType.CHOCO);
+        List<PackageManagerType> chocoOff = List.of(PackageManagerType.WINGET);
+
+        assertThat(names(noPolicy(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, chocoOn)))
+                .containsExactlyInAnyOrder("7-Zip", "VLC media player");
+        assertThat(names(noPolicy(SoftwareAutoUpdateStatus.NO_PACKAGE, chocoOn))).containsExactly("Contoso Tool");
+        assertThat(names(noPolicy(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, chocoOff))).isEmpty();
+        assertThat(names(noPolicy(SoftwareAutoUpdateStatus.NO_PACKAGE, chocoOff)))
+                .containsExactlyInAnyOrder("Contoso Tool", "7-Zip");
+    }
+
+    @Test
+    @DisplayName("a Mac app has only an adoption match: a cask to adopt into is NEEDS_ADOPTION and not NO_PACKAGE, no cask is NO_PACKAGE, no match at all is neither")
+    void findTitles_macAppsWithoutAPackageMatch_followTheirAdoptionMatch() {
+        // setup
+        Software slack = title(TENANT, 8L, "Slack", "apps", null, 1, 0);
+        Software macTool = title(TENANT, 9L, "Mac Tool", "apps", null, 1, 0);
+        slack.setAdoptionMatch(brewMatch(PackageMatchState.MATCHED));
+        macTool.setAdoptionMatch(brewMatch(PackageMatchState.NO_PACKAGE));
+        repository.saveAll(List.of(slack, macTool));
+        List<PackageManagerType> brewOn = List.of(PackageManagerType.BREW);
+
+        // execution
+        List<String> needsAdoption = names(noPolicy(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, brewOn));
+        List<String> noPackage = names(noPolicy(SoftwareAutoUpdateStatus.NO_PACKAGE, brewOn));
+
+        // verifications
+        assertThat(needsAdoption).containsExactly("Slack");
+        assertThat(noPackage).containsExactlyInAnyOrder("Contoso Tool", "Mac Tool");
+    }
+
+    private static SoftwareTitleQuery noPolicy(SoftwareAutoUpdateStatus status, List<PackageManagerType> adoptionManagers) {
+        return titles().autoUpdateStatuses(List.of(status))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).adoptionManagers(adoptionManagers).build();
+    }
+
+    private static SoftwarePackageMatch chocoMatch() {
+        return SoftwarePackageMatch.builder().state(PackageMatchState.MATCHED).manager(PackageManagerType.CHOCO)
+                .packageId("some-package").build();
+    }
+
+    private static SoftwarePackageMatch brewMatch(PackageMatchState state) {
+        PackageManagerType manager = state == PackageMatchState.MATCHED ? PackageManagerType.BREW : null;
+        return SoftwarePackageMatch.builder().state(state).manager(manager).build();
+    }
+
+    private static SoftwareTitleQuery autoUpdate(SoftwareAutoUpdateStatus... statuses) {
+        return titles().autoUpdateStatuses(List.of(statuses))
+                .enabledPolicyTitleIds(Set.of(2L)).policyTitleIds(Set.of(2L, 4L)).build();
+    }
+
+    private List<String> names(SoftwareTitleQuery titles) {
+        return names(repository.findTitles(titles, Pageable.unpaged()));
+    }
+
+    private static SoftwareTitleQuery.SoftwareTitleQueryBuilder titles() {
+        return SoftwareTitleQuery.builder().tenantId(TENANT).managerSources(MANAGER_SOURCES);
+    }
+
     private Page<Software> titles(String nameLower, boolean vulnerableOnly, Boolean manageable) {
-        return repository.findTitles(
-                new SoftwareTitleQuery(TENANT, nameLower, vulnerableOnly, manageable, MANAGER_SOURCES), Pageable.unpaged());
+        SoftwareTitleQuery titles = titles().nameLower(nameLower).vulnerableOnly(vulnerableOnly).manageable(manageable).build();
+        return repository.findTitles(titles, Pageable.unpaged());
     }
 
     private static List<String> names(Page<Software> page) {

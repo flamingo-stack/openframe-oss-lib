@@ -58,8 +58,8 @@ public class SoftwareProjector {
         applyName(software, rollup);
         applyProgram(software, program);
         software.setInstallerTypes(rollup.installerTypes());
-        if (keysChanged || isStale(software.getPackageMatch())) {
-            software.setPackageMatch(matchOf(program));
+        if (keysChanged || isStale(software)) {
+            applyMatches(software, program);
         }
         String latestVersion = latestVersion(rollup.versions());
         software.setLatestVersion(latestVersion);
@@ -90,6 +90,10 @@ public class SoftwareProjector {
                 .productCodes(rollup.arpKeys())
                 .packageFamilyNames(rollup.packageFamilyNames())
                 .systemComponent(rollup.systemComponent())
+                .wingetIds(rollup.wingetIds())
+                .bundleIdentifier(rollup.bundleIdentifier())
+                .appFileNames(rollup.appFileNames())
+                .topLevelApp(rollup.topLevelApp())
                 .build();
     }
 
@@ -99,6 +103,10 @@ public class SoftwareProjector {
         software.setArpKeys(program.getProductCodes());
         software.setPackageFamilyNames(program.getPackageFamilyNames());
         software.setSystemComponent(program.isSystemComponent());
+        software.setWingetIds(program.getWingetIds());
+        software.setBundleIdentifier(program.getBundleIdentifier());
+        software.setAppFileNames(program.getAppFileNames());
+        software.setTopLevelApp(program.getTopLevelApp());
     }
 
     // the handler projects every title of a host on every host_software event, so a title is matched again only
@@ -110,7 +118,16 @@ public class SoftwareProjector {
                 && Objects.equals(software.getUpgradeCode(), program.getUpgradeCode())
                 && Objects.equals(orEmpty(software.getArpKeys()), program.getProductCodes())
                 && Objects.equals(orEmpty(software.getPackageFamilyNames()), program.getPackageFamilyNames())
+                && Objects.equals(orEmpty(software.getWingetIds()), program.getWingetIds())
+                && Objects.equals(software.getBundleIdentifier(), program.getBundleIdentifier())
+                && Objects.equals(orEmpty(software.getAppFileNames()), program.getAppFileNames())
+                && Objects.equals(software.getTopLevelApp(), program.getTopLevelApp())
                 && Boolean.TRUE.equals(software.getSystemComponent()) == program.isSystemComponent();
+    }
+
+    // either match dates the title: a source only one of the two matchers takes is not matched again on every event
+    private static boolean isStale(Software software) {
+        return isStale(software.getPackageMatch()) && isStale(software.getAdoptionMatch());
     }
 
     private static boolean isStale(SoftwarePackageMatch match) {
@@ -118,9 +135,13 @@ public class SoftwareProjector {
                 || match.getMatchedAt().isBefore(Instant.now().minus(MATCH_TTL));
     }
 
-    private SoftwarePackageMatch matchOf(InstalledProgram program) {
-        PackageMatch match = packageMatcher.match(List.of(program)).get(program);
-        return match == null ? null : match.toStored(Instant.now());
+    private void applyMatches(Software software, InstalledProgram program) {
+        Instant matchedAt = Instant.now();
+        List<InstalledProgram> programs = List.of(program);
+        PackageMatch match = packageMatcher.match(programs).get(program);
+        PackageMatch adoptionMatch = packageMatcher.matchForAdoption(programs).get(program);
+        software.setPackageMatch(match == null ? null : match.toStored(matchedAt));
+        software.setAdoptionMatch(adoptionMatch == null ? null : adoptionMatch.toStored(matchedAt));
     }
 
     private static List<String> orEmpty(List<String> values) {

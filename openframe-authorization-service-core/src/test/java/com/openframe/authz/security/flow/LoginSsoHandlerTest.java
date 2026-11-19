@@ -126,6 +126,7 @@ class LoginSsoHandlerTest {
         handler.handle(request, response, authentication);
 
         verify(ssoIdentityService).link("microsoft", untrustedMicrosoft.getClaims(), existing);
+        verify(userService).recordSsoLogin(existing);
         verify(sessionPrincipalBinder).bind(authentication, existing, request, response);
         assertThat(response.getHeader("Location")).isEqualTo("https://auth.example.com/oauth/continue?tenantId=tenant-1");
     }
@@ -170,6 +171,7 @@ class LoginSsoHandlerTest {
         handler.handle(request("/devices", false), response, authentication("google", trustedGoogle));
 
         verify(ssoIdentityService).link("google", trustedGoogle.getClaims(), existing);
+        verify(userService).recordSsoLogin(existing);
         assertThat(response.getHeader("Location"))
                 .isEqualTo("https://auth.example.com/oauth/continue?tenantId=tenant-1&redirectTo=%2Fdevices");
         assertThat(response.getCookies()).anySatisfy(c -> {
@@ -196,6 +198,7 @@ class LoginSsoHandlerTest {
         assertThatThrownBy(() -> handler.handle(request(), response, authentication("google", trustedGoogle)))
                 .hasMessageContaining("blocked");
         verify(ssoIdentityService, never()).link(anyString(), any(), any());
+        verify(userService, never()).recordSsoLogin(any());
     }
 
     @Test
@@ -210,6 +213,7 @@ class LoginSsoHandlerTest {
         assertThat(response.getRedirectedUrl()).isEqualTo("/auth/sso-join");
         verify(ssoOidcUserService, never()).autoProvisionByGlobalDomain(anyString(), any());
         verify(ssoIdentityService, never()).link(anyString(), any(), any());
+        verify(userService, never()).recordSsoLogin(any());
     }
 
     @Test
@@ -222,6 +226,7 @@ class LoginSsoHandlerTest {
         handler.handle(request(), response, authentication("google", trustedGoogle));
 
         verify(ssoIdentityService).link("google", trustedGoogle.getClaims(), existing);
+        verify(userService).recordSsoLogin(existing);
         assertThat(response.getHeader("Location")).contains("tenantId=tenant-1");
     }
 

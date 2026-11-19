@@ -37,9 +37,10 @@ extend type Mutation {
 
     """
     Assign every device matching filter + search, resolved on the server ("Add N Devices").
-    Takes the same filter/search as availableDevices. Already-assigned devices are skipped.
+    Takes the same filter/search/softwareId as availableDevices. Already-assigned devices are skipped.
+    softwareId is applied only when the software read model is on; otherwise it is ignored.
     """
-    addAllDevicesToSoftwareBundle(bundleId: ID!, filter: DeviceFilterInput, search: String): SoftwareBundle!
+    addAllDevicesToSoftwareBundle(bundleId: ID!, filter: DeviceFilterInput, search: String, softwareId: ID): SoftwareBundle!
 
     """
     Unassign every assigned device matching filter + search ("Remove N Devices").
@@ -106,10 +107,16 @@ type SoftwareBundle implements Node {
     deviceCount: Int!
     "Assigned devices. Same filter/search/sort/pagination as the top-level devices query."
     assignedDevices(filter: DeviceFilterInput, first: Int, after: String, last: Int, before: String, search: String, sort: SortInput): DeviceConnection!
-    "The picker's \"Available Devices\". Each edge carries assigned."
-    availableDevices(filter: DeviceFilterInput, first: Int, after: String, last: Int, before: String, search: String, sort: SortInput): AvailableDeviceConnection!
+    """
+    The picker's "Available Devices". Each edge carries assigned.
+    softwareId: only the devices that have this Software (the Update and Auto-update forms). Null: every device.
+    It is applied only when the software read model is on (openframe.features.software-read-model.enabled);
+    otherwise it is ignored and every device is listed.
+    """
+    availableDevices(filter: DeviceFilterInput, first: Int, after: String, last: Int, before: String, search: String, sort: SortInput, softwareId: ID): AvailableDeviceConnection!
     assignedDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
-    availableDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!
+    "softwareId: as in availableDevices, applied only when the software read model is on and ignored otherwise."
+    availableDeviceFilters(filter: DeviceFilterInput, search: String, softwareId: ID): DeviceFilters!
 
     "For SCHEDULED bundles: when the run fires (absolute instant, SERVER time). Null for NOW."
     startAt: Instant

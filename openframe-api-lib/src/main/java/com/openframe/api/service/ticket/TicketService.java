@@ -450,6 +450,7 @@ public class TicketService {
                 .activity(ticketStalenessResolver.resolve(filter.getActivity()))
                 .escalatedByUser(filter.getEscalatedByUser())
                 .hasPendingApproval(filter.getHasPendingApproval())
+                .creationSources(filter.getCreationSources())
                 .build();
     }
 

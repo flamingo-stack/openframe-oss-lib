@@ -1,6 +1,7 @@
 package com.openframe.data.document.rmm.command;
 
 import com.openframe.data.document.TenantScoped;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptExecution;
@@ -77,6 +78,7 @@ public class CommandExecution implements TenantScoped {
     private String initiatedBy;
 
     private ExecutionStatus status;
+    private ExecutionFailureReason failureReason;
 
     private Instant dispatchedAt;
     private Instant statusChangedAt;

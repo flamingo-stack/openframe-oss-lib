@@ -5,7 +5,12 @@ import { useCallback, useMemo } from 'react';
 import { cn } from '../../../utils/cn';
 import { FiltersDropdown, type FilterSection } from '../../features';
 import { Filter02Icon } from '../../icons-v2-generated';
-import type { DataTableFilterOption } from './types';
+import {
+  type DataTableFilterOption,
+  type DataTableFilterSection,
+  filterSectionValue,
+  splitFilterSectionValues,
+} from './types';
 import { alignJustify } from './utils';
 
 // Stable reference for "no filter selected" — avoids creating a new `[]` per
@@ -16,6 +21,8 @@ const EMPTY_ARRAY: string[] = [];
 export interface DataTableColumnFilterProps {
   column: Column<unknown, unknown>;
   options: DataTableFilterOption[];
+  /** More groups in the same dropdown: see `meta.filter.sections`. */
+  extraSections?: DataTableFilterSection[];
   placement?: 'bottom-start' | 'bottom-end' | 'bottom';
   label: string;
   align?: 'left' | 'center' | 'right';
@@ -32,6 +39,7 @@ export interface DataTableColumnFilterProps {
 export function DataTableColumnFilter({
   column,
   options,
+  extraSections,
   placement = 'bottom-start',
   label,
   align = 'left',
@@ -40,6 +48,8 @@ export function DataTableColumnFilter({
 }: DataTableColumnFilterProps) {
   const currentValue = column.getFilterValue() as string[] | undefined;
   const activeCount = currentValue?.length ?? 0;
+
+  const extraIds = useMemo(() => (extraSections ?? []).map(section => section.id), [extraSections]);
 
   const sections = useMemo<FilterSection[]>(
     () => [
@@ -50,18 +60,34 @@ export function DataTableColumnFilter({
         options,
         allowSelectAll: true,
       },
+      ...(extraSections ?? [])
+        .filter(section => section.options.length > 0)
+        .map(section => ({
+          id: section.id,
+          title: section.title,
+          type: 'checkbox' as const,
+          options: section.options,
+          allowSelectAll: true,
+        })),
     ],
-    [column.id, label, options],
+    [column.id, label, options, extraSections],
   );
 
-  const currentFilters = useMemo(() => ({ [column.id]: currentValue ?? EMPTY_ARRAY }), [column.id, currentValue]);
+  const currentFilters = useMemo(() => {
+    if (extraIds.length === 0) return { [column.id]: currentValue ?? EMPTY_ARRAY };
+    const { own, sections: picked } = splitFilterSectionValues(currentValue, extraIds);
+    return { [column.id]: own, ...picked };
+  }, [column.id, currentValue, extraIds]);
 
   const handleApply = useCallback(
     (applied: Record<string, string[]>) => {
-      const next = applied[column.id] ?? [];
+      const next = [
+        ...(applied[column.id] ?? []),
+        ...extraIds.flatMap(id => (applied[id] ?? []).map(value => filterSectionValue(id, value))),
+      ];
       column.setFilterValue(next.length > 0 ? next : undefined);
     },
-    [column],
+    [column, extraIds],
   );
 
   const handleReset = useCallback(() => {

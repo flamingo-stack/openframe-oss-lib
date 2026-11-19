@@ -3,9 +3,14 @@
  * option takes away (or rearranges) exactly its own block.
  */
 
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { SoftwareActionForm, type SoftwareActionFormProps } from '../software-action-form';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  type SoftwareActionFormValues,
+  SoftwareActionForm,
+  type SoftwareActionFormProps,
+  type SoftwareDeviceScope,
+} from '../software-action-form';
 
 const base: SoftwareActionFormProps = {
   action: 'UPDATE',
@@ -65,5 +70,26 @@ describe('SoftwareActionForm run modes', () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByText(/immediately/)).toBeNull();
+  });
+});
+
+describe('SoftwareActionForm on one title', () => {
+  const software = { name: 'Google Chrome', osTypes: ['WINDOWS'], summary: <span>title card</span> };
+
+  it('is titled by it, draws its card instead of the rows and scopes the picker to its systems', () => {
+    const renderDevicePicker = vi.fn((scope: SoftwareDeviceScope) => <span>{scope.osTypesKey}</span>);
+    render(<SoftwareActionForm {...base} showHeader software={software} renderDevicePicker={renderDevicePicker} />);
+    expect(screen.getByRole('heading', { name: 'Update Google Chrome' })).toBeTruthy();
+    expect(screen.getByText('title card')).toBeTruthy();
+    expect(screen.queryByText('package field')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add Software' })).toBeNull();
+    expect(renderDevicePicker).toHaveBeenLastCalledWith({ osTypes: ['WINDOWS'], osTypesKey: 'WINDOWS' });
+  });
+
+  it('submits no rows: the server picks the package', () => {
+    const onSubmit = vi.fn<(values: SoftwareActionFormValues) => void>();
+    render(<SoftwareActionForm {...base} showHeader software={software} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Schedule Update' })[0]);
+    expect(onSubmit.mock.calls[0][0].rows).toEqual([]);
   });
 });

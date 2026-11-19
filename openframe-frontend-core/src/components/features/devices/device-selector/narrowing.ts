@@ -1,3 +1,4 @@
+import { splitStatusFilterValue } from '../device-statuses';
 import type { DeviceFilterInput } from '../types';
 import type { DeviceSelectorNarrowing } from './device-selector.types';
 
@@ -19,10 +20,12 @@ export function narrowingToFilter(narrowing: DeviceSelectorNarrowing): DeviceFil
   });
 
   const filter: DeviceFilterInput = {};
-  const statuses = column('status');
+  // The STATUS funnel also holds the Connectivity group's picks (`connectivity:ONLINE`).
+  const { statuses, connectivity } = splitStatusFilterValue(column('status'));
   const osTypes = column('os');
   const organizationIds = column('organization');
-  if (statuses?.length) filter.statuses = statuses;
+  if (statuses.length) filter.statuses = statuses;
+  if (connectivity.length) filter.connectivity = connectivity;
   if (osTypes?.length) filter.osTypes = osTypes;
   if (organizationIds?.length) filter.organizationIds = organizationIds;
   if (tagPairs.length) {

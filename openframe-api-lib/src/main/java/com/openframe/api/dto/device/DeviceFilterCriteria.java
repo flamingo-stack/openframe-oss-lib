@@ -23,6 +23,7 @@ public class DeviceFilterCriteria {
 
     private List<DeviceStatus> statuses;
     private List<TelemetryStatus> connectivity;
+    private Boolean clientOutdated;
     private List<DeviceType> deviceTypes;
     private List<OsType> osTypes;
     private List<String> organizationIds;
