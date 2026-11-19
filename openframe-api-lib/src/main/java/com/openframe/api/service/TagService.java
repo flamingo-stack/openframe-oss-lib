@@ -10,7 +10,9 @@ import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,12 +33,15 @@ public class TagService {
 
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
+    private final AuditedMethodRunner auditedMethodRunner;
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
 
-    public TagService(TagRepository tagRepository, TagAssignmentRepository tagAssignmentRepository) {
+    public TagService(TagRepository tagRepository, TagAssignmentRepository tagAssignmentRepository,
+                      AuditedMethodRunner auditedMethodRunner) {
         this.tagRepository = tagRepository;
         this.tagAssignmentRepository = tagAssignmentRepository;
+        this.auditedMethodRunner = auditedMethodRunner;
     }
 
     public Optional<Tag> findById(String id) {
@@ -247,7 +252,6 @@ public class TagService {
     }
 
     @Transactional
-    @Audited(action = TAG_CREATE, targetId = "#result.id", details = "entityType=#entityType")
     public Tag createTag(String key, TagEntityType entityType, String description, String color) {
         log.info("Creating tag '{}' with entityType: {}", key, entityType);
 
@@ -255,6 +259,14 @@ public class TagService {
         if (existing != null) {
             return existing;
         }
+        AuditCall call = AuditCall.of(TAG_CREATE, null, Map.of("entityType", entityType))
+                .withCompare(false)
+                .withTargetIdInResult(true)
+                .withTargetIdFromResult(created -> ((Tag) created).getId());
+        return auditedMethodRunner.run(call, () -> saveNewTag(key, entityType, description, color));
+    }
+
+    private Tag saveNewTag(String key, TagEntityType entityType, String description, String color) {
         boolean caseVariantExists = tagRepository.existsByKeyIgnoreCaseAndEntityType(key, entityType);
         if (caseVariantExists) {
             throw new ConflictException("Tag with key '" + key + "' already exists");

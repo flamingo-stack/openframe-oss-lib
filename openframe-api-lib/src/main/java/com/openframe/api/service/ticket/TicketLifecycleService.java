@@ -236,15 +236,12 @@ public class TicketLifecycleService {
         AuditCall call = AuditCall.of(TICKET_ARCHIVE, null)
                 .withCompare(false)
                 .withRecordsResult(archived -> !((List<?>) archived).isEmpty())
-                .withDetailsFromResult(archived -> archiveDetails(filterInput, archived));
+                .withDetailsFromResult(TicketLifecycleService::archiveDetails);
         return auditedMethodRunner.run(call, () -> archiveResolved(principal, filterInput));
     }
 
-    private static Map<String, Object> archiveDetails(TicketFilterInput filterInput, Object archivedIds) {
-        Map<String, Object> details = new HashMap<>();
-        details.put("filter", filterInput);
-        details.put("ticketIds", archivedIds);
-        return details;
+    private static Map<String, Object> archiveDetails(Object archivedIds) {
+        return Map.of("ticketIds", archivedIds);
     }
 
     private List<String> archiveResolved(AuthPrincipal principal, TicketFilterInput filterInput) {

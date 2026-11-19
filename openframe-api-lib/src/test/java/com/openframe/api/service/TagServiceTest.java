@@ -1,5 +1,7 @@
 package com.openframe.api.service;
 
+import org.mockito.Answers;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.device.MachineTag;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.tag.Tag;
@@ -26,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +37,7 @@ class TagServiceTest {
 
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
 
     private TagService tagService;
 
@@ -45,7 +49,7 @@ class TagServiceTest {
 
     @BeforeEach
     void setUp() {
-        tagService = new TagService(tagRepository, tagAssignmentRepository);
+        tagService = new TagService(tagRepository, tagAssignmentRepository, auditedMethodRunner);
     }
 
     @Test
@@ -56,6 +60,7 @@ class TagServiceTest {
 
         assertThat(result).isSameAs(newTag);
         verify(tagRepository, never()).save(any());
+        verifyNoInteractions(auditedMethodRunner);
     }
 
     @Test
