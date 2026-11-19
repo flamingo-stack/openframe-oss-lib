@@ -33,9 +33,7 @@ public class AgentLogKeyService {
 
     public AgentKeyResponse current() {
         return logKeyRepository.findFirstByOrderByCreatedAtDesc()
-                .map(logKey -> new AgentKeyResponse(
-                        encryptionService.decrypt(logKey.getEncryptedKey(), context()),
-                        logKey.getCreatedAt()))
+                .map(this::reveal)
                 .orElseThrow(AgentLogKeyNotFoundException::new);
     }
 
@@ -58,13 +56,23 @@ public class AgentLogKeyService {
 
     private AgentLogKey saveNewKey(String plainKey) {
         AgentLogKey logKey = new AgentLogKey();
-        logKey.setEncryptedKey(encryptionService.encrypt(plainKey, context()));
+        EncryptionContext context = context();
+        String encryptedKey = encryptionService.encrypt(plainKey, context);
+        logKey.setEncryptedKey(encryptedKey);
         logKey.setCreatedAt(Instant.now());
         return logKeyRepository.save(logKey);
     }
 
+    private AgentKeyResponse reveal(AgentLogKey logKey) {
+        EncryptionContext context = context();
+        String encryptedKey = logKey.getEncryptedKey();
+        String plainKey = encryptionService.decrypt(encryptedKey, context);
+        return new AgentKeyResponse(plainKey, logKey.getCreatedAt());
+    }
+
     private EncryptionContext context() {
-        return EncryptionContext.forTenant(tenantIdProvider.getTenantId(), AGENT_LOG_KEY);
+        String tenantId = tenantIdProvider.getTenantId();
+        return EncryptionContext.forTenant(tenantId, AGENT_LOG_KEY);
     }
 
 }

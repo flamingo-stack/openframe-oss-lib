@@ -54,7 +54,9 @@ public class SSOConfigService {
         cfg.setProvider(provider);
         cfg.setClientId(defaults.getDefaultClientId());
         // Encrypt so downstream decryption works transparently; no tenant: a platform-level secret
-        cfg.setClientSecret(encryptionService.encrypt(defaults.getDefaultClientSecret(), context(cfg)));
+        String defaultClientSecret = defaults.getDefaultClientSecret();
+        EncryptionContext platformContext = context(cfg);
+        cfg.setClientSecret(encryptionService.encrypt(defaultClientSecret, platformContext));
         cfg.setTeamId(defaults.getDefaultTeamId());
         cfg.setKeyId(defaults.getDefaultKeyId());
         cfg.setEnabled(true);
@@ -135,7 +137,9 @@ public class SSOConfigService {
         if (config.getClientSecret() == null) {
             return null;
         }
-        return encryptionService.decrypt(config.getClientSecret(), context(config));
+        String clientSecret = config.getClientSecret();
+        EncryptionContext context = context(config);
+        return encryptionService.decrypt(clientSecret, context);
     }
 
     private static EncryptionContext context(SSOConfig config) {

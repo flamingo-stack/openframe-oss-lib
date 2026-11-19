@@ -167,7 +167,9 @@ public class ScriptScheduleMapper {
 
     private String decrypt(String ciphertext) {
         EncryptionService service = encryptionService.getObject();
-        return service.decrypt(ciphertext, EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SCRIPT_ENV_VAR));
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SCRIPT_ENV_VAR);
+        return service.decrypt(ciphertext, context);
     }
 
     // Copies, never mutates: the same entity may still be saved after it is mapped to a response.

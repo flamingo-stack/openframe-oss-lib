@@ -21,6 +21,7 @@ import java.util.Base64;
 public class EncryptionService {
 
     public static final String TINK_PREFIX = "tk1:";
+    private static final int TINK_PREFIX_LENGTH = TINK_PREFIX.length();
 
     private final TextEncryptor legacy;
     private final Aead aead;
@@ -77,12 +78,15 @@ public class EncryptionService {
         if (!isLegacy(ciphertext)) {
             return ciphertext;
         }
-        return encryptTink(decrypt(ciphertext, context), context);
+        String plainText = decrypt(ciphertext, context);
+        return encryptTink(plainText, context);
     }
 
     private String encryptTink(String plainText, EncryptionContext context) {
         try {
-            byte[] sealed = aead.encrypt(plainText.getBytes(StandardCharsets.UTF_8), context.associatedData());
+            byte[] plainBytes = plainText.getBytes(StandardCharsets.UTF_8);
+            byte[] associatedData = context.associatedData();
+            byte[] sealed = aead.encrypt(plainBytes, associatedData);
             return TINK_PREFIX + Base64.getEncoder().encodeToString(sealed);
         } catch (GeneralSecurityException e) {
             throw new EncryptionException(ErrorCode.ENCRYPTION_FAILED, "Failed to encrypt sensitive data", e);
@@ -94,8 +98,11 @@ public class EncryptionService {
             throw new EncryptionException(ErrorCode.DECRYPTION_FAILED, "No encryption keyset to decrypt a Tink value");
         }
         try {
-            byte[] sealed = Base64.getDecoder().decode(ciphertext.substring(TINK_PREFIX.length()));
-            return new String(aead.decrypt(sealed, context.associatedData()), StandardCharsets.UTF_8);
+            String encoded = ciphertext.substring(TINK_PREFIX_LENGTH);
+            byte[] sealed = Base64.getDecoder().decode(encoded);
+            byte[] associatedData = context.associatedData();
+            byte[] plainBytes = aead.decrypt(sealed, associatedData);
+            return new String(plainBytes, StandardCharsets.UTF_8);
         } catch (GeneralSecurityException | IllegalArgumentException e) {
             throw new EncryptionException(ErrorCode.DECRYPTION_FAILED, "Failed to decrypt sensitive data", e);
         }

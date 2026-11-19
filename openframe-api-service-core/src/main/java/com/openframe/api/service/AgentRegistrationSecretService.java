@@ -32,24 +32,14 @@ public class AgentRegistrationSecretService {
 
     public AgentRegistrationSecretResponse getActiveSecret() {
         return secretRepository.findByActiveTrue()
-                .map(secret -> AgentRegistrationSecretResponse.builder()
-                        .id(secret.getId())
-                        .key(encryptionService.decrypt(secret.getSecretKey(), context()))
-                        .createdAt(secret.getCreatedAt())
-                        .active(secret.isActive())
-                        .build())
+                .map(this::toResponse)
                 .orElseThrow(() -> new AgentRegistrationSecretNotFoundException(ErrorCode.AGENT_REGISTRATION_SECRET_NOT_FOUND, "Active agent registration secret not found"));
     }
 
     public List<AgentRegistrationSecretResponse> getAllSecrets() {
         List<AgentRegistrationSecret> secrets = secretRepository.findAll();
         return secrets.stream()
-                .map(secret -> AgentRegistrationSecretResponse.builder()
-                        .id(secret.getId())
-                        .key(encryptionService.decrypt(secret.getSecretKey(), context()))
-                        .createdAt(secret.getCreatedAt())
-                        .active(secret.isActive())
-                        .build())
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -58,7 +48,9 @@ public class AgentRegistrationSecretService {
         String newSecretKey = secretGenerator.generate();
 
         AgentRegistrationSecret newSecret = new AgentRegistrationSecret();
-        newSecret.setSecretKey(encryptionService.encrypt(newSecretKey, context()));
+        EncryptionContext context = context();
+        String encryptedSecretKey = encryptionService.encrypt(newSecretKey, context);
+        newSecret.setSecretKey(encryptedSecretKey);
         newSecret.setCreatedAt(Instant.now());
         newSecret.setActive(true);
 
@@ -85,7 +77,20 @@ public class AgentRegistrationSecretService {
         secretProcessor.postProcessSecretDeactivated(activeSecret);
     }
 
+    private AgentRegistrationSecretResponse toResponse(AgentRegistrationSecret secret) {
+        EncryptionContext context = context();
+        String storedSecretKey = secret.getSecretKey();
+        String key = encryptionService.decrypt(storedSecretKey, context);
+        return AgentRegistrationSecretResponse.builder()
+                .id(secret.getId())
+                .key(key)
+                .createdAt(secret.getCreatedAt())
+                .active(secret.isActive())
+                .build();
+    }
+
     private EncryptionContext context() {
-        return EncryptionContext.forTenant(tenantIdProvider.getTenantId(), AGENT_REGISTRATION_SECRET);
+        String tenantId = tenantIdProvider.getTenantId();
+        return EncryptionContext.forTenant(tenantId, AGENT_REGISTRATION_SECRET);
     }
 }

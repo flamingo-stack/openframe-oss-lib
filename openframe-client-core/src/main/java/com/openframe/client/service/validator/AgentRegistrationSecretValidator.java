@@ -33,8 +33,10 @@ public class AgentRegistrationSecretValidator {
         AgentRegistrationSecret secret = secretRepository.findByActiveTrue()
                 .orElseThrow(() -> new AgentRegistrationSecretValidationErrorException("No active agent secret found"));
 
-        String decryptedSecretKey = encryptionService.decrypt(secret.getSecretKey(),
-                EncryptionContext.forTenant(tenantIdProvider.getTenantId(), AGENT_REGISTRATION_SECRET));
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, AGENT_REGISTRATION_SECRET);
+        String storedSecretKey = secret.getSecretKey();
+        String decryptedSecretKey = encryptionService.decrypt(storedSecretKey, context);
         boolean matches = MessageDigest.isEqual(
                 decryptedSecretKey.getBytes(StandardCharsets.UTF_8),
                 initialKey.getBytes(StandardCharsets.UTF_8));

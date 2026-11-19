@@ -21,10 +21,12 @@ public class ScriptSecretSealer {
     private final TenantIdProvider tenantIdProvider;
 
     public List<ScriptEnvVar> seal(List<ScriptEnvVar> envVars) {
-        return ScriptEnvVar.sealAll(envVars, plain -> encryptionService.encrypt(plain, context()));
+        return ScriptEnvVar.sealAll(envVars, this::encrypt);
     }
 
-    private EncryptionContext context() {
-        return EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SCRIPT_ENV_VAR);
+    private String encrypt(String plain) {
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SCRIPT_ENV_VAR);
+        return encryptionService.encrypt(plain, context);
     }
 }

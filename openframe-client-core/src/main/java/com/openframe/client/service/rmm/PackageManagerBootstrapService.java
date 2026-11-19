@@ -125,8 +125,7 @@ public class PackageManagerBootstrapService {
 
         // the agent gets a stored secret in the clear
         List<ScriptEnvVar> storedEnvVars = script.getEnvVars();
-        List<ScriptEnvVar> envVars = ScriptEnvVar.revealAll(storedEnvVars, value ->
-                encryptionService.decrypt(value, EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SCRIPT_ENV_VAR)));
+        List<ScriptEnvVar> envVars = ScriptEnvVar.revealAll(storedEnvVars, this::decrypt);
         scriptBootstrapNatsPublisher.publishBootstrapScript(machineId, ScriptMessage.builder()
                 .executionId(executionId)
                 .scriptId(script.getId())
@@ -141,5 +140,11 @@ public class PackageManagerBootstrapService {
 
         log.info("Dispatched {} bootstrap: machineId={} executionId={} scriptId={}",
                 packageManager, machineId, executionId, script.getId());
+    }
+
+    private String decrypt(String ciphertext) {
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SCRIPT_ENV_VAR);
+        return encryptionService.decrypt(ciphertext, context);
     }
 }

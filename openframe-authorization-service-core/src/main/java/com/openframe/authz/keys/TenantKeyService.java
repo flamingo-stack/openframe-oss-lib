@@ -37,13 +37,18 @@ public class TenantKeyService {
         }
 
         RSAPublicKey pub = PemUtil.parsePublicKey(doc.getPublicPem());
-        RSAPrivateKey priv = PemUtil.parsePrivateKey(encryptionService.decrypt(doc.getPrivateEncrypted(), context(tenantId)));
+        String privateEncrypted = doc.getPrivateEncrypted();
+        EncryptionContext context = context(tenantId);
+        String privatePem = encryptionService.decrypt(privateEncrypted, context);
+        RSAPrivateKey priv = PemUtil.parsePrivateKey(privatePem);
         return new RSAKey.Builder(pub).privateKey(priv).keyID(doc.getKeyId()).build();
     }
 
     private TenantKey createAndStore(String tenantId) {
         AuthenticationKeyPair pair = keyPairGenerator.generate();
-        String enc = encryptionService.encrypt(pair.privatePem(), context(tenantId));
+        String privatePem = pair.privatePem();
+        EncryptionContext context = context(tenantId);
+        String enc = encryptionService.encrypt(privatePem, context);
         TenantKey doc = new TenantKey();
         doc.setId(randomUUID().toString());
         doc.setTenantId(tenantId);

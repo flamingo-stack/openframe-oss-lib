@@ -22,7 +22,8 @@ public class SSOConfigMapper {
         SSOConfig config = new SSOConfig();
         config.setProvider(provider);
         config.setClientId(request.getClientId());
-        config.setClientSecret(encryptionService.encrypt(request.getClientSecret(), context()));
+        String encryptedClientSecret = encryptClientSecret(request, encryptionService);
+        config.setClientSecret(encryptedClientSecret);
         config.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         config.setMsTenantId(request.getMsTenantId());
         config.setAllowedDomains(request.getAllowedDomains());
@@ -32,7 +33,8 @@ public class SSOConfigMapper {
 
     public void updateEntity(SSOConfig existing, SSOConfigRequest request, EncryptionService encryptionService) {
         existing.setClientId(request.getClientId());
-        existing.setClientSecret(encryptionService.encrypt(request.getClientSecret(), context()));
+        String encryptedClientSecret = encryptClientSecret(request, encryptionService);
+        existing.setClientSecret(encryptedClientSecret);
         existing.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         existing.setMsTenantId(request.getMsTenantId());
         existing.setAllowedDomains(request.getAllowedDomains());
@@ -51,8 +53,11 @@ public class SSOConfigMapper {
                 .build();
     }
 
-    private EncryptionContext context() {
-        return EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SSO_CLIENT_SECRET);
+    private String encryptClientSecret(SSOConfigRequest request, EncryptionService encryptionService) {
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SSO_CLIENT_SECRET);
+        String clientSecret = request.getClientSecret();
+        return encryptionService.encrypt(clientSecret, context);
     }
 }
 

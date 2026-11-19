@@ -107,7 +107,9 @@ public class ScriptMapper {
 
     private String decrypt(String ciphertext) {
         EncryptionService service = encryptionService.getObject();
-        return service.decrypt(ciphertext, EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SCRIPT_ENV_VAR));
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SCRIPT_ENV_VAR);
+        return service.decrypt(ciphertext, context);
     }
 
     private List<ScriptEnvVar> seal(List<ScriptEnvVar> envVars) {

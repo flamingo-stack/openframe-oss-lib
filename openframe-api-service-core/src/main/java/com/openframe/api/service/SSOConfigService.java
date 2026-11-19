@@ -75,11 +75,7 @@ public class SSOConfigService {
             return openframeLoginConfig(provider);
         }
         return ssoConfigRepository.findByProvider(provider)
-                .map(config -> ssoConfigMapper.toResponse(
-                        config,
-                        encryptionService.decrypt(config.getClientSecret(),
-                                EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SSO_CLIENT_SECRET))
-                ))
+                .map(this::toResponseWithClientSecret)
                 .orElse(SSOConfigResponse.builder()
                         .id(null)
                         .provider(provider)
@@ -89,6 +85,14 @@ public class SSOConfigService {
                         .autoProvisionUsers(false)
                         .enabled(false)
                         .build());
+    }
+
+    private SSOConfigResponse toResponseWithClientSecret(SSOConfig config) {
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SSO_CLIENT_SECRET);
+        String storedClientSecret = config.getClientSecret();
+        String clientSecret = encryptionService.decrypt(storedClientSecret, context);
+        return ssoConfigMapper.toResponse(config, clientSecret);
     }
 
     private SSOConfigResponse saveConfig(String provider, @Valid SSOConfigRequest request) {

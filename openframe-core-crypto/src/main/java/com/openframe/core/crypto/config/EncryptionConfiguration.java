@@ -1,5 +1,6 @@
 package com.openframe.core.crypto.config;
 
+import com.google.crypto.tink.Aead;
 import com.google.crypto.tink.InsecureSecretKeyAccess;
 import com.google.crypto.tink.KeysetHandle;
 import com.google.crypto.tink.KmsClient;
@@ -52,9 +53,12 @@ public class EncryptionConfiguration {
         }
         KeysetHandle handle = loadKeyset(keyset, kmsKeyUri, cleartextAllowed && !required, kmsClient);
         log.info("Encryption keyset loaded; Tink writes {}, legacy reads {}", onOff(tinkWrite), onOff(legacyRead));
-        return legacyRead
-                ? EncryptionService.withKeyset(handle, tinkWrite, blankToNull(legacyPassword), blankToNull(legacySalt))
-                : EncryptionService.withKeyset(handle, true, null, null);
+        if (!legacyRead) {
+            return EncryptionService.withKeyset(handle, true, null, null);
+        }
+        String password = blankToNull(legacyPassword);
+        String salt = blankToNull(legacySalt);
+        return EncryptionService.withKeyset(handle, tinkWrite, password, salt);
     }
 
     private static KeysetHandle loadKeyset(String keyset, String kmsKeyUri, boolean cleartextAllowed,
@@ -63,8 +67,8 @@ public class EncryptionConfiguration {
             AeadConfig.register();
             if (StringUtils.hasText(kmsKeyUri)) {
                 KmsClient client = kmsClient.getIfAvailable(() -> gcpKmsClient(kmsKeyUri));
-                return TinkJsonProtoKeysetFormat.parseEncryptedKeyset(
-                        keyset, client.getAead(kmsKeyUri), NO_ASSOCIATED_DATA);
+                Aead keysetEncryptionAead = client.getAead(kmsKeyUri);
+                return TinkJsonProtoKeysetFormat.parseEncryptedKeyset(keyset, keysetEncryptionAead, NO_ASSOCIATED_DATA);
             }
             if (cleartextAllowed) {
                 log.warn("Using a cleartext encryption keyset: local and test runs only");

@@ -40,21 +40,27 @@ public class AgentRegistrationSecretManagementService {
     }
 
     public AgentRegistrationSecret rotateSecret() {
-        secretRepository.findByActiveTrue().ifPresent(active -> {
-            active.setActive(false);
-            secretRepository.save(active);
-            log.info("Deactivated agent registration key with ID: {}", active.getId());
-        });
-        AgentRegistrationSecret savedKey = saveNewActiveSecret(secretGenerator.generate());
+        secretRepository.findByActiveTrue().ifPresent(this::deactivate);
+        String secretKey = secretGenerator.generate();
+        AgentRegistrationSecret savedKey = saveNewActiveSecret(secretKey);
         log.info("Rotated agent registration key, new key ID: {}", savedKey.getId());
         return savedKey;
     }
 
+    private void deactivate(AgentRegistrationSecret active) {
+        active.setActive(false);
+        secretRepository.save(active);
+        log.info("Deactivated agent registration key with ID: {}", active.getId());
+    }
+
     private AgentRegistrationSecret saveNewActiveSecret(String secretKey) {
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, AGENT_REGISTRATION_SECRET);
+        String encryptedSecretKey = encryptionService.encrypt(secretKey, context);
+        Instant createdAt = Instant.now();
         AgentRegistrationSecret secret = new AgentRegistrationSecret();
-        secret.setSecretKey(encryptionService.encrypt(secretKey,
-                EncryptionContext.forTenant(tenantIdProvider.getTenantId(), AGENT_REGISTRATION_SECRET)));
-        secret.setCreatedAt(Instant.now());
+        secret.setSecretKey(encryptedSecretKey);
+        secret.setCreatedAt(createdAt);
         secret.setActive(true);
         return secretRepository.save(secret);
     }

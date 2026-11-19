@@ -67,7 +67,9 @@ public class AppleTokenService {
             doc.setTenantId(tenantId);
             doc.setUserId(userId);
             doc.setClientId(clientId);
-            doc.setRefreshToken(encryptionService.encrypt(refreshToken, context(tenantId)));
+            EncryptionContext context = context(tenantId);
+            String encryptedRefreshToken = encryptionService.encrypt(refreshToken, context);
+            doc.setRefreshToken(encryptedRefreshToken);
             doc.setUpdatedAt(Instant.now());
             tokenRepository.save(doc);
         } catch (Exception e) {
@@ -95,7 +97,11 @@ public class AppleTokenService {
             MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
             form.add("client_id", token.getClientId());
             form.add("client_secret", clientSecret);
-            form.add("token", encryptionService.decrypt(token.getRefreshToken(), context(token.getTenantId())));
+            String tenantId = token.getTenantId();
+            EncryptionContext context = context(tenantId);
+            String storedRefreshToken = token.getRefreshToken();
+            String refreshToken = encryptionService.decrypt(storedRefreshToken, context);
+            form.add("token", refreshToken);
             form.add("token_type_hint", "refresh_token");
 
             restClient.post()
