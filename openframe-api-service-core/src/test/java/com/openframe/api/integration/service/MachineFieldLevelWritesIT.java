@@ -1,5 +1,6 @@
 package com.openframe.api.integration.service;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -38,6 +39,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static com.openframe.data.service.machine.MachineFields.COMPUTER_NAME;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_SOURCES;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_IDS;
@@ -118,7 +120,8 @@ class MachineFieldLevelWritesIT {
         DeliveryRouter deliveryRouter = mock(DeliveryRouter.class);
         when(deliveryRouter.dispatch(any())).thenReturn(true);
         ForceClientUninstallService service =
-                new ForceClientUninstallService(interleavingMachines, machineWriter, deliveryRouter);
+                new ForceClientUninstallService(interleavingMachines, machineWriter, deliveryRouter,
+                        mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         ForceClientUninstallRequest request = new ForceClientUninstallRequest();
         request.setMachineIds(List.of(MACHINE_ID));
 

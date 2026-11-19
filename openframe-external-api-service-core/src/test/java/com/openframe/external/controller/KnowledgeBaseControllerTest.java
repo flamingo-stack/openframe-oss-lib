@@ -1311,7 +1311,10 @@ class KnowledgeBaseControllerTest {
 
     @Test
     void getAttachmentDownloadUrlReturnsASignedUrl() throws Exception {
-        when(knowledgeBaseAttachmentService.generateDownloadUrl("att-1")).thenReturn("https://storage.test/download/att-1");
+        KnowledgeBaseItemAttachment attachment = attachment("att-1", "art-1");
+        when(knowledgeBaseReadService.requireAttachment("att-1")).thenReturn(attachment);
+        when(knowledgeBaseAttachmentService.generateDownloadUrl(attachment))
+                .thenReturn("https://storage.test/download/att-1");
 
         mockMvc.perform(get(BASE + "/attachments/att-1/download-url"))
                 .andExpect(status().isOk())
@@ -1319,7 +1322,7 @@ class KnowledgeBaseControllerTest {
 
         InOrder order = inOrder(knowledgeBaseReadService, knowledgeBaseAttachmentService);
         order.verify(knowledgeBaseReadService).requireAttachment("att-1");
-        order.verify(knowledgeBaseAttachmentService).generateDownloadUrl("att-1");
+        order.verify(knowledgeBaseAttachmentService).generateDownloadUrl(attachment);
     }
 
     @Test
@@ -1336,13 +1339,16 @@ class KnowledgeBaseControllerTest {
 
     @Test
     void deleteAttachmentIs204() throws Exception {
+        KnowledgeBaseItemAttachment attachment = attachment("att-1", "art-1");
+        when(knowledgeBaseReadService.requireAttachment("att-1")).thenReturn(attachment);
+
         mockMvc.perform(delete(BASE + "/attachments/att-1"))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
 
         InOrder order = inOrder(knowledgeBaseReadService, knowledgeBaseAttachmentService);
         order.verify(knowledgeBaseReadService).requireAttachment("att-1");
-        order.verify(knowledgeBaseAttachmentService).deleteAttachment("att-1");
+        order.verify(knowledgeBaseAttachmentService).deleteAttachment(attachment);
     }
 
     @Test

@@ -1,9 +1,12 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -22,6 +25,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.KB_ITEM_TAG_ADD;
+import static com.openframe.data.document.audit.AuditAction.KB_ITEM_TAG_REMOVE;
 import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Service
@@ -35,6 +40,7 @@ public class KnowledgeBaseTagService {
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final KnowledgeBaseItemRepository itemRepository;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     public List<Tag> getAllTags(boolean archived) {
         List<TagAssignment> assignments = tagAssignmentRepository.findByEntityType(ENTITY_TYPE);
@@ -87,9 +93,15 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void addTagToItem(String itemId, String tagId) {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
-        requireTagAttachment(itemId, tagId);
-        if (tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE).isPresent()) {
-            return;
+        requireExistingTag(tagId);
+        KnowledgeBaseItem item = requireItem(itemId);
+        auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_ADD, targetTypeOf(item), itemId, Map.of("tagId", tagId),
+                () -> assignTag(itemId, tagId));
+    }
+
+    private boolean assignTag(String itemId, String tagId) {
+        if (isAssigned(itemId, tagId)) {
+            return false;
         }
         TagAssignment assignment = TagAssignment.builder()
                 .entityId(itemId)
@@ -97,6 +109,23 @@ public class KnowledgeBaseTagService {
                 .entityType(ENTITY_TYPE)
                 .build();
         tagAssignmentRepository.save(assignment);
+        return true;
+    }
+
+    private boolean unassignTag(String itemId, String tagId) {
+        if (!isAssigned(itemId, tagId)) {
+            return false;
+        }
+        tagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE);
+        return true;
+    }
+
+    private boolean isAssigned(String itemId, String tagId) {
+        return tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE).isPresent();
+    }
+
+    private static AuditTargetType targetTypeOf(KnowledgeBaseItem item) {
+        return item.getType() == KnowledgeBaseItemType.FOLDER ? AuditTargetType.KB_FOLDER : AuditTargetType.KB_ARTICLE;
     }
 
     public void requireExistingTags(List<String> tagIds) {
@@ -108,10 +137,12 @@ public class KnowledgeBaseTagService {
 
     public void requireTagAttachment(String itemId, String tagId) {
         requireExistingTag(tagId);
-        if (!itemRepository.existsById(itemId)) {
-            throw new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND,
-                    "Knowledge base item not found: " + itemId);
-        }
+        requireItem(itemId);
+    }
+
+    private KnowledgeBaseItem requireItem(String itemId) {
+        return itemRepository.findById(itemId).orElseThrow(() -> new NotFoundException(
+                ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Knowledge base item not found: " + itemId));
     }
 
     private void requireExistingTag(String tagId) {
@@ -123,7 +154,11 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void removeTagFromItem(String itemId, String tagId) {
         log.info("Removing tag {} from KB item {}", tagId, itemId);
-        tagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE);
+        AuditTargetType targetType = itemRepository.findById(itemId)
+                .map(KnowledgeBaseTagService::targetTypeOf)
+                .orElse(AuditTargetType.KB_ARTICLE);
+        auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_REMOVE, targetType, itemId, Map.of("tagId", tagId),
+                () -> unassignTag(itemId, tagId));
     }
 
     /** Makes the item's tags exactly {@code tagIds}: adds the missing ones and removes the rest. */

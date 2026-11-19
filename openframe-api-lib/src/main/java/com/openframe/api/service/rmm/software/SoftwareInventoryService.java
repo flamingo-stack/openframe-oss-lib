@@ -16,6 +16,7 @@ import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
@@ -91,6 +92,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_AUTO_UPDATE_DISABLE;
 import static org.apache.commons.lang3.StringUtils.containsIgnoreCase;
 import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
@@ -212,6 +214,8 @@ public class SoftwareInventoryService {
 
     // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there
     // while a policy already names it: the policy is enough to turn off, and nothing is written for an unknown id.
+    @Audited(action = SOFTWARE_AUTO_UPDATE_DISABLE, targetId = "#softwareId", targetName = "#result.name",
+            compare = false)
     public SoftwareResponse turnOffAutoUpdate(String softwareId, String actor) {
         Optional<SoftwareResponse> title = findById(softwareId);
         boolean inFleet = title.isPresent();

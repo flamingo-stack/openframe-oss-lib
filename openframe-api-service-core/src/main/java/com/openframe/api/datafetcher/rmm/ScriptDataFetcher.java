@@ -7,6 +7,8 @@ import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.audit.Audited;
+import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.data.document.tag.Tag;
@@ -47,6 +49,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_ARCHIVE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_OUTPUT_VIEW;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_UNARCHIVE;
 import static com.openframe.graphql.relay.NodeType.SCRIPT;
 import static com.openframe.graphql.relay.NodeType.TAG;
 import static com.openframe.graphql.relay.NodeType.USER;
@@ -127,12 +132,14 @@ public class ScriptDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = SCRIPT_ARCHIVE, targetId = "rawId(#id)")
     public ScriptResponse archiveScript(@InputArgument @NotBlank String id) {
         String scriptId = relayIdCodec.decode(id, SCRIPT);
         return scriptService.archive(scriptId);
     }
 
     @DgsMutation
+    @Audited(action = SCRIPT_UNARCHIVE, targetId = "rawId(#id)")
     public ScriptResponse unarchiveScript(@InputArgument @NotBlank String id) {
         String scriptId = relayIdCodec.decode(id, SCRIPT);
         return scriptService.unarchive(scriptId);
@@ -186,6 +193,13 @@ public class ScriptDataFetcher {
     public List<ScriptEnvVarInput> envVars(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();
         return ScriptEnvVarMapper.mask(script.getEnvVars());
+    }
+
+    @DgsData(parentType = "Script", field = "scriptBody")
+    @Audited(action = SCRIPT_OUTPUT_VIEW, targetType = AuditTargetType.SCRIPT, targetId = "rawId(#dfe.source.id)")
+    public String scriptBody(DgsDataFetchingEnvironment dfe) {
+        ScriptResponse script = dfe.getSource();
+        return script.getScriptBody();
     }
 
     /** Resolves the {@code Script.tags} field, batched per request via the data loader. */

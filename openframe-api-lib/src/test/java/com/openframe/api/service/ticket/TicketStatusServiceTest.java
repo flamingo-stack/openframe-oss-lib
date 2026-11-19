@@ -11,6 +11,7 @@ import com.openframe.api.exception.ticket.InvalidTicketStatusReplacementExceptio
 import com.openframe.api.exception.ticket.SystemTicketStatusModificationException;
 import com.openframe.api.exception.ticket.TicketStatusInUseException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ForbiddenException;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -59,6 +61,7 @@ class TicketStatusServiceTest {
     @Mock private TicketStatusDefinitionRepository statusRepository;
     @Mock private TicketRepository ticketRepository;
     @Mock private TicketTransitionPolicyValidator transitionPolicy;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
 
     @InjectMocks private TicketStatusService service;
 

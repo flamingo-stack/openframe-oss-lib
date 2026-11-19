@@ -1,5 +1,7 @@
 package com.openframe.client.service;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.dto.agent.AgentRegistrationTagInput;
@@ -34,6 +36,8 @@ import java.util.List;
 import java.time.Instant;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -124,7 +128,7 @@ class AgentRegistrationServiceTest {
                 toolConnectionService,
                 agentRegistrationClientFeatureFlagsService,
                 agentRegistrationClientUpdateService
-        );
+        , mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
         request = createTestRequest();
     }
 

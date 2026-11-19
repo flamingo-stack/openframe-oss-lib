@@ -26,6 +26,7 @@ import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryInput;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.audit.Audited;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.ParsedRelayId;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -50,6 +51,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.data.document.audit.AuditAction.TIME_ENTRY_CREATE;
+import static com.openframe.data.document.audit.AuditAction.TIME_ENTRY_DELETE;
+import static com.openframe.data.document.audit.AuditAction.TIME_ENTRY_TICKET_UNLINK;
+import static com.openframe.data.document.audit.AuditAction.TIME_ENTRY_UPDATE;
 import static com.openframe.graphql.relay.NodeType.ORGANIZATION;
 import static com.openframe.graphql.relay.NodeType.TICKET;
 import static com.openframe.graphql.relay.NodeType.TIME_ENTRY;
@@ -150,6 +155,7 @@ public class TimeEntryDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = TIME_ENTRY_CREATE, targetId = "#result.id", details = "userId=rawId(#input.userId)")
     public TimeEntry createTimeEntry(@InputArgument @Valid CreateTimeEntryInput input) {
         String actingUserId = getCurrentUserId();
         CreateTimeEntryCommand cmd = toCreateTimeEntryCommand(input);
@@ -157,6 +163,7 @@ public class TimeEntryDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = TIME_ENTRY_UPDATE, targetId = "rawId(#input.id)")
     public TimeEntry updateTimeEntry(@InputArgument @Valid UpdateTimeEntryInput input) {
         String actingUserId = getCurrentUserId();
         UpdateTimeEntryCommand cmd = toUpdateTimeEntryCommand(input);
@@ -164,6 +171,7 @@ public class TimeEntryDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = TIME_ENTRY_TICKET_UNLINK, targetId = "rawId(#id)")
     public TimeEntry unlinkTicketFromTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
         String rawId = relayIdCodec.decode(id, TIME_ENTRY);
@@ -171,6 +179,7 @@ public class TimeEntryDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = TIME_ENTRY_DELETE, targetId = "rawId(#id)")
     public boolean deleteTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
         String rawId = relayIdCodec.decode(id, TIME_ENTRY);

@@ -23,10 +23,20 @@ public class RefreshTokenHandler {
     private final OAuthClientRepository clientRepository;
     private final AccessTokenGenerator accessTokenGenerator;
     private final RefreshTokenGenerator refreshTokenGenerator;
+    private final AgentAuthAudit agentAuthAudit;
 
     public AgentTokenResponse handle(String refreshToken) {
-        Jwt jwt = jwtService.decodeToken(refreshToken);
+        Jwt jwt = null;
+        try {
+            jwt = jwtService.decodeToken(refreshToken);
+            return refresh(jwt);
+        } catch (RuntimeException e) {
+            agentAuthAudit.failed(jwt == null ? null : jwt.getSubject(), REFRESH_TOKEN_GRANT_TYPE, e);
+            throw e;
+        }
+    }
 
+    private AgentTokenResponse refresh(Jwt jwt) {
         validateExpiration(jwt);
 
         Long refreshCount = jwt.getClaim("refresh_count");

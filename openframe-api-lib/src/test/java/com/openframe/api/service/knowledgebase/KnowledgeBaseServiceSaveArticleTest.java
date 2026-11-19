@@ -1,5 +1,7 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.knowledgebase.CreateArticleCommand;
 import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
 import com.openframe.api.service.AssignmentService;
@@ -21,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,7 +66,7 @@ class KnowledgeBaseServiceSaveArticleTest {
             return item;
         });
         service = new KnowledgeBaseService(repository, tagService, assignmentService,
-                tempAttachmentService, attachmentService);
+                tempAttachmentService, attachmentService, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
     }
 
     @Test
@@ -90,7 +93,7 @@ class KnowledgeBaseServiceSaveArticleTest {
     void writesFollowTheOrderThatSurvivesAFailure() {
         givenArticle(KnowledgeBaseArticleStatus.DRAFT, "f1");
         List<KnowledgeBaseItemAttachment> toDelete = List.of(
-                KnowledgeBaseItemAttachment.builder().id("x1").itemId(ARTICLE_ID).build());
+                KnowledgeBaseItemAttachment.builder().id("x1").fileName("old.pdf").itemId(ARTICLE_ID).build());
         when(attachmentService.getArticleAttachments(ARTICLE_ID, List.of("x1"))).thenReturn(toDelete);
 
         service.updateArticle(USER_ID, UpdateArticleCommand.builder()
@@ -118,10 +121,10 @@ class KnowledgeBaseServiceSaveArticleTest {
         givenArticle(KnowledgeBaseArticleStatus.DRAFT, "f1");
         String sharedPath = "kb-attachments/a1/report.pdf";
         List<KnowledgeBaseItemAttachment> toDelete = List.of(
-                KnowledgeBaseItemAttachment.builder().id("x1").itemId(ARTICLE_ID).storagePath(sharedPath).build());
+                KnowledgeBaseItemAttachment.builder().id("x1").fileName("old.pdf").itemId(ARTICLE_ID).storagePath(sharedPath).build());
         when(attachmentService.getArticleAttachments(ARTICLE_ID, List.of("x1"))).thenReturn(toDelete);
         when(tempAttachmentService.linkTempAttachmentsToArticle(ARTICLE_ID, List.of("tmp1"), USER_ID))
-                .thenReturn(List.of(KnowledgeBaseItemAttachment.builder().itemId(ARTICLE_ID).storagePath(sharedPath).build()));
+                .thenReturn(List.of(KnowledgeBaseItemAttachment.builder().id("n1").fileName("new.pdf").itemId(ARTICLE_ID).storagePath(sharedPath).build()));
 
         service.updateArticle(USER_ID, UpdateArticleCommand.builder()
                 .id(ARTICLE_ID)

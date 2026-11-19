@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.PackageUpdateSettingsInput;
 import com.openframe.api.dto.rmm.software.SoftwareAutoUpdateInput;
@@ -48,6 +49,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -94,7 +97,7 @@ class SoftwareBundleServiceTest {
         service = new SoftwareBundleService(bundleRepository, onlineDispatchRepository, softwareScheduleService,
                 softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability,
                 new SoftwarePackageSelectionResolver(softwareInventoryService), softwareInventoryService,
-                packageCatalogVersions);
+                packageCatalogVersions, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(1));
         ReflectionTestUtils.setField(service, "scheduleReconnectWindowSeconds", RECONNECT_WINDOW);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);

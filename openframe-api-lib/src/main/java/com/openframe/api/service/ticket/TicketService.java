@@ -14,12 +14,18 @@ import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.api.service.device.ClientOwnerScopeResolver;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.ticket.AdminTicketOwner;
@@ -46,11 +52,18 @@ import org.springframework.validation.annotation.Validated;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
 import static com.openframe.api.util.AuthPrincipalUtils.*;
+import static com.openframe.data.document.audit.AuditAction.TICKET_ASSIGN;
+import static com.openframe.data.document.audit.AuditAction.TICKET_CREATE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_DEVICE_UNLINK;
+import static com.openframe.data.document.audit.AuditAction.TICKET_ORGANIZATION_UNLINK;
+import static com.openframe.data.document.audit.AuditAction.TICKET_UNASSIGN;
+import static com.openframe.data.document.audit.AuditAction.TICKET_UPDATE;
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -81,6 +94,8 @@ public class TicketService {
     private final TicketResolverStamp ticketResolverStamp;
     private final ClientOwnerScopeResolver clientOwnerScopeResolver;
     private final List<TicketEventListener> listeners;
+    private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
 
     /**
      * Cursor-paginated ticket listing. Cursors are raw ticket ids. AGENT principals only see the
@@ -152,6 +167,11 @@ public class TicketService {
     }
 
     @Transactional
+    @Audited(action = TICKET_CREATE, targetId = "#result.id",
+            details = {"statusId=#input.statusId", "tagIds=#input.tagIds",
+                    "organizationIds=#input.assignedOrganizationIds", "deviceIds=#input.assignedDeviceIds",
+                    "ticketIds=#input.assignedTicketIds", "articleIds=#input.assignedKnowledgeArticleIds",
+                    "insightId=#input.insightId"})
     public Ticket createTicket(AuthPrincipal principal, CreateTicketInput input) {
         log.info("Creating ticket by {} {}", principal.getActorType(), principal.getDisplayName());
 
@@ -199,6 +219,7 @@ public class TicketService {
      * (set later by the conversational layer) and status is ACTIVE because the AI handles it.
      */
     @Transactional
+    @Audited(action = TICKET_CREATE, targetId = "#result.id", details = "via='dialog'")
     public Ticket createTicketFromDialog(AuthPrincipal principal) {
         log.info("Creating ticket from dialog for {}", principal.getDisplayName());
 
@@ -223,6 +244,7 @@ public class TicketService {
      * Stamps FAE_DIALOG provenance and applies the lifecycle status when enabled.
      */
     @Transactional
+    @Audited(action = TICKET_CREATE, targetId = "#result.id", details = "via='escalation'")
     public Ticket createEscalationTicket(AuthPrincipal principal, String title, String description) {
         log.info("Creating escalation ticket from dialog for {}", principal.getDisplayName());
 
@@ -272,6 +294,7 @@ public class TicketService {
     }
 
     @Transactional
+    @Audited(action = TICKET_UPDATE, targetId = "#ticketId", details = "tagIds=#input.tagIds")
     public Ticket updateTicket(AuthPrincipal principal, @NotBlank String ticketId, UpdateTicketInput input) {
         validateAdminAccess(principal);
         log.info("Updating ticket {} by user: {}", ticketId, principal.getDisplayName());
@@ -287,11 +310,21 @@ public class TicketService {
         if (input.getDeviceId() != null || input.getOrganizationId() != null) {
             populateDeviceAndOrganization(ticket, input.getDeviceId(), input.getOrganizationId());
         }
+        String assigneeBefore = ticket.getAssignedTo();
         if (input.getAssigneeId() != null) {
             populateAssignee(ticket, input.getAssigneeId());
         }
 
         Ticket savedTicket = ticketRepository.save(ticket);
+        if (!Objects.equals(assigneeBefore, savedTicket.getAssignedTo())) {
+            auditRecorder.record(AuditEntry.builder()
+                    .action(TICKET_ASSIGN)
+                    .outcome(AuditOutcome.SUCCESS)
+                    .targetId(ticketId)
+                    .details(Map.of("assigneeId", input.getAssigneeId()))
+                    .changes(Map.of("assignedTo", new AuditChange(assigneeBefore, savedTicket.getAssignedTo())))
+                    .build());
+        }
 
         ticketTagService.syncTagAssignments(savedTicket.getId(), input.getTagIds());
 
@@ -300,6 +333,7 @@ public class TicketService {
     }
 
     @Transactional
+    @Audited(action = TICKET_ASSIGN, targetId = "#ticketId", details = "assigneeId=#assigneeId")
     public Ticket assignTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String assigneeId) {
         validateAdminAccess(principal);
         log.info("Assigning ticket {} to user {} by: {}", ticketId, assigneeId, principal.getDisplayName());
@@ -323,12 +357,15 @@ public class TicketService {
         }
 
         String adminId = principal.getId();
-        populateAssignee(ticket, adminId);
-        ticketRepository.save(ticket);
+        auditedMethodRunner.run(TICKET_ASSIGN, ticketId, Map.of("assigneeId", adminId, "via", "direct-mode"), () -> {
+            populateAssignee(ticket, adminId);
+            ticketRepository.save(ticket);
+        });
         log.info("Auto-assigned ticket {} to admin {} on direct chat start", ticketId, adminId);
     }
 
     @Transactional
+    @Audited(action = TICKET_UNASSIGN, targetId = "#ticketId")
     public Ticket unassignTicket(AuthPrincipal principal, @NotBlank String ticketId) {
         validateAdminAccess(principal);
         log.info("Unassigning ticket {} by: {}", ticketId, principal.getDisplayName());
@@ -341,6 +378,7 @@ public class TicketService {
     }
 
     @Transactional
+    @Audited(action = TICKET_DEVICE_UNLINK, targetId = "#ticketId")
     public Ticket unlinkDeviceFromTicket(AuthPrincipal principal, @NotBlank String ticketId) {
         validateAdminAccess(principal);
         log.info("Unlinking device from ticket {} by: {}", ticketId, principal.getDisplayName());
@@ -353,6 +391,7 @@ public class TicketService {
     }
 
     @Transactional
+    @Audited(action = TICKET_ORGANIZATION_UNLINK, targetId = "#ticketId")
     public Ticket unlinkOrganizationFromTicket(AuthPrincipal principal, @NotBlank String ticketId) {
         validateAdminAccess(principal);
         log.info("Unlinking organization from ticket {} by: {}", ticketId, principal.getDisplayName());

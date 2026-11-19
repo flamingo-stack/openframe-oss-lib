@@ -179,7 +179,7 @@ public class SSOConfigService {
      * TODO: once the new mobile app version is released and "openframe" becomes the canonical id
      * (see {@link SSOConfig#OPENFRAME_PROVIDER}), remove this alias handling.
      */
-    private static boolean isOpenframeLogin(String provider) {
+    public static boolean isOpenframeLogin(String provider) {
         return OPENFRAME_PROVIDER.equals(provider) || "openframe".equals(provider);
     }
 

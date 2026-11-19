@@ -20,8 +20,18 @@ public class ClientCredentialsHandler {
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenGenerator accessTokenGenerator;
     private final RefreshTokenGenerator refreshTokenGenerator;
+    private final AgentAuthAudit agentAuthAudit;
 
     public AgentTokenResponse handle(String clientId, String clientSecret) {
+        try {
+            return issue(clientId, clientSecret);
+        } catch (RuntimeException e) {
+            agentAuthAudit.failed(clientId, CLIENT_CREDENTIALS_GRANT_TYPE, e);
+            throw e;
+        }
+    }
+
+    private AgentTokenResponse issue(String clientId, String clientSecret) {
         OAuthClient client = clientRepository.findByClientId(clientId)
                 .orElseThrow(() -> {
                     log.error("Client not found: {}", clientId);

@@ -1,0 +1,35 @@
+package com.openframe.client.service.auth;
+
+import com.openframe.audit.ActionOutcome;
+import com.openframe.audit.AuditOutcomeResolver;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.model.audit.AuditEntry;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.Map;
+import java.util.Objects;
+
+import static com.openframe.data.document.audit.AuditAction.DEVICE_AUTH_FAIL;
+
+@Component
+@RequiredArgsConstructor
+public class AgentAuthAudit {
+
+    private static final String AGENT_CLIENT_PREFIX = "agent_";
+
+    private final AuditRecorder auditRecorder;
+    private final AuditOutcomeResolver outcomeResolver;
+
+    public void failed(String clientId, String grantType, RuntimeException failure) {
+        ActionOutcome outcome = outcomeResolver.ofFailure(failure);
+        String machineId = clientId == null ? null : clientId.replaceFirst("^" + AGENT_CLIENT_PREFIX, "");
+        auditRecorder.recordOnce(AuditEntry.builder()
+                .action(DEVICE_AUTH_FAIL)
+                .outcome(outcome.outcome())
+                .reason(outcome.reason())
+                .targetId(machineId)
+                .details(Map.of("grantType", grantType))
+                .build(), grantType + ":" + Objects.requireNonNullElse(clientId, "-"));
+    }
+}

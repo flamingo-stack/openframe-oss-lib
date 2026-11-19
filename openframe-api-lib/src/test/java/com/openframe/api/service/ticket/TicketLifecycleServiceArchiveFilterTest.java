@@ -1,5 +1,6 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
 import com.openframe.data.document.ticket.TicketCreationSource;
@@ -24,6 +25,8 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -61,7 +64,7 @@ class TicketLifecycleServiceArchiveFilterTest {
     void setUp() {
         service = new TicketLifecycleService(ticketRepository, statusRepository, transitionPolicy,
                 tenantIdProvider, ticketTagService, ticketIdsForFilter, ticketResolverStamp,
-                historyService, List.of(listener));
+                historyService, List.of(listener), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         when(statusRepository.findByKind(TicketStatusKind.RESOLVED)).thenReturn(Optional.of(resolved));
         when(statusRepository.findByKind(TicketStatusKind.ARCHIVED)).thenReturn(Optional.of(archived));
         when(ticketRepository.buildTicketQuery(any(), isNull(), any(), isNull())).thenReturn(query);

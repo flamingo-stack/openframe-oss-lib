@@ -1,5 +1,7 @@
 package com.openframe.client.integration;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -57,6 +59,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static com.openframe.data.service.machine.MachineFields.COMPUTER_NAME;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_SOURCES;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_IDS;
@@ -231,7 +234,7 @@ class MachineFieldLevelWritesIT {
         private static AgentUninstallService uninstallService(MachineRepository machines) {
             return new AgentUninstallService(knownClient(false), mock(ClientSecretValidator.class), machines, machineWriter,
                     mock(ToolConnectionService.class), mock(InstalledAgentService.class),
-                    mock(DeletedMachineCleanup.class), mock(ApplicationEventPublisher.class));
+                    mock(DeletedMachineCleanup.class), mock(ApplicationEventPublisher.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
         }
 
         private static AgentRegistrationService registrationService(MachineRepository machines) {
@@ -244,7 +247,7 @@ class MachineFieldLevelWritesIT {
                     mock(AgentRegistrationToolInstallationService.class), mock(AgentRegistrationProcessor.class),
                     mock(RegistrationTagAssignmentService.class), mock(InstalledAgentService.class),
                     mock(ToolConnectionService.class), mock(AgentRegistrationClientFeatureFlagsService.class),
-                    mock(AgentRegistrationClientUpdateService.class));
+                    mock(AgentRegistrationClientUpdateService.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
         }
 
         private static OAuthClientRepository knownClient(boolean concurrentWriteAfterTheRead) {

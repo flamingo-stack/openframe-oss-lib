@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.invitation.InvitationIdInput;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.invitation.InviteUsersInput;
@@ -32,6 +33,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static com.openframe.graphql.relay.NodeType.INVITATION;
 import static com.openframe.graphql.relay.NodeType.USER;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,7 +57,7 @@ class UserMutationsTest {
     @Mock private InvitationService invitationService;
 
     private UserDataFetcher users() {
-        return new UserDataFetcher(userService, new GraphQLUserMapper(), CODEC);
+        return new UserDataFetcher(userService, new GraphQLUserMapper(), CODEC, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
     }
 
     private InvitationDataFetcher invitations() {

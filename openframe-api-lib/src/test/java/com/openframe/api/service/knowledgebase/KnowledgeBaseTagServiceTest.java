@@ -1,7 +1,9 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
@@ -9,6 +11,7 @@ import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -37,6 +40,7 @@ class KnowledgeBaseTagServiceTest {
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private KnowledgeBaseItemRepository itemRepository;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
 
     @Captor private ArgumentCaptor<TagAssignment> assignmentCaptor;
 
@@ -76,7 +80,7 @@ class KnowledgeBaseTagServiceTest {
     void addTagToItem_existingTagNotYetAssigned_savesAssignment() {
         // setup
         when(tagRepository.existsById(TAG_ID)).thenReturn(true);
-        when(itemRepository.existsById(ITEM_ID)).thenReturn(true);
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(KnowledgeBaseItem.builder().id(ITEM_ID).build()));
         when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ITEM_ID, TAG_ID, TagEntityType.KNOWLEDGE_ARTICLE))
                 .thenReturn(Optional.empty());
 
@@ -100,7 +104,7 @@ class KnowledgeBaseTagServiceTest {
                 .entityType(TagEntityType.KNOWLEDGE_ARTICLE)
                 .build();
         when(tagRepository.existsById(TAG_ID)).thenReturn(true);
-        when(itemRepository.existsById(ITEM_ID)).thenReturn(true);
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(KnowledgeBaseItem.builder().id(ITEM_ID).build()));
         when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ITEM_ID, TAG_ID, TagEntityType.KNOWLEDGE_ARTICLE))
                 .thenReturn(Optional.of(existing));
 

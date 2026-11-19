@@ -10,8 +10,12 @@ import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
@@ -45,6 +49,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +57,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_AUTO_UPDATE_ENABLE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -72,6 +81,7 @@ public class SoftwareBundleService {
     private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
     private final SoftwareInventoryService softwareInventoryService;
     private final PackageCatalogVersions packageCatalogVersions;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     @Value("${openframe.rmm.software.bundle.pending-ttl}")
     private Duration pendingTtl;
@@ -137,11 +147,32 @@ public class SoftwareBundleService {
             log.info("submitSoftwareBundle id={} already COMPLETED — returning unchanged", input.getId());
             return toResponse(entity);
         }
+        Map<String, Object> details = new HashMap<>();
+        details.put("bundleId", input.getId());
+        details.put("softwareAction", input.getAction());
+        details.put("machineIds", currentMachineIds(entity));
+        return auditedMethodRunner.run(submitCall(input, details), () -> doSubmit(entity, input, actor, details));
+    }
+
+    private static AuditCall submitCall(SubmitSoftwareBundleInput input, Map<String, Object> details) {
+        if (input.getSchedule() != null) {
+            return AuditCall.of(SOFTWARE_SCHEDULE_CREATE, null, details)
+                    .withCompare(false)
+                    .withTargetIdInResult(true)
+                    .withTargetIdFromResult(result -> ((SoftwareBundleResponse) result).getScheduleId());
+        }
+        AuditAction action = input.getAction() == SoftwareAction.INSTALL ? SOFTWARE_INSTALL : SOFTWARE_UPDATE;
+        return AuditCall.of(action, null, details);
+    }
+
+    private SoftwareBundleResponse doSubmit(SoftwareBundle entity, SubmitSoftwareBundleInput input, String actor,
+                                            Map<String, Object> details) {
         List<String> machineIds = currentMachineIds(entity);
         if (machineIds.isEmpty()) {
             throw new BadRequestException("Cannot submit software bundle " + input.getId() + ": no devices assigned");
         }
         List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
+        details.put("packages", packages.stream().map(SoftwareBundlePackage::getPackageName).toList());
         validatePackages(packages);
         Map<String, OsType> deviceOsTypes = requireEligibleDeviceOsTypes(machineIds, packages);
         PackageUpdateSettings updateSettings = PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings());
@@ -173,6 +204,8 @@ public class SoftwareBundleService {
         return toResponse(entity);
     }
 
+    @Audited(action = SOFTWARE_AUTO_UPDATE_ENABLE, targetId = "#input.softwareId", targetName = "#result.name",
+            compare = false, details = "bundleId=#input.bundleId")
     public SoftwareResponse turnOnAutoUpdate(TurnOnSoftwareAutoUpdateInput input, String actor) {
         String bundleId = input.getBundleId();
         SoftwareBundle entity = loadPendingOrThrow(bundleId);

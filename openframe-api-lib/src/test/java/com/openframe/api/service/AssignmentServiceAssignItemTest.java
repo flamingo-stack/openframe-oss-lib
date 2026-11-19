@@ -1,5 +1,6 @@
 package com.openframe.api.service;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.assignment.AssignmentTarget;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,7 +46,7 @@ class AssignmentServiceAssignItemTest {
             organizationRepository,
             mock(MachineRepository.class),
             mock(TicketRepository.class),
-            mock(KnowledgeBaseItemRepository.class));
+            mock(KnowledgeBaseItemRepository.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
 
     @Test
     @DisplayName("a first assignment is inserted with the target's resolved display name")

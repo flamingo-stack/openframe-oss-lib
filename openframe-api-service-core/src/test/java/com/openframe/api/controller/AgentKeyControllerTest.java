@@ -1,5 +1,6 @@
 package com.openframe.api.controller;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.service.agentkey.AgentKeyService;
 import com.openframe.api.service.agentkey.AgentKeyType;
 import com.openframe.api.service.agentkey.AgentKeyTypeConverter;
@@ -16,6 +17,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,7 +40,7 @@ class AgentKeyControllerTest {
     void setUp() {
         FormattingConversionService conversion = new FormattingConversionService();
         conversion.addConverter(new AgentKeyTypeConverter());
-        mockMvc = MockMvcBuilders.standaloneSetup(new AgentKeyController(agentKeyService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new AgentKeyController(agentKeyService, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS)))
                 .setConversionService(conversion)
                 .setControllerAdvice(new BaseGlobalExceptionHandler())
                 .build();

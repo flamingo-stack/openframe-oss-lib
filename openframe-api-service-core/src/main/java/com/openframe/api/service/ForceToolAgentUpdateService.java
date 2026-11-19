@@ -7,15 +7,18 @@ import com.openframe.api.dto.update.ForceToolAgentUpdateResponse;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.nats.delivery.ToolUpdateDeliverySeed;
-import com.openframe.data.nats.delivery.route.DeliveryRouter;
+import com.openframe.data.nats.delivery.route.DeviceCommandSender;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.toolagent.IntegratedToolAgentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_TOOL_AGENT_UPDATE;
 import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -26,7 +29,7 @@ public class ForceToolAgentUpdateService {
 
     private final IntegratedToolAgentRepository toolAgentRepository;
     private final MachineRepository machineRepository;
-    private final DeliveryRouter deliveryRouter;
+    private final DeviceCommandSender deviceCommandSender;
 
     public ForceToolAgentUpdateResponse process(ForceToolAgentUpdateRequest request) {
         String toolAgentId = request.getToolAgentId();
@@ -70,8 +73,8 @@ public class ForceToolAgentUpdateService {
     private ForceAgentStatus sendToEveryMachine(String toolAgentId) {
         try {
             IntegratedToolAgent toolAgent = loadToolAgent(toolAgentId);
-            ToolUpdateDeliverySeed seed = ToolUpdateDeliverySeed.forEveryMachine(toolAgent);
-            boolean carried = deliveryRouter.dispatch(seed);
+            boolean carried = deviceCommandSender.send(DEVICE_TOOL_AGENT_UPDATE, null, details(toolAgent),
+                    () -> ToolUpdateDeliverySeed.forEveryMachine(toolAgent));
             return outcomeOf(carried);
         } catch (Exception e) {
             log.error("Failed to send the tool agent {} update to every machine", toolAgentId, e);
@@ -94,8 +97,8 @@ public class ForceToolAgentUpdateService {
     private ForceToolAgentUpdateResponseItem processMachine(String machineId, String toolAgentId) {
         try {
             IntegratedToolAgent toolAgent = loadToolAgent(toolAgentId);
-            ToolUpdateDeliverySeed seed = ToolUpdateDeliverySeed.forMachine(machineId, toolAgent);
-            boolean carried = deliveryRouter.dispatch(seed);
+            boolean carried = deviceCommandSender.send(DEVICE_TOOL_AGENT_UPDATE, machineId, details(toolAgent),
+                    () -> ToolUpdateDeliverySeed.forMachine(machineId, toolAgent));
             ForceAgentStatus outcome = outcomeOf(carried);
             return buildResponseItem(machineId, toolAgentId, outcome);
         } catch (Exception e) {
@@ -107,6 +110,13 @@ public class ForceToolAgentUpdateService {
     private IntegratedToolAgent loadToolAgent(String toolAgentId) {
         return toolAgentRepository.findByKey(toolAgentId)
                 .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
+    }
+
+    private static Map<String, Object> details(IntegratedToolAgent toolAgent) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("toolAgent", toolAgent.getKey());
+        details.put("version", toolAgent.getVersion());
+        return details;
     }
 
     private static ForceAgentStatus outcomeOf(boolean carried) {
