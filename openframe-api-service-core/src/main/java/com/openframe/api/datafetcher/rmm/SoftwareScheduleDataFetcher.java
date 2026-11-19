@@ -49,7 +49,6 @@ import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_AR
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CRITERIA_SET;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DELETE;
-import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_SET;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_UNARCHIVE;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_UPDATE;
 import static com.openframe.graphql.relay.NodeType.MACHINE;
@@ -80,7 +79,8 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = SOFTWARE_SCHEDULE_CREATE, targetId = "rawId(#result.id)")
+    @Audited(action = SOFTWARE_SCHEDULE_CREATE, targetId = "rawId(#result.id)",
+            details = "machineIds=rawId(#input.machineIds)")
     public SoftwareScheduleResponse createSoftwareSchedule(@InputArgument @Valid CreateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         List<String> machineGlobalIds = input.getMachineIds();
@@ -126,15 +126,14 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_SET, targetId = "rawId(#scheduleId)", compare = false,
-            details = "machineIds=#machineIds.![#root.rawId(#this)]")
     public SoftwareScheduleResponse setSoftwareScheduleDevices(@InputArgument @NotBlank String scheduleId,
                                                               @InputArgument List<String> machineIds,
                                                               @AuthenticationPrincipal AuthPrincipal principal) {
         String rawScheduleId = relayIdCodec.decode(scheduleId, SOFTWARE_SCHEDULE);
         List<String> rawMachineIds = relayIdCodec.decodeAll(machineIds, MACHINE);
         String userId = principal.getId();
-        return scheduleService.setDevices(rawScheduleId, rawMachineIds, userId);
+        scheduleService.setDevices(rawScheduleId, rawMachineIds, userId);
+        return scheduleService.get(rawScheduleId);
     }
 
     @DgsMutation

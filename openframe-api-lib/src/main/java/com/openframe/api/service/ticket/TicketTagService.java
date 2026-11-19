@@ -1,8 +1,9 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.exception.ticket.TicketNotFoundException;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditRecorder;
-import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.audit.AuditAction;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,7 @@ public class TicketTagService {
     private final TagAssignmentRepository tagAssignmentRepository;
     private final TicketRepository ticketRepository;
     private final AuditRecorder auditRecorder;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     public List<Tag> getTags(AuthPrincipal principal) {
         validateAdminAccess(principal);
@@ -66,9 +69,12 @@ public class TicketTagService {
     }
 
     @Transactional
-    @Audited(action = TICKET_TAG_ADD, targetId = "#ticketId", compare = false, condition = "#result",
-            details = "tagId=#tagId")
     public boolean addTagToTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
+        return auditedMethodRunner.run(tagCall(TICKET_TAG_ADD, ticketId, tagId),
+                () -> assignTag(principal, ticketId, tagId));
+    }
+
+    private boolean assignTag(AuthPrincipal principal, String ticketId, String tagId) {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);
         log.info("Adding tag {} to ticket {} by: {}", tagId, ticketId, principal.getDisplayName());
@@ -85,9 +91,24 @@ public class TicketTagService {
     }
 
     @Transactional
-    @Audited(action = TICKET_TAG_REMOVE, targetId = "#ticketId", compare = false, condition = "#result",
-            details = "tagId=#tagId")
     public boolean removeTagFromTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
+        return auditedMethodRunner.run(tagCall(TICKET_TAG_REMOVE, ticketId, tagId),
+                () -> unassignTag(principal, ticketId, tagId));
+    }
+
+    private AuditCall tagCall(AuditAction action, String ticketId, String tagId) {
+        return AuditCall.of(action, ticketId, tagDetails(tagId))
+                .withCompare(false)
+                .withRecordsResult(changed -> (Boolean) changed);
+    }
+
+    private Map<String, Object> tagDetails(String tagId) {
+        Map<String, Object> details = new HashMap<>(Map.of("tagId", tagId));
+        tagRepository.findById(tagId).ifPresent(tag -> details.put("tagKey", tag.getKey()));
+        return details;
+    }
+
+    private boolean unassignTag(AuthPrincipal principal, String ticketId, String tagId) {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);
         log.info("Removing tag {} from ticket {} by: {}", tagId, ticketId, principal.getDisplayName());
@@ -117,6 +138,7 @@ public class TicketTagService {
                         .build())
                 .toList();
         tagAssignmentRepository.saveAll(assignments);
+        tagIds.forEach(tagId -> recordTagChange(TICKET_TAG_ADD, ticketId, tagId));
     }
 
     @Transactional
@@ -143,7 +165,7 @@ public class TicketTagService {
                 .action(action)
                 .outcome(AuditOutcome.SUCCESS)
                 .targetId(ticketId)
-                .details(Map.of("tagId", tagId))
+                .details(tagDetails(tagId))
                 .build());
     }
 

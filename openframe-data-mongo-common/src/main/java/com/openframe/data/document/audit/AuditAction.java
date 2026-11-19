@@ -165,6 +165,8 @@ public enum AuditAction {
     SCRIPT_ARCHIVE("script.archive", CHANGE, SCRIPT),
     SCRIPT_UNARCHIVE("script.unarchive", CHANGE, SCRIPT),
     SCRIPT_RUN("script.run", CHANGE, SCRIPT),
+    SCRIPT_TAG_ADD("script.tag.add", CHANGE, SCRIPT),
+    SCRIPT_TAG_REMOVE("script.tag.remove", CHANGE, SCRIPT),
     COMMAND_RUN("command.run", CHANGE, DEVICE),
     EXECUTION_CANCEL("execution.cancel", CHANGE, EXECUTION),
     EXECUTION_END("execution.end", CHANGE, EXECUTION),

@@ -7,10 +7,12 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.organization.Organization;
@@ -25,9 +27,11 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -116,12 +120,26 @@ public class AssignmentService {
     public ItemAssignment assignItem(String itemId, AssignmentItemType itemType,
                                       AssignmentTargetType targetType, String targetId) {
         return repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
-                .orElseGet(() -> auditedMethodRunner.runWithoutCompare(LINK_CREATE, targetTypeOf(itemType), itemId,
-                        linkDetails(targetType, targetId), () -> createAssignment(itemId, itemType, targetType, targetId)));
+                .orElseGet(() -> {
+                    String displayName = resolveDisplayName(targetType, targetId);
+                    AuditCall call = linkCall(LINK_CREATE, itemType, itemId, targetType, targetId, displayName);
+                    return auditedMethodRunner.run(call,
+                            () -> createAssignment(itemId, itemType, targetType, targetId, displayName));
+                });
     }
 
-    private static Map<String, Object> linkDetails(AssignmentTargetType targetType, String targetId) {
-        return Map.of("targetType", targetType, "targetId", targetId);
+    private static AuditCall linkCall(AuditAction action, AssignmentItemType itemType, String itemId,
+                                      AssignmentTargetType targetType, String targetId, String targetName) {
+        Map<String, Object> details = new HashMap<>(Map.of("targetType", targetType, "targetId", targetId));
+        if (targetName != null) {
+            details.put("targetName", targetName);
+        }
+        String linkedOrganizationId = targetType == AssignmentTargetType.ORGANIZATION ? targetId : null;
+        String linkedDeviceId = targetType == AssignmentTargetType.DEVICE ? targetId : null;
+        return AuditCall.of(action, targetTypeOf(itemType), itemId, details)
+                .withCompare(false)
+                .withOrganizationIdOf(_ -> linkedOrganizationId)
+                .withDeviceIdOf(_ -> linkedDeviceId);
     }
 
     private static AuditTargetType targetTypeOf(AssignmentItemType itemType) {
@@ -133,8 +151,7 @@ public class AssignmentService {
     }
 
     private ItemAssignment createAssignment(String itemId, AssignmentItemType itemType,
-                                            AssignmentTargetType targetType, String targetId) {
-        String displayName = resolveDisplayName(targetType, targetId);
+                                            AssignmentTargetType targetType, String targetId, String displayName) {
         log.info("Assigning {}:{} ({}) to {} {}", targetType, targetId, displayName, itemType, itemId);
         ItemAssignment assignment = ItemAssignment.builder()
                 .itemId(itemId)
@@ -156,9 +173,12 @@ public class AssignmentService {
     public void unassignItem(String itemId, AssignmentTargetType targetType, String targetId) {
         log.info("Unassigning {}:{} from item {}", targetType, targetId, itemId);
         repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
-                .ifPresent(assignment -> auditedMethodRunner.runWithoutCompare(LINK_DELETE,
-                        targetTypeOf(assignment.getItemType()), itemId, linkDetails(targetType, targetId),
-                        () -> repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)));
+                .ifPresent(assignment -> auditedMethodRunner.run(linkCall(LINK_DELETE, assignment.getItemType(),
+                                itemId, targetType, targetId, assignment.getDisplayName()),
+                        () -> {
+                            repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+                            return assignment;
+                        }));
     }
 
     /**
@@ -203,7 +223,8 @@ public class AssignmentService {
             return;
         }
         Map<String, Object> details = Map.of("targetType", targetType,
-                "targetIds", links.stream().map(ItemAssignment::getTargetId).toList());
+                "targetIds", links.stream().map(ItemAssignment::getTargetId).toList(),
+                "targetNames", links.stream().map(ItemAssignment::getDisplayName).filter(Objects::nonNull).toList());
         AuditTargetType itemType = targetTypeOf(links.getFirst().getItemType());
         auditedMethodRunner.runWithoutCompare(LINK_DELETE, itemType, itemId, details,
                 () -> repository.deleteByItemIdAndTargetType(itemId, targetType));

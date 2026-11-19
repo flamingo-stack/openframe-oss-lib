@@ -9,6 +9,7 @@ import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
@@ -53,6 +54,8 @@ class KnowledgeBaseTagServiceTest {
 
     @Captor private ArgumentCaptor<TagAssignment> assignmentCaptor;
 
+    private static final Tag TAG = Tag.builder().id(TAG_ID).key("env").build();
+
     @InjectMocks private KnowledgeBaseTagService service;
 
     private Boolean changed;
@@ -60,7 +63,6 @@ class KnowledgeBaseTagServiceTest {
     @Test
     void addTagToItem_unknownTag_throwsTagNotFound() {
         // setup
-        when(tagRepository.existsById(TAG_ID)).thenReturn(false);
 
         // execution
         NotFoundException exception = assertThrows(NotFoundException.class,
@@ -76,7 +78,7 @@ class KnowledgeBaseTagServiceTest {
     @Test
     void addTagToItem_missingItem_rejectsWithoutAssignment() {
         // setup
-        when(tagRepository.existsById(TAG_ID)).thenReturn(true);
+        when(tagRepository.findById(TAG_ID)).thenReturn(Optional.of(TAG));
 
         // execution
         NotFoundException exception = assertThrows(NotFoundException.class,
@@ -90,7 +92,7 @@ class KnowledgeBaseTagServiceTest {
     @Test
     void addTagToItem_existingTagNotYetAssigned_savesAssignment() {
         // setup
-        when(tagRepository.existsById(TAG_ID)).thenReturn(true);
+        when(tagRepository.findById(TAG_ID)).thenReturn(Optional.of(TAG));
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(KnowledgeBaseItem.builder().id(ITEM_ID).build()));
         when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ITEM_ID, TAG_ID, TagEntityType.KNOWLEDGE_ARTICLE))
                 .thenReturn(Optional.empty());
@@ -108,19 +110,19 @@ class KnowledgeBaseTagServiceTest {
                 .returns(TAG_ID, TagAssignment::getTagId)
                 .returns(TagEntityType.KNOWLEDGE_ARTICLE, TagAssignment::getEntityType);
         verify(auditedMethodRunner).runWhenChanged(eq(KB_ITEM_TAG_ADD), eq(AuditTargetType.KB_ARTICLE), eq(ITEM_ID),
-                eq(Map.of("tagId", TAG_ID)), any());
+                eq(Map.of("tagId", TAG_ID, "tagKey", "env")), any());
     }
 
     @Test
     void addTagToItem_folder_recordedAgainstTheFolder() {
-        when(tagRepository.existsById(TAG_ID)).thenReturn(true);
+        when(tagRepository.findById(TAG_ID)).thenReturn(Optional.of(TAG));
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(
                 KnowledgeBaseItem.builder().id(ITEM_ID).type(KnowledgeBaseItemType.FOLDER).build()));
 
         service.addTagToItem(ITEM_ID, TAG_ID);
 
         verify(auditedMethodRunner).runWhenChanged(eq(KB_ITEM_TAG_ADD), eq(AuditTargetType.KB_FOLDER), eq(ITEM_ID),
-                eq(Map.of("tagId", TAG_ID)), any());
+                eq(Map.of("tagId", TAG_ID, "tagKey", "env")), any());
     }
 
     @Test
@@ -141,7 +143,7 @@ class KnowledgeBaseTagServiceTest {
                 .tagId(TAG_ID)
                 .entityType(TagEntityType.KNOWLEDGE_ARTICLE)
                 .build();
-        when(tagRepository.existsById(TAG_ID)).thenReturn(true);
+        when(tagRepository.findById(TAG_ID)).thenReturn(Optional.of(TAG));
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(KnowledgeBaseItem.builder().id(ITEM_ID).build()));
         when(tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ITEM_ID, TAG_ID, TagEntityType.KNOWLEDGE_ARTICLE))
                 .thenReturn(Optional.of(existing));
@@ -225,6 +227,6 @@ class KnowledgeBaseTagServiceTest {
         doAnswer(invocation -> {
             changed = invocation.<BooleanSupplier>getArgument(4).getAsBoolean();
             return changed;
-        }).when(auditedMethodRunner).runWhenChanged(eq(action), any(), eq(ITEM_ID), eq(Map.of("tagId", TAG_ID)), any());
+        }).when(auditedMethodRunner).runWhenChanged(eq(action), any(), eq(ITEM_ID), any(), any());
     }
 }

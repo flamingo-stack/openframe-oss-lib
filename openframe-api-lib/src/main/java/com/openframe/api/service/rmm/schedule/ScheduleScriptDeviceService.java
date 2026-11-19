@@ -36,6 +36,7 @@ import java.util.Set;
 
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_DEVICES_ADD;
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_DEVICES_REMOVE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_DEVICES_SET;
 import static java.util.stream.Collectors.toSet;
 
 @Slf4j
@@ -54,7 +55,9 @@ public class ScheduleScriptDeviceService {
     private static final String DEVICE_REMOVED = "device removed from the schedule";
 
     @Transactional
-    public void setDevices(String scheduleId, List<String> machineIds, String actorUserId) {
+    @Audited(action = SCRIPT_SCHEDULE_DEVICES_SET, targetId = "#scheduleId", compare = false,
+            condition = "!#result.isEmpty()", details = {"added=#result.added", "removed=#result.removed"})
+    public ScheduleDeviceChange setDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
         ScheduleScript schedule = requireVisibleSchedule(tenantId, scheduleId);   // throws NotFound if missing / DELETED
 
@@ -95,6 +98,7 @@ public class ScheduleScriptDeviceService {
 
         log.info("Set {} device(s) on script schedule id={} tenantId={} (+{} -{})",
                 requested.size(), scheduleId, tenantId, toAdd.size(), toRemove.size());
+        return new ScheduleDeviceChange(List.copyOf(toAdd), List.copyOf(toRemove));
     }
 
     /**

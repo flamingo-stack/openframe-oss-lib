@@ -7,6 +7,7 @@ import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
 import com.openframe.api.service.rmm.software.SoftwareScheduleService;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -75,7 +76,8 @@ class SoftwareScheduleServiceTest {
         packageManagerAvailability = mock(PackageManagerAvailability.class);
         softwareInventoryService = mock(SoftwareInventoryService.class);
         service = new SoftwareScheduleService(scheduleRepository, assignedRepository, targetResolver, tenantIdProvider,
-                packageManagerAvailability, new SoftwarePackageSelectionResolver(softwareInventoryService));
+                packageManagerAvailability, new SoftwarePackageSelectionResolver(softwareInventoryService),
+                mock(AuditRecorder.class));
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Saves are identity so assertions can read back what the service built.

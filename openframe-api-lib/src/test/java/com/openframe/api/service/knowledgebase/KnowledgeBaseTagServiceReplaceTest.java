@@ -3,6 +3,7 @@ package com.openframe.api.service.knowledgebase;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
@@ -41,6 +42,7 @@ class KnowledgeBaseTagServiceReplaceTest {
         when(items.findById("a1")).thenReturn(Optional.of(KnowledgeBaseItem.builder().id("a1").build()));
         when(tags.existsById("t2")).thenReturn(true);
         when(tags.existsById("t3")).thenReturn(true);
+        when(tags.findById("t3")).thenReturn(Optional.of(Tag.builder().id("t3").key("k3").build()));
         when(assignments.findByEntityIdAndEntityType("a1", TYPE)).thenReturn(List.of(tagged("t1"), tagged("t2")));
         when(assignments.findByEntityIdAndTagIdAndEntityType("a1", "t1", TYPE)).thenReturn(Optional.of(tagged("t1")));
 

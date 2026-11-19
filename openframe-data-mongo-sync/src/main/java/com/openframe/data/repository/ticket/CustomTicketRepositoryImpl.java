@@ -460,6 +460,13 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     @Override
+    public List<Ticket> findAuditFieldsByStatusId(String statusId) {
+        Query query = new Query(Criteria.where(FIELD_STATUS_ID).is(statusId));
+        query.fields().include(FIELD_TITLE, FIELD_ORGANIZATION_ID, FIELD_DEVICE_ID, FIELD_STATUS_ID);
+        return mongoTemplate.find(query, Ticket.class);
+    }
+
+    @Override
     public int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind) {
         Query query = new Query(Criteria.where(FIELD_STATUS_ID).is(fromStatusId));
         return reassignTicketsToStatus(query, toStatusId, toKind);

@@ -11,10 +11,14 @@ import com.openframe.api.exception.ticket.InvalidTicketStatusReplacementExceptio
 import com.openframe.api.exception.ticket.SystemTicketStatusModificationException;
 import com.openframe.api.exception.ticket.TicketStatusInUseException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ForbiddenException;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.security.authentication.ActorType;
@@ -24,14 +28,17 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CHANGE;
 import static com.openframe.data.document.ticket.TicketStatusKind.AI_ASSISTANCE;
 import static com.openframe.data.document.ticket.TicketStatusKind.ARCHIVED;
 import static com.openframe.data.document.ticket.TicketStatusKind.CUSTOM;
@@ -62,6 +69,7 @@ class TicketStatusServiceTest {
     @Mock private TicketRepository ticketRepository;
     @Mock private TicketTransitionPolicyValidator transitionPolicy;
     @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
+    @Mock private AuditRecorder auditRecorder;
 
     @InjectMocks private TicketStatusService service;
 
@@ -256,11 +264,22 @@ class TicketStatusServiceTest {
             when(statusRepository.findById("st-tech")).thenReturn(Optional.of(techRequired));
             when(ticketRepository.countByStatusId("st-hold")).thenReturn(7L);
             when(transitionPolicy.allowedKinds(CUSTOM)).thenReturn(Set.of(TECH_REQUIRED, RESOLVED));
+            Ticket printer = Ticket.builder().id("t-1").title("Printer offline").organizationId("org-1")
+                    .deviceId("machine-1").statusId("st-hold").build();
+            when(ticketRepository.findAuditFieldsByStatusId("st-hold")).thenReturn(List.of(printer));
 
             assertThat(service.delete(admin, delete("st-hold", "st-tech"))).isTrue();
 
             verify(ticketRepository).reassignTicketsToStatus("st-hold", "st-tech", TECH_REQUIRED);
             verify(statusRepository).delete(onHold);
+            ArgumentCaptor<List<AuditEntry>> moved = ArgumentCaptor.captor();
+            verify(auditRecorder).recordAll(moved.capture());
+            assertThat(moved.getValue()).singleElement()
+                    .returns(TICKET_STATUS_CHANGE, AuditEntry::getAction)
+                    .returns("t-1", AuditEntry::getTargetId)
+                    .returns("org-1", AuditEntry::getOrganizationId)
+                    .returns("machine-1", AuditEntry::getDeviceId)
+                    .returns(Map.of("statusId", new AuditChange("st-hold", "st-tech")), AuditEntry::getChanges);
         }
 
         @Test

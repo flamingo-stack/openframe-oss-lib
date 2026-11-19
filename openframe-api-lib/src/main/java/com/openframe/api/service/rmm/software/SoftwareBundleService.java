@@ -11,7 +11,6 @@ import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
 import com.openframe.audit.AuditCall;
-import com.openframe.audit.Audited;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
@@ -41,6 +40,7 @@ import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
@@ -52,6 +52,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -149,10 +150,19 @@ public class SoftwareBundleService {
         Map<String, Object> details = new HashMap<>();
         details.put("bundleId", input.getId());
         details.put("softwareAction", input.getAction());
+        details.put("packages", packageNamesOf(entity));
         List<String> machineIds = currentMachineIds(entity);
         details.put("machineIds", machineIds);
         return auditedMethodRunner.run(submitCall(input, machineIds, details),
                 () -> doSubmit(entity, input, actor, details));
+    }
+
+    private static List<String> packageNamesOf(SoftwareBundle entity) {
+        return Objects.requireNonNullElse(entity.getPackages(), List.<SoftwareBundlePackage>of()).stream()
+                .map(bundlePackage -> ObjectUtils.firstNonNull(bundlePackage.getPackageName(),
+                        bundlePackage.getSoftwareId()))
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private static AuditCall submitCall(SubmitSoftwareBundleInput input, List<String> machineIds,
@@ -206,12 +216,21 @@ public class SoftwareBundleService {
         return toResponse(entity);
     }
 
-    @Audited(action = SOFTWARE_AUTO_UPDATE_ENABLE, targetId = "#input.softwareId", targetName = "#result.name",
-            compare = false, details = "bundleId=#input.bundleId")
     public SoftwareResponse turnOnAutoUpdate(TurnOnSoftwareAutoUpdateInput input, String actor) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("bundleId", input.getBundleId());
+        AuditCall call = AuditCall.of(SOFTWARE_AUTO_UPDATE_ENABLE, input.getSoftwareId(), details)
+                .withCompare(false)
+                .withTargetNameOf(result -> result instanceof SoftwareResponse software ? software.getName() : null);
+        return auditedMethodRunner.run(call, () -> enableAutoUpdate(input, actor, details));
+    }
+
+    private SoftwareResponse enableAutoUpdate(TurnOnSoftwareAutoUpdateInput input, String actor,
+                                              Map<String, Object> details) {
         String bundleId = input.getBundleId();
         SoftwareBundle entity = loadPendingOrThrow(bundleId);
         List<String> machineIds = currentMachineIds(entity);
+        details.put("machineIds", machineIds);
         if (machineIds.isEmpty()) {
             throw new BadRequestException("Cannot turn on auto-update from software bundle " + bundleId
                     + ": no devices assigned");

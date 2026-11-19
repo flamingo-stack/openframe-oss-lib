@@ -65,7 +65,6 @@ import java.util.stream.Collectors;
 
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_ARCHIVE;
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_CRITERIA_SET;
-import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_DEVICES_SET;
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_RUN;
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_UNARCHIVE;
 import static com.openframe.graphql.relay.NodeType.MACHINE;
@@ -181,8 +180,6 @@ public class ScriptScheduleDataFetcher {
      * Replace the devices assigned to a schedule.
      */
     @DgsMutation
-    @Audited(action = SCRIPT_SCHEDULE_DEVICES_SET, targetId = "rawId(#scheduleId)", compare = false,
-            details = "machineIds=#machineIds.![#root.rawId(#this)]")
     public ScriptScheduleResponse setScriptScheduleDevices(@InputArgument @NotBlank String scheduleId,
                                                            @InputArgument List<String> machineIds,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {

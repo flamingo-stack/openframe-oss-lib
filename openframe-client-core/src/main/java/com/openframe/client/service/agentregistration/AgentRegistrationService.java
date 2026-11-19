@@ -5,6 +5,7 @@ import com.openframe.audit.AuditContext;
 import com.openframe.audit.AuditRecorder;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
+import com.openframe.client.dto.agent.AgentRegistrationTagInput;
 import com.openframe.client.exception.AgentRegistrationSecretValidationException;
 import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
@@ -33,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -102,6 +104,9 @@ public class AgentRegistrationService {
         Map<String, Object> details = new HashMap<>();
         details.put("enrollmentKeyId", enrollmentKeyId);
         details.put("claimedUserId", request.getUserId());
+        if (!CollectionUtils.isEmpty(request.getTags())) {
+            details.put("tags", request.getTags().stream().map(AgentRegistrationTagInput::getKey).toList());
+        }
         return auditedMethodRunner.run(DEVICE_REGISTER, machineId, details, () -> registerMachine(machineId, request));
     }
 

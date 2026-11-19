@@ -4,11 +4,14 @@ import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
+import com.openframe.api.service.rmm.schedule.ScheduleDeviceChange;
 import com.openframe.api.service.rmm.schedule.ScheduleGrid;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
@@ -18,6 +21,7 @@ import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -31,11 +35,14 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_ADD;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_REMOVE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_SET;
 
 @Slf4j
 @Service
@@ -52,6 +59,7 @@ public class SoftwareScheduleService {
     private final TenantIdProvider tenantIdProvider;
     private final PackageManagerAvailability packageManagerAvailability;
     private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
+    private final AuditRecorder auditRecorder;
 
     public SoftwareScheduleResponse create(CreateSoftwareScheduleInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -117,7 +125,9 @@ public class SoftwareScheduleService {
         entity.setNextRunAt(seedNextRunAt(timeReference, input.getStartAt()));
         SoftwareSchedule saved = scheduleRepository.save(entity);
         if (input.getMachineIds() != null) {
+            List<String> before = assignedMachineIds(tenantId, saved.getId());
             replaceDevices(tenantId, saved.getId(), input.getMachineIds(), updatedBy);
+            recordDeviceChange(saved.getId(), ScheduleDeviceChange.between(before, input.getMachineIds()));
         }
         return toResponse(saved);
     }
@@ -169,14 +179,17 @@ public class SoftwareScheduleService {
         return toResponse(entity);
     }
 
-    public SoftwareScheduleResponse setDevices(String scheduleId, List<String> machineIds, String actor) {
+    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_SET, targetId = "#scheduleId", compare = false,
+            condition = "!#result.isEmpty()", details = {"added=#result.added", "removed=#result.removed"})
+    public ScheduleDeviceChange setDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
         List<PackageManagerType> managers = managersOf(entity.getPackages());
         packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
         ensureSpecificMode(entity);
+        List<String> before = assignedMachineIds(tenantId, scheduleId);
         replaceDevices(tenantId, scheduleId, machineIds, actor);
-        return toResponse(entity);
+        return ScheduleDeviceChange.between(before, Objects.requireNonNullElse(machineIds, List.of()));
     }
 
     @Audited(action = SOFTWARE_SCHEDULE_DEVICES_ADD, targetId = "#scheduleId", compare = false,
@@ -233,6 +246,18 @@ public class SoftwareScheduleService {
 
     public int deviceCount(String scheduleId) {
         return getMachineIds(scheduleId).size();
+    }
+
+    private void recordDeviceChange(String scheduleId, ScheduleDeviceChange change) {
+        if (change.isEmpty()) {
+            return;
+        }
+        auditRecorder.record(AuditEntry.builder()
+                .action(SOFTWARE_SCHEDULE_DEVICES_SET)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(scheduleId)
+                .details(Map.of("added", change.added(), "removed", change.removed()))
+                .build());
     }
 
     private List<String> assignedMachineIds(String tenantId, String scheduleId) {

@@ -1,5 +1,6 @@
 package com.openframe.api.service;
 
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.assignment.AssignmentTarget;
 import com.openframe.data.document.assignment.AssignmentItemType;
@@ -19,7 +20,6 @@ import org.springframework.dao.DuplicateKeyException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Supplier;
 
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,7 +95,7 @@ class AssignmentServiceAssignItemTest {
         assertThat(second).isSameAs(existing);
         verify(repository, times(1)).save(any());
         verify(repository, never()).delete(any());
-        verify(auditedMethodRunner, times(1)).runWithoutCompare(any(), any(), any(), any(), any(Supplier.class));
+        verify(auditedMethodRunner, times(1)).run(any(AuditCall.class), any());
     }
 
     @Test

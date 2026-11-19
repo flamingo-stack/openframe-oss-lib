@@ -294,7 +294,7 @@ public class TicketService {
     }
 
     @Transactional
-    @Audited(action = TICKET_UPDATE, targetId = "#ticketId", details = "tagIds=#input.tagIds")
+    @Audited(action = TICKET_UPDATE, targetId = "#ticketId")
     public Ticket updateTicket(AuthPrincipal principal, @NotBlank String ticketId, UpdateTicketInput input) {
         validateAdminAccess(principal);
         log.info("Updating ticket {} by user: {}", ticketId, principal.getDisplayName());

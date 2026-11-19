@@ -194,7 +194,7 @@ public class ScriptService {
                 .build();
     }
 
-    @Audited(action = SCRIPT_UPDATE, targetId = "#input.id", details = "tagIds=#input.tagIds")
+    @Audited(action = SCRIPT_UPDATE, targetId = "#input.id")
     public ScriptResponse update(UpdateScriptInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();

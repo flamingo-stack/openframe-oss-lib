@@ -67,7 +67,8 @@ public class InvitationService {
     private final AuditedMethodRunner auditedMethodRunner;
     private final AuditRecorder auditRecorder;
 
-    @Audited(action = INVITATION_CREATE, targetId = "#result.id")
+    @Audited(action = INVITATION_CREATE, targetId = "#result.id", targetName = "#request.email",
+            details = "roles=#request.roles")
     public InvitationResponse createInvitation(CreateInvitationRequest request) {
         emailDomainPolicy.ensureEmailAllowed(request.getEmail());
 
@@ -93,10 +94,6 @@ public class InvitationService {
         return invitationMapper.toResponse(saved);
     }
 
-    private static final AuditCall INVITE = AuditCall.of(INVITATION_CREATE, null)
-            .withCompare(false)
-            .withTargetIdInResult(true)
-            .withTargetIdFromResult(result -> ((InvitationResponse) result).getId());
     private static final Pattern EMAIL = Pattern.compile(ValidEmail.DEFAULT_REGEX);
 
     /** The invitations sent, in input order, and an error per email that was not, keyed ["emails", "<index>"]. */
@@ -121,7 +118,7 @@ public class InvitationService {
             if (problem == null) {
                 CreateInvitationRequest request = CreateInvitationRequest.builder().email(email).build();
                 try {
-                    invitations.add(auditedMethodRunner.run(INVITE, () -> createInvitation(request)));
+                    invitations.add(auditedMethodRunner.run(inviteCall(email), () -> createInvitation(request)));
                 } catch (IllegalArgumentException | IllegalStateException | BaseException e) {
                     problem = e.getMessage();
                 } catch (RuntimeException e) {
@@ -136,6 +133,14 @@ public class InvitationService {
             }
         }
         return new InviteUsersResult(invitations, errors);
+    }
+
+    private static AuditCall inviteCall(String email) {
+        return AuditCall.of(INVITATION_CREATE, null)
+                .withCompare(false)
+                .withTargetIdInResult(true)
+                .withTargetIdFromResult(result -> ((InvitationResponse) result).getId())
+                .withTargetNameOf(_ -> email);
     }
 
     private void recordRefusedInvitation(String email, String reason) {

@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -92,10 +93,11 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void addTagToItem(String itemId, String tagId) {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
-        requireExistingTag(tagId);
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId));
         KnowledgeBaseItem item = requireItem(itemId);
         auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_ADD, KnowledgeBaseService.targetTypeOf(item), itemId,
-                Map.of("tagId", tagId),
+                Map.of("tagId", tagId, "tagKey", tag.getKey()),
                 () -> assignTag(itemId, tagId));
     }
 
@@ -153,7 +155,9 @@ public class KnowledgeBaseTagService {
         AuditTargetType targetType = itemRepository.findById(itemId)
                 .map(KnowledgeBaseService::targetTypeOf)
                 .orElse(AuditTargetType.KB_ARTICLE);
-        auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_REMOVE, targetType, itemId, Map.of("tagId", tagId),
+        Map<String, Object> details = new HashMap<>(Map.of("tagId", tagId));
+        tagRepository.findById(tagId).ifPresent(tag -> details.put("tagKey", tag.getKey()));
+        auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_REMOVE, targetType, itemId, details,
                 () -> unassignTag(itemId, tagId));
     }
 

@@ -310,7 +310,8 @@ public class KnowledgeBaseService {
         createAssignments(saved.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
         createAssignments(saved.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
         knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
-                saved.getId(), cmd.getAttachmentTempIds(), currentUserId);
+                        saved.getId(), cmd.getAttachmentTempIds(), currentUserId)
+                .forEach(attachment -> recordAttachment(KB_ATTACHMENT_ADD, saved.getId(), attachment));
 
         return saved;
     }
@@ -686,6 +687,11 @@ public class KnowledgeBaseService {
         }
         children.forEach(c -> c.setParentId(targetFolderId));
         repository.saveAll(children);
+        children.forEach(child -> auditRecorder.record(subChange(KB_ITEM_MOVE, child.getId())
+                .targetType(targetTypeOf(child))
+                .targetName(child.getName())
+                .changes(Map.of("parentId", new AuditChange(currentFolderId, targetFolderId)))
+                .build()));
     }
 
     /**
@@ -696,18 +702,27 @@ public class KnowledgeBaseService {
         List<KnowledgeBaseItem> children = repository.findByParentId(folderId);
         List<KnowledgeBaseItem> toArchive = new ArrayList<>();
 
+        List<AuditEntry> archived = new ArrayList<>();
         for (KnowledgeBaseItem child : children) {
             if (child.getType() == KnowledgeBaseItemType.ARTICLE) {
+                archived.add(subChange(KB_ARTICLE_ARCHIVE, child.getId())
+                        .targetName(child.getName())
+                        .changes(Map.of(
+                                "status", new AuditChange(child.getStatus(), KnowledgeBaseArticleStatus.ARCHIVED),
+                                "parentId", new AuditChange(folderId, null)))
+                        .build());
                 child.setStatus(KnowledgeBaseArticleStatus.ARCHIVED);
                 child.setParentId(null);
                 toArchive.add(child);
             } else {
                 archiveSubtree(child.getId());
                 repository.deleteById(child.getId());
+                auditRecorder.record(subChange(KB_FOLDER_DELETE, child.getId()).targetName(child.getName()).build());
             }
         }
         if (!toArchive.isEmpty()) {
             repository.saveAll(toArchive);
+            auditRecorder.recordAll(archived);
         }
     }
 
