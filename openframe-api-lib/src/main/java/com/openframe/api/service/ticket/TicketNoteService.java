@@ -57,15 +57,17 @@ public class TicketNoteService {
         validateAdminAccess(principal);
         log.info("Updating note {} by: {}", noteId, principal.getDisplayName());
         TicketNote note = requireNote(noteId);
-        if (content.equals(note.getContent())) {
-            return note;
-        }
-        return auditedMethodRunner.runWithoutCompare(TICKET_NOTE_UPDATE, TICKET, note.getTicketId(),
-                Map.of("noteId", noteId), () -> {
+        auditedMethodRunner.runWhenChanged(TICKET_NOTE_UPDATE, TICKET, note.getTicketId(), Map.of("noteId", noteId),
+                () -> {
                     requireAuthor(note, principal, "Only the author can update this note");
+                    if (content.equals(note.getContent())) {
+                        return false;
+                    }
                     note.setContent(content);
-                    return noteRepository.save(note);
+                    noteRepository.save(note);
+                    return true;
                 });
+        return note;
     }
 
     @Transactional

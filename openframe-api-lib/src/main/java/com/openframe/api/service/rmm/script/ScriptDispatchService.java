@@ -118,7 +118,8 @@ public class ScriptDispatchService {
     @Audited(action = SCRIPT_RUN, targetId = "#input.scriptId", compare = false,
             deviceId = "#input.machineIds.size() == 1 ? rawId(#input.machineIds[0]) : null",
             details = {"machineIds=#input.machineIds", "privilegeLevel=#input.privilegeLevel", "source=#source",
-                    "envVarNames=#input.envVars?.![name]", "executionId=#result.executionId"})
+                    "envVarNames=#input.envVars?.![name]", "executionId=#result.executionId",
+                    "unsavedDraft=#input.scriptBody != null || #input.shell != null"})
     public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
         ScriptEnvVarMapper.validate(input.getEnvVars());

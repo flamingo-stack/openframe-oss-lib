@@ -70,7 +70,8 @@ public class SoftwareActionDataFetcher {
     @DgsData(parentType = "SoftwareActionDevice", field = "stdout")
     @DgsData(parentType = "SoftwareActionDevice", field = "stderr")
     @Audited(action = SCRIPT_OUTPUT_VIEW, targetType = DEVICE, targetId = "#dfe.source.machineId",
-            condition = "#result != null")
+            condition = "#result != null", details = {"softwareAction=#dfe.source.kind",
+            "dispatchedAt=#dfe.source.dispatchedAt"})
     public String output(DgsDataFetchingEnvironment dfe) {
         SoftwareActionDeviceResponse device = dfe.getSource();
         return "stdout".equals(dfe.getField().getName()) ? device.getStdout() : device.getStderr();
