@@ -32,7 +32,6 @@ import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.organization.OrganizationRepository;
-import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -84,6 +83,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -109,7 +109,6 @@ class SoftwareInventoryServiceTest {
     @Mock private OrganizationRepository organizationRepository;
     @Mock private SoftwareScheduleRepository softwareScheduleRepository;
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
-    @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
 
     @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
     @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
@@ -122,8 +121,7 @@ class SoftwareInventoryServiceTest {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
-                softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository);
+                softwareScheduleRepository, softwareScheduleTargetResolver);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -993,7 +991,8 @@ class SoftwareInventoryServiceTest {
         // verifications
         assertThat(rows).extracting(SoftwareOnDeviceResponse::getStatus)
                 .containsExactly(SoftwareOnDeviceStatus.OUTDATED, SoftwareOnDeviceStatus.UP_TO_DATE);
-        verifyNoInteractions(softwareScheduleTargetResolver);
+        verify(softwareScheduleTargetResolver).resolveMachineIdsAwaitingDeviceTime(List.of());
+        verifyNoMoreInteractions(softwareScheduleTargetResolver);
     }
 
     @Test
