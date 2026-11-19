@@ -30,7 +30,6 @@ import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMappe
 import com.openframe.api.util.FleetSoftwareMapper;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.api.util.FleetVulnerabilityMapper;
-import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
@@ -49,7 +48,6 @@ import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;
-import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -128,7 +126,6 @@ public class SoftwareInventoryService {
     private final OrganizationRepository organizationRepository;
     private final SoftwareScheduleRepository softwareScheduleRepository;
     private final SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
-    private final ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -543,12 +540,14 @@ public class SoftwareInventoryService {
                 .map(softwareScheduleTargetResolver::resolveMachineIds)
                 .flatMap(List::stream)
                 .toList();
-        List<String> atDeviceTime = softwareScheduleRepository
+        List<SoftwareSchedule> atDeviceTimeSchedules = softwareScheduleRepository
                 .findByTenantIdAndStatusAndTriggerAndTimeReference(tenantId, ScriptStatus.ACTIVE,
                         ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)
                 .stream()
                 .filter(schedule -> updates(schedule, softwareId, managingPackage))
-                .map(this::machinesAwaitingDeviceTime)
+                .toList();
+        List<String> atDeviceTime = softwareScheduleTargetResolver
+                .resolveMachineIdsAwaitingDeviceTime(atDeviceTimeSchedules).values().stream()
                 .flatMap(List::stream)
                 .toList();
         Set<String> scheduled = new HashSet<>(atServerTime);
@@ -556,21 +555,6 @@ public class SoftwareInventoryService {
         rows.stream()
                 .filter(row -> isOn(row, scheduled))
                 .forEach(row -> row.setStatus(SoftwareOnDeviceStatus.SCHEDULED_UPDATE));
-    }
-
-    // a device-time schedule keeps no nextRunAt: its one-off run is ahead until the device's own run is recorded
-    private List<String> machinesAwaitingDeviceTime(SoftwareSchedule schedule) {
-        List<String> machineIds = softwareScheduleTargetResolver.resolveMachineIds(schedule);
-        if (schedule.getRepeat() != null || machineIds.isEmpty()) {
-            return machineIds;
-        }
-        String scheduleId = schedule.getId();
-        Set<String> ran = scheduleDeviceLocalDispatchRepository
-                .findByScheduleIdAndMachineIdIn(scheduleId, machineIds).stream()
-                .filter(run -> run.getLastOccurrenceAt() != null)
-                .map(ScheduleLocalMachineTimeDispatch::getMachineId)
-                .collect(Collectors.toSet());
-        return machineIds.stream().filter(machineId -> !ran.contains(machineId)).toList();
     }
 
     private static boolean updates(SoftwareSchedule schedule, String softwareId, PackageCatalogEntry managingPackage) {
