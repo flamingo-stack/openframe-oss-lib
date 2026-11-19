@@ -29,6 +29,11 @@ export interface DataTableCellProps {
    * email, a reason) is cut with an ellipsis when the column is too narrow for it, its full value in a tooltip.
    */
   secondary?: string;
+  /**
+   * The secondary text's tone. `warning` marks one worth a look (users no customer claims, seats left unused).
+   * Default `secondary`.
+   */
+  secondaryTone?: 'secondary' | 'warning';
   /** A small mark at the end of the line (an unread dot). */
   trailing?: ReactNode;
   className?: string;
@@ -63,6 +68,7 @@ export function DataTableCell({
   tag,
   moreTags,
   secondary,
+  secondaryTone = 'secondary',
   trailing,
   className,
 }: DataTableCellProps) {
@@ -111,7 +117,12 @@ export function DataTableCell({
           (cutSecondary ? (
             // Cut once the main text is down to its first characters, the full value in a tooltip.
             <span data-part="secondary" className="flex min-w-0 shrink">
-              <TruncateText as="span" variant="h6" tone="secondary">
+              <TruncateText
+                as="span"
+                variant="h6"
+                tone="secondary"
+                className={secondaryTone === 'warning' ? 'text-ods-warning' : undefined}
+              >
                 {secondary}
               </TruncateText>
             </span>
@@ -121,7 +132,8 @@ export function DataTableCell({
             <span
               data-part="secondary"
               className={cn(
-                'whitespace-nowrap text-ods-text-secondary text-h6',
+                'whitespace-nowrap text-h6',
+                secondaryTone === 'warning' ? 'text-ods-warning' : 'text-ods-text-secondary',
                 hasText ? 'shrink-0' : 'min-w-0 flex-1 truncate',
               )}
             >

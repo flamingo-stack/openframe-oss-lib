@@ -83,7 +83,6 @@ needs the checklist above before a host asks it for the grid:
 |---|---|
 | `ScriptsTable`, `ScriptSchedulesTable`, `ScriptExecutionsTable` | `size` / `minSize` in `scripts-table-columns.ts` (their `width` classes are card-only), `gridCell` for the name + description, date + time and initiator cells, `actions` and `open` as action columns |
 | `KnowledgeBaseTableBody` | `size` / `minSize`, `gridCell` for the name cell (icon, name, status, summary), `open` and the host's `actionsColumn` as action columns |
-| `TenantsTableView` (both variants) | `size` / `minSize`, `gridCell` for the tenant, customers and licences cells, `open` as an action column |
 | `DeviceSelector` | `size` / `minSize`, `gridCell` for the device and customer cells, its add / remove column as an action column |
 
 `DevicesTableBody` (`features/devices/devices-table-columns.tsx`) is the worked example: every column has a `size`, a
@@ -96,3 +95,6 @@ device) keeps its width and the detail after it (the description, the log id, th
 where the second line is long; `DataTable.Cell`'s `secondary` is for a short one, which it keeps whole. `LogsTableView`
 draws its Log ID header as the date header from its `dateFilter` prop, and takes the host's copy button in its grid
 form (`<LogCopyIconButton grid />`).
+
+`TenantsTableView` (`features/cloud-tenants`, both variants) is ready too: its one-line cells are in
+`tenant-grid-cells.tsx`, and its open column is kept by hand because the card table hides it below `md` in one variant.
