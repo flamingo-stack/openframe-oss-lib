@@ -41,6 +41,7 @@ public class PackageAdoptStatusMessage {
 
     public enum Outcome {
         ADOPTED_IN_PLACE,
-        REINSTALLED
+        REINSTALLED,
+        ALREADY_MANAGED
     }
 }

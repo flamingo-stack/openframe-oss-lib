@@ -45,6 +45,9 @@ class PackageAdoptStatusListenerTest {
             {"eventId": "e3", "requestId": "req-1", "machineId": "mach-42", "state": "DONE",
              "outcome": "REINSTALLED", "restartRequired": true}
             """;
+    private static final String DONE_ALREADY_MANAGED = """
+            {"eventId": "e6", "requestId": "req-1", "machineId": "mach-42", "state": "DONE", "outcome": "ALREADY_MANAGED"}
+            """;
     private static final String DONE_UNKNOWN_OUTCOME = """
             {"eventId": "e4", "requestId": "req-1", "machineId": "mach-42", "state": "DONE", "outcome": "MOVED"}
             """;
@@ -115,6 +118,21 @@ class PackageAdoptStatusListenerTest {
         assertThat(eventCaptor.getValue())
                 .extracting(PackageAdoptStatusMessage::getOutcome, PackageAdoptStatusMessage::getRestartRequired)
                 .containsExactly(Outcome.REINSTALLED, true);
+    }
+
+    @Test
+    void handleMessage_doneAlreadyManaged_outcomeRead() {
+        // setup
+        stubMessage(SUBJECT, DONE_ALREADY_MANAGED);
+
+        // execution
+        listener.handleMessage(message);
+
+        // verifications
+        verify(packageAdoptStatusProcessor).process(eq(MACHINE_ID), eventCaptor.capture());
+        assertThat(eventCaptor.getValue())
+                .extracting(PackageAdoptStatusMessage::getState, PackageAdoptStatusMessage::getOutcome)
+                .containsExactly(State.DONE, Outcome.ALREADY_MANAGED);
     }
 
     @Test

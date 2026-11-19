@@ -36,6 +36,7 @@ public class PackageAdoptStatusProcessor {
     static final String ADOPTED_SUMMARY = "Adopted.";
     static final String ADOPTED_IN_PLACE_SUMMARY = "Adopted in place.";
     static final String REINSTALLED_SUMMARY = "Reinstalled.";
+    static final String ALREADY_MANAGED_SUMMARY = "Already managed by Homebrew.";
     static final String RESTART_HINT = " Restart the app.";
     static final String FAILED_ERROR = "Adoption failed";
 
@@ -90,6 +91,7 @@ public class PackageAdoptStatusProcessor {
         String summary = outcome == null ? ADOPTED_SUMMARY : switch (outcome) {
             case ADOPTED_IN_PLACE -> ADOPTED_IN_PLACE_SUMMARY;
             case REINSTALLED -> REINSTALLED_SUMMARY;
+            case ALREADY_MANAGED -> ALREADY_MANAGED_SUMMARY;
         };
         return Boolean.TRUE.equals(event.getRestartRequired()) ? summary + RESTART_HINT : summary;
     }

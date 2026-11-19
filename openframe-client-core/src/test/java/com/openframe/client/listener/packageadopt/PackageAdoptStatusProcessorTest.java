@@ -395,6 +395,8 @@ class PackageAdoptStatusProcessorTest {
                 Arguments.of(Outcome.ADOPTED_IN_PLACE, false, "Adopted in place."),
                 Arguments.of(Outcome.REINSTALLED, null, "Reinstalled."),
                 Arguments.of(Outcome.REINSTALLED, true, "Reinstalled. Restart the app."),
+                Arguments.of(Outcome.ALREADY_MANAGED, null, "Already managed by Homebrew."),
+                Arguments.of(Outcome.ALREADY_MANAGED, true, "Already managed by Homebrew. Restart the app."),
                 Arguments.of(null, true, "Adopted. Restart the app."));
     }
 
