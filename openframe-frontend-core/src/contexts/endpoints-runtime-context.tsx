@@ -50,6 +50,10 @@ export interface EndpointsRuntime {
    *  block from it, for the page's topic (`usePageTopic`). OPTIONAL: a host whose layout draws every page's FAQ itself
    *  (the hub) leaves it unset, and `FaqSection` then asks the same-origin `/api/faqs`. */
   faqsUrl?: string;
+  /** GET base of the host's icon images (the hub's `/api/icons`): `<base>/<name>?theme=light|dark` answers library icon
+   *  `name` as a PNG. Where an icon leaves React (an MCP result, an email) its images are `entityIconImages(icon, <base>)`
+   *  (`utils/named-icon`); in React, `EntityIcon` draws the same value. OPTIONAL: nothing in the lib fetches it. */
+  iconsUrl?: string;
   /** GET base of the host's YouTube poster resolver (`<base>/<videoId>` answers the sharpest poster that video
    *  really has, as a redirect). The player draws it instead of `youtubePosterUrl` (`hqdefault`, 480px), because
    *  only a server can tell which sizes exist: YouTube answers a missing size with a 404 that still carries a

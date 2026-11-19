@@ -100,17 +100,10 @@ export {
   TICKET_OPEN_PARAM,
   buildTicketOpenHref,
 } from './dev-sections/dev-section-param-keys';
-// Dynamic icon registry — single source of truth lives at
-// components/chat/utils/icon-registry. Re-exported here so existing
-// `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
-// distribution-channel screens) keep working without changing their import path.
-export {
-  getDynamicIcon,
-  type DynamicIconSize,
-  ICON_REGISTRY,
-  getIconComponent,
-  normalizeIconKey,
-} from '../components/chat/utils/icon-registry';
+// Icons by name, for `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin distribution-channel screens).
+// What a name draws is decided in components/chat/utils/icon-refs; icon-registry draws it.
+export { getDynamicIcon, type DynamicIconSize, getIconComponent } from '../components/chat/utils/icon-registry';
+export { ICON_REGISTRY, normalizeIconKey } from '../components/chat/utils/icon-refs';
 export { getPlatformIconComponent as getPlatformLogo } from './platform-config';
 // Tool type utilities
 export * from './tool-utils';

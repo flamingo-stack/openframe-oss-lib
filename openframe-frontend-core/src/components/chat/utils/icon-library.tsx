@@ -1,262 +1,37 @@
 /**
- * Resolve the empty-state onboarding-card icon from a backend
- * `SlashCommandSummary.iconName`.
- *
- * Primary keys match the production `/api/docs/commands` contract
- * (multi-platform-hub) — short, source-system-style identifiers:
- *
- *   - `clickup` → ClickUp brand glyph (mono grey)
- *   - `slack`   → Slack brand glyph (mono grey)
- *   - `hubspot` → HubSpot brand glyph (mono grey)
- *   - `github`  → GitHub brand glyph
- *   - `openframe` → OpenFrame logo
- *   - `newspaper` / `rocket` / `briefcase` / `graduation-cap`
- *     / `video` / `calendar` / `headphones` → v2 generic glyphs
- *     mapped to the closest available icon in `icons-v2-generated`
- *
- * Figma-canonical keys (`clickup-logo-grey`, `logo-openframe`,
- * `rocket-02`, …) and a handful of generic v2 fall-throughs
- * (`search`, `ticket`, `bug`, …) are kept as aliases so the
- * Storybook fixtures and any older feed entries still resolve.
- *
- * Any `iconName` NOT in the curated map below is resolved generically
- * against the entire `icons-v2-generated` set by naming convention
- * (`chart-pie` → `ChartPieIcon`, `bank` → `BankIcon`, …) — see
- * `resolveFromLibrary`. So the full icon library is supported, and the
- * curated map only exists for aliases that don't map 1:1. Keys that
- * name no real icon (and `null`) fall back to `FileIcon` so a
- * misconfigured row still renders.
+ * The design variant DRAWN, as components: `resolveIcon` (every chip, row and picker, through `EntityIcon`),
+ * `findIcon` and `brandLogoForName`, plus the admin picker's curated list (`ICON_OPTIONS`). What a name draws is
+ * decided in `icon-refs` (`iconRefFor`); nothing here decides it.
  */
 
-import { platformAccentVarName } from '../../../utils/platform-identity';
-import { iconFromSet, iconOf, lucideIcon, setIcon, type IconComponent, type IconRef } from './icon-loading';
-import { getIconComponent, normalizeIconKey, registryIcon } from './icon-registry';
+import { iconOf, lucideIcon, setIcon, type IconComponent } from './icon-loading';
+import { brandLogoRefForName, iconRefFor } from './icon-refs';
 
-// A sister platform's mark is drawn in THAT platform's brand colour (the
-// platform brand registry), never in the accent of the page showing it: on
-// flamingo.run the OpenMSP mark stays OpenMSP yellow, not flamingo pink.
-const brandColor = (platform: string) => `var(${platformAccentVarName(platform)})`;
-
-/** The size a mark draws at when it is given none (a chip, a command row). */
-const MARK_SIZE = 16;
-
-// The marks several names share. Each is DATA: the icon's name in the set and,
-// for a mark with colours of its own, those colours. Nothing is loaded until a
-// name is drawn.
-const OPENMSP_MARK: IconRef = {
-  set: 'OpenmspLogoIcon',
-  size: MARK_SIZE,
-  // On the dark surfaces every glyph sits on, the bubbles take the theme's text
-  // and background tokens and the back bubble OpenMSP's brand colour.
-  color: 'var(--color-text-primary)',
-  secondaryColor: 'var(--color-bg)',
-  tertiaryColor: brandColor('openmsp'),
-  ownColor: true,
-};
-const FLAMINGO_MARK: IconRef = {
-  set: 'FlamingoMarkIcon',
-  size: MARK_SIZE,
-  color: brandColor('flamingo'),
-  ownColor: true,
-};
-// The OpenFrame logo as a GLYPH: both of its parts in one colour, the slot's
-// own unless the caller names one, so it tints like every icon beside it.
-const OPENFRAME_GLYPH: IconRef = { set: 'OpenframeLogoIcon', size: MARK_SIZE, oneColor: true };
-const CLICKUP_GREY: IconRef = { set: 'ClickupLogoGreyIcon' };
-const SLACK_GREY: IconRef = { set: 'SlackLogoGreyIcon' };
-const HUBSPOT_GREY: IconRef = { set: 'HubspotLogoGreyIcon' };
-const GITHUB: IconRef = { set: 'GithubIcon' };
-const ROCKET: IconRef = { set: 'Rocket02Icon' };
-const BOOK: IconRef = { set: 'BookIcon' };
-const CHATS: IconRef = { set: 'ChatsIcon' };
-const FILE: IconRef = { set: 'FileIcon' };
-
-/**
- * The names that do NOT follow the set's naming convention — backend `iconName` → the icon it draws, as data. Brand-grey
- * logos live in `icons-v2-generated/brand-logos/`; the rest are
- * monochrome v2 glyphs that inherit `currentColor` from the card slot
- * (`text-ods-text-secondary`).
- */
-export const ICON_ALIASES: Readonly<Record<string, IconRef>> = {
-  // Production `/api/docs/commands` keys (multi-platform-hub contract)
-  clickup: CLICKUP_GREY,
-  slack: SLACK_GREY,
-  hubspot: HUBSPOT_GREY,
-  github: GITHUB,
-  openframe: OPENFRAME_GLYPH,
-  rocket: ROCKET,
-  video: { set: 'VideoRecorderIcon' },
-  headphones: { set: 'HeadphoneIcon' },
-
-  // The two LLM brands offered by `ICON_OPTIONS`. Their brand-colored glyphs
-  // are the only picker entries that hardcode a fill (#000 / #D97757), so they
-  // ignored the chip accent and sat black and orange in a cyan grid; the grey
-  // variants fill with `currentColor` like every other brand logo here.
-  'openai-logo': { set: 'OpenaiLogoGreyIcon' },
-  'anthropic-logo': { set: 'AnthropicLogoGreyIcon' },
-
-  // Figma-canonical aliases (node 7363:205938) — kept for Storybook
-  // fixtures and any older feed entries still using the long names.
-  'clickup-logo': CLICKUP_GREY,
-  'clickup-logo-grey': CLICKUP_GREY,
-  'slack-logo': SLACK_GREY,
-  'slack-logo-grey': SLACK_GREY,
-  'hubspot-logo': HUBSPOT_GREY,
-  'hubspot-logo-grey': HUBSPOT_GREY,
-  'github-logo': GITHUB,
-  'logo-openframe': OPENFRAME_GLYPH,
-  'rocket-01': ROCKET,
-  'rocket-02': ROCKET,
-
-  // The platforms' marks, by the names the announcement bar and the navigation store.
-  'openframe-logo': OPENFRAME_GLYPH,
-  'openmsp-logo': OPENMSP_MARK,
-  // Major League GitHub draws its mark in the theme's text colour on its own site, never in an accent.
-  'mlg-logo': { set: 'MlgLogoIcon', size: MARK_SIZE, color: 'var(--color-text-primary)' },
-  'tmcg-logo': {
-    set: 'TmcgMarkIcon',
-    size: MARK_SIZE,
-    secondaryColor: brandColor('tmcg'),
-    tertiaryColor: 'var(--color-text-primary)',
-    ownColor: true,
-  },
-  flamingo: FLAMINGO_MARK,
-  'flamingo-logo': FLAMINGO_MARK,
-  // The same mark as a GLYPH: it takes the colour of the slot it sits in, like every icon beside it.
-  'flamingo-logo-grey': { set: 'FlamingoMarkIcon', size: MARK_SIZE, color: 'currentColor' },
-  // Microsoft 365 is drawn with the Office 365 mark, which the set names by the product's older name.
-  'microsoft-365-logo-grey': { set: 'Office365LogoGreyIcon' },
-  megaphone: { lucide: 'megaphone' },
-  bell: { lucide: 'bell' },
-  info: { lucide: 'info' },
-  star: { lucide: 'star' },
-  package: { lucide: 'package' },
-
-  // Names whose glyph is another icon of the set.
-  book: BOOK,
-  'book-open': BOOK,
-  file: FILE,
-  'file-text': FILE,
-  chats: CHATS,
-  'message-square': CHATS,
-  'message-circle': CHATS,
-};
-
-/** The icon an alias names, or `undefined` for a name that is not an alias. */
-function aliasIcon(iconName: string): IconComponent | undefined {
-  if (!Object.prototype.hasOwnProperty.call(ICON_ALIASES, iconName)) return undefined;
-  return iconOf(ICON_ALIASES[iconName]) ?? undefined;
-}
-
-/**
- * Generic resolution against the FULL `icons-v2-generated` set.
- *
- * Every generated icon follows one naming convention: a file named
- * `<kebab>-icon.tsx` exports a component `<PascalCase>Icon` with the
- * `{ size, className, color }` signature `IconComponent`
- * expects. So any backend `iconName` that names a real icon (e.g.
- * `chart-pie`, `bank`, `money-bill-dollar`, `piggy-bank`) resolves
- * here without a hand-maintained entry — the whole library is
- * supported, not just the curated aliases above.
- *
- * Two candidate PascalCase spellings are tried because the generator
- * is inconsistent about the `ai` token: the standalone AI glyphs
- * export `…AIIcon` (`BrainAIIcon`, `CodeAIIcon`), while the Adobe
- * Illustrator brand glyph keeps `AdobeAiIcon`. We try the literal
- * capitalization first, then the `ai → AI` variant, and take whichever
- * actually exists in the set (its loader table is the source of truth, so
- * we never guess wrong).
- */
-function resolveFromLibrary(iconName: string): IconComponent | undefined {
-  const tokens = iconName.trim().toLowerCase().replace(/_/g, '-').split('-');
-  if (tokens.some(t => t.length === 0)) return undefined;
-  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-  const candidates = [
-    `${tokens.map(cap).join('')}Icon`,
-    `${tokens.map(t => (t === 'ai' ? 'AI' : cap(t))).join('')}Icon`,
-  ];
-  for (const name of candidates) {
-    // An icon found by its name takes the text colour of wherever it sits, like
-    // its row-mates: a few icons of the set carry a default colour of their own
-    // (the one their artwork was drawn in), which is right where a component
-    // places the icon and wrong in a row of named glyphs. A caller's `color` wins.
-    if (iconFromSet(name)) return iconOf({ set: name, color: 'currentColor' }) ?? undefined;
-  }
-  return undefined;
-}
-
-/**
- * THE brand logo for a company or product NAME ("Google Cloud Platform",
- * "Anthropic", "Azure AD"), or `null` when the icon set has no mark for it —
- * the caller keeps its own fallback (initials). Dynamic by the icon set's
- * naming convention, never a list: a brand's mark is `<Brand>LogoIcon`, so a
- * logo added to `icons-v2-generated/brand-logos` is found with no code change.
- * The name's word runs are tried longest first ("Azure AD" → `AzureAdLogoIcon`
- * before `AzureLogoIcon`; "Google Workspace" → `GoogleLogoIcon`). Only
- * `…LogoIcon` names count, so "Cloud" never resolves to a generic cloud glyph.
- */
+/** A company's or product's logo by name as a component, or `null` (the rule: `brandLogoRefForName`). */
 export function brandLogoForName(name: string | null | undefined): IconComponent | null {
-  const words = (name ?? '').split(/[^A-Za-z0-9]+/).filter(Boolean);
-  const pascal = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-  for (let length = Math.min(3, words.length); length >= 1; length -= 1) {
-    for (let start = 0; start + length <= words.length; start += 1) {
-      const Logo = iconFromSet(
-        `${words
-          .slice(start, start + length)
-          .map(pascal)
-          .join('')}LogoIcon`,
-      );
-      if (Logo) return Logo;
-    }
-  }
-  return null;
+  const ref = brandLogoRefForName(name);
+  return ref ? iconOf(ref) : null;
 }
 
 /**
- * THE single icon-name → component resolver for the whole app. Two variants —
- * one entry point, no duplicated resolver machinery:
- *
- *   • `'design'` (DEFAULT): the icons-v2 design set — chat chips, slash
- *      autocomplete, announcement bar, AI-agent icons, the admin picker.
- *      Order: curated `ICON_ALIASES` (brand-grey logos, tinted OpenFrame,
- *      semantic aliases) → generic `icons-v2-generated` by naming convention →
- *      `FileIcon`.
- *   • `'brand'`: the brand/social set (lucide + brand-colored logos) via the
- *      registry resolver `getIconComponent` (PascalCase-normalised) — social
- *      links, source-row CTAs.
- *
- * The two glyph SETS differ on purpose (a grey design 'slack' vs a brand-color
- * social 'slack'); this resolver is the ONE place that owns both. `getIconComponent`
- * / `getDynamicIcon` remain as the brand-variant + sized-brand helpers.
+ * A name's icon as a component, of the design set (default) or the brand set: exactly what `iconRefFor` answers.
+ * A name no set holds draws a fallback glyph (design: the file icon; brand: `file-text`), so a chip is never empty.
  */
 export function resolveIcon(
   iconName: string | null | undefined,
   opts?: { variant?: 'design' | 'brand' },
 ): IconComponent {
-  if (opts?.variant === 'brand') {
-    // The brand set first. A name it does not hold is drawn from the design
-    // set, so a source whose icon lives only there is never shown as the file
-    // glyph; a name neither holds keeps the registry's own fallback.
-    const brand = iconName ? registryIcon(normalizeIconKey(iconName)) : undefined;
-    if (brand) return brand;
-    const design = iconName ? (aliasIcon(iconName) ?? resolveFromLibrary(iconName)) : undefined;
-    return design ?? getIconComponent(iconName);
-  }
-  if (!iconName) return setIcon('FileIcon');
-  // A stored name the set does not hold is still drawn when lucide has an icon by that name
-  // (`git-pull-request`), before the file glyph that says "no such icon".
-  return (
-    aliasIcon(iconName) ??
-    resolveFromLibrary(iconName) ??
-    lucideIcon(iconName.trim().toLowerCase()) ??
-    setIcon('FileIcon')
-  );
+  const variant = opts?.variant ?? 'design';
+  const ref = iconRefFor(iconName, { variant });
+  const icon = ref ? iconOf(ref) : null;
+  if (icon) return icon;
+  return variant === 'brand' ? (lucideIcon('file-text') as IconComponent) : setIcon('FileIcon');
 }
 
-/** The icon a name resolves to, or `null` when the set holds none: for a caller that draws nothing in that case (`resolveIcon` draws a fallback glyph). */
+/** A name's icon of the design set, or `null` when it has none: for a caller that draws nothing then. */
 export function findIcon(iconName: string | null | undefined): IconComponent | null {
-  if (!iconName) return null;
-  return aliasIcon(iconName) ?? resolveFromLibrary(iconName) ?? null;
+  const ref = iconRefFor(iconName, { lucide: false });
+  return ref ? iconOf(ref) : null;
 }
 
 /** One selectable icon in the admin slash-command picker. */
