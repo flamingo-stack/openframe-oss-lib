@@ -545,7 +545,7 @@ public class OAuthBffService {
         return Mono.defer(() -> Mono.justOrEmpty(findAuthorizationByRefreshToken(refreshToken)))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(auth -> {
-                    String tenantId = extractTenantIdFromAuthorizationUri(auth.getArAuthorizationUri()).orElse(null);
+                    String tenantId = owningTenantId(auth);
                     if (!hasText(tenantId)) return Mono.empty();
                     return revokeRefreshToken(tenantId, refreshToken);
                 })
