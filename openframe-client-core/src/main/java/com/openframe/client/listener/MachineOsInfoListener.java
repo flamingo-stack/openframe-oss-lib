@@ -64,20 +64,25 @@ public class MachineOsInfoListener extends AbstractJetStreamPushListener {
     protected void handleMessage(Message message) {
         String payload = new String(message.getData(), StandardCharsets.UTF_8);
         String subject = message.getSubject();
+        String machineId;
+        MachineOsInfoMessage osInfo;
         try {
-            String machineId = machineIdExtractor.extract(subject);
-            MachineOsInfoMessage osInfo = objectMapper.readValue(payload, MachineOsInfoMessage.class);
-            String osVersion = osInfo.getOsVersion();
-            if (isBlank(osVersion)) {
-                log.warn("OS info message without a version for machineId={}, acking without update", machineId);
-                message.ack();
-                return;
-            }
-            log.info("Processing OS info: machineId={} osVersion={} osBuild={}", machineId, osVersion, osInfo.getOsBuild());
-            machineOsInfoService.updateOsInfo(machineId, osVersion, osInfo.getOsBuild());
-            message.ack();
+            machineId = machineIdExtractor.extract(subject);
+            osInfo = objectMapper.readValue(payload, MachineOsInfoMessage.class);
         } catch (JacksonException | IllegalArgumentException permanentlyBad) {
             log.warn("Dropping malformed OS info subject={} payload={}", subject, payload, permanentlyBad);
+            message.ack();
+            return;
+        }
+        String osVersion = osInfo.getOsVersion();
+        if (isBlank(osVersion)) {
+            log.warn("OS info message without a version for machineId={}, acking without update", machineId);
+            message.ack();
+            return;
+        }
+        try {
+            log.info("Processing OS info: machineId={} osVersion={} osBuild={}", machineId, osVersion, osInfo.getOsBuild());
+            machineOsInfoService.updateOsInfo(machineId, osVersion, osInfo.getOsBuild());
             message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing OS info: {}", payload, e);

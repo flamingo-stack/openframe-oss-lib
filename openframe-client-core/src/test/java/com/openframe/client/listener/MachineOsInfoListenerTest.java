@@ -176,7 +176,7 @@ class MachineOsInfoListenerTest {
     }
 
     @Test
-    void handleMessage_serviceRejectsTheArguments_ackedAndDropped() {
+    void handleMessage_serviceThrowsIllegalArgument_notAckedForRedelivery() {
         // setup
         stubMessage(SUBJECT, PAYLOAD);
         doThrow(new IllegalArgumentException("bad version")).when(machineOsInfoService)
@@ -186,7 +186,7 @@ class MachineOsInfoListenerTest {
         listener.handleMessage(message);
 
         // verifications
-        verify(message).ack();
+        verify(message, never()).ack();
     }
 
     @Test
