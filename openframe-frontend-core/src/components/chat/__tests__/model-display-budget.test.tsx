@@ -6,6 +6,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { Button } from '../../ui/button';
 import { ModelDisplay } from '../model-display';
 
 describe('ModelDisplay context budget', () => {
@@ -23,9 +24,9 @@ describe('ModelDisplay context budget', () => {
         usedTokens={12_300}
         contextWindow={150_000}
         renderLabel={({ name, provider }) => (
-          <button type="button">
+          <Button type="button">
             {provider} {name}
-          </button>
+          </Button>
         )}
       />,
     );
