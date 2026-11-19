@@ -140,22 +140,20 @@ export {
   safeHref,
 } from './compact-card-classes';
 
-// Icon + source registries (chat surfaces). The icon-registry file is
-// the SINGLE source of truth for all icon-name → React-component lookup
-// across the lib + the hub — kebab-case keys, with PascalCase aliases
-// routed through `normalizeIconKey()` for DB columns that store
-// component-style names (e.g. channel_platforms.icon_name).
-export {
-  ICON_REGISTRY,
-  getIconComponent,
-  normalizeIconKey,
-  getDynamicIcon,
-  type DynamicIconSize,
-} from './icon-registry';
+// Icons: what a name draws is decided ONLY in `icon-refs` (`iconRefFor`); `icon-library` and `icon-registry` draw it.
+export { getIconComponent, getDynamicIcon, type DynamicIconSize } from './icon-registry';
 // Library icon resolver — `icons-v2-generated`-backed, shared by the chat
 // empty-state chips, the slash-command autocomplete, AND the admin icon picker
 // (`ICON_OPTIONS`), so picked icons always display.
-export { resolveIcon, findIcon, ICON_ALIASES, ICON_OPTIONS, type IconOption } from './icon-library';
+export { resolveIcon, findIcon, ICON_OPTIONS, type IconOption } from './icon-library';
+export {
+  ICON_ALIASES,
+  ICON_REGISTRY,
+  normalizeIconKey,
+  iconRefFor,
+  brandLogoRefForName,
+  type IconVariant,
+} from './icon-refs';
 export { type IconComponent } from './icon-loading';
 export {
   SOURCE_ICON_NAMES,

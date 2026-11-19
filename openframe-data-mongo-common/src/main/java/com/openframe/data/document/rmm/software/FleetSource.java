@@ -16,6 +16,8 @@ public enum FleetSource {
     APPS("apps"),
     PROGRAMS("programs"),
     HOMEBREW_PACKAGES("homebrew_packages"),
+    // our Fleet fork: a cask that has an app, which Fleet itself reports only as the app
+    HOMEBREW_CASKS("homebrew_casks"),
     CHOCOLATEY_PACKAGES("chocolatey_packages"),
     WINGET_PACKAGES("winget_packages"),
     DEB_PACKAGES("deb_packages"),

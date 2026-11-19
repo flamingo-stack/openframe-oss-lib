@@ -313,3 +313,139 @@ describe('useChatEngine: the usage after the host changes its model', () => {
     await waitFor(() => expect(result.current.dialogTokenUsage).toBeNull());
   });
 });
+
+describe('useChatEngine: the context budget the counter shows', () => {
+  const usage = (contextSize: number): DialogTokenUsage => ({
+    inputTokensSize: 10,
+    outputTokensSize: 5,
+    totalTokensSize: 15,
+    contextSize,
+  });
+  const tokenUsageChunk = (contextSize: number, streamSeq: number) => ({
+    type: 'TOKEN_USAGE',
+    inputTokensSize: 10,
+    outputTokensSize: 5,
+    totalTokensSize: 15,
+    contextSize,
+    streamSeq,
+  });
+
+  function renderOpen(fetchDialog: (id: string) => Promise<ChatDialogRecord>) {
+    const tail: { current: ChatLiveTailOptions | null } = { current: null };
+    const transport: ChatLiveTailTransport = {
+      replays: true,
+      useLiveTail: options => {
+        tail.current = options;
+      },
+      publish: vi.fn(),
+    };
+    const history: ChatHistoryBackend = {
+      fetchDialogMessages: () => Promise.resolve({ messages: persisted, nextCursor: null }),
+      fetchDialog,
+    };
+    const hook = renderHook(
+      ({ modelLabel }: { modelLabel: string }) => useChatEngine({ transport, history, modelLabel, dialogId: 'd1' }),
+      { initialProps: { modelLabel: 'Claude' } },
+    );
+    return { ...hook, tail };
+  }
+
+  it("is the record's, the model selected now, over a replayed usage of the model that last answered", async () => {
+    // Reloaded on Claude (200k) after GPT (150k) gave the last reply: the tail replays GPT's usage.
+    const { result, tail } = renderOpen(id =>
+      Promise.resolve({ dialog: { id, title: 'Disk' }, tokenUsage: usage(200_000) }),
+    );
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => {
+      tail.current?.onEvent(tokenUsageChunk(150_000, 8), 'message');
+    });
+    await waitFor(() => expect(result.current.currentContextWindowMaxTokens).toBe(200_000));
+    expect(result.current.dialogTokenUsage?.contextSize).toBe(150_000);
+  });
+
+  it("stands in with the stream's usage while the record has none (a new chat)", async () => {
+    const { result, tail } = renderOpen(id => Promise.resolve({ dialog: { id, title: 'New' }, tokenUsage: null }));
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => {
+      tail.current?.onEvent(tokenUsageChunk(200_000, 8), 'message');
+    });
+    await waitFor(() => expect(result.current.currentContextWindowMaxTokens).toBe(200_000));
+  });
+
+  it("never shows the model's whole window as the budget: unknown until a usage says it", async () => {
+    const { result, tail } = renderOpen(id => Promise.resolve({ dialog: { id, title: 'New' }, tokenUsage: null }));
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 8 }, 'message');
+      tail.current?.onEvent(
+        {
+          type: 'AI_METADATA',
+          modelName: 'claude-opus',
+          modelDisplayName: 'Claude Opus 5.5',
+          providerName: 'anthropic',
+          contextWindow: 1_000_000,
+          streamSeq: 9,
+        },
+        'message',
+      );
+    });
+    await waitFor(() => expect(result.current.currentModelLabel).toBe('Claude Opus 5.5'));
+    expect(result.current.currentContextWindowMaxTokens).toBeNull();
+  });
+
+  it('keeps the budget a turn started with while it answers, and takes the new model once it ends', async () => {
+    let record: ChatDialogRecord = { dialog: { id: 'd1', title: 'Disk' }, tokenUsage: usage(200_000) };
+    const fetchDialog = vi.fn(() => Promise.resolve(record));
+    const { result, tail, rerender } = renderOpen(fetchDialog);
+    await waitFor(() => expect(result.current.currentContextWindowMaxTokens).toBe(200_000));
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 8 }, 'message');
+    });
+    await waitFor(() => expect(result.current.streamingPhase).not.toBe('idle'));
+
+    record = { ...record, tokenUsage: usage(150_000) };
+    const reads = fetchDialog.mock.calls.length;
+    rerender({ modelLabel: 'GPT' });
+    await waitFor(() => expect(fetchDialog.mock.calls.length).toBe(reads + 1));
+    await waitFor(() => expect(result.current.dialogTokenUsage?.contextSize).toBe(150_000));
+    expect(result.current.currentContextWindowMaxTokens).toBe(200_000);
+
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 9 }, 'message');
+    });
+    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    expect(result.current.currentContextWindowMaxTokens).toBe(150_000);
+  });
+});
+
+describe('useChatEngine: a reload while a reply streams', () => {
+  it("draws the prompt once: history holds it, and the tail's replayed echo is its twin", async () => {
+    // The backend persists the prompt with no seq, so the tail starts after the last answer (7) and replays its echo.
+    const history: HistoricalMessage[] = [
+      ...persisted,
+      {
+        id: 'u2',
+        createdAt: '2026-11-04T10:01:00Z',
+        owner: { type: 'ADMIN' },
+        parts: [{ type: 'TEXT', text: 'Reload check' }],
+      },
+    ];
+    const { result, tail } = setup({
+      dialogId: 'd1',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: history, nextCursor: null }) },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => {
+      tail.current?.onEvent(
+        { type: 'MESSAGE_REQUEST', text: 'Reload check', ownerType: 'ADMIN', streamSeq: 8 },
+        'message',
+      );
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 9 }, 'message');
+      tail.current?.onEvent({ type: 'TEXT', text: 'Backups matter', streamSeq: 10 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 11 }, 'message');
+    });
+    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    const prompts = result.current.messages.filter(m => m.role === 'user');
+    expect(prompts.map(m => m.id)).toEqual(['u2']);
+  });
+});

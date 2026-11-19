@@ -8,6 +8,7 @@ import com.openframe.api.dto.rmm.software.SoftwareType;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageMatchState;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -110,6 +112,9 @@ class DeviceSoftwareReadModelQueryTest {
         chrome.setPackageFamilyNames(List.of("google.chrome_x"));
         chrome.setSystemComponent(false);
         chrome.setPackageMatch(new SoftwarePackageMatch(PackageMatchState.NO_PACKAGE, null, null, null));
+        SoftwarePackageMatch storedAdoption =
+                new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.CHOCO, "googlechrome", null);
+        chrome.setAdoptionMatch(storedAdoption);
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(onM1(3L, "130.0").build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleIdIn("t1", List.of(3L))).thenReturn(List.of(chrome));
 
@@ -122,5 +127,27 @@ class DeviceSoftwareReadModelQueryTest {
         assertThat(row.getPackageFamilyNames()).containsExactly("google.chrome_x");
         assertThat(row.getSystemComponent()).isFalse();
         assertThat(row.getPackageMatch().getState()).isEqualTo(PackageMatchState.NO_PACKAGE);
+        assertThat(row.getAdoptionMatch()).isEqualTo(storedAdoption);
+    }
+
+    @Test
+    void rowsForDevice_macApp_carriesItsBundleIdAppFileNamesAndTopLevelFlag() {
+        // setup
+        Software slack = software(4L, "Slack", "apps");
+        slack.setBundleIdentifier("com.tinyspeck.slackmacgap");
+        slack.setAppFileNames(List.of("Slack"));
+        slack.setTopLevelApp(true);
+        DeviceSoftware installed = onM1(4L, "4.4").build();
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(installed));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleIdIn("t1", List.of(4L))).thenReturn(List.of(slack));
+
+        // execution
+        List<SoftwareResponse> rows = query.rowsForDevice("t1", "m1", null);
+
+        // verifications
+        assertThat(rows)
+                .extracting(SoftwareResponse::getBundleIdentifier, SoftwareResponse::getAppFileNames,
+                        SoftwareResponse::getTopLevelApp)
+                .containsExactly(tuple("com.tinyspeck.slackmacgap", List.of("Slack"), true));
     }
 }

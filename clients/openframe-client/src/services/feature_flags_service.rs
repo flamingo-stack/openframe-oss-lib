@@ -8,7 +8,7 @@ use tracing::{info, warn};
 use crate::models::{
     DeliveryRef, FeatureFlag, FeatureFlags, FeatureFlagsMessage, FeatureFlagsState,
 };
-use crate::utils::fs::atomic_write;
+use crate::utils::fs::{atomic_write, read_json_or_quarantine};
 use crate::utils::version_comparator::parse_version;
 
 pub struct FeatureFlagsService {
@@ -26,15 +26,8 @@ pub enum FlagsApplied {
 
 impl FeatureFlagsService {
     pub fn load(path: PathBuf, version: String) -> Self {
-        let state = match std::fs::read(&path) {
-            Ok(bytes) => match serde_json::from_slice::<FeatureFlagsState>(&bytes) {
-                Ok(state) => state,
-                Err(e) => {
-                    warn!(path = %path.display(), "Feature flags file unreadable, all features off: {:#}", e);
-                    FeatureFlagsState::default()
-                }
-            },
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => FeatureFlagsState::default(),
+        let state = match read_json_or_quarantine::<FeatureFlagsState>(&path) {
+            Ok(file) => file.parsed().unwrap_or_default(),
             Err(e) => {
                 warn!(path = %path.display(), "Failed to read feature flags file, all features off: {:#}", e);
                 FeatureFlagsState::default()

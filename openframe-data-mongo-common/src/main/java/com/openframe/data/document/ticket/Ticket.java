@@ -32,7 +32,8 @@ import java.time.Instant;
         @CompoundIndex(name = "status_kind", def = "{'statusKind': 1}"),
         @CompoundIndex(name = "status_id_order", def = "{'statusId': 1, 'order': 1}"),
         // Board activity filter: per-column staleness scan. Never edit a live index def in place.
-        @CompoundIndex(name = "tenant_status_activity", def = "{'tenantId': 1, 'statusId': 1, 'lastActivityAt': 1}")
+        @CompoundIndex(name = "tenant_status_activity", def = "{'tenantId': 1, 'statusId': 1, 'lastActivityAt': 1}"),
+        @CompoundIndex(name = "tenant_creation_source", def = "{'tenantId': 1, 'creationSource': 1}")
 })
 public class Ticket implements TenantScoped {
     @Id
@@ -45,6 +46,10 @@ public class Ticket implements TenantScoped {
     private TicketStatusKind statusKind;
     private TicketCreationSource creationSource;
     private TicketOwner owner;
+    // Set only on tickets created from an inbound email; null on every other ticket.
+    private TicketEmailOrigin emailOrigin;
+    // The directory account the email sender was matched to; null when nobody matched.
+    private TicketRequester requester;
     @Indexed
     private String deviceId;
     private String deviceHostname;

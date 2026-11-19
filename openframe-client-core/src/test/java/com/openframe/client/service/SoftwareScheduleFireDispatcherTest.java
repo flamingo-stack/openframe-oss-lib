@@ -5,6 +5,7 @@ import com.openframe.client.service.rmm.SoftwareScheduleFireDispatcher;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
@@ -41,6 +42,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -65,8 +67,9 @@ class SoftwareScheduleFireDispatcherTest {
     private final ScriptDeliveryRetryStore retryStore = mock(ScriptDeliveryRetryStore.class);
     private final MachineRepository machineRepository = mock(MachineRepository.class);
     private final TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
+    private final PackageManagerProperties packageManagerProperties = new PackageManagerProperties();
     private final PackageManagerAvailability packageManagerAvailability =
-            new PackageManagerAvailability(new PackageManagerProperties(), machineRepository, tenantIdProvider);
+            new PackageManagerAvailability(packageManagerProperties, machineRepository, tenantIdProvider);
     private final MachinePlatformResolver platformResolver =
             new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
 
@@ -110,6 +113,32 @@ class SoftwareScheduleFireDispatcherTest {
         assertThat(msgs.getAllValues()).allSatisfy(m -> assertThat(m.getArgs()).containsExactly("--cask", "slack"));
         verify(retryStore).store(eq(executionId), eq("m-1"), eq(DeliveryChannel.SOFTWARE), any());
         verify(retryStore).store(eq(executionId), eq("m-2"), eq(DeliveryChannel.SOFTWARE), any());
+    }
+
+    @Test
+    @DisplayName("a winget package skips the Windows device that cannot run winget, even though Chocolatey manages that device")
+    void dispatch_deviceThatCannotRunTheManager_isNotATarget() {
+        packageManagerProperties.setChocoEnabled(true);
+        Machine server = machine("m-server", OsType.WINDOWS);
+        server.setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.UNSUPPORTED,
+                PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-win", OsType.WINDOWS), server));
+        when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__winget-install", ScriptType.SOFTWARE))
+                .thenReturn(Optional.of(script("winget-install-id", OsType.WINDOWS)));
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).createdBy("user-1").action(SoftwareAction.INSTALL)
+                .packages(List.of(SoftwareSchedulePackage.builder()
+                        .packageManager(PackageManagerType.WINGET).packageName("vscode").build()))
+                .build();
+
+        dispatcher.dispatch(schedule, List.of("m-win", "m-server"), Instant.now());
+
+        ArgumentCaptor<RunningExecutionRows> rows = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(scriptExecutionRepository).saveQueued(rows.capture());
+        assertThat(rows.getValue().getMachineIds()).containsExactly("m-win");
+        verify(softwareNatsPublisher, never()).publishSoftware(eq("m-server"), any());
     }
 
     @Test

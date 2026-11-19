@@ -1,8 +1,7 @@
 use crate::models::{InstalledTool, ToolRecordState};
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::{atomic_write, read_json};
 use anyhow::{Context, Result};
-use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -59,16 +58,7 @@ impl InstalledToolsService {
     }
 
     pub async fn get_all(&self) -> Result<Vec<InstalledTool>> {
-        if !self.file_path.exists() {
-            return Ok(Vec::new());
-        }
-
-        let json = fs::read_to_string(&self.file_path).with_context(|| {
-            format!("Failed to read installed tools file: {:?}", self.file_path)
-        })?;
-        let tools: Vec<InstalledTool> = serde_json::from_str(&json)
-            .context("Failed to deserialize installed tools from JSON")?;
-        Ok(tools)
+        Ok(read_json(&self.file_path)?.unwrap_or_default())
     }
 
     /// Delete an installed tool by its tool_agent_id
@@ -90,21 +80,11 @@ impl InstalledToolsService {
         let json = serde_json::to_string_pretty(tools)
             .context("Failed to serialize installed tools to JSON")?;
 
-        let tmp_path = self.file_path.with_extension("json.tmp");
-        {
-            let mut file = fs::File::create(&tmp_path)
-                .with_context(|| format!("Failed to create temp tools file: {:?}", tmp_path))?;
-            file.write_all(json.as_bytes())
-                .with_context(|| format!("Failed to write temp tools file: {:?}", tmp_path))?;
-            file.sync_all()
-                .with_context(|| format!("Failed to fsync temp tools file: {:?}", tmp_path))?;
-        }
-        fs::rename(&tmp_path, &self.file_path).with_context(|| {
-            format!(
-                "Failed to atomically replace tools file: {:?}",
-                self.file_path
-            )
-        })?;
-        Ok(())
+        atomic_write(&self.file_path, json)
+            .with_context(|| format!("Failed to write tools file: {:?}", self.file_path))
     }
 }
+
+#[cfg(test)]
+#[path = "installed_tools_service_tests.rs"]
+mod tests;

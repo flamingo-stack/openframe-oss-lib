@@ -76,6 +76,17 @@ describe('textOfParts', () => {
 });
 
 describe.skipIf(!WIRE)('storablePartsOf', () => {
+  it('keeps quick actions offered inline (`data-suggestions`), in place', () => {
+    const suggestions: ChatPart = {
+      type: 'data-suggestions',
+      data: { groups: [{ label: 'Pricing', prompts: [{ label: 'What does a device cost?' }] }], note: 'n' },
+    };
+    expect(storablePartsOf([{ type: 'text', text: 'Try one:' }, suggestions])).toEqual([
+      { type: 'text', text: 'Try one:' },
+      suggestions,
+    ]);
+  });
+
   it('keeps text, sources, files and record cards, and drops everything else', () => {
     const parts: ChatPart[] = [
       { type: 'reasoning', text: 'thinking', state: 'done' },
@@ -427,6 +438,47 @@ describe.skipIf(!WIRE)('parseStoredParts', () => {
     expect(parseStoredParts([{ type: 'source-document', sourceId: 'record://a/1', title: 'A' }])).toEqual([
       { type: 'source-document', sourceId: 'record://a/1', mediaType: 'text/plain', title: 'A' },
     ]);
+  });
+});
+
+describe('a stored row`s inline quick actions', () => {
+  it('reads back what was stored, icon and note included', () => {
+    const part = {
+      type: 'data-suggestions',
+      data: {
+        groups: [
+          { label: 'On any page', prompts: [{ label: 'What is new?' }] },
+          {
+            label: 'Pricing',
+            prompts: [
+              { label: 'Price?', prompt: 'What does a device cost?', icon: { name: 'tag', url: null, props: null } },
+            ],
+          },
+        ],
+        note: 'Each page offers its own.',
+      },
+    };
+    expect(parseStoredParts([{ type: 'text', text: 'Try one:' }, part])).toEqual([
+      { type: 'text', text: 'Try one:' },
+      part,
+    ]);
+  });
+
+  it('leaves out a chip with no label, a group with no chip, and a part with no group', () => {
+    expect(
+      parseStoredParts([
+        {
+          type: 'data-suggestions',
+          data: {
+            groups: [
+              { label: 'A', prompts: [{ prompt: 'x' }, { label: 'ok', prompt: 7 }] },
+              { label: 'B', prompts: [] },
+            ],
+          },
+        },
+        { type: 'data-suggestions', data: { groups: [] } },
+      ]),
+    ).toEqual([{ type: 'data-suggestions', data: { groups: [{ label: 'A', prompts: [{ label: 'ok' }] }] } }]);
   });
 });
 

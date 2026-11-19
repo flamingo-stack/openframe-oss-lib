@@ -33,6 +33,7 @@ import static com.openframe.data.document.packagesearch.PackageManagerType.WINGE
 import static com.openframe.data.repository.packagesearch.PackageCatalogOrder.BY_NAME;
 import static com.openframe.data.repository.packagesearch.PackageCatalogOrder.MOST_POPULAR_FIRST;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
@@ -264,6 +265,33 @@ class PackageCatalogRepositoryIT {
         assertThat(found)
                 .extracting(PackageCatalogEntry::getPackageId)
                 .containsExactlyInAnyOrder("Google.Chrome", "Adobe.Acrobat.Reader.64-bit", "Microsoft.UI.Xaml.2.8", "Git.Git");
+    }
+
+    @Test
+    void findByManagerAndBrewType_cask_onlyTheFieldsTheCaskIndexAndAMatchRead() {
+        // setup
+        PackageCatalogRepository catalog = springRepository();
+        PackageCatalogEntry figma = brew("figma", "Figma", 4200, "Collaborative team software");
+        figma.setHomepage("https://www.figma.com/");
+        figma.setVersion("125.1.5");
+        figma.setAppNames(List.of("figma"));
+        figma.setWeakAppNames(List.of());
+        figma.setBundleIds(List.of("com.figma.desktop"));
+        figma.setBundleIdPrefixes(List.of());
+        repository.upsertAll(List.of(figma));
+
+        // execution
+        List<PackageCatalogEntry> casks = catalog.findByManagerAndBrewType(BREW, BrewPackageType.CASK);
+
+        // verifications
+        assertThat(casks)
+                .filteredOn(cask -> "figma".equals(cask.getPackageId()))
+                .extracting(PackageCatalogEntry::getManager, PackageCatalogEntry::getBrewType, PackageCatalogEntry::getName,
+                        PackageCatalogEntry::getVersion, PackageCatalogEntry::getPopularity, PackageCatalogEntry::getAppNames,
+                        PackageCatalogEntry::getBundleIds, PackageCatalogEntry::getDescription,
+                        PackageCatalogEntry::getHomepage)
+                .containsExactly(tuple(BREW, BrewPackageType.CASK, "Figma", "125.1.5", 4200,
+                        List.of("figma"), List.of("com.figma.desktop"), null, null));
     }
 
     @Test

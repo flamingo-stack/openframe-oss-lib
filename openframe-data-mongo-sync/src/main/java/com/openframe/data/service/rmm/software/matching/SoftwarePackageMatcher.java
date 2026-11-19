@@ -21,6 +21,7 @@ import java.util.function.Function;
 
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.partitioningBy;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
@@ -28,20 +29,40 @@ import static java.util.stream.Collectors.toSet;
 public class SoftwarePackageMatcher {
 
     private final Map<FleetSource, PackageMatcher> matchers;
+    private final Map<FleetSource, PackageMatcher> adoptionMatchers;
     private final PackageCatalogRepository catalogRepository;
 
     // no matcher bean for an osquery table: its programs are left out and keep their status
     public SoftwarePackageMatcher(ObjectProvider<PackageMatcher> matchers, PackageCatalogRepository catalogRepository) {
-        this.matchers = matchers.orderedStream().collect(toMap(PackageMatcher::getFleetSource, Function.identity()));
+        Map<Boolean, Map<FleetSource, PackageMatcher>> byPurpose = matchers.orderedStream().collect(
+                partitioningBy(PackageMatcher::isForAdoption, toMap(PackageMatcher::getFleetSource, Function.identity())));
+        this.matchers = byPurpose.get(false);
+        this.adoptionMatchers = byPurpose.get(true);
         this.catalogRepository = catalogRepository;
     }
 
     // keyed by identity: two programs can be equal; a program no matcher takes is left out
     public Map<InstalledProgram, PackageMatch> match(List<InstalledProgram> programs) {
+        return match(programs, matchers, InstalledProgram::getStoredMatch);
+    }
+
+    // the package a program can be adopted into, whatever match() says about it: which of the two counts is decided
+    // per device, by the managers that run there
+    public Map<InstalledProgram, PackageMatch> matchForAdoption(List<InstalledProgram> programs) {
+        Map<InstalledProgram, PackageMatch> matches =
+                match(programs, adoptionMatchers, InstalledProgram::getStoredAdoptionMatch);
+        // the admin confirms an adoption, so of several packages the best one is offered
+        matches.replaceAll((program, match) -> match.orBestCandidate());
+        return matches;
+    }
+
+    private Map<InstalledProgram, PackageMatch> match(List<InstalledProgram> programs,
+                                                      Map<FleetSource, PackageMatcher> matchersBySource,
+                                                      Function<InstalledProgram, SoftwarePackageMatch> storedOf) {
         Map<InstalledProgram, PackageMatch> matches = new IdentityHashMap<>();
-        List<InstalledProgram> unresolved = resolveStored(programs, matches);
+        List<InstalledProgram> unresolved = resolveStored(programs, storedOf, matches);
         Map<PackageMatcher, List<InstalledProgram>> byMatcher = new LinkedHashMap<>();
-        unresolved.forEach(program -> matcherOf(program)
+        unresolved.forEach(program -> matcherOf(program, matchersBySource)
                 .ifPresent(matcher -> byMatcher.computeIfAbsent(matcher, key -> new ArrayList<>()).add(program)));
         byMatcher.forEach((matcher, group) -> putMatches(matches, group, matcher));
         return matches;
@@ -49,11 +70,13 @@ public class SoftwarePackageMatcher {
 
     // a stored match is the answer unless its package left the catalog: that program is matched afresh
     private List<InstalledProgram> resolveStored(List<InstalledProgram> programs,
+                                                 Function<InstalledProgram, SoftwarePackageMatch> storedOf,
                                                  Map<InstalledProgram, PackageMatch> matches) {
-        Map<PackageManagerType, Map<String, PackageCatalogEntry>> storedEntries = storedEntries(programs);
+        Map<PackageManagerType, Map<String, PackageCatalogEntry>> storedEntries = storedEntries(programs, storedOf);
         List<InstalledProgram> unresolved = new ArrayList<>();
         for (InstalledProgram program : programs) {
-            PackageMatch resolved = resolve(program.getStoredMatch(), storedEntries);
+            SoftwarePackageMatch stored = storedOf.apply(program);
+            PackageMatch resolved = resolve(stored, storedEntries);
             if (resolved == null) {
                 unresolved.add(program);
             } else {
@@ -63,9 +86,10 @@ public class SoftwarePackageMatcher {
         return unresolved;
     }
 
-    private Map<PackageManagerType, Map<String, PackageCatalogEntry>> storedEntries(List<InstalledProgram> programs) {
+    private Map<PackageManagerType, Map<String, PackageCatalogEntry>> storedEntries(
+            List<InstalledProgram> programs, Function<InstalledProgram, SoftwarePackageMatch> storedOf) {
         Map<PackageManagerType, Set<String>> idsByManager = programs.stream()
-                .map(InstalledProgram::getStoredMatch)
+                .map(storedOf)
                 .filter(SoftwarePackageMatcher::isStoredPackage)
                 .collect(groupingBy(SoftwarePackageMatch::getManager, mapping(SoftwarePackageMatch::getPackageId, toSet())));
         Map<PackageManagerType, Map<String, PackageCatalogEntry>> entries = new LinkedHashMap<>();
@@ -95,9 +119,10 @@ public class SoftwarePackageMatcher {
         };
     }
 
-    private Optional<PackageMatcher> matcherOf(InstalledProgram program) {
+    private static Optional<PackageMatcher> matcherOf(InstalledProgram program,
+                                                      Map<FleetSource, PackageMatcher> matchersBySource) {
         return Optional.ofNullable(program.getFleetSource())
-                .map(matchers::get);
+                .map(matchersBySource::get);
     }
 
     private static void putMatches(Map<InstalledProgram, PackageMatch> matches, List<InstalledProgram> group,

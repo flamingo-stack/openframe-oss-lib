@@ -12,9 +12,9 @@ public class FleetSoftwareType {
     private static final Set<String> APPLICATIONS = Set.of("apps", "programs");
     private static final Set<String> BROWSER_EXTENSIONS = Set.of("chrome_extensions", "firefox_addons",
             "safari_extensions", "ie_extensions");
-    private static final Set<String> PACKAGES = Set.of("homebrew_packages", "chocolatey_packages", "winget_packages", "deb_packages",
-            "rpm_packages", "portage_packages", "pkg_packages", "npm_packages", "python_packages", "atom_packages",
-            "go_binaries");
+    private static final Set<String> PACKAGES = Set.of("homebrew_packages", "homebrew_casks", "chocolatey_packages",
+            "winget_packages", "deb_packages", "rpm_packages", "portage_packages", "pkg_packages", "npm_packages",
+            "python_packages", "atom_packages", "go_binaries");
 
     public static SoftwareType of(String fleetSource) {
         if (fleetSource == null) {
