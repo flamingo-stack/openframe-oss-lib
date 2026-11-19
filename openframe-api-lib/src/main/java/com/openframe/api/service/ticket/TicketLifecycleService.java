@@ -261,7 +261,7 @@ public class TicketLifecycleService {
         Query updateQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
         ticketRepository.reassignTicketsToStatus(updateQuery, archived.getId(), archived.getKind());
         log.info("Archived {} resolved tickets (lifecycle)", resolvedTickets.size());
-        auditRecorder.recordAll(resolvedTickets.stream()
+        auditRecorder.recordAllWithTargetFields(resolvedTickets.stream()
                 .map(ticket -> archivedEntry(ticket, archived.getId()))
                 .toList());
         return resolvedTickets.stream().map(Ticket::getId).toList();

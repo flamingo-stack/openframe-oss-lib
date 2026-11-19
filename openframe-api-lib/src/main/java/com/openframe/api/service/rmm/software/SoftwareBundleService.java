@@ -174,7 +174,8 @@ public class SoftwareBundleService {
                     .withTargetIdFromResult(result -> ((SoftwareBundleResponse) result).getScheduleId());
         }
         String machineId = machineIds.size() == 1 ? machineIds.getFirst() : null;
-        return AuditCall.of(input.getAction().select(SOFTWARE_INSTALL, SOFTWARE_UPDATE), machineId, details);
+        return AuditCall.of(input.getAction().select(SOFTWARE_INSTALL, SOFTWARE_UPDATE), machineId, details)
+                .withCompare(false);
     }
 
     private SoftwareBundleResponse doSubmit(SoftwareBundle entity, SubmitSoftwareBundleInput input, String actor,

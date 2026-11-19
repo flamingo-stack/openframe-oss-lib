@@ -273,7 +273,7 @@ class TicketStatusServiceTest {
             verify(ticketRepository).reassignTicketsToStatus("st-hold", "st-tech", TECH_REQUIRED);
             verify(statusRepository).delete(onHold);
             ArgumentCaptor<List<AuditEntry>> moved = ArgumentCaptor.captor();
-            verify(auditRecorder).recordAll(moved.capture());
+            verify(auditRecorder).recordAllWithTargetFields(moved.capture());
             assertThat(moved.getValue()).singleElement()
                     .returns(TICKET_STATUS_CHANGE, AuditEntry::getAction)
                     .returns("t-1", AuditEntry::getTargetId)

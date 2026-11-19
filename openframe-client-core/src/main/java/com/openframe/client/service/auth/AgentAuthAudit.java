@@ -5,6 +5,7 @@ import com.openframe.audit.AuditOutcomeResolver;
 import com.openframe.audit.AuditRecorder;
 import com.openframe.data.model.audit.AuditEntry;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -23,7 +24,7 @@ public class AgentAuthAudit {
 
     public void failed(String clientId, String grantType, RuntimeException failure) {
         ActionOutcome outcome = outcomeResolver.ofFailure(failure);
-        String machineId = clientId == null ? null : clientId.replaceFirst("^" + AGENT_CLIENT_PREFIX, "");
+        String machineId = StringUtils.removeStart(clientId, AGENT_CLIENT_PREFIX);
         auditRecorder.recordOnce(AuditEntry.builder()
                 .action(DEVICE_AUTH_FAIL)
                 .outcome(outcome.outcome())

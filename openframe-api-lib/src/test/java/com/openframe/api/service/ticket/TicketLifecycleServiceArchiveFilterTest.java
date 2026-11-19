@@ -105,7 +105,7 @@ class TicketLifecycleServiceArchiveFilterTest {
 
         assertThat(archivedIds).containsExactly("t-1");
         ArgumentCaptor<List<AuditEntry>> entries = ArgumentCaptor.captor();
-        verify(auditRecorder).recordAll(entries.capture());
+        verify(auditRecorder).recordAllWithTargetFields(entries.capture());
         assertThat(entries.getValue()).singleElement()
                 .returns(TICKET_ARCHIVE, AuditEntry::getAction)
                 .returns("t-1", AuditEntry::getTargetId)

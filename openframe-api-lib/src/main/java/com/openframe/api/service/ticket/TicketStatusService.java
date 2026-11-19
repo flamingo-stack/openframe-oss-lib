@@ -275,7 +275,7 @@ public class TicketStatusService {
         int reassigned = ticketRepository.reassignTicketsToStatus(
                 status.getId(), replacement.getId(), replacement.getKind());
         statusRepository.delete(status);
-        auditRecorder.recordAll(moved.stream()
+        auditRecorder.recordAllWithTargetFields(moved.stream()
                 .map(ticket -> movedEntry(ticket, replacement.getId()))
                 .toList());
         log.info("Deleted custom status {} with {} tickets reassigned to {}",
