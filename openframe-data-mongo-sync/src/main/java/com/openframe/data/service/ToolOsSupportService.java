@@ -7,6 +7,7 @@ import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolOsSupport;
 import com.openframe.data.document.toolagent.UnsupportedTool;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -31,8 +32,8 @@ public class ToolOsSupportService {
 
     public List<AgentWithToolType> agentsWithMinOsVersion() {
         return integratedToolAgentService.getAllEnabled().stream()
-                .filter(ToolOsSupportService::hasMinOsVersion)
-                .flatMap(agent -> toolTypeOf(agent).map(type -> new AgentWithToolType(agent, type)).stream())
+                .filter(ToolOsSupport::hasMinOsVersion)
+                .flatMap(agent -> findToolType(agent).map(type -> new AgentWithToolType(agent, type)).stream())
                 .toList();
     }
 
@@ -48,29 +49,24 @@ public class ToolOsSupportService {
 
     public Set<ToolType> unsupportedToolTypes(Machine machine) {
         return unsupportedTools(machine).stream()
-                .map(UnsupportedTool::toolType)
+                .map(UnsupportedTool::getToolType)
                 .collect(Collectors.toCollection(() -> EnumSet.noneOf(ToolType.class)));
     }
 
-    public Optional<ToolType> toolTypeOf(IntegratedToolAgent agent) {
+    public Optional<ToolType> findToolType(IntegratedToolAgent agent) {
         return integratedToolService.getToolByKey(agent.getToolId())
                 .map(IntegratedTool::getToolType)
                 .flatMap(ToolOsSupportService::parseToolType);
     }
 
     private static Stream<UnsupportedTool> unsupportedTool(Machine machine, AgentWithToolType entry) {
-        IntegratedToolAgent agent = entry.agent();
+        IntegratedToolAgent agent = entry.getAgent();
         if (!ToolOsSupport.isUnsupported(machine, agent)) {
             return Stream.empty();
         }
         return ToolOsSupport.minOsVersion(agent, machine.getOsType())
-                .map(minimum -> new UnsupportedTool(agent.getKey(), entry.toolType(), minimum, machine.getOsVersion()))
+                .map(minimum -> new UnsupportedTool(agent.getKey(), entry.getToolType(), minimum, machine.getOsVersion()))
                 .stream();
-    }
-
-    private static boolean hasMinOsVersion(IntegratedToolAgent agent) {
-        return agent.getDownloadConfigurations() != null && agent.getDownloadConfigurations().stream()
-                .anyMatch(configuration -> configuration.getMinOsVersion() != null);
     }
 
     private static Optional<ToolType> parseToolType(String value) {
@@ -85,6 +81,9 @@ public class ToolOsSupportService {
         }
     }
 
-    public record AgentWithToolType(IntegratedToolAgent agent, ToolType toolType) {
+    @Value
+    public static class AgentWithToolType {
+        IntegratedToolAgent agent;
+        ToolType toolType;
     }
 }

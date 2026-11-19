@@ -44,9 +44,8 @@ public class MachineOsInfoService {
             log.debug("Ignoring OS info for machineId={} in status {}", machineId, status);
             return;
         }
-        String previousOsVersion = machine.getOsVersion();
         Machine current = write(machine, osVersion, osBuild);
-        toolOsSupportReconciler.reconcile(current, previousOsVersion);
+        toolOsSupportReconciler.reconcile(current);
     }
 
     private Machine write(Machine machine, String osVersion, String osBuild) {

@@ -13,6 +13,7 @@ import com.openframe.data.document.rmm.script.OsType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.openframe.data.service.machine.MachineField.field;
 
@@ -35,6 +36,8 @@ public final class MachineFields {
     public static final MachineField<OsType> OS_TYPE = field("osType", Machine::setOsType);
     public static final MachineField<String> OS_VERSION = field("osVersion", Machine::setOsVersion);
     public static final MachineField<String> OS_BUILD = field("osBuild", Machine::setOsBuild);
+    public static final MachineField<Set<String>> WITHHELD_TOOL_AGENTS =
+            field("withheldToolAgents", Machine::setWithheldToolAgents);
     public static final MachineField<String> USER_ID = field("userId", Machine::setUserId);
     public static final MachineField<String> TIMEZONE = field("timezone", Machine::setTimezone);
     public static final MachineField<Instant> STUCK_NOTIFIED_AT = field("stuckNotifiedAt", Machine::setStuckNotifiedAt);

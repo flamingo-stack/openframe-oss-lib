@@ -1,17 +1,20 @@
 package com.openframe.data.service;
 
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolOsSupport;
 import com.openframe.data.nats.delivery.ToolInstallationDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.WithheldToolAgents;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 
@@ -25,17 +28,20 @@ public class ToolInstallationService {
     private final ToolCommandParamsResolver toolCommandParamsResolver;
     private final DeliveryRouter deliveryRouter;
     private final MachineRepository machineRepository;
+    private final WithheldToolAgents withheldToolAgents;
 
-    public void process(String machineId, IntegratedToolAgent toolAgent) {
-        process(machineId, toolAgent, false);
+    public ToolInstallationOutcome process(String machineId, IntegratedToolAgent toolAgent) {
+        return process(machineId, toolAgent, false);
     }
 
-    public void process(String machineId, IntegratedToolAgent toolAgent, boolean reinstall) {
+    public ToolInstallationOutcome process(String machineId, IntegratedToolAgent toolAgent, boolean reinstall) {
         String toolId = toolAgent.getToolId();
-        if (!supports(machineId, toolAgent)) {
+        Optional<Machine> machine = machineRepository.findByMachineId(machineId);
+        if (machine.isPresent() && ToolOsSupport.isUnsupported(machine.get(), toolAgent)) {
+            withheldToolAgents.withhold(machine.get(), toolAgent.getKey());
             log.info("Skipped {} agent installation for machine {}: its OS version is below the agent's minimum",
                     toolId, machineId);
-            return;
+            return ToolInstallationOutcome.NOT_SUPPORTED;
         }
         try {
             IntegratedTool tool = getIntegratedToolData(toolId);
@@ -54,17 +60,14 @@ public class ToolInstallationService {
             boolean carried = deliveryRouter.dispatch(seed);
             if (carried) {
                 log.info("Published {} agent installation message for machine {}", toolId, machineId);
+                return ToolInstallationOutcome.DISPATCHED;
             }
+            return ToolInstallationOutcome.NOT_CARRIED;
         } catch (Exception e) {
             // TODO: add fallback mechanism
             log.error("Failed to publish {} agent installation message for machine {}", toolId, machineId, e);
+            return ToolInstallationOutcome.FAILED;
         }
-    }
-
-    public boolean supports(String machineId, IntegratedToolAgent toolAgent) {
-        return machineRepository.findByMachineId(machineId)
-                .map(machine -> !ToolOsSupport.isUnsupported(machine, toolAgent))
-                .orElse(true);
     }
 
     // TODO: need have boolean field at agent configuration like "hasToolServer"

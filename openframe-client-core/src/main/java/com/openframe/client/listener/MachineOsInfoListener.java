@@ -1,5 +1,6 @@
 package com.openframe.client.listener;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.MachineOsInfoService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
@@ -74,6 +75,9 @@ public class MachineOsInfoListener extends AbstractJetStreamPushListener {
             }
             log.info("Processing OS info: machineId={} osVersion={} osBuild={}", machineId, osVersion, osInfo.getOsBuild());
             machineOsInfoService.updateOsInfo(machineId, osVersion, osInfo.getOsBuild());
+            message.ack();
+        } catch (JacksonException | IllegalArgumentException permanentlyBad) {
+            log.warn("Dropping malformed OS info subject={} payload={}", subject, payload, permanentlyBad);
             message.ack();
         } catch (Exception e) {
             log.error("Unexpected error processing OS info: {}", payload, e);

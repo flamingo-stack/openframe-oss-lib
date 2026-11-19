@@ -14,10 +14,11 @@ public class ToolOsSupportSweepScheduler {
 
     private final ToolOsSupportSweepService sweepService;
 
-    @Scheduled(fixedDelayString = "${openframe.tool-os-support.sweep.interval:PT5M}")
+    @Scheduled(fixedDelayString = "${openframe.tool-os-support.sweep.interval:PT1H}",
+            initialDelayString = "${openframe.tool-os-support.sweep.initial-delay:PT5M}")
     @SchedulerLock(name = "toolOsSupportSweep",
-            lockAtMostFor = "${openframe.tool-os-support.sweep.lock-at-most-for:30m}",
-            lockAtLeastFor = "${openframe.tool-os-support.sweep.lock-at-least-for:1m}")
+            lockAtMostFor = "${openframe.tool-os-support.sweep.lock-at-most-for:2h}",
+            lockAtLeastFor = "${openframe.tool-os-support.sweep.lock-at-least-for:5m}")
     public void run() {
         try {
             sweepService.sweep();

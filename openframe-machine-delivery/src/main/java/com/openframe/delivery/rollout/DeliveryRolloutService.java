@@ -128,7 +128,13 @@ public class DeliveryRolloutService {
         if (machines.isEmpty()) {
             return machines;
         }
-        DeliveryPayload payload = payloadJson.read(rollout.getPayloadJson(), spec.getPayloadClass());
+        DeliveryPayload payload;
+        try {
+            payload = payloadJson.read(rollout.getPayloadJson(), spec.getPayloadClass());
+        } catch (RuntimeException unreadable) {
+            log.warn("Delivery rollout payload unreadable, every machine admitted: id={}", rollout.getId(), unreadable);
+            return machines;
+        }
         List<Machine> admitted = machines.stream()
                 .filter(machine -> spec.admits(machine, payload))
                 .toList();

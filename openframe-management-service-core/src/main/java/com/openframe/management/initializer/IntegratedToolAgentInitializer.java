@@ -91,9 +91,9 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
         if (minOsVersions == null || downloadConfigurations == null) {
             return;
         }
-        downloadConfigurations.stream()
-                .filter(downloadConfiguration -> minOsVersions.containsKey(downloadConfiguration.getOs()))
-                .forEach(downloadConfiguration -> downloadConfiguration.setMinOsVersion(minOsVersions.get(downloadConfiguration.getOs())));
+        minOsVersions.forEach((os, minOsVersion) -> downloadConfigurations.stream()
+                .filter(downloadConfiguration -> os.equalsIgnoreCase(downloadConfiguration.getOs()))
+                .forEach(downloadConfiguration -> downloadConfiguration.setMinOsVersion(minOsVersion)));
     }
 
     private static void applyAssetVersion(IntegratedToolAgentConfiguration configuration, String assetId, String version) {
