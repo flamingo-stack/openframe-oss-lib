@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+use super::OsVersionNumber;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum InstallationType {
@@ -24,6 +26,26 @@ pub struct DownloadConfiguration {
     pub bundle_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_os_version: Option<OsVersionNumber>,
+}
+
+pub fn os_version_shortfall(
+    configs: &[DownloadConfiguration],
+    current: Option<&OsVersionNumber>,
+) -> Option<String> {
+    let config = configs.iter().find(|c| c.matches_current_os())?;
+    let minimum = config.min_os_version.as_ref()?;
+    let current = current?;
+    (current < minimum).then(|| {
+        let os = match config.os.to_ascii_lowercase().as_str() {
+            "macos" => "macOS",
+            "windows" => "Windows",
+            "linux" => "Linux",
+            _ => config.os.as_str(),
+        };
+        format!("needs {os} {minimum} or later, this device runs {current}")
+    })
 }
 
 impl DownloadConfiguration {
@@ -62,3 +84,7 @@ impl DownloadConfiguration {
         self.os.eq_ignore_ascii_case(current_os)
     }
 }
+
+#[cfg(test)]
+#[path = "download_configuration_tests.rs"]
+mod tests;

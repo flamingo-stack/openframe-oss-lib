@@ -1,15 +1,31 @@
-/// OS version and build as the device page shows them; empty when unknown.
+use std::sync::OnceLock;
+
+use tracing::info;
+
+use crate::models::OsVersionNumber;
+
+/// OS version and build; empty when unknown.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OsVersion {
-    pub version: String,
+    pub version: Option<OsVersionNumber>,
     pub build: String,
 }
 
-/// Builds on which `ProductName` still reads "Windows 10" although the OS is Windows 11.
-const WINDOWS_11_FIRST_BUILD: u32 = 22000;
+pub fn current() -> &'static OsVersion {
+    static CURRENT: OnceLock<OsVersion> = OnceLock::new();
+    CURRENT.get_or_init(|| {
+        let detected = detect();
+        info!(
+            version = ?detected.version.as_ref().map(ToString::to_string),
+            build = %detected.build,
+            "Resolved OS version"
+        );
+        detected
+    })
+}
 
 /// Reads the running OS version; every failure logs a warning and leaves the field empty.
-pub fn detect() -> OsVersion {
+fn detect() -> OsVersion {
     #[cfg(target_os = "macos")]
     {
         macos::detect()
@@ -24,7 +40,7 @@ pub fn detect() -> OsVersion {
     }
 }
 
-/// Parses `sw_vers` output into `macOS 15.6.1` / `24G90`.
+/// Parses `sw_vers` output into `15.6.1` / `24G90`.
 pub fn parse_sw_vers(output: &str) -> OsVersion {
     let field = |name: &str| {
         output
@@ -36,41 +52,21 @@ pub fn parse_sw_vers(output: &str) -> OsVersion {
             .filter(|value| !value.is_empty())
     };
 
-    let name = field("ProductName").unwrap_or_else(|| "macOS".to_string());
-    let version = field("ProductVersion")
-        .map(|version| match field("ProductVersionExtra") {
-            Some(extra) => format!("{name} {version} {extra}"),
-            None => format!("{name} {version}"),
-        })
-        .unwrap_or_default();
-
     OsVersion {
-        version,
+        version: field("ProductVersion").and_then(|version| version.parse().ok()),
         build: field("BuildVersion").unwrap_or_default(),
     }
 }
 
-/// Builds `Windows 11 Pro 23H2` / `22631.3007` from the CurrentVersion registry values.
+/// Builds `10.0.22631` / `22631.3007` from the CurrentVersion registry values.
 pub fn windows_version(
-    product_name: &str,
-    display_version: Option<&str>,
+    kernel_version: Option<(u32, u32)>,
     build_number: &str,
     ubr: Option<u32>,
 ) -> OsVersion {
     let build_number = build_number.trim();
-    let mut name = product_name.trim().to_string();
-    let is_windows_11 = build_number
-        .parse::<u32>()
-        .is_ok_and(|build| build >= WINDOWS_11_FIRST_BUILD);
-    if let Some(rest) = name.strip_prefix("Windows 10").filter(|_| is_windows_11) {
-        name = format!("Windows 11{rest}");
-    }
-
-    let version = match display_version.map(str::trim).filter(|d| !d.is_empty()) {
-        Some(display) if name.is_empty() => display.to_string(),
-        Some(display) => format!("{name} {display}"),
-        None => name,
-    };
+    let version = kernel_version
+        .and_then(|(major, minor)| format!("{major}.{minor}.{build_number}").parse().ok());
     let build = match ubr {
         Some(ubr) if build_number.is_empty() => ubr.to_string(),
         Some(ubr) => format!("{build_number}.{ubr}"),
@@ -128,31 +124,18 @@ mod windows {
             }
         };
 
-        let product_name = string_value(&key, "ProductName");
-        let build_number = string_value(&key, "CurrentBuildNumber");
-        // DisplayVersion (e.g. 24H2) exists since 20H2; older installs only carry ReleaseId.
-        let display_version: Option<String> = key
-            .get_value("DisplayVersion")
-            .or_else(|_| key.get_value("ReleaseId"))
-            .ok();
-        let ubr: Option<u32> = key.get_value("UBR").ok();
-
-        windows_version(
-            &product_name,
-            display_version.as_deref(),
-            &build_number,
-            ubr,
-        )
-    }
-
-    fn string_value(key: &RegKey, name: &str) -> String {
-        key.get_value(name).unwrap_or_else(|e| {
+        let build_number: String = key.get_value("CurrentBuildNumber").unwrap_or_else(|e| {
             warn!(
-                "Failed to read {} from HKLM\\{}: {:#}",
-                name, CURRENT_VERSION_KEY, e
+                "Failed to read CurrentBuildNumber from HKLM\\{}: {:#}",
+                CURRENT_VERSION_KEY, e
             );
             String::new()
-        })
+        });
+        let ubr: Option<u32> = key.get_value("UBR").ok();
+        let major: Option<u32> = key.get_value("CurrentMajorVersionNumber").ok();
+        let minor: Option<u32> = key.get_value("CurrentMinorVersionNumber").ok();
+
+        windows_version(major.zip(minor), &build_number, ubr)
     }
 }
 

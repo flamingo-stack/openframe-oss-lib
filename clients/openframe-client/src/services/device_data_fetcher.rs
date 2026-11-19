@@ -113,12 +113,7 @@ impl DeviceDataFetcher {
     }
 
     pub fn get_os_version(&self) -> OsVersion {
-        let os_version = os_version::detect();
-        info!(
-            "OS version: '{}', build: '{}'",
-            os_version.version, os_version.build
-        );
-        os_version
+        os_version::current().clone()
     }
 
     pub fn get_os_type(&self) -> String {

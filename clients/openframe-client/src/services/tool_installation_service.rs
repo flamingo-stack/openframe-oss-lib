@@ -1,17 +1,20 @@
 use crate::clients::tool_api_client::ToolApiClient;
-use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
+use crate::models::download_configuration::{
+    os_version_shortfall, DownloadConfiguration, InstallationType,
+};
 use crate::models::tool_installation_message::AssetSource;
 use crate::models::ToolInstallationMessage;
 use crate::models::{Installation, InstalledTool, ToolRecordState};
 #[cfg(target_os = "windows")]
 use crate::platform::file_lock::log_file_lock_info;
-use crate::platform::DirectoryManager;
+use crate::platform::{os_version, DirectoryManager};
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::tool_connection_processing_manager::ToolConnectionProcessingManager;
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_kill_service::ToolKillService;
-use crate::services::tool_ops::ToolOpGuard;
+use crate::services::tool_ops::{ToolChange, ToolOpGuard};
 use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::tool_uninstall_service::remove_fleet_orbit_state;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
 use crate::services::InstalledToolsService;
@@ -92,8 +95,19 @@ impl ToolInstallationService {
         &self,
         tool_installation_message: ToolInstallationMessage,
         _op: ToolOpGuard,
-    ) -> Result<()> {
-        self.install_inner(tool_installation_message).await
+    ) -> Result<ToolChange> {
+        if let Some(shortfall) = os_version_shortfall(
+            &tool_installation_message.download_configurations,
+            os_version::current().version.as_ref(),
+        ) {
+            info!(
+                "Not installing {}: {}",
+                tool_installation_message.tool_agent_id, shortfall
+            );
+            return Ok(ToolChange::NotSupported(shortfall));
+        }
+        self.install_inner(tool_installation_message).await?;
+        Ok(ToolChange::Done)
     }
 
     async fn install_inner(
@@ -334,37 +348,8 @@ impl ToolInstallationService {
             }
         }
 
-        if reinstall && tool_agent_id.to_lowercase().contains("fleet") {
-            info!("Cleaning up leftover Orbit state for {}", tool_agent_id);
-            if let Err(e) = self
-                .tool_kill_service
-                .stop_asset("osqueryd", tool_agent_id)
-                .await
-            {
-                warn!("Failed to stop osqueryd before Orbit cleanup: {:#}", e);
-            }
-            let orbit_dir = crate::platform::orbit_dir();
-            if orbit_dir.exists() {
-                if let Err(e) = self
-                    .tool_kill_service
-                    .stop_tool_by_path(&orbit_dir.to_string_lossy())
-                    .await
-                {
-                    warn!(
-                        "Failed to stop processes under Orbit directory {}: {:#}",
-                        orbit_dir.display(),
-                        e
-                    );
-                }
-                info!("Removing leftover Orbit directory: {}", orbit_dir.display());
-                if let Err(e) = crate::platform::remove_directory_with_retry(&orbit_dir, 5).await {
-                    warn!(
-                        "Failed to remove Orbit directory {}: {:#}",
-                        orbit_dir.display(),
-                        e
-                    );
-                }
-            }
+        if reinstall {
+            remove_fleet_orbit_state(&self.tool_kill_service, tool_agent_id).await;
         }
 
         // Ensure tool-specific directory exists

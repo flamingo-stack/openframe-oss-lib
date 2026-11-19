@@ -19,13 +19,14 @@ use crate::models::DeliveryRef;
 use crate::services::delivery_results::DeliveryResults;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::result_store::ResultStore;
+use crate::services::tool_ops::ToolChange;
 use crate::services::AgentConfigurationService;
 
 use delivery::Delivery;
 
 pub use handlers::{
     ClientUninstallHandler, ClientUpdateHandler, FeatureFlagsHandler, ToolInstallationHandler,
-    ToolUpdateHandler,
+    ToolUninstallHandler, ToolUpdateHandler,
 };
 pub use package_update::PackageUpdateHandler;
 pub use restart::RestartGate;
@@ -94,7 +95,18 @@ pub enum Outcome {
     Restarting,
     // the handler took the work on and answers itself once it ends
     Deferred,
+    NotSupported(String),
     Failed(String),
+}
+
+impl From<Result<ToolChange>> for Outcome {
+    fn from(result: Result<ToolChange>) -> Self {
+        match result {
+            Ok(ToolChange::Done) => Outcome::Done,
+            Ok(ToolChange::NotSupported(detail)) => Outcome::NotSupported(detail),
+            Err(e) => Outcome::Failed(format!("{e:#}")),
+        }
+    }
 }
 
 impl From<Result<()>> for Outcome {

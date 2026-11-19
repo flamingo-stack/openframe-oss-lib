@@ -104,6 +104,12 @@ impl ToolOps {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum ToolChange {
+    Done,
+    NotSupported(String),
+}
+
 impl ToolLock {
     pub fn mark_busy(self) -> ToolOpGuard {
         self.ops

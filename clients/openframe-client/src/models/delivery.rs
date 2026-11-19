@@ -44,6 +44,14 @@ impl DeliveryResultMessage {
         Self::new(delivery, DeliveryResult::Failed, Some(reason.into()))
     }
 
+    pub fn not_supported(delivery: DeliveryRef, detail: &str) -> Self {
+        Self::new(
+            delivery,
+            DeliveryResult::Done,
+            Some(format!("NOT_SUPPORTED: {detail}")),
+        )
+    }
+
     pub fn new(delivery: DeliveryRef, result: DeliveryResult, error: Option<String>) -> Self {
         Self {
             delivery,
