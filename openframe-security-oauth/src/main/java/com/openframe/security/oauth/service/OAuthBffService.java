@@ -154,10 +154,25 @@ public class OAuthBffService {
                 .subscribeOn(Schedulers.boundedElastic())
                 .switchIfEmpty(Mono.fromRunnable(() -> log.warn("Refresh refused: unknown refresh token")))
                 .flatMap(auth -> {
-                    String tenantId = extractTenantIdFromAuthorizationUri(auth.getArAuthorizationUri()).orElse(null);
-                    if (!hasText(tenantId)) return Mono.empty();
+                    String tenantId = owningTenantId(auth);
+                    if (!hasText(tenantId)) {
+                        log.warn("Refresh refused: no tenant on authorization {}", auth.getId());
+                        return Mono.empty();
+                    }
                     return refreshTokensPublic(tenantId, refreshToken, request);
                 });
+    }
+
+    /**
+     * The tenant stored on the authorization, else the one in its saved authorize URI. Sessions minted
+     * by the custom grants (signup-ticket, apple-native) never went through /authorize, so the stored
+     * tenant is all they have; authorizations saved before it was stored still route by the URI.
+     */
+    private String owningTenantId(MongoOAuth2Authorization auth) {
+        if (hasText(auth.getTenantId())) {
+            return auth.getTenantId();
+        }
+        return extractTenantIdFromAuthorizationUri(auth.getArAuthorizationUri()).orElse(null);
     }
 
     /** A retired token resolves too: whether it is still inside its grace window is the auth server's call. */
