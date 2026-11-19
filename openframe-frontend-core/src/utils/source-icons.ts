@@ -100,6 +100,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
 
   // Product-hub internal
   'design-docs': 'file-text',
+  'product-features': 'puzzle-01',
   'openframe-tenants': 'openframe',
   'recorded-calls': 'call',
 
@@ -200,6 +201,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
 
   // Product-hub internal
   'design-docs': 'Design Docs',
+  'product-features': 'Product Features',
   'openframe-tenants': 'OpenFrame Tenants',
   'recorded-calls': 'Recorded calls',
 
@@ -302,6 +304,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
 
   // Product-hub internal
   design_doc: 'design-docs',
+  product_feature: 'product-features',
   openframe_tenant: 'openframe-tenants',
   recorded_call: 'recorded-calls',
 

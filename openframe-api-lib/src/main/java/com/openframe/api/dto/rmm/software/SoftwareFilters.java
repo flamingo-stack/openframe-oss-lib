@@ -12,6 +12,7 @@ public class SoftwareFilters {
     private List<SoftwareFilterOption> sources;
     private List<SoftwareFilterOption> versionStatuses;
     private List<SoftwareFilterOption> severities;
+    private List<SoftwareFilterOption> osTypes;
 
     // non-null in the schema; the tenant-wide facet stays empty until the read model backs it
     @Builder.Default
@@ -22,6 +23,7 @@ public class SoftwareFilters {
                 .sources(List.of())
                 .versionStatuses(List.of())
                 .severities(List.of())
+                .osTypes(List.of())
                 .build();
     }
 }

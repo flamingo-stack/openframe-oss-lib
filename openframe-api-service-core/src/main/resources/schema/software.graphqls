@@ -37,7 +37,9 @@ extend type Query {
         sort: SortInput
     ): SoftwareOnDeviceConnection!
 
-    """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab."""
+    """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab.
+    Sortable fields: cveId, severity, cvssScore, discoveredAt, affectedVersion (version order, missing versions last).
+    An unknown sort field is rejected as a client error (BAD_REQUEST)."""
     softwareVulnerabilities(
         softwareId: ID!,
         filter: SoftwareVulnerabilityFilterInput,
@@ -50,11 +52,12 @@ extend type Query {
     ): SoftwareVulnerabilityConnection!
 
     """Faceted filter-option counts for the software list — Type / Source / Version-status /
-    Vulnerability-severity dropdowns. Mirrors scriptFilters / deviceFilters."""
+    Vulnerability-severity / OS dropdowns. Mirrors scriptFilters / deviceFilters.
+    Counts only the titles that match filter and search; send each dropdown's facet without its own dimension."""
     softwareFilters(filter: SoftwareFilterInput, search: String): SoftwareFilters!
 
     """Faceted filter-option counts for a software title's Devices tab — the Status dropdown.
-    Mirrors softwareFilters; scoped to the devices that have this software installed."""
+    Mirrors softwareFilters; scoped to the devices that have this software installed and match filter and search."""
     softwareDeviceFilters(softwareId: ID!, filter: SoftwareOnDeviceFilterInput, search: String): SoftwareOnDeviceFilters!
 
     """Auto-update of a software title, for its Auto-update form: on or off, the settings and the devices."""
@@ -350,6 +353,8 @@ type SoftwareFilters {
     severities: [SoftwareFilterOption!]!
     "AUTO-UPDATE dropdown: ON / OFF / NO_PACKAGE / NEEDS_ADOPTION."
     autoUpdateStatuses: [SoftwareFilterOption!]!
+    "OS dropdown: the systems of the titles (Software.os)."
+    osTypes: [SoftwareFilterOption!]!
 }
 
 type SoftwareOnDeviceFilters {
@@ -374,6 +379,7 @@ type SoftwareFilterOption {
 
 input SoftwareFilterInput {
     sources: [SoftwareSource!]
+    """The CURRENT VERSION filter (Software.versionStatus). With Fleet paging it is left out, like sources."""
     versionStatuses: [SoftwareVersionStatus!]
     minSeverity: SoftwareCveSeverity
     deviceTagIds: [ID!]

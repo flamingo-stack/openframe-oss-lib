@@ -249,12 +249,13 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Test
     void getSoftwareFilters_emptyFacetsWithoutFleet() {
         // execution
-        SoftwareFilters filters = service.getSoftwareFilters(null);
+        SoftwareFilters filters = service.getSoftwareFilters(null, null);
 
         // verifications
         assertThat(filters.getSources()).isEmpty();
         assertThat(filters.getVersionStatuses()).isEmpty();
         assertThat(filters.getSeverities()).isEmpty();
+        assertThat(filters.getOsTypes()).isEmpty();
         verifyNoInteractions(fleet);
     }
 

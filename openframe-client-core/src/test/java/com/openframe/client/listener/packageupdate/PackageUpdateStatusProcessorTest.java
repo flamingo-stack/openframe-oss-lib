@@ -17,9 +17,12 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.delivery.dispatch.DeliveryDispatcher;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
@@ -61,6 +64,11 @@ class PackageUpdateStatusProcessorTest {
     @InjectMocks private PackageUpdateStatusProcessor processor;
 
     private static final Instant T = Instant.parse("2026-10-20T14:00:00Z");
+
+    private void verifyNoDeliveryRowTouched() {
+        verify(deliveryTracker, never()).done(any(DeliveryRef.class), any());
+        verify(deliveryTracker, never()).cancel(any(), any(), any(), any());
+    }
 
     private void machineResolves() {
         Machine m = new Machine();
@@ -151,7 +159,8 @@ class PackageUpdateStatusProcessorTest {
 
         verify(requestRepository).save(any());                   // rolled up to WAITING
         verify(executionRecorder).record(any(), eq("m1"), any()); // mirrored onto the history row
-        verifyNoInteractions(deliveryDispatcher, deliveryTracker); // no deadline, no force
+        verifyNoInteractions(deliveryDispatcher);
+        verifyNoDeliveryRowTouched(); // no deadline, no force
     }
 
     @Test
@@ -307,7 +316,7 @@ class PackageUpdateStatusProcessorTest {
         assertThat(seed.getMachineId()).isEqualTo("m1");
         assertThat(seed.getRequestId()).isEqualTo("req-1");              // the agent finds the request by it
         assertThat(seed.getTargetId()).isEqualTo("req-1:deadline");      // a row of its own, the WAIT keeps its row
-        verifyNoInteractions(deliveryTracker);
+        verifyNoDeliveryRowTouched();
     }
 
     @Test
@@ -324,7 +333,8 @@ class PackageUpdateStatusProcessorTest {
                 PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
 
         assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
-        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+        verifyNoInteractions(deliveryDispatcher);
+        verifyNoDeliveryRowTouched();
     }
 
     @Test
@@ -356,7 +366,7 @@ class PackageUpdateStatusProcessorTest {
         PackageUpdateDeliverySeed force = seedCaptor.getAllValues().get(1);
         assertThat(force.getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(force.getTargetId()).isEqualTo("req-1:deadline");
-        verifyNoInteractions(deliveryTracker);
+        verifyNoDeliveryRowTouched();
     }
 
     @Test
@@ -375,7 +385,8 @@ class PackageUpdateStatusProcessorTest {
 
         assertThat(st.getWaitingPhase()).isEqualTo("POSTPONED");
         assertThat(st.getAskAgainAt()).isNull();
-        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+        verifyNoInteractions(deliveryDispatcher);
+        verifyNoDeliveryRowTouched();
     }
 
     @Test
@@ -420,11 +431,30 @@ class PackageUpdateStatusProcessorTest {
         verifyNoInteractions(deliveryDispatcher);
     }
 
+    // the agent's own result comes only after the update: a row left open would time out while the user decides
     @Test
-    void finished_theOrderIsOnTheDevice_itsRowIsLeftForTheAgentsAnswer() {
+    void waiting_theOrderIsOnTheDevice_itsRowIsClosedByTheStatus() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        MachineDelivery onTheDevice = MachineDelivery.builder().status(DeliveryStatus.ACKED).dispatchId("d1").build();
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+        when(deliveryTracker.find(DeliveryType.PACKAGE_UPDATE, "req-1", "m1")).thenReturn(Optional.of(onTheDevice));
+
+        processor.process("m1", waiting("e1", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
+
+        verify(deliveryTracker).done(new DeliveryRef(DeliveryType.PACKAGE_UPDATE, "req-1", "d1"), "m1");
+        verify(deliveryTracker, never()).cancel(any(), any(), any(), any());
+    }
+
+    @Test
+    void finished_theOrderIsOnTheDevice_itsRowIsClosedByTheStatus() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
-        MachineDelivery onTheDevice = MachineDelivery.builder().status(DeliveryStatus.ACKED).build();
+        MachineDelivery onTheDevice = MachineDelivery.builder().status(DeliveryStatus.ACKED).dispatchId("d1").build();
         when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
         when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
                 .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
@@ -432,7 +462,27 @@ class PackageUpdateStatusProcessorTest {
 
         processor.process("m1", base("e3", T, PackageUpdateStatusMessage.State.DONE));
 
+        verify(deliveryTracker).done(new DeliveryRef(DeliveryType.PACKAGE_UPDATE, "req-1", "d1"), "m1");
         verify(deliveryTracker, never()).cancel(any(), any(), any(), any());
+    }
+
+    // PENDING is the next prompt held for its moment, FAILED a row the engine already closed
+    @ParameterizedTest
+    @EnumSource(value = DeliveryStatus.class, names = "ACKED", mode = EnumSource.Mode.EXCLUDE)
+    void waiting_theRowIsNotWaitingForAResult_itIsLeftAsItIs(DeliveryStatus status) {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        MachineDelivery row = MachineDelivery.builder().status(status).dispatchId("d1").build();
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+        when(deliveryTracker.find(DeliveryType.PACKAGE_UPDATE, "req-1", "m1")).thenReturn(Optional.of(row));
+
+        processor.process("m1", waiting("e1", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
+
+        verifyNoDeliveryRowTouched();
     }
 
     @Test
@@ -494,7 +544,7 @@ class PackageUpdateStatusProcessorTest {
         assertThat(seed.getCountdownSeconds()).isZero();
         assertThat(seed.getRequestId()).isEqualTo("req-1");
         assertThat(seed.getTargetId()).isEqualTo("req-1:deadline");      // replaces the force held for the deadline
-        verifyNoInteractions(deliveryTracker);
+        verifyNoDeliveryRowTouched();
     }
 
     @Test
@@ -535,7 +585,7 @@ class PackageUpdateStatusProcessorTest {
         assertThat(seed.getCountdownSeconds()).isZero();
         assertThat(seed.getSource().getOrigin()).isEqualTo(UpdateSource.Origin.USER);
         assertThat(seed.getRequestId()).isEqualTo("req-1");
-        verifyNoInteractions(deliveryTracker);
+        verifyNoDeliveryRowTouched();
     }
 
     // the force's row takes the agent's result; the WAIT row would wait for one until its timeout
@@ -570,7 +620,8 @@ class PackageUpdateStatusProcessorTest {
                 PackageUpdateStatusMessage.Waiting.Phase.COUNTDOWN));
 
         assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
-        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+        verifyNoInteractions(deliveryDispatcher);
+        verifyNoDeliveryRowTouched();
     }
 
     @Test
