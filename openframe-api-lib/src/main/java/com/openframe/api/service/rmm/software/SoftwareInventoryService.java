@@ -73,6 +73,7 @@ import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -134,6 +135,8 @@ public class SoftwareInventoryService {
     private final SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
     private final ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
     private final SoftwareAdoptionService softwareAdoptionService;
+    private final PackageManagerAvailability packageManagerAvailability;
+    private final PackageAdoptReach packageAdoptReach;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -188,6 +191,7 @@ public class SoftwareInventoryService {
         SoftwareResponse row = tenantSoftwareReadModelQuery.get(tenantId, softwareId);
         List<SoftwareResponse> rows = List.of(row);
         applyStatuses(rows);
+        applyAdoptionCounts(rows);
         return Optional.of(row);
     }
 
@@ -296,7 +300,10 @@ public class SoftwareInventoryService {
             String tenantId = tenantIdProvider.getTenantId();
             PageResult<SoftwareResponse> readModelPage = tenantSoftwareReadModelQuery.listSoftware(tenantId, search,
                     page, perPage, sort, vulnerable, filter);
-            return withStatuses(readModelPage);
+            List<SoftwareResponse> rows = readModelPage.items();
+            applyStatuses(rows);
+            applyAdoptionCounts(rows);
+            return readModelPage;
         }
         if (fleetPaging) {
             return withStatuses(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
@@ -328,6 +335,48 @@ public class SoftwareInventoryService {
     private static boolean hasStatusFilter(SoftwareFilterInput filter) {
         return filter != null && (filter.getManageable() != null || !isEmpty(filter.getSources())
                 || !isEmpty(filter.getAutoUpdateStatuses()));
+    }
+
+    // read model only: a device counts where adoptSoftware would send the order
+    private void applyAdoptionCounts(List<SoftwareResponse> rows) {
+        rows.forEach(row -> row.setAdoptionCount(0));
+        List<SoftwareResponse> adoptable = rows.stream().filter(row -> row.getAdoptionPackage() != null).toList();
+        if (adoptable.isEmpty()) {
+            return;
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        List<Long> titleIds = adoptable.stream().map(SoftwareResponse::getId).map(Long::valueOf).toList();
+        Map<Long, List<String>> machinesByTitleId =
+                deviceSoftwareReadModelQuery.machinesOutsideUserApplicationsByTitleId(tenantId, titleIds);
+        List<String> machineIds = machinesByTitleId.values().stream().flatMap(List::stream).distinct().toList();
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        List<String> reachable = packageAdoptReach.filterReachable(machineIds);
+        Map<PackageManagerType, Set<String>> adoptableByManager = adoptable.stream()
+                .map(row -> row.getAdoptionPackage().getPackageManager())
+                .distinct()
+                .collect(Collectors.toMap(Function.identity(),
+                        manager -> Set.copyOf(packageManagerAvailability.adoptableOn(reachable, manager))));
+        Map<String, Set<String>> casksByMachineId =
+                deviceSoftwareReadModelQuery.caskTokensByMachineId(tenantId, reachable);
+        for (SoftwareResponse row : adoptable) {
+            Long titleId = Long.valueOf(row.getId());
+            List<String> titleMachineIds = machinesByTitleId.getOrDefault(titleId, List.of());
+            SoftwareBundlePackage adoptionPackage = row.getAdoptionPackage();
+            Set<String> withManager = adoptableByManager.get(adoptionPackage.getPackageManager());
+            String cask = caskTokenOf(adoptionPackage);
+            long count = titleMachineIds.stream()
+                    .filter(withManager::contains)
+                    .filter(machineId -> !hasCask(casksByMachineId, machineId, cask))
+                    .count();
+            row.setAdoptionCount(Math.toIntExact(count));
+        }
+    }
+
+    private static boolean hasCask(Map<String, Set<String>> casksByMachineId, String machineId, String cask) {
+        Set<String> casks = casksByMachineId.getOrDefault(machineId, Set.of());
+        return cask != null && casks.contains(cask);
     }
 
     private PageResult<SoftwareResponse> withStatuses(PageResult<SoftwareResponse> page) {

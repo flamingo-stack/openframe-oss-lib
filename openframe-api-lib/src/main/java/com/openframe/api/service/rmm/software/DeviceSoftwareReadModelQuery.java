@@ -60,6 +60,15 @@ public class DeviceSoftwareReadModelQuery {
                 .collect(Collectors.toSet());
     }
 
+    public Map<Long, List<String>> machinesOutsideUserApplicationsByTitleId(String tenantId,
+                                                                           Collection<Long> softwareTitleIds) {
+        return deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdInAndMachineConnectedTrue(tenantId,
+                        softwareTitleIds).stream()
+                .filter(row -> !Boolean.TRUE.equals(row.getUserApplicationsOnly()))
+                .collect(Collectors.groupingBy(DeviceSoftware::getSoftwareTitleId,
+                        Collectors.mapping(DeviceSoftware::getMachineId, Collectors.toList())));
+    }
+
     // a homebrew_casks row is named by the cask's token
     public Map<String, Set<String>> caskTokensByMachineId(String tenantId, Collection<String> machineIds) {
         if (machineIds.isEmpty()) {

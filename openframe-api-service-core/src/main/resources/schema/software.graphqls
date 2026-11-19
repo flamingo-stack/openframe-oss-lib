@@ -10,7 +10,7 @@ extend type Query {
 
     """Paginated list of software titles installed across the tenant's fleet.
     One row = one software title (aggregated across devices).
-    Sortable fields: name, devicesCount, cveCount, highestSeverity, adoptionCount (default: Fleet order by name).
+    Sortable fields: name, devicesCount, cveCount, highestSeverity (default: Fleet order by name).
     An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error."""
     softwares(
         filter: SoftwareFilterInput,
@@ -176,8 +176,7 @@ type Software {
 
     """Devices that have this title installed manually (installedBy UNMANAGED) and can be adopted — the
     ADOPTION column and the "N devices have … installed manually" banner with Adopt. Null or 0 = "–", no banner;
-    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with).
-    Sortable as adoptionCount."""
+    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with)."""
     adoptionCount: Int
 
     """The package Adopt reinstalls this title with, shown to the admin for confirmation: the best match of a

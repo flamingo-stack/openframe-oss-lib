@@ -21,6 +21,9 @@ public interface DeviceSoftwareRepository extends MongoRepository<DeviceSoftware
     List<DeviceSoftware> findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(
             String tenantId, Long softwareTitleId);
 
+    List<DeviceSoftware> findByTenantIdAndSoftwareTitleIdInAndMachineConnectedTrue(
+            String tenantId, Collection<Long> softwareTitleIds);
+
     List<DeviceSoftware> findByTenantIdAndSoftwareTitleIdAndMachineIdIn(
             String tenantId, Long softwareTitleId, List<String> machineIds);
 

@@ -36,6 +36,8 @@ import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +51,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -91,6 +95,8 @@ class SoftwareInventoryServiceReadModelTest {
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
     @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
     @Mock private SoftwareAdoptionService softwareAdoptionService;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private PackageAdoptReach packageAdoptReach;
 
     private SoftwareInventoryService service;
 
@@ -100,7 +106,8 @@ class SoftwareInventoryServiceReadModelTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository, softwareAdoptionService);
+                scheduleDeviceLocalDispatchRepository, softwareAdoptionService, packageManagerAvailability,
+                packageAdoptReach);
         ReflectionTestUtils.setField(service, "softwareReadModel", true);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
@@ -304,6 +311,110 @@ class SoftwareInventoryServiceReadModelTest {
 
         assertThat(service.listSoftware("x", 0, 20, null, null, null).items()).hasSize(1);
         verifyPoliciesThenCatalog();
+    }
+
+    @Test
+    void listSoftware_adoptionPackage_countsOnlyDevicesAdoptSoftwareWouldOrder() {
+        // setup
+        SoftwareResponse hiddenBar = row("7", SoftwareSource.UNMANAGED);
+        hiddenBar.setAdoptionPackage(HIDDENBAR_CASK);
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(hiddenBar), false, false, 1, 0);
+        List<String> outsideUserApplications = List.of("m1", "m2", "m3", "m4");
+        List<String> reachable = List.of("m1", "m2", "m3");
+        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, null, 0, 20, null, null, null)).thenReturn(page);
+        when(deviceSoftwareReadModelQuery.machinesOutsideUserApplicationsByTitleId(TENANT, List.of(7L)))
+                .thenReturn(Map.of(7L, outsideUserApplications));
+        when(packageAdoptReach.filterReachable(outsideUserApplications)).thenReturn(reachable);
+        when(packageManagerAvailability.adoptableOn(reachable, PackageManagerType.BREW))
+                .thenReturn(List.of("m1", "m2"));
+        when(deviceSoftwareReadModelQuery.caskTokensByMachineId(TENANT, reachable))
+                .thenReturn(Map.of("m2", Set.of("hiddenbar"), "m1", Set.of("zed")));
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getAdoptionCount).containsExactly(1);
+    }
+
+    @Test
+    void listSoftware_titleWithoutAnAdoptionPackage_zeroWithoutAnyLookup() {
+        // setup
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(row("1", SoftwareSource.BREW)), false, false, 1, 0);
+        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, null, 0, 20, null, null, null)).thenReturn(page);
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getAdoptionCount).containsExactly(0);
+        verifyNoInteractions(deviceSoftwareReadModelQuery, packageAdoptReach, packageManagerAvailability);
+    }
+
+    @Test
+    void listSoftware_everyCopyOnlyInTheUsersApplicationsFolder_zeroWithoutReachOrManagerLookups() {
+        // setup
+        SoftwareResponse hiddenBar = row("7", SoftwareSource.UNMANAGED);
+        hiddenBar.setAdoptionPackage(HIDDENBAR_CASK);
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(hiddenBar), false, false, 1, 0);
+        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, null, 0, 20, null, null, null)).thenReturn(page);
+        when(deviceSoftwareReadModelQuery.machinesOutsideUserApplicationsByTitleId(TENANT, List.of(7L)))
+                .thenReturn(Map.of());
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getAdoptionCount).containsExactly(0);
+        verifyNoInteractions(packageAdoptReach, packageManagerAvailability);
+    }
+
+    @Test
+    void listSoftware_chocoAndCaskTitlesOnOnePage_eachCountedWithItsOwnManager() {
+        // setup
+        SoftwareResponse hiddenBar = row("7", SoftwareSource.UNMANAGED);
+        hiddenBar.setAdoptionPackage(HIDDENBAR_CASK);
+        SoftwareResponse sevenZip = row("9", SoftwareSource.UNMANAGED);
+        sevenZip.setAdoptionPackage(SoftwareBundlePackage.builder()
+                .packageManager(PackageManagerType.CHOCO).packageName("7zip").build());
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(hiddenBar, sevenZip), false, false, 2, 0);
+        List<String> machineIds = List.of("mac", "win");
+        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, null, 0, 20, null, null, null)).thenReturn(page);
+        when(deviceSoftwareReadModelQuery.machinesOutsideUserApplicationsByTitleId(TENANT, List.of(7L, 9L)))
+                .thenReturn(new TreeMap<>(Map.of(7L, List.of("mac"), 9L, List.of("win"))));
+        when(packageAdoptReach.filterReachable(machineIds)).thenReturn(machineIds);
+        when(packageManagerAvailability.adoptableOn(machineIds, PackageManagerType.BREW)).thenReturn(List.of("mac"));
+        when(packageManagerAvailability.adoptableOn(machineIds, PackageManagerType.CHOCO)).thenReturn(List.of("win"));
+        when(deviceSoftwareReadModelQuery.caskTokensByMachineId(TENANT, machineIds)).thenReturn(Map.of());
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, null);
+
+        // verifications
+        assertThat(result.items())
+                .extracting(SoftwareResponse::getId, SoftwareResponse::getAdoptionCount)
+                .containsExactly(tuple("7", 1), tuple("9", 1));
+    }
+
+    @Test
+    void findById_titlePage_adoptionCountFilled() {
+        // setup
+        SoftwareResponse hiddenBar = row("7", SoftwareSource.UNMANAGED);
+        hiddenBar.setAdoptionPackage(HIDDENBAR_CASK);
+        List<String> machineIds = List.of("m1");
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "7")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "7")).thenReturn(hiddenBar);
+        when(deviceSoftwareReadModelQuery.machinesOutsideUserApplicationsByTitleId(TENANT, List.of(7L)))
+                .thenReturn(Map.of(7L, machineIds));
+        when(packageAdoptReach.filterReachable(machineIds)).thenReturn(machineIds);
+        when(packageManagerAvailability.adoptableOn(machineIds, PackageManagerType.BREW)).thenReturn(machineIds);
+        when(deviceSoftwareReadModelQuery.caskTokensByMachineId(TENANT, machineIds)).thenReturn(Map.of());
+
+        // execution
+        Optional<SoftwareResponse> title = service.findById("7");
+
+        // verifications
+        assertThat(title).get().extracting(SoftwareResponse::getAdoptionCount).isEqualTo(1);
     }
 
     // the read model narrows by the stored match in Mongo; the rows that come back still get the statuses

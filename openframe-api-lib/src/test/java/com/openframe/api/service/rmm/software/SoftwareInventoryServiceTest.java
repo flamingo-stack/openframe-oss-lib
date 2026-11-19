@@ -38,6 +38,8 @@ import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -117,6 +119,8 @@ class SoftwareInventoryServiceTest {
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
     @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
     @Mock private SoftwareAdoptionService softwareAdoptionService;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private PackageAdoptReach packageAdoptReach;
 
     @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
     @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
@@ -130,7 +134,8 @@ class SoftwareInventoryServiceTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository, softwareAdoptionService);
+                scheduleDeviceLocalDispatchRepository, softwareAdoptionService, packageManagerAvailability,
+                packageAdoptReach);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }

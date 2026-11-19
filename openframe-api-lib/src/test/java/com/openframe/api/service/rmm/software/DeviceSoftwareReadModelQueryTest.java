@@ -193,6 +193,28 @@ class DeviceSoftwareReadModelQueryTest {
     }
 
     @Test
+    void machinesOutsideUserApplicationsByTitleId_copiesOfTheTitles_userFolderOnlyCopiesLeftOut() {
+        // setup
+        List<Long> titleIds = List.of(7L, 9L);
+        DeviceSoftware systemFolder = DeviceSoftware.builder().softwareTitleId(7L).machineId("m1")
+                .userApplicationsOnly(false).build();
+        DeviceSoftware userFolder = DeviceSoftware.builder().softwareTitleId(7L).machineId("m2")
+                .userApplicationsOnly(true).build();
+        DeviceSoftware unknown = DeviceSoftware.builder().softwareTitleId(9L).machineId("m3").build();
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdInAndMachineConnectedTrue("t1", titleIds))
+                .thenReturn(List.of(systemFolder, userFolder, unknown));
+
+        // execution
+        Map<Long, List<String>> machines = query.machinesOutsideUserApplicationsByTitleId("t1", titleIds);
+
+        // verifications
+        assertThat(machines)
+                .containsOnlyKeys(7L, 9L)
+                .containsEntry(7L, List.of("m1"))
+                .containsEntry(9L, List.of("m3"));
+    }
+
+    @Test
     void caskTokensByMachineId_noDevices_emptyWithoutAQuery() {
         // setup
         List<String> machineIds = List.of();
