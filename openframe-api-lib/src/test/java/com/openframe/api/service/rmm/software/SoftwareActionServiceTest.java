@@ -21,6 +21,7 @@ import com.openframe.data.repository.rmm.SoftwareActionAggregationRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,8 +33,10 @@ import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -48,6 +51,7 @@ class SoftwareActionServiceTest {
     @Mock private SoftwareScheduleRepository scheduleRepository;
     @Mock private SoftwareScheduleMachineAssignedRepository assignedRepository;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
 
     private final ScriptFilterOptionMapper optionMapper = new ScriptFilterOptionMapper(null, null);
 
@@ -55,7 +59,8 @@ class SoftwareActionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SoftwareActionService(aggregationRepository, scheduleRepository, assignedRepository, optionMapper, tenantIdProvider);
+        service = new SoftwareActionService(aggregationRepository, scheduleRepository, assignedRepository, optionMapper, tenantIdProvider,
+                softwareScheduleTargetResolver);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
 
@@ -122,9 +127,12 @@ class SoftwareActionServiceTest {
         Instant now = Instant.now();
         Instant aheadSomewhere = now.minusSeconds(3600);
         Instant passedEverywhere = now.minusSeconds(13 * 3600);
+        SoftwareSchedule ahead = deviceTimeSchedule("ahead", aheadSomewhere);
         when(scheduleRepository.findByTenantIdAndStatusAndTriggerAndTimeReference(TENANT, ScriptStatus.ACTIVE,
                 ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL))
-                .thenReturn(List.of(deviceTimeSchedule("ahead", aheadSomewhere), deviceTimeSchedule("passed", passedEverywhere)));
+                .thenReturn(List.of(ahead, deviceTimeSchedule("passed", passedEverywhere)));
+        when(softwareScheduleTargetResolver.resolveMachineIdsAwaitingDeviceTime(List.of(ahead)))
+                .thenReturn(Map.of("ahead", List.of("m1")));
         when(assignedRepository.countByTenantIdAndSoftwareScheduleId(TENANT, "ahead")).thenReturn(3L);
         when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(0L);
 
@@ -146,11 +154,79 @@ class SoftwareActionServiceTest {
         daily.setRepeat(86400L);
         when(scheduleRepository.findByTenantIdAndStatusAndTriggerAndTimeReference(TENANT, ScriptStatus.ACTIVE,
                 ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)).thenReturn(List.of(daily));
+        when(softwareScheduleTargetResolver.resolveMachineIdsAwaitingDeviceTime(List.of(daily)))
+                .thenReturn(Map.of("daily", List.of("m1")));
         when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(0L);
 
         PageResult<SoftwareActionResponse> result = service.list(null, null, null, 0, 25);
 
         assertThat(result.items().get(0).getScheduledAt()).isEqualTo(firstRun.plusSeconds(4 * 86400));
+    }
+
+    @Test
+    void list_oneOffDeviceTimeScheduleEveryDeviceRan_noScheduledRow() {
+        // setup
+        SoftwareSchedule ran = deviceTimeSchedule("ran", Instant.now().minusSeconds(3600));
+        when(scheduleRepository.findByTenantIdAndStatusAndTriggerAndTimeReference(TENANT, ScriptStatus.ACTIVE,
+                ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)).thenReturn(List.of(ran));
+        when(softwareScheduleTargetResolver.resolveMachineIdsAwaitingDeviceTime(List.of(ran)))
+                .thenReturn(Map.of("ran", List.of()));
+        when(aggregationRepository.getDefaultSortField()).thenReturn("dispatchedAt");
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(0L);
+        when(aggregationRepository.findPage(TENANT, null, null, "dispatchedAt", Sort.Direction.DESC, 0, 25))
+                .thenReturn(List.of());
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, null, 0, 25);
+
+        // verifications
+        assertThat(result.items()).isEmpty();
+        assertThat(result.filteredCount()).isZero();
+    }
+
+    @Test
+    void list_oneOffDeviceTimeScheduleOneDeviceStillWaits_scheduledRowShown() {
+        // setup
+        SoftwareSchedule waits = deviceTimeSchedule("waits", Instant.now().minusSeconds(3600));
+        when(scheduleRepository.findByTenantIdAndStatusAndTriggerAndTimeReference(TENANT, ScriptStatus.ACTIVE,
+                ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)).thenReturn(List.of(waits));
+        when(softwareScheduleTargetResolver.resolveMachineIdsAwaitingDeviceTime(List.of(waits)))
+                .thenReturn(Map.of("waits", List.of("m2")));
+        when(assignedRepository.countByTenantIdAndSoftwareScheduleId(TENANT, "waits")).thenReturn(2L);
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(0L);
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, null, 0, 25);
+
+        // verifications
+        assertThat(result.items())
+                .extracting(SoftwareActionResponse::getScheduleId, SoftwareActionResponse::getStatus,
+                        SoftwareActionResponse::getTotalMachineCount)
+                .containsExactly(tuple("waits", SoftwareActionStatus.SCHEDULED, 2));
+    }
+
+    @Test
+    void list_serverTimeSchedule_shownWithoutAskingWhichDevicesRan() {
+        // setup
+        SoftwareSchedule serverTime = SoftwareSchedule.builder()
+                .id("s1").tenantId(TENANT).action(SoftwareAction.UPDATE)
+                .nextRunAt(Instant.now().plusSeconds(3600))
+                .packages(List.of(SoftwareSchedulePackage.builder()
+                        .packageManager(PackageManagerType.WINGET).packageName("Microsoft.PowerShell").build()))
+                .build();
+        when(scheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(eq(TENANT),
+                eq(ScriptStatus.ACTIVE), any(Instant.class))).thenReturn(List.of(serverTime));
+        when(assignedRepository.countByTenantIdAndSoftwareScheduleId(TENANT, "s1")).thenReturn(1L);
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(0L);
+        when(aggregationRepository.findPage(TENANT, null, null, null, Sort.Direction.DESC, 0, 24))
+                .thenReturn(List.of());
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, null, 0, 25);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getScheduleId).containsExactly("s1");
+        verify(softwareScheduleTargetResolver).resolveMachineIdsAwaitingDeviceTime(List.of());
     }
 
     private static SoftwareSchedule deviceTimeSchedule(String id, Instant startAt) {
