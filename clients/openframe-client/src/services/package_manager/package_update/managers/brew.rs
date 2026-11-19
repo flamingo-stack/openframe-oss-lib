@@ -1,12 +1,12 @@
 use serde::Deserialize;
 
 use super::{
-    last_line, Probe, ProbeState, QueryError, UpgradeOutcome, PROBE_TIMEOUT_SECS,
-    UPGRADE_TIMEOUT_SECS,
+    Probe, ProbeState, QueryError, UpgradeOutcome, PROBE_TIMEOUT_SECS, UPGRADE_TIMEOUT_SECS,
 };
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::{BrewKind, PackageRef};
-use crate::services::package_manager::brew;
+use crate::services::package_manager::brew::{self, COULD_NOT_LAUNCH};
+use crate::services::package_manager::last_line;
 
 /// `brew update` first: without it `info` compares against stale tap metadata.
 const INFO: &str = r#""$BREW" update >/dev/null
@@ -19,8 +19,6 @@ const INSTALLED_INFO: &str = r#"HOMEBREW_NO_AUTO_UPDATE=1 "$BREW" info --json=v2
 
 const UPGRADE: &str = r#"NONINTERACTIVE=1 HOMEBREW_NO_AUTO_UPDATE=1 "$BREW" upgrade "$@"
 "#;
-
-const COULD_NOT_LAUNCH: i32 = 85;
 
 #[derive(Deserialize)]
 struct Info {

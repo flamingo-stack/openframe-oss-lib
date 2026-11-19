@@ -33,7 +33,7 @@ pub struct RestartSignals {
 }
 
 impl RestartSignals {
-    fn pending(&self) -> bool {
+    pub(crate) fn pending(&self) -> bool {
         self.client_update.is_pending() || self.agent_restart.is_set()
     }
 }
