@@ -32,8 +32,31 @@ import type {
   FetchDialogMessagesResult,
 } from './chat-transport';
 
-/** Post one GraphQL request; resolves to its `data`, and rejects on any GraphQL error. */
+/**
+ * Post one GraphQL request; resolves to its `data`, and rejects on any GraphQL error. A host that can tell a query the
+ * server refused to run from any other failure rejects with a {@link MingoGraphqlError}.
+ */
 export type MingoGraphqlPost = <T>(query: string, variables: Record<string, unknown>) => Promise<T>;
+
+/**
+ * A `MingoGraphqlPost` rejection that says how the backend answered. `refused`: the server would not run the query at
+ * all (GraphQL errors and no `data`, a validation error): its schema does not have what the query asks, and asking
+ * again only fails again. Any other rejection, a plain `Error` included, counts as temporary.
+ */
+export class MingoGraphqlError extends Error {
+  readonly refused: boolean;
+
+  constructor(message: string, options: { refused?: boolean } = {}) {
+    super(message);
+    this.name = 'MingoGraphqlError';
+    this.refused = options.refused === true;
+  }
+}
+
+/** A refusal by its shape, not its class: a host may bundle a copy of the lib of its own. */
+function isRefusal(error: unknown): boolean {
+  return error instanceof Error && (error as { refused?: unknown }).refused === true;
+}
 
 export interface MingoGraphqlHistoryOptions {
   /** Only this chat of the dialog (the client's side of a ticket, the operator's Mingo). */
@@ -70,11 +93,24 @@ export interface MingoGraphqlDialogsOptions {
   imageUrlOf?: (image: MingoImage) => string | null;
   /**
    * The record's token usage also carries the cache split and the compaction ratio (`TokenUsageCacheSplit`), read
-   * with their own query beside the record. A backend that refuses that query (it does not have the fields yet) is
-   * not asked again in this session, and the usage comes without them.
+   * with their own query beside the record. The record waits for it a few seconds at most. Whenever the split is
+   * missing the usage comes without it, and the split is asked again on the next read, except: after a read that timed
+   * out, not for a minute; after a refusal ({@link MingoGraphqlError} `refused`: the backend does not have the fields
+   * yet), not for half an hour.
    */
   tokenUsageSplit?: boolean;
 }
+
+/** How long the record waits for its split. Past it, the record comes without the split and the read timed out. */
+const SPLIT_WAIT_MS = 4_000;
+/** After a split read that timed out, how long the split is not asked for: a slow resolver would hold every record. */
+const SPLIT_TIMEOUT_PAUSE_MS = 60_000;
+/**
+ * After a refusal, how long the split is not asked for. Not the page's life: a desktop or mobile shell keeps one page
+ * open for days, across the deploy that adds the fields.
+ */
+const SPLIT_REFUSAL_PAUSE_MS = 30 * 60_000;
+const SPLIT_TIMED_OUT = Symbol('split timed out');
 
 /** The list's order: the dialog with the latest message first. The cursor follows it. */
 const DIALOGS_BY_LAST_ACTIVITY = { field: 'lastActivityAt', direction: 'DESC' } as const;
@@ -197,18 +233,34 @@ export function createMingoGraphqlDialogs(
         nextCursor: data.dialogs.pageInfo.hasNextPage ? data.dialogs.pageInfo.endCursor : null,
       };
     };
-  // Cleared once the backend refuses the split query: it does not have the fields, and asking again only fails again.
-  let splitSupported = tokenUsageSplit;
+  // The moment (epoch ms) until which the split is not asked for: briefly after a timeout, for long after a refusal. A
+  // pause only ever grows, so a read still in flight that times out never shortens a refusal's.
+  let splitPausedUntil = 0;
+  const pauseSplit = (ms: number): void => {
+    splitPausedUntil = Math.max(splitPausedUntil, Date.now() + ms);
+  };
   const readSplit = async (dialogId: string): Promise<MingoDialogNode | null> => {
-    if (!splitSupported) return null;
+    if (!tokenUsageSplit || Date.now() < splitPausedUntil) return null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<typeof SPLIT_TIMED_OUT>(resolve => {
+      timer = setTimeout(() => resolve(SPLIT_TIMED_OUT), SPLIT_WAIT_MS);
+    });
     try {
-      const data = await post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY, {
-        id: dialogId,
-      });
-      return data.dialog;
-    } catch {
-      splitSupported = false;
+      const answer = await Promise.race([
+        post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY, { id: dialogId }),
+        timedOut,
+      ]);
+      if (answer === SPLIT_TIMED_OUT) {
+        pauseSplit(SPLIT_TIMEOUT_PAUSE_MS);
+        return null;
+      }
+      return answer.dialog;
+    } catch (error) {
+      // Any other failure (a 5xx, the network) pauses nothing: the next read, a retry of this one included, asks again.
+      if (isRefusal(error)) pauseSplit(SPLIT_REFUSAL_PAUSE_MS);
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   };
   const mutate = async (mutation: string, field: string, input: Record<string, unknown>): Promise<void> => {
