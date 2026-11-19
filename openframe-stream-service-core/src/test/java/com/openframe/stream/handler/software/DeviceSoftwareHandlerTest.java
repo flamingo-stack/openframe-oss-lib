@@ -559,6 +559,41 @@ class DeviceSoftwareHandlerTest {
     }
 
     @Test
+    void handle_updateWithoutTheRowBefore_afterAReconcileOfTheHost_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 7), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", null, lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_updatesOfLastOpenedAtOnly_ofAnUnresolvedHost_lookUpTheHostOnce() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false);
+
+        handler.handle(msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostResolver, times(1)).isResolvable("100");
+        verifyNoInteractions(fleetHostSoftwareCache, deviceSoftwareRepository, projectionTrigger);
+    }
+
+    @Test
+    void handle_realChangeOfAHostUnresolvedOnALastOpenedAtUpdate_isResolvedAgain() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false, true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 8), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostResolver, times(2)).isResolvable("100");
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
     void handle_realChangeAfterAReconcileOfTheHost_reconciles() {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));

@@ -49,7 +49,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     static final Duration SNAPSHOT_HOST_WINDOW = Duration.ofHours(24);
-    static final Duration SNAPSHOT_UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
+    static final Duration UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
     static final Duration RECONCILED_COMMIT_WINDOW = Duration.ofHours(1);
     static final long RECONCILED_COMMIT_CAPACITY = 100_000;
     static final String NO_COMMIT = "0";
@@ -69,8 +69,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private final Cache<Long, Boolean> snapshotReconciledHosts = Caffeine.newBuilder()
             .expireAfterWrite(SNAPSHOT_HOST_WINDOW)
             .build();
-    private final Cache<Long, Boolean> snapshotUnresolvedHosts = Caffeine.newBuilder()
-            .expireAfterWrite(SNAPSHOT_UNRESOLVED_HOST_WINDOW)
+    private final Cache<Long, Boolean> unresolvedHosts = Caffeine.newBuilder()
+            .expireAfterWrite(UNRESOLVED_HOST_WINDOW)
             .build();
     private final Cache<HostCommit, Boolean> reconciledCommits = Caffeine.newBuilder()
             .expireAfterWrite(RECONCILED_COMMIT_WINDOW)
@@ -106,12 +106,13 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (hostId == null) {
             return;
         }
-        if (onlyUntrackedColumnsChanged(payload) && recentlyReconciledHosts.getIfPresent(hostId) != null) {
+        boolean untrackedOnly = onlyUntrackedColumnsChanged(payload);
+        boolean unresolved = unresolvedHosts.getIfPresent(hostId) != null;
+        if (untrackedOnly && (recentlyReconciledHosts.getIfPresent(hostId) != null || unresolved)) {
             return;
         }
         boolean snapshotRead = isSnapshotRead(operation);
-        if (snapshotRead && (snapshotReconciledHosts.getIfPresent(hostId) != null
-                || snapshotUnresolvedHosts.getIfPresent(hostId) != null)) {
+        if (snapshotRead && (snapshotReconciledHosts.getIfPresent(hostId) != null || unresolved)) {
             return;
         }
         String commit = commitOf(payload);
@@ -121,8 +122,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         }
         String fleetHostId = String.valueOf(hostId);
         if (!fleetHostResolver.isResolvable(fleetHostId)) {
-            if (snapshotRead) {
-                snapshotUnresolvedHosts.put(hostId, Boolean.TRUE);
+            if (snapshotRead || untrackedOnly) {
+                unresolvedHosts.put(hostId, Boolean.TRUE);
             }
             log.debug("[software-cdc] host_software for unresolved Fleet host {} — skipping", hostId);
             return;
@@ -195,7 +196,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             reported.setUpdatedAt(now);
             changed.add(reported);
             affectedTitles.add(titleId);
-            affectedCves.addAll(reported.getVulnerabilities());
+            List<String> reportedCves = reported.getVulnerabilities();
+            affectedCves.addAll(reportedCves);
         }
 
         List<String> staleIds = new ArrayList<>();
@@ -218,27 +220,43 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     }
 
     private static DeviceSoftware reportedRow(FleetHostRef host, Long titleId, HostSoftwareTitle title) {
-        DeviceSoftware row = new DeviceSoftware();
-        row.setTenantId(host.tenantId());
-        row.setMachineId(host.machineId());
-        row.setSoftwareTitleId(titleId);
-        row.setName(title.getName());
-        row.setSource(title.getSource());
-        row.setVersions(versionsOf(title));
-        row.setUpgradeCode(title.getUpgradeCode());
-        row.setVendor(firstOf(title, HostSoftwareInstalledVersion::getVendor));
-        row.setArpKeys(valuesOf(title, HostSoftwareInstalledVersion::getArpKey));
-        row.setPackageFamilyNames(valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName));
-        row.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
-        row.setSystemComponent(systemComponentOf(title));
-        row.setWingetId(firstOf(title, HostSoftwareInstalledVersion::getWingetId));
+        String tenantId = host.tenantId();
+        String machineId = host.machineId();
+        String name = title.getName();
         String source = title.getSource();
+        List<String> versions = versionsOf(title);
+        String upgradeCode = title.getUpgradeCode();
+        String vendor = firstOf(title, HostSoftwareInstalledVersion::getVendor);
+        List<String> arpKeys = valuesOf(title, HostSoftwareInstalledVersion::getArpKey);
+        List<String> packageFamilyNames = valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName);
+        List<String> installerTypes = valuesOf(title, HostSoftwareInstalledVersion::getInstallerType);
+        Boolean systemComponent = systemComponentOf(title);
+        String wingetId = firstOf(title, HostSoftwareInstalledVersion::getWingetId);
         boolean app = FleetSource.of(source) == FleetSource.APPS;
         List<String> appPaths = app ? installedPathsOf(title) : List.of();
-        row.setBundleIdentifier(app ? title.getBundleIdentifier() : null);
-        row.setAppFileNames(appFileNamesOf(appPaths));
-        row.setTopLevelApp(topLevelAppOf(appPaths));
-        row.setVulnerabilities(vulnerabilitiesOf(title));
+        String bundleIdentifier = app ? title.getBundleIdentifier() : null;
+        List<String> appFileNames = appFileNamesOf(appPaths);
+        Boolean topLevelApp = topLevelAppOf(appPaths);
+        List<String> vulnerabilities = vulnerabilitiesOf(title);
+
+        DeviceSoftware row = new DeviceSoftware();
+        row.setTenantId(tenantId);
+        row.setMachineId(machineId);
+        row.setSoftwareTitleId(titleId);
+        row.setName(name);
+        row.setSource(source);
+        row.setVersions(versions);
+        row.setUpgradeCode(upgradeCode);
+        row.setVendor(vendor);
+        row.setArpKeys(arpKeys);
+        row.setPackageFamilyNames(packageFamilyNames);
+        row.setInstallerTypes(installerTypes);
+        row.setSystemComponent(systemComponent);
+        row.setWingetId(wingetId);
+        row.setBundleIdentifier(bundleIdentifier);
+        row.setAppFileNames(appFileNames);
+        row.setTopLevelApp(topLevelApp);
+        row.setVulnerabilities(vulnerabilities);
         return row;
     }
 
