@@ -115,7 +115,7 @@ export interface UseJetStreamDialogSubscriptionOptions {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onSubscribed?: () => void;
-  /** The ordered consumer finished replaying its backlog. */
+  /** The ordered consumer finished replaying its initial backlog. */
   onReplayComplete?: () => void;
   /** Called on disconnect, before reconnect attempt. Use to refresh auth. May return a verdict; see {@link NatsBeforeReconnect}. */
   onBeforeReconnect?: NatsBeforeReconnect;

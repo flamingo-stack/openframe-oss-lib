@@ -52,7 +52,7 @@ export interface ChatLiveTailOptions {
   onConnect: () => void;
   /** A replaying tail came back after a gap and delivered what the stream held: the engine refetches history. */
   onResync: () => void;
-  /** The ordered consumer finished replaying its backlog before it delivers further live events. */
+  /** The ordered consumer finished replaying its initial backlog. */
   onReplayComplete?: () => void;
   /** The tail is subscribed to `dialogId`: a transport that `awaitsSubscription` publishes only after it. */
   onSubscribed?: () => void;

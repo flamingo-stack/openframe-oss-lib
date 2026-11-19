@@ -67,7 +67,7 @@ export interface JetStreamOrderedSubscribeOptions {
    * is about to replay, and the replay then renders them a second time.
    */
   onCaughtUp?: () => void;
-  /** Called after the consumer delivers its backlog, or immediately when the backlog is empty. */
+  /** Called once when the initial consumer backlog is delivered or the consumer drains sooner. */
   onReplayComplete?: () => void;
 }
 
@@ -705,71 +705,75 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
       return { unsubscribe() {} };
     }
 
-    // Whether the consumer delivering now still owes `onCaughtUp` its backlog.
+    // A new publication can increase pending while the initial replay is being delivered.
+    // Use the creation count for replay, and keep the drain signal for reconnect history refetches.
+    let replayRemaining: number | undefined;
+    let replayOwed = opts.onReplayComplete !== undefined;
     let backlogOwed = true;
-    const reportCaughtUp = (replayComplete: boolean) => {
+    const reportReplayComplete = () => {
+      if (!replayOwed || closed) return;
+      replayOwed = false;
+      invokeCallback('onReplayComplete', opts.onReplayComplete);
+    };
+    const reportCaughtUp = () => {
       if (!backlogOwed || closed) return;
       backlogOwed = false;
-      if (replayComplete) invokeCallback('onReplayComplete', opts.onReplayComplete);
       invokeCallback('onCaughtUp', opts.onCaughtUp);
     };
-    // An empty backlog has no message to say so: it shows only in the answer to
-    // CONSUMER.CREATE, which `info(true)` returns without asking the server again.
-    const reportIfNothingPending = async (consumerName?: string) => {
+    const readCreationBacklog = async (recreatedName?: string) => {
+      // Read the cached CONSUMER.CREATE answer, including for a consumer that has nothing to deliver.
+      const info = await consumer.info(true).catch(() => null);
+      if (!info || (recreatedName !== undefined && info.name !== recreatedName)) return;
+      if (recreatedName === undefined) replayRemaining = info.num_pending;
+      if (info.num_pending !== 0) return;
+      reportReplayComplete();
+      reportCaughtUp();
+    };
+    const handleDelivery = async (msg: JsMsg) => {
       try {
-        const info = await consumer.info(true);
-        if (consumerName !== undefined && info.name !== consumerName) return;
-        if (info.num_pending === 0) reportCaughtUp(true);
-      } catch {
-        // A failed lookup reports nothing: the next message with `pending === 0` does instead.
+        await onMessage(msg);
+      } catch (e) {
+        emitStatus({ status: 'error', data: e });
       }
+      const drained = msg.info.pending === 0;
+      if (replayOwed) {
+        if (replayRemaining !== undefined) replayRemaining -= 1;
+        // A true drain also settles replay if creation info was unavailable or retained messages expired.
+        if (drained || replayRemaining === 0) reportReplayComplete();
+      }
+      if (drained) reportCaughtUp();
     };
 
-    (async () => {
-      try {
-        const iter = await consumer.consume();
-        if (closed) {
-          try {
-            await iter.close();
-          } catch {
-            // ignore
-          }
-          return;
-        }
-        iterRef.current = iter;
-        if (opts.onRecovered || opts.onCaughtUp || opts.onReplayComplete) {
-          watchForRecovery(iter, nats.ConsumerEvents.OrderedConsumerRecreated, consumerName => {
-            backlogOwed = true;
-            invokeCallback('onRecovered', opts.onRecovered);
-            // nats.ws announces the recreated consumer before it records it as
-            // the current one (a promise continuation does that), so its answer
-            // is read once those have run — and only if it is the one announced.
-            setTimeout(() => {
-              void reportIfNothingPending(consumerName);
-            }, 0);
-          });
-        }
-        if (opts.onCaughtUp || opts.onReplayComplete) await reportIfNothingPending();
-        for await (const msg of iter) {
-          if (closed) break;
-          try {
-            await onMessage(msg);
-          } catch (e) {
-            emitStatus({ status: 'error', data: e });
-          }
-          // `pending` is what the stream still held for this consumer when it
-          // sent this message: 0 means the backlog ends here.
-          if (msg.info.pending === 0) reportCaughtUp(true);
-        }
-      } catch (e) {
-        if (!closed) {
-          emitStatus({ status: 'error', data: e });
-          // This consumer delivers nothing more: settle what it owed rather than
-          // leave the caller's history at its pre-gap snapshot (see `onCaughtUp`).
-          reportCaughtUp(false);
-        }
+    async function consumeMessages(): Promise<void> {
+      const iter = await consumer.consume();
+      if (closed) {
+        await iter.close().catch(() => undefined);
+        return;
       }
-    })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
+      iterRef.current = iter;
+      if (opts.onRecovered || opts.onCaughtUp || opts.onReplayComplete) {
+        watchForRecovery(iter, nats.ConsumerEvents.OrderedConsumerRecreated, consumerName => {
+          backlogOwed = true;
+          invokeCallback('onRecovered', opts.onRecovered);
+          // nats.ws announces the recreated consumer before it records it as current.
+          setTimeout(() => {
+            void readCreationBacklog(consumerName);
+          }, 0);
+        });
+      }
+      if (opts.onCaughtUp || opts.onReplayComplete) await readCreationBacklog();
+      for await (const msg of iter) {
+        if (closed) break;
+        await handleDelivery(msg);
+      }
+    }
+
+    void consumeMessages().catch((e: unknown) => {
+      if (closed) return;
+      emitStatus({ status: 'error', data: e });
+      // A failed consumer can no longer replay, so a waiting host can refetch its history.
+      reportCaughtUp();
+    });
 
     return {
       unsubscribe() {
