@@ -2,8 +2,10 @@ package com.openframe.data.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.ToolOsSupport;
 import com.openframe.data.nats.delivery.ToolInstallationDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
+import com.openframe.data.repository.device.MachineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,6 +24,7 @@ public class ToolInstallationService {
     private final IntegratedToolService integratedToolService;
     private final ToolCommandParamsResolver toolCommandParamsResolver;
     private final DeliveryRouter deliveryRouter;
+    private final MachineRepository machineRepository;
 
     public void process(String machineId, IntegratedToolAgent toolAgent) {
         process(machineId, toolAgent, false);
@@ -29,6 +32,11 @@ public class ToolInstallationService {
 
     public void process(String machineId, IntegratedToolAgent toolAgent, boolean reinstall) {
         String toolId = toolAgent.getToolId();
+        if (!supports(machineId, toolAgent)) {
+            log.info("Skipped {} agent installation for machine {}: its OS version is below the agent's minimum",
+                    toolId, machineId);
+            return;
+        }
         try {
             IntegratedTool tool = getIntegratedToolData(toolId);
 
@@ -51,6 +59,12 @@ public class ToolInstallationService {
             // TODO: add fallback mechanism
             log.error("Failed to publish {} agent installation message for machine {}", toolId, machineId, e);
         }
+    }
+
+    public boolean supports(String machineId, IntegratedToolAgent toolAgent) {
+        return machineRepository.findByMachineId(machineId)
+                .map(machine -> !ToolOsSupport.isUnsupported(machine, toolAgent))
+                .orElse(true);
     }
 
     // TODO: need have boolean field at agent configuration like "hasToolServer"

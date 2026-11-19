@@ -195,6 +195,14 @@ public class IntegratedToolAgentService {
     }
 
     @RetryOnOptimisticLockingFailure
+    public void markMinOsVersionsApplied(String id, Map<String, String> minOsVersions) {
+        IntegratedToolAgent agent = getByUuid(id);
+        agent.setAppliedMinOsVersions(minOsVersions);
+        agentRepository.save(agent);
+        log.info("Applied minimum OS versions of tool agent {}: {}", agent.getKey(), minOsVersions);
+    }
+
+    @RetryOnOptimisticLockingFailure
     public void updateReleaseAgentVersion(String id, String newVersion) {
         IntegratedToolAgent agent = getByUuid(id);
         boolean releaseAgent = agent.isReleaseVersion();

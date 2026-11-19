@@ -8,6 +8,7 @@ import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
+import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
@@ -19,6 +20,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -37,6 +39,7 @@ public class DeviceLifecycleService {
     private final ToolConnectionRepository toolConnectionRepository;
     private final MachineWriter machineWriter;
     private final ApplicationEventPublisher eventPublisher;
+    private final ToolOsSupportService toolOsSupportService;
 
     @Value("${openframe.features.devices.managed-status.enabled:false}")
     private final boolean managedStatusEnabled;
@@ -60,7 +63,7 @@ public class DeviceLifecycleService {
             log.debug("Machine {} stays PENDING: no heartbeat since registration", machineId);
             return;
         }
-        if (!allRequiredToolsConnected(machineId)) {
+        if (!allRequiredToolsConnected(machine)) {
             log.debug("Machine {} stays PENDING: required tools not all connected", machineId);
             return;
         }
@@ -73,14 +76,16 @@ public class DeviceLifecycleService {
         return lastSeen != null && (registeredAt == null || lastSeen.isAfter(registeredAt));
     }
 
-    private boolean allRequiredToolsConnected(String machineId) {
+    private boolean allRequiredToolsConnected(Machine machine) {
+        Set<ToolType> required = EnumSet.copyOf(REQUIRED_TOOL_TYPES);
+        required.removeAll(toolOsSupportService.unsupportedToolTypes(machine));
         List<ToolConnection> connected = toolConnectionRepository.findByMachineIdAndToolTypeInAndStatus(
-                machineId, REQUIRED_TOOL_TYPES, ConnectionStatus.CONNECTED);
+                machine.getMachineId(), required, ConnectionStatus.CONNECTED);
         Set<ToolType> connectedTypes = connected.stream()
                 .filter(connection -> isNotBlank(connection.getAgentToolId()))
                 .map(ToolConnection::getToolType)
                 .collect(Collectors.toSet());
-        return connectedTypes.containsAll(REQUIRED_TOOL_TYPES);
+        return connectedTypes.containsAll(required);
     }
 
     // The guard makes the promotion atomic: a heartbeat and a tool connection racing here promote once and publish once.

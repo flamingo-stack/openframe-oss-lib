@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.List;
+import java.util.Map;
 @Data
 @Document(collection = "integrated_tool_agents")
 @CompoundIndex(name = "tenant_key_idx", def = "{'tenantId':1,'key':1}", unique = true, sparse = true)
@@ -30,4 +31,5 @@ public class IntegratedToolAgent implements TenantScoped {
     private List<String> uninstallationCommandArgs;
     private ToolAgentStatus status;
     private PublishState publishState;
+    private Map<String, String> appliedMinOsVersions;
 }
