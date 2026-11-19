@@ -91,7 +91,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (payload == null) {
             return;
         }
-        JsonNode row = isDelete(payload.getOperation()) ? payload.getBefore() : payload.getAfter();
+        String operation = payload.getOperation();
+        JsonNode row = isDelete(operation) ? payload.getBefore() : payload.getAfter();
         if (row == null) {
             return;
         }
@@ -99,12 +100,10 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (hostId == null) {
             return;
         }
-        JsonNode before = payload.getBefore();
-        JsonNode after = payload.getAfter();
-        if (isUpdate(payload.getOperation()) && differsOnlyIn(before, after, UNTRACKED_COLUMNS)) {
+        if (onlyUntrackedColumnsChanged(payload)) {
             return;
         }
-        boolean snapshotRead = isSnapshotRead(payload.getOperation());
+        boolean snapshotRead = isSnapshotRead(operation);
         if (snapshotRead && (snapshotReconciledHosts.getIfPresent(hostId) != null
                 || snapshotUnresolvedHosts.getIfPresent(hostId) != null)) {
             return;
@@ -133,6 +132,13 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     }
 
     private record HostCommit(long hostId, String commit) {
+    }
+
+    private static boolean onlyUntrackedColumnsChanged(DebeziumMessage.Payload<JsonNode> payload) {
+        String operation = payload.getOperation();
+        JsonNode before = payload.getBefore();
+        JsonNode after = payload.getAfter();
+        return isUpdate(operation) && differsOnlyIn(before, after, UNTRACKED_COLUMNS);
     }
 
     private static String commitOf(DebeziumMessage.Payload<JsonNode> payload) {
