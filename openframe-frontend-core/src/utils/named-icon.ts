@@ -1,13 +1,19 @@
 /**
- * An icon NAME (a database `icon_name`) as an icon a SERVER can draw: the component the chat would draw for it, loaded
- * here rather than on demand in the browser, with the colours its name states. For a server that renders an icon as an
- * image (an MCP host's `icons`, an email), so the picture is the chat's own. The name rules are `iconRefOfName`'s.
+ * An icon value (`EntityIconValue`: a library `name`, an uploaded `url`) shown where React does not draw it. ONE place,
+ * beside `EntityIcon` (which draws the same value in React): every image of an icon, on every surface, comes from here.
+ *
+ *   - `entityIconImages(icon, iconsUrl)`: the value as MCP's standard `Icon`s (`src`, `mimeType`, `sizes`, `theme`). An
+ *     upload is its own image; a library name is the host's icon endpoint (`EndpointsRuntime.iconsUrl`, the hub's
+ *     `/api/icons`), `<iconsUrl>/<name>?theme=light|dark`, once per host theme.
+ *   - `loadNamedIcon(name, …)`: what that endpoint draws, the chat's own icon for the name (`iconRefOfName`'s rules),
+ *     loaded on a server with the colours its name states.
  *
  * No React import and no client module: the icon modules are plain function components.
  */
 import type { ComponentType } from 'react';
 import type { IconRef } from '../components/chat/utils/icon-loading';
 import { iconRefOfName } from '../components/chat/utils/icon-refs';
+import type { EntityIconValue } from '../components/icon-display';
 import type { LoadedIconProps } from '../components/icons-v2-generated/icon-loaders';
 
 /** What a loaded icon is drawn with: its size and colours (a mark with parts of its own takes more than one). */
@@ -55,4 +61,57 @@ function propsOf(ref: IconRef, size: number, color: string): NamedIconProps {
     };
   }
   return { size, color };
+}
+
+/** The edge, in pixels, an icon endpoint draws a library icon at. */
+export const NAMED_ICON_PIXELS = 96;
+
+/** The host theme an icon image is drawn for: a dark glyph on a light surface, a light one on a dark surface. */
+export type NamedIconTheme = 'light' | 'dark';
+
+/** The theme an icon request asks for; anything else is `dark` (the chat's own surfaces are dark). */
+export function namedIconTheme(value: string | null | undefined): NamedIconTheme {
+  return value === 'light' ? 'light' : 'dark';
+}
+
+/** MCP's standard `Icon` (the `icons` of a tool, a prompt, a resource or a result). */
+export interface StandardIcon {
+  src: string;
+  mimeType?: string;
+  sizes?: string[];
+  theme?: NamedIconTheme;
+}
+
+const IMAGE_TYPES: Readonly<Record<string, string>> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+  gif: 'image/gif',
+};
+
+/** Where the icon endpoint draws library icon `name` for `theme`. */
+export function namedIconImageUrl(iconsUrl: string, name: string, theme: NamedIconTheme): string {
+  return `${iconsUrl.replace(/\/+$/, '')}/${encodeURIComponent(name)}?theme=${theme}`;
+}
+
+/**
+ * An icon value as images, MCP's standard `icons`: its upload as itself, else its library icon from `iconsUrl` once per
+ * host theme, else none. `iconsUrl` must be absolute wherever the images leave the page (an MCP result).
+ */
+export function entityIconImages(icon: EntityIconValue | null | undefined, iconsUrl: string): StandardIcon[] {
+  if (icon?.url) {
+    const extension = (icon.url.split(/[?#]/)[0] ?? '').split('.').pop()?.toLowerCase() ?? '';
+    const mimeType = IMAGE_TYPES[extension];
+    return [{ src: icon.url, ...(mimeType ? { mimeType } : {}) }];
+  }
+  if (!icon?.name) return [];
+  const sizes = [`${NAMED_ICON_PIXELS}x${NAMED_ICON_PIXELS}`];
+  return (['light', 'dark'] as const).map(theme => ({
+    src: namedIconImageUrl(iconsUrl, icon.name as string, theme),
+    mimeType: 'image/png',
+    sizes,
+    theme,
+  }));
 }
