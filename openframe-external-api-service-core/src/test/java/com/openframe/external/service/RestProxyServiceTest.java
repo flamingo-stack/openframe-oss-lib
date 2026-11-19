@@ -219,7 +219,7 @@ class RestProxyServiceTest {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("http://rmm-api", "8000", ToolUrlType.API));
         when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
 
-        service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api/v1/agents", "status=online&page=2"), null);
+        catchThrowable(() -> service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api/v1/agents", "status=online&page=2"), null));
 
         ArgumentCaptor<URI> originalUri = ArgumentCaptor.forClass(URI.class);
         verify(proxyUrlResolver).resolvePreservingEncoding(eq(TOOL_ID), eq("http://rmm-api"), eq("8000"), originalUri.capture(), eq("/tools"));
@@ -232,7 +232,7 @@ class RestProxyServiceTest {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("http://rmm-api", "8000", ToolUrlType.API));
         when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
 
-        service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api/v1/agents", null), null);
+        catchThrowable(() -> service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api/v1/agents", null), null));
 
         ArgumentCaptor<URI> originalUri = ArgumentCaptor.forClass(URI.class);
         verify(proxyUrlResolver).resolvePreservingEncoding(eq(TOOL_ID), eq("http://rmm-api"), eq("8000"), originalUri.capture(), eq("/tools"));
