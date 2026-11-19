@@ -73,8 +73,17 @@ export function AskAi() {
       {/* Demo-only chooser: flip the SAME chat between Guide mode and an
           OpenFrame AI agent. A real embedder might hardcode one agent slug.
           Bottom-RIGHT — opposite corner from the floating walkthrough-video
-          widget (bottom-left), so neither covers the other. */}
-      <div className="fixed bottom-4 right-4 z-[60] flex gap-1 rounded-lg border border-ods-border bg-ods-card p-1 shadow-lg">
+          widget (bottom-left), so neither covers the other.
+          It must work while the chat is OPEN: the panel is a modal dialog
+          (z-[9998]) that sets `pointer-events: none` on the body and closes on
+          a press or focus outside it. So the chooser sits above it, takes
+          pointer events back, and neither its press nor its focus reaches the
+          dialog's outside-click handling. */}
+      <div
+        className="pointer-events-auto fixed bottom-4 right-4 z-[9999] flex gap-1 rounded-lg border border-ods-border bg-ods-card p-1 shadow-lg"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.preventDefault()}
+      >
         {AGENT_CHOICES.map((choice) => (
           <button
             key={choice.label}
