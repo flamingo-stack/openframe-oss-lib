@@ -69,6 +69,7 @@ export {
   createMingoGraphqlDialogs,
   createMingoGraphqlHistory,
   dialogItemOfNode,
+  MingoGraphqlError,
   type MingoGraphqlDialogsOptions,
   type MingoGraphqlHistoryOptions,
   type MingoGraphqlPost,
