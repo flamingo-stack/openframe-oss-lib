@@ -1,6 +1,7 @@
 package com.openframe.client.listener.packageupdate;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
@@ -10,10 +11,12 @@ import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Done;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.State;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +34,7 @@ import static org.mockito.Mockito.when;
 class PackageUpdateExecutionRecorderTest {
 
     @Mock private ScriptExecutionRepository scriptExecutionRepository;
+    @Mock private PackageCatalogVersions packageCatalogVersions;
 
     @InjectMocks private PackageUpdateExecutionRecorder recorder;
 
@@ -44,6 +48,15 @@ class PackageUpdateExecutionRecorderTest {
         when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineIdAndPackageUpdateRequestId(
                 "t1", "exec-1", "m1", "req-1")).thenReturn(Optional.of(row));
         return row;
+    }
+
+    private PackageUpdateRequest stubWingetCatalogVersion(String catalogVersion) {
+        when(packageCatalogVersions.hasShownLatest(PackageManagerType.WINGET, "Microsoft.PowerShell", null)).thenReturn(true);
+        when(packageCatalogVersions.shownLatest(PackageManagerType.WINGET, "Microsoft.PowerShell", null))
+                .thenReturn(catalogVersion);
+        return PackageUpdateRequest.builder()
+                .tenantId("t1").requestId("req-1").executionId("exec-1")
+                .packageManager(PackageManagerType.WINGET).packageName("Microsoft.PowerShell").build();
     }
 
     private static PackageUpdateStatusMessage event(State state) {
@@ -184,6 +197,70 @@ class PackageUpdateExecutionRecorderTest {
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
         assertThat(row.getStdout()).isEqualTo("Already up to date (4.36.140).");
+    }
+
+    @Test
+    void record_alreadyLatestBelowTheCatalogVersion_failsAsNoApplicableUpdate() {
+        // setup
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        PackageUpdateRequest wingetRequest = stubWingetCatalogVersion("7.7.0.0");
+
+        // execution
+        recorder.record(wingetRequest, "m1", done(Done.Result.ALREADY_LATEST, "7.6.10.0", false));
+
+        // verifications
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getFailureReason()).isEqualTo(ExecutionFailureReason.SYSTEM_SCRIPT_ERROR);
+        assertThat(row.getError()).isEqualTo("No applicable update for this install: installed 7.6.10.0, target 7.7.0.0");
+        assertThat(row.getStdout()).isEqualTo("Already up to date (7.6.10.0).");
+        assertThat(row.getFinishedAt()).isNotNull();
+        verify(scriptExecutionRepository).save(row);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7.7.0.0", "7.8.1.0"})
+    void record_alreadyLatestAtOrAboveTheCatalogVersion_succeeds(String installedVersion) {
+        // setup
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        PackageUpdateRequest wingetRequest = stubWingetCatalogVersion("7.7.0.0");
+
+        // execution
+        recorder.record(wingetRequest, "m1", done(Done.Result.ALREADY_LATEST, installedVersion, false));
+
+        // verifications
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        assertThat(row.getFailureReason()).isNull();
+        assertThat(row.getError()).isNull();
+    }
+
+    @Test
+    void record_alreadyLatestOfAPackageTheCatalogLacks_succeeds() {
+        // setup
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        PackageUpdateRequest chocoRequest = PackageUpdateRequest.builder()
+                .tenantId("t1").requestId("req-1").executionId("exec-1")
+                .packageManager(PackageManagerType.CHOCO).packageName("git").build();
+        when(packageCatalogVersions.hasShownLatest(PackageManagerType.CHOCO, "git", null)).thenReturn(false);
+
+        // execution
+        recorder.record(chocoRequest, "m1", done(Done.Result.ALREADY_LATEST, "2.40.0", false));
+
+        // verifications
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        verify(packageCatalogVersions, never()).shownLatest(PackageManagerType.CHOCO, "git", null);
+    }
+
+    @Test
+    void record_upgraded_succeedsWithoutAskingTheCatalog() {
+        // setup
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        // execution
+        recorder.record(request, "m1", done(Done.Result.UPGRADED, "7.7.0.0", false));
+
+        // verifications
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        verifyNoInteractions(packageCatalogVersions);
     }
 
     @Test
