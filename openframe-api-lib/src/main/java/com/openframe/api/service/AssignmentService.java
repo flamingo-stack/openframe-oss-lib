@@ -115,8 +115,9 @@ public class AssignmentService {
     @Transactional
     public ItemAssignment assignItem(String itemId, AssignmentItemType itemType,
                                       AssignmentTargetType targetType, String targetId) {
-        return auditedMethodRunner.runWithoutCompare(LINK_CREATE, targetTypeOf(itemType), itemId,
-                linkDetails(targetType, targetId), () -> createAssignment(itemId, itemType, targetType, targetId));
+        return repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
+                .orElseGet(() -> auditedMethodRunner.runWithoutCompare(LINK_CREATE, targetTypeOf(itemType), itemId,
+                        linkDetails(targetType, targetId), () -> createAssignment(itemId, itemType, targetType, targetId)));
     }
 
     private static Map<String, Object> linkDetails(AssignmentTargetType targetType, String targetId) {

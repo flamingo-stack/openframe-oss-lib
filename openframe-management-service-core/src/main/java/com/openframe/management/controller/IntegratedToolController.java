@@ -40,7 +40,7 @@ public class IntegratedToolController {
     }
 
     @GetMapping("/{id}")
-    @Audited(action = TOOL_CREDENTIALS_VIEW, targetId = "#id", condition = "#result['status'] == 'success'")
+    @Audited(action = TOOL_CREDENTIALS_VIEW, targetId = "#result['tool'].id", condition = "#result['status'] == 'success'")
     public Map<String, Object> getTool(@PathVariable String id) {
         return toolService.getTool(id)
             .map(tool -> Map.of("status", "success", "tool", tool))

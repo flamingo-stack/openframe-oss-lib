@@ -42,7 +42,7 @@ public class CommandDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = EXECUTION_CANCEL, targetId = "#input.executionId", details = "machineId=#input.machineId")
+    @Audited(action = EXECUTION_CANCEL, targetId = "#input.executionId", deviceId = "#input.machineId", compare = false)
     public DispatchResponse cancelExecution(@InputArgument @Valid CancelExecutionInput input) {
         return commandDispatchService.cancelExecution(input);
     }

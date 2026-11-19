@@ -1,6 +1,5 @@
 package com.openframe.api.dto.shared;
 
-import com.openframe.core.dto.HasUserErrors;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,7 +11,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MutationDeletePayload implements HasUserErrors {
+public class MutationDeletePayload {
     private String deletedId;
     @Builder.Default
     private List<MutationError> userErrors = List.of();
@@ -27,10 +26,5 @@ public class MutationDeletePayload implements HasUserErrors {
         return MutationDeletePayload.builder()
                 .userErrors(List.of(MutationError.builder().message(message).build()))
                 .build();
-    }
-
-    @Override
-    public List<String> userErrorMessages() {
-        return userErrors.stream().map(MutationError::getMessage).toList();
     }
 }

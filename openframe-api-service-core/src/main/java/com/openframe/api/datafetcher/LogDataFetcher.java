@@ -46,6 +46,7 @@ public class LogDataFetcher {
     @DgsQuery
     @Audited(action = AUDIT_LOG_VIEW, condition = "#after == null && #before == null",
             details = {"startDate=#filter?.startDate", "endDate=#filter?.endDate",
+            "timestampFrom=#filter?.timestampFrom", "timestampTo=#filter?.timestampTo",
             "eventTypes=#filter?.eventTypes", "toolTypes=#filter?.toolTypes", "severities=#filter?.severities",
             "organizationIds=#filter?.organizationIds", "deviceId=#filter?.deviceId", "search=#search"})
     public GenericConnection<GenericEdge<LogEvent>> logs(

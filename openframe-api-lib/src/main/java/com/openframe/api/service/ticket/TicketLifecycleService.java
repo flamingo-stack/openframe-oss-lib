@@ -1,8 +1,6 @@
 package com.openframe.api.service.ticket;
 
 import com.github.pravin.raha.lexorank4j.LexoRank;
-import com.openframe.core.exception.ValidationException;
-import com.openframe.core.exception.ConflictException;
 import com.openframe.api.dto.ticket.ReorderTicketInput;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.TransitionTicketInput;
@@ -10,9 +8,13 @@ import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
 import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.InternalException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
@@ -31,23 +33,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.openframe.api.service.ticket.TicketTransitionPolicyValidator.MANUALLY_CREATABLE_KINDS;
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
+import static com.openframe.data.document.audit.AuditAction.TICKET_ARCHIVE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CHANGE;
 import static com.openframe.data.document.ticket.TicketStatusKind.AI_ASSISTANCE;
 import static com.openframe.data.document.ticket.TicketStatusKind.RESOLVED;
 import static org.springframework.util.StringUtils.hasText;
-
-import com.openframe.audit.AuditedMethodRunner;
-import java.util.HashMap;
-import java.util.Map;
-import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CHANGE;
-
-import com.openframe.audit.AuditCall;
-import static com.openframe.data.document.audit.AuditAction.TICKET_ARCHIVE;
 
 /**
  * Lifecycle operations for custom-status tickets.

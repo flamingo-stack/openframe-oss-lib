@@ -51,7 +51,7 @@ public class LogController {
     @GetMapping
     @ResponseStatus(OK)
     @Audited(action = AUDIT_LOG_VIEW, condition = "#cursor == null", details = {"startDate=#startDate",
-            "endDate=#endDate", "toolTypes=#toolTypes", "eventTypes=#eventTypes", "severities=#severities",
+            "endDate=#endDate", "timestampFrom=#timestampFrom", "timestampTo=#timestampTo", "toolTypes=#toolTypes", "eventTypes=#eventTypes", "severities=#severities",
             "customerIds=#customerIds", "deviceId=#deviceId", "search=#search"})
     public LogsResponse getLogs(
             @Parameter(description = "Start date in YYYY-MM-DD format")

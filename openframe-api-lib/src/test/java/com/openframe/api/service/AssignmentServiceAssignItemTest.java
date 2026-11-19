@@ -19,6 +19,7 @@ import org.springframework.dao.DuplicateKeyException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,12 +42,13 @@ class AssignmentServiceAssignItemTest {
 
     private final ItemAssignmentRepository repository = mock(ItemAssignmentRepository.class);
     private final OrganizationRepository organizationRepository = mock(OrganizationRepository.class);
+    private final AuditedMethodRunner auditedMethodRunner = mock(AuditedMethodRunner.class, CALLS_REAL_METHODS);
     private final AssignmentService service = new AssignmentService(
             repository,
             organizationRepository,
             mock(MachineRepository.class),
             mock(TicketRepository.class),
-            mock(KnowledgeBaseItemRepository.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
+            mock(KnowledgeBaseItemRepository.class), auditedMethodRunner);
 
     @Test
     @DisplayName("a first assignment is inserted with the target's resolved display name")
@@ -67,11 +69,10 @@ class AssignmentServiceAssignItemTest {
                 .returns("o1", ItemAssignment::getTargetId)
                 .returns("Dunder Mifflin", ItemAssignment::getDisplayName);
         assertThat(assignment).isSameAs(saved.getValue());
-        verify(repository, never()).findByItemIdAndTargetTypeAndTargetId(any(), any(), any());
     }
 
     @Test
-    @DisplayName("assigning the same target again returns the existing assignment, untouched, instead of failing")
+    @DisplayName("assigning the same target again returns the existing assignment, untouched, and records no new link")
     void repeatedAssignmentReturnsTheExistingOne() {
         ItemAssignment existing = ItemAssignment.builder()
                 .id("as-1")
@@ -82,10 +83,9 @@ class AssignmentServiceAssignItemTest {
                 .displayName("Dunder Mifflin")
                 .createdAt(Instant.ofEpochMilli(1_760_000_000_000L))
                 .build();
-        when(repository.save(any()))
-                .thenReturn(existing)
-                .thenThrow(new DuplicateKeyException("item_target_unique"));
+        when(repository.save(any())).thenReturn(existing);
         when(repository.findByItemIdAndTargetTypeAndTargetId("a1", ORGANIZATION, "o1"))
+                .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(existing));
 
         ItemAssignment first = service.assignItem("a1", ARTICLE, ORGANIZATION, "o1");
@@ -93,8 +93,9 @@ class AssignmentServiceAssignItemTest {
 
         assertThat(first).isSameAs(existing);
         assertThat(second).isSameAs(existing);
-        verify(repository, times(2)).save(any());
+        verify(repository, times(1)).save(any());
         verify(repository, never()).delete(any());
+        verify(auditedMethodRunner, times(1)).runWithoutCompare(any(), any(), any(), any(), any(Supplier.class));
     }
 
     @Test

@@ -15,7 +15,6 @@ import com.openframe.audit.Audited;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
-import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
@@ -161,8 +160,7 @@ public class SoftwareBundleService {
                     .withTargetIdInResult(true)
                     .withTargetIdFromResult(result -> ((SoftwareBundleResponse) result).getScheduleId());
         }
-        AuditAction action = input.getAction() == SoftwareAction.INSTALL ? SOFTWARE_INSTALL : SOFTWARE_UPDATE;
-        return AuditCall.of(action, null, details);
+        return AuditCall.of(input.getAction().select(SOFTWARE_INSTALL, SOFTWARE_UPDATE), null, details);
     }
 
     private SoftwareBundleResponse doSubmit(SoftwareBundle entity, SubmitSoftwareBundleInput input, String actor,

@@ -12,6 +12,9 @@ import com.openframe.api.exception.ticket.SystemTicketStatusModificationExceptio
 import com.openframe.api.exception.ticket.TicketStatusInUseException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusOperation;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -24,22 +27,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.api.exception.ticket.TicketStatusOperation.*;
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
-import static com.openframe.data.document.ticket.TicketStatusKind.*;
-
-import com.openframe.audit.AuditCall;
-import com.openframe.audit.AuditedMethodRunner;
-import com.openframe.audit.Audited;
-import java.util.HashMap;
-import java.util.Map;
 import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CREATE;
 import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_DELETE;
 import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_MOVE;
 import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_UPDATE;
+import static com.openframe.data.document.ticket.TicketStatusKind.*;
 
 /**
  * Tenant ticket status definitions: the seeded system statuses plus custom ones managed by admins.
