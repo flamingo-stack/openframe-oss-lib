@@ -544,7 +544,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   // Adapter-armed flags.
   let suppressAgentBusy = 0;
   let adoptTrailingAssistant = false;
-  /** See `setTailReplaysHistory`: false only while the tail opened on new messages only. */
+  /** Whether the tail might still replay requests the history already holds. */
   let tailReplaysHistory = true;
   /** A message a replay took over: the first chunk that writes to its body replaces it. Until then the old copy stays. */
   let adoptedMessageId: string | null = null;
@@ -705,12 +705,12 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
    *  Dedup layers in priority order: seq identity → one-shot optimistic-echo
    *  consumption → same-author content window (seq-less transports only). */
   /**
-   * A replayed `MESSAGE_REQUEST` echo of the prompt the thread already holds as its last row. The backend persists a
-   * user row with no stream seq, so after a reload mid-reply the history has the prompt but its seq cannot move the
+   * A replayed `MESSAGE_REQUEST` echo of the prompt the thread already holds as its last row. An older user row can
+   * lack a stream seq, so after a reload mid-reply the history has the prompt but its seq cannot move the
    * live tail past the echo: the tail replays it. Its twin is the trailing persisted user row with the same text, when
    * nothing in the thread reached the echo's seq. A new send that repeats an answered prompt is not one: the answer,
-   * stamped with its seq, sits after the older twin. Nor is any echo of a tail that opened on new messages only
-   * (`setTailReplaysHistory(false)`): it cannot replay what the history holds.
+   * stamped with its seq, sits after the older twin. A tail that opened on new messages or finished its replay
+   * (`setTailReplaysHistory(false)`) delivers fresh requests.
    */
   function isReplayOfTrailingPrompt(text: string, authorType: 'admin' | 'user', seq: number): boolean {
     if (!tailReplaysHistory) return false;

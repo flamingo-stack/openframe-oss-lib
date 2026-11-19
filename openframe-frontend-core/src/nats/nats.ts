@@ -67,6 +67,8 @@ export interface JetStreamOrderedSubscribeOptions {
    * is about to replay, and the replay then renders them a second time.
    */
   onCaughtUp?: () => void;
+  /** Called after the consumer delivers its backlog, or immediately when the backlog is empty. */
+  onReplayComplete?: () => void;
 }
 
 export interface JetStreamSubscriptionHandle {
@@ -705,9 +707,10 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
 
     // Whether the consumer delivering now still owes `onCaughtUp` its backlog.
     let backlogOwed = true;
-    const reportCaughtUp = () => {
+    const reportCaughtUp = (replayComplete: boolean) => {
       if (!backlogOwed || closed) return;
       backlogOwed = false;
+      if (replayComplete) invokeCallback('onReplayComplete', opts.onReplayComplete);
       invokeCallback('onCaughtUp', opts.onCaughtUp);
     };
     // An empty backlog has no message to say so: it shows only in the answer to
@@ -716,7 +719,7 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
       try {
         const info = await consumer.info(true);
         if (consumerName !== undefined && info.name !== consumerName) return;
-        if (info.num_pending === 0) reportCaughtUp();
+        if (info.num_pending === 0) reportCaughtUp(true);
       } catch {
         // A failed lookup reports nothing: the next message with `pending === 0` does instead.
       }
@@ -734,7 +737,7 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           return;
         }
         iterRef.current = iter;
-        if (opts.onRecovered || opts.onCaughtUp) {
+        if (opts.onRecovered || opts.onCaughtUp || opts.onReplayComplete) {
           watchForRecovery(iter, nats.ConsumerEvents.OrderedConsumerRecreated, consumerName => {
             backlogOwed = true;
             invokeCallback('onRecovered', opts.onRecovered);
@@ -746,7 +749,7 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
             }, 0);
           });
         }
-        if (opts.onCaughtUp) await reportIfNothingPending();
+        if (opts.onCaughtUp || opts.onReplayComplete) await reportIfNothingPending();
         for await (const msg of iter) {
           if (closed) break;
           try {
@@ -756,14 +759,14 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           }
           // `pending` is what the stream still held for this consumer when it
           // sent this message: 0 means the backlog ends here.
-          if (msg.info.pending === 0) reportCaughtUp();
+          if (msg.info.pending === 0) reportCaughtUp(true);
         }
       } catch (e) {
         if (!closed) {
           emitStatus({ status: 'error', data: e });
           // This consumer delivers nothing more: settle what it owed rather than
           // leave the caller's history at its pre-gap snapshot (see `onCaughtUp`).
-          reportCaughtUp();
+          reportCaughtUp(false);
         }
       }
     })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
