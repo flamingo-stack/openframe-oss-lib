@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +23,9 @@ public interface DeviceSoftwareRepository extends MongoRepository<DeviceSoftware
 
     List<DeviceSoftware> findByTenantIdAndSoftwareTitleIdAndMachineIdIn(
             String tenantId, Long softwareTitleId, List<String> machineIds);
+
+    List<DeviceSoftware> findByTenantIdAndMachineIdInAndSource(
+            String tenantId, Collection<String> machineIds, String source);
 
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 

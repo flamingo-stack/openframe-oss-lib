@@ -14,6 +14,7 @@ import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
@@ -48,6 +49,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,6 +57,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
@@ -69,6 +72,9 @@ import static org.mockito.Mockito.when;
 class SoftwareInventoryServiceReadModelTest {
 
     private static final String TENANT = "t1";
+    private static final SoftwareBundlePackage HIDDENBAR_CASK = SoftwareBundlePackage.builder()
+            .packageManager(PackageManagerType.BREW).packageName("hiddenbar").brewPackageType(BrewPackageType.CASK)
+            .build();
 
     @Mock private IntegratedToolRepository integratedToolRepository;
     @Mock private FleetDeviceCountEnricher deviceCountEnricher;
@@ -469,7 +475,7 @@ class SoftwareInventoryServiceReadModelTest {
         assertThat(result.items()).extracting(SoftwareResponse::getId).containsExactly("1");
         InOrder order = inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq("m1"), anyList());
-        order.verify(catalogStatus).applyOnDevice(eq("m1"), anyList());
+        order.verify(catalogStatus).applyOnDevice(eq("m1"), anyList(), anySet());
         verifyNoInteractions(deviceHostInventoryLoader, deviceCountEnricher);
     }
 
@@ -481,7 +487,7 @@ class SoftwareInventoryServiceReadModelTest {
 
         InOrder order = inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq("m1"), anyList());
-        order.verify(catalogStatus).applyOnDevice(eq("m1"), anyList());
+        order.verify(catalogStatus).applyOnDevice(eq("m1"), anyList(), anySet());
     }
 
     @Test
@@ -503,6 +509,61 @@ class SoftwareInventoryServiceReadModelTest {
         assertThat(result.items()).extracting(SoftwareOnDeviceResponse::getInstalledBy)
                 .containsOnly(SoftwareSource.BREW);
         org.mockito.Mockito.verify(autoUpdateService).applyToDevices(eq("42"), anyList());
+    }
+
+    @Test
+    void listDevicesForSoftware_deviceWhereBrewInstalledTheAdoptionCask_installedByBrewAndAutoUpdateOff() {
+        // setup
+        SoftwareResponse hiddenBar = row("7", SoftwareSource.UNMANAGED);
+        hiddenBar.setAdoptionPackage(HIDDENBAR_CASK);
+        List<String> machineIds = List.of("m1", "m2");
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "7")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "7")).thenReturn(hiddenBar);
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "7", null, null))
+                .thenReturn(List.of(onDevice("m1"), onDevice("m2")));
+        when(deviceSoftwareReadModelQuery.caskTokensByMachineId(TENANT, machineIds))
+                .thenReturn(Map.of("m1", Set.of("hiddenbar")));
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("7", null, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items())
+                .extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getInstalledBy,
+                        SoftwareOnDeviceResponse::getAutoUpdate)
+                .containsExactly(tuple("m1", SoftwareSource.BREW, SoftwareAutoUpdateStatus.OFF),
+                        tuple("m2", null, null));
+    }
+
+    @Test
+    void listDevicesForSoftware_titleWithoutAnAdoptionCask_noCaskLookedUp() {
+        // setup
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "8")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "8")).thenReturn(row("8", SoftwareSource.UNMANAGED));
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "8", null, null))
+                .thenReturn(List.of(onDevice("m1")));
+
+        // execution
+        service.listDevicesForSoftware("8", null, null, 0, 20, null);
+
+        // verifications
+        verify(deviceSoftwareReadModelQuery, never()).caskTokensByMachineId(TENANT, List.of("m1"));
+    }
+
+    @Test
+    void listSoftwareForDevice_everyCaskOfTheDeviceGoesToTheCatalog_whateverTheSearch() {
+        // setup
+        List<String> machineIds = List.of("m1");
+        when(deviceSoftwareReadModelQuery.rowsForDevice(TENANT, "m1", "Hidden Bar"))
+                .thenReturn(List.of(row("7", SoftwareSource.UNMANAGED)));
+        when(deviceSoftwareReadModelQuery.caskTokensByMachineId(TENANT, machineIds))
+                .thenReturn(Map.of("m1", Set.of("hiddenbar")));
+
+        // execution
+        service.listSoftwareForDevice("m1", null, "Hidden Bar", 0, 20, null);
+
+        // verifications
+        verify(catalogStatus).applyOnDevice(eq("m1"), anyList(), eq(Set.of("hiddenbar")));
     }
 
     @Test

@@ -35,6 +35,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -441,7 +442,7 @@ class SoftwareCatalogStatusTest {
         stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(sevenZip));
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
 
         // verifications
         assertThat(sevenZip.getManagingPackage()).isSameAs(winget7zip);
@@ -461,7 +462,7 @@ class SoftwareCatalogStatusTest {
         when(packageManagerAvailability.isAdoptableOn(server, PackageManagerType.CHOCO)).thenReturn(true);
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(sevenZip));
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
 
         // verifications
         assertThat(sevenZip)
@@ -482,7 +483,7 @@ class SoftwareCatalogStatusTest {
         when(packageManagerAvailability.isAdoptableOn(server, PackageManagerType.CHOCO)).thenReturn(false);
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(sevenZip));
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
 
         // verifications
         assertThat(sevenZip)
@@ -499,7 +500,7 @@ class SoftwareCatalogStatusTest {
         stubMatch(chrome, PackageMatch.of(wingetPackage("Google.Chrome", "142.0")));
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(chrome));
+        status().applyOnDevice(MACHINE_ID, List.of(chrome), Set.of());
 
         // verifications
         assertThat(chrome)
@@ -519,7 +520,7 @@ class SoftwareCatalogStatusTest {
         stubMatch(chrome, PackageMatch.of(wingetChrome));
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(chrome));
+        status().applyOnDevice(MACHINE_ID, List.of(chrome), Set.of());
 
         // verifications
         assertThat(chrome.getManagingPackage()).isSameAs(wingetChrome);
@@ -535,7 +536,7 @@ class SoftwareCatalogStatusTest {
         stubMatch(chrome, PackageMatch.of(wingetChrome));
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(chrome));
+        status().applyOnDevice(MACHINE_ID, List.of(chrome), Set.of());
 
         // verifications
         assertThat(chrome.getManagingPackage()).isSameAs(wingetChrome);
@@ -695,13 +696,108 @@ class SoftwareCatalogStatusTest {
         when(packageManagerAvailability.isAdoptableOn(mac, PackageManagerType.BREW)).thenReturn(true);
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(slack));
+        status().applyOnDevice(MACHINE_ID, List.of(slack), Set.of());
 
         // verifications
         assertThat(slack)
                 .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getManagingPackage,
                         SoftwareResponse::getAdoptionPackage)
                 .containsExactly(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, adoptionIntoCask("slack", "4.41"));
+    }
+
+    @Test
+    void applyOnDevice_macAppWhoseCaskBrewInstalledOnTheDevice_brewManagesItWithoutTheOffer() {
+        // setup
+        SoftwareResponse hiddenBar = macApp("Hidden Bar", "1.9");
+        stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.PRESENT));
+        stubAdoptionMatch(hiddenBar, PackageMatch.of(brewCask("hiddenbar", "1.9")));
+        Set<String> installedCasks = Set.of("hiddenbar");
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(hiddenBar), installedCasks);
+
+        // verifications
+        assertThat(hiddenBar)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getAdoptionPackage, SoftwareResponse::getLatestVersion)
+                .containsExactly(SoftwareSource.BREW, SoftwareAutoUpdateStatus.OFF, null, "1.9");
+    }
+
+    @Test
+    void applyOnDevice_macAppWhoseCaskBrewInstalledWithAPolicy_policyStays() {
+        // setup
+        SoftwareResponse hiddenBar = macApp("Hidden Bar", "1.9");
+        hiddenBar.setAutoUpdate(SoftwareAutoUpdateStatus.ON);
+        stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.PRESENT));
+        stubAdoptionMatch(hiddenBar, PackageMatch.of(brewCask("hiddenbar", "1.9")));
+        Set<String> installedCasks = Set.of("hiddenbar");
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(hiddenBar), installedCasks);
+
+        // verifications
+        assertThat(hiddenBar)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate)
+                .containsExactly(SoftwareSource.BREW, SoftwareAutoUpdateStatus.ON);
+    }
+
+    @Test
+    void applyOnDevice_macAppWhoseCaskIsInstalledOnADeviceTheAdoptOrderCannotReach_stillBrews() {
+        // setup
+        SoftwareResponse hiddenBar = macApp("Hidden Bar", "1.9");
+        Machine mac = new Machine();
+        mac.setMachineId(MACHINE_ID);
+        mac.setPackageManagers(Map.of(PackageManagerType.BREW, PackageManagerState.PRESENT));
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Optional.of(mac));
+        when(packageAdoptReach.isReachable(MACHINE_ID)).thenReturn(false);
+        stubAdoptionMatch(hiddenBar, PackageMatch.of(brewCask("hiddenbar", "1.9")));
+        Set<String> installedCasks = Set.of("hiddenbar");
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(hiddenBar), installedCasks);
+
+        // verifications
+        assertThat(hiddenBar)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareSource.BREW, SoftwareAutoUpdateStatus.OFF, null);
+    }
+
+    @Test
+    void applyOnDevice_macAppWithAnotherCaskInstalledOnTheDevice_needsAdoptionWithItsCask() {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "4.40");
+        Machine mac = stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.PRESENT));
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
+        when(packageManagerAvailability.isAdoptableOn(mac, PackageManagerType.BREW)).thenReturn(true);
+        Set<String> installedCasks = Set.of("hiddenbar");
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(slack), installedCasks);
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION,
+                        adoptionIntoCask("slack", "4.41"));
+    }
+
+    @Test
+    void apply_tenantWide_aCaskInstalledSomewhereChangesNothing_needsAdoption() {
+        // setup
+        SoftwareResponse hiddenBar = macApp("Hidden Bar", "1.9");
+        stubAdoptionMatch(hiddenBar, PackageMatch.of(brewCask("hiddenbar", "1.9")));
+        when(packageManagerAvailability.isEnabled(PackageManagerType.BREW)).thenReturn(true);
+
+        // execution
+        status().apply(List.of(hiddenBar));
+
+        // verifications
+        assertThat(hiddenBar)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate)
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION);
     }
 
     @Test
@@ -717,7 +813,7 @@ class SoftwareCatalogStatusTest {
         stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(slack));
+        status().applyOnDevice(MACHINE_ID, List.of(slack), Set.of());
 
         // verifications
         assertThat(slack)
@@ -736,7 +832,7 @@ class SoftwareCatalogStatusTest {
         stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(slack));
+        status().applyOnDevice(MACHINE_ID, List.of(slack), Set.of());
 
         // verifications
         assertThat(slack)
@@ -755,7 +851,7 @@ class SoftwareCatalogStatusTest {
         when(packageManagerAvailability.isAdoptableOn(mac, PackageManagerType.BREW)).thenReturn(false);
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(slack));
+        status().applyOnDevice(MACHINE_ID, List.of(slack), Set.of());
 
         // verifications
         assertThat(slack)
@@ -779,7 +875,7 @@ class SoftwareCatalogStatusTest {
         when(packageManagerAvailability.isAdoptableOn(mac, PackageManagerType.BREW)).thenReturn(false);
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(slack));
+        status().applyOnDevice(MACHINE_ID, List.of(slack), Set.of());
 
         // verifications
         assertThat(slack)

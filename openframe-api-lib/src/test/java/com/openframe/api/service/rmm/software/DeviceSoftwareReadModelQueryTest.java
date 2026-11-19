@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -168,6 +169,40 @@ class DeviceSoftwareReadModelQueryTest {
         assertThat(rows)
                 .extracting(SoftwareResponse::getUserApplicationsOnly, SoftwareResponse::getTopLevelApp)
                 .containsExactly(tuple(true, true));
+    }
+
+    @Test
+    void caskTokensByMachineId_casksOfTheDevices_lowerCaseTokensPerDevice() {
+        // setup
+        List<String> machineIds = List.of("m1", "m2");
+        DeviceSoftware hiddenBar = DeviceSoftware.builder().machineId("m1").name("HiddenBar").build();
+        DeviceSoftware zed = DeviceSoftware.builder().machineId("m1").name("zed").build();
+        DeviceSoftware discord = DeviceSoftware.builder().machineId("m2").name("discord").build();
+        DeviceSoftware unnamed = DeviceSoftware.builder().machineId("m2").build();
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdInAndSource("t1", machineIds, "homebrew_casks"))
+                .thenReturn(List.of(hiddenBar, zed, discord, unnamed));
+
+        // execution
+        Map<String, Set<String>> casks = query.caskTokensByMachineId("t1", machineIds);
+
+        // verifications
+        assertThat(casks)
+                .containsOnlyKeys("m1", "m2")
+                .containsEntry("m1", Set.of("hiddenbar", "zed"))
+                .containsEntry("m2", Set.of("discord"));
+    }
+
+    @Test
+    void caskTokensByMachineId_noDevices_emptyWithoutAQuery() {
+        // setup
+        List<String> machineIds = List.of();
+
+        // execution
+        Map<String, Set<String>> casks = query.caskTokensByMachineId("t1", machineIds);
+
+        // verifications
+        assertThat(casks).isEmpty();
+        verifyNoInteractions(deviceSoftwareRepository);
     }
 
     @Test

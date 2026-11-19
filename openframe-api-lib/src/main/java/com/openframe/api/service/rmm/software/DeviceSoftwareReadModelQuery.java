@@ -13,7 +13,9 @@ import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -56,6 +58,18 @@ public class DeviceSoftwareReadModelQuery {
                 .filter(row -> Boolean.TRUE.equals(row.getUserApplicationsOnly()))
                 .map(DeviceSoftware::getMachineId)
                 .collect(Collectors.toSet());
+    }
+
+    // a homebrew_casks row is named by the cask's token
+    public Map<String, Set<String>> caskTokensByMachineId(String tenantId, Collection<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return Map.of();
+        }
+        String casks = FleetSource.HOMEBREW_CASKS.getFleetName();
+        return deviceSoftwareRepository.findByTenantIdAndMachineIdInAndSource(tenantId, machineIds, casks).stream()
+                .filter(row -> row.getName() != null)
+                .collect(Collectors.groupingBy(DeviceSoftware::getMachineId,
+                        Collectors.mapping(row -> row.getName().toLowerCase(Locale.ROOT), Collectors.toSet())));
     }
 
     private static SoftwareResponse toResponse(Software sw, DeviceSoftware installed) {
