@@ -185,13 +185,7 @@ public class SoftwareCatalogStatus {
         row.setVersionStatus(status);
     }
 
-    // Devices behind each other are outdated whatever the catalog says; with one version everywhere only the catalog
-    // can tell whether a newer release is out.
     private static SoftwareVersionStatus versionStatus(SoftwareResponse row, String catalogLatest) {
-        Integer older = row.getOlderVersionsCount();
-        if (older != null && older > 0) {
-            return SoftwareVersionStatus.OUTDATED;
-        }
         String installed = row.getCurrentVersion();
         if (catalogLatest == null || installed == null) {
             return SoftwareVersionStatus.UNKNOWN;
