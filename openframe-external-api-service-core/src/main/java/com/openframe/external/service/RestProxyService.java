@@ -1,5 +1,7 @@
 package com.openframe.external.service;
 
+import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.InternalException;
 import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolApiKey;
@@ -51,6 +53,8 @@ public class RestProxyService {
 
     static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(25);
+    static final Duration CONNECTION_REQUEST_TIMEOUT = Duration.ofSeconds(3);
+    static final int MAX_CONNECTIONS_PER_ROUTE = 20;
     private static final String TOOLS_PREFIX = "/tools";
 
     private final IntegratedToolRepository toolRepository;
@@ -120,10 +124,10 @@ public class RestProxyService {
             log.info("Target URI resolved to: {}", targetUri);
         } catch (URISyntaxException e) {
             log.error("Invalid URI syntax for tool: {}", toolId, e);
-            return ResponseEntity.badRequest().body("Invalid URI: " + e.getMessage());
+            throw new BadRequestException("Invalid request URI for tool " + toolId);
         } catch (Exception e) {
             log.error("Error proxying request for tool: {}", toolId, e);
-            return ResponseEntity.internalServerError().body("Internal server error: " + e.getMessage());
+            throw new InternalException("Failed to proxy the request to tool " + toolId);
         }
 
         Map<String, String> headers = buildApiRequestHeaders(tool);
@@ -209,7 +213,7 @@ public class RestProxyService {
             throw ToolProxyException.unreachable(tool.getKey(), e);
         } catch (Exception e) {
             log.error("Unexpected error proxying request to {} at {}: {}", tool.getName(), targetUri, e.getMessage(), e);
-            return ResponseEntity.internalServerError().body("Unexpected error: " + e.getMessage());
+            throw new InternalException("Failed to proxy the request to tool " + tool.getKey());
         }
     }
 
@@ -258,7 +262,7 @@ public class RestProxyService {
 
     private static CloseableHttpClient createHttpClient(Duration connectTimeout, Duration responseTimeout) {
         RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectionRequestTimeout(Timeout.ofSeconds(10))
+                .setConnectionRequestTimeout(Timeout.of(CONNECTION_REQUEST_TIMEOUT))
                 .setResponseTimeout(Timeout.of(responseTimeout))
                 .build();
         ConnectionConfig connectionConfig = ConnectionConfig.custom()
@@ -268,6 +272,7 @@ public class RestProxyService {
         return HttpClients.custom()
                 .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
                         .setDefaultConnectionConfig(connectionConfig)
+                        .setMaxConnPerRoute(MAX_CONNECTIONS_PER_ROUTE)
                         .build())
                 .setDefaultRequestConfig(requestConfig)
                 .build();
