@@ -27,6 +27,7 @@ import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
@@ -317,6 +318,44 @@ class AuditOutcomeResolverTest {
                 .isEqualTo(new ActionOutcome(AuditOutcome.REFUSED, "This domain is already in use"));
     }
 
+    @Test
+    void ofFailure_refusedCallWithAMessageInItsBody_isRefusedWithThatMessage() {
+        HttpClientErrorException failure = badRequest(
+                "{\"code\":\"TOKEN_SALE_REFUSED\",\"message\":\"Tokens are sold with a subscription\"}");
+        refusedByTheHandler(failure);
+
+        assertThat(resolver.ofFailure(failure))
+                .isEqualTo(new ActionOutcome(AuditOutcome.REFUSED, "Tokens are sold with a subscription"));
+    }
+
+    @Test
+    void ofFailure_refusedCallAnsweringAProblemDetail_isRefusedWithItsDetail() {
+        HttpClientErrorException failure = badRequest(
+                "{\"title\":\"Bad Request\",\"status\":400,\"detail\":\"Invalid request content.\"}");
+        refusedByTheHandler(failure);
+
+        assertThat(resolver.ofFailure(failure))
+                .isEqualTo(new ActionOutcome(AuditOutcome.REFUSED, "Invalid request content."));
+    }
+
+    @Test
+    void ofFailure_refusedCallWithAJsonBodyWithoutAMessage_isRefusedWithTheWholeError() {
+        HttpClientErrorException failure = badRequest("{\"code\":\"PLAN_LOCKED\"}");
+        refusedByTheHandler(failure);
+
+        assertThat(resolver.ofFailure(failure))
+                .isEqualTo(new ActionOutcome(AuditOutcome.REFUSED, failure.getMessage()));
+    }
+
+    @Test
+    void ofFailure_refusedCallWithABodyThatIsNotJson_isRefusedWithTheWholeError() {
+        HttpClientErrorException failure = badRequest("upstream refused the call");
+        refusedByTheHandler(failure);
+
+        assertThat(resolver.ofFailure(failure))
+                .isEqualTo(new ActionOutcome(AuditOutcome.REFUSED, failure.getMessage()));
+    }
+
     private static Stream<RuntimeException> exceptionsOfTheSecurityLayer() {
         return Stream.of(new AccessDeniedException(REFUSAL), new BadCredentialsException(REFUSAL));
     }
@@ -324,6 +363,16 @@ class AuditOutcomeResolverTest {
     private static Stream<RuntimeException> exceptionsWithAClientErrorStatusOfTheirOwn() {
         return Stream.of(new ForbiddenException(REFUSAL), new IllegalArgumentException(REFUSAL),
                 new IllegalStateException(REFUSAL));
+    }
+
+    private static HttpClientErrorException badRequest(String body) {
+        return HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request", HttpHeaders.EMPTY,
+                body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
+    }
+
+    private void refusedByTheHandler(RuntimeException failure) {
+        handledAsThrown(failure);
+        when(exceptionHandlerStatuses.statusOf(failure)).thenReturn(Optional.of(HttpStatus.BAD_REQUEST));
     }
 
     private void handledAsThrown(RuntimeException failure) {

@@ -1,5 +1,6 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
@@ -25,6 +26,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.TICKET_ARCHIVE;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,17 +60,31 @@ class TicketLifecycleServiceArchiveFilterTest {
     private final TicketStatusDefinition archived = definition("st-archived", TicketStatusKind.ARCHIVED);
     private final Query query = new Query();
 
+    private final AuditedMethodRunner auditedMethodRunner = mock(AuditedMethodRunner.class, CALLS_REAL_METHODS);
+
     private TicketLifecycleService service;
 
     @BeforeEach
     void setUp() {
         service = new TicketLifecycleService(ticketRepository, statusRepository, transitionPolicy,
                 tenantIdProvider, ticketTagService, ticketIdsForFilter, ticketResolverStamp,
-                historyService, List.of(listener), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
+                historyService, List.of(listener), auditedMethodRunner);
         when(statusRepository.findByKind(TicketStatusKind.RESOLVED)).thenReturn(Optional.of(resolved));
         when(statusRepository.findByKind(TicketStatusKind.ARCHIVED)).thenReturn(Optional.of(archived));
         when(ticketRepository.buildTicketQuery(any(), isNull(), any(), isNull())).thenReturn(query);
         when(ticketRepository.findTicketsWithCursor(eq(query), isNull(), anyInt(), any(), any())).thenReturn(List.of());
+    }
+
+    @Test
+    void archiveResolvedTickets_archiveCall_recordedOnlyWhenTicketsWereArchived() {
+        service.archiveResolvedTickets(admin, null);
+
+        ArgumentCaptor<AuditCall> call = ArgumentCaptor.forClass(AuditCall.class);
+        verify(auditedMethodRunner).run(call.capture(), any());
+        assertThat(call.getValue().action()).isEqualTo(TICKET_ARCHIVE);
+        assertThat(call.getValue().recordsResult())
+                .rejects(List.of())
+                .accepts(List.of("t-1"));
     }
 
     @Test
