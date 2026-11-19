@@ -6,6 +6,7 @@ import { CheckIcon, Copy02Icon, Filter02Icon, Refresh02HrIcon, SearchIcon } from
 import { PageLayout } from '../../layout/page-layout';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
+import { GRID_ACTION_BUTTON_CLASS } from '../feature-table-grid-cells';
 
 export interface LogsPageViewProps {
   /** The table (and whatever boundary the host loads it under). */
@@ -92,19 +93,21 @@ export interface LogCopyIconButtonProps {
   /** The copy just succeeded: the icon is a check. */
   copied?: boolean;
   disabled?: boolean;
+  /** The grid table's form: a bare 40px icon button, the action cell being its frame. Default: the outlined button. */
+  grid?: boolean;
 }
 
 /** A row's "Copy log details" icon button. The host fetches the log and copies it. */
-export function LogCopyIconButton({ onClick, copied = false, disabled = false }: LogCopyIconButtonProps) {
+export function LogCopyIconButton({ onClick, copied = false, disabled = false, grid = false }: LogCopyIconButtonProps) {
   return (
     <Button
       onClick={onClick}
       disabled={disabled}
-      variant="outline"
+      variant={grid ? 'transparent' : 'outline'}
       size="icon"
       leftIcon={copied ? <CheckIcon className="h-5 w-5 text-ods-success" /> : <Copy02Icon className="h-5 w-5" />}
       aria-label="Copy log details"
-      className="bg-ods-card"
+      className={grid ? GRID_ACTION_BUTTON_CLASS : 'bg-ods-card'}
     />
   );
 }

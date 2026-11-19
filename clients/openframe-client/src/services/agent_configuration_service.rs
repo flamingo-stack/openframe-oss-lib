@@ -1,11 +1,13 @@
 use anyhow::{Context, Result};
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::{error, warn};
 
 use crate::models::AgentConfiguration;
 use crate::platform::directories::DirectoryManager;
+use crate::platform::machine_info_persistence::PersistedMachineInfo;
+use crate::utils::fs::{atomic_write, quarantine_path, read_json, CorruptJson};
 
 #[derive(Clone)]
 pub struct AgentConfigurationService {
@@ -81,27 +83,66 @@ impl AgentConfigurationService {
         Ok(config.refresh_token.clone())
     }
 
-    fn get(&self) -> Result<AgentConfiguration> {
-        if !self.config_file_path.exists() {
-            return Ok(AgentConfiguration::default());
+    /// Replaces a config that doesn't parse, copied first to `agent_config.json.corrupt`: rebuilt from `saved` with empty tokens, or emptied so the device registers again.
+    pub async fn replace_corrupt(&self, saved: Option<&PersistedMachineInfo>) -> Result<()> {
+        let _guard = self.write_lock.lock().await;
+        let corrupt = match self.get() {
+            Ok(_) => return Ok(()),
+            Err(e) if e.is::<CorruptJson>() => e,
+            Err(e) => return Err(e),
+        };
+
+        let copy = quarantine_path(&self.config_file_path);
+        if let Err(e) = std::fs::copy(&self.config_file_path, &copy) {
+            warn!(
+                "Failed to copy the corrupt agent configuration to {}: {}",
+                copy.display(),
+                e
+            );
         }
 
-        let json_content = fs::read_to_string(&self.config_file_path)
-            .with_context(|| format!("Failed to read config file: {:?}", self.config_file_path))?;
+        match saved {
+            Some(saved) => {
+                self.save(&AgentConfiguration {
+                    machine_id: saved.machine_id.clone(),
+                    // The backend builds the client id from this template at registration.
+                    client_id: format!("agent_{}", saved.machine_id),
+                    client_secret: saved.client_secret.clone(),
+                    ..AgentConfiguration::default()
+                })
+                .await?;
+                warn!(
+                    machine_id = %saved.machine_id,
+                    "{:#}; rebuilt it from the saved machine record",
+                    corrupt
+                );
+            }
+            None => {
+                self.save(&AgentConfiguration::default()).await?;
+                error!(
+                    "{:#}; no saved machine record to rebuild it from, so the device must register again: run `openframe-client auth` with the install command's arguments",
+                    corrupt
+                );
+            }
+        }
+        Ok(())
+    }
 
-        let config: AgentConfiguration = serde_json::from_str(&json_content)
-            .context("Failed to deserialize agent configuration from JSON")?;
-
-        Ok(config)
+    fn get(&self) -> Result<AgentConfiguration> {
+        Ok(read_json(&self.config_file_path)?.unwrap_or_default())
     }
 
     async fn save(&self, config: &AgentConfiguration) -> Result<()> {
         let json_content = serde_json::to_string_pretty(config)
             .context("Failed to serialize agent configuration to JSON")?;
 
-        crate::utils::fs::atomic_write(&self.config_file_path, json_content)
+        atomic_write(&self.config_file_path, json_content)
             .with_context(|| format!("Failed to write config file: {:?}", self.config_file_path))?;
 
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "agent_configuration_service_tests.rs"]
+mod tests;

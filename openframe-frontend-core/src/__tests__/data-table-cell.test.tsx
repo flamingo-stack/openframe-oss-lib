@@ -17,17 +17,87 @@ function partClasses(container: HTMLElement, part: string): string {
  * (and is cut with an ellipsis) and which part never does, for each of the cell's shapes.
  */
 describe('DataTable.Cell', () => {
-  it('cuts the main text on one line and keeps the secondary text whole beside it', () => {
+  it('cuts the main text on one line and keeps a short secondary text whole beside it', () => {
     const { container } = render(<DataTable.Cell text="Romans-MacBook-Pro.local" secondary="v2.4.1" />);
 
     const main = screen.getByText('Romans-MacBook-Pro.local');
     expect(main.className).toContain('truncate');
     expect(main.className).not.toMatch(/line-clamp/);
+    expect(main.parentElement?.className ?? '').toContain('flex-1');
 
     expect(screen.getByText('v2.4.1')).toBeTruthy();
     const secondary = partClasses(container, 'secondary');
     expect(secondary).toContain('shrink-0');
     expect(secondary).toContain('whitespace-nowrap');
+  });
+
+  it('cuts a long secondary text once the main text is down to its first characters', () => {
+    const { container } = render(
+      <DataTable.Cell text="Roman Khutornoy" secondary="roman.khutornoy@greenvalleymanufacturing.com" />,
+    );
+
+    // The main text is the first to give way (the larger shrink factor), and stops at its minimum.
+    const mainBox = screen.getByText('Roman Khutornoy').parentElement?.className ?? '';
+    expect(mainBox).toContain('flex-[1_9999_auto]');
+    expect(mainBox).toContain('min-w-[9ch]');
+
+    // From there the secondary text is cut with an ellipsis: it never pushes the main text out of the cell.
+    const secondaryText = screen.getByText('roman.khutornoy@greenvalleymanufacturing.com');
+    expect(secondaryText.className).toContain('truncate');
+    expect(secondaryText.className).toContain('text-ods-text-secondary');
+    const secondary = partClasses(container, 'secondary');
+    expect(secondary).toContain('min-w-0');
+    expect(secondary).toContain('shrink');
+    expect(secondary).not.toContain('shrink-0');
+  });
+
+  it('never shrinks a main text that is already at its minimum: the long secondary text beside it is what is cut', () => {
+    render(<DataTable.Cell text="Kept" secondary="Kept by Jerome Park · Legal hold until the audit closes" />);
+
+    const mainBox = screen.getByText('Kept').parentElement?.className ?? '';
+    expect(mainBox).toContain('flex-[1_0_auto]');
+    expect(mainBox).not.toContain('min-w-[9ch]');
+    expect(screen.getByText(/Legal hold/).className).toContain('truncate');
+  });
+
+  it('keeps a secondary text of 8 characters whole and cuts one of 9', () => {
+    const { container, rerender } = render(<DataTable.Cell text="Romans-MacBook-Pro.local" secondary="12:34:56" />);
+    expect(partClasses(container, 'secondary')).toContain('shrink-0');
+    expect(screen.getByText('Romans-MacBook-Pro.local').parentElement?.className ?? '').toContain('flex-1');
+
+    rerender(<DataTable.Cell text="Romans-MacBook-Pro.local" secondary="12:34:567" />);
+    expect(partClasses(container, 'secondary')).not.toContain('shrink-0');
+    expect(screen.getByText('12:34:567').className).toContain('truncate');
+    expect(screen.getByText('Romans-MacBook-Pro.local').parentElement?.className ?? '').toContain('flex-[1_9999_auto]');
+  });
+
+  it('never shrinks a main text of 9 characters beside a long secondary text, and shrinks one of 10', () => {
+    const secondary = 'roman.khutornoy@greenvalleymanufacturing.com';
+    const { rerender } = render(<DataTable.Cell text="123456789" secondary={secondary} />);
+    const nine = screen.getByText('123456789').parentElement?.className ?? '';
+    expect(nine).toContain('flex-[1_0_auto]');
+    expect(nine).not.toContain('min-w-[9ch]');
+
+    rerender(<DataTable.Cell text="1234567890" secondary={secondary} />);
+    const ten = screen.getByText('1234567890').parentElement?.className ?? '';
+    expect(ten).toContain('flex-[1_9999_auto]');
+    expect(ten).toContain('min-w-[9ch]');
+  });
+
+  it('lets the main text take the line when there is no secondary text', () => {
+    render(<DataTable.Cell text="Dell OptiPlex 7090 Small Form Factor" />);
+    const mainBox = screen.getByText('Dell OptiPlex 7090 Small Form Factor').parentElement?.className ?? '';
+    expect(mainBox).toContain('flex-1');
+    expect(mainBox).not.toContain('flex-[1_9999_auto]');
+  });
+
+  it('mutes the main text on request and leaves it primary otherwise', () => {
+    const { rerender } = render(<DataTable.Cell text="12 Nov 2026" tone="secondary" />);
+    expect(screen.getByText('12 Nov 2026').className).toContain('text-ods-text-secondary');
+
+    rerender(<DataTable.Cell text="12 Nov 2026" />);
+    expect(screen.getByText('12 Nov 2026').className).toContain('text-ods-text-primary');
+    expect(screen.getByText('12 Nov 2026').className).not.toContain('text-ods-text-secondary');
   });
 
   it('never shrinks a tag: with no main text the secondary text is the part that is cut', () => {
@@ -83,5 +153,23 @@ describe('DataTable.Cell', () => {
     expect(partClasses(container, 'trailing')).toContain('shrink-0');
     // The trailing part is the last thing in the cell's markup.
     expect(container.innerHTML).toMatch(/data-part="trailing"[^>]*><i data-testid="dot"><\/i><\/span><\/div>$/);
+  });
+
+  it('draws the secondary text in the warning colour on request, short or long, and in the secondary one otherwise', () => {
+    render(
+      <>
+        <DataTable.Cell text="118 of 120" secondary="2 unused" />
+        <DataTable.Cell text="100 of 120" secondary="20 left" secondaryTone="warning" />
+        <DataTable.Cell text="Acme" secondary="30 of 412 unattributed" secondaryTone="warning" />
+      </>,
+    );
+
+    expect(screen.getByText('2 unused').className).toContain('text-ods-text-secondary');
+    expect(screen.getByText('2 unused').className).not.toContain('text-ods-warning');
+    // Short: the part itself carries the colour.
+    expect(screen.getByText('20 left').className).toContain('text-ods-warning');
+    expect(screen.getByText('20 left').className).not.toContain('text-ods-text-secondary');
+    // Long: the cut text carries it.
+    expect(screen.getByText('30 of 412 unattributed').className).toContain('text-ods-warning');
   });
 });
