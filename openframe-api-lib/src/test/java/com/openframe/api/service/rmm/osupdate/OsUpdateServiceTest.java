@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm.osupdate;
 
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.rmm.osupdate.DeviceOsStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateHistoryEntryResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateResponse;
 import com.openframe.api.dto.shared.CursorCodec;
@@ -10,8 +11,10 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.OsUpdateMapper;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdate;
+import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -41,6 +45,7 @@ class OsUpdateServiceTest {
     private static final String RAW_CURSOR = "1795142470000|6aff19c07ce86a3f0386ff82";
 
     @Mock private MachineRepository machineRepository;
+    @Mock private DeviceOsStateRepository deviceOsStateRepository;
     @Mock private DeviceOsUpdateRepository deviceOsUpdateRepository;
     @Mock private DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
     @Mock private OsUpdateMapper osUpdateMapper;
@@ -64,6 +69,66 @@ class OsUpdateServiceTest {
         oldest = DeviceOsUpdateHistoryEntry.builder().id("id-oldest").build();
         newestResponse = DeviceOsUpdateHistoryEntryResponse.builder().cursor(CursorCodec.encode("raw-newest")).build();
         middleResponse = DeviceOsUpdateHistoryEntryResponse.builder().cursor(CursorCodec.encode("raw-middle")).build();
+    }
+
+    @Test
+    void hasStateForDevice_unknownDevice_throwsDeviceNotFound() {
+        // setup
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+
+        // execution
+        DeviceNotFoundException ex = assertThrows(DeviceNotFoundException.class,
+                () -> service.hasStateForDevice(MACHINE_ID));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Device not found: " + MACHINE_ID);
+        verifyNoInteractions(deviceOsStateRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void hasStateForDevice_knownDevice_whetherAStateOfItsTenantIsStored(boolean stored) {
+        // setup
+        stubKnownDevice();
+        when(deviceOsStateRepository.existsByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(stored);
+
+        // execution
+        boolean hasState = service.hasStateForDevice(MACHINE_ID);
+
+        // verifications
+        assertThat(hasState).isEqualTo(stored);
+    }
+
+    @Test
+    void getStateForDevice_stateStored_stateOfItsTenantAsAResponse() {
+        // setup
+        DeviceOsState state = DeviceOsState.builder().machineId(MACHINE_ID).build();
+        DeviceOsStateResponse response = DeviceOsStateResponse.builder().osVersion("Windows 11 Pro").build();
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(deviceOsStateRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .thenReturn(Optional.of(state));
+        when(osUpdateMapper.toResponse(state)).thenReturn(response);
+
+        // execution
+        DeviceOsStateResponse found = service.getStateForDevice(MACHINE_ID);
+
+        // verifications
+        assertThat(found).isSameAs(response);
+    }
+
+    @Test
+    void getStateForDevice_noStateStored_throwsIllegalState() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(deviceOsStateRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .thenReturn(Optional.empty());
+
+        // execution
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> service.getStateForDevice(MACHINE_ID));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("No OS state stored for device: " + MACHINE_ID);
     }
 
     @Test

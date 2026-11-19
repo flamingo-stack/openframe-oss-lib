@@ -3,9 +3,9 @@ package com.openframe.client.service.rmm;
 import com.openframe.client.listener.rmm.MachineOsUpdatesListener;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRepository;
-import com.openframe.data.service.machine.MachineWriter;
 import io.nats.client.Connection;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -22,7 +22,7 @@ class OsUpdateWiringTest {
             .withBean(ObjectMapper.class, () -> JsonMapper.builder().build())
             .withBean(NatsTopicMachineIdExtractor.class, () -> mock(NatsTopicMachineIdExtractor.class))
             .withBean(MachineRepository.class, () -> mock(MachineRepository.class))
-            .withBean(MachineWriter.class, () -> mock(MachineWriter.class))
+            .withBean(DeviceOsStateRepository.class, () -> mock(DeviceOsStateRepository.class))
             .withBean(DeviceOsUpdateRepository.class, () -> mock(DeviceOsUpdateRepository.class))
             .withBean(DeviceOsUpdateHistoryRepository.class, () -> mock(DeviceOsUpdateHistoryRepository.class))
             .withUserConfiguration(MachineOsUpdatesListener.class, MachineOsUpdatesService.class,

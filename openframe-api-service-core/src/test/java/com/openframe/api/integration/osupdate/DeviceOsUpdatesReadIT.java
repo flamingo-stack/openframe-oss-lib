@@ -38,10 +38,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Acceptance of the read half of CU-17tkuw67mjf, pass 1: what MongoDB holds after the agent's OS report is what
- * {@code device(machineId) { osVersion osBuild osState }}, {@code deviceOsUpdates} and {@code deviceOsUpdateHistory}
- * answer.
+ * {@code deviceOsState}, {@code deviceOsUpdates} and {@code deviceOsUpdateHistory} answer. The device type is not
+ * part of it (design.md, ruling 11).
  *
- * <p>In: the raw documents of {@code machines}, {@code device_os_updates} and {@code device_os_update_history}, in
+ * <p>In: the raw documents of {@code device_os_states}, {@code device_os_updates} and
+ * {@code device_os_update_history}, with the device they belong to in {@code machines}, in
  * the shapes the ingest half (MachineOsUpdatesIngestIT in openframe-client-core) asserts for the fixtures of the
  * contract. Out: the GraphQL answer of the module's whole schema, in the SDL of design.md.
  */
@@ -86,14 +87,11 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     private static final String OCTOBER_INSTALL = "2026-10-16T02:41:10Z";
     private static final String NOVEMBER_INSTALL = "2026-11-20T02:41:10Z";
 
-    private static final String DEVICE = """
+    private static final String STATE = """
             query($machineId: String!) {
-              device(machineId: $machineId) {
-                machineId osVersion osBuild
-                osState {
-                  restartPending restartPendingSince lastScanAt lastScanError lastInstalledAt
-                  managementState managedElsewhereReason observedReason authorization receivedAt
-                }
+              deviceOsState(machineId: $machineId) {
+                osVersion osBuild restartPending restartPendingSince lastScanAt lastScanError lastInstalledAt
+                managementState managedElsewhereReason observedReason authorization receivedAt
               }
             }
             """;
@@ -127,6 +125,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     void removeTheMachinesOfThisClass() {
         Bson ownMachines = Filters.regex("machineId", "^" + OWN_MACHINES);
         machines().deleteMany(ownMachines);
+        statesCollection().deleteMany(ownMachines);
         pendingCollection().deleteMany(ownMachines);
         historyCollection().deleteMany(ownMachines);
     }
@@ -149,6 +148,42 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 Map.of("machineId", MACHINE_ID, "osVersion", "Windows 10 Pro", "osBuild", "19045.5011"));
     }
 
+    // ───────── A17: the device type is the one of main ─────────
+
+    @Test
+    void deviceRead_keepsTheVersionAndBuildOfTheDevice_theReportedOnesAreInTheStateRead() {
+        // setup
+        saveMachine(machine(MACHINE_ID, TENANT_ID).append("osVersion", "Windows 10 Pro").append("osBuild", "19045.5011"));
+        saveState(windowsStateAfterFirstReport(MACHINE_ID));
+
+        // execution
+        ExecutionResult device = queryExecutor.execute(
+                "query($machineId: String!) { device(machineId: $machineId) { machineId osVersion osBuild } }",
+                Map.of("machineId", MACHINE_ID));
+        Map<String, Object> state = state(MACHINE_ID);
+
+        // verifications
+        assertThat(device.getErrors()).isEmpty();
+        assertThat(device.<Map<String, Object>>getData()).containsEntry("device",
+                Map.of("machineId", MACHINE_ID, "osVersion", "Windows 10 Pro", "osBuild", "19045.5011"));
+        assertThat(state).containsEntry("osVersion", "Windows 11 Pro").containsEntry("osBuild", "26100.4061");
+    }
+
+    @Test
+    void deviceRead_hasNoOsStateField() {
+        // setup
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
+
+        // execution
+        ExecutionResult device = queryExecutor.execute(
+                "query($machineId: String!) { device(machineId: $machineId) { osState { receivedAt } } }",
+                Map.of("machineId", MACHINE_ID));
+
+        // verifications
+        assertThat(device.getErrors()).as("errors of device { osState }").singleElement()
+                .satisfies(error -> assertThat(error.getMessage()).contains("FieldUndefined", "osState"));
+    }
+
     // ───────── A16, flag on ─────────
 
     @Test
@@ -169,18 +204,18 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     // ───────── A1, A9, E1: Windows first report ─────────
 
     @Test
-    void windowsDeviceAfterItsFirstReport_deviceReadReturnsVersionBuildStateAndThePendingUpdate() {
+    void windowsDeviceAfterItsFirstReport_stateReadReturnsVersionBuildStateAndThePendingUpdate() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         savePending(kb5068861(MACHINE_ID, TENANT_ID));
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
         List<Map<String, Object>> pending = pending(MACHINE_ID);
 
         // verifications
-        assertThat(device).containsEntry("osVersion", "Windows 11 Pro").containsEntry("osBuild", "26100.4061");
-        assertThat(osState(device))
+        assertThat(state).containsEntry("osVersion", "Windows 11 Pro").containsEntry("osBuild", "26100.4061");
+        assertThat(state)
                 .containsEntry("restartPending", false)
                 .containsEntry("restartPendingSince", null)
                 .containsEntry("lastScanAt", FIRST_SCAN)
@@ -210,13 +245,14 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void macNotAuthorized_authorizationAndThePendingUpdateReturned_severityNullAndNoKb() {
         // setup
-        saveMachine(machine(MAC_MACHINE_ID, TENANT_ID).append("osType", "MAC_OS")
+        saveMachine(machine(MAC_MACHINE_ID, TENANT_ID).append("osType", "MAC_OS"));
+        saveState(new Document("tenantId", TENANT_ID).append("machineId", MAC_MACHINE_ID)
                 .append("osVersion", "26.2").append("osBuild", "25C56")
-                .append("osState", new Document("restartPending", false)
-                        .append("lastScanAt", date("2026-11-19T10:14:40Z"))
-                        .append("managementState", "MANAGED")
-                        .append("authorization", "NOT_AUTHORIZED")
-                        .append("receivedAt", date(RECEIVED))));
+                .append("restartPending", false)
+                .append("lastScanAt", date("2026-11-19T10:14:40Z"))
+                .append("managementState", "MANAGED")
+                .append("authorization", "NOT_AUTHORIZED")
+                .append("receivedAt", date(RECEIVED)));
         // lists the Mac report never carried are not in the row at all
         savePending(new Document("tenantId", TENANT_ID).append("machineId", MAC_MACHINE_ID)
                 .append("updateKey", MAC_KEY).append("title", "macOS Tahoe 26.7.3").append("version", "26.7.3")
@@ -224,12 +260,12 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("discoveredAt", date("2026-11-19T10:14:40Z")));
 
         // execution
-        Map<String, Object> device = device(MAC_MACHINE_ID);
+        Map<String, Object> state = state(MAC_MACHINE_ID);
         List<Map<String, Object>> pending = pending(MAC_MACHINE_ID);
 
         // verifications
-        assertThat(device).containsEntry("osVersion", "26.2").containsEntry("osBuild", "25C56");
-        assertThat(osState(device))
+        assertThat(state).containsEntry("osVersion", "26.2").containsEntry("osBuild", "25C56");
+        assertThat(state)
                 .containsEntry("authorization", "NOT_AUTHORIZED")
                 .containsEntry("managementState", "MANAGED")
                 .containsEntry("lastInstalledAt", null);
@@ -251,15 +287,15 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @ValueSource(strings = {"AUTHORIZED", "NOT_AUTHORIZED", "NOT_REQUIRED"})
     void authorization_eachOfTheThreeStates_returnedAsItself(String authorization) {
         // setup
-        Document machine = windowsMachineAfterFirstReport(MACHINE_ID);
-        machine.get("osState", Document.class).append("authorization", authorization);
-        saveMachine(machine);
+        Document stored = windowsStateAfterFirstReport(MACHINE_ID);
+        stored.append("authorization", authorization);
+        saveReportedDevice(stored);
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
 
         // verifications
-        assertThat(osState(device)).containsEntry("authorization", authorization);
+        assertThat(state).containsEntry("authorization", authorization);
     }
 
     // ───────── A3, A4, E2: installed ─────────
@@ -267,24 +303,24 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void deviceAfterTheInstall_noPendingUpdates_historyNewestFirst_lastInstalledAtAndRestartPending() {
         // setup
-        Document machine = windowsMachineAfterFirstReport(MACHINE_ID);
-        machine.get("osState", Document.class)
+        Document stored = windowsStateAfterFirstReport(MACHINE_ID);
+        stored
                 .append("restartPending", true)
                 .append("restartPendingSince", date("2026-11-20T02:44:00.120Z"))
                 .append("lastScanAt", date("2026-11-20T02:43:07Z"))
                 .append("lastInstalledAt", date(NOVEMBER_INSTALL));
-        saveMachine(machine);
+        saveReportedDevice(stored);
         saveHistory(history(MACHINE_ID, TENANT_ID, OCTOBER_KEY, OCTOBER_TITLE, OCTOBER_INSTALL, "INSTALL", "SUCCEEDED"));
         saveHistory(history(MACHINE_ID, TENANT_ID, KB5068861_KEY, KB5068861_TITLE, NOVEMBER_INSTALL, "INSTALL", "SUCCEEDED"));
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
         List<Map<String, Object>> pending = pending(MACHINE_ID);
         HistoryPage history = history(MACHINE_ID, null, null);
 
         // verifications
         assertThat(pending).isEmpty();
-        assertThat(osState(device))
+        assertThat(state)
                 .containsEntry("restartPending", true)
                 .containsEntry("restartPendingSince", "2026-11-20T02:44:00.120Z")
                 .containsEntry("lastInstalledAt", NOVEMBER_INSTALL);
@@ -303,7 +339,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void failedInstallInTheHistory_resultAndErrorCodeReturnedVerbatim() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         saveHistory(history(MACHINE_ID, TENANT_ID, DOTNET_KEY, DOTNET_TITLE, "2026-11-01T03:00:00Z", "INSTALL", "FAILED")
                 .append("errorCode", "0x80240022"));
         saveHistory(history(MACHINE_ID, TENANT_ID, null, "macOS Tahoe 26.2", "2026-10-04T07:45:00Z", null, null)
@@ -329,11 +365,11 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void deviceUnderWsus_managedElsewhereWithItsReason_andItsPendingUpdatesStillReturned() {
         // setup
-        Document machine = windowsMachineAfterFirstReport(MACHINE_ID);
-        machine.get("osState", Document.class)
+        Document stored = windowsStateAfterFirstReport(MACHINE_ID);
+        stored
                 .append("managementState", "MANAGED_ELSEWHERE")
                 .append("managedElsewhereReason", "WSUS");
-        saveMachine(machine);
+        saveReportedDevice(stored);
         savePending(kb5068861(MACHINE_ID, TENANT_ID));
         savePending(pendingRow(MACHINE_ID, TENANT_ID, DOTNET_KEY, DOTNET_TITLE, FIRST_SCAN)
                 .append("severity", "IMPORTANT").append("restartBehaviour", "MAY_REQUIRE"));
@@ -342,11 +378,11 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("categories", List.of(category(DEFINITION_UPDATES_ID, "Definition Updates"))));
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
         List<Map<String, Object>> pending = pending(MACHINE_ID);
 
         // verifications
-        assertThat(osState(device))
+        assertThat(state)
                 .containsEntry("managementState", "MANAGED_ELSEWHERE")
                 .containsEntry("managedElsewhereReason", "WSUS")
                 .containsEntry("observedReason", null);
@@ -361,17 +397,17 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void observedDevice_observedWithItsReasonReturned() {
         // setup
-        Document machine = windowsMachineAfterFirstReport(MACHINE_ID);
-        machine.get("osState", Document.class)
+        Document stored = windowsStateAfterFirstReport(MACHINE_ID);
+        stored
                 .append("managementState", "OBSERVED")
                 .append("observedReason", "HOME_EDITION");
-        saveMachine(machine);
+        saveReportedDevice(stored);
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
 
         // verifications
-        assertThat(osState(device))
+        assertThat(state)
                 .containsEntry("managementState", "OBSERVED")
                 .containsEntry("observedReason", "HOME_EDITION")
                 .containsEntry("managedElsewhereReason", null);
@@ -380,17 +416,17 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     // ───────── A7, E5: never reported, never scanned ─────────
 
     @Test
-    void deviceThatNeverReported_osStateNullAndBothListsEmpty() {
+    void deviceThatNeverReported_deviceOsStateNullAndBothListsEmpty() {
         // setup
         saveMachine(machine(MACHINE_ID, TENANT_ID));
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
         List<Map<String, Object>> pending = pending(MACHINE_ID);
         HistoryPage history = history(MACHINE_ID, null, null);
 
         // verifications
-        assertThat(device).containsEntry("machineId", MACHINE_ID).containsEntry("osState", null);
+        assertThat(state).as("deviceOsState of a device that never reported").isNull();
         assertThat(pending).isEmpty();
         assertThat(history.nodes()).isEmpty();
         assertThat(history.hasNextPage()).isFalse();
@@ -399,21 +435,21 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void deviceThatNeverScanned_lastScanAtNullAndTheScanErrorReturned_noPendingUpdates() {
         // setup
-        saveMachine(machine(MACHINE_ID, TENANT_ID)
+        saveReportedDevice(new Document("tenantId", TENANT_ID).append("machineId", MACHINE_ID)
                 .append("osVersion", "Windows 11 Pro").append("osBuild", "26100.4061")
-                .append("osState", new Document("restartPending", false)
-                        .append("lastScanAt", null)
-                        .append("lastScanError", "0x8024402C")
-                        .append("managementState", "MANAGED")
-                        .append("authorization", "NOT_REQUIRED")
-                        .append("receivedAt", date(RECEIVED))));
+                .append("restartPending", false)
+                .append("lastScanAt", null)
+                .append("lastScanError", "0x8024402C")
+                .append("managementState", "MANAGED")
+                .append("authorization", "NOT_REQUIRED")
+                .append("receivedAt", date(RECEIVED)));
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
         List<Map<String, Object>> pending = pending(MACHINE_ID);
 
         // verifications
-        assertThat(osState(device)).as("osState of a device that reported").isNotNull()
+        assertThat(state).as("deviceOsState of a device that reported").isNotNull()
                 .containsEntry("lastScanAt", null)
                 .containsEntry("lastScanError", "0x8024402C")
                 .containsEntry("lastInstalledAt", null)
@@ -426,17 +462,17 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void deviceAfterAFailedScan_errorAndTheKeptLastScanAtReturned_withTheListItHad() {
         // setup
-        Document machine = windowsMachineAfterFirstReport(MACHINE_ID);
-        machine.get("osState", Document.class).append("lastScanError", "0x80072EE2");
-        saveMachine(machine);
+        Document stored = windowsStateAfterFirstReport(MACHINE_ID);
+        stored.append("lastScanError", "0x80072EE2");
+        saveReportedDevice(stored);
         savePending(kb5068861(MACHINE_ID, TENANT_ID));
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
         List<Map<String, Object>> pending = pending(MACHINE_ID);
 
         // verifications
-        assertThat(osState(device))
+        assertThat(state)
                 .containsEntry("lastScanError", "0x80072EE2")
                 .containsEntry("lastScanAt", FIRST_SCAN);
         assertThat(pending).singleElement().satisfies(update -> assertThat(update)
@@ -449,17 +485,19 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void valuesStoredAsUnknown_returnedAsNull_listsAsEmpty() {
         // setup
-        saveMachine(machine(MACHINE_ID, TENANT_ID)
-                .append("osState", new Document("receivedAt", date(RECEIVED)).append("lastScanAt", date(FIRST_SCAN))));
+        saveReportedDevice(new Document("tenantId", TENANT_ID).append("machineId", MACHINE_ID)
+                .append("receivedAt", date(RECEIVED)).append("lastScanAt", date(FIRST_SCAN)));
         savePending(new Document("tenantId", TENANT_ID).append("machineId", MACHINE_ID)
                 .append("updateKey", "k-bare").append("title", "Bare update").append("discoveredAt", date(FIRST_SCAN)));
 
         // execution
-        Map<String, Object> device = device(MACHINE_ID);
+        Map<String, Object> state = state(MACHINE_ID);
         List<Map<String, Object>> pending = pending(MACHINE_ID);
 
         // verifications
-        assertThat(osState(device))
+        assertThat(state)
+                .containsEntry("osVersion", null)
+                .containsEntry("osBuild", null)
                 .containsEntry("restartPending", null)
                 .containsEntry("managementState", null)
                 .containsEntry("authorization", null)
@@ -478,7 +516,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void categories_returnedAsTheirNamesInTheStoredOrder_oneWithoutANameLeftOut() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         savePending(pendingRow(MACHINE_ID, TENANT_ID, "k-named", "Alpha", FIRST_SCAN)
                 .append("categories", List.of(
                         category(SECURITY_UPDATES_ID, "Security Updates"),
@@ -503,7 +541,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void pendingUpdates_newestDiscoveredFirst_thenByTitle() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         savePending(pendingRow(MACHINE_ID, TENANT_ID, "k-1", "Bravo", "2026-11-19T10:14:51Z"));
         savePending(pendingRow(MACHINE_ID, TENANT_ID, "k-2", "Alpha", "2026-11-19T10:14:51Z"));
         savePending(pendingRow(MACHINE_ID, TENANT_ID, "k-3", "Zulu", "2026-11-12T10:14:51Z"));
@@ -521,27 +559,28 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void deviceOfAnotherTenant_readAnswersAsForAnUnknownDevice() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(OTHER_TENANT_MACHINE_ID).append("tenantId", OTHER_TENANT_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(OTHER_TENANT_MACHINE_ID).append("tenantId", OTHER_TENANT_ID));
         savePending(kb5068861(OTHER_TENANT_MACHINE_ID, OTHER_TENANT_ID));
         saveHistory(history(OTHER_TENANT_MACHINE_ID, OTHER_TENANT_ID, OCTOBER_KEY, OCTOBER_TITLE, OCTOBER_INSTALL,
                 "INSTALL", "SUCCEEDED"));
 
         // execution
-        ExecutionResult device = queryExecutor.execute(DEVICE, Map.of("machineId", OTHER_TENANT_MACHINE_ID));
+        ExecutionResult state = queryExecutor.execute(STATE, Map.of("machineId", OTHER_TENANT_MACHINE_ID));
         ExecutionResult pending = queryExecutor.execute(PENDING, Map.of("machineId", OTHER_TENANT_MACHINE_ID));
         ExecutionResult history = queryExecutor.execute(HISTORY, Map.of("machineId", OTHER_TENANT_MACHINE_ID));
 
         // verifications
-        assertThat(device.getErrors()).isEmpty();
-        assertThat(device.<Map<String, Object>>getData()).containsEntry("device", null);
+        assertStateDeviceNotFound(state);
         assertDeviceNotFound(pending);
         assertDeviceNotFound(history);
     }
 
     @Test
-    void rowsOfAnotherTenantUnderTheSameMachineId_neverReturned() {
+    void stateAndRowsOfAnotherTenantUnderTheSameMachineId_neverReturned() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveState(windowsStateAfterFirstReport(MACHINE_ID).append("tenantId", OTHER_TENANT_ID)
+                .append("osVersion", "Of another tenant"));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         savePending(kb5068861(MACHINE_ID, TENANT_ID));
         savePending(pendingRow(MACHINE_ID, OTHER_TENANT_ID, "k-foreign", "Update of another tenant", FIRST_SCAN));
         saveHistory(history(MACHINE_ID, TENANT_ID, OCTOBER_KEY, OCTOBER_TITLE, OCTOBER_INSTALL, "INSTALL", "SUCCEEDED"));
@@ -549,10 +588,12 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 "INSTALL", "SUCCEEDED"));
 
         // execution
+        Map<String, Object> state = state(MACHINE_ID);
         List<Map<String, Object>> pending = pending(MACHINE_ID);
         HistoryPage history = history(MACHINE_ID, null, null);
 
         // verifications
+        assertThat(state).containsEntry("osVersion", "Windows 11 Pro");
         assertThat(pending).extracting(update -> update.get("updateKey")).containsExactly(KB5068861_KEY);
         assertThat(history.nodes()).extracting(node -> node.get("updateKey")).containsExactly(OCTOBER_KEY);
     }
@@ -560,16 +601,18 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     // ───────── A14: unknown device ─────────
 
     @Test
-    void unknownMachineId_bothListsAnswerDeviceNotFound() {
+    void unknownMachineId_allThreeReadsAnswerDeviceNotFound() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         savePending(kb5068861(MACHINE_ID, TENANT_ID));
 
         // execution
+        ExecutionResult state = queryExecutor.execute(STATE, Map.of("machineId", UNKNOWN_MACHINE_ID));
         ExecutionResult pending = queryExecutor.execute(PENDING, Map.of("machineId", UNKNOWN_MACHINE_ID));
         ExecutionResult history = queryExecutor.execute(HISTORY, Map.of("machineId", UNKNOWN_MACHINE_ID));
 
         // verifications
+        assertStateDeviceNotFound(state);
         assertDeviceNotFound(pending);
         assertDeviceNotFound(history);
     }
@@ -579,7 +622,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void history_fortyFiveEntriesInPagesOfTwenty_newestFirst_everyEntryOnce() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         saveHistoryEntries(MACHINE_ID, 45);
 
         // execution
@@ -604,7 +647,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void history_cursorOfAnEntryInTheMiddleOfAPage_continuesRightAfterThatEntry() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         saveHistoryEntries(MACHINE_ID, 12);
 
         // execution
@@ -619,7 +662,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void history_entriesInstalledAtTheSameInstant_splitOverPagesWithoutLossOrRepeat() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         for (int i = 0; i < 9; i++) {
             saveHistory(history(MACHINE_ID, TENANT_ID, "same-" + i, "Same instant " + i, "2026-11-10T03:00:00Z",
                     "INSTALL", "SUCCEEDED"));
@@ -641,7 +684,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void history_withoutFirst_twentyEntries_andNeverMoreThanAHundred() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         saveHistoryEntries(MACHINE_ID, 120);
 
         // execution
@@ -666,7 +709,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @ValueSource(ints = {19, 20, 21})
     void history_aroundThePageEdge_hasNextPageOnlyWhenAnEntryIsLeft(int stored) {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
         saveHistoryEntries(MACHINE_ID, stored);
 
         // execution
@@ -684,8 +727,8 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     @Test
     void history_ofTwoDevices_eachReturnsItsOwn() {
         // setup
-        saveMachine(windowsMachineAfterFirstReport(MACHINE_ID));
-        saveMachine(windowsMachineAfterFirstReport(SECOND_MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(MACHINE_ID));
+        saveReportedDevice(windowsStateAfterFirstReport(SECOND_MACHINE_ID));
         saveHistory(history(MACHINE_ID, TENANT_ID, OCTOBER_KEY, OCTOBER_TITLE, OCTOBER_INSTALL, "INSTALL", "SUCCEEDED"));
         saveHistory(history(SECOND_MACHINE_ID, TENANT_ID, KB5068861_KEY, KB5068861_TITLE, NOVEMBER_INSTALL, "INSTALL", "SUCCEEDED"));
         savePending(kb5068861(MACHINE_ID, TENANT_ID));
@@ -702,14 +745,11 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
 
     // ───────── reading ─────────
 
-    private Map<String, Object> device(String machineId) {
-        Map<String, Object> data = data(DEVICE, Map.of("machineId", machineId));
-        return map(data.get("device"));
-    }
-
-    private static Map<String, Object> osState(Map<String, Object> device) {
-        assertThat(device).as("device").isNotNull();
-        return map(device.get("osState"));
+    // null = the read answered deviceOsState: null
+    private Map<String, Object> state(String machineId) {
+        Map<String, Object> data = data(STATE, Map.of("machineId", machineId));
+        assertThat(data).as("data of the deviceOsState read").containsKey("deviceOsState");
+        return map(data.get("deviceOsState"));
     }
 
     private List<Map<String, Object>> pending(String machineId) {
@@ -745,12 +785,24 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
         return result.getData();
     }
 
+    // a list read is non-null: its error leaves no data at all
     private static void assertDeviceNotFound(ExecutionResult result) {
+        assertDeviceNotFoundError(result);
+        assertThat(result.<Object>getData()).isNull();
+    }
+
+    // deviceOsState is nullable: beside the error the field itself is null
+    private static void assertStateDeviceNotFound(ExecutionResult result) {
+        assertDeviceNotFoundError(result);
+        assertThat(result.<Map<String, Object>>getData()).as("data beside the DEVICE_NOT_FOUND error")
+                .containsOnlyKeys("deviceOsState").containsEntry("deviceOsState", null);
+    }
+
+    private static void assertDeviceNotFoundError(ExecutionResult result) {
         assertThat(result.getErrors()).singleElement().extracting(GraphQLError::getExtensions)
                 .satisfies(extensions -> assertThat(extensions)
                         .containsEntry("code", "DEVICE_NOT_FOUND")
                         .containsEntry("httpStatus", 404));
-        assertThat(result.<Object>getData()).isNull();
     }
 
     private static List<String> keys(HistoryPage... pages) {
@@ -784,16 +836,18 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("osType", "WINDOWS");
     }
 
-    private static Document windowsMachineAfterFirstReport(String machineId) {
-        return machine(machineId, TENANT_ID)
+    // the document of device_os_states the ingest half leaves after the first Windows report
+    private static Document windowsStateAfterFirstReport(String machineId) {
+        return new Document("tenantId", TENANT_ID)
+                .append("machineId", machineId)
                 .append("osVersion", "Windows 11 Pro")
                 .append("osBuild", "26100.4061")
-                .append("osState", new Document("restartPending", false)
-                        .append("lastScanAt", date(FIRST_SCAN))
-                        .append("lastInstalledAt", date(OCTOBER_INSTALL))
-                        .append("managementState", "MANAGED")
-                        .append("authorization", "NOT_REQUIRED")
-                        .append("receivedAt", date(RECEIVED)));
+                .append("restartPending", false)
+                .append("lastScanAt", date(FIRST_SCAN))
+                .append("lastInstalledAt", date(OCTOBER_INSTALL))
+                .append("managementState", "MANAGED")
+                .append("authorization", "NOT_REQUIRED")
+                .append("receivedAt", date(RECEIVED));
     }
 
     private static Document kb5068861(String machineId, String tenantId) {
@@ -864,6 +918,16 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
         machines().insertOne(machine);
     }
 
+    private void saveState(Document state) {
+        statesCollection().insertOne(state);
+    }
+
+    // a device with its OS state: the device document carries none of it
+    private void saveReportedDevice(Document state) {
+        saveMachine(machine(state.getString("machineId"), state.getString("tenantId")));
+        saveState(state);
+    }
+
     private void savePending(Document row) {
         pendingCollection().insertOne(row);
     }
@@ -874,6 +938,10 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
 
     private MongoCollection<Document> machines() {
         return mongoTemplate.getCollection("machines");
+    }
+
+    private MongoCollection<Document> statesCollection() {
+        return mongoTemplate.getCollection("device_os_states");
     }
 
     private MongoCollection<Document> pendingCollection() {

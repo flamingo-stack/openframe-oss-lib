@@ -63,8 +63,7 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withIgnoredFields(Set.of("lastSeen", "telemetryStatus", "packageManagers", "securityState",
                                 "complianceState", "securityAlerts", "lastSecurityScan", "lastComplianceScan",
                                 "stuckNotifiedAt", "hostFactsCheckedAt", "computerName", "directorySources",
-                                "directoryUserLink", "directoryUserIds", "directoryUserName", "osState", "osVersion",
-                                "osBuild")),
+                                "directoryUserLink", "directoryUserIds", "directoryUserName")),
                 AuditTarget.of(USER, User.class, User::nameOrEmail)
                         .withIgnoredFields(Set.of("crmSynced", "lastLogin"))
                         .withMaskedFields(Set.of("passwordHash")),

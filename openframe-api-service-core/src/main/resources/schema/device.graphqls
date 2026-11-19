@@ -99,8 +99,6 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     installedAgents: [InstalledAgent]
     """Package managers as last reported by the device agent. Null until the first report."""
     packageManagers: MachinePackageManagers
-    """OS update state as last reported by the device agent. Null until the first OS report."""
-    osState: DeviceOsState
     """False when no enabled package manager can ever work on this device. Software Management then hides it
     from device pickers and skips it at dispatch; inventory and vulnerabilities still show it."""
     softwareManagementSupported: Boolean!
@@ -116,46 +114,6 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     """The current user's unread notifications about this device (entity DEVICE, machineId). Counts the same
     read states as unreadCountsByCategory, so a row and the sidebar badge agree. 0 when none."""
     unreadNotificationCount: Int!
-}
-
-type DeviceOsState {
-    restartPending: Boolean
-    """When the device first reported the restart that is still pending."""
-    restartPendingSince: Instant
-    """Last successful scan for updates. Null = never scanned successfully."""
-    lastScanAt: Instant
-    """Error of the last scan, as the OS gave it. Null after a successful scan."""
-    lastScanError: String
-    lastInstalledAt: Instant
-    managementState: OsUpdateManagementState
-    managedElsewhereReason: OsUpdateManagedElsewhereReason
-    observedReason: OsUpdateObservedReason
-    authorization: OsUpdateAuthorization
-    receivedAt: Instant!
-}
-
-enum OsUpdateManagementState {
-    MANAGED
-    MANAGED_ELSEWHERE
-    OBSERVED
-}
-
-enum OsUpdateManagedElsewhereReason {
-    GPO
-    WSUS
-    MDM
-    CONFIGMGR
-}
-
-enum OsUpdateObservedReason {
-    HOME_EDITION
-    WRITE_FILTER
-}
-
-enum OsUpdateAuthorization {
-    AUTHORIZED
-    NOT_AUTHORIZED
-    NOT_REQUIRED
 }
 
 """A tag assigned to one device. `id` is the tag assignment's, unique per (device, tag) and resolvable through

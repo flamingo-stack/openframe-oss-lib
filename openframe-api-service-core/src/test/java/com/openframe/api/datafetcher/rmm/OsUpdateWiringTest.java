@@ -4,6 +4,7 @@ import com.openframe.api.mapper.GraphQLOsUpdateMapper;
 import com.openframe.api.mapper.OsUpdateMapper;
 import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -18,6 +19,7 @@ class OsUpdateWiringTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withBean(MachineRepository.class, () -> mock(MachineRepository.class))
             .withBean(TenantIdProvider.class, () -> mock(TenantIdProvider.class))
+            .withBean(DeviceOsStateRepository.class, () -> mock(DeviceOsStateRepository.class))
             .withBean(DeviceOsUpdateRepository.class, () -> mock(DeviceOsUpdateRepository.class))
             .withBean(DeviceOsUpdateHistoryRepository.class, () -> mock(DeviceOsUpdateHistoryRepository.class))
             .withUserConfiguration(OsUpdateDataFetcher.class, GraphQLOsUpdateMapper.class, OsUpdateService.class,

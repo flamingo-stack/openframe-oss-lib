@@ -9,15 +9,12 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateInstallResult;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRepository;
-import com.openframe.data.service.machine.MachineField;
-import com.openframe.data.service.machine.MachineUpdate;
-import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -31,13 +28,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.openframe.data.service.machine.MachineFields.OS_BUILD;
-import static com.openframe.data.service.machine.MachineFields.OS_STATE;
-import static com.openframe.data.service.machine.MachineFields.OS_VERSION;
-import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
@@ -45,12 +37,11 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @Slf4j
 public class MachineOsUpdatesService {
 
-    private static final String RECEIVED_AT_PATH = OS_STATE.path() + ".receivedAt";
     private static final Set<OsUpdateInstallResult> SUCCEEDED_RESULTS =
             EnumSet.of(OsUpdateInstallResult.SUCCEEDED, OsUpdateInstallResult.SUCCEEDED_WITH_ERRORS);
 
     private final MachineRepository machineRepository;
-    private final MachineWriter machineWriter;
+    private final DeviceOsStateRepository deviceOsStateRepository;
     private final DeviceOsUpdateRepository deviceOsUpdateRepository;
     private final DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
     private final OsUpdateReportMapper osUpdateReportMapper;
@@ -70,8 +61,8 @@ public class MachineOsUpdatesService {
         String tenantId = machine.getTenantId();
         List<DeviceOsUpdateHistoryEntry> history =
                 osUpdateReportMapper.toHistoryEntries(tenantId, machineId, report.getInstallHistory());
-        MachineUpdate stateUpdate = toStateUpdate(machine, report.getOsState(), history, receivedAt);
-        if (machineWriter.update(machineId, storedNotNewerThan(receivedAt), stateUpdate).isEmpty()) {
+        DeviceOsState osState = toOsState(machine, report.getOsState(), history, receivedAt);
+        if (!deviceOsStateRepository.upsertUnlessNewerStored(osState)) {
             log.info("Ignoring OS-updates report for machineId={} received at {}: a newer one is applied",
                     machineId, receivedAt);
             return;
@@ -97,31 +88,15 @@ public class MachineOsUpdatesService {
         return reported.getLastScanAt() != null ? reported.getLastScanAt() : receivedAt;
     }
 
-    private static Criteria storedNotNewerThan(Instant receivedAt) {
-        Criteria neverReceived = Criteria.where(RECEIVED_AT_PATH).isNull();
-        Criteria receivedEarlier = Criteria.where(RECEIVED_AT_PATH).lte(receivedAt);
-        return new Criteria().orOperator(neverReceived, receivedEarlier);
-    }
-
-    private MachineUpdate toStateUpdate(Machine machine, MachineOsUpdatesMessage.OsState reported,
-                                        List<DeviceOsUpdateHistoryEntry> history, Instant receivedAt) {
-        MachineUpdate stateUpdate = machineUpdate();
-        setIfReported(stateUpdate, OS_VERSION, reported.getOsVersion());
-        setIfReported(stateUpdate, OS_BUILD, reported.getOsBuild());
-        return stateUpdate.set(OS_STATE, toOsState(machine, reported, history, receivedAt));
-    }
-
-    private static void setIfReported(MachineUpdate stateUpdate, MachineField<String> field, String reported) {
-        if (isNotBlank(reported)) {
-            stateUpdate.set(field, reported);
-        }
-    }
-
     private DeviceOsState toOsState(Machine machine, MachineOsUpdatesMessage.OsState reported,
                                     List<DeviceOsUpdateHistoryEntry> history, Instant receivedAt) {
         return DeviceOsState.builder()
+                .tenantId(machine.getTenantId())
+                .machineId(machine.getMachineId())
+                .osVersion(defaultIfBlank(reported.getOsVersion(), null))
+                .osBuild(defaultIfBlank(reported.getOsBuild(), null))
                 .restartPending(reported.getRestartPending())
-                .restartPendingSince(restartPendingSince(machine.getOsState(), reported, receivedAt).orElse(null))
+                .restartPendingSince(restartPendingSince(machine, reported, receivedAt).orElse(null))
                 .lastScanAt(reported.getLastScanAt())
                 .lastScanError(defaultIfBlank(reported.getLastScanError(), null))
                 .lastInstalledAt(lastInstalledAt(machine, history).orElse(null))
@@ -133,14 +108,14 @@ public class MachineOsUpdatesService {
                 .build();
     }
 
-    private static Optional<Instant> restartPendingSince(DeviceOsState stored, MachineOsUpdatesMessage.OsState reported,
-                                                         Instant receivedAt) {
+    private Optional<Instant> restartPendingSince(Machine machine, MachineOsUpdatesMessage.OsState reported,
+                                                  Instant receivedAt) {
         if (!Boolean.TRUE.equals(reported.getRestartPending())) {
             return Optional.empty();
         }
-        Instant since = stored != null && stored.getRestartPendingSince() != null
-                ? stored.getRestartPendingSince() : receivedAt;
-        return Optional.of(since);
+        return deviceOsStateRepository.findByTenantIdAndMachineId(machine.getTenantId(), machine.getMachineId())
+                .map(DeviceOsState::getRestartPendingSince)
+                .or(() -> Optional.of(receivedAt));
     }
 
     private Optional<Instant> lastInstalledAt(Machine machine, List<DeviceOsUpdateHistoryEntry> reported) {

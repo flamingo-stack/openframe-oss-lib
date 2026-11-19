@@ -3,6 +3,7 @@ package com.openframe.api.datafetcher.rmm;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.rmm.osupdate.DeviceOsStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateHistoryEntryResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -19,6 +20,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +34,47 @@ class OsUpdateDataFetcherTest {
     @Mock private GraphQLOsUpdateMapper graphQLOsUpdateMapper;
 
     @InjectMocks private OsUpdateDataFetcher dataFetcher;
+
+    @Test
+    void deviceOsState_deviceReported_stateOfTheService() {
+        // setup
+        DeviceOsStateResponse state = DeviceOsStateResponse.builder().osVersion("Windows 11 Pro").build();
+        when(osUpdateService.hasStateForDevice(MACHINE_ID)).thenReturn(true);
+        when(osUpdateService.getStateForDevice(MACHINE_ID)).thenReturn(state);
+
+        // execution
+        DeviceOsStateResponse found = dataFetcher.deviceOsState(MACHINE_ID);
+
+        // verifications
+        assertThat(found).isSameAs(state);
+    }
+
+    @Test
+    void deviceOsState_deviceNeverReported_null() {
+        // setup
+        when(osUpdateService.hasStateForDevice(MACHINE_ID)).thenReturn(false);
+
+        // execution
+        DeviceOsStateResponse found = dataFetcher.deviceOsState(MACHINE_ID);
+
+        // verifications
+        assertThat(found).isNull();
+        verify(osUpdateService, never()).getStateForDevice(MACHINE_ID);
+    }
+
+    @Test
+    void deviceOsState_unknownDevice_deviceNotFoundPassedOn() {
+        // setup
+        when(osUpdateService.hasStateForDevice(MACHINE_ID))
+                .thenThrow(new DeviceNotFoundException("Device not found: " + MACHINE_ID));
+
+        // execution
+        DeviceNotFoundException ex = assertThrows(DeviceNotFoundException.class,
+                () -> dataFetcher.deviceOsState(MACHINE_ID));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Device not found: " + MACHINE_ID);
+    }
 
     @Test
     void deviceOsUpdates_knownDevice_pendingUpdatesOfTheService() {

@@ -1,11 +1,17 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.rmm.osupdate.DeviceOsStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateHistoryEntryResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateResponse;
+import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdate;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateCategory;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
+import com.openframe.data.document.rmm.osupdate.OsUpdateAuthorization;
 import com.openframe.data.document.rmm.osupdate.OsUpdateInstallResult;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManagedElsewhereReason;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManagementState;
+import com.openframe.data.document.rmm.osupdate.OsUpdateObservedReason;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRestartBehaviour;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
@@ -31,6 +37,48 @@ class OsUpdateMapperTest {
     @BeforeEach
     void setUp() {
         mapper = new OsUpdateMapper();
+    }
+
+    @Test
+    void toResponse_osState_everyApiFieldMapped() {
+        // setup
+        DeviceOsState state = DeviceOsState.builder()
+                .id("id-1")
+                .tenantId("tenant-1")
+                .machineId("machine-1")
+                .osVersion("Windows 11 Pro")
+                .osBuild("26100.4061")
+                .restartPending(true)
+                .restartPendingSince(PUBLISHED_AT)
+                .lastScanAt(DISCOVERED_AT)
+                .lastScanError("0x80072EE2")
+                .lastInstalledAt(INSTALLED_AT)
+                .managementState(OsUpdateManagementState.MANAGED_ELSEWHERE)
+                .managedElsewhereReason(OsUpdateManagedElsewhereReason.WSUS)
+                .observedReason(OsUpdateObservedReason.HOME_EDITION)
+                .authorization(OsUpdateAuthorization.NOT_REQUIRED)
+                .receivedAt(DISCOVERED_AT)
+                .build();
+        DeviceOsStateResponse expected = DeviceOsStateResponse.builder()
+                .osVersion("Windows 11 Pro")
+                .osBuild("26100.4061")
+                .restartPending(true)
+                .restartPendingSince(PUBLISHED_AT)
+                .lastScanAt(DISCOVERED_AT)
+                .lastScanError("0x80072EE2")
+                .lastInstalledAt(INSTALLED_AT)
+                .managementState(OsUpdateManagementState.MANAGED_ELSEWHERE)
+                .managedElsewhereReason(OsUpdateManagedElsewhereReason.WSUS)
+                .observedReason(OsUpdateObservedReason.HOME_EDITION)
+                .authorization(OsUpdateAuthorization.NOT_REQUIRED)
+                .receivedAt(DISCOVERED_AT)
+                .build();
+
+        // execution
+        DeviceOsStateResponse response = mapper.toResponse(state);
+
+        // verifications
+        assertThat(response).isEqualTo(expected);
     }
 
     @Test

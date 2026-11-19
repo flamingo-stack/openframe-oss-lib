@@ -8,12 +8,15 @@ import com.openframe.api.integration.support.DeviceOsReadTestApplication;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import graphql.ExecutionResult;
+import graphql.GraphQLError;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
@@ -62,6 +65,7 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
     void removeTheMachinesOfThisClass() {
         Bson ownMachines = Filters.in("machineId", READ, DELETED, KEPT);
         machines().deleteMany(ownMachines);
+        states().deleteMany(ownMachines);
         pending().deleteMany(ownMachines);
         history().deleteMany(ownMachines);
     }
@@ -88,10 +92,50 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
                 .containsEntry("device", Map.of("machineId", READ, "osVersion", "Windows 11 Pro"));
     }
 
+    // design.md, ruling 12: with the flag off the two list reads answer with an error
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "deviceOsUpdates(machineId: $machineId) { updateKey }",
+            "deviceOsUpdateHistory(machineId: $machineId) { pageInfo { hasNextPage } }"})
+    void osUpdateFlagAbsent_listReadIsInTheSchemaAndAnswersWithAnError(String read) {
+        // setup
+        machines().insertOne(machine(READ));
+        states().insertOne(stateDocument(READ));
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(
+                "query($machineId: String!) { " + read + " }", Map.of("machineId", READ));
+
+        // verifications
+        assertThat(result.getErrors()).as("errors of %s", read).isNotEmpty();
+        assertThat(result.getErrors()).extracting(GraphQLError::getMessage)
+                .as("%s is in the schema: no FieldUndefined validation error", read)
+                .noneMatch(message -> message.contains("FieldUndefined"));
+    }
+
+    // design.md, ruling 12: with the flag off deviceOsState answers null without an error, stored state or not
     @Test
-    void osUpdateFlagAbsent_deletingADeviceStillRemovesItsPendingAndHistoryRows_andNoOtherDevices() {
+    void osUpdateFlagAbsent_deviceOsStateIsInTheSchemaAndAnswersNullWithoutAnError() {
+        // setup
+        machines().insertOne(machine(READ));
+        states().insertOne(stateDocument(READ));
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(
+                "query($machineId: String!) { deviceOsState(machineId: $machineId) { receivedAt } }",
+                Map.of("machineId", READ));
+
+        // verifications
+        assertThat(result.getErrors()).as("errors of deviceOsState").isEmpty();
+        assertThat(result.<Map<String, Object>>getData()).as("data of deviceOsState")
+                .containsKey("deviceOsState").containsEntry("deviceOsState", null);
+    }
+
+    @Test
+    void osUpdateFlagAbsent_deletingADeviceStillRemovesItsStatePendingAndHistoryRows_andNoOtherDevices() {
         // setup
         machines().insertMany(List.of(machine(DELETED), machine(KEPT)));
+        states().insertMany(List.of(stateDocument(DELETED), stateDocument(KEPT)));
         pending().insertMany(List.of(pendingRow(DELETED), pendingRow(KEPT)));
         history().insertMany(List.of(historyRow(DELETED), historyRow(KEPT)));
 
@@ -100,14 +144,23 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
 
         // verifications
         assertThat(machines().find(Filters.eq("machineId", DELETED)).first().getString("status")).isEqualTo("DELETED");
+        assertThat(states().countDocuments(Filters.eq("machineId", DELETED)))
+                .as("device_os_states documents of the deleted device").isZero();
         assertThat(pending().countDocuments(Filters.eq("machineId", DELETED))).isZero();
         assertThat(history().countDocuments(Filters.eq("machineId", DELETED))).isZero();
+        assertThat(states().countDocuments(Filters.eq("machineId", KEPT))).isEqualTo(1);
         assertThat(pending().countDocuments(Filters.eq("machineId", KEPT))).isEqualTo(1);
         assertThat(history().countDocuments(Filters.eq("machineId", KEPT))).isEqualTo(1);
     }
 
     private static Document machine(String machineId) {
         return new Document("machineId", machineId).append("tenantId", TENANT_ID).append("status", "ONLINE");
+    }
+
+    private static Document stateDocument(String machineId) {
+        return new Document("tenantId", TENANT_ID).append("machineId", machineId)
+                .append("osVersion", "Windows 11 Pro").append("osBuild", "26100.4061")
+                .append("receivedAt", Date.from(Instant.parse("2026-11-19T10:15:02.417Z")));
     }
 
     private static Document pendingRow(String machineId) {
@@ -125,6 +178,10 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
 
     private MongoCollection<Document> machines() {
         return mongoTemplate.getCollection("machines");
+    }
+
+    private MongoCollection<Document> states() {
+        return mongoTemplate.getCollection("device_os_states");
     }
 
     private MongoCollection<Document> pending() {

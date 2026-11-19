@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.rmm.osupdate.DeviceOsStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateHistoryEntryResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateResponse;
 import com.openframe.api.mapper.GraphQLOsUpdateMapper;
@@ -22,6 +23,11 @@ public class OsUpdateDataFetcher {
 
     private final OsUpdateService osUpdateService;
     private final GraphQLOsUpdateMapper graphQLOsUpdateMapper;
+
+    @DgsQuery
+    public DeviceOsStateResponse deviceOsState(@InputArgument String machineId) {
+        return osUpdateService.hasStateForDevice(machineId) ? osUpdateService.getStateForDevice(machineId) : null;
+    }
 
     @DgsQuery
     public List<DeviceOsUpdateResponse> deviceOsUpdates(@InputArgument String machineId) {

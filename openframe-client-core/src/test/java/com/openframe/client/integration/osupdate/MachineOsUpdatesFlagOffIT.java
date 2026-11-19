@@ -58,10 +58,12 @@ class MachineOsUpdatesFlagOffIT extends BaseOsReportIngestIT {
     }
 
     @Test
-    void osUpdateFlagAbsent_deletedMachineCleanupStillRemovesThePendingAndHistoryRowsOfThatMachineOnly() {
+    void osUpdateFlagAbsent_deletedMachineCleanupStillRemovesTheStateAndTheRowsOfThatMachineOnly() {
         // setup
+        states().deleteMany(Filters.in("machineId", DELETED, KEPT));
         pending().deleteMany(Filters.in("machineId", DELETED, KEPT));
         history().deleteMany(Filters.in("machineId", DELETED, KEPT));
+        states().insertMany(List.of(stateDocument(DELETED), stateDocument(KEPT)));
         pending().insertMany(List.of(pendingRow(DELETED), pendingRow(KEPT)));
         history().insertMany(List.of(historyRow(DELETED), historyRow(KEPT)));
 
@@ -69,10 +71,19 @@ class MachineOsUpdatesFlagOffIT extends BaseOsReportIngestIT {
         deletedMachineCleanup.cleanUpDeletedMachine(TENANT_ID, DELETED);
 
         // verifications
+        assertThat(states().countDocuments(Filters.eq("machineId", DELETED)))
+                .as("device_os_states documents of the deleted device").isZero();
         assertThat(pending().countDocuments(Filters.eq("machineId", DELETED))).isZero();
         assertThat(history().countDocuments(Filters.eq("machineId", DELETED))).isZero();
+        assertThat(states().countDocuments(Filters.eq("machineId", KEPT))).isEqualTo(1);
         assertThat(pending().countDocuments(Filters.eq("machineId", KEPT))).isEqualTo(1);
         assertThat(history().countDocuments(Filters.eq("machineId", KEPT))).isEqualTo(1);
+    }
+
+    private static Document stateDocument(String machineId) {
+        return new Document("tenantId", TENANT_ID).append("machineId", machineId)
+                .append("osVersion", "Windows 11 Pro").append("osBuild", "26100.4061")
+                .append("receivedAt", Date.from(Instant.parse("2026-11-19T10:15:02.417Z")));
     }
 
     private static Document pendingRow(String machineId) {
@@ -86,6 +97,10 @@ class MachineOsUpdatesFlagOffIT extends BaseOsReportIngestIT {
                 .append("entryKey", "k-0|2026-10-16T02:41:10Z|INSTALL").append("updateKey", "k-0")
                 .append("title", "Update zero").append("operation", "INSTALL").append("result", "SUCCEEDED")
                 .append("installedAt", Date.from(Instant.parse("2026-10-16T02:41:10Z")));
+    }
+
+    private MongoCollection<Document> states() {
+        return mongoTemplate.getCollection("device_os_states");
     }
 
     private MongoCollection<Document> pending() {

@@ -3,6 +3,7 @@ package com.openframe.data.service.rmm;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -28,6 +29,7 @@ class DeletedMachineCleanupTest {
     @Mock private DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjectionTrigger projectionTrigger;
+    @Mock private DeviceOsStateRepository deviceOsStateRepository;
     @Mock private DeviceOsUpdateRepository deviceOsUpdateRepository;
     @Mock private DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
 
@@ -50,17 +52,18 @@ class DeletedMachineCleanupTest {
 
         verifyNoInteractions(assignedRepository, onlineDeviceDispatchRepository,
                 deviceSoftwareRepository, projectionTrigger,
-                deviceOsUpdateRepository, deviceOsUpdateHistoryRepository);
+                deviceOsStateRepository, deviceOsUpdateRepository, deviceOsUpdateHistoryRepository);
     }
 
     @Test
-    void cleanUpDeletedMachine_machineDeleted_itsPendingOsUpdatesAndOsUpdateHistoryRemoved() {
+    void cleanUpDeletedMachine_machineDeleted_itsOsStatePendingOsUpdatesAndOsUpdateHistoryRemoved() {
         // setup
 
         // execution
         cleanup.cleanUpDeletedMachine("t-1", "m-1");
 
         // verifications
+        verify(deviceOsStateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
         verify(deviceOsUpdateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
         verify(deviceOsUpdateHistoryRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
     }

@@ -50,7 +50,8 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
                 ".*\\.ScriptScheduleMachineAssignedRepository",
                 ".*\\.DeviceOnlineDispatchRepository",
                 ".*\\.DeviceSoftwareRepository",
-                ".*OsUpdate.*"
+                ".*OsUpdate.*",
+                ".*\\.osupdate\\..*"
         }))
 @ComponentScan(
         basePackages = {"com.openframe.client", "com.openframe.data"},

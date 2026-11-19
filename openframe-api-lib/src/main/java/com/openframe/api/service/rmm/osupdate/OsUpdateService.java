@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm.osupdate;
 
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.rmm.osupdate.DeviceOsStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateHistoryEntryResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateResponse;
 import com.openframe.api.dto.shared.CursorCodec;
@@ -10,6 +11,7 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.OsUpdateMapper;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -25,10 +27,22 @@ import java.util.List;
 public class OsUpdateService {
 
     private final MachineRepository machineRepository;
+    private final DeviceOsStateRepository deviceOsStateRepository;
     private final DeviceOsUpdateRepository deviceOsUpdateRepository;
     private final DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
     private final OsUpdateMapper osUpdateMapper;
     private final TenantIdProvider tenantIdProvider;
+
+    public boolean hasStateForDevice(String machineId) {
+        verifyDeviceExists(machineId);
+        return deviceOsStateRepository.existsByTenantIdAndMachineId(tenantIdProvider.getTenantId(), machineId);
+    }
+
+    public DeviceOsStateResponse getStateForDevice(String machineId) {
+        return deviceOsStateRepository.findByTenantIdAndMachineId(tenantIdProvider.getTenantId(), machineId)
+                .map(osUpdateMapper::toResponse)
+                .orElseThrow(() -> new IllegalStateException("No OS state stored for device: " + machineId));
+    }
 
     public List<DeviceOsUpdateResponse> listPendingForDevice(String machineId) {
         verifyDeviceExists(machineId);

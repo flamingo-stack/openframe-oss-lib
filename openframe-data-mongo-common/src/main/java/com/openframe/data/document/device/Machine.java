@@ -2,7 +2,6 @@ package com.openframe.data.document.device;
 import com.openframe.data.document.TenantScoped;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
-import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.script.OsType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -61,7 +60,6 @@ public class Machine implements TenantScoped {
     private String osBuild;
     private String timezone;
     private Map<PackageManagerType, PackageManagerState> packageManagers;
-    private DeviceOsState osState;
     private SecurityState securityState;
     private ComplianceState complianceState;
     private List<SecurityAlert> securityAlerts;

@@ -1,7 +1,9 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.rmm.osupdate.DeviceOsStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateHistoryEntryResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateResponse;
+import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdate;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateCategory;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
@@ -14,6 +16,23 @@ import java.util.Objects;
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
 public class OsUpdateMapper {
+
+    public DeviceOsStateResponse toResponse(DeviceOsState state) {
+        return DeviceOsStateResponse.builder()
+                .osVersion(state.getOsVersion())
+                .osBuild(state.getOsBuild())
+                .restartPending(state.getRestartPending())
+                .restartPendingSince(state.getRestartPendingSince())
+                .lastScanAt(state.getLastScanAt())
+                .lastScanError(state.getLastScanError())
+                .lastInstalledAt(state.getLastInstalledAt())
+                .managementState(state.getManagementState())
+                .managedElsewhereReason(state.getManagedElsewhereReason())
+                .observedReason(state.getObservedReason())
+                .authorization(state.getAuthorization())
+                .receivedAt(state.getReceivedAt())
+                .build();
+    }
 
     public DeviceOsUpdateResponse toResponse(DeviceOsUpdate update) {
         return DeviceOsUpdateResponse.builder()

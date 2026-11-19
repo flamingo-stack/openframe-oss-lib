@@ -1,4 +1,8 @@
 extend type Query {
+    """OS update state as the device agent last reported it. Null = the device never sent an OS report.
+    Unknown machineId → DEVICE_NOT_FOUND."""
+    deviceOsState(machineId: String!): DeviceOsState
+
     """OS updates the device's OS currently offers it, newest discovered first, then by title.
     Unknown machineId → DEVICE_NOT_FOUND; a device that never reported → empty list."""
     deviceOsUpdates(machineId: String!): [DeviceOsUpdate!]!
@@ -6,6 +10,48 @@ extend type Query {
     """OS updates the device installed or failed to install, newest first.
     `first`: 1-100, default 20. Unknown machineId → DEVICE_NOT_FOUND."""
     deviceOsUpdateHistory(machineId: String!, first: Int, after: String): DeviceOsUpdateHistoryConnection!
+}
+
+type DeviceOsState {
+    osVersion: String
+    osBuild: String
+    restartPending: Boolean
+    """When the device first reported the restart that is still pending."""
+    restartPendingSince: Instant
+    """Last successful scan for updates. Null = never scanned successfully."""
+    lastScanAt: Instant
+    """Error of the last scan, as the OS gave it. Null after a successful scan."""
+    lastScanError: String
+    lastInstalledAt: Instant
+    managementState: OsUpdateManagementState
+    managedElsewhereReason: OsUpdateManagedElsewhereReason
+    observedReason: OsUpdateObservedReason
+    authorization: OsUpdateAuthorization
+    receivedAt: Instant!
+}
+
+enum OsUpdateManagementState {
+    MANAGED
+    MANAGED_ELSEWHERE
+    OBSERVED
+}
+
+enum OsUpdateManagedElsewhereReason {
+    GPO
+    WSUS
+    MDM
+    CONFIGMGR
+}
+
+enum OsUpdateObservedReason {
+    HOME_EDITION
+    WRITE_FILTER
+}
+
+enum OsUpdateAuthorization {
+    AUTHORIZED
+    NOT_AUTHORIZED
+    NOT_REQUIRED
 }
 
 type DeviceOsUpdate {

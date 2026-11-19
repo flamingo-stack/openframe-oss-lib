@@ -15,6 +15,7 @@ import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
@@ -47,17 +48,51 @@ class OsUpdateSchemaContractTest {
         }
     }
 
+    // design.md, ruling 11: the OS state is its own query, the device type is the one of main
     @Test
-    void machine_hasTheOsStateOfTheDevice_nullableForADeviceThatNeverReported() {
+    void machine_hasNoOsStateField_keepsItsOwnVersionAndBuild() {
         // setup
 
         // execution
         Map<String, String> machine = fields("Machine");
 
         // verifications
-        assertThat(machine).containsEntry("osState", "DeviceOsState")
+        assertThat(machine).doesNotContainKey("osState")
                 .containsEntry("osVersion", "String")
                 .containsEntry("osBuild", "String");
+    }
+
+    @Test
+    void deviceSchemaFile_namesNothingOfTheOsUpdateFeature_itsTypesAreInTheOsUpdateFile() throws IOException {
+        // setup
+        SchemaParser parser = new SchemaParser();
+
+        // execution
+        String deviceFile = new ClassPathResource("schema/device.graphqls").getContentAsString(StandardCharsets.UTF_8);
+        TypeDefinitionRegistry osUpdateFile = parser.parse(
+                new ClassPathResource("schema/os-update.graphqls").getContentAsString(StandardCharsets.UTF_8));
+
+        // verifications
+        assertThat(deviceFile).as("schema/device.graphqls").doesNotContain("osState", "DeviceOsState", "OsUpdate");
+        assertThat(osUpdateFile.getType("DeviceOsState", ObjectTypeDefinition.class))
+                .as("type DeviceOsState in schema/os-update.graphqls").isPresent();
+        assertThat(List.of("OsUpdateManagementState", "OsUpdateManagedElsewhereReason", "OsUpdateObservedReason",
+                "OsUpdateAuthorization"))
+                .as("enums in schema/os-update.graphqls")
+                .allSatisfy(name -> assertThat(osUpdateFile.getType(name, EnumTypeDefinition.class)).as(name).isPresent());
+    }
+
+    @Test
+    void deviceOsState_rootQueryByMachineId_nullForADeviceThatNeverReported() {
+        // setup
+
+        // execution
+        Optional<FieldDefinition> query = queryField("deviceOsState");
+
+        // verifications
+        assertThat(query).as("Query.deviceOsState").isPresent();
+        assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(Map.of("machineId", "String!"));
+        assertThat(print(query.get().getType())).isEqualTo("DeviceOsState");
     }
 
     @Test
@@ -68,17 +103,20 @@ class OsUpdateSchemaContractTest {
         Map<String, String> osState = fields("DeviceOsState");
 
         // verifications
-        assertThat(osState).containsExactlyInAnyOrderEntriesOf(Map.of(
-                "restartPending", "Boolean",
-                "restartPendingSince", "Instant",
-                "lastScanAt", "Instant",
-                "lastScanError", "String",
-                "lastInstalledAt", "Instant",
-                "managementState", "OsUpdateManagementState",
-                "managedElsewhereReason", "OsUpdateManagedElsewhereReason",
-                "observedReason", "OsUpdateObservedReason",
-                "authorization", "OsUpdateAuthorization",
-                "receivedAt", "Instant!"));
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("osVersion", "String");
+        expected.put("osBuild", "String");
+        expected.put("restartPending", "Boolean");
+        expected.put("restartPendingSince", "Instant");
+        expected.put("lastScanAt", "Instant");
+        expected.put("lastScanError", "String");
+        expected.put("lastInstalledAt", "Instant");
+        expected.put("managementState", "OsUpdateManagementState");
+        expected.put("managedElsewhereReason", "OsUpdateManagedElsewhereReason");
+        expected.put("observedReason", "OsUpdateObservedReason");
+        expected.put("authorization", "OsUpdateAuthorization");
+        expected.put("receivedAt", "Instant!");
+        assertThat(osState).containsExactlyInAnyOrderEntriesOf(expected);
     }
 
     @Test

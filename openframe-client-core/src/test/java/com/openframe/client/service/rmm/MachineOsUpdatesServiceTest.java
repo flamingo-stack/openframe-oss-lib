@@ -12,12 +12,9 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateManagementState;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRepository;
-import com.openframe.data.service.machine.MachineUpdate;
-import com.openframe.data.service.machine.MachineWriteResult;
-import com.openframe.data.service.machine.MachineWriter;
-import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +29,6 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,7 +40,6 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -64,13 +59,12 @@ class MachineOsUpdatesServiceTest {
             Set.of(OsUpdateInstallResult.SUCCEEDED, OsUpdateInstallResult.SUCCEEDED_WITH_ERRORS);
 
     @Mock private MachineRepository machineRepository;
-    @Mock private MachineWriter machineWriter;
+    @Mock private DeviceOsStateRepository deviceOsStateRepository;
     @Mock private DeviceOsUpdateRepository deviceOsUpdateRepository;
     @Mock private DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
     @Mock private OsUpdateReportMapper osUpdateReportMapper;
 
-    @Captor private ArgumentCaptor<Criteria> guardCaptor;
-    @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
+    @Captor private ArgumentCaptor<DeviceOsState> osStateCaptor;
     @Captor private ArgumentCaptor<Collection<DeviceOsUpdate>> savedCaptor;
 
     @InjectMocks private MachineOsUpdatesService service;
@@ -109,7 +103,7 @@ class MachineOsUpdatesServiceTest {
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        verifyNoInteractions(machineWriter, deviceOsUpdateRepository, deviceOsUpdateHistoryRepository,
+        verifyNoInteractions(deviceOsStateRepository, deviceOsUpdateRepository, deviceOsUpdateHistoryRepository,
                 osUpdateReportMapper);
     }
 
@@ -124,12 +118,12 @@ class MachineOsUpdatesServiceTest {
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        verifyNoInteractions(machineWriter, deviceOsUpdateRepository, deviceOsUpdateHistoryRepository,
+        verifyNoInteractions(deviceOsStateRepository, deviceOsUpdateRepository, deviceOsUpdateHistoryRepository,
                 osUpdateReportMapper);
     }
 
     @Test
-    void apply_report_versionBuildAndStateWrittenAsReported() {
+    void apply_report_stateOfThatTenantAndMachineWrittenAsReported() {
         // setup
         stubStateWritten();
         reportedState.setLastScanError("0x80072EE2");
@@ -137,6 +131,10 @@ class MachineOsUpdatesServiceTest {
         reportedState.setManagedElsewhereReason(OsUpdateManagedElsewhereReason.WSUS);
         reportedState.setOsUpdateAuthorization(OsUpdateAuthorization.NOT_REQUIRED);
         DeviceOsState expected = DeviceOsState.builder()
+                .tenantId(TENANT_ID)
+                .machineId(MACHINE_ID)
+                .osVersion("Windows 11 Pro")
+                .osBuild("26100.4061")
                 .restartPending(false)
                 .lastScanAt(LAST_SCAN_AT)
                 .lastScanError("0x80072EE2")
@@ -150,18 +148,13 @@ class MachineOsUpdatesServiceTest {
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        Machine written = new Machine();
-        updateCaptor.getValue().applyTo(written);
-        assertThat(updateCaptor.getValue().paths()).containsExactly("osVersion", "osBuild", "osState");
-        assertThat(written.getOsVersion()).isEqualTo("Windows 11 Pro");
-        assertThat(written.getOsBuild()).isEqualTo("26100.4061");
-        assertThat(written.getOsState()).isEqualTo(expected);
+        assertThat(osStateCaptor.getValue()).isEqualTo(expected);
     }
 
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", " "})
-    void apply_reportWithoutVersionAndBuild_storedVersionAndBuildNotTouched(String absent) {
+    void apply_reportWithoutVersionAndBuild_noneHandedOverSoTheStoredOnesStay(String absent) {
         // setup
         stubStateWritten();
         reportedState.setOsVersion(absent);
@@ -171,11 +164,13 @@ class MachineOsUpdatesServiceTest {
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        assertThat(updateCaptor.getValue().paths()).containsExactly("osState");
+        assertThat(osStateCaptor.getValue())
+                .extracting(DeviceOsState::getOsVersion, DeviceOsState::getOsBuild)
+                .containsOnlyNulls();
     }
 
     @Test
-    void apply_reportWithVersionButNoBuild_onlyTheVersionWritten() {
+    void apply_reportWithVersionButNoBuild_onlyTheVersionHandedOver() {
         // setup
         stubStateWritten();
         reportedState.setOsBuild(null);
@@ -184,7 +179,9 @@ class MachineOsUpdatesServiceTest {
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        assertThat(updateCaptor.getValue().paths()).containsExactly("osVersion", "osState");
+        assertThat(osStateCaptor.getValue())
+                .extracting(DeviceOsState::getOsVersion, DeviceOsState::getOsBuild)
+                .containsExactly("Windows 11 Pro", null);
     }
 
     @ParameterizedTest
@@ -198,9 +195,7 @@ class MachineOsUpdatesServiceTest {
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        Machine written = new Machine();
-        updateCaptor.getValue().applyTo(written);
-        assertThat(written.getOsState().getLastScanError()).isNull();
+        assertThat(osStateCaptor.getValue().getLastScanError()).isNull();
     }
 
     @ParameterizedTest
@@ -224,26 +219,10 @@ class MachineOsUpdatesServiceTest {
     }
 
     @Test
-    void apply_report_writtenOnlyWhileTheStoredReportIsNotNewer() {
-        // setup
-        stubStateWritten();
-        Document neverReceived = new Document("osState.receivedAt", null);
-        Document receivedEarlier = new Document("osState.receivedAt", new Document("$lte", RECEIVED_AT));
-        Document expectedGuard = new Document("$or", List.of(neverReceived, receivedEarlier));
-
-        // execution
-        service.apply(MACHINE_ID, report, RECEIVED_AT);
-
-        // verifications
-        assertThat(guardCaptor.getValue().getCriteriaObject()).isEqualTo(expectedGuard);
-    }
-
-    @Test
     void apply_newerReportAlreadyApplied_noRowsTouched() {
         // setup
         stubStateLookups();
-        when(machineWriter.update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture()))
-                .thenReturn(Optional.empty());
+        when(deviceOsStateRepository.upsertUnlessNewerStored(osStateCaptor.capture())).thenReturn(false);
         report.setPendingUpdates(reportedPending);
         history.add(historyEntry("k-1", REPORTED_INSTALL, OsUpdateOperation.INSTALL, OsUpdateInstallResult.SUCCEEDED));
 
@@ -429,16 +408,13 @@ class MachineOsUpdatesServiceTest {
         when(deviceOsUpdateHistoryRepository
                 .findFirstByTenantIdAndMachineIdAndOperationAndResultInOrderByInstalledAtDesc(
                         TENANT_ID, MACHINE_ID, OsUpdateOperation.INSTALL, SUCCEEDED_RESULTS)).thenReturn(stored);
-        when(machineWriter.update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture()))
-                .thenReturn(Optional.of(new MachineWriteResult(machine, machine)));
+        when(deviceOsStateRepository.upsertUnlessNewerStored(osStateCaptor.capture())).thenReturn(true);
 
         // execution
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        Machine written = new Machine();
-        updateCaptor.getValue().applyTo(written);
-        assertThat(written.getOsState().getLastInstalledAt()).isEqualTo(expected);
+        assertThat(osStateCaptor.getValue().getLastInstalledAt()).isEqualTo(expected);
     }
 
     @Test
@@ -450,57 +426,50 @@ class MachineOsUpdatesServiceTest {
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        Machine written = new Machine();
-        updateCaptor.getValue().applyTo(written);
-        assertThat(written.getOsState().getLastInstalledAt()).isNull();
+        assertThat(osStateCaptor.getValue().getLastInstalledAt()).isNull();
     }
 
     @Test
     void apply_restartPendingFirstReported_sinceIsWhenTheReportWasReceived() {
         // setup
         stubStateWritten();
-        machine.setOsState(DeviceOsState.builder().restartPending(false).build());
+        stubStoredState(DeviceOsState.builder().restartPending(false).build());
         reportedState.setRestartPending(true);
 
         // execution
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        Machine written = new Machine();
-        updateCaptor.getValue().applyTo(written);
-        assertThat(written.getOsState().getRestartPending()).isTrue();
-        assertThat(written.getOsState().getRestartPendingSince()).isEqualTo(RECEIVED_AT);
+        assertThat(osStateCaptor.getValue().getRestartPending()).isTrue();
+        assertThat(osStateCaptor.getValue().getRestartPendingSince()).isEqualTo(RECEIVED_AT);
     }
 
     @Test
     void apply_restartPendingOnADeviceThatNeverReported_sinceIsWhenTheReportWasReceived() {
         // setup
         stubStateWritten();
+        when(deviceOsStateRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Optional.empty());
         reportedState.setRestartPending(true);
 
         // execution
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        Machine written = new Machine();
-        updateCaptor.getValue().applyTo(written);
-        assertThat(written.getOsState().getRestartPendingSince()).isEqualTo(RECEIVED_AT);
+        assertThat(osStateCaptor.getValue().getRestartPendingSince()).isEqualTo(RECEIVED_AT);
     }
 
     @Test
     void apply_restartStillPending_sinceKept() {
         // setup
         stubStateWritten();
-        machine.setOsState(DeviceOsState.builder().restartPending(true).restartPendingSince(EARLIER).build());
+        stubStoredState(DeviceOsState.builder().restartPending(true).restartPendingSince(EARLIER).build());
         reportedState.setRestartPending(true);
 
         // execution
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        Machine written = new Machine();
-        updateCaptor.getValue().applyTo(written);
-        assertThat(written.getOsState().getRestartPendingSince()).isEqualTo(EARLIER);
+        assertThat(osStateCaptor.getValue().getRestartPendingSince()).isEqualTo(EARLIER);
     }
 
     @ParameterizedTest
@@ -509,17 +478,19 @@ class MachineOsUpdatesServiceTest {
     void apply_restartNoLongerPendingOrUnknown_sinceCleared(Boolean restartPending) {
         // setup
         stubStateWritten();
-        machine.setOsState(DeviceOsState.builder().restartPending(true).restartPendingSince(EARLIER).build());
         reportedState.setRestartPending(restartPending);
 
         // execution
         service.apply(MACHINE_ID, report, RECEIVED_AT);
 
         // verifications
-        Machine written = new Machine();
-        updateCaptor.getValue().applyTo(written);
-        assertThat(written.getOsState().getRestartPending()).isEqualTo(restartPending);
-        assertThat(written.getOsState().getRestartPendingSince()).isNull();
+        assertThat(osStateCaptor.getValue().getRestartPending()).isEqualTo(restartPending);
+        assertThat(osStateCaptor.getValue().getRestartPendingSince()).isNull();
+    }
+
+    private void stubStoredState(DeviceOsState stored) {
+        when(deviceOsStateRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .thenReturn(Optional.of(stored));
     }
 
     private void stubStateLookups() {
@@ -532,8 +503,7 @@ class MachineOsUpdatesServiceTest {
 
     private void stubStateWritten() {
         stubStateLookups();
-        when(machineWriter.update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture()))
-                .thenReturn(Optional.of(new MachineWriteResult(machine, machine)));
+        when(deviceOsStateRepository.upsertUnlessNewerStored(osStateCaptor.capture())).thenReturn(true);
     }
 
     private static DeviceOsUpdate pending(String id, String updateKey, String title, Instant discoveredAt) {

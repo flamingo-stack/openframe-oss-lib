@@ -52,15 +52,17 @@ import java.util.stream.Stream;
 import static com.openframe.client.integration.support.OsReportIngestTestApplication.TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.assertj.core.api.SoftAssertions.assertSoftly;
 import static org.awaitility.Awaitility.await;
 
 /**
  * Acceptance of the ingest half of CU-17tkuw67mjf, pass 1: what the agent publishes on
  * {@code machine.<machineId>.os-updates} (os-report-contract-draft.md, draft v1) is what MongoDB holds afterwards.
  *
- * <p>In: the report as bytes over a real JetStream. Out: the raw documents of {@code machines},
- * {@code device_os_updates} and {@code device_os_update_history}, in the shapes design.md gives and the read half
- * (DeviceOsUpdatesReadIT in openframe-api-service-core) reads. The fixtures under {@code os-updates/} are the two
+ * <p>In: the report as bytes over a real JetStream. Out: the raw documents of {@code device_os_states},
+ * {@code device_os_updates} and {@code device_os_update_history}, in the shapes design.md gives (ruling 11: the OS
+ * state is its own document, the device document is not written) and the read half (DeviceOsUpdatesReadIT in
+ * openframe-api-service-core) reads. The fixtures under {@code os-updates/} are the two
  * examples of the contract and the reports of scenarios E1 to E7; the stand script publishes the same files.
  */
 @SpringBootTest(
@@ -84,7 +86,6 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
     private static final String OTHER_TENANT_ID = "tenant-b";
     // every machine id of this class starts with it: setup and cleanup leave the rest of the shared database alone
     private static final String OWN_MACHINES = "os-ingest-";
-    private static final String BARRIER_MACHINE_ID = OWN_MACHINES + "barrier";
 
     private static final String WINDOWS_FIRST_REPORT = "windows-first-report";
     private static final String WINDOWS_INSTALLED = "windows-installed";
@@ -123,14 +124,17 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
     @Autowired
     private DeletedMachineCleanup deletedMachineCleanup;
 
+    // the stream sequence of the report this test published last
+    private long lastStored;
+
     @BeforeEach
     void removeTheMachinesOfThisClass() {
-        // deleteMany, not drop: the indexes of the two row collections must outlive a test
+        // deleteMany, not drop: the indexes of the three feature collections must outlive a test
         Bson ownMachines = Filters.regex("machineId", "^" + OWN_MACHINES);
         machines().deleteMany(ownMachines);
+        stateCollection().deleteMany(ownMachines);
         pendingCollection().deleteMany(ownMachines);
         historyCollection().deleteMany(ownMachines);
-        saveMachine(BARRIER_MACHINE_ID, DeviceStatus.ONLINE, TENANT_ID);
     }
 
     // ───────── harness ─────────
@@ -183,13 +187,11 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         awaitProcessed();
 
         // verifications
-        Document machine = machine(machineId);
-        assertThat(machine.getString("osVersion")).isEqualTo("Windows 11 Pro");
-        assertThat(machine.getString("osBuild")).isEqualTo("26100.4061");
-        assertThat(machine.getString("hostname")).as("a field the report does not own").isEqualTo("host-" + machineId);
-        assertThat(machine.getString("status")).isEqualTo("ONLINE");
         Document osState = osState(machineId);
-        assertThat(osState).as("machines.osState").isNotNull();
+        assertThat(osState.getString("tenantId")).isEqualTo(TENANT_ID);
+        assertThat(osState.getString("machineId")).isEqualTo(machineId);
+        assertThat(osState.getString("osVersion")).isEqualTo("Windows 11 Pro");
+        assertThat(osState.getString("osBuild")).isEqualTo("26100.4061");
         assertThat(osState.get("restartPending")).isEqualTo(false);
         assertThat(osState.get("restartPendingSince")).isNull();
         assertThat(instant(osState, "lastScanAt")).isEqualTo(FIRST_SCAN);
@@ -242,10 +244,9 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         awaitProcessed();
 
         // verifications
-        Document machine = machine(machineId);
-        assertThat(machine.getString("osVersion")).isEqualTo("26.2");
-        assertThat(machine.getString("osBuild")).isEqualTo("25C56");
         Document osState = osState(machineId);
+        assertThat(osState.getString("osVersion")).isEqualTo("26.2");
+        assertThat(osState.getString("osBuild")).isEqualTo("25C56");
         assertThat(osState.get("authorization")).isEqualTo("NOT_AUTHORIZED");
         assertThat(osState.get("managementState")).isEqualTo("MANAGED");
         assertThat(osState.get("restartPending")).isEqualTo(false);
@@ -577,18 +578,17 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
 
         // verifications
         Document osState = osState(machineId);
-        assertThat(osState).as("machines.osState").isNotNull();
         assertThat(osState.get("lastScanAt")).isNull();
         assertThat(osState.get("lastScanError")).isEqualTo("0x8024402C");
         assertThat(osState.get("lastInstalledAt")).isNull();
         assertThat(instant(osState, "receivedAt")).isEqualTo(storedByNats);
-        assertThat(machine(machineId).getString("osVersion")).isEqualTo("Windows 11 Pro");
+        assertThat(osState.getString("osVersion")).isEqualTo("Windows 11 Pro");
         assertThat(pendingRows(machineId)).isEmpty();
         assertThat(historyRows(machineId)).isEmpty();
     }
 
     @Test
-    void deviceThatNeverReported_hasNoOsStateAndNoRows() {
+    void deviceThatNeverReported_hasNoOsStateDocumentAndNoRows() {
         // setup
         String machineId = newMachine();
 
@@ -597,7 +597,7 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         awaitProcessed();
 
         // verifications
-        assertThat(machine(machineId).get("osState")).isNull();
+        assertThat(stateDocuments(machineId)).isEmpty();
         assertThat(pendingRows(machineId)).isEmpty();
         assertThat(historyRows(machineId)).isEmpty();
     }
@@ -689,8 +689,8 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         awaitProcessed();
 
         // verifications
-        assertThat(machine(machineId).getString("osBuild")).isEqualTo("26100.4202");
         Document osState = osState(machineId);
+        assertThat(osState.getString("osBuild")).isEqualTo("26100.4202");
         assertThat(osState.get("restartPending")).isEqualTo(true);
         assertThat(instant(osState, "lastInstalledAt")).isEqualTo(OCTOBER_INSTALL);
         assertThat(pendingRows(machineId)).singleElement().satisfies(row ->
@@ -710,10 +710,10 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         return Stream.of(absent.toString(), nulls.toString(), empty.toString(), spaces.toString());
     }
 
-    // the device page and the external API show this version: a report that has none must not blank it
+    // a report that has no version and build must not blank the ones the OS tab shows
     @ParameterizedTest
     @MethodSource("reportsWithoutVersionAndBuild")
-    void reportWithoutOsVersionAndBuild_deviceKeepsTheOnesItHad_restOfTheReportApplied(String report) {
+    void reportWithoutOsVersionAndBuild_stateKeepsTheOnesItHad_restOfTheReportApplied(String report) {
         // setup
         String machineId = newMachine();
         publish(machineId, fixtureText(WINDOWS_FIRST_REPORT));
@@ -723,10 +723,10 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         awaitProcessed();
 
         // verifications
-        Document machine = machine(machineId);
-        assertThat(machine.getString("osVersion")).isEqualTo("Windows 11 Pro");
-        assertThat(machine.getString("osBuild")).isEqualTo("26100.4061");
-        assertThat(instant(osState(machineId), "lastScanAt")).isEqualTo(SECOND_SCAN);
+        Document osState = osState(machineId);
+        assertThat(osState.getString("osVersion")).isEqualTo("Windows 11 Pro");
+        assertThat(osState.getString("osBuild")).isEqualTo("26100.4061");
+        assertThat(instant(osState, "lastScanAt")).isEqualTo(SECOND_SCAN);
         assertThat(pendingByKey(machineId)).containsOnlyKeys(KB5068861_KEY, DOTNET_KEY);
     }
 
@@ -765,6 +765,36 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         assertThat(pending.get("absent").get("severity")).isNull();
     }
 
+    // ───────── A17: a report is not written into the device document ─────────
+
+    @Test
+    void reports_changeNothingInTheDeviceDocument() {
+        // setup
+        String machineId = newMachine();
+        Date updatedBeforeTheReports = Date.from(Instant.parse("2026-11-01T00:00:00Z"));
+        machines().updateOne(Filters.eq("machineId", machineId), Updates.combine(
+                Updates.set("osVersion", "Windows 10 Pro"),
+                Updates.set("osBuild", "19045.5011"),
+                Updates.set("updatedAt", updatedBeforeTheReports)));
+        Document deviceBeforeTheReports = machine(machineId);
+
+        // execution
+        publish(machineId, fixtureText(WINDOWS_FIRST_REPORT));
+        publish(machineId, fixtureText(WINDOWS_INSTALLED));
+        awaitProcessed();
+
+        // verifications
+        Document device = machine(machineId);
+        assertSoftly(softly -> {
+            softly.assertThat(device.getString("osVersion")).as("machines.osVersion").isEqualTo("Windows 10 Pro");
+            softly.assertThat(device.getString("osBuild")).as("machines.osBuild").isEqualTo("19045.5011");
+            softly.assertThat(device.getDate("updatedAt")).as("machines.updatedAt").isEqualTo(updatedBeforeTheReports);
+            softly.assertThat(device).as("the device document has no osState").doesNotContainKey("osState");
+            softly.assertThat(device).as("the whole device document").isEqualTo(deviceBeforeTheReports);
+            softly.assertThat(stateDocuments(machineId)).as("the reports did arrive: device_os_states").hasSize(1);
+        });
+    }
+
     // ───────── A10: reports are ordered by the time NATS stored them ─────────
 
     @Test
@@ -772,20 +802,19 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         // setup
         String machineId = newMachine();
         Date appliedReportStoredAt = Date.from(Instant.now().plus(1, ChronoUnit.DAYS));
-        machines().updateOne(Filters.eq("machineId", machineId), Updates.combine(
-                Updates.set("osVersion", "from the applied report"),
-                Updates.set("osState.receivedAt", appliedReportStoredAt),
-                Updates.set("osState.lastScanError", "from the applied report")));
+        stateCollection().insertOne(new Document("tenantId", TENANT_ID).append("machineId", machineId)
+                .append("osVersion", "from the applied report")
+                .append("lastScanError", "from the applied report")
+                .append("receivedAt", appliedReportStoredAt));
 
         // execution
         publish(machineId, fixtureText(WINDOWS_FIRST_REPORT));
         awaitProcessed();
 
         // verifications
-        Document machine = machine(machineId);
-        assertThat(machine.getString("osVersion")).isEqualTo("from the applied report");
-        assertThat(machine.get("osBuild")).isNull();
         Document osState = osState(machineId);
+        assertThat(osState.getString("osVersion")).isEqualTo("from the applied report");
+        assertThat(osState.get("osBuild")).isNull();
         assertThat(osState.getDate("receivedAt")).isEqualTo(appliedReportStoredAt);
         assertThat(osState.get("lastScanError")).isEqualTo("from the applied report");
         assertThat(osState.get("lastScanAt")).isNull();
@@ -908,8 +937,8 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         awaitProcessed();
 
         // verifications
-        assertThat(machine(machineId).getString("osVersion")).isEqualTo("Windows 11 Pro");
         Document osState = osState(machineId);
+        assertThat(osState.getString("osVersion")).isEqualTo("Windows 11 Pro");
         assertThat(instant(osState, "lastScanAt")).isEqualTo(FIRST_SCAN);
         assertThat(osState.get("managementState")).isNull();
         assertThat(osState.get("managedElsewhereReason")).isNull();
@@ -1025,6 +1054,7 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
 
         // verifications
         assertThat(machine(unknownMachineId)).isNull();
+        assertThat(stateDocuments(unknownMachineId)).isEmpty();
         assertThat(pendingRows(unknownMachineId)).isEmpty();
         assertThat(historyRows(unknownMachineId)).isEmpty();
         assertNothingLeftForRedelivery();
@@ -1042,23 +1072,22 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         awaitProcessed();
 
         // verifications
-        Document machine = machine(machineId);
-        assertThat(machine.get("osState")).isNull();
-        assertThat(machine.get("osVersion")).isNull();
-        assertThat(machine.getString("status")).isEqualTo(frozen.name());
+        assertThat(stateDocuments(machineId)).isEmpty();
+        assertThat(machine(machineId).getString("status")).isEqualTo(frozen.name());
         assertThat(pendingRows(machineId)).isEmpty();
         assertThat(historyRows(machineId)).isEmpty();
         assertNothingLeftForRedelivery();
     }
 
     @Test
-    void deletedMachineCleanup_removesThePendingAndHistoryRowsOfThatMachineOnly() {
+    void deletedMachineCleanup_removesTheStateThePendingAndTheHistoryRowsOfThatMachineOnly() {
         // setup
         String deleted = newMachine();
         String kept = newMachine();
         publish(deleted, fixtureText(WINDOWS_FIRST_REPORT));
         publish(kept, fixtureText(WINDOWS_FIRST_REPORT));
         awaitProcessed();
+        int statesBefore = stateDocuments(deleted).size();
         int pendingBefore = pendingRows(deleted).size();
         int historyBefore = historyRows(deleted).size();
 
@@ -1066,10 +1095,13 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         deletedMachineCleanup.cleanUpDeletedMachine(TENANT_ID, deleted);
 
         // verifications
+        assertThat(statesBefore).as("device_os_states documents before the deletion").isEqualTo(1);
         assertThat(pendingBefore).isEqualTo(1);
         assertThat(historyBefore).isEqualTo(1);
+        assertThat(stateDocuments(deleted)).as("device_os_states documents of the deleted device").isEmpty();
         assertThat(pendingRows(deleted)).isEmpty();
         assertThat(historyRows(deleted)).isEmpty();
+        assertThat(stateDocuments(kept)).as("device_os_states documents of the other device").hasSize(1);
         assertThat(pendingRows(kept)).hasSize(1);
         assertThat(historyRows(kept)).hasSize(1);
     }
@@ -1098,6 +1130,8 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         assertThat(pendingRows(ours)).isEmpty();
         assertThat(pendingRows(theirs)).hasSize(1);
         assertThat(historyRows(theirs)).extracting(row -> row.getString("tenantId")).containsOnly(OTHER_TENANT_ID);
+        assertThat(osState(ours).getString("tenantId")).isEqualTo(TENANT_ID);
+        assertThat(osState(theirs).getString("tenantId")).isEqualTo(OTHER_TENANT_ID);
     }
 
     // A report naming one update twice must not wedge the consumer on the unique key. Whether such a report is
@@ -1125,16 +1159,19 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
     // ───────── design.md, storage ─────────
 
     @Test
-    void rowCollections_haveTheirUniqueKeysAndTheHistoryReadIndex() {
+    void featureCollections_haveTheirUniqueKeysAndTheHistoryReadIndex() {
         // setup
         publish(newMachine(), fixtureText(WINDOWS_FIRST_REPORT));
         awaitProcessed();
 
         // execution
+        List<Document> stateIndexes = stateCollection().listIndexes().into(new ArrayList<>());
         List<Document> pendingIndexes = pendingCollection().listIndexes().into(new ArrayList<>());
         List<Document> historyIndexes = historyCollection().listIndexes().into(new ArrayList<>());
 
         // verifications
+        assertThat(uniqueKeys(stateIndexes)).as("unique indexes of device_os_states")
+                .contains("{\"tenantId\": 1, \"machineId\": 1}");
         assertThat(uniqueKeys(pendingIndexes)).as("unique indexes of device_os_updates")
                 .contains("{\"tenantId\": 1, \"machineId\": 1, \"updateKey\": 1}");
         assertThat(uniqueKeys(historyIndexes)).as("unique indexes of device_os_update_history")
@@ -1154,7 +1191,8 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
     private long store(String machineId, String report) {
         byte[] payload = report.getBytes(StandardCharsets.UTF_8);
         try {
-            return natsConnection.jetStream().publish("machine." + machineId + ".os-updates", payload).getSeqno();
+            lastStored = natsConnection.jetStream().publish("machine." + machineId + ".os-updates", payload).getSeqno();
+            return lastStored;
         } catch (IOException | JetStreamApiException e) {
             throw new IllegalStateException("The report was not stored by JetStream", e);
         }
@@ -1196,26 +1234,20 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
                 .build();
     }
 
-    // One consumer handles the stream in order, so once the barrier machine shows this report, every report
-    // published before it has been handled.
+    // One consumer handles the stream in order and acknowledges a report once it is done with it, so when its
+    // acknowledgements reach the report this test published last, every report published before is handled.
+    // Where the report was written is not part of the wait: the assertions after it say that.
     private void awaitProcessed() {
-        String marker = "barrier-" + UUID.randomUUID();
-        ObjectNode barrier = fixture(WINDOWS_NEVER_SCANNED);
-        state(barrier).put("lastScanError", marker);
-        publish(BARRIER_MACHINE_ID, barrier.toString());
+        String consumer = onlyConsumer();
         Duration wait = nothingApplies ? SHORT_WAIT : FIRST_WAIT;
         try {
-            await().atMost(wait).pollInterval(Duration.ofMillis(25)).until(() -> marker.equals(barrierError()));
+            await().atMost(wait).pollInterval(Duration.ofMillis(25))
+                    .until(() -> consumerInfo(consumer).getAckFloor().getStreamSequence() >= lastStored);
         } catch (ConditionTimeoutException timeout) {
             nothingApplies = true;
-            throw new AssertionError("No OS report is applied: a valid report published on machine."
-                    + BARRIER_MACHINE_ID + ".os-updates did not reach machines.osState within " + wait, timeout);
+            throw new AssertionError("The report under sequence " + lastStored + " of " + OS_UPDATES_STREAM
+                    + " was not acknowledged within " + wait, timeout);
         }
-    }
-
-    private String barrierError() {
-        Document osState = osState(BARRIER_MACHINE_ID);
-        return osState == null ? null : osState.getString("lastScanError");
     }
 
     // a report left unacknowledged comes back after ackWait, up to maxDeliver times
@@ -1283,6 +1315,10 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         return mongoTemplate.getCollection("machines");
     }
 
+    private MongoCollection<Document> stateCollection() {
+        return mongoTemplate.getCollection("device_os_states");
+    }
+
     private MongoCollection<Document> pendingCollection() {
         return mongoTemplate.getCollection("device_os_updates");
     }
@@ -1295,9 +1331,15 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         return machines().find(Filters.eq("machineId", machineId)).first();
     }
 
+    // the OS state of a device that reported: its one document of device_os_states
     private Document osState(String machineId) {
-        Document machine = machine(machineId);
-        return machine == null ? null : machine.get("osState", Document.class);
+        List<Document> states = stateDocuments(machineId);
+        assertThat(states).as("documents of device_os_states for machine %s", machineId).hasSize(1);
+        return states.getFirst();
+    }
+
+    private List<Document> stateDocuments(String machineId) {
+        return stateCollection().find(Filters.eq("machineId", machineId)).into(new ArrayList<>());
     }
 
     private List<Document> pendingRows(String machineId) {
