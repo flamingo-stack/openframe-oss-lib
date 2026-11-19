@@ -86,7 +86,6 @@ public class SoftwareActionService {
         List<SoftwareActionResponse> scheduled = includeScheduled(filter)
                 ? scheduledRows(tenantId, filter, search)
                 : new ArrayList<>();
-        scheduled.sort(order);
         int scheduledCount = scheduled.size();
         long executedTotal = aggregationRepository.count(tenantId, queryFilter, search);
         long total = scheduledCount + executedTotal;
@@ -98,29 +97,15 @@ public class SoftwareActionService {
                 sortField, direction, executedSkip, executedLimit);
         List<SoftwareActionResponse> executed = mapExecuted(executedPage);
 
-        int scheduledBefore = executedSkip == 0 ? 0 : countBefore(scheduled, executed, order);
-        List<SoftwareActionResponse> scheduledLeft = scheduled.subList(scheduledBefore, scheduledCount);
-        List<SoftwareActionResponse> merged = merge(scheduledLeft, executed, order);
-        int mergedStart = executedSkip + scheduledBefore;
+        List<SoftwareActionResponse> merged = merge(scheduled, executed, order);
         int mergedCount = merged.size();
-        int from = Math.min(mergedCount, offset - mergedStart);
+        int from = Math.min(mergedCount, offset - executedSkip);
         int to = Math.min(mergedCount, from + size);
         List<SoftwareActionResponse> items = merged.subList(from, to).stream().toList();
 
         boolean hasNext = (long) offset + items.size() < total;
         boolean hasPrev = page > 0;
         return new PageResult<>(items, hasNext, hasPrev, (int) total, page);
-    }
-
-    private static int countBefore(List<SoftwareActionResponse> scheduled, List<SoftwareActionResponse> executed,
-                                   Comparator<SoftwareActionResponse> order) {
-        if (executed.isEmpty()) {
-            return scheduled.size();
-        }
-        SoftwareActionResponse firstExecuted = executed.getFirst();
-        return (int) scheduled.stream()
-                .takeWhile(row -> order.compare(row, firstExecuted) < 0)
-                .count();
     }
 
     private static List<SoftwareActionResponse> merge(List<SoftwareActionResponse> scheduled,

@@ -446,6 +446,42 @@ class SoftwareActionServiceTest {
     }
 
     @Test
+    void list_thirdPageScheduledRowsBeforeAndInsideIt_pageHoldsTheRowsAtItsPosition() {
+        // setup
+        upcoming(schedule("s1", "d", HOUR_AHEAD), schedule("s2", "b", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(4L);
+        when(aggregationRepository.findPage(TENANT, null, null, "packageName", Sort.Direction.ASC, 2, 4)).thenReturn(List.of(
+                executed("exec-e", "e", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-f", "f", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("software", SortDirection.ASC), 2, 2);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getSoftware).containsExactly("e", "f");
+        assertThat(result.filteredCount()).isEqualTo(6);
+        assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void list_secondPageScheduledRowsAroundTheWindow_pageHoldsTheRowsAtItsPosition() {
+        // setup
+        upcoming(schedule("s1", "z", HOUR_AHEAD), schedule("s2", "b", HOUR_AHEAD));
+        when(aggregationRepository.count(TENANT, null, null)).thenReturn(4L);
+        when(aggregationRepository.findPage(TENANT, null, null, "packageName", Sort.Direction.ASC, 0, 4)).thenReturn(List.of(
+                executed("exec-a", "a", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-c", "c", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-d", "d", SoftwareActionStatus.COMPLETED, 1, 1, T0),
+                executed("exec-e", "e", SoftwareActionStatus.COMPLETED, 1, 1, T0)));
+
+        // execution
+        PageResult<SoftwareActionResponse> result = service.list(null, null, sort("software", SortDirection.ASC), 1, 2);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareActionResponse::getSoftware).containsExactly("c", "d");
+    }
+
+    @Test
     void list_firstPageScheduledRowInsideIt_pageMergesBothKinds() {
         // setup
         upcoming(schedule("s1", "b", HOUR_AHEAD));
