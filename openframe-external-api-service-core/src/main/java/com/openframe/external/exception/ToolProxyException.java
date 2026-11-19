@@ -11,10 +11,12 @@ public class ToolProxyException extends BaseException {
     }
 
     public static ToolProxyException unreachable(String toolId, Throwable cause) {
-        throw new UnsupportedOperationException("not implemented");
+        return new ToolProxyException(ErrorCode.TOOL_UNREACHABLE, HttpStatus.BAD_GATEWAY,
+                "Tool " + toolId + " is unreachable", cause);
     }
 
     public static ToolProxyException timeout(String toolId, Throwable cause) {
-        throw new UnsupportedOperationException("not implemented");
+        return new ToolProxyException(ErrorCode.TOOL_TIMEOUT, HttpStatus.GATEWAY_TIMEOUT,
+                "Tool " + toolId + " did not answer in time", cause);
     }
 }
