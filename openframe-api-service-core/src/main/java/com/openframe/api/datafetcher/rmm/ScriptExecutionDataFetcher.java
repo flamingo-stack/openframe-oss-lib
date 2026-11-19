@@ -233,7 +233,8 @@ public class ScriptExecutionDataFetcher {
 
     @DgsData(parentType = "ScriptExecution", field = "stdout")
     @DgsData(parentType = "ScriptExecution", field = "stderr")
-    @Audited(action = SCRIPT_OUTPUT_VIEW, targetType = EXECUTION, targetId = "#dfe.source.id")
+    @Audited(action = SCRIPT_OUTPUT_VIEW, targetType = EXECUTION, targetId = "#dfe.source.id",
+            condition = "#result != null")
     public String output(DgsDataFetchingEnvironment dfe) {
         ScriptExecutionResponse execution = dfe.getSource();
         return "stdout".equals(dfe.getField().getName()) ? execution.getStdout() : execution.getStderr();

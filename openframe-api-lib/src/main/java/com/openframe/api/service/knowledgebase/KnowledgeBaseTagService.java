@@ -6,7 +6,6 @@ import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
-import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -95,7 +94,8 @@ public class KnowledgeBaseTagService {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
         requireExistingTag(tagId);
         KnowledgeBaseItem item = requireItem(itemId);
-        auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_ADD, targetTypeOf(item), itemId, Map.of("tagId", tagId),
+        auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_ADD, KnowledgeBaseService.targetTypeOf(item), itemId,
+                Map.of("tagId", tagId),
                 () -> assignTag(itemId, tagId));
     }
 
@@ -122,10 +122,6 @@ public class KnowledgeBaseTagService {
 
     private boolean isAssigned(String itemId, String tagId) {
         return tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE).isPresent();
-    }
-
-    private static AuditTargetType targetTypeOf(KnowledgeBaseItem item) {
-        return item.getType() == KnowledgeBaseItemType.FOLDER ? AuditTargetType.KB_FOLDER : AuditTargetType.KB_ARTICLE;
     }
 
     public void requireExistingTags(List<String> tagIds) {
@@ -155,7 +151,7 @@ public class KnowledgeBaseTagService {
     public void removeTagFromItem(String itemId, String tagId) {
         log.info("Removing tag {} from KB item {}", tagId, itemId);
         AuditTargetType targetType = itemRepository.findById(itemId)
-                .map(KnowledgeBaseTagService::targetTypeOf)
+                .map(KnowledgeBaseService::targetTypeOf)
                 .orElse(AuditTargetType.KB_ARTICLE);
         auditedMethodRunner.runWhenChanged(KB_ITEM_TAG_REMOVE, targetType, itemId, Map.of("tagId", tagId),
                 () -> unassignTag(itemId, tagId));

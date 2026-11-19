@@ -523,7 +523,7 @@ public class KnowledgeBaseService {
         return auditedMethodRunner.run(KB_ITEM_MOVE, targetTypeOf(item), id, details, () -> move(item, parentId));
     }
 
-    private static AuditTargetType targetTypeOf(KnowledgeBaseItem item) {
+    static AuditTargetType targetTypeOf(KnowledgeBaseItem item) {
         return item.getType() == KnowledgeBaseItemType.FOLDER ? AuditTargetType.KB_FOLDER : AuditTargetType.KB_ARTICLE;
     }
 

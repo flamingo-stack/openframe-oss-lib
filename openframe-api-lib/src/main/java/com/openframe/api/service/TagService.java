@@ -13,6 +13,7 @@ import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.audit.AuditCall;
 import com.openframe.audit.Audited;
 import com.openframe.audit.AuditedMethodRunner;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ import static com.openframe.data.document.audit.AuditAction.TAG_UPDATE;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TagService {
 
@@ -36,13 +38,6 @@ public class TagService {
     private final AuditedMethodRunner auditedMethodRunner;
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
-
-    public TagService(TagRepository tagRepository, TagAssignmentRepository tagAssignmentRepository,
-                      AuditedMethodRunner auditedMethodRunner) {
-        this.tagRepository = tagRepository;
-        this.tagAssignmentRepository = tagAssignmentRepository;
-        this.auditedMethodRunner = auditedMethodRunner;
-    }
 
     public Optional<Tag> findById(String id) {
         return tagRepository.findById(id);

@@ -239,7 +239,7 @@ public class TicketLifecycleService {
     }
 
     private static Map<String, Object> archiveDetails(Object archivedIds) {
-        return Map.of("ticketIds", archivedIds);
+        return archivedIds == null ? Map.of() : Map.of("ticketIds", archivedIds);
     }
 
     private List<String> archiveResolved(AuthPrincipal principal, TicketFilterInput filterInput) {
