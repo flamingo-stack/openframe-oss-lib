@@ -50,10 +50,10 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     static final String NO_COMMIT = "0";
 
     private static final Pattern APP_PATH = Pattern.compile("(?:.*/)?([^/]+)\\.app", Pattern.CASE_INSENSITIVE);
-    // not /Users/<user>/Applications: brew installs a cask into /Applications, adopting a copy from the user's folder
-    // leaves two; a false here keeps the app out of package matching
     private static final Pattern TOP_LEVEL_APP_PATH = Pattern.compile(
-            "/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
+            "(/Users/[^/]+)?/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
+    private static final Pattern USER_APPLICATIONS_APP_PATH = Pattern.compile(
+            "/Users/[^/]+/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
 
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -182,6 +182,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setBundleIdentifier(app ? title.getBundleIdentifier() : null);
             deviceSoftware.setAppFileNames(appFileNamesOf(appPaths));
             deviceSoftware.setTopLevelApp(topLevelAppOf(appPaths));
+            deviceSoftware.setUserApplicationsOnly(userApplicationsOnlyOf(appPaths));
             deviceSoftware.setVulnerabilities(vulnerabilities);
             deviceSoftware.setUpdatedAt(now);
             if (newRow) {
@@ -265,6 +266,17 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return null;
         }
         return installedPaths.stream().anyMatch(path -> TOP_LEVEL_APP_PATH.matcher(path).matches());
+    }
+
+    private static Boolean userApplicationsOnlyOf(List<String> installedPaths) {
+        if (installedPaths.isEmpty()) {
+            return null;
+        }
+        List<String> topLevelPaths = installedPaths.stream()
+                .filter(path -> TOP_LEVEL_APP_PATH.matcher(path).matches())
+                .toList();
+        return !topLevelPaths.isEmpty()
+                && topLevelPaths.stream().allMatch(path -> USER_APPLICATIONS_APP_PATH.matcher(path).matches());
     }
 
     private static List<HostSoftwareInstalledVersion> installedVersionsOf(HostSoftwareTitle title) {

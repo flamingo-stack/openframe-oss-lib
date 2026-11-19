@@ -37,6 +37,7 @@ public class SoftwareResponse {
     private String bundleIdentifier;
     private List<String> appFileNames;
     private Boolean topLevelApp;
+    private Boolean userApplicationsOnly;
     private List<String> productCodes;
     private List<String> packageFamilyNames;
     private Boolean systemComponent;

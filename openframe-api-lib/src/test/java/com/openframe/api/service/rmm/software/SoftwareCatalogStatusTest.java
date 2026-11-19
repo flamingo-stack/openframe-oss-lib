@@ -728,6 +728,25 @@ class SoftwareCatalogStatusTest {
     }
 
     @Test
+    void applyOnDevice_macAppKeptOnlyInTheUsersApplicationsFolder_manuallyInstalledWithoutTheOffer() {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "4.40");
+        slack.setUserApplicationsOnly(true);
+        Machine mac = stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.PRESENT));
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(slack));
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getAdoptionPackage,
+                        SoftwareResponse::getLatestVersion, SoftwareResponse::getVersionStatus)
+                .containsExactly(SoftwareAutoUpdateStatus.NO_PACKAGE, null, "4.41", SoftwareVersionStatus.OUTDATED);
+        verify(packageManagerAvailability, never()).isAdoptableOn(mac, PackageManagerType.BREW);
+    }
+
+    @Test
     void applyOnDevice_macAppOnADeviceWhereBrewIsUnsupported_noPackage() {
         // setup
         SoftwareResponse slack = macApp("Slack", "4.40");

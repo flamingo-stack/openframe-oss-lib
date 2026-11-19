@@ -209,6 +209,20 @@ public class SoftwareInventoryService {
         return software;
     }
 
+    // only the read model knows where a device keeps its copy: on the Fleet path every device stays
+    public List<String> withoutUserApplicationsOnlyCopies(String softwareId, List<String> machineIds) {
+        if (!softwareReadModel) {
+            return machineIds;
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        Long softwareTitleId = Long.valueOf(softwareId);
+        Set<String> userApplicationsOnly = deviceSoftwareReadModelQuery.machinesWithUserApplicationsOnlyCopy(
+                tenantId, softwareTitleId, machineIds);
+        return machineIds.stream()
+                .filter(machineId -> !userApplicationsOnly.contains(machineId))
+                .toList();
+    }
+
     private SoftwareResponse getSoftware(String softwareId) {
         return findById(softwareId)
                 .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -48,6 +49,15 @@ public class DeviceSoftwareReadModelQuery {
                 .toList();
     }
 
+    public Set<String> machinesWithUserApplicationsOnlyCopy(String tenantId, Long softwareTitleId,
+                                                            List<String> machineIds) {
+        return deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineIdIn(tenantId, softwareTitleId, machineIds)
+                .stream()
+                .filter(row -> Boolean.TRUE.equals(row.getUserApplicationsOnly()))
+                .map(DeviceSoftware::getMachineId)
+                .collect(Collectors.toSet());
+    }
+
     private static SoftwareResponse toResponse(Software sw, DeviceSoftware installed) {
         List<String> versions = versionsOnDevice(installed);
         String currentVersion = versions.isEmpty() ? null : versions.getFirst();
@@ -76,6 +86,7 @@ public class DeviceSoftwareReadModelQuery {
         row.setBundleIdentifier(sw.getBundleIdentifier());
         row.setAppFileNames(sw.getAppFileNames());
         row.setTopLevelApp(sw.getTopLevelApp());
+        row.setUserApplicationsOnly(installed.getUserApplicationsOnly());
         row.setPackageMatch(sw.getPackageMatch());
         row.setAdoptionMatch(sw.getAdoptionMatch());
         row.setType(type);

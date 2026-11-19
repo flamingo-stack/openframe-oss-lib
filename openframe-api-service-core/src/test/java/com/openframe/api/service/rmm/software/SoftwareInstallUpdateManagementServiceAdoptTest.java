@@ -172,6 +172,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(machineIds)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(machineIds, osTypes, WINDOWS_OS)).thenReturn(machineIds);
         when(packageManagerAvailability.adoptableOn(machineIds, PackageManagerType.CHOCO)).thenReturn(machineIds);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, machineIds)).thenReturn(machineIds);
         when(packageAdoptReach.filterReachable(machineIds)).thenReturn(List.of(WINDOWS));
         stubAdoptDispatch(null, null);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -200,6 +201,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(machineIds)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(machineIds, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, macOnly)).thenReturn(macOnly);
         when(packageAdoptReach.filterReachable(macOnly)).thenReturn(List.of(MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -221,6 +223,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(macOnly);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, macOnly)).thenReturn(macOnly);
         when(packageAdoptReach.filterReachable(macOnly)).thenReturn(List.of(MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -244,6 +247,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(macOnly)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(macOnly, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, macOnly)).thenReturn(macOnly);
         when(packageAdoptReach.filterReachable(macOnly)).thenReturn(List.of(MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -267,6 +271,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(macOnly)).thenReturn(osTypes);
         when(machinePlatformResolver.compatible(macOnly, osTypes, MAC_OS)).thenReturn(macOnly);
         when(packageManagerAvailability.adoptableOn(macOnly, PackageManagerType.BREW)).thenReturn(macOnly);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, macOnly)).thenReturn(macOnly);
         when(packageAdoptReach.filterReachable(macOnly)).thenReturn(List.of(MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -326,6 +331,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(noOsTypes);
         when(machinePlatformResolver.compatible(MACS, noOsTypes, MAC_OS)).thenReturn(noMachines);
         when(packageManagerAvailability.adoptableOn(noMachines, PackageManagerType.BREW)).thenReturn(noMachines);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, noMachines)).thenReturn(noMachines);
 
         // execution
         BadRequestException refused = assertThrows(BadRequestException.class, () -> service.adopt(macsInput, USER));
@@ -342,6 +348,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, MACS)).thenReturn(MACS);
         when(packageAdoptReach.filterReachable(MACS)).thenReturn(List.of(OTHER_MAC));
         stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -357,12 +364,54 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     }
 
     @Test
+    void adopt_deviceWhoseCopyIsOnlyInTheUsersApplicationsFolder_leftOutAndTheRestOrdered() {
+        // setup
+        List<String> otherMacOnly = List.of(OTHER_MAC);
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
+        when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
+        when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
+        when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, MACS)).thenReturn(otherMacOnly);
+        when(packageAdoptReach.filterReachable(otherMacOnly)).thenReturn(otherMacOnly);
+        stubAdoptDispatch(BrewPackageType.CASK, BUNDLE_ID);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+
+        // execution
+        List<String> ordered = service.adopt(macsInput, USER);
+
+        // verifications
+        verify(deviceService).verifyDispatchable(otherMacOnly);
+        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(SOFTWARE_ID), eq(BUNDLE_ID));
+        assertThat(rowsCaptor.getValue().getMachineIds()).containsExactly(OTHER_MAC);
+        assertThat(ordered).containsExactly(OTHER_MAC);
+    }
+
+    @Test
+    void adopt_everyCopyOnlyInTheUsersApplicationsFolder_refusedAndNothingSent() {
+        // setup
+        List<String> noMachines = List.of();
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
+        when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
+        when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
+        when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, MACS)).thenReturn(noMachines);
+
+        // execution
+        BadRequestException refused = assertThrows(BadRequestException.class, () -> service.adopt(macsInput, USER));
+
+        // verifications
+        assertThat(refused.getMessage()).isEqualTo("None of the given devices can adopt postman with BREW");
+        verifyNoInteractions(packageAdoptReach, deviceService, packageUpdateDispatchService);
+    }
+
+    @Test
     void adopt_orderReachesNoDevice_refusedAndNothingSent() {
         // setup
         when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(caskTitle);
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, MACS)).thenReturn(MACS);
         when(packageAdoptReach.filterReachable(MACS)).thenReturn(List.of());
 
         // execution
@@ -408,6 +457,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         when(machinePlatformResolver.osTypesByMachineId(MACS)).thenReturn(MAC_OS_TYPES);
         when(machinePlatformResolver.compatible(MACS, MAC_OS_TYPES, MAC_OS)).thenReturn(MACS);
         when(packageManagerAvailability.adoptableOn(MACS, PackageManagerType.BREW)).thenReturn(MACS);
+        when(softwareInventoryService.withoutUserApplicationsOnlyCopies(SOFTWARE_ID, MACS)).thenReturn(MACS);
         when(packageAdoptReach.filterReachable(MACS)).thenReturn(List.of(MAC, OTHER_MAC));
     }
 

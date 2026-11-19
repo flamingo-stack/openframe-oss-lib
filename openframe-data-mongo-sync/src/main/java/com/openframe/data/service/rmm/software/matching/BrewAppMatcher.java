@@ -81,7 +81,7 @@ public class BrewAppMatcher implements PackageMatcher {
         return matchByNameOnly(strongNameCasks, weakNameCasks, index);
     }
 
-    // topLevelApp is null when Fleet sent no path: unknown is allowed, a known nested or user-folder app is refused
+    // topLevelApp is null when Fleet sent no path: unknown is allowed, only a known nested app is refused
     private static boolean isNeverMatched(InstalledProgram app, String bundleId) {
         return bundleId.startsWith(APPLE_BUNDLE_ID_PREFIX) || Boolean.FALSE.equals(app.getTopLevelApp());
     }

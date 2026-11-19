@@ -11,7 +11,9 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -25,6 +27,7 @@ import tools.jackson.databind.node.ObjectNode;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -508,13 +511,13 @@ class DeviceSoftwareHandlerTest {
     @ParameterizedTest
     @CsvSource({
             "/Applications/Slack.app, true",
-            "/Users/alice/Applications/Slack.app, false",
+            "/Users/alice/Applications/Slack.app, true",
             "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app, false",
             "/Users/alice/Applications/Chrome Apps.localized/Gmail.app, false",
             "/Applications/Utilities/Slack.app, false",
             "/Library/Application Support/Slack/Slack.app, false"
     })
-    void handle_macAppByItsInstalledPath_topLevelOnlyDirectlyInTheSystemApplicationsFolder(String path, boolean topLevel) {
+    void handle_macAppByItsInstalledPath_topLevelOnlyDirectlyInAnApplicationsFolder(String path, boolean topLevel) {
         // setup
         HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap", path);
         stubHostSoftware(slack);
@@ -544,8 +547,24 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getTopLevelApp()).isTrue();
     }
 
+    @ParameterizedTest
+    @MethodSource("userApplicationsCopies")
+    void handle_macAppByItsInstalledPaths_userApplicationsOnlyWhenNoTopLevelCopyIsOutsideTheUsersFolder(
+            String[] installedPaths, boolean userApplicationsOnly) {
+        // setup
+        HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap", installedPaths);
+        stubHostSoftware(slack);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        assertThat(deviceSoftwareCaptor.getValue().getUserApplicationsOnly()).isEqualTo(userApplicationsOnly);
+    }
+
     @Test
-    void handle_macAppWithoutInstalledPaths_topLevelUnknownAndNoAppFileNames() {
+    void handle_macAppWithoutInstalledPaths_topLevelAndUserApplicationsUnknownAndNoAppFileNames() {
         // setup
         HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap");
         stubHostSoftware(slack);
@@ -559,6 +578,7 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
         assertThat(saved.getAppFileNames()).isEmpty();
         assertThat(saved.getTopLevelApp()).isNull();
+        assertThat(saved.getUserApplicationsOnly()).isNull();
     }
 
     @ParameterizedTest
@@ -619,6 +639,16 @@ class DeviceSoftwareHandlerTest {
                 .thenReturn(List.of(hostSoftwareTitle));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
+    }
+
+    private static Stream<Arguments> userApplicationsCopies() {
+        return Stream.of(
+                Arguments.of(new String[]{"/Users/alice/Applications/Slack.app"}, true),
+                Arguments.of(new String[]{"/Users/alice/Applications/Slack.app",
+                        "/Users/alice/Applications/Slack.app/Contents/Helpers/Slack Helper.app"}, true),
+                Arguments.of(new String[]{"/Applications/Slack.app"}, false),
+                Arguments.of(new String[]{"/Applications/Slack.app", "/Users/alice/Applications/Slack.app"}, false),
+                Arguments.of(new String[]{"/Users/alice/Applications/Chrome Apps.localized/Gmail.app"}, false));
     }
 
     private HostSoftwareTitle app(String bundleIdentifier, String... installedPaths) {

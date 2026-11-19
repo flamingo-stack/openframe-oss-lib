@@ -1464,6 +1464,36 @@ class SoftwareInventoryServiceTest {
                 .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount).containsExactly(tuple("ON", 1));
     }
 
+    @Test
+    void withoutUserApplicationsOnlyCopies_readModel_devicesWhoseCopyIsOnlyInTheUsersFolderLeftOut() {
+        // setup
+        ReflectionTestUtils.setField(service, "softwareReadModel", true);
+        List<String> machineIds = List.of("m1", "m2", "m3");
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        when(deviceSoftwareReadModelQuery.machinesWithUserApplicationsOnlyCopy("t1", 42L, machineIds))
+                .thenReturn(Set.of("m2"));
+
+        // execution
+        List<String> result = service.withoutUserApplicationsOnlyCopies("42", machineIds);
+
+        // verifications
+        assertThat(result).containsExactly("m1", "m3");
+    }
+
+    @Test
+    void withoutUserApplicationsOnlyCopies_fleetPath_everyDeviceStays() {
+        // setup
+        ReflectionTestUtils.setField(service, "softwareReadModel", false);
+        List<String> machineIds = List.of("m1", "m2");
+
+        // execution
+        List<String> result = service.withoutUserApplicationsOnlyCopies("42", machineIds);
+
+        // verifications
+        assertThat(result).containsExactly("m1", "m2");
+        verifyNoInteractions(deviceSoftwareReadModelQuery);
+    }
+
     private List<String> machineIds(SoftwareOnDeviceFilterInput filter) {
         return service.listDevicesForSoftware("42", filter, null, 0, 50, null).items().stream()
                 .map(row -> row.getDevice().getMachineId()).toList();

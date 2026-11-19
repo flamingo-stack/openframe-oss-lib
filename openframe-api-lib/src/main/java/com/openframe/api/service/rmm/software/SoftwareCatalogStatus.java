@@ -87,7 +87,9 @@ public class SoftwareCatalogStatus {
             PackageMatch match = matches.get(program);
             PackageMatch adoptionMatch = adoptionMatches.get(program);
             PackageCatalogEntry managing = entryOf(match, manages);
-            PackageCatalogEntry adoption = entryOf(adoptionMatch, adopts);
+            // brew installs a cask into /Applications: adopting a copy kept only in the user's folder leaves two
+            PackageCatalogEntry adoption = Boolean.TRUE.equals(row.getUserApplicationsOnly())
+                    ? null : entryOf(adoptionMatch, adopts);
             // a Mac app is taken by no managing matcher: what is known about its package is the adoption match
             PackageMatch known = match != null ? match : adoptionMatch;
             apply(row, brewPackages, known, managing, adoption);

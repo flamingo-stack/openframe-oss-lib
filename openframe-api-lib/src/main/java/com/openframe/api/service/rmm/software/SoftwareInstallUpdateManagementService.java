@@ -82,7 +82,7 @@ public class SoftwareInstallUpdateManagementService {
             throw new BadRequestException("A program is not adopted into WINGET: winget updates it as it is installed");
         }
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
-        List<String> adoptable = adoptableMachines(machineIds, packageManager);
+        List<String> adoptable = adoptableMachines(softwareId, machineIds, packageManager);
         if (adoptable.isEmpty()) {
             throw new BadRequestException("None of the given devices can adopt " + packageName + " with " + packageManager);
         }
@@ -119,12 +119,14 @@ public class SoftwareInstallUpdateManagementService {
         return targets;
     }
 
-    private List<String> adoptableMachines(List<String> machineIds, PackageManagerType packageManager) {
+    private List<String> adoptableMachines(String softwareId, List<String> machineIds,
+                                           PackageManagerType packageManager) {
         Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         OsType packageOs = SoftwareBundleService.osTypeOf(packageManager);
         Set<OsType> packageOsTypes = Set.of(packageOs);
         List<String> compatible = machinePlatformResolver.compatible(machineIds, osTypes, packageOsTypes);
-        return packageManagerAvailability.adoptableOn(compatible, packageManager);
+        List<String> withManager = packageManagerAvailability.adoptableOn(compatible, packageManager);
+        return softwareInventoryService.withoutUserApplicationsOnlyCopies(softwareId, withManager);
     }
 
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,
