@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use tokio::time::{Duration, Instant};
+use tracing::warn;
 
 use super::check::{may_force, not_running, plan, verify, Plan};
 use super::{wait_until, InstallGate, Refusal};
@@ -126,12 +127,13 @@ async fn install_over(name: &str, app: &Path, bundle_id: &str) -> Result<AdoptOu
     let adopted = run(name, ADOPT, ADOPT_TIMEOUT_SECS).await;
     finished(&adopted, "brew install --cask --adopt")?;
     let cask = info(name, CASK_INFO, INSTALLED_INFO_TIMEOUT_SECS).await?;
+    let refused = manager_error(&adopted, "brew install --cask --adopt");
     match (adopted.retcode == 0, cask.installed.is_some()) {
         (true, true) => return verify(&cask, app, bundle_id, AdoptOutcome::AdoptedInPlace),
-        (false, false) => {}
-        _ => return Err(manager_error(&adopted, "brew install --cask --adopt")),
+        (false, false) => warn!(cask = name, "{}", refused.message),
+        _ => return Err(refused),
     }
-    may_force(&cask, app)?;
+    may_force(&cask, app, refused)?;
     not_running(app, &update_gate::snapshot().await)?;
     succeeded(
         &run(name, FORCE, FORCE_TIMEOUT_SECS).await,

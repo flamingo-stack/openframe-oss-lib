@@ -73,6 +73,7 @@ pub(crate) struct Cask {
     old_tokens: Vec<String>,
     pub(crate) installed: Option<String>,
     pub(crate) version: Option<String>,
+    pub(crate) auto_updates: Option<bool>,
     #[serde(default)]
     artifacts: Vec<serde_json::Map<String, serde_json::Value>>,
 }

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 
 use super::Refusal;
@@ -84,13 +85,17 @@ pub(super) fn verify(
     Ok(outcome)
 }
 
-pub(super) fn may_force(cask: &Cask, app: &Path) -> Result<(), Refusal> {
+pub(super) fn may_force(cask: &Cask, app: &Path, refused: Refusal) -> Result<(), Refusal> {
+    if cask.auto_updates == Some(true) {
+        return Err(refused);
+    }
     let installed = short_version(app)
         .map_err(|e| Refusal::new(AdoptFailReason::VersionUnknown, format!("{e:#}")))?;
     let available = cask.version.as_deref().unwrap_or_default();
-    match older(&installed, available) {
-        Some(true) => Ok(()),
-        Some(false) => Err(Refusal::new(
+    match compare(&installed, available) {
+        Some(Ordering::Less) => Ok(()),
+        Some(Ordering::Equal) => Err(refused),
+        Some(Ordering::Greater) => Err(Refusal::new(
             AdoptFailReason::NotOlder,
             format!(
                 "the installed app is {installed}, not older than the cask's {available}; it was not reinstalled"
@@ -131,13 +136,13 @@ pub(super) fn not_running(
     }
 }
 
-fn older(installed: &str, cask: &str) -> Option<bool> {
+fn compare(installed: &str, cask: &str) -> Option<Ordering> {
     let mut installed = dotted(installed)?;
     let mut cask = dotted(cask.split(',').next()?)?;
     let len = installed.len().max(cask.len());
     installed.resize(len, 0);
     cask.resize(len, 0);
-    Some(installed < cask)
+    Some(installed.cmp(&cask))
 }
 
 fn dotted(version: &str) -> Option<Vec<u64>> {

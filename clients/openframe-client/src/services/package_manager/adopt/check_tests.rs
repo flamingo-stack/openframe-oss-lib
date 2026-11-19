@@ -194,11 +194,12 @@ fn app_with_version(dir: &Path, version: Option<&str>) -> PathBuf {
     app
 }
 
-fn cask_at_version(version: Option<&str>) -> Cask {
+fn cask_at_version(version: Option<&str>, auto_updates: Option<bool>) -> Cask {
     serde_json::from_value(json!({
         "token": "firefox",
         "installed": null,
         "version": version,
+        "auto_updates": auto_updates,
         "artifacts": [{"app": ["Firefox.app"]}],
     }))
     .unwrap()
@@ -207,31 +208,63 @@ fn cask_at_version(version: Option<&str>) -> Cask {
 #[test]
 fn force_replaces_only_an_app_strictly_older_than_the_cask() {
     let cases = [
-        (Some("1.0"), Some("2.0"), Ok(())),
-        (Some("1.2"), Some("1.2.1"), Ok(())),
-        (Some("4.51.1"), Some("4.52.0,210994"), Ok(())),
-        (Some("2.0"), Some("1.0"), Err(AdoptFailReason::NotOlder)),
-        (Some("1.2.0"), Some("1.2"), Err(AdoptFailReason::NotOlder)),
+        (Some("1.0"), Some("2.0"), None, Ok(())),
+        (Some("1.2"), Some("1.2.1"), None, Ok(())),
+        (Some("4.51.1"), Some("4.52.0,210994"), None, Ok(())),
+        (
+            Some("2.0"),
+            Some("1.0"),
+            None,
+            Err(AdoptFailReason::NotOlder),
+        ),
+        (
+            Some("1.2.0"),
+            Some("1.2"),
+            None,
+            Err(AdoptFailReason::ManagerError),
+        ),
+        (
+            Some("1.0"),
+            Some("2.0"),
+            Some(true),
+            Err(AdoptFailReason::ManagerError),
+        ),
         (
             Some("1.0"),
             Some("latest"),
+            None,
             Err(AdoptFailReason::VersionUnknown),
         ),
         (
             Some("1.0b2"),
             Some("1.0"),
+            None,
             Err(AdoptFailReason::VersionUnknown),
         ),
-        (Some("1.0"), None, Err(AdoptFailReason::VersionUnknown)),
-        (None, Some("2.0"), Err(AdoptFailReason::VersionUnknown)),
+        (
+            Some("1.0"),
+            None,
+            None,
+            Err(AdoptFailReason::VersionUnknown),
+        ),
+        (
+            None,
+            Some("2.0"),
+            None,
+            Err(AdoptFailReason::VersionUnknown),
+        ),
     ];
 
-    for (installed, available, expected) in cases {
+    for (installed, available, auto_updates, expected) in cases {
         let dir = tempfile::tempdir().unwrap();
         let app = app_with_version(dir.path(), installed);
-        let allowed =
-            may_force(&cask_at_version(available), &app).map_err(|refusal| refusal.reason);
-        assert_eq!(allowed, expected, "{installed:?} over {available:?}");
+        let refused = Refusal::new(AdoptFailReason::ManagerError, "brew refused the adoption");
+        let allowed = may_force(&cask_at_version(available, auto_updates), &app, refused)
+            .map_err(|refusal| refusal.reason);
+        assert_eq!(
+            allowed, expected,
+            "{installed:?} over {available:?}, auto_updates {auto_updates:?}"
+        );
     }
 }
 
