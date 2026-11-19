@@ -23,14 +23,6 @@ import type { TenantCustomer, TenantLicenseSummary } from './tenant-row';
 /** The provider's mark in a grid cell: the design's 20px leading icon. */
 const GRID_PROVIDER_MARK_SIZE = 20;
 
-/**
- * A note worth a look (unattributed users, unused seats) at the end of a grid cell, in the warning colour the card
- * cell gives its second line. The cell's own secondary text has one colour, so a warning goes in its trailing slot.
- */
-function WarningNote({ children }: { children: string }) {
-  return <span className="whitespace-nowrap text-ods-warning text-h6">{children}</span>;
-}
-
 /** TENANT: the provider's mark, the name, the domain after it. */
 export function TenantGridCell({ provider, name, domain }: { provider: string; name: string; domain?: string | null }) {
   const { Logo, label } = providerMark(provider);
@@ -77,8 +69,9 @@ export function TenantCustomersGridCell({
       leading={first ? { type: 'image', src: first.imageUrl, alt: first.name } : undefined}
       text={first ? first.name : TENANT_EMPTY_VALUE}
       moreTags={rest.map(customer => customer.name)}
-      secondary={unattributed ? undefined : count}
-      trailing={unattributed ? <WarningNote>{unattributed}</WarningNote> : undefined}
+      // Users no customer claims are worth a look: the count is said in the warning colour, as on the card.
+      secondary={unattributed ?? count}
+      secondaryTone={unattributed ? 'warning' : 'secondary'}
     />
   );
 }
@@ -110,11 +103,7 @@ export function TenantLicensesGridCell({ licenses }: { licenses?: TenantLicenseS
   if (loading) return <DataTable.Cell text="" />;
   const { value, detail, warning } = licenseSummaryLines(licenses);
   return (
-    <DataTable.Cell
-      text={value}
-      secondary={detail && !warning ? detail : undefined}
-      trailing={detail && warning ? <WarningNote>{detail}</WarningNote> : undefined}
-    />
+    <DataTable.Cell text={value} secondary={detail ?? undefined} secondaryTone={warning ? 'warning' : 'secondary'} />
   );
 }
 

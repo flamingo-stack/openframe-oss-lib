@@ -154,4 +154,22 @@ describe('DataTable.Cell', () => {
     // The trailing part is the last thing in the cell's markup.
     expect(container.innerHTML).toMatch(/data-part="trailing"[^>]*><i data-testid="dot"><\/i><\/span><\/div>$/);
   });
+
+  it('draws the secondary text in the warning colour on request, short or long, and in the secondary one otherwise', () => {
+    render(
+      <>
+        <DataTable.Cell text="118 of 120" secondary="2 unused" />
+        <DataTable.Cell text="100 of 120" secondary="20 left" secondaryTone="warning" />
+        <DataTable.Cell text="Acme" secondary="30 of 412 unattributed" secondaryTone="warning" />
+      </>,
+    );
+
+    expect(screen.getByText('2 unused').className).toContain('text-ods-text-secondary');
+    expect(screen.getByText('2 unused').className).not.toContain('text-ods-warning');
+    // Short: the part itself carries the colour.
+    expect(screen.getByText('20 left').className).toContain('text-ods-warning');
+    expect(screen.getByText('20 left').className).not.toContain('text-ods-text-secondary');
+    // Long: the cut text carries it.
+    expect(screen.getByText('30 of 412 unattributed').className).toContain('text-ods-warning');
+  });
 });
