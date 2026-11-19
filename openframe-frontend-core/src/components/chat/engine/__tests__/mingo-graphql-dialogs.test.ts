@@ -248,6 +248,42 @@ describe('createMingoGraphqlDialogs', () => {
       expect(splitCalls(post)).toBe(2);
     });
 
+    it('a refusal that comes after the few seconds still leaves the split out for half an hour', async () => {
+      vi.useFakeTimers();
+      const { post, dialogs } = splitBackend(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => reject(refusal()), 5_000);
+          }),
+      );
+      const opening = dialogs.fetchDialog('d1');
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect((await opening)?.tokenUsage).toEqual(withoutSplit);
+      await vi.advanceTimersByTimeAsync(1_000);
+      vi.advanceTimersByTime(60_000);
+      void dialogs.fetchDialog('d1');
+      expect(splitCalls(post)).toBe(1);
+      vi.advanceTimersByTime(30 * 60_000 - 60_000);
+      void dialogs.fetchDialog('d1');
+      expect(splitCalls(post)).toBe(2);
+    });
+
+    it('any other failure after the few seconds keeps only the minute', async () => {
+      vi.useFakeTimers();
+      const { post, dialogs } = splitBackend(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Request failed with status 503')), 5_000);
+          }),
+      );
+      const opening = dialogs.fetchDialog('d1');
+      await vi.advanceTimersByTimeAsync(5_000);
+      await opening;
+      vi.advanceTimersByTime(59_000);
+      void dialogs.fetchDialog('d1');
+      expect(splitCalls(post)).toBe(2);
+    });
+
     it('does not ask for the split unless the host turns it on', async () => {
       const { post, dialogs } = backend({ dialog: node });
       await dialogs.fetchDialog('d1');

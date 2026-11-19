@@ -245,13 +245,15 @@ export function createMingoGraphqlDialogs(
     const timedOut = new Promise<typeof SPLIT_TIMED_OUT>(resolve => {
       timer = setTimeout(() => resolve(SPLIT_TIMED_OUT), SPLIT_WAIT_MS);
     });
+    const read = post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY, { id: dialogId });
     try {
-      const answer = await Promise.race([
-        post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY, { id: dialogId }),
-        timedOut,
-      ]);
+      const answer = await Promise.race([read, timedOut]);
       if (answer === SPLIT_TIMED_OUT) {
         pauseSplit(SPLIT_TIMEOUT_PAUSE_MS);
+        // The read goes on without the record. A refusal that comes later still holds the split off for its own pause.
+        void read.catch((error: unknown) => {
+          if (isRefusal(error)) pauseSplit(SPLIT_REFUSAL_PAUSE_MS);
+        });
         return null;
       }
       return answer.dialog;
