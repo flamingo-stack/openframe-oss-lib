@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
-use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::models::{DeviceTag, InitialConfiguration};
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::{atomic_write, read_json};
 
 #[derive(Clone)]
 pub struct InitialConfigurationService {
@@ -98,21 +98,7 @@ impl InitialConfigurationService {
     }
 
     fn get(&self) -> Result<InitialConfiguration> {
-        if !self.config_file_path.exists() {
-            return Err(anyhow::anyhow!("Initial configuration file does not exist"));
-        }
-
-        let json_content = fs::read_to_string(&self.config_file_path).with_context(|| {
-            format!(
-                "Failed to read initial config file: {:?}",
-                self.config_file_path
-            )
-        })?;
-
-        let config: InitialConfiguration = serde_json::from_str(&json_content)
-            .context("Failed to deserialize initial configuration from JSON")?;
-
-        Ok(config)
+        read_json(&self.config_file_path)?.context("Initial configuration file does not exist")
     }
 
     pub fn clear_initial_key(&self) -> Result<()> {
@@ -130,7 +116,7 @@ impl InitialConfigurationService {
     pub fn save(&self, config: &InitialConfiguration) -> Result<()> {
         let config_json = serde_json::to_string_pretty(config)
             .context("Failed to serialize initial configuration to JSON")?;
-        crate::utils::fs::atomic_write(&self.config_file_path, config_json).with_context(|| {
+        atomic_write(&self.config_file_path, config_json).with_context(|| {
             format!(
                 "Failed to write initial configuration file: {:?}",
                 self.config_file_path

@@ -135,46 +135,85 @@ impl<T> JsonFile<T> {
     }
 }
 
+/// A JSON file that didn't parse; the message names the error kind and position only, never file content.
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "{} is corrupt (size {size}, all zero: {all_zero}, {:?} error at line {} column {})",
+    .path.display(),
+    .parse_error.classify(),
+    .parse_error.line(),
+    .parse_error.column()
+)]
+pub struct CorruptJson {
+    path: PathBuf,
+    size: usize,
+    all_zero: bool,
+    parse_error: serde_json::Error,
+}
+
+/// Read `path` as JSON, `None` when it doesn't exist; a file that doesn't parse stays in place and is a [`CorruptJson`] error.
+pub fn read_json<T: DeserializeOwned>(path: &Path) -> Result<Option<T>> {
+    match read_bytes(path)? {
+        Some(bytes) => Ok(Some(parse_json(path, &bytes)?)),
+        None => Ok(None),
+    }
+}
+
 /// Read `path` as JSON, moving a file that doesn't parse aside (see [`parse_json_or_quarantine`]).
 pub fn read_json_or_quarantine<T: DeserializeOwned>(path: &Path) -> Result<JsonFile<T>> {
-    match std::fs::read(path) {
-        Ok(bytes) => Ok(parse_json_or_quarantine(path, &bytes)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(JsonFile::Missing),
-        Err(e) => Err(e).with_context(|| format!("failed to read {}", path.display())),
-    }
+    Ok(match read_bytes(path)? {
+        Some(bytes) => parse_json_or_quarantine(path, &bytes),
+        None => JsonFile::Missing,
+    })
 }
 
 /// Parse `bytes` read from `path`; on failure log it and rename the file to `<name>.corrupt` so the next write starts fresh.
 pub fn parse_json_or_quarantine<T: DeserializeOwned>(path: &Path, bytes: &[u8]) -> JsonFile<T> {
-    let parse_error = match serde_json::from_slice(bytes) {
+    let corrupt = match parse_json(path, bytes) {
         Ok(value) => return JsonFile::Parsed(value),
-        Err(e) => e,
+        Err(corrupt) => corrupt,
     };
 
     let quarantine = quarantine_path(path);
-    let all_zero = !bytes.is_empty() && bytes.iter().all(|b| *b == 0);
     match std::fs::rename(path, &quarantine) {
         Ok(()) => warn!(
             path = %path.display(),
-            size = bytes.len(),
-            all_zero,
+            size = corrupt.size,
+            all_zero = corrupt.all_zero,
             "Corrupt JSON file moved to {}, starting fresh: {}",
             quarantine.display(),
-            parse_error
+            corrupt.parse_error
         ),
         Err(e) => warn!(
             path = %path.display(),
-            size = bytes.len(),
-            all_zero,
+            size = corrupt.size,
+            all_zero = corrupt.all_zero,
             "Corrupt JSON file could not be moved aside ({}), starting fresh: {}",
             e,
-            parse_error
+            corrupt.parse_error
         ),
     }
     JsonFile::Corrupt
 }
 
-fn quarantine_path(path: &Path) -> PathBuf {
+fn read_bytes(path: &Path) -> Result<Option<Vec<u8>>> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e).with_context(|| format!("failed to read {}", path.display())),
+    }
+}
+
+fn parse_json<T: DeserializeOwned>(path: &Path, bytes: &[u8]) -> Result<T, CorruptJson> {
+    serde_json::from_slice(bytes).map_err(|parse_error| CorruptJson {
+        path: path.to_path_buf(),
+        size: bytes.len(),
+        all_zero: !bytes.is_empty() && bytes.iter().all(|b| *b == 0),
+        parse_error,
+    })
+}
+
+pub(crate) fn quarantine_path(path: &Path) -> PathBuf {
     let mut name = path.file_name().unwrap_or_default().to_os_string();
     name.push(".corrupt");
     path.with_file_name(name)
