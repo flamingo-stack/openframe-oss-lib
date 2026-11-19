@@ -28,6 +28,7 @@ fn not_configured_when_file_is_corrupt() {
     let dir = TempDir::new().unwrap();
     write_config(&dir, "{ this is not json");
     assert!(!service_in(&dir).is_configured());
+    assert!(dir.path().join("secured/initial_config.json").exists());
 }
 
 #[test]
