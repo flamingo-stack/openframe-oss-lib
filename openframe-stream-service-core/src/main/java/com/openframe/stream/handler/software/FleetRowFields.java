@@ -5,11 +5,15 @@ import tools.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 
 final class FleetRowFields {
 
     // Debezium's op code for a deleted row ("c" create, "u" update, "r" snapshot read)
     private static final String DELETE_OPERATION = "d";
+    private static final String UPDATE_OPERATION = "u";
     private static final String SNAPSHOT_READ_OPERATION = "r";
 
     private FleetRowFields() {
@@ -19,8 +23,27 @@ final class FleetRowFields {
         return DELETE_OPERATION.equals(op);
     }
 
+    static boolean isUpdate(String op) {
+        return UPDATE_OPERATION.equals(op);
+    }
+
     static boolean isSnapshotRead(String op) {
         return SNAPSHOT_READ_OPERATION.equals(op);
+    }
+
+    static boolean differsOnlyIn(JsonNode before, JsonNode after, Set<String> fields) {
+        if (before == null || after == null || !before.isObject() || !after.isObject()) {
+            return false;
+        }
+        Set<String> names = new HashSet<>(before.propertyNames());
+        names.addAll(after.propertyNames());
+        names.removeAll(fields);
+        for (String name : names) {
+            if (!Objects.equals(before.get(name), after.get(name))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static boolean isGlobalStats(JsonNode row) {

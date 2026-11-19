@@ -23,7 +23,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,7 +48,7 @@ class DeviceSoftwareHandlerTest {
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjectionTrigger projectionTrigger;
 
-    @Captor private ArgumentCaptor<DeviceSoftware> deviceSoftwareCaptor;
+    @Captor private ArgumentCaptor<List<DeviceSoftware>> savedCaptor;
 
     @InjectMocks private DeviceSoftwareHandler handler;
 
@@ -79,6 +78,15 @@ class DeviceSoftwareHandlerTest {
         return MAPPER.createObjectNode();
     }
 
+    private ObjectNode detailsRow(long hostId, String arpKey) {
+        return row().put("host_id", hostId).put("software_id", 7).put("arp_key", arpKey)
+                .put("updated_at", "2026-11-17T22:00:00.000000Z");
+    }
+
+    private ObjectNode lastOpened(long hostId, String time) {
+        return row().put("host_id", hostId).put("software_id", 7).put("last_opened_at", "2026-11-17T" + time + ":00Z");
+    }
+
     private HostSoftwareTitle title(long id, String name, String source, String... versions) {
         HostSoftwareTitle t = new HostSoftwareTitle();
         t.setId(id);
@@ -90,6 +98,19 @@ class DeviceSoftwareHandlerTest {
             return iv;
         }).toList());
         return t;
+    }
+
+    private DeviceSoftware savedRow() {
+        verify(deviceSoftwareRepository).saveAll(savedCaptor.capture());
+        assertThat(savedCaptor.getValue()).hasSize(1);
+        return savedCaptor.getValue().get(0);
+    }
+
+    private DeviceSoftware stored(String id, long titleId, String name, String version, String... cves) {
+        return DeviceSoftware.builder().id(id).tenantId("t1").machineId("m1").softwareTitleId(titleId)
+                .name(name).source("apps").versions(List.of(version)).vulnerabilities(List.of(cves))
+                .arpKeys(List.of()).packageFamilyNames(List.of()).installerTypes(List.of())
+                .appFileNames(List.of()).machineConnected(false).build();
     }
 
     private HostSoftwareTitle titleWithCves(long id, String name, String version, String... cves) {
@@ -133,18 +154,13 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(
                 title(42L, "Google Chrome", "apps", "1.0", "2.0")));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
-                .thenReturn(Optional.empty());
-        // stale row for a title no longer present in the snapshot
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
-                DeviceSoftware.builder().tenantId("t1").machineId("m1").softwareTitleId(42L).build(),
-                DeviceSoftware.builder().tenantId("t1").machineId("m1").softwareTitleId(99L).build()));
+                DeviceSoftware.builder().id("ds-99").tenantId("t1").machineId("m1").softwareTitleId(99L).build()));
 
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
-        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository).save(captor.capture());
-        DeviceSoftware saved = captor.getValue();
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getId()).isNull();
         assertThat(saved.getTenantId()).isEqualTo("t1");
         assertThat(saved.getMachineId()).isEqualTo("m1");
         assertThat(saved.getSoftwareTitleId()).isEqualTo(42L);
@@ -155,9 +171,7 @@ class DeviceSoftwareHandlerTest {
         // a new row is written for a device reporting software, so it counts until a lifecycle change says otherwise
         assertThat(saved.isMachineConnected()).isTrue();
 
-        ArgumentCaptor<DeviceSoftware> deleted = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository).delete(deleted.capture());
-        assertThat(deleted.getValue().getSoftwareTitleId()).isEqualTo(99L);
+        verify(deviceSoftwareRepository).deleteAllById(List.of("ds-99"));
 
         verify(projectionTrigger).titlesChanged("t1", Set.of(42L, 99L));
     }
@@ -168,15 +182,11 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(
                 titleWithCves(42L, "Google Chrome", "1.0", "CVE-1", "CVE-2")));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
-                .thenReturn(Optional.empty());
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of());
 
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
-        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository).save(captor.capture());
-        assertThat(captor.getValue().getVulnerabilities()).containsExactly("CVE-1", "CVE-2");
+        assertThat(savedRow().getVulnerabilities()).containsExactly("CVE-1", "CVE-2");
 
         verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
         verify(projectionTrigger).cvesChanged("t1", Set.of("CVE-1", "CVE-2"));
@@ -188,12 +198,12 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of());
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
-                DeviceSoftware.builder().tenantId("t1").machineId("m1").softwareTitleId(42L).build()));
+                DeviceSoftware.builder().id("ds-42").tenantId("t1").machineId("m1").softwareTitleId(42L).build()));
 
         handler.handle(msg("d", row().put("host_id", 100), null), null);
 
-        verify(deviceSoftwareRepository, never()).save(any());
-        verify(deviceSoftwareRepository).delete(any(DeviceSoftware.class));
+        verify(deviceSoftwareRepository, never()).saveAll(any());
+        verify(deviceSoftwareRepository).deleteAllById(List.of("ds-42"));
         verify(projectionTrigger).titlesChanged(eq("t1"), eq(Set.of(42L)));
     }
 
@@ -278,7 +288,7 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
 
         handler.handle(msg("r", null, row().put("host_id", 100)), null);
-        handler.handle(msgAt("u", row().put("host_id", 100), row().put("host_id", 100), COMMIT_TS + 1), null);
+        handler.handle(msgAt("u", detailsRow(100, "A"), detailsRow(100, "B"), COMMIT_TS + 1), null);
         handler.handle(msgAt("c", null, row().put("host_id", 100), COMMIT_TS + 2), null);
         handler.handle(msgAt("d", row().put("host_id", 100), null, COMMIT_TS + 3), null);
 
@@ -369,7 +379,7 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
 
-        handler.handle(msgIn("u", row().put("host_id", 100), row().put("host_id", 100), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", detailsRow(100, "A"), detailsRow(100, "B"), COMMIT_TS, GTID_1), null);
         handler.handle(msgIn("c", null, row().put("host_id", 100), COMMIT_TS, GTID_2), null);
 
         verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
@@ -415,14 +425,10 @@ class DeviceSoftwareHandlerTest {
         msi.setPackageFamilyName("");
         msi.setInstallerType("msi");
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(chrome));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
-                .thenReturn(Optional.empty());
 
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
-        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository).save(captor.capture());
-        DeviceSoftware saved = captor.getValue();
+        DeviceSoftware saved = savedRow();
         assertThat(saved.getUpgradeCode()).isEqualTo("{UPGRADE}");
         assertThat(saved.getVendor()).isEqualTo("Google LLC");
         assertThat(saved.getArpKeys()).containsExactly("Google Chrome", "{8A69D345-D564-463C-AFF1-A69D9E530F96}");
@@ -441,16 +447,13 @@ class DeviceSoftwareHandlerTest {
         HostSoftwareTitle libnghttp2 = title(44L, "libnghttp2", source, "1.70.0", "1.68.0", "1.71.0");
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
                 .thenReturn(List.of(libnghttp2));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 44L))
-                .thenReturn(Optional.empty());
         DeserializedDebeziumMessage message = msg("c", null, row().put("host_id", 100));
 
         // execution
         handler.handle(message, null);
 
         // verifications
-        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
-        assertThat(deviceSoftwareCaptor.getValue().getVersions()).containsExactly("1.71.0");
+        assertThat(savedRow().getVersions()).containsExactly("1.71.0");
     }
 
     @Test
@@ -460,14 +463,10 @@ class DeviceSoftwareHandlerTest {
         HostSoftwareTitle sevenZip = title(43L, "7-Zip", "winget_packages", "24.08");
         sevenZip.getInstalledVersions().get(0).setWingetId("7zip.7zip");
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS))).thenReturn(List.of(sevenZip));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 43L))
-                .thenReturn(Optional.empty());
 
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
-        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository).save(captor.capture());
-        assertThat(captor.getValue().getWingetId()).isEqualTo("7zip.7zip");
+        assertThat(savedRow().getWingetId()).isEqualTo("7zip.7zip");
     }
 
     @Test
@@ -476,15 +475,217 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
                 .thenReturn(List.of(title(42L, "Slack", "apps", "4.0")));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
-                .thenReturn(Optional.empty());
 
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
-        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository).save(captor.capture());
-        assertThat(captor.getValue().getSystemComponent()).isNull();
-        assertThat(captor.getValue().getVendor()).isNull();
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getSystemComponent()).isNull();
+        assertThat(saved.getVendor()).isNull();
+    }
+
+    @Test
+    void handle_updateOfLastOpenedAtOnly_ofAHostNotReconciledRecently_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS, GTID_1), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+    }
+
+    @Test
+    void handle_updateOfLastOpenedAtOnly_afterAReconcileOfTheHost_isSkipped() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 7), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache, never()).hostSoftware("t1", 100L, GTID_2);
+        verify(fleetHostResolver, times(1)).resolve("100");
+    }
+
+    @Test
+    void handle_updateOfLastOpenedAtOnly_afterALastOpenedAtReconcileOfTheHost_isSkipped() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache, never()).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_updateOfWindowsDetailsTimestampOnly_afterAReconcileOfTheHost_isSkipped() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        ObjectNode after = detailsRow(100, "A").put("updated_at", "2026-11-17T22:05:00.000000Z");
+
+        handler.handle(msgIn("c", null, detailsRow(100, "A"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", detailsRow(100, "A"), after, COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache, never()).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_updateOfLastOpenedAtOnly_ofAnotherHost_reconcilesThatHost() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.isResolvable("101")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostResolver.resolve("101")).thenReturn(new FleetHostRef("t1", "m2"));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 7), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(101, "21:00"), lastOpened(101, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 101L, GTID_2);
+    }
+
+    @Test
+    void handle_updateOfLastOpenedAtOnly_afterAFailedReconcileOfTheHost_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenThrow(new IllegalStateException("Fleet 503"));
+
+        assertThatThrownBy(() -> handler.handle(
+                msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null))
+                .isInstanceOf(IllegalStateException.class);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_updateWithoutTheRowBefore_afterAReconcileOfTheHost_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 7), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", null, lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_updatesOfLastOpenedAtOnly_ofAnUnresolvedHost_lookUpTheHostOnce() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false);
+
+        handler.handle(msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", lastOpened(100, "21:00"), lastOpened(100, "22:00"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostResolver, times(1)).isResolvable("100");
+        verifyNoInteractions(fleetHostSoftwareCache, deviceSoftwareRepository, projectionTrigger);
+    }
+
+    @Test
+    void handle_realChangeOfAHostUnresolvedOnALastOpenedAtUpdate_isResolvedAgain() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false, true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 8), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostResolver, times(2)).isResolvable("100");
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_realChangeAfterAReconcileOfTheHost_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", lastOpened(100, "20:00"), lastOpened(100, "21:00"), COMMIT_TS, GTID_1), null);
+        handler.handle(msgIn("u", detailsRow(100, "A"), detailsRow(100, "B"), COMMIT_TS + 1, GTID_2), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_2);
+    }
+
+    @Test
+    void handle_updateWithoutTheRowBefore_reconciles() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msgIn("u", null, detailsRow(100, "A"), COMMIT_TS, GTID_1), null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, GTID_1);
+    }
+
+    @Test
+    void handle_reconcile_unchangedRowsAreNeitherWrittenNorProjected() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenReturn(List.of(
+                titleWithCves(42L, "Google Chrome", "1.0", "CVE-1")));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
+                stored("ds-42", 42L, "Google Chrome", "1.0", "CVE-1")));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100), COMMIT_TS, GTID_1), null);
+
+        verify(deviceSoftwareRepository, never()).saveAll(any());
+        verify(deviceSoftwareRepository, never()).deleteAllById(any());
+        verify(projectionTrigger).titlesChanged("t1", Set.of());
+        verify(projectionTrigger).cvesChanged("t1", Set.of());
+    }
+
+    @Test
+    void handle_reconcile_changedRowKeepsItsIdAndConnectivityAndProjectsOldAndNewCves() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenReturn(List.of(
+                titleWithCves(42L, "Google Chrome", "2.0", "CVE-2"),
+                titleWithCves(43L, "Slack", "4.0")));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
+                stored("ds-42", 42L, "Google Chrome", "1.0", "CVE-1"),
+                stored("ds-43", 43L, "Slack", "4.0")));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100), COMMIT_TS, GTID_1), null);
+
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getId()).isEqualTo("ds-42");
+        assertThat(saved.isMachineConnected()).isFalse();
+        assertThat(saved.getVersions()).containsExactly("2.0");
+        assertThat(saved.getUpdatedAt()).isNotNull();
+        verify(deviceSoftwareRepository, never()).deleteAllById(any());
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
+        verify(projectionTrigger).cvesChanged("t1", Set.of("CVE-1", "CVE-2"));
+    }
+
+    @Test
+    void handle_reconcile_removedTitleProjectsItsCves() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenReturn(List.of());
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
+                stored("ds-42", 42L, "Google Chrome", "1.0", "CVE-1")));
+
+        handler.handle(msgIn("d", row().put("host_id", 100), null, COMMIT_TS, GTID_1), null);
+
+        verify(deviceSoftwareRepository).deleteAllById(List.of("ds-42"));
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
+        verify(projectionTrigger).cvesChanged("t1", Set.of("CVE-1"));
+    }
+
+    @Test
+    void handle_reconcile_changedRowOfAConnectedDeviceStaysConnected() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenReturn(List.of(
+                titleWithCves(42L, "Google Chrome", "2.0")));
+        DeviceSoftware connected = stored("ds-42", 42L, "Google Chrome", "1.0");
+        connected.setMachineConnected(true);
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(connected));
+
+        handler.handle(msgIn("c", null, row().put("host_id", 100), COMMIT_TS, GTID_1), null);
+
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getId()).isEqualTo("ds-42");
+        assertThat(saved.isMachineConnected()).isTrue();
+        assertThat(saved.getVersions()).containsExactly("2.0");
     }
 
     @Test
@@ -498,8 +699,7 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         // verifications
-        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
-        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        DeviceSoftware saved = savedRow();
         assertThat(saved.getBundleIdentifier()).isEqualTo("com.microsoft.VSCode");
         assertThat(saved.getAppFileNames()).containsExactly("Code", "Visual Studio Code");
         assertThat(saved.getTopLevelApp()).isTrue();
@@ -523,8 +723,7 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         // verifications
-        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
-        assertThat(deviceSoftwareCaptor.getValue().getTopLevelApp()).isEqualTo(topLevel);
+        assertThat(savedRow().getTopLevelApp()).isEqualTo(topLevel);
     }
 
     @Test
@@ -538,8 +737,7 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         // verifications
-        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
-        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        DeviceSoftware saved = savedRow();
         assertThat(saved.getAppFileNames()).containsExactly("Helper");
         assertThat(saved.getTopLevelApp()).isTrue();
     }
@@ -554,8 +752,7 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         // verifications
-        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
-        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        DeviceSoftware saved = savedRow();
         assertThat(saved.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
         assertThat(saved.getAppFileNames()).isEmpty();
         assertThat(saved.getTopLevelApp()).isNull();
@@ -572,8 +769,7 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         // verifications
-        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
-        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        DeviceSoftware saved = savedRow();
         assertThat(saved.getAppFileNames()).isEmpty();
         assertThat(saved.getTopLevelApp()).isNull();
     }
@@ -588,8 +784,7 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         // verifications
-        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
-        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        DeviceSoftware saved = savedRow();
         assertThat(saved.getAppFileNames()).isEmpty();
         assertThat(saved.getTopLevelApp()).isFalse();
     }
@@ -605,11 +800,49 @@ class DeviceSoftwareHandlerTest {
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         // verifications
-        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
-        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
+        DeviceSoftware saved = savedRow();
         assertThat(saved.getBundleIdentifier()).isNull();
         assertThat(saved.getAppFileNames()).isEmpty();
         assertThat(saved.getTopLevelApp()).isNull();
+    }
+
+    @Test
+    void handle_reconcile_storedAppWithTheSameAppKeys_isNotWritten() {
+        // setup
+        stubHostSoftware(app("com.tinyspeck.slackmacgap", "/Applications/Slack.app"));
+        DeviceSoftware slack = storedApp(true);
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(slack));
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void handle_reconcile_storedAppMovedToTheApplicationsFolder_isWritten() {
+        // setup
+        stubHostSoftware(app("com.tinyspeck.slackmacgap", "/Applications/Slack.app"));
+        DeviceSoftware slack = storedApp(false);
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(slack));
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getId()).isEqualTo("ds-42");
+        assertThat(saved.getTopLevelApp()).isTrue();
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
+    }
+
+    private DeviceSoftware storedApp(boolean topLevelApp) {
+        DeviceSoftware app = stored("ds-42", 42L, "App", "1.0");
+        app.setBundleIdentifier("com.tinyspeck.slackmacgap");
+        app.setAppFileNames(List.of("Slack"));
+        app.setTopLevelApp(topLevelApp);
+        return app;
     }
 
     private void stubHostSoftware(HostSoftwareTitle hostSoftwareTitle) {
@@ -617,8 +850,6 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
                 .thenReturn(List.of(hostSoftwareTitle));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
-                .thenReturn(Optional.empty());
     }
 
     private HostSoftwareTitle app(String bundleIdentifier, String... installedPaths) {
