@@ -67,6 +67,20 @@ class RestProxyServiceTimeoutTest {
     }
 
     @Test
+    void defaults_poolLeaseThreeSecondsAndTwentyConnectionsPerRoute() {
+        // setup
+        Duration gatewayResponseTimeout = Duration.ofSeconds(30);
+
+        // execution
+        Duration worstCase = RestProxyService.CONNECTION_REQUEST_TIMEOUT.plus(RestProxyService.RESPONSE_TIMEOUT);
+
+        // verifications
+        assertThat(RestProxyService.CONNECTION_REQUEST_TIMEOUT).isEqualTo(Duration.ofSeconds(3));
+        assertThat(RestProxyService.MAX_CONNECTIONS_PER_ROUTE).isEqualTo(20);
+        assertThat(worstCase).isLessThan(gatewayResponseTimeout);
+    }
+
+    @Test
     void proxy_connectionRefused_throwsToolUnreachable() throws IOException {
         // setup
         int closedPort = closedPort();
@@ -100,7 +114,7 @@ class RestProxyServiceTimeoutTest {
     @Test
     void proxy_slowUpstream_throwsToolTimeoutWithinResponseTimeout() throws IOException {
         // setup
-        startSlowUpstream(Duration.ofSeconds(3));
+        startSlowUpstream(Duration.ofSeconds(1));
         stubTool("http://127.0.0.1", String.valueOf(upstream.getAddress().getPort()));
         RestProxyService service = service(Duration.ofSeconds(5), SHORT);
         long started = System.nanoTime();

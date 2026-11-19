@@ -103,6 +103,30 @@ class FleetEndpointMatcherTest {
     }
 
     @Test
+    void matches_numericIdConstraintAndLiteralSegment_false() {
+        // setup
+        FleetEndpointMatcher matcher = new FleetEndpointMatcher(List.of("GET /api/{v}/fleet/hosts/{id:[0-9]+}"));
+
+        // execution
+        boolean matches = matcher.matches(HttpMethod.GET, "/api/v1/fleet/hosts/report");
+
+        // verifications
+        assertThat(matches).isFalse();
+    }
+
+    @Test
+    void matches_numericIdConstraintAndNumericSegment_true() {
+        // setup
+        FleetEndpointMatcher matcher = new FleetEndpointMatcher(List.of("GET /api/{v}/fleet/hosts/{id:[0-9]+}"));
+
+        // execution
+        boolean matches = matcher.matches(HttpMethod.GET, "/api/v1/fleet/hosts/42");
+
+        // verifications
+        assertThat(matches).isTrue();
+    }
+
+    @Test
     void matches_lowercaseMethodInEntry_parsed() {
         // setup
         FleetEndpointMatcher matcher = new FleetEndpointMatcher(List.of("  get   /api/{v}/fleet/hosts"));

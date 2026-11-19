@@ -50,9 +50,9 @@ class RestProxyServiceFleetTest {
     private static final String TENANT_HEADER = "X-Tenant-Id";
     private static final List<String> ALLOWED = List.of(
             "GET /api/{v}/fleet/hosts",
-            "GET /api/{v}/fleet/hosts/{id}",
+            "GET /api/{v}/fleet/hosts/{id:[0-9]+}",
             "GET /api/{v}/fleet/hosts/identifier/{identifier}",
-            "GET /api/{v}/fleet/hosts/{id}/software"
+            "GET /api/{v}/fleet/hosts/{id:[0-9]+}/software"
     );
 
     @Mock
@@ -129,6 +129,35 @@ class RestProxyServiceFleetTest {
         // execution
         Throwable thrown = catchThrowable(() -> service.proxyApiRequest(FLEET,
                 request("GET", "/tools/fleetmdm-server/api/v1/fleet/hosts/%2e%2e/software"), null));
+
+        // verifications
+        assertEndpointNotAllowed(thrown);
+        verifyNoInteractions(toolRepository);
+    }
+
+    @Test
+    void proxy_hostsReportWithLabel_throws403WithoutToolLookup() {
+        // setup
+        RestProxyService service = service(true);
+        MockHttpServletRequest request = request("GET", "/tools/fleetmdm-server/api/v1/fleet/hosts/report");
+        request.setQueryString("format=csv&label_id=1");
+
+        // execution
+        Throwable thrown = catchThrowable(() -> service.proxyApiRequest(FLEET, request, null));
+
+        // verifications
+        assertEndpointNotAllowed(thrown);
+        verifyNoInteractions(toolRepository);
+    }
+
+    @Test
+    void proxy_toolIdEncodedInRawPath_throws403WithoutToolLookup() {
+        // setup
+        RestProxyService service = service(true);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> service.proxyApiRequest(FLEET,
+                request("GET", "/tools/fleetmdm%2Dserver/api/v1/fleet/queries"), null));
 
         // verifications
         assertEndpointNotAllowed(thrown);

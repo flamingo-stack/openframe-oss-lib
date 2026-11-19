@@ -28,9 +28,9 @@ class FleetProxyGuardTest {
     private static final String TENANT_ID = "tenant-a";
     private static final List<String> ALLOWED = List.of(
             "GET /api/{v}/fleet/hosts",
-            "GET /api/{v}/fleet/hosts/{id}",
+            "GET /api/{v}/fleet/hosts/{id:[0-9]+}",
             "GET /api/{v}/fleet/hosts/identifier/{identifier}",
-            "GET /api/{v}/fleet/hosts/{id}/software"
+            "GET /api/{v}/fleet/hosts/{id:[0-9]+}/software"
     );
 
     @Mock
@@ -110,6 +110,12 @@ class FleetProxyGuardTest {
             "DELETE, /api/v1/fleet/hosts/42",
             "HEAD, /api/v1/fleet/hosts",
             "GET, /api/v1/fleet/software",
+            "GET, /api/v1/fleet/hosts/count",
+            "GET, /api/v1/fleet/hosts/report",
+            "GET, /api/v1/fleet/hosts/summary/software",
+            "GET, /api/v1/fleet/hosts/42/",
+            "GET, /api/v1/fleet//hosts",
+            "GET, /API/V1/FLEET/HOSTS",
             "GET, /"
     })
     void requireAllowed_offListEndpoint_throwsEndpointNotAllowed(String method, String toolPath) {
@@ -192,7 +198,7 @@ class FleetProxyGuardTest {
         Throwable thrown = catchThrowable(guard::tenantId);
 
         // verifications
-        assertThat(thrown).isInstanceOf(InternalException.class);
+        assertThat(thrown).isInstanceOf(InternalException.class).hasMessageContaining("tenant");
     }
 
     @Test
@@ -205,7 +211,7 @@ class FleetProxyGuardTest {
         Throwable thrown = catchThrowable(guard::tenantId);
 
         // verifications
-        assertThat(thrown).isInstanceOf(InternalException.class);
+        assertThat(thrown).isInstanceOf(InternalException.class).hasMessageContaining("tenant");
     }
 
     private FleetProxyGuard guard(boolean enabled, List<String> allowed) {

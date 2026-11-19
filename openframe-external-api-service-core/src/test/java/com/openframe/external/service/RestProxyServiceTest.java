@@ -1,6 +1,8 @@
 package com.openframe.external.service;
 
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.InternalException;
 import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.document.apikey.APIKeyType;
 import com.openframe.data.document.tool.IntegratedTool;
@@ -201,13 +203,14 @@ class RestProxyServiceTest {
     }
 
     @Test
-    void malformedQueryStringIs400InvalidUri() {
+    void malformedQueryStringIsBadRequestWithoutTheParserMessage() {
         when(toolRepository.findByKey(TOOL_ID)).thenReturn(Optional.of(enabledTool(null)));
 
-        ResponseEntity<String> response = service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api", "q=a b"), null);
+        Throwable thrown = catchThrowable(() -> service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api", "q=a b"), null));
 
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertTrue(response.getBody().startsWith("Invalid URI: "), response.getBody());
+        assertInstanceOf(BadRequestException.class, thrown);
+        assertEquals(ErrorCode.BAD_REQUEST, ((BadRequestException) thrown).getErrorCode());
+        assertFalse(thrown.getMessage().contains("Illegal character"), thrown.getMessage());
         verifyNoInteractions(toolUrlService, proxyUrlResolver);
     }
 
@@ -237,26 +240,27 @@ class RestProxyServiceTest {
     }
 
     @Test
-    void resolverFailureIs500WithItsMessage() {
+    void resolverFailureIsInternalErrorWithoutItsMessage() {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("http://rmm-api", "8000", ToolUrlType.API));
         when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("Failed to resolve tool url"));
 
-        ResponseEntity<String> response = service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api", null), null);
+        Throwable thrown = catchThrowable(() -> service.proxyApiRequest(TOOL_ID, request("GET", "/tools/tactical-rmm/api", null), null));
 
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        assertEquals("Internal server error: Failed to resolve tool url", response.getBody());
+        assertInstanceOf(InternalException.class, thrown);
+        assertFalse(thrown.getMessage().contains("Failed to resolve tool url"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains(TOOL_ID), thrown.getMessage());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"TRACE", "CONNECT", "BOGUS"})
-    void unsupportedMethodIs500WithoutCallingTheTool(String method) {
+    void unsupportedMethodIsInternalErrorWithoutCallingTheTool(String method) {
         stubToolWithApiUrl(enabledTool(null), new ToolUrl("http://rmm-api", "8000", ToolUrlType.API));
         when(proxyUrlResolver.resolvePreservingEncoding(any(), any(), any(), any(), any())).thenReturn(URI.create("http://rmm-api:8000/api"));
 
-        ResponseEntity<String> response = service.proxyApiRequest(TOOL_ID, request(method, "/tools/tactical-rmm/api", null), null);
+        Throwable thrown = catchThrowable(() -> service.proxyApiRequest(TOOL_ID, request(method, "/tools/tactical-rmm/api", null), null));
 
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        assertEquals("Unexpected error: Unsupported HTTP method: " + method, response.getBody());
+        assertInstanceOf(InternalException.class, thrown);
+        assertFalse(thrown.getMessage().contains("Unsupported HTTP method"), thrown.getMessage());
     }
 
     @Test
