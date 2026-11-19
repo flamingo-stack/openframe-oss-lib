@@ -18,8 +18,4 @@ public interface SoftwareActionAggregationRepository {
     Map<String, Integer> facet(String tenantId, SoftwareActionQueryFilter filter, String search, String field);
 
     Optional<SoftwareActionSummary> findByExecutionId(String tenantId, String executionId);
-
-    boolean isSortableField(String field);
-
-    String getDefaultSortField();
 }

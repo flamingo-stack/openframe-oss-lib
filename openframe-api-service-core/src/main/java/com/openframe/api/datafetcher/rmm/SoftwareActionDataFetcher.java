@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareActionFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareActionFilters;
@@ -59,5 +60,14 @@ public class SoftwareActionDataFetcher {
             @InputArgument String search) {
         SoftwareActionId id = SoftwareActionId.decode(actionId);
         return softwareActionDetailService.devices(id.executionId(), id.bundleId(), id.scheduleId(), filter, search);
+    }
+
+    @DgsQuery
+    public SoftwareActionDeviceFilters softwareActionExecutionFilters(
+            @InputArgument String actionId,
+            @InputArgument SoftwareActionDeviceFilterInput filter,
+            @InputArgument String search) {
+        SoftwareActionId id = SoftwareActionId.decode(actionId);
+        return softwareActionDetailService.filters(id.executionId(), id.bundleId(), id.scheduleId(), filter, search);
     }
 }

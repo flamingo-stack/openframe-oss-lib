@@ -40,7 +40,6 @@ import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
-import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -791,24 +790,8 @@ public class SoftwareInventoryService {
     }
 
     private List<SoftwareFilterOption> organizationFacet(List<SoftwareOnDeviceResponse> rows) {
-        Map<String, Long> counts = rows.stream()
-                .map(row -> row.getDevice().getOrganizationId())
-                .filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-        if (counts.isEmpty()) {
-            return List.of();
-        }
-        Map<String, String> names = organizationRepository.findByOrganizationIdIn(counts.keySet()).stream()
-                .filter(organization -> organization.getName() != null)
-                .collect(Collectors.toMap(Organization::getOrganizationId, Organization::getName, (a, b) -> a));
-        return counts.entrySet().stream()
-                .map(e -> SoftwareFilterOption.builder()
-                        .value(e.getKey())
-                        .label(names.getOrDefault(e.getKey(), e.getKey()))
-                        .count(e.getValue().intValue())
-                        .build())
-                .sorted(Comparator.comparing(SoftwareFilterOption::getLabel, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        Stream<String> organizationIds = rows.stream().map(row -> row.getDevice().getOrganizationId());
+        return SoftwareFilterOptions.organizations(organizationIds, organizationRepository);
     }
 
     private List<SoftwareOnDeviceResponse> allDevicesForSoftware(String softwareId, String search) {
@@ -962,23 +945,7 @@ public class SoftwareInventoryService {
     }
 
     private static <T, E extends Enum<E>> List<SoftwareFilterOption> facet(List<T> rows, Function<T, E> dimension) {
-        Map<E, Long> counts = rows.stream()
-                .map(dimension)
-                .filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-        return counts.entrySet().stream()
-                .sorted(Comparator.comparingInt(e -> e.getKey().ordinal()))
-                .map(e -> SoftwareFilterOption.builder()
-                        .value(e.getKey().name())
-                        .label(humanize(e.getKey().name()))
-                        .count(e.getValue().intValue())
-                        .build())
-                .toList();
-    }
-
-    private static String humanize(String enumName) {
-        String lower = enumName.toLowerCase(Locale.ROOT).replace('_', ' ');
-        return lower.isEmpty() ? lower : Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+        return SoftwareFilterOptions.enumFacet(rows, dimension);
     }
 
     private static Optional<Long> parseNumericId(String softwareId) {
