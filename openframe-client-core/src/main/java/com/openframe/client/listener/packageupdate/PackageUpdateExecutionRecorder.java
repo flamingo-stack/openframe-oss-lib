@@ -1,5 +1,6 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
@@ -10,6 +11,7 @@ import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Done;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.State;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,8 +31,10 @@ public class PackageUpdateExecutionRecorder {
     static final String SUPERSEDED_ERROR = "Superseded by a newer update request";
     static final String FAILED_ERROR = "Update failed";
     static final String UNDELIVERED_ERROR = "The device did not receive the update";
+    static final String NO_APPLICABLE_UPDATE_ERROR = "No applicable update for this install: installed %s, target %s";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
+    private final PackageCatalogVersions packageCatalogVersions;
 
     public void record(PackageUpdateRequest request, String machineId, PackageUpdateStatusMessage event) {
         ScriptExecution row = historyRow(request, machineId).orElse(null);
@@ -44,7 +48,7 @@ public class PackageUpdateExecutionRecorder {
         switch (event.getState()) {
             case WAITING -> markWaiting(row);
             case DONE -> {
-                update(row, ExecutionStatus.SUCCESS, null, now, null, summary(event), null);
+                markDone(row, request, event, now);
                 keepManagerOutput(row, event);
             }
             case FAILED -> {
@@ -91,6 +95,32 @@ public class PackageUpdateExecutionRecorder {
             update(row, ExecutionStatus.RUNNING, null, null, null, null, null);
         }
         row.setWaiting(true);
+    }
+
+    // the manager may find no update for an install the catalog has a newer version of: nothing changed on the device
+    private void markDone(ScriptExecution row, PackageUpdateRequest request, PackageUpdateStatusMessage event, Instant now) {
+        String summary = summary(event);
+        if (isAlreadyLatest(event) && hasCatalogVersion(request)) {
+            String installedVersion = event.getInstalledVersion();
+            String targetVersion = packageCatalogVersions.shownLatest(request.getPackageManager(),
+                    request.getPackageName(), request.getBrewPackageType());
+            if (SoftwareVersions.compare(installedVersion, targetVersion) < 0) {
+                String error = NO_APPLICABLE_UPDATE_ERROR.formatted(installedVersion, targetVersion);
+                update(row, ExecutionStatus.FAILED, ExecutionFailureReason.SYSTEM_SCRIPT_ERROR, now, null, summary, error);
+                return;
+            }
+        }
+        update(row, ExecutionStatus.SUCCESS, null, now, null, summary, null);
+    }
+
+    private static boolean isAlreadyLatest(PackageUpdateStatusMessage event) {
+        Done done = event.getDone();
+        return done != null && done.getResult() == Done.Result.ALREADY_LATEST && hasText(event.getInstalledVersion());
+    }
+
+    private boolean hasCatalogVersion(PackageUpdateRequest request) {
+        return packageCatalogVersions.hasShownLatest(request.getPackageManager(), request.getPackageName(),
+                request.getBrewPackageType());
     }
 
     private static void markFailed(ScriptExecution row, Failed failed, Instant now) {

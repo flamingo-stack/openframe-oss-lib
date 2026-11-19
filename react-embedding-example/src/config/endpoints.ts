@@ -32,9 +32,9 @@ export const EP = {
   // The active agents' public identities (name, icon, audience): where the assistant's
   // identity comes from on a platform that configured none of its own.
   aiAgents: `${CONTENT}/ai-agents`,
-  // The questions an "ask" surface offers (the FAQ's card): `?count&topic&exclude`.
-  // `topic` is the surface's topic, any FAQ topic the hub knows.
-  askPrompts: `${CONTENT}/faqs/questions`,
+  // The questions an "ask" surface offers (a section's row, the FAQ's card): `?count&topic&exclude`.
+  // They are the chat's quick actions; `topic` is the surface's page or section.
+  askPrompts: `${CONTENT}/quick-actions/questions`,
   // The FAQ list: every <FaqSection> without a base of its own, and the shared pages' own FAQ blocks.
   faqs: `${CONTENT}/faqs`,
   // Icon images: `<icons>/<name>?theme=light|dark` draws a library icon as a PNG (`entityIconImages` builds the urls).
