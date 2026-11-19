@@ -5,7 +5,7 @@
  *   - `entityIconImages(icon, iconsUrl)`: the value as MCP's standard `Icon`s (`src`, `mimeType`, `sizes`, `theme`). An
  *     upload is its own image; a library name is the host's icon endpoint (`EndpointsRuntime.iconsUrl`, the hub's
  *     `/api/icons`), `<iconsUrl>/<name>?theme=light|dark`, once per host theme.
- *   - `loadNamedIcon(name, …)`: what that endpoint draws, the chat's own icon for the name (`iconRefOfName`'s rules),
+ *   - `loadNamedIcon(name, …)`: what that endpoint draws, the chat's own icon for the name (`iconRefFor`, the one rule),
  *     loaded on a server with the colours its name states.
  *
  * No React import and no client module: the generated icons are plain function components, and a lucide icon is drawn
@@ -13,7 +13,7 @@
  */
 import type { ComponentType } from 'react';
 import type { IconRef } from '../components/chat/utils/icon-loading';
-import { drawnIconRefOfName } from '../components/chat/utils/icon-refs';
+import { iconRefFor } from '../components/chat/utils/icon-refs';
 import type { EntityIconValue } from '../components/icon-display';
 import type { LoadedIconProps } from '../components/icons-v2-generated/icon-loaders';
 
@@ -36,7 +36,7 @@ export async function loadNamedIcon(
   iconName: string | null | undefined,
   { size, color }: { size: number; color: string },
 ): Promise<LoadedNamedIcon | null> {
-  const ref = drawnIconRefOfName(iconName);
+  const ref = iconRefFor(iconName);
   if (ref?.set) {
     const { ICON_LOADERS } = await import('../components/icons-v2-generated/icon-loaders');
     const loader = ICON_LOADERS[ref.set];

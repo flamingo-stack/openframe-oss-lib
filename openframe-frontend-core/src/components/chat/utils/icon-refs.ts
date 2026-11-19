@@ -1,8 +1,18 @@
 /**
- * How an icon NAME (a database `icon_name`) becomes the icon it draws, as DATA: the names that do not follow the
- * generated set's naming convention (`ICON_ALIASES`), and the convention itself (`iconRefOfName`). Nothing here
- * imports React or an icon, so a server reads the same rules the chat draws by (`utils/named-icon` renders one as an
- * image; `resolveIcon` / `findIcon` draw one in the browser). Change a name's icon here, never in a copy.
+ * WHAT AN ICON NAME DRAWS: the ONE place that decides it, for every surface (chat chips, slash commands, admin rows,
+ * social links, source rows, MCP icon images). Plain data and pure functions, no React: a server reads the same rules
+ * the browser draws by.
+ *
+ *   `iconRefFor(name, { variant })` is the only answer:
+ *     - `design` (default; chips, rows, pickers, images): an alias (`ICON_ALIASES`), else the generated set by its
+ *       naming convention (`chart-pie` → `ChartPieIcon`), else lucide's icon by that name (`git-pull-request`).
+ *     - `brand` (social links, channel platforms, source rows): the brand table (`ICON_REGISTRY`, PascalCase column
+ *       values through `normalizeIconKey`), else the design set.
+ *   `brandLogoRefForName(company)`: a company's logo by the set's `<Brand>LogoIcon` convention.
+ *
+ * Everything that DRAWS an icon only draws what these answer: `EntityIcon` / `resolveIcon` / `findIcon` /
+ * `brandLogoForName` (icon-library), `getIconComponent` / `getDynamicIcon` (icon-registry) and, on a server,
+ * `loadNamedIcon` (utils/named-icon). To change what a name draws, change it here.
  */
 
 import { platformAccentVarName } from '../../../utils/platform-identity';
@@ -119,25 +129,11 @@ export const ICON_ALIASES: Readonly<Record<string, IconRef>> = {
   'message-circle': CHATS,
 };
 
-/** The icon a name draws, as data: its alias, else the generated set's icon by the naming convention (`chart-pie` →
- *  `ChartPieIcon`), else `null`. The set's names are the source of truth, so a name is never guessed. */
-export function iconRefOfName(iconName: string | null | undefined): IconRef | null {
+/** The design set's icon for a name: its alias, else the generated set by the naming convention, else `null`. */
+function iconRefOfName(iconName: string | null | undefined): IconRef | null {
   if (!iconName) return null;
   if (Object.prototype.hasOwnProperty.call(ICON_ALIASES, iconName)) return ICON_ALIASES[iconName] ?? null;
   return conventionIconRef(iconName);
-}
-
-/**
- * The icon a name DRAWS (the design variant every chip, row and image uses): `iconRefOfName`, else lucide's icon by
- * that name (`git-pull-request`), else `null` (the browser then draws the file glyph that says "no such icon"). ONE
- * chain: `resolveIcon` draws it in the browser and `loadNamedIcon` on a server, so an icon image is never missing for
- * a name the chat draws.
- */
-export function drawnIconRefOfName(iconName: string | null | undefined): IconRef | null {
-  const ref = iconRefOfName(iconName);
-  if (ref || !iconName) return ref;
-  const lucide = iconName.trim().toLowerCase();
-  return LUCIDE_ICON_NAMES.has(lucide) ? { lucide } : null;
 }
 
 /**
@@ -151,7 +147,7 @@ export function drawnIconRefOfName(iconName: string | null | undefined): IconRef
  * An icon found by its name takes the text colour of wherever it sits, like its row-mates: a few icons of the set carry
  * a default colour of their own, which is right where a component places the icon and wrong in a row of named glyphs.
  */
-export function conventionIconRef(iconName: string): IconRef | null {
+function conventionIconRef(iconName: string): IconRef | null {
   const tokens = iconName.trim().toLowerCase().replace(/_/g, '-').split('-');
   if (tokens.some(t => t.length === 0)) return null;
   const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -160,6 +156,201 @@ export function conventionIconRef(iconName: string): IconRef | null {
     `${tokens.map(t => (t === 'ai' ? 'AI' : cap(t))).join('')}Icon`,
   ]) {
     if (ICON_SET_NAMES.has(name)) return { set: name, color: 'currentColor' };
+  }
+  return null;
+}
+
+// ── The brand set ─────────────────────────────────────────────────────────────
+
+const lucide = (name: string): IconRef => ({ lucide: name });
+const fromSet = (exportName: string): IconRef => ({ set: exportName });
+
+/**
+ * The kebab-case registry, as DATA: each name states where its icon lives
+ * (lucide, or the generated set) and nothing is loaded until it is drawn. ALL
+ * lookups go through here; PascalCase aliases route through
+ * `normalizeIconKey()` first.
+ */
+export const ICON_REGISTRY: Readonly<Record<string, IconRef>> = {
+  activity: lucide('activity'),
+  banknote: lucide('banknote'),
+  bell: lucide('bell'),
+  'book-open': lucide('book-open'),
+  box: lucide('box'),
+  briefcase: lucide('briefcase'),
+  calendar: lucide('calendar'),
+  'check-square': lucide('square-check-big'),
+  'dollar-sign': lucide('dollar-sign'),
+  // For brand-vs-lucide variants the kebab key is the BRAND (most-common
+  // social-platform intent); `'<name>-lucide'` carries the lucide outline.
+  facebook: fromSet('FacebookClassicIcon'),
+  'facebook-lucide': lucide('facebook'),
+  'file-text': lucide('file-text'),
+  // `'github-lucide'` is the lucide outline glyph (used by
+  // `channel_platforms.icon_name='Github'`); `'github'` is the brand icon
+  // (used by `chat_admin_slash_commands.icon_name='github'`).
+  github: fromSet('GithubClassicIcon'),
+  'github-lucide': lucide('github'),
+  globe: lucide('globe'),
+  'graduation-cap': lucide('graduation-cap'),
+  headphones: lucide('headphones'),
+  info: lucide('info'),
+  instagram: fromSet('InstagramClassicIcon'),
+  'instagram-lucide': lucide('instagram'),
+  mail: lucide('mail'),
+  megaphone: lucide('megaphone'),
+  'message-circle': lucide('message-circle'),
+  'message-square': lucide('message-square'),
+  newspaper: lucide('newspaper'),
+  package: lucide('package'),
+  'pen-square': lucide('square-pen'),
+  phone: lucide('phone'),
+  rocket: lucide('rocket'),
+  search: lucide('search'),
+  send: lucide('send'),
+  shield: lucide('shield'),
+  star: lucide('star'),
+  table: lucide('table-properties'),
+  'trending-up': lucide('trending-up'),
+  twitter: lucide('twitter'),
+  users: lucide('users'),
+  video: lucide('video'),
+  whatsapp: fromSet('WhatsappIcon'),
+  youtube: fromSet('YoutubeClassicIcon'),
+  'youtube-lucide': lucide('youtube'),
+  // brand-only icons (no lucide variant in current use)
+  slack: fromSet('SlackIcon'),
+  clickup: fromSet('ClickupIcon'),
+  hubspot: fromSet('HubspotIcon'),
+  linkedin: fromSet('LinkedinClassicIcon'),
+  // Monochrome mark in the text colour: TikTok's brand black would vanish on dark surfaces.
+  tiktok: fromSet('TiktokIcon'),
+  x: fromSet('XLogoIcon'),
+  // The OpenFrame logo's frame takes the text colour of where it sits (its own
+  // default is invisible on dark chat surfaces); the squares stay white.
+  openframe: {
+    set: 'OpenframeLogoIcon',
+    color: 'currentColor',
+    secondaryColor: 'var(--ods-system-greys-white)',
+    ownColor: true,
+  },
+};
+
+/**
+ * PascalCase → kebab-case alias table for DB columns that store icon
+ * names as component identifiers (currently `channel_platforms.icon_name`).
+ * Keep these in sync with the actual rows in those tables.
+ */
+const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
+  // Lucide PascalCase names → kebab equivalents
+  Activity: 'activity',
+  Banknote: 'banknote',
+  Bell: 'bell',
+  BookOpen: 'book-open',
+  Box: 'box',
+  Briefcase: 'briefcase',
+  Calendar: 'calendar',
+  CheckSquare: 'check-square',
+  DollarSign: 'dollar-sign',
+  // Lucide PascalCase → the `-lucide` kebab variant (kebab default is the
+  // brand icon for the social-platform names below).
+  Facebook: 'facebook-lucide',
+  FileText: 'file-text',
+  Github: 'github-lucide',
+  Globe: 'globe',
+  GraduationCap: 'graduation-cap',
+  Headphones: 'headphones',
+  Info: 'info',
+  Instagram: 'instagram-lucide',
+  Mail: 'mail',
+  Megaphone: 'megaphone',
+  MessageCircle: 'message-circle',
+  MessageSquare: 'message-square',
+  Newspaper: 'newspaper',
+  Package: 'package',
+  PenSquare: 'pen-square',
+  Phone: 'phone',
+  Rocket: 'rocket',
+  Search: 'search',
+  Send: 'send',
+  Shield: 'shield',
+  Star: 'star',
+  TableProperties: 'table',
+  TrendingUp: 'trending-up',
+  Twitter: 'twitter',
+  Users: 'users',
+  Video: 'video',
+  Youtube: 'youtube-lucide',
+  // Brand-icon PascalCase exports → kebab (kebab default is the brand)
+  SlackIcon: 'slack',
+  GitHubIcon: 'github',
+  ClickUpIcon: 'clickup',
+  HubspotIcon: 'hubspot',
+  LinkedInIcon: 'linkedin',
+  // `channel_platforms.icon_name` stores the names these marks were first exported under.
+  FacebookIcon: 'facebook',
+  InstagramIcon: 'instagram',
+  FacebookClassicIcon: 'facebook',
+  InstagramClassicIcon: 'instagram',
+  YouTubeIcon: 'youtube',
+  WhatsAppIcon: 'whatsapp',
+  XLogo: 'x',
+  TiktokIcon: 'tiktok',
+  TikTokIcon: 'tiktok',
+  OpenFrameLogo: 'openframe',
+};
+
+/**
+ * Normalize an icon key to the registry's canonical kebab-case form.
+ * Accepts PascalCase variants (from `channel_platforms.icon_name`-style
+ * columns) and passes kebab-case keys through unchanged.
+ */
+export function normalizeIconKey(key: string): string {
+  return PASCAL_TO_KEBAB_ALIASES[key] ?? key;
+}
+
+// ── The one answer ────────────────────────────────────────────────────────────
+
+/** Which of the two icon sets a surface draws from (see the header). */
+export type IconVariant = 'design' | 'brand';
+
+/**
+ * THE icon a name draws, as data, or `null` when no set holds it (the drawer then shows its own fallback glyph).
+ * `lucide: false` keeps to the design set (a caller that draws nothing for an unknown name, `findIcon`).
+ */
+export function iconRefFor(
+  iconName: string | null | undefined,
+  { variant = 'design', lucide: withLucide = true }: { variant?: IconVariant; lucide?: boolean } = {},
+): IconRef | null {
+  if (!iconName) return null;
+  if (variant === 'brand') {
+    const key = normalizeIconKey(iconName);
+    if (Object.prototype.hasOwnProperty.call(ICON_REGISTRY, key)) return ICON_REGISTRY[key] ?? null;
+    return iconRefOfName(iconName);
+  }
+  const design = iconRefOfName(iconName);
+  if (design || !withLucide) return design;
+  const name = iconName.trim().toLowerCase();
+  return LUCIDE_ICON_NAMES.has(name) ? { lucide: name } : null;
+}
+
+/**
+ * A company's or product's logo by NAME ("Google Cloud Platform", "Azure AD"), or `null`: the set's `<Brand>LogoIcon`
+ * convention, never a list, so a logo added to `icons-v2-generated/brand-logos` is found with no code change. The
+ * name's word runs are tried longest first ("Azure AD" → `AzureAdLogoIcon` before `AzureLogoIcon`); only `…LogoIcon`
+ * names count, so "Cloud" never resolves to a generic cloud glyph.
+ */
+export function brandLogoRefForName(name: string | null | undefined): IconRef | null {
+  const words = (name ?? '').split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const pascal = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  for (let length = Math.min(3, words.length); length >= 1; length -= 1) {
+    for (let start = 0; start + length <= words.length; start += 1) {
+      const exportName = `${words
+        .slice(start, start + length)
+        .map(pascal)
+        .join('')}LogoIcon`;
+      if (ICON_SET_NAMES.has(exportName)) return { set: exportName };
+    }
   }
   return null;
 }

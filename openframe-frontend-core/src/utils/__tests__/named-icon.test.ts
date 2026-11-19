@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { drawnIconRefOfName, iconRefOfName } from '../../components/chat/utils/icon-refs';
+import { iconRefFor } from '../../components/chat/utils/icon-refs';
 import { entityIconImages, loadNamedIcon, type NamedIconProps } from '../named-icon';
 
 describe('loadNamedIcon', () => {
@@ -10,7 +10,7 @@ describe('loadNamedIcon', () => {
   });
 
   it('reads aliases and keeps a mark one colour', async () => {
-    expect(iconRefOfName('openframe')?.set).toBe('OpenframeLogoIcon');
+    expect(iconRefFor('openframe')?.set).toBe('OpenframeLogoIcon');
     expect((await loadNamedIcon('openframe', { size: 16, color: '#fafafa' }))?.props).toEqual({
       size: 16,
       color: '#fafafa',
@@ -62,7 +62,7 @@ describe('entityIconImages', () => {
 
 describe('the one chain of what a name draws', () => {
   it('draws a name only lucide holds, as its plain svg tree, on a server too', async () => {
-    expect(drawnIconRefOfName('git-pull-request')).toEqual({ lucide: 'git-pull-request' });
+    expect(iconRefFor('git-pull-request')).toEqual({ lucide: 'git-pull-request' });
     const loaded = await loadNamedIcon('git-pull-request', { size: 96, color: '#212121' });
     // A loaded lucide icon is a function component (it draws its plain svg tree).
     if (!loaded) throw new Error('git-pull-request did not load');
@@ -74,7 +74,7 @@ describe('the one chain of what a name draws', () => {
   });
 
   it('keeps the design set first and draws nothing for an unknown name', () => {
-    expect(drawnIconRefOfName('timer')?.set).toBe('TimerIcon');
-    expect(drawnIconRefOfName('no-such-icon-at-all')).toBeNull();
+    expect(iconRefFor('timer')?.set).toBe('TimerIcon');
+    expect(iconRefFor('no-such-icon-at-all')).toBeNull();
   });
 });
