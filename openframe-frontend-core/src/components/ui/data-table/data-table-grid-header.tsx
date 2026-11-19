@@ -9,6 +9,7 @@ import { InfoHint } from '../info-hint';
 import { useLoadingScope } from '../loading-scope';
 import { useDataTableContext } from './data-table';
 import { DataTableColumnFilter } from './data-table-column-filter';
+import { DataTableDateFilterHeader } from './data-table-date-filter';
 import {
   GRID_PIN_LEFT_VAR,
   GRID_PIN_RIGHT_VAR,
@@ -159,8 +160,10 @@ function GridHeaderCell({ column, header, sort, onSortChange, loading }: GridHea
   }
 
   const meta = header.column.columnDef.meta;
-  const filter = meta?.filter;
-  const canSort = meta?.sortable === true && !filter;
+  // One control per header: the date menu (it sorts and filters), else the filter, else the sort.
+  const dateFilter = meta?.dateFilter;
+  const filter = dateFilter ? undefined : meta?.filter;
+  const canSort = meta?.sortable === true && !filter && !dateFilter;
   const sortDir: false | 'asc' | 'desc' = sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false;
   const label = resolveHeaderLabel(header);
   const hint = meta?.hint ? <InfoHint label={label}>{meta.hint}</InfoHint> : null;
@@ -179,7 +182,12 @@ function GridHeaderCell({ column, header, sort, onSortChange, loading }: GridHea
       data-grid-col={column.id}
       onClick={canSort ? () => onSortChange?.(column.id) : undefined}
     >
-      {filter ? (
+      {dateFilter ? (
+        <>
+          <DataTableDateFilterHeader filter={dateFilter} label={label} align={column.align} />
+          {hint}
+        </>
+      ) : filter ? (
         <>
           <DataTableColumnFilter
             variant="grid"

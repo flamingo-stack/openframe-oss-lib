@@ -20,6 +20,7 @@ Go through its column definitions:
 | `meta.gridCell` | The cell's form in the grid: ONE line, normally a `DataTable.Cell` (leading icon / picture / avatar, text, tag, secondary text, trailing mark). When the column is narrow the text gives way first; a long secondary text (an email, a reason) is cut once the text is down to its first 9 characters, a short one and a tag never are. `tone="secondary"` mutes the text of a row whose subject is gone. `cell` stays the card form. A column without `gridCell` draws `cell` clipped to one line. |
 | Row actions as action columns | One 56px column per action, pinned right, never hidden, not in the gear menu. Use `actionColumn({ id, cell })`. If the same columns also serve a cards table that hides the action from `md` (`hideAt: 'md'`), keep the column by hand instead: `size: GRID_ACTION_COLUMN_SIZE` and `meta: { gridKind: 'action', hideAt: 'md', ... }`. `actionColumn()` sets no `hideAt`, so it would add the action to that cards table. |
 | `selectionColumn()` first, only with a bulk action | The checkbox column: pinned left, selection in the table's `rowSelection` state. A cards table does not draw it. |
+| `meta.dateFilter` on a column that sorts and filters by date | The header draws the label and a calendar and opens the date menu (a sort direction and a range, committed on Apply); a set range or a direction that is not the list's own shows as applied. Pass the applied `sortDirection` and `range` and an `onApply`, and give the column a text `header`: a control passed as the header node is drawn as it is, with a card header's look. The cards layout does not read `meta.dateFilter`. |
 | `meta.label` in sentence case | The column's name in the gear menu ("Last login"). Without it the menu shows the header text, or the column id when the header is a node. |
 | `loading` on `DataTable.Header` | Pass it what the body gets. A loading table names no column: each data header cell is a bar with no control, because the columns a loading table draws are not always the ones it loads with (a column behind a flag still being read, the viewer's saved order). A table that loads by a page loading scope needs nothing. |
 | `settings.storageKey`, unique per table | Names the saved layout (hidden columns, order, widths) in the browser's storage. Two tables with one key share a layout. `settings={{}}` gives the gear with nothing kept. |
@@ -61,6 +62,7 @@ With `DataTable` directly, the results count goes in `<DataTable.Meta>`, a direc
   hides columns in the gear menu instead.
 - `DataTable.Header`'s `rightSlot`. The count sits above the table in `DataTable.Meta`.
 - `stickyHeader` and `stickyHeaderOffset` once `maxHeight` is set: the header is sticky inside the table's own viewport.
+- Sort and `meta.filter` on a column with `meta.dateFilter`: the header draws the date menu, which owns both.
 - Sort on a column that also has a filter: the header draws the filter.
 
 ## Height
@@ -79,8 +81,6 @@ needs the checklist above before a host asks it for the grid:
 
 | Table | Still to do |
 |---|---|
-| `LogsTableView` | `size` / `minSize`, one-line `gridCell` for the two-line source and description cells, the row buttons (quick view, copy, open) as action columns, `meta.label` |
-| `PoliciesTable` | `size` / `minSize`, `gridCell` for the name + description cell and the status with its note, `actions` and `open` as action columns |
 | `ScriptsTable`, `ScriptSchedulesTable`, `ScriptExecutionsTable` | `size` / `minSize` in `scripts-table-columns.ts` (their `width` classes are card-only), `gridCell` for the name + description, date + time and initiator cells, `actions` and `open` as action columns |
 | `KnowledgeBaseTableBody` | `size` / `minSize`, `gridCell` for the name cell (icon, name, status, summary), `open` and the host's `actionsColumn` as action columns |
 | `DeviceSelector` | `size` / `minSize`, `gridCell` for the device and customer cells, its add / remove column as an action column |
@@ -88,6 +88,13 @@ needs the checklist above before a host asks it for the grid:
 `DevicesTableBody` (`features/devices/devices-table-columns.tsx`) is the worked example: every column has a `size`, a
 `minSize` and a `gridCell`, its open column is kept by hand, and it adds `selectionColumn()` itself when the host
 passes `selectable` (off by default: the devices list has no bulk action yet).
+
+`PoliciesTable` and `LogsTableView` are ready too. Both put a card row's two lines on one with
+`GridTextWithDetailCell` (`features/feature-table-grid-cells.tsx`): the subject (a policy's name, a log's time, a
+device) keeps its width and the detail after it (the description, the log id, the customer) is the part cut. Use it
+where the second line is long; `DataTable.Cell`'s `secondary` is for a short one, which it keeps whole. `LogsTableView`
+draws its Log ID header as the date header from its `dateFilter` prop, and takes the host's copy button in its grid
+form (`<LogCopyIconButton grid />`).
 
 `TenantsTableView` (`features/cloud-tenants`, both variants) is ready too: its one-line cells are in
 `tenant-grid-cells.tsx`, and its open column is kept by hand because the card table hides it below `md` in one variant.
