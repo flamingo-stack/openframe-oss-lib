@@ -16,6 +16,7 @@ import com.openframe.stream.handler.MessageHandler;
 import com.openframe.stream.handler.software.FleetHostResolver.FleetHostRef;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -44,6 +45,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 @ConditionalOnProperty(name = "openframe.fleet.software-cdc.enabled", havingValue = "true")
+@RequiredArgsConstructor
 @Slf4j
 public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
@@ -64,6 +66,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
+    @Value("${openframe.fleet.software-cdc.skipped-hosts}")
     private final Set<Long> skippedHosts;
 
     private final Cache<Long, Boolean> snapshotReconciledHosts = Caffeine.newBuilder()
@@ -80,18 +83,6 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             .expireAfterWrite(HOST_REFRESH_WINDOW)
             .maximumSize(HOST_REFRESH_CAPACITY)
             .build();
-
-    public DeviceSoftwareHandler(FleetHostResolver fleetHostResolver,
-                                 FleetHostSoftwareCache fleetHostSoftwareCache,
-                                 DeviceSoftwareRepository deviceSoftwareRepository,
-                                 SoftwareProjectionTrigger projectionTrigger,
-                                 @Value("${openframe.fleet.software-cdc.skipped-hosts}") Set<Long> skippedHosts) {
-        this.fleetHostResolver = fleetHostResolver;
-        this.fleetHostSoftwareCache = fleetHostSoftwareCache;
-        this.deviceSoftwareRepository = deviceSoftwareRepository;
-        this.projectionTrigger = projectionTrigger;
-        this.skippedHosts = skippedHosts;
-    }
 
     @Override
     public EventHandlerType getType() {
