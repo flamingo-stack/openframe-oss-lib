@@ -5,14 +5,15 @@
  *   - `entityIconImages(icon, iconsUrl)`: the value as MCP's standard `Icon`s (`src`, `mimeType`, `sizes`, `theme`). An
  *     upload is its own image; a library name is the host's icon endpoint (`EndpointsRuntime.iconsUrl`, the hub's
  *     `/api/icons`), `<iconsUrl>/<name>?theme=light|dark`, once per host theme.
- *   - `loadNamedIcon(name, …)`: what that endpoint draws, the chat's own icon for the name (`iconRefOfName`'s rules),
+ *   - `loadNamedIcon(name, …)`: what that endpoint draws, the chat's own icon for the name (`iconRefFor`, the one rule),
  *     loaded on a server with the colours its name states.
  *
- * No React import and no client module: the icon modules are plain function components.
+ * No React import and no client module: the generated icons are plain function components, and a lucide icon is drawn
+ * as its plain `<svg>` tree (`hostTree`).
  */
 import type { ComponentType } from 'react';
 import type { IconRef } from '../components/chat/utils/icon-loading';
-import { iconRefOfName } from '../components/chat/utils/icon-refs';
+import { iconRefFor } from '../components/chat/utils/icon-refs';
 import type { EntityIconValue } from '../components/icon-display';
 import type { LoadedIconProps } from '../components/icons-v2-generated/icon-loaders';
 
@@ -35,13 +36,28 @@ export async function loadNamedIcon(
   iconName: string | null | undefined,
   { size, color }: { size: number; color: string },
 ): Promise<LoadedNamedIcon | null> {
-  const ref = iconRefOfName(iconName);
-  if (!ref?.set) return null;
-  const { ICON_LOADERS } = await import('../components/icons-v2-generated/icon-loaders');
-  const loader = ICON_LOADERS[ref.set];
-  if (!loader) return null;
-  const Icon = (await loader()).default as ComponentType<NamedIconProps>;
-  return { Icon, props: propsOf(ref, size, color) };
+  const ref = iconRefFor(iconName);
+  if (ref?.set) {
+    const { ICON_LOADERS } = await import('../components/icons-v2-generated/icon-loaders');
+    const loader = ICON_LOADERS[ref.set];
+    if (!loader) return null;
+    const Icon = (await loader()).default as ComponentType<NamedIconProps>;
+    return { Icon, props: propsOf(ref, size, color) };
+  }
+  if (ref?.lucide) {
+    const loaders = (await import('lucide-react/dynamicIconImports')).default as unknown as Record<
+      string,
+      (() => Promise<{ default: unknown }>) | undefined
+    >;
+    const loader = loaders[ref.lucide];
+    if (!loader) return null;
+    const Lucide = (await loader()).default;
+    // A lucide icon is a `forwardRef`, which a server image renderer does not call: draw its plain `<svg>` tree.
+    const Icon: ComponentType<NamedIconProps> = ({ size: edge, color: stroke }) =>
+      hostTree({ type: Lucide, props: { size: edge, color: stroke } });
+    return { Icon, props: { size, color } };
+  }
+  return null;
 }
 
 /** A colour as an image can draw it: a CSS value (`var(...)`, `currentColor`) becomes the caller's colour. */
@@ -114,4 +130,31 @@ export function entityIconImages(icon: EntityIconValue | null | undefined, icons
     sizes,
     theme,
   }));
+}
+
+type Node = { $$typeof?: symbol; type?: unknown; props?: Record<string, unknown> } | string | number | null | undefined;
+
+/** An element tree with every component called down to its host tags (`<svg>`, `<path>`): what an image renderer that
+ *  does not call `forwardRef` or `memo` components can draw. Only for icon trees, which have no hooks. */
+function hostTree(node: Node): never {
+  return resolveNode(node) as never;
+}
+
+function resolveNode(node: Node): Node {
+  if (!node || typeof node !== 'object') return node;
+  if (Array.isArray(node)) return node.map(resolveNode) as never;
+  const { type, props = {} } = node;
+  if (typeof type === 'function') return resolveNode((type as (p: unknown) => Node)(props));
+  if (type && typeof type === 'object') {
+    const wrapped = type as { render?: (p: unknown, r: null) => Node; type?: unknown };
+    if (wrapped.render) return resolveNode(wrapped.render(props, null));
+    if (wrapped.type) return resolveNode({ ...node, type: wrapped.type });
+  }
+  const children = props.children as Node | Node[] | undefined;
+  return children === undefined
+    ? node
+    : {
+        ...node,
+        props: { ...props, children: Array.isArray(children) ? children.map(resolveNode) : resolveNode(children) },
+      };
 }

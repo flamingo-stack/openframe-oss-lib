@@ -1,121 +1,37 @@
 /**
- * Resolve the empty-state onboarding-card icon from a backend
- * `SlashCommandSummary.iconName`.
- *
- * Primary keys match the production `/api/docs/commands` contract
- * (multi-platform-hub) — short, source-system-style identifiers:
- *
- *   - `clickup` → ClickUp brand glyph (mono grey)
- *   - `slack`   → Slack brand glyph (mono grey)
- *   - `hubspot` → HubSpot brand glyph (mono grey)
- *   - `github`  → GitHub brand glyph
- *   - `openframe` → OpenFrame logo
- *   - `newspaper` / `rocket` / `briefcase` / `graduation-cap`
- *     / `video` / `calendar` / `headphones` → v2 generic glyphs
- *     mapped to the closest available icon in `icons-v2-generated`
- *
- * Figma-canonical keys (`clickup-logo-grey`, `logo-openframe`,
- * `rocket-02`, …) and a handful of generic v2 fall-throughs
- * (`search`, `ticket`, `bug`, …) are kept as aliases so the
- * Storybook fixtures and any older feed entries still resolve.
- *
- * Any `iconName` NOT in the curated map below is resolved generically
- * against the entire `icons-v2-generated` set by naming convention
- * (`chart-pie` → `ChartPieIcon`, `bank` → `BankIcon`, …) — see
- * `resolveFromLibrary`. So the full icon library is supported, and the
- * curated map only exists for aliases that don't map 1:1. Keys that
- * name no real icon (and `null`) fall back to `FileIcon` so a
- * misconfigured row still renders.
+ * The design variant DRAWN, as components: `resolveIcon` (every chip, row and picker, through `EntityIcon`),
+ * `findIcon` and `brandLogoForName`, plus the admin picker's curated list (`ICON_OPTIONS`). What a name draws is
+ * decided in `icon-refs` (`iconRefFor`); nothing here decides it.
  */
 
-import { iconFromSet, iconOf, lucideIcon, setIcon, type IconComponent } from './icon-loading';
-import { ICON_ALIASES, conventionIconRef } from './icon-refs';
-import { getIconComponent, normalizeIconKey, registryIcon } from './icon-registry';
+import { iconOf, lucideIcon, setIcon, type IconComponent } from './icon-loading';
+import { brandLogoRefForName, iconRefFor } from './icon-refs';
 
-/** The icon an alias names, or `undefined` for a name that is not an alias. */
-function aliasIcon(iconName: string): IconComponent | undefined {
-  if (!Object.prototype.hasOwnProperty.call(ICON_ALIASES, iconName)) return undefined;
-  return iconOf(ICON_ALIASES[iconName]) ?? undefined;
-}
-
-/** The generated set's icon by the naming convention (`conventionIconRef`, which states the rule). */
-function resolveFromLibrary(iconName: string): IconComponent | undefined {
-  const ref = conventionIconRef(iconName);
-  return ref ? (iconOf(ref) ?? undefined) : undefined;
-}
-
-/**
- * THE brand logo for a company or product NAME ("Google Cloud Platform",
- * "Anthropic", "Azure AD"), or `null` when the icon set has no mark for it —
- * the caller keeps its own fallback (initials). Dynamic by the icon set's
- * naming convention, never a list: a brand's mark is `<Brand>LogoIcon`, so a
- * logo added to `icons-v2-generated/brand-logos` is found with no code change.
- * The name's word runs are tried longest first ("Azure AD" → `AzureAdLogoIcon`
- * before `AzureLogoIcon`; "Google Workspace" → `GoogleLogoIcon`). Only
- * `…LogoIcon` names count, so "Cloud" never resolves to a generic cloud glyph.
- */
+/** A company's or product's logo by name as a component, or `null` (the rule: `brandLogoRefForName`). */
 export function brandLogoForName(name: string | null | undefined): IconComponent | null {
-  const words = (name ?? '').split(/[^A-Za-z0-9]+/).filter(Boolean);
-  const pascal = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-  for (let length = Math.min(3, words.length); length >= 1; length -= 1) {
-    for (let start = 0; start + length <= words.length; start += 1) {
-      const Logo = iconFromSet(
-        `${words
-          .slice(start, start + length)
-          .map(pascal)
-          .join('')}LogoIcon`,
-      );
-      if (Logo) return Logo;
-    }
-  }
-  return null;
+  const ref = brandLogoRefForName(name);
+  return ref ? iconOf(ref) : null;
 }
 
 /**
- * THE single icon-name → component resolver for the whole app. Two variants —
- * one entry point, no duplicated resolver machinery:
- *
- *   • `'design'` (DEFAULT): the icons-v2 design set — chat chips, slash
- *      autocomplete, announcement bar, AI-agent icons, the admin picker.
- *      Order: curated `ICON_ALIASES` (brand-grey logos, tinted OpenFrame,
- *      semantic aliases) → generic `icons-v2-generated` by naming convention →
- *      `FileIcon`.
- *   • `'brand'`: the brand/social set (lucide + brand-colored logos) via the
- *      registry resolver `getIconComponent` (PascalCase-normalised) — social
- *      links, source-row CTAs.
- *
- * The two glyph SETS differ on purpose (a grey design 'slack' vs a brand-color
- * social 'slack'); this resolver is the ONE place that owns both. `getIconComponent`
- * / `getDynamicIcon` remain as the brand-variant + sized-brand helpers.
+ * A name's icon as a component, of the design set (default) or the brand set: exactly what `iconRefFor` answers.
+ * A name no set holds draws a fallback glyph (design: the file icon; brand: `file-text`), so a chip is never empty.
  */
 export function resolveIcon(
   iconName: string | null | undefined,
   opts?: { variant?: 'design' | 'brand' },
 ): IconComponent {
-  if (opts?.variant === 'brand') {
-    // The brand set first. A name it does not hold is drawn from the design
-    // set, so a source whose icon lives only there is never shown as the file
-    // glyph; a name neither holds keeps the registry's own fallback.
-    const brand = iconName ? registryIcon(normalizeIconKey(iconName)) : undefined;
-    if (brand) return brand;
-    const design = iconName ? (aliasIcon(iconName) ?? resolveFromLibrary(iconName)) : undefined;
-    return design ?? getIconComponent(iconName);
-  }
-  if (!iconName) return setIcon('FileIcon');
-  // A stored name the set does not hold is still drawn when lucide has an icon by that name
-  // (`git-pull-request`), before the file glyph that says "no such icon".
-  return (
-    aliasIcon(iconName) ??
-    resolveFromLibrary(iconName) ??
-    lucideIcon(iconName.trim().toLowerCase()) ??
-    setIcon('FileIcon')
-  );
+  const variant = opts?.variant ?? 'design';
+  const ref = iconRefFor(iconName, { variant });
+  const icon = ref ? iconOf(ref) : null;
+  if (icon) return icon;
+  return variant === 'brand' ? (lucideIcon('file-text') as IconComponent) : setIcon('FileIcon');
 }
 
-/** The icon a name resolves to, or `null` when the set holds none: for a caller that draws nothing in that case (`resolveIcon` draws a fallback glyph). */
+/** A name's icon of the design set, or `null` when it has none: for a caller that draws nothing then. */
 export function findIcon(iconName: string | null | undefined): IconComponent | null {
-  if (!iconName) return null;
-  return aliasIcon(iconName) ?? resolveFromLibrary(iconName) ?? null;
+  const ref = iconRefFor(iconName, { lucide: false });
+  return ref ? iconOf(ref) : null;
 }
 
 /** One selectable icon in the admin slash-command picker. */
