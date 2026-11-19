@@ -1,5 +1,6 @@
 package com.openframe.audit;
 
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.core.dto.HasUserErrors;
 import com.openframe.core.exception.ForbiddenException;
 import com.openframe.core.exception.InternalException;
@@ -51,7 +52,7 @@ class AuditOutcomeResolverTest {
 
     @BeforeEach
     void setUp() {
-        resolver = new AuditOutcomeResolver(List.of(), exceptionHandlerStatuses);
+        resolver = new AuditOutcomeResolver(List.of(), exceptionHandlerStatuses, new ObjectMapper());
     }
 
     @Test
@@ -156,7 +157,7 @@ class AuditOutcomeResolverTest {
         handledAsThrown(denied);
         when(failureStatus.statusOf(denied)).thenReturn(Optional.of(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThat(new AuditOutcomeResolver(List.of(failureStatus), exceptionHandlerStatuses).ofFailure(denied))
+        assertThat(new AuditOutcomeResolver(List.of(failureStatus), exceptionHandlerStatuses, new ObjectMapper()).ofFailure(denied))
                 .isEqualTo(new ActionOutcome(AuditOutcome.FAILURE, "AccessDeniedException"));
     }
 
@@ -300,7 +301,7 @@ class AuditOutcomeResolverTest {
         handledAsThrown(failure);
         when(failureStatus.statusOf(failure)).thenReturn(Optional.of(HttpStatus.ACCEPTED));
 
-        assertThat(new AuditOutcomeResolver(List.of(failureStatus), exceptionHandlerStatuses).ofFailure(failure))
+        assertThat(new AuditOutcomeResolver(List.of(failureStatus), exceptionHandlerStatuses, new ObjectMapper()).ofFailure(failure))
                 .isEqualTo(new ActionOutcome(AuditOutcome.SUCCESS, "Directory sync pending"));
         verify(exceptionHandlerStatuses, never()).statusOf(any());
     }
@@ -312,7 +313,7 @@ class AuditOutcomeResolverTest {
         when(failureStatus.statusOf(failure)).thenReturn(Optional.empty());
         when(exceptionHandlerStatuses.statusOf(failure)).thenReturn(Optional.of(HttpStatus.CONFLICT));
 
-        assertThat(new AuditOutcomeResolver(List.of(failureStatus), exceptionHandlerStatuses).ofFailure(failure))
+        assertThat(new AuditOutcomeResolver(List.of(failureStatus), exceptionHandlerStatuses, new ObjectMapper()).ofFailure(failure))
                 .isEqualTo(new ActionOutcome(AuditOutcome.REFUSED, "This domain is already in use"));
     }
 
