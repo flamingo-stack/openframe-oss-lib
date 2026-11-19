@@ -89,6 +89,8 @@ fn an_unreadable_file_means_every_feature_off() {
             String::from_utf8_lossy(contents)
         );
         assert_eq!(service.applied_sequence(MACHINE), 0);
+        assert!(!path.exists());
+        assert!(path.with_file_name("feature_flags.json.corrupt").exists());
     }
 }
 

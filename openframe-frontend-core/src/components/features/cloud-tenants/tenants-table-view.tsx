@@ -11,10 +11,13 @@ import {
   DataTable,
   type DataTableFilterOption,
   dataTableLoadingRows,
+  GRID_ACTION_COLUMN_SIZE,
+  GRID_MIN_WIDTH,
   type Row,
   useDataTable,
 } from '../../ui/data-table';
 import { useLoadingScope } from '../../ui/loading-scope';
+import { GRID_ACTION_BUTTON_CLASS } from '../feature-table-grid-cells';
 import { dataTableLayoutProps, type FeatureTableLayoutProps } from '../feature-table-layout';
 import {
   SingleCustomerTenantsTableView,
@@ -23,6 +26,12 @@ import {
 import { TenantAccessCell } from './tenant-access-cell';
 import { TenantCell } from './tenant-cell';
 import { TenantCustomerCell } from './tenant-customer-cell';
+import {
+  TenantAccessGridCell,
+  TenantCustomersGridCell,
+  TenantGridCell,
+  TenantLicensesGridCell,
+} from './tenant-grid-cells';
 import { TenantLicensesCell } from './tenant-licenses-cell';
 import type { MultiCustomerTenantRow } from './tenant-row';
 import { TENANT_COLUMNS, type TenantsTableColumn } from './tenants-table-columns';
@@ -41,7 +50,7 @@ const loadingTenant = (id: string): MultiCustomerTenantRow => ({
 });
 
 /** The row's open-in-new-tab button: static chrome, drawn real and inert while the row is read. */
-function OpenTenantButton({ href, name }: { href: string; name: string }) {
+function OpenTenantButton({ href, name, grid = false }: { href: string; name: string; grid?: boolean }) {
   const loading = useLoadingScope();
   return (
     // The row itself is the details link; a nested `<a>` is invalid, so this opens the same href.
@@ -49,11 +58,12 @@ function OpenTenantButton({ href, name }: { href: string; name: string }) {
       <Button
         onClick={loading ? undefined : openInNewTab(href)}
         disabled={loading}
-        variant="outline"
+        // In the grid the action is a bare 40px icon button: the cell is its frame.
+        variant={grid ? 'transparent' : 'outline'}
         size="icon"
         leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
         aria-label={`Open ${name} in new tab`}
-        className="bg-ods-card"
+        className={grid ? GRID_ACTION_BUTTON_CLASS : 'bg-ods-card'}
       />
     </div>
   );
@@ -145,6 +155,8 @@ function MultiCustomerTenantsTableView({
       const options = filterOptions?.[id];
       return options ? { filter: { options, pending: filtersPending } } : {};
     };
+    // Each data column states what the grid layout reads beside the card layout's `meta.width`: a `size`, a `minSize`
+    // where the cell holds more than text, a one-line `gridCell` and a `label` for the settings menu.
     return [
       {
         id: TENANT_COLUMNS.tenant.id,
@@ -153,7 +165,16 @@ function MultiCustomerTenantsTableView({
           <TenantCell provider={row.original.provider} name={row.original.name} domain={row.original.domain} />
         ),
         enableSorting: false,
-        meta: { ...columnMeta(TENANT_COLUMNS.tenant), ...funnel('tenant') },
+        size: 320,
+        minSize: GRID_MIN_WIDTH.icon,
+        meta: {
+          ...columnMeta(TENANT_COLUMNS.tenant),
+          ...funnel('tenant'),
+          label: 'Tenant',
+          gridCell: ({ row }) => (
+            <TenantGridCell provider={row.original.provider} name={row.original.name} domain={row.original.domain} />
+          ),
+        },
       },
       {
         id: TENANT_COLUMNS.customer.id,
@@ -167,7 +188,21 @@ function MultiCustomerTenantsTableView({
           />
         ),
         enableSorting: false,
-        meta: { ...columnMeta(TENANT_COLUMNS.customer), ...funnel('customer') },
+        size: 300,
+        minSize: GRID_MIN_WIDTH.media,
+        meta: {
+          ...columnMeta(TENANT_COLUMNS.customer),
+          ...funnel('customer'),
+          label: 'Customers',
+          gridCell: ({ row }) => (
+            <TenantCustomersGridCell
+              customers={row.original.customers}
+              userCount={row.original.userCount}
+              unattributedUserCount={row.original.unattributedUserCount}
+              neverRead={row.original.lastReadAt == null && row.original.userCount == null}
+            />
+          ),
+        },
       },
       {
         id: TENANT_COLUMNS.licenses.id,
@@ -176,7 +211,13 @@ function MultiCustomerTenantsTableView({
           <TenantLicensesCell licenses={row.original.licenses} />
         ),
         enableSorting: false,
-        meta: { ...columnMeta(TENANT_COLUMNS.licenses), ...funnel('licenses') },
+        size: 200,
+        meta: {
+          ...columnMeta(TENANT_COLUMNS.licenses),
+          ...funnel('licenses'),
+          label: 'Licences',
+          gridCell: ({ row }) => <TenantLicensesGridCell licenses={row.original.licenses} />,
+        },
       },
       {
         id: TENANT_COLUMNS.access.id,
@@ -190,7 +231,20 @@ function MultiCustomerTenantsTableView({
           />
         ),
         enableSorting: false,
-        meta: { ...columnMeta(TENANT_COLUMNS.access), ...funnel('access') },
+        size: 260,
+        meta: {
+          ...columnMeta(TENANT_COLUMNS.access),
+          ...funnel('access'),
+          label: 'Access',
+          gridCell: ({ row }) => (
+            <TenantAccessGridCell
+              accessState={row.original.accessState}
+              lastReadAt={row.original.lastReadAt}
+              syncPaused={row.original.syncPaused}
+              now={now}
+            />
+          ),
+        },
       },
       {
         id: TENANT_COLUMNS.open.id,
@@ -198,7 +252,13 @@ function MultiCustomerTenantsTableView({
           <OpenTenantButton href={getHref(row.original)} name={row.original.name} />
         ),
         enableSorting: false,
-        meta: columnMeta(TENANT_COLUMNS.open),
+        // An action column of the grid, kept by hand: `actionColumn()` would replace the card layout's `meta`.
+        size: GRID_ACTION_COLUMN_SIZE,
+        meta: {
+          ...columnMeta(TENANT_COLUMNS.open),
+          gridKind: 'action',
+          gridCell: ({ row }) => <OpenTenantButton href={getHref(row.original)} name={row.original.name} grid />,
+        },
       },
     ];
   }, [getHref, now, filterOptions, filtersPending]);

@@ -66,6 +66,11 @@ public class MongoRecreationTracker implements RecreationTracker {
         repository.deleteByCreatedAtBefore(cutoff());
     }
 
+    @Override
+    public boolean hasRecentRecreation(String baseName) {
+        return repository.countByBaseNameAndCreatedAtAfter(baseName, cutoff()) > 0;
+    }
+
     private Instant cutoff() {
         return Instant.now().minus(WINDOW);
     }
