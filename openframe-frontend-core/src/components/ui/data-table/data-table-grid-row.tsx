@@ -8,7 +8,14 @@ import { cn } from '../../../utils/cn';
 import { isOwnClick } from '../../../utils/own-click';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { loadingItemProps, useLoadingScope } from '../loading-scope';
-import { GRID_ROW_CLASS, gridCellClass, gridCellStyle, type GridColumn, type GridLayout } from './data-table-grid';
+import {
+  GRID_ROW_CLASS,
+  GRID_SUB_ROW_CLASS,
+  gridCellClass,
+  gridCellStyle,
+  type GridColumn,
+  type GridLayout,
+} from './data-table-grid';
 import { cancelAfterReactHandlers, isRowLinkControlClick } from './row-link-click';
 /**
  * The selection cell. Its checkbox skips its toggle on a click that arrives already cancelled, so the cell cancels the
@@ -34,7 +41,10 @@ export interface DataTableGridRowProps<T> {
    * the selection changes, so without this prop a selection cell would not repaint.
    */
   selected?: boolean;
-  /** Content drawn below the cells, as wide as the row. */
+  /**
+   * Content drawn below the cells, as wide as the visible table: it wraps at the scroll viewport's width and stays in
+   * view while the cells scroll sideways (`GRID_SUB_ROW_CLASS`).
+   */
   subRow?: ReactNode;
   /** A placeholder row the host put in the table while it loads: it draws its real cells in the loading scope. */
   drawsCells?: boolean;
@@ -164,7 +174,9 @@ function DataTableGridRowImpl<T>({
       ) : (
         <div className={cn(rowClassName, interactiveClassName)}>{cells}</div>
       )}
-      <div className="border-b border-ods-border bg-ods-card">{subRow}</div>
+      <div data-grid-sub-row className={cn(GRID_SUB_ROW_CLASS, 'border-b border-ods-border bg-ods-card')}>
+        {subRow}
+      </div>
     </div>
   );
 }

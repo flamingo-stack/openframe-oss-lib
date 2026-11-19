@@ -228,6 +228,30 @@ export const GRID_ROOT_CLASS = '[--dt-pin-l:0px] lg:content-md:[--dt-pin-l:var(-
 /** One grid row, header or body: as wide as its columns, never narrower than the viewport. */
 export const GRID_ROW_CLASS = 'flex w-max min-w-full';
 
+/**
+ * The scroll viewport's own width (its `clientWidth`) in px, written on the viewport element by its controller: the
+ * one length a sub-row needs that CSS cannot name, because a `%` inside the rows is a share of the COLUMNS' width.
+ * Unset until the viewport is measured (a server render).
+ */
+export const GRID_VIEWPORT_WIDTH_VAR = '--dt-viewport-w';
+
+/**
+ * A row's sub-row (`renderSubRow`): as wide as the VISIBLE table, whatever its own content and the columns add up to.
+ * - `w-0` with a `min-width` in `%`: it adds nothing to the row's `w-max` width (a `%` min-width counts as 0 there),
+ *   so a long line in it wraps and never widens the table.
+ * - the `min-width` is the viewport's width (`GRID_VIEWPORT_WIDTH_VAR`), and never more than the row (`100%`): where
+ *   the columns are wider than the viewport the sub-row is still one viewport wide, and `sticky left-0` keeps it in
+ *   view while the cells scroll. Before the viewport is measured it is as wide as the row.
+ * - `z-[3]`: over the horizontal gradients. They shade columns that scroll, and the sub-row does not.
+ * - `overflow-x-clip` and `break-words`: a word longer than the viewport breaks, and content the host forbids to
+ *   wrap is cut at the viewport's edge (the scroller would cut it there anyway) instead of widening the table.
+ *
+ * The table's own layers, bottom to top: pinned cells 1, horizontal gradients 2, sub-rows 3, vertical gradients 4,
+ * the fixed-height header 5.
+ */
+export const GRID_SUB_ROW_CLASS =
+  'sticky left-0 z-[3] w-0 min-w-[min(100%,var(--dt-viewport-w,100%))] overflow-x-clip break-words';
+
 /** A grid cell's box: 48px, its dividers, its fill, and its pin. The content goes inside. */
 export function gridCellClass(column: GridColumn, section: 'header' | 'body'): string {
   return cn(
@@ -401,9 +425,18 @@ export function createGridScrollController(vertical: boolean): GridScrollControl
   let header: HTMLDivElement | null = null;
   let viewport: HTMLDivElement | null = null;
   let observer: ResizeObserver | null = null;
+  /** The width last written to the viewport, so a measure that changes nothing writes nothing. */
+  let viewportWidth = 0;
 
   const measure = () => {
-    if (viewport) edges.set(readEdges(viewport, vertical));
+    if (!viewport) return;
+    edges.set(readEdges(viewport, vertical));
+    // What the sub-rows are as wide as (`GRID_SUB_ROW_CLASS`). `clientWidth`, so a vertical scrollbar is left out.
+    const width = viewport.clientWidth;
+    if (width === viewportWidth) return;
+    viewportWidth = width;
+    if (width > 0) viewport.style.setProperty(GRID_VIEWPORT_WIDTH_VAR, `${width}px`);
+    else viewport.style.removeProperty(GRID_VIEWPORT_WIDTH_VAR);
   };
 
   return {
@@ -417,6 +450,8 @@ export function createGridScrollController(vertical: boolean): GridScrollControl
       observer?.disconnect();
       observer = null;
       viewport = element;
+      // A new element has no width written on it yet.
+      viewportWidth = 0;
       if (!element) return;
       measure();
       // The edges are also a matter of size: rows arriving, a column appearing or the page resizing changes what is
@@ -515,8 +550,10 @@ export function GridGradient({
       data-grid-gradient={edge}
       data-visible={visible}
       className={cn(
-        'pointer-events-none absolute z-[2] transition-opacity duration-150',
-        horizontal ? 'inset-y-0 w-10' : 'inset-x-0 h-10',
+        'pointer-events-none absolute transition-opacity duration-150',
+        // A horizontal one lies under the sub-rows, which do not scroll sideways; a vertical one over them, as over
+        // the rows (the layers: `GRID_SUB_ROW_CLASS`).
+        horizontal ? 'inset-y-0 z-[2] w-10' : 'inset-x-0 z-[4] h-10',
         edge === 'bottom' && 'bottom-0',
         visible ? 'opacity-100' : 'opacity-0',
       )}

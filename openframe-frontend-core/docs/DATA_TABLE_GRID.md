@@ -65,6 +65,14 @@ With `DataTable` directly, the results count goes in `<DataTable.Meta>`, a direc
 - Sort and `meta.filter` on a column with `meta.dateFilter`: the header draws the date menu, which owns both.
 - Sort on a column that also has a filter: the header draws the filter.
 
+## Sub-rows
+
+`DataTable.Body`'s `renderSubRow` draws a block under a row. In the grid that block is as wide as the VISIBLE table,
+not as its own content or the columns: a long line in it wraps and adds nothing to the table's scroll width, and where
+the columns are wider than the screen (a tablet, a phone) it is one screen wide and stays in view while the cells
+scroll sideways. The host gives it no width of its own (no `w-0 min-w-full` wrapper); content the host forbids to wrap
+is cut at the table's edge.
+
 ## Height
 
 - No `maxHeight`: the page scrolls, the header sticks at `stickyHeaderOffset`, only the body scrolls sideways.
