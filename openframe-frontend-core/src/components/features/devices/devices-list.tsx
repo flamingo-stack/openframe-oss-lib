@@ -395,7 +395,9 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
                 {...pager}
                 itemName={totalCount === 1 ? 'device' : 'devices'}
                 totalCount={totalCount}
-                loading={isLoading}
+                // While the next page is read the rows on screen are the last page's: the buttons wait for it (the
+                // count stays), so a second Next cannot resend the same cursor under the next page's index.
+                loading={isLoading || !!isPending}
               />
             ) : (
               infiniteScroll && (
