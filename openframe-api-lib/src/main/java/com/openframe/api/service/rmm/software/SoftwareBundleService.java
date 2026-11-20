@@ -58,6 +58,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_ADOPT;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_AUTO_UPDATE_ENABLE;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
@@ -181,7 +182,11 @@ public class SoftwareBundleService {
                     .withTargetIdFromResult(result -> ((SoftwareBundleResponse) result).getScheduleId());
         }
         String machineId = machineIds.size() == 1 ? machineIds.getFirst() : null;
-        AuditAction action = input.getAction() == SoftwareAction.INSTALL ? SOFTWARE_INSTALL : SOFTWARE_UPDATE;
+        AuditAction action = switch (input.getAction()) {
+            case INSTALL -> SOFTWARE_INSTALL;
+            case UPDATE -> SOFTWARE_UPDATE;
+            case ADOPT -> SOFTWARE_ADOPT;
+        };
         return AuditCall.of(action, machineId, details).withCompare(false);
     }
 
@@ -217,11 +222,8 @@ public class SoftwareBundleService {
             entity.setMode(SoftwareBundleMode.NOW);
             packages.forEach(this::fillLatestVersion);
             armOnlineDispatch(entity, now);
-            entity.setExecutionIds(executionIds(entity));
-            details.put("executionIds", sent.stream()
-                    .map(bundlePackage -> SoftwareExecutionId.forBundle(entity.getId(),
-                            bundlePackage.getPackageManager(), bundlePackage.getPackageName()))
-                    .toList());
+            entity.setExecutionIds(executionIds(entity.getId(), entity.getPackages()));
+            details.put("executionIds", executionIds(entity.getId(), sent));
         }
 
         saveCompleted(entity, now);
@@ -381,9 +383,9 @@ public class SoftwareBundleService {
         }
     }
 
-    private static List<String> executionIds(SoftwareBundle bundle) {
-        return bundle.getPackages().stream()
-                .map(p -> SoftwareExecutionId.forBundle(bundle.getId(), p.getPackageManager(), p.getPackageName()))
+    private static List<String> executionIds(String bundleId, List<SoftwareBundlePackage> packages) {
+        return packages.stream()
+                .map(p -> SoftwareExecutionId.forBundle(bundleId, p.getPackageManager(), p.getPackageName()))
                 .toList();
     }
 

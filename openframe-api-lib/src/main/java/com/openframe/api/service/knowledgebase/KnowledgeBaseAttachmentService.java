@@ -93,9 +93,9 @@ public class KnowledgeBaseAttachmentService {
 
     private static Map<String, Object> attachmentDetails(String attachmentId, AttachmentResult<?> result) {
         if (result == null) {
-            return Map.of("attachmentId", attachmentId);
+            return Map.of("attachmentIds", List.of(attachmentId));
         }
-        return Map.of("attachmentId", attachmentId, "fileName", result.attachment().getFileName());
+        return Map.of("attachmentIds", List.of(attachmentId), "fileNames", List.of(result.attachment().getFileName()));
     }
 
     @Transactional

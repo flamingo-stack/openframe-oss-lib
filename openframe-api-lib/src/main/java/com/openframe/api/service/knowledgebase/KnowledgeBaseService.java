@@ -308,7 +308,7 @@ public class KnowledgeBaseService {
         createAssignments(saved.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
         createAssignments(saved.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
         createAssignments(saved.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
-        recordAttachmentsAdded(saved.getId(), knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
+        recordAttachments(KB_ATTACHMENT_ADD, saved.getId(), knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
                 saved.getId(), cmd.getAttachmentTempIds(), currentUserId));
 
         return saved;
@@ -373,7 +373,7 @@ public class KnowledgeBaseService {
         replaceAssignments(article.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
         List<KnowledgeBaseItemAttachment> linked = knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
                 article.getId(), cmd.getAttachmentTempIds(), currentUserId);
-        recordAttachmentsAdded(article.getId(), linked);
+        recordAttachments(KB_ATTACHMENT_ADD, article.getId(), linked);
         KnowledgeBaseArticleStatus statusBefore = article.getStatus();
         String parentBefore = article.getParentId();
 
@@ -406,24 +406,18 @@ public class KnowledgeBaseService {
                 .map(KnowledgeBaseItemAttachment::getStoragePath)
                 .collect(Collectors.toSet());
         knowledgeBaseAttachmentService.deleteAttachments(attachmentsToDelete, pathsStillInUse);
-        attachmentsToDelete.forEach(attachment -> recordAttachmentDeleted(saved.getId(), attachment));
+        recordAttachments(KB_ATTACHMENT_DELETE, saved.getId(), attachmentsToDelete);
         return saved;
     }
 
-    private void recordAttachmentsAdded(String articleId, List<KnowledgeBaseItemAttachment> attachments) {
+    private void recordAttachments(AuditAction action, String articleId, List<KnowledgeBaseItemAttachment> attachments) {
         if (attachments.isEmpty()) {
             return;
         }
         List<String> ids = attachments.stream().map(KnowledgeBaseItemAttachment::getId).toList();
         List<String> fileNames = attachments.stream().map(KnowledgeBaseItemAttachment::getFileName).toList();
-        auditRecorder.record(subChange(KB_ATTACHMENT_ADD, articleId)
+        auditRecorder.record(subChange(action, articleId)
                 .details(Map.of("attachmentIds", ids, "fileNames", fileNames))
-                .build());
-    }
-
-    private void recordAttachmentDeleted(String articleId, KnowledgeBaseItemAttachment attachment) {
-        auditRecorder.record(subChange(KB_ATTACHMENT_DELETE, articleId)
-                .details(Map.of("attachmentId", attachment.getId(), "fileName", attachment.getFileName()))
                 .build());
     }
 

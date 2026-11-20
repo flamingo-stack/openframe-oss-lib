@@ -41,7 +41,7 @@ public class KnowledgeBaseImageService {
     private final KnowledgeBaseImageProperties imageProperties;
 
     @Audited(action = KB_IMAGE_ADD, targetId = "#result.image.id", compare = false,
-            details = {"fileName=#fileName", "contentType=#contentType", "fileSize=#fileSize"})
+            details = {"fileNames={#fileName}", "contentType=#contentType", "fileSize=#fileSize"})
     public KnowledgeBaseImageUpload createUpload(String uploaderId, String fileName, String contentType, Long fileSize) {
         long maxSizeBytes = imageProperties.getMaxSizeBytes();
         String extension = validateAndResolveExtension(contentType, fileSize, maxSizeBytes);

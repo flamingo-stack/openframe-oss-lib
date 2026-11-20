@@ -83,8 +83,9 @@ public class SoftwareInstallUpdateManagementService {
         Map<String, Object> details = new HashMap<>();
         details.put("softwareId", input.getSoftwareId());
         details.put("machineIds", machineIds);
-        String machineId = machineIds.size() == 1 ? machineIds.getFirst() : null;
-        AuditCall call = AuditCall.of(SOFTWARE_ADOPT, machineId, details).withCompare(false);
+        AuditCall call = AuditCall.of(SOFTWARE_ADOPT, onlyMachineOf(machineIds), details)
+                .withCompare(false)
+                .withTargetIdFromResult(targets -> onlyMachineOf((List<?>) targets));
         return auditedMethodRunner.run(call, () -> sendAdoptOrder(input.getSoftwareId(), machineIds, initiatedBy, details));
     }
 
@@ -135,6 +136,10 @@ public class SoftwareInstallUpdateManagementService {
         log.info("Software adopt order sent: requestId={} executionId={} softwareId={} package={}/{} machines={}/{}",
                 requestId, executionId, softwareId, packageManager, packageName, targets.size(), machineIds.size());
         return targets;
+    }
+
+    private static String onlyMachineOf(List<?> targets) {
+        return targets.size() == 1 ? (String) targets.getFirst() : null;
     }
 
     private List<String> adoptableMachines(String softwareId, SoftwareBundlePackage adoptionPackage,
