@@ -19,7 +19,6 @@
  * Client/embed mode: omit it — skeleton page + self-fetch via `contentFetch`
  * (embed-auth adapters inherited for free).
  */
-
 import { ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import Link from '../../embed-shims/next-link';
@@ -120,7 +119,7 @@ function DirectoryRow({
 
         {/* No audience entity (scope=all "other" group) → no chip. */}
         {audienceLabel && (
-          <StatusBadge text={`For ${audienceLabel}`} singleLine className="hidden shrink-0 content-sm:inline-flex" />
+          <StatusBadge text={`For ${audienceLabel}`} className="hidden shrink-0 content-sm:inline-flex" />
         )}
 
         {/* Hosts stay visible on mobile too — the facepile is the row's "who
