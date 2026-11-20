@@ -1147,7 +1147,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                           displayApprovalTypes={displayApprovalTypes}
                           progress={metadata?.progress}
                           interrupted={metadata?.finishReason === 'interrupted'}
-                          aborted={metadata?.aborted === true}
                           NavLinkAnchor={NavLinkAnchor}
                         />
                         {ownedContent}

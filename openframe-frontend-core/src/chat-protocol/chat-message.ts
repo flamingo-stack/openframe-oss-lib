@@ -212,8 +212,6 @@ export type ChatToolMetadata = {
    * nothing about waiting. See {@link approvalAnswerInFlight}.
    */
   answerSent?: boolean;
-  /** The server returned this row's result as the turn's answer (a slash command's tool, as the tool gave it): drawn. */
-  resultIsAnswer?: boolean;
 };
 
 /** The standard's opaque `approval.descriptor`: what the card draws. */
