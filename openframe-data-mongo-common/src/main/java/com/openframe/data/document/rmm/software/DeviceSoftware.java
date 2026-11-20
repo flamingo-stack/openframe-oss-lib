@@ -62,6 +62,7 @@ public class DeviceSoftware implements TenantScoped {
     // names only: an installed path carries the name of its user and is never stored
     private List<String> appFileNames;
     private Boolean topLevelApp;
+    private Boolean userApplicationsOnly;
     private boolean machineConnected;
 
     private Instant updatedAt;

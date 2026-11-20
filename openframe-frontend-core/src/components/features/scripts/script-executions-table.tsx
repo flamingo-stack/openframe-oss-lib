@@ -8,13 +8,18 @@ import { SquareAvatar } from '../../ui/square-avatar';
 import { dataTableLayoutProps, type FeatureTableLayoutProps, hasSlotContent } from '../feature-table-layout';
 import {
   ExecutionDeviceCell,
+  ExecutionDeviceGridCell,
   ExecutionInitiatorCell,
+  ExecutionInitiatorGridCell,
   ExecutionResultCell,
+  ExecutionResultGridCell,
   ExecutionStatusCell,
+  ExecutionStatusGridCell,
   ExecutionTimestampCell,
+  ExecutionTimestampGridCell,
 } from './execution-cells';
 import { EXECUTION_COLUMNS, EXECUTIONS_TABLE_COLUMNS, type ScriptsTableColumnLayout } from './scripts-table-columns';
-import { OpenInNewTabCell, scriptsColumnMeta } from './scripts-table-shared';
+import { OpenInNewTabCell, scriptsColumnMeta, scriptsColumnSize } from './scripts-table-shared';
 
 /** One execution, as the Execution History shows it. */
 export interface ScriptExecutionTableRow {
@@ -126,15 +131,36 @@ export function ScriptExecutionsTable({
       [EXECUTION_COLUMNS.result.id]: row => <ExecutionResultCell result={row.result} />,
       [EXECUTION_COLUMNS.open.id]: row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null),
     };
+    // The same cells in the grid layout: one line each.
+    const gridRenderers: Record<string, (row: ScriptExecutionTableRow) => ReactNode> = {
+      [EXECUTION_COLUMNS.executionId.id]: row => (
+        <ExecutionTimestampGridCell timestamp={row.timestamp} executionId={row.executionId} />
+      ),
+      [EXECUTION_COLUMNS.status.id]: row => <ExecutionStatusGridCell status={row.status} />,
+      [EXECUTION_COLUMNS.machineId.id]: row => (
+        <ExecutionDeviceGridCell name={row.machineName} organization={row.organization} />
+      ),
+      [EXECUTION_COLUMNS.initiatorId.id]: row => (
+        <ExecutionInitiatorGridCell
+          leading={{ type: 'avatar', src: row.initiator.image, name: row.initiator.name }}
+          name={row.initiator.name}
+          source={row.source}
+          scriptName={row.scriptName}
+        />
+      ),
+      [EXECUTION_COLUMNS.result.id]: row => <ExecutionResultGridCell result={row.result} />,
+      [EXECUTION_COLUMNS.open.id]: row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} grid /> : null),
+    };
     // No row menu here: its one action (copy the id) is the product's, so the actions column is left out.
     return columnLayout
       .filter(column => renderers[column.id] && !hideColumns?.includes(column.id))
-      .map(column => ({
+      .map((column): ColumnDef<ScriptExecutionTableRow> => ({
         id: column.id,
         header: column.header ?? '',
         cell: ({ row }: { row: Row<ScriptExecutionTableRow> }) => renderers[column.id](row.original),
         enableSorting: false,
-        meta: scriptsColumnMeta(column),
+        ...scriptsColumnSize(column),
+        meta: { ...scriptsColumnMeta(column), gridCell: ({ row }) => gridRenderers[column.id](row.original) },
       }));
   }, [columnLayout, hideColumns]);
 

@@ -76,8 +76,33 @@ npm run build && npm run preview:proxy
 |-----|------|---------|
 | `HUB_ORIGIN` | server only | Where `/content/api/*` is forwarded. Default `http://localhost:3000`. |
 | `VITE_HUB_ORIGIN` | client | Public hub origin for new-tab "open full content" links. |
+| `ANTHROPIC_API_KEY` | server only | The model key Mingo's chat loop calls Anthropic with (Mingo mode only). |
+| `MINGO_MODEL` | server only | Mingo's model. Default `claude-opus-5-5`, the AI service's production default. |
+| `HUB_MCP_API_KEY` | server only | The platform key Mingo calls the hub's MCP server with (the AI service's own variable name). Unset: the browser's `/debug` key. |
 
 > There is intentionally **no chat-source / platform variable**. The client is platform-agnostic: the chat wire resolves `source` server-side (the hub's `currentPlatform()`), client-side same-tab/new-tab link decisions fall back to an origin comparison, and the chat-history namespace falls back to a lib default. Point `HUB_ORIGIN` at any platform's hub and it just works.
+
+## Guide and Mingo
+
+The chat's corner switch picks which chat answers:
+
+| Mode | Who answers | Path |
+|---|---|---|
+| Guide | The hub's own chat, the Help Center chat | browser → `/content/api/docs/chat` → hub |
+| Mingo | The OpenFrame AI agent, as production runs him | browser → `/agent/mingo/chat` → [`proxy/agent.mjs`](proxy/agent.mjs) (Anthropic) → hub `/api/mcp` |
+
+Mingo's loop is a port of the OpenFrame AI agent service (`openframe-saas-ai-agent`, openframe-saas-tenant): it reaches
+the hub ONLY over its MCP server, with the same rules (each function in [`proxy/agent-mcp.mjs`](proxy/agent-mcp.mjs) and
+[`proxy/agent-slash.mjs`](proxy/agent-slash.mjs) names the Java class it mirrors): the hub's read tools minus
+`ask_guide`, `confirm_proposal` and `get_entity_cards`; search previews removed and the hub's answer rules attached to
+docs results; slash commands resolved through MCP `prompts/get`, a forced tool offered alone on the first round; and a
+command the hub marks `responseMode: direct` answered with its tool's result unchanged (`/what-can-you-do` as chips).
+His opening screen and the "/" menu are the hub's, as in the OpenFrame app.
+
+What it does not have: the AI service's own tools (devices, scripts, Fleet, tickets…: they need a tenant), write
+tools and their approval step, its system prompt rules (Java constants; a copy would drift), and saved conversations
+(they live in the server's memory). Fae is not offered: in production she runs in the desktop client with device
+tools only, no hub tools.
 
 ## How it's wired
 

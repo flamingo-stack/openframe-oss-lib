@@ -12,7 +12,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
@@ -24,6 +26,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -765,8 +768,23 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getTopLevelApp()).isTrue();
     }
 
+    @ParameterizedTest
+    @MethodSource("userApplicationsCopies")
+    void handle_macAppByItsInstalledPaths_userApplicationsOnlyWhenNoTopLevelCopyIsOutsideTheUsersFolder(
+            String[] installedPaths, boolean userApplicationsOnly) {
+        // setup
+        HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap", installedPaths);
+        stubHostSoftware(slack);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        assertThat(savedRow().getUserApplicationsOnly()).isEqualTo(userApplicationsOnly);
+    }
+
     @Test
-    void handle_macAppWithoutInstalledPaths_topLevelUnknownAndNoAppFileNames() {
+    void handle_macAppWithoutInstalledPaths_topLevelAndUserApplicationsUnknownAndNoAppFileNames() {
         // setup
         HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap");
         stubHostSoftware(slack);
@@ -779,6 +797,7 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
         assertThat(saved.getAppFileNames()).isEmpty();
         assertThat(saved.getTopLevelApp()).isNull();
+        assertThat(saved.getUserApplicationsOnly()).isNull();
     }
 
     @ParameterizedTest
@@ -865,6 +884,7 @@ class DeviceSoftwareHandlerTest {
         app.setBundleIdentifier("com.tinyspeck.slackmacgap");
         app.setAppFileNames(List.of("Slack"));
         app.setTopLevelApp(topLevelApp);
+        app.setUserApplicationsOnly(false);
         return app;
     }
 
@@ -873,6 +893,16 @@ class DeviceSoftwareHandlerTest {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, String.valueOf(COMMIT_TS)))
                 .thenReturn(List.of(hostSoftwareTitle));
+    }
+
+    private static Stream<Arguments> userApplicationsCopies() {
+        return Stream.of(
+                Arguments.of(new String[]{"/Users/alice/Applications/Slack.app"}, true),
+                Arguments.of(new String[]{"/Users/alice/Applications/Slack.app",
+                        "/Users/alice/Applications/Slack.app/Contents/Helpers/Slack Helper.app"}, true),
+                Arguments.of(new String[]{"/Applications/Slack.app"}, false),
+                Arguments.of(new String[]{"/Applications/Slack.app", "/Users/alice/Applications/Slack.app"}, false),
+                Arguments.of(new String[]{"/Users/alice/Applications/Chrome Apps.localized/Gmail.app"}, false));
     }
 
     private HostSoftwareTitle app(String bundleIdentifier, String... installedPaths) {

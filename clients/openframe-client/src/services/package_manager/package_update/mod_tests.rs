@@ -37,7 +37,10 @@ impl Fixture {
         let (status, _events) = StatusReporter::in_memory();
         let agent_restart = Latch::default();
         let worker = Arc::new(Worker {
-            machine: Box::new(System { tool_run_manager }),
+            machine: Box::new(System {
+                tool_run_manager,
+                brew: BrewLock::default(),
+            }),
             orders,
             status,
             results: DeliveryResults::in_memory().0,

@@ -1,6 +1,7 @@
 mod core_nats;
 mod delivery;
 mod handlers;
+mod package_adopt;
 mod package_update;
 mod restart;
 
@@ -28,6 +29,7 @@ pub use handlers::{
     ClientUninstallHandler, ClientUpdateHandler, FeatureFlagsHandler, ToolInstallationHandler,
     ToolUninstallHandler, ToolUpdateHandler,
 };
+pub use package_adopt::PackageAdoptHandler;
 pub use package_update::PackageUpdateHandler;
 pub use restart::RestartGate;
 

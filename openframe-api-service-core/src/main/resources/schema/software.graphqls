@@ -10,7 +10,7 @@ extend type Query {
 
     """Paginated list of software titles installed across the tenant's fleet.
     One row = one software title (aggregated across devices).
-    Sortable fields: name, devicesCount, cveCount, highestSeverity, adoptionCount (default: Fleet order by name).
+    Sortable fields: name, devicesCount, cveCount, highestSeverity (default: Fleet order by name).
     An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error."""
     softwares(
         filter: SoftwareFilterInput,
@@ -187,8 +187,7 @@ type Software {
 
     """Devices that have this title installed manually (installedBy UNMANAGED) and can be adopted — the
     ADOPTION column and the "N devices have … installed manually" banner with Adopt. Null or 0 = "–", no banner;
-    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with).
-    Sortable as adoptionCount."""
+    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with)."""
     adoptionCount: Int
 
     """The package Adopt reinstalls this title with, shown to the admin for confirmation: the best match of a
@@ -484,11 +483,13 @@ input VulnerabilityFilterInput {
 #
 # PackageManagerType and BrewPackageType are declared in package-search.graphqls and reused here.
 
-"""Install vs update — the two software management actions. Also scopes a package's Execution
-History (softwareExecutions)."""
+"""The software management actions. Also scopes a package's Execution History (softwareExecutions)."""
 enum SoftwareAction {
     INSTALL
     UPDATE
+    """A hand-installed copy reinstalled with a package manager (adoptSoftware). Not a bundle or schedule action:
+    BAD_REQUEST there."""
+    ADOPT
 }
 
 extend type Mutation {
@@ -500,11 +501,16 @@ extend type Mutation {
     dispatched as its own RMM execution; returns one result (with its executionId) per package."""
     updateSoftware(input: SoftwareManagementInput!): [SoftwareDispatchResult!]!
 
-    """Adopt a software title on devices that have it installed manually: reinstall it with a package manager,
-    so it can be updated. Runs now; an offline device starts when it comes online. The device picker lists
-    softwareDevices(softwareId, filter: {installedBy: [UNMANAGED]}). Returns one result per package manager used
-    (each its own execution, shown as an ADOPT row in Software Actions)."""
-    adoptSoftware(input: AdoptSoftwareInput!): [SoftwareDispatchResult!]!
+    """Adopt a software title on devices that have it installed by hand: the device reinstalls it with the title's
+    adoption package (Software.adoptionPackage), so it can be updated later. Sends the order to the devices now.
+    SoftwareOnDevice.adoption shows the device's latest adoption of the title: ADOPTING until the device reports the
+    reinstall done, then null; FAILED with the error when the reinstall or its delivery failed. Each call is one ADOPT
+    row in Software Actions with one Execution History row per device.
+    Returns the devices (Machine global ids) the order was sent to. Left out: devices of another OS, devices without
+    the package manager reported PRESENT, devices whose copy is only in ~/Applications, and devices the order cannot
+    reach (the order is switched off or the agent is too old for it). NOT_FOUND for an unknown title. BAD_REQUEST
+    when the title has no adoption package, when no device is left, and when a device is not managed."""
+    adoptSoftware(input: AdoptSoftwareInput!): [ID!]!
 
     """Save the Auto-update form: on with these settings for the bundle's devices, off for the title's other
     devices. Runs no update; the bundle becomes COMPLETED."""
@@ -520,25 +526,11 @@ extend type Mutation {
 # ────────── Adopt ──────────
 
 input AdoptSoftwareInput {
-    "The software title (Software.id) to adopt."
+    """The software title (Software.id). It is adopted into its Software.adoptionPackage: a Homebrew cask on
+    macOS, a Chocolatey package on Windows."""
     softwareId: ID!
-    """Selected devices (Machine global ids), 1..100. Devices that do not have the title installed manually are
-    skipped. Null = every device matching filter + search ("Add All Devices")."""
-    machineIds: [ID!]
-    """With machineIds null: the devices to adopt, as the picker's softwareDevices(softwareId, filter, search) lists
-    them. Always narrowed to installedBy UNMANAGED. Ignored when machineIds is set."""
-    filter: SoftwareOnDeviceFilterInput
-    search: String
-    "Package Manager for Windows. macOS devices always adopt with Brew."
-    windowsPackageManager: SoftwareAdoptionWindowsManager! = MATCH_CUSTOMER
-}
-
-"""Which package manager adopts the title on Windows devices."""
-enum SoftwareAdoptionWindowsManager {
-    "The manager each customer already uses for this app; Winget if none."
-    MATCH_CUSTOMER
-    WINGET
-    CHOCOLATEY
+    "The devices (Machine global ids), 1..100."
+    machineIds: [ID!]!
 }
 
 """A set of catalog packages to install/update on a set of devices."""

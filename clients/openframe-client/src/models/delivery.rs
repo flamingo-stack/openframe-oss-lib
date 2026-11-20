@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 pub const DELIVERY_RESULT_KIND: &str = "delivery.result";
 pub const CLIENT_UPDATE_DELIVERY_TYPE: &str = "CLIENT_UPDATE";
 pub const PACKAGE_UPDATE_DELIVERY_TYPE: &str = "PACKAGE_UPDATE";
+pub const PACKAGE_ADOPT_DELIVERY_TYPE: &str = "PACKAGE_ADOPT";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

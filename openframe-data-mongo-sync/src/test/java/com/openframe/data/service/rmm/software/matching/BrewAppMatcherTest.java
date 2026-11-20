@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 class BrewAppMatcherTest {
 
     private static final String BUNDLE_ID_OF_NO_CASK = "com.example.app";
+    private static final String BUNDLE_ID_OF_EVERY_CASK = "com.example.shared";
 
     @Mock private BrewCaskIndexCache brewCaskIndexCache;
 
@@ -47,9 +48,10 @@ class BrewAppMatcherTest {
     void match_severalApps_oneResultPerAppInTheirOrder() {
         // setup
         PackageCatalogEntry slack = slack().build();
-        PackageCatalogEntry keka = cask("keka", "Keka").appNames(List.of("keka")).build();
+        PackageCatalogEntry keka = cask("keka", "Keka").appNames(List.of("keka")).bundleIds(List.of("com.aone.keka"))
+                .build();
         stubCatalog(slack, keka);
-        List<InstalledProgram> apps = List.of(app("Keka", BUNDLE_ID_OF_NO_CASK),
+        List<InstalledProgram> apps = List.of(app("Keka", "com.aone.keka"),
                 app("Unknown Tool", BUNDLE_ID_OF_NO_CASK), app("Slack", "com.tinyspeck.slackmacgap"));
 
         // execution
@@ -442,10 +444,10 @@ class BrewAppMatcherTest {
         assertThat(matches).containsExactly(PackageMatch.noPackage(), PackageMatch.noPackage());
     }
 
-    @Test
-    void match_nameOnlyAndTheCaskNamesNoBundleIds_matchedWhateverTheAppsId() {
+    @ParameterizedTest
+    @MethodSource("kekaCasksKnowingNotTheAppsBundleId")
+    void match_nameOnly_noPackage(PackageCatalogEntry keka) {
         // setup
-        PackageCatalogEntry keka = cask("keka", "Keka").appNames(List.of("keka")).build();
         stubCatalog(keka);
         List<InstalledProgram> apps = List.of(app("Keka", "com.aone.keka"));
 
@@ -453,116 +455,18 @@ class BrewAppMatcherTest {
         List<PackageMatch> matches = matcher.match(apps);
 
         // verifications
-        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(keka);
-    }
-
-    @ParameterizedTest
-    @MethodSource("slackCasksNamingOtherBundleIds")
-    void match_nameOnlyButTheCaskNamesOtherBundleIds_noPackage(PackageCatalogEntry slack) {
-        // setup
-        stubCatalog(slack);
-        List<InstalledProgram> apps = List.of(app("Slack", "com.example.slack-clone"));
-
-        // execution
-        List<PackageMatch> matches = matcher.match(apps);
-
-        // verifications
-        assertThat(matches).containsExactly(PackageMatch.noPackage());
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-            "900, 20, zoom",
-            "20, 900, zoom-for-it-admins",
-            ", 20, zoom-for-it-admins",
-            ", , zoom"
-    })
-    void match_nameOnlyTwoCasksInstallTheApp_ambiguousAndTheBestIsTheMostInstalled(
-            Integer zoomInstalls, Integer zoomForItAdminsInstalls, String bestToken) {
-        // setup
-        stubCatalog(cask("zoom", "Zoom").appNames(List.of("zoom.us")).popularity(zoomInstalls).build(),
-                cask("zoom-for-it-admins", "Zoom for IT Admins").appNames(List.of("zoom.us"))
-                        .popularity(zoomForItAdminsInstalls).build());
-        List<InstalledProgram> apps = List.of(app("zoom.us", "com.example.unknown"));
-
-        // execution
-        List<PackageMatch> matches = matcher.match(apps);
-
-        // verifications
-        assertThat(matches).extracting(PackageMatch::getBestCandidate).extracting(PackageCatalogEntry::getPackageId)
-                .containsExactly(bestToken);
-    }
-
-    @Test
-    void match_nameOnlySeveralCasksAllNamingOtherBundleIds_noPackage() {
-        // setup
-        PackageCatalogEntry office = cask("microsoft-office", "Microsoft Office")
-                .weakAppNames(List.of("microsoft defender")).bundleIds(List.of("com.microsoft.word")).build();
-        PackageCatalogEntry officeBusinessPro = cask("microsoft-office-businesspro", "Microsoft Office BusinessPro")
-                .weakAppNames(List.of("microsoft defender")).bundleIdPrefixes(List.of("com.microsoft.office")).build();
-        stubCatalog(office, officeBusinessPro);
-        List<InstalledProgram> apps = List.of(app("Microsoft Defender", "com.example.wdav"));
-
-        // execution
-        List<PackageMatch> matches = matcher.match(apps);
-
-        // verifications
         assertThat(matches).containsExactly(PackageMatch.noPackage());
     }
 
     @Test
-    void match_nameOnlySeveralCasksAndOneNamesOtherBundleIds_theOtherCask() {
+    void match_bundleIdOfBothAndStrongAndWeakNames_theStrongOne() {
         // setup
-        PackageCatalogEntry amethystNostr = cask("amethyst-nostr", "Amethyst").appNames(List.of("amethyst")).build();
-        stubCatalog(cask("amethyst", "Amethyst").appNames(List.of("amethyst")).popularity(900)
-                .bundleIds(List.of("com.amethyst.amethyst")).build(), amethystNostr);
-        List<InstalledProgram> apps = List.of(app("Amethyst", "com.example.unknown"));
-
-        // execution
-        List<PackageMatch> matches = matcher.match(apps);
-
-        // verifications
-        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(amethystNostr);
-    }
-
-    @Test
-    void match_nameOnlySeveralCasksByAWeakNameAndOneIsAVariant_theOtherCask() {
-        // setup
-        PackageCatalogEntry mailTool = cask("mail-tool", "Mail Tool").weakAppNames(List.of("em client")).build();
-        stubCatalog(cask("emclient@beta", "eM Client Beta").weakAppNames(List.of("em client")).popularity(900).build(),
-                mailTool);
-        List<InstalledProgram> apps = List.of(app("eM Client", BUNDLE_ID_OF_NO_CASK));
-
-        // execution
-        List<PackageMatch> matches = matcher.match(apps);
-
-        // verifications
-        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(mailTool);
-    }
-
-    @Test
-    void match_nameOnlyFamily_theBaseCask() {
-        // setup
-        PackageCatalogEntry iterm = cask("iterm2", "iTerm2").appNames(List.of("iterm")).build();
-        PackageCatalogEntry itermBeta = cask("iterm2@beta", "iTerm2").appNames(List.of("iterm")).build();
-        PackageCatalogEntry itermNightly = cask("iterm2@nightly", "iTerm2").appNames(List.of("iterm")).build();
-        stubCatalog(itermNightly, itermBeta, iterm);
-        List<InstalledProgram> apps = List.of(app("iTerm", BUNDLE_ID_OF_NO_CASK));
-
-        // execution
-        List<PackageMatch> matches = matcher.match(apps);
-
-        // verifications
-        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(iterm);
-    }
-
-    @Test
-    void match_nameOnlyStrongAndWeakNames_theStrongOne() {
-        // setup
-        PackageCatalogEntry docker = cask("docker-desktop", "Docker Desktop").appNames(List.of("docker")).build();
-        PackageCatalogEntry toolbox = cask("docker-toolbox", "Docker").weakAppNames(List.of("docker")).build();
+        PackageCatalogEntry docker = cask("docker-desktop", "Docker Desktop").appNames(List.of("docker"))
+                .bundleIds(List.of(BUNDLE_ID_OF_EVERY_CASK)).build();
+        PackageCatalogEntry toolbox = cask("docker-toolbox", "Docker").weakAppNames(List.of("docker"))
+                .bundleIds(List.of(BUNDLE_ID_OF_EVERY_CASK)).build();
         stubCatalog(toolbox, docker);
-        List<InstalledProgram> apps = List.of(app("Docker", BUNDLE_ID_OF_NO_CASK));
+        List<InstalledProgram> apps = List.of(app("Docker", BUNDLE_ID_OF_EVERY_CASK));
 
         // execution
         List<PackageMatch> matches = matcher.match(apps);
@@ -576,13 +480,14 @@ class BrewAppMatcherTest {
             "zoom.us, zoom-for-it-admins",
             "Logitech Options+, logi-options+"
     })
-    void match_nameOnlyByAWeakName_thatCask(String appName, String token) {
+    void match_bundleIdOfBothAndAWeakName_thatCask(String appName, String token) {
         // setup
         PackageCatalogEntry removingTheApp = cask("zoom-for-it-admins", "Zoom for IT Admins")
-                .weakAppNames(List.of("zoom.us")).build();
-        PackageCatalogEntry displayedAsTheApp = cask("logi-options+", "Logitech Options+").build();
+                .weakAppNames(List.of("zoom.us")).bundleIds(List.of(BUNDLE_ID_OF_EVERY_CASK)).build();
+        PackageCatalogEntry displayedAsTheApp = cask("logi-options+", "Logitech Options+")
+                .bundleIds(List.of(BUNDLE_ID_OF_EVERY_CASK)).build();
         stubCatalog(removingTheApp, displayedAsTheApp);
-        List<InstalledProgram> apps = List.of(app(appName, BUNDLE_ID_OF_NO_CASK));
+        List<InstalledProgram> apps = List.of(app(appName, BUNDLE_ID_OF_EVERY_CASK));
 
         // execution
         List<PackageMatch> matches = matcher.match(apps);
@@ -590,33 +495,6 @@ class BrewAppMatcherTest {
         // verifications
         assertThat(matches).extracting(PackageMatch::getEntry).extracting(PackageCatalogEntry::getPackageId)
                 .containsExactly(token);
-    }
-
-    @Test
-    void match_nameOnlyVariantReachedByAWeakName_noPackage() {
-        // setup
-        stubCatalog(cask("emclient@beta", "eM Client Beta").weakAppNames(List.of("em client")).build());
-        List<InstalledProgram> apps = List.of(app("eM Client", BUNDLE_ID_OF_NO_CASK));
-
-        // execution
-        List<PackageMatch> matches = matcher.match(apps);
-
-        // verifications
-        assertThat(matches).containsExactly(PackageMatch.noPackage());
-    }
-
-    @Test
-    void match_nameOnlyVariantReachedByItsAppName_matched() {
-        // setup
-        PackageCatalogEntry beta = cask("emclient@beta", "eM Client Beta").appNames(List.of("em client")).build();
-        stubCatalog(beta);
-        List<InstalledProgram> apps = List.of(app("eM Client", BUNDLE_ID_OF_NO_CASK));
-
-        // execution
-        List<PackageMatch> matches = matcher.match(apps);
-
-        // verifications
-        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(beta);
     }
 
     @ParameterizedTest
@@ -628,15 +506,16 @@ class BrewAppMatcherTest {
             "TablePlus.app, tableplus",
             "Docker, docker-desktop"
     })
-    void match_nameWrittenAsAToken_theCaskOfThatTokenOrOldToken(String appName, String token) {
+    void match_bundleIdOfAllAndNameWrittenAsAToken_theCaskOfThatTokenOrOldToken(String appName, String token) {
         // setup
-        stubCatalog(cask("visual-studio-code", "Microsoft Visual Studio Code").build(),
-                cask("mission-control-plus", "Mission Control+").build(),
-                cask("genesis-plus", "Genesis Plus").build(),
-                cask("zoom-us", "Zoom Workplace").build(),
-                cask("tableplus", "Table Plus").build(),
-                cask("docker-desktop", "Docker Desktop").aliases(List.of("docker")).build());
-        List<InstalledProgram> apps = List.of(app(appName, BUNDLE_ID_OF_NO_CASK));
+        List<String> bundleIds = List.of(BUNDLE_ID_OF_EVERY_CASK);
+        stubCatalog(cask("visual-studio-code", "Microsoft Visual Studio Code").bundleIds(bundleIds).build(),
+                cask("mission-control-plus", "Mission Control+").bundleIds(bundleIds).build(),
+                cask("genesis-plus", "Genesis Plus").bundleIds(bundleIds).build(),
+                cask("zoom-us", "Zoom Workplace").bundleIds(bundleIds).build(),
+                cask("tableplus", "Table Plus").bundleIds(bundleIds).build(),
+                cask("docker-desktop", "Docker Desktop").aliases(List.of("docker")).bundleIds(bundleIds).build());
+        List<InstalledProgram> apps = List.of(app(appName, BUNDLE_ID_OF_EVERY_CASK));
 
         // execution
         List<PackageMatch> matches = matcher.match(apps);
@@ -650,11 +529,12 @@ class BrewAppMatcherTest {
     void match_appFileNamesReported_usedInPlaceOfTheDisplayName() {
         // setup
         PackageCatalogEntry code = cask("visual-studio-code", "Microsoft Visual Studio Code")
-                .appNames(List.of("visual studio code")).build();
-        PackageCatalogEntry displayedAsCode = cask("code-notes", "Code").appNames(List.of("code")).build();
+                .appNames(List.of("visual studio code")).bundleIds(List.of(BUNDLE_ID_OF_EVERY_CASK)).build();
+        PackageCatalogEntry displayedAsCode = cask("code-notes", "Code").appNames(List.of("code"))
+                .bundleIds(List.of(BUNDLE_ID_OF_EVERY_CASK)).build();
         stubCatalog(code, displayedAsCode);
         InstalledProgram app = InstalledProgram.builder().fleetSource(FleetSource.APPS).name("Code")
-                .bundleIdentifier(BUNDLE_ID_OF_NO_CASK).appFileNames(List.of("Visual Studio Code")).topLevelApp(true)
+                .bundleIdentifier(BUNDLE_ID_OF_EVERY_CASK).appFileNames(List.of("Visual Studio Code")).topLevelApp(true)
                 .build();
 
         // execution
@@ -692,10 +572,15 @@ class BrewAppMatcherTest {
         assertThat(matches).containsExactly(PackageMatch.noPackage());
     }
 
-    private static Stream<PackageCatalogEntry> slackCasksNamingOtherBundleIds() {
+    private static Stream<PackageCatalogEntry> kekaCasksKnowingNotTheAppsBundleId() {
         return Stream.of(
-                cask("slack", "Slack").appNames(List.of("slack")).bundleIds(List.of("com.tinyspeck.slackmacgap")).build(),
-                cask("slack", "Slack").appNames(List.of("slack")).bundleIdPrefixes(List.of("com.tinyspeck.")).build());
+                cask("keka", "Keka").appNames(List.of("keka")).build(),
+                cask("keka-helper", "Keka Helper").weakAppNames(List.of("keka")).build(),
+                cask("keka-tool", "Keka").build(),
+                cask("keka", "Archiver").build(),
+                cask("archiver", "Archiver").aliases(List.of("keka")).build(),
+                cask("keka", "Keka").appNames(List.of("keka")).bundleIds(List.of("com.aone.other")).build(),
+                cask("keka", "Keka").appNames(List.of("keka")).bundleIdPrefixes(List.of("com.other.")).build());
     }
 
     private void stubCatalog(PackageCatalogEntry... casks) {

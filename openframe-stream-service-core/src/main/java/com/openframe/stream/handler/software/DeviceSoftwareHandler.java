@@ -61,6 +61,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private static final Pattern APP_PATH = Pattern.compile("(?:.*/)?([^/]+)\\.app", Pattern.CASE_INSENSITIVE);
     private static final Pattern TOP_LEVEL_APP_PATH = Pattern.compile(
             "(/Users/[^/]+)?/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
+    private static final Pattern USER_APPLICATIONS_APP_PATH = Pattern.compile(
+            "/Users/[^/]+/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
 
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -240,6 +242,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         String bundleIdentifier = app ? title.getBundleIdentifier() : null;
         List<String> appFileNames = appFileNamesOf(appPaths);
         Boolean topLevelApp = topLevelAppOf(appPaths);
+        Boolean userApplicationsOnly = userApplicationsOnlyOf(appPaths);
         List<String> vulnerabilities = vulnerabilitiesOf(title);
 
         DeviceSoftware row = new DeviceSoftware();
@@ -259,6 +262,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         row.setBundleIdentifier(bundleIdentifier);
         row.setAppFileNames(appFileNames);
         row.setTopLevelApp(topLevelApp);
+        row.setUserApplicationsOnly(userApplicationsOnly);
         row.setVulnerabilities(vulnerabilities);
         return row;
     }
@@ -277,6 +281,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
                 && Objects.equals(existing.getBundleIdentifier(), reported.getBundleIdentifier())
                 && Objects.equals(existing.getAppFileNames(), reported.getAppFileNames())
                 && Objects.equals(existing.getTopLevelApp(), reported.getTopLevelApp())
+                && Objects.equals(existing.getUserApplicationsOnly(), reported.getUserApplicationsOnly())
                 && Objects.equals(existing.getVulnerabilities(), reported.getVulnerabilities());
     }
 
@@ -346,6 +351,17 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return null;
         }
         return installedPaths.stream().anyMatch(path -> TOP_LEVEL_APP_PATH.matcher(path).matches());
+    }
+
+    private static Boolean userApplicationsOnlyOf(List<String> installedPaths) {
+        if (installedPaths.isEmpty()) {
+            return null;
+        }
+        List<String> topLevelPaths = installedPaths.stream()
+                .filter(path -> TOP_LEVEL_APP_PATH.matcher(path).matches())
+                .toList();
+        return !topLevelPaths.isEmpty()
+                && topLevelPaths.stream().allMatch(path -> USER_APPLICATIONS_APP_PATH.matcher(path).matches());
     }
 
     private static List<HostSoftwareInstalledVersion> installedVersionsOf(HostSoftwareTitle title) {
