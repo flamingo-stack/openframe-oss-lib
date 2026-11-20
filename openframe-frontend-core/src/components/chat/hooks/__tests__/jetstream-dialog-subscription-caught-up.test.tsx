@@ -30,13 +30,22 @@ let testIndex = 0;
 let log: string[];
 let latest: UseJetStreamDialogSubscriptionReturn;
 
-function Probe({ url, optStartSeq }: { url: string; optStartSeq: number | null }) {
+function Probe({
+  url,
+  optStartSeq,
+  onReplayComplete,
+}: {
+  url: string;
+  optStartSeq: number | null;
+  onReplayComplete?: () => void;
+}) {
   const result = useJetStreamDialogSubscription({
     enabled: true,
     dialogId: DIALOG,
     topic: 'admin-message',
     optStartSeq,
     getNatsWsUrl: () => url,
+    ...(onReplayComplete ? { onReplayComplete } : {}),
     reconnectionBackoff: { initialDelayMs: 20, maxDelayMs: 20 },
     onEvent: payload => {
       log.push(`msg:${(payload as { streamSeq: number }).streamSeq}`);
@@ -79,6 +88,24 @@ describe('useJetStreamDialogSubscription caughtUpCount', () => {
     await wait(50);
 
     expect(log).toEqual(seqs.map(s => `msg:${s}`));
+    expect(latest.caughtUpCount).toBe(0);
+  });
+
+  it('reports the initial backlog drained after delivering its last event without moving caughtUpCount', async () => {
+    const replayed = publish('retained');
+    render(
+      <Probe
+        url={`ws://caught-up-${testIndex}`}
+        optStartSeq={0}
+        onReplayComplete={() => log.push('replay-complete')}
+      />,
+    );
+
+    await until(() => log.includes('replay-complete'));
+    const live = publish('live');
+    await until(() => log.includes(`msg:${live}`));
+
+    expect(log).toEqual([`msg:${replayed}`, 'replay-complete', `msg:${live}`]);
     expect(latest.caughtUpCount).toBe(0);
   });
 

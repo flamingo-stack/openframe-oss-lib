@@ -112,6 +112,8 @@ export class FakeJetStream {
   createdConsumers: ServerConsumerConfig[] = [];
   /** Latency between CONSUMER.CREATE and the first delivered message. */
   consumeDelayMs = 0;
+  /** Publish during the gap between the creation snapshot and the first pull. */
+  beforeFirstPull?: () => void;
   /** CONSUMER lookups fail (e.g. STREAM.INFO while JetStream recovers after a restart). */
   failConsumerLookup = false;
   /** Every `consumers.get`, failed ones included. */
@@ -250,14 +252,17 @@ export class FakeJetStream {
               info: () => Promise.resolve(info),
               consume: () => {
                 if (this.failConsume) return Promise.reject(new Error('consumer could not be created'));
-                const backlog =
+                const firstSeq =
                   config.deliver_policy === 'by_start_sequence'
-                    ? this.retainedAfter(filter, config.opt_start_seq ?? 1)
+                    ? (config.opt_start_seq ?? 1)
                     : config.deliver_policy === 'all'
-                      ? this.retainedAfter(filter, 1)
-                      : [];
-                cursor = backlog.length > 0 ? 0 : this.nextSeq - 1;
-                info = { name: config.name, num_pending: backlog.length };
+                      ? 1
+                      : this.nextSeq;
+                const numPending = this.retainedAfter(filter, firstSeq).length;
+                cursor = numPending > 0 ? 0 : this.nextSeq - 1;
+                info = { name: config.name, num_pending: numPending };
+                this.beforeFirstPull?.();
+                const backlog = this.retainedAfter(filter, firstSeq);
                 this.live.add(entry);
                 if (backlog.length > 0) {
                   if (this.consumeDelayMs > 0) setTimeout(() => deliverBacklog(backlog), this.consumeDelayMs);
