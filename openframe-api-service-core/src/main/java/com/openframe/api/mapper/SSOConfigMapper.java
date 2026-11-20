@@ -2,20 +2,28 @@ package com.openframe.api.mapper;
 
 import com.openframe.api.dto.SSOConfigRequest;
 import com.openframe.api.dto.SSOConfigResponse;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.sso.SSOConfig;
+import com.openframe.data.service.TenantIdProvider;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import static com.openframe.core.crypto.service.SecretPurpose.SSO_CLIENT_SECRET;
 import static java.lang.Boolean.TRUE;
 
 @Component
+@RequiredArgsConstructor
 public class SSOConfigMapper {
+
+    private final TenantIdProvider tenantIdProvider;
 
     public SSOConfig toEntity(String provider, SSOConfigRequest request, EncryptionService encryptionService) {
         SSOConfig config = new SSOConfig();
         config.setProvider(provider);
         config.setClientId(request.getClientId());
-        config.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
+        String encryptedClientSecret = encryptClientSecret(request, encryptionService);
+        config.setClientSecret(encryptedClientSecret);
         config.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         config.setMsTenantId(request.getMsTenantId());
         config.setAllowedDomains(request.getAllowedDomains());
@@ -25,7 +33,8 @@ public class SSOConfigMapper {
 
     public void updateEntity(SSOConfig existing, SSOConfigRequest request, EncryptionService encryptionService) {
         existing.setClientId(request.getClientId());
-        existing.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
+        String encryptedClientSecret = encryptClientSecret(request, encryptionService);
+        existing.setClientSecret(encryptedClientSecret);
         existing.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         existing.setMsTenantId(request.getMsTenantId());
         existing.setAllowedDomains(request.getAllowedDomains());
@@ -44,6 +53,12 @@ public class SSOConfigMapper {
                 .build();
     }
 
+    private String encryptClientSecret(SSOConfigRequest request, EncryptionService encryptionService) {
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SSO_CLIENT_SECRET);
+        String clientSecret = request.getClientSecret();
+        return encryptionService.encrypt(clientSecret, context);
+    }
 }
 
 

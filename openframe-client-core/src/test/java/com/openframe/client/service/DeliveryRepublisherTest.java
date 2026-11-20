@@ -7,6 +7,7 @@ import com.openframe.client.service.rmm.watchdog.DeliveryRepublisher;
 import com.openframe.client.service.rmm.watchdog.DeliveryRepublisherRegistry;
 import com.openframe.client.service.rmm.watchdog.ScheduleDeliveryRepublisher;
 import com.openframe.client.service.rmm.watchdog.SoftwareDeliveryRepublisher;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
@@ -20,11 +21,16 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
+import static com.openframe.core.crypto.service.SecretPurpose.SSO_CLIENT_SECRET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 class DeliveryRepublisherTest {
@@ -34,7 +40,8 @@ class DeliveryRepublisherTest {
     private final ScriptScheduleNatsPublisher scheduleNats = mock(ScriptScheduleNatsPublisher.class);
     private final SoftwareNatsPublisher softwareNats = mock(SoftwareNatsPublisher.class);
 
-    private final ScheduleDeliveryRepublisher schedule = new ScheduleDeliveryRepublisher(objectMapper, scheduleNats, encryptionService);
+    private final ScheduleDeliveryRepublisher schedule = new ScheduleDeliveryRepublisher(objectMapper, scheduleNats, encryptionService,
+            TestEncryption.tenant());
     private final SoftwareDeliveryRepublisher software = new SoftwareDeliveryRepublisher(objectMapper, softwareNats);
 
     @Test
@@ -64,7 +71,7 @@ class DeliveryRepublisherTest {
     @DisplayName("schedule republisher: the stored copy keeps secrets encrypted, the agent gets them in plain")
     void schedule_republishRevealsStoredSecrets() throws Exception {
         ScriptEnvVar secret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
-                .sealed(encryptionService::encrypt);
+                .sealed(TestEncryption::seal);
         String json = objectMapper.writeValueAsString(ScriptScheduleExecutionMessage.builder()
                 .executionId("exec-1").machineId("m-1")
                 .scripts(List.of(ScriptScheduleExecutionItem.builder().scriptId("s-1").envVars(List.of(secret)).build()))
@@ -77,6 +84,42 @@ class DeliveryRepublisherTest {
             ScriptEnvVar sent = m.getScripts().get(0).getEnvVars().get(0);
             return "s3cr3t".equals(sent.getValue()) && !sent.isEncrypted();
         }));
+    }
+
+    @Test
+    @DisplayName("schedule republisher: a secret sealed for another tenant is never re-sent")
+    void schedule_secretOfAnotherTenant_notRepublished() throws Exception {
+        schedule.republish("m-1", batchWithSecretSealedFor(EncryptionContext.forTenant("tenant-2", SCRIPT_ENV_VAR)));
+
+        verify(scheduleNats, never()).publish(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("schedule republisher: a secret sealed for another purpose is never re-sent")
+    void schedule_secretOfAnotherPurpose_notRepublished() throws Exception {
+        schedule.republish("m-1", batchWithSecretSealedFor(EncryptionContext.forTenant(TestEncryption.TENANT, SSO_CLIENT_SECRET)));
+
+        verify(scheduleNats, never()).publish(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("schedule republisher: reveals with the pod's tenant, not a fixed one")
+    void schedule_revealsWithThePodTenant() throws Exception {
+        ScheduleDeliveryRepublisher otherPod = new ScheduleDeliveryRepublisher(objectMapper, scheduleNats, encryptionService,
+                TestEncryption.tenant("tenant-2"));
+
+        otherPod.republish("m-1", batchWithSecretSealedFor(TestEncryption.SCRIPT_CONTEXT));
+
+        verify(scheduleNats, never()).publish(anyString(), any());
+    }
+
+    private String batchWithSecretSealedFor(EncryptionContext context) {
+        ScriptEnvVar secret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(v -> encryptionService.encrypt(v, context));
+        return objectMapper.writeValueAsString(ScriptScheduleExecutionMessage.builder()
+                .executionId("exec-1").machineId("m-1")
+                .scripts(List.of(ScriptScheduleExecutionItem.builder().scriptId("s-1").envVars(List.of(secret)).build()))
+                .build());
     }
 
     @Test
@@ -97,7 +140,8 @@ class DeliveryRepublisherTest {
     @DisplayName("registry rejects duplicate republishers for the same channel")
     void registry_rejectsDuplicates() {
         assertThatThrownBy(() -> new DeliveryRepublisherRegistry(
-                List.of(schedule, new ScheduleDeliveryRepublisher(objectMapper, scheduleNats, encryptionService))))
+                List.of(schedule, new ScheduleDeliveryRepublisher(objectMapper, scheduleNats, encryptionService,
+                        TestEncryption.tenant()))))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

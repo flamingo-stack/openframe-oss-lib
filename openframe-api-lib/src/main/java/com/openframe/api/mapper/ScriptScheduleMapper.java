@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
@@ -13,6 +14,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
@@ -21,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
 
 /**
  * Pure entity &harr; DTO mapping for script schedules. Mirrors {@link ScriptMapper};
@@ -34,6 +38,7 @@ public class ScriptScheduleMapper {
     // ObjectProvider: a service that never reads a stored secret boots without the encryption config
     private final ObjectProvider<EncryptionService> encryptionService;
     private final ObjectProvider<ScriptSecretSealer> secretSealer;
+    private final TenantIdProvider tenantIdProvider;
 
     public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input,
                                    Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
@@ -162,7 +167,9 @@ public class ScriptScheduleMapper {
 
     private String decrypt(String ciphertext) {
         EncryptionService service = encryptionService.getObject();
-        return service.decrypt(ciphertext);
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SCRIPT_ENV_VAR);
+        return service.decrypt(ciphertext, context);
     }
 
     // Copies, never mutates: the same entity may still be saved after it is mapped to a response.

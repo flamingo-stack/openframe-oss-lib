@@ -1,5 +1,6 @@
 package com.openframe.authz.service.sso;
 
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+
+import static com.openframe.core.crypto.service.SecretPurpose.SSO_CLIENT_SECRET;
 
 
 @Slf4j
@@ -50,8 +53,10 @@ public class SSOConfigService {
         SSOConfig cfg = new SSOConfig();
         cfg.setProvider(provider);
         cfg.setClientId(defaults.getDefaultClientId());
-        // Encrypt so downstream decryption works transparently
-        cfg.setClientSecret(encryptionService.encryptClientSecret(defaults.getDefaultClientSecret()));
+        // Encrypt so downstream decryption works transparently; no tenant: a platform-level secret
+        String defaultClientSecret = defaults.getDefaultClientSecret();
+        EncryptionContext platformContext = context(cfg);
+        cfg.setClientSecret(encryptionService.encrypt(defaultClientSecret, platformContext));
         cfg.setTeamId(defaults.getDefaultTeamId());
         cfg.setKeyId(defaults.getDefaultKeyId());
         cfg.setEnabled(true);
@@ -132,6 +137,15 @@ public class SSOConfigService {
         if (config.getClientSecret() == null) {
             return null;
         }
-        return encryptionService.decryptClientSecret(config.getClientSecret());
+        String clientSecret = config.getClientSecret();
+        EncryptionContext context = context(config);
+        return encryptionService.decrypt(clientSecret, context);
+    }
+
+    private static EncryptionContext context(SSOConfig config) {
+        String tenantId = config.getTenantId();
+        return tenantId == null
+                ? EncryptionContext.platform(SSO_CLIENT_SECRET)
+                : EncryptionContext.forTenant(tenantId, SSO_CLIENT_SECRET);
     }
 }

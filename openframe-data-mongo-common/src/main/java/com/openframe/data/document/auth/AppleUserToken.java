@@ -32,7 +32,7 @@ public class AppleUserToken implements TenantScoped {
     private String userId;
     /** Client the token was issued to (web Services ID or the app's bundle id) — revocation must use the same one. */
     private String clientId;
-    /** Apple refresh token, encrypted with the platform {@code EncryptionService}. */
+    /** Apple refresh token, encrypted for its tenant with {@code EncryptionService}. */
     private String refreshToken;
     private Instant updatedAt;
 }

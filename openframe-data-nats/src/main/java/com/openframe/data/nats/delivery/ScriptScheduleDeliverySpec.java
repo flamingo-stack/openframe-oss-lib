@@ -1,15 +1,18 @@
 package com.openframe.data.nats.delivery;
 
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.delivery.spec.DeliveryRequest;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.delivery.spec.DeliverySpec;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
 import static java.lang.String.format;
 
 @Component
@@ -23,6 +26,7 @@ public class ScriptScheduleDeliverySpec implements DeliverySpec<ScriptScheduleDe
 
     // ObjectProvider: a service that never sends this type boots without the encryption config
     private final ObjectProvider<EncryptionService> encryptionService;
+    private final TenantIdProvider tenantIdProvider;
 
     @Override
     public DeliveryType getType() {
@@ -49,7 +53,8 @@ public class ScriptScheduleDeliverySpec implements DeliverySpec<ScriptScheduleDe
     // the batch is stored with its secrets encrypted, the agent gets them in the clear
     @Override
     public ScriptScheduleExecutionMessage wireForm(ScriptScheduleExecutionMessage message) {
-        return message.revealed(value -> encryptionService.getObject().decrypt(value));
+        EncryptionContext context = EncryptionContext.forTenant(tenantIdProvider.getTenantId(), SCRIPT_ENV_VAR);
+        return message.revealed(value -> encryptionService.getObject().decrypt(value, context));
     }
 
     @Override

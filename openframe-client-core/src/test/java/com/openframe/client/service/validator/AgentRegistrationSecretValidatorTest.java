@@ -2,43 +2,47 @@ package com.openframe.client.service.validator;
 
 import com.openframe.client.exception.AgentRegistrationSecretValidationErrorException;
 import com.openframe.client.exception.AgentRegistrationSecretValidationException;
+import com.openframe.client.support.TestEncryption;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.core.exception.EncryptionException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
+import static com.openframe.core.crypto.service.SecretPurpose.AGENT_LOG_KEY;
+import static com.openframe.core.crypto.service.SecretPurpose.AGENT_REGISTRATION_SECRET;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class AgentRegistrationSecretValidatorTest {
 
-    private static final String ENCRYPTED = "encrypted";
+    private static final String TENANT = TestEncryption.TENANT;
+    private static final EncryptionContext SECRET_CONTEXT = EncryptionContext.forTenant(TENANT, AGENT_REGISTRATION_SECRET);
     private static final String SECRET = "expected-secret";
 
-    @Mock
-    private AgentRegistrationSecretRepository secretRepository;
-
-    @Mock
-    private EncryptionService encryptionService;
-
-    @InjectMocks
+    private final EncryptionService encryptionService = TestEncryption.SERVICE;
+    private final AgentRegistrationSecretRepository secretRepository = mock(AgentRegistrationSecretRepository.class);
     private AgentRegistrationSecretValidator validator;
+
+    @BeforeEach
+    void setUp() {
+        validator = new AgentRegistrationSecretValidator(secretRepository, encryptionService, TestEncryption.tenant());
+    }
 
     @ParameterizedTest
     @NullSource
@@ -56,12 +60,11 @@ class AgentRegistrationSecretValidatorTest {
         when(secretRepository.findByActiveTrue()).thenReturn(Optional.empty());
 
         assertThrows(AgentRegistrationSecretValidationErrorException.class, () -> validator.validate(SECRET));
-        verify(encryptionService, never()).decrypt(any());
     }
 
     @Test
     void sameLengthWrongKeyIsRejected() {
-        stubActiveSecret();
+        givenActive(encryptionService.encrypt(SECRET, SECRET_CONTEXT));
 
         AgentRegistrationSecretValidationException ex =
                 assertThrows(AgentRegistrationSecretValidationException.class, () -> validator.validate("expected-Secret"));
@@ -71,7 +74,7 @@ class AgentRegistrationSecretValidatorTest {
 
     @Test
     void keyDifferingOnlyInLengthIsRejected() {
-        stubActiveSecret();
+        givenActive(encryptionService.encrypt(SECRET, SECRET_CONTEXT));
 
         AgentRegistrationSecretValidationException ex =
                 assertThrows(AgentRegistrationSecretValidationException.class, () -> validator.validate(SECRET + "x"));
@@ -81,15 +84,55 @@ class AgentRegistrationSecretValidatorTest {
 
     @Test
     void equalKeyInAnotherInstancePasses() {
-        stubActiveSecret();
+        givenActive(encryptionService.encrypt(SECRET, SECRET_CONTEXT));
 
         assertDoesNotThrow(() -> validator.validate(new String(SECRET)));
     }
 
-    private void stubActiveSecret() {
+    @Test
+    void activeSecretEncryptedForThePodTenantAndRegistrationPurposeIsAccepted() {
+        givenActive(encryptionService.encrypt(SECRET, SECRET_CONTEXT));
+
+        assertThatCode(() -> validator.validate(SECRET)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void secretEncryptedForAnotherTenantIsRejectedEvenWithTheRightKey() {
+        givenActive(encryptionService.encrypt(SECRET, EncryptionContext.forTenant("tenant-2", AGENT_REGISTRATION_SECRET)));
+
+        assertThatThrownBy(() -> validator.validate(SECRET))
+                .isInstanceOfAny(EncryptionException.class, AgentRegistrationSecretValidationException.class,
+                        AgentRegistrationSecretValidationErrorException.class);
+    }
+
+    @Test
+    void secretEncryptedForAnotherPurposeIsRejectedEvenWithTheRightKey() {
+        givenActive(encryptionService.encrypt(SECRET, EncryptionContext.forTenant(TENANT, AGENT_LOG_KEY)));
+
+        assertThatThrownBy(() -> validator.validate(SECRET))
+                .isInstanceOfAny(EncryptionException.class, AgentRegistrationSecretValidationException.class,
+                        AgentRegistrationSecretValidationErrorException.class);
+    }
+
+    @Test
+    void afterRotationTheNewKeyIsAcceptedAndTheOldOneRejected() {
+        givenActive(encryptionService.encrypt("old-key", SECRET_CONTEXT));
+        assertThatCode(() -> validator.validate("old-key")).doesNotThrowAnyException();
+
+        // rotation: the repository now returns the new active secret, the old one is inactive
+        givenActive(encryptionService.encrypt("new-key", SECRET_CONTEXT));
+
+        assertThatCode(() -> validator.validate("new-key")).doesNotThrowAnyException();
+        AgentRegistrationSecretValidationException ex =
+                assertThrows(AgentRegistrationSecretValidationException.class, () -> validator.validate("old-key"));
+        assertEquals(ErrorCode.INITIAL_KEY_INVALID, ex.getErrorCode());
+    }
+
+    private void givenActive(String encryptedKey) {
         AgentRegistrationSecret secret = new AgentRegistrationSecret();
-        secret.setSecretKey(ENCRYPTED);
+        secret.setTenantId(TENANT);
+        secret.setSecretKey(encryptedKey);
+        secret.setActive(true);
         when(secretRepository.findByActiveTrue()).thenReturn(Optional.of(secret));
-        when(encryptionService.decrypt(ENCRYPTED)).thenReturn(SECRET);
     }
 }

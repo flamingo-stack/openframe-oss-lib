@@ -3,6 +3,7 @@ package com.openframe.authz.service.sso.apple;
 import com.openframe.authz.config.oidc.AppleSSOProperties;
 import com.openframe.authz.service.auth.strategy.AppleClientSecretFactory;
 import com.openframe.authz.service.sso.SSOConfigService;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.auth.AppleUserToken;
 import com.openframe.data.document.sso.SSOConfig;
@@ -19,6 +20,7 @@ import java.util.Optional;
 
 import static com.openframe.authz.config.oidc.AppleSSOProperties.APPLE;
 import static com.openframe.authz.service.auth.strategy.AppleClientSecretFactory.APPLE_ISSUER;
+import static com.openframe.core.crypto.service.SecretPurpose.APPLE_REFRESH_TOKEN;
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -65,7 +67,9 @@ public class AppleTokenService {
             doc.setTenantId(tenantId);
             doc.setUserId(userId);
             doc.setClientId(clientId);
-            doc.setRefreshToken(encryptionService.encryptClientSecret(refreshToken));
+            EncryptionContext context = context(tenantId);
+            String encryptedRefreshToken = encryptionService.encrypt(refreshToken, context);
+            doc.setRefreshToken(encryptedRefreshToken);
             doc.setUpdatedAt(Instant.now());
             tokenRepository.save(doc);
         } catch (Exception e) {
@@ -93,7 +97,11 @@ public class AppleTokenService {
             MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
             form.add("client_id", token.getClientId());
             form.add("client_secret", clientSecret);
-            form.add("token", encryptionService.decryptClientSecret(token.getRefreshToken()));
+            String tenantId = token.getTenantId();
+            EncryptionContext context = context(tenantId);
+            String storedRefreshToken = token.getRefreshToken();
+            String refreshToken = encryptionService.decrypt(storedRefreshToken, context);
+            form.add("token", refreshToken);
             form.add("token_type_hint", "refresh_token");
 
             restClient.post()
@@ -114,6 +122,10 @@ public class AppleTokenService {
 
     public Optional<AppleUserToken> findByUserId(String userId) {
         return tokenRepository.findByUserId(userId);
+    }
+
+    private static EncryptionContext context(String tenantId) {
+        return EncryptionContext.forTenant(tenantId, APPLE_REFRESH_TOKEN);
     }
 
     private String revokeUrl() {

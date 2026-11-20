@@ -5,7 +5,9 @@ import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.core.exception.EncryptionException;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.Script;
@@ -19,7 +21,10 @@ import java.util.List;
 
 import static com.openframe.data.document.rmm.script.ScriptStatus.ACTIVE;
 import static com.openframe.data.document.rmm.script.ScriptStatus.ARCHIVED;
+import static com.openframe.core.crypto.service.SecretPurpose.AGENT_LOG_KEY;
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Verifies the PUT semantics of {@link ScriptMapper#updateEntity(Script, UpdateScriptInput)}:
@@ -32,12 +37,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ScriptMapperTest {
 
     private final EncryptionService encryptionService = TestEncryption.SERVICE;
-    private final ScriptMapper mapper = new ScriptMapper(TestEncryption.service(), TestEncryption.sealerOn());
+    private final ScriptMapper mapper = new ScriptMapper(TestEncryption.service(), TestEncryption.sealerOn(),
+            TestEncryption.tenant());
 
     @Test
     @DisplayName("no encryption config: a script with no encrypted value still maps both ways")
     void noEncryptionService_plainScript_mapsWithoutIt() {
-        ScriptMapper mapperWithoutKey = new ScriptMapper(TestEncryption.noService(), TestEncryption.sealerOff());
+        ScriptMapper mapperWithoutKey = new ScriptMapper(TestEncryption.noService(), TestEncryption.sealerOff(),
+                TestEncryption.tenant());
         CreateScriptInput input = new CreateScriptInput();
         input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()));
 
@@ -50,7 +57,8 @@ class ScriptMapperTest {
     @Test
     @DisplayName("encryption off: a secret is stored as given, and an already encrypted one still comes back plain")
     void encryptionOff_storesPlain_stillDecrypts() {
-        ScriptMapper plainMapper = new ScriptMapper(TestEncryption.service(), TestEncryption.sealerOff());
+        ScriptMapper plainMapper = new ScriptMapper(TestEncryption.service(), TestEncryption.sealerOff(),
+                TestEncryption.tenant());
         CreateScriptInput input = new CreateScriptInput();
         input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()));
 
@@ -60,7 +68,7 @@ class ScriptMapperTest {
 
         Script sealedEarlier = Script.builder().envVars(List.of(ScriptEnvVar.builder()
                 .name("TOKEN").value("s3cr3t").secret(true).build()
-                .sealed(encryptionService::encrypt))).build();
+                .sealed(TestEncryption::seal))).build();
         assertThat(plainMapper.toResponse(sealedEarlier).getEnvVars().get(0).getValue()).isEqualTo("s3cr3t");
     }
 
@@ -76,9 +84,59 @@ class ScriptMapperTest {
 
         assertThat(stored.get(0).isEncrypted()).isTrue();
         assertThat(stored.get(0).getValue()).isNotEqualTo("s3cr3t");
-        assertThat(encryptionService.decrypt(stored.get(0).getValue())).isEqualTo("s3cr3t");
+        assertThat(TestEncryption.reveal(stored.get(0).getValue())).isEqualTo("s3cr3t");
         assertThat(stored.get(1).isEncrypted()).isFalse();
         assertThat(stored.get(1).getValue()).isEqualTo("eu");
+    }
+
+    @Test
+    @DisplayName("toEntity: a secret is sealed for the pod's tenant and the script-env-var purpose, unreadable under any other context")
+    void toEntity_sealsForThePodTenantAndScriptPurpose() {
+        CreateScriptInput input = new CreateScriptInput();
+        input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()));
+
+        String stored = mapper.toEntity(TestEncryption.TENANT, input).getEnvVars().get(0).getValue();
+
+        assertThat(stored).doesNotContain("s3cr3t");
+        assertThat(encryptionService.decrypt(stored, EncryptionContext.forTenant(TestEncryption.TENANT, SCRIPT_ENV_VAR)))
+                .isEqualTo("s3cr3t");
+        assertThatThrownBy(() -> encryptionService.decrypt(stored, EncryptionContext.forTenant("tenant-2", SCRIPT_ENV_VAR)))
+                .isInstanceOf(EncryptionException.class);
+        assertThatThrownBy(() -> encryptionService.decrypt(stored, EncryptionContext.forTenant(TestEncryption.TENANT, AGENT_LOG_KEY)))
+                .isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    @DisplayName("toEntity: the pod's tenant is the context even when the caller passes another tenant id")
+    void toEntity_podTenantWinsOverTheArgument() {
+        CreateScriptInput input = new CreateScriptInput();
+        input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()));
+
+        String stored = mapper.toEntity("tenant-2", input).getEnvVars().get(0).getValue();
+
+        assertThat(TestEncryption.reveal(stored)).isEqualTo("s3cr3t");
+    }
+
+    @Test
+    @DisplayName("toResponse: a secret sealed for another tenant fails instead of coming back")
+    void toResponse_secretOfAnotherTenant_fails() {
+        Script entity = Script.builder().tenantId(TestEncryption.TENANT).envVars(List.of(
+                ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                        .sealed(v -> encryptionService.encrypt(v, EncryptionContext.forTenant("tenant-2", SCRIPT_ENV_VAR)))))
+                .build();
+
+        assertThatThrownBy(() -> mapper.toResponse(entity)).isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    @DisplayName("toResponse: a secret sealed for another purpose fails instead of coming back")
+    void toResponse_secretOfAnotherPurpose_fails() {
+        Script entity = Script.builder().tenantId(TestEncryption.TENANT).envVars(List.of(
+                ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                        .sealed(v -> encryptionService.encrypt(v, EncryptionContext.forTenant(TestEncryption.TENANT, AGENT_LOG_KEY)))))
+                .build();
+
+        assertThatThrownBy(() -> mapper.toResponse(entity)).isInstanceOf(EncryptionException.class);
     }
 
     @Test
@@ -86,7 +144,7 @@ class ScriptMapperTest {
     void toResponse_decryptsSecrets() {
         Script entity = Script.builder().envVars(List.of(
                 ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
-                        .sealed(encryptionService::encrypt))).build();
+                        .sealed(TestEncryption::seal))).build();
 
         ScriptResponse response = mapper.toResponse(entity);
 
@@ -99,7 +157,7 @@ class ScriptMapperTest {
     @DisplayName("updateEntity: a kept secret (no value sent) keeps its stored ciphertext — never encrypted twice")
     void updateEntity_keptSecretIsNotEncryptedTwice() {
         ScriptEnvVar stored = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
-                .sealed(encryptionService::encrypt);
+                .sealed(TestEncryption::seal);
         Script existing = Script.builder().envVars(List.of(stored)).build();
         UpdateScriptInput input = new UpdateScriptInput();
         input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").secret(true).build()));
@@ -109,7 +167,7 @@ class ScriptMapperTest {
         ScriptEnvVar kept = existing.getEnvVars().get(0);
         assertThat(kept.getValue()).isEqualTo(stored.getValue());
         assertThat(kept.isEncrypted()).isTrue();
-        assertThat(encryptionService.decrypt(kept.getValue())).isEqualTo("s3cr3t");
+        assertThat(TestEncryption.reveal(kept.getValue())).isEqualTo("s3cr3t");
     }
 
     @Test
@@ -376,7 +434,7 @@ class ScriptMapperTest {
     }
 
     private List<ScriptEnvVar> revealed(List<ScriptEnvVar> envVars) {
-        return ScriptEnvVar.revealAll(envVars, encryptionService::decrypt);
+        return ScriptEnvVar.revealAll(envVars, TestEncryption::reveal);
     }
 
     private static Script fullyPopulated() {

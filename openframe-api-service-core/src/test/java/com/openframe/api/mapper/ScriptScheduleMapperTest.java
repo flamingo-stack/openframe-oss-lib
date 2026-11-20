@@ -5,10 +5,14 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
+import com.openframe.api.dto.rmm.script.CreateScriptInput;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.core.exception.EncryptionException;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.core.crypto.service.SecretPurpose.AGENT_REGISTRATION_SECRET;
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -26,7 +32,7 @@ class ScriptScheduleMapperTest {
 
     private final EncryptionService encryptionService = TestEncryption.SERVICE;
     private final ScriptScheduleMapper mapper = new ScriptScheduleMapper(TestEncryption.service(),
-            TestEncryption.sealerOn());
+            TestEncryption.sealerOn(), TestEncryption.tenant());
 
     @Test
     @DisplayName("toEntity (create): secret override with value=null resolves from the script's own env vars — first-time customization keeps the script's stored secret")
@@ -162,8 +168,61 @@ class ScriptScheduleMapperTest {
         assertThat(entity.getScriptCustomParams().get(0).getEnvVars().get(0)).isSameAs(stored);
     }
 
+    @Test
+    @DisplayName("toEntity: a secret override is sealed for the pod's tenant and the script-env-var purpose only")
+    void secretOverride_sealedForThePodTenantAndScriptPurpose() {
+        CreateScriptScheduleInput input = createInput(customParams(SCRIPT_ID, null, List.of(
+                ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build())));
+
+        String stored = mapper.toEntity(TestEncryption.TENANT, input, Map.of())
+                .getScriptCustomParams().get(0).getEnvVars().get(0).getValue();
+
+        assertThat(stored).doesNotContain("s3cr3t");
+        assertThat(encryptionService.decrypt(stored, EncryptionContext.forTenant(TestEncryption.TENANT, SCRIPT_ENV_VAR)))
+                .isEqualTo("s3cr3t");
+        assertThatThrownBy(() -> encryptionService.decrypt(stored, EncryptionContext.forTenant("tenant-2", SCRIPT_ENV_VAR)))
+                .isInstanceOf(EncryptionException.class);
+        assertThatThrownBy(() -> encryptionService.decrypt(stored,
+                EncryptionContext.forTenant(TestEncryption.TENANT, AGENT_REGISTRATION_SECRET)))
+                .isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    @DisplayName("toResponse: a secret override sealed for another tenant fails instead of coming back")
+    void toResponse_overrideOfAnotherTenant_fails() {
+        ScriptEnvVar foreign = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(v -> encryptionService.encrypt(v, EncryptionContext.forTenant("tenant-2", SCRIPT_ENV_VAR)));
+        ScheduleScript entity = ScheduleScript.builder().tenantId(TestEncryption.TENANT)
+                .scriptCustomParams(List.of(ScheduledScriptCustomParams.builder()
+                        .scriptId(SCRIPT_ID).envVars(List.of(foreign)).build()))
+                .build();
+
+        assertThatThrownBy(() -> mapper.toResponse(entity)).isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    @DisplayName("a secret sealed on a Script and copied as ciphertext into the schedule still reveals")
+    void scriptSecretCopiedAsCiphertext_stillReveals() {
+        ScriptMapper scriptMapper = new ScriptMapper(TestEncryption.service(), TestEncryption.sealerOn(),
+                TestEncryption.tenant());
+        CreateScriptInput scriptInput = new CreateScriptInput();
+        scriptInput.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("script-secret").secret(true).build()));
+        Script script = scriptMapper.toEntity(TestEncryption.TENANT, scriptInput);
+        ScriptEnvVar sealedOnScript = script.getEnvVars().get(0);
+        CreateScriptScheduleInput input = createInput(customParams(SCRIPT_ID, null, List.of(
+                ScriptEnvVarInput.builder().name("TOKEN").value(null).secret(true).build())));
+
+        ScheduleScript entity = mapper.toEntity(TestEncryption.TENANT, input, Map.of(SCRIPT_ID, script.getEnvVars()));
+
+        ScriptEnvVar copied = entity.getScriptCustomParams().get(0).getEnvVars().get(0);
+        assertThat(copied.isEncrypted()).isTrue();
+        assertThat(copied.getValue()).isEqualTo(sealedOnScript.getValue());
+        assertThat(mapper.toResponse(entity).getScriptCustomParams().get(0).getEnvVars().get(0).getValue())
+                .isEqualTo("script-secret");
+    }
+
     private List<ScriptEnvVar> revealed(List<ScriptEnvVar> envVars) {
-        return ScriptEnvVar.revealAll(envVars, encryptionService::decrypt);
+        return ScriptEnvVar.revealAll(envVars, TestEncryption::reveal);
     }
 
     private static CreateScriptScheduleInput createInput(ScheduledScriptCustomParamsInput params) {
