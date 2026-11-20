@@ -226,12 +226,17 @@ public class TicketService {
         Integer ticketNumber = ticketNumberService.getNextTicketNumber();
         Ticket ticket = SystemTicketFields.newTicket(command, ticketNumber);
 
-        ticketLifecycleService.applySystemInitialStatus(ticket, command.getStatusId());
-        activeAssignee(command.getAssigneeId()).ifPresent(user -> SystemTicketFields.applyAssignee(ticket, user));
-        activeOrganization(command.getOrganizationId())
+        String statusId = command.getStatusId();
+        String assigneeId = command.getAssigneeId();
+        String organizationId = command.getOrganizationId();
+        String deviceId = command.getDeviceId();
+        ticketLifecycleService.applySystemInitialStatus(ticket, statusId);
+        activeAssignee(assigneeId).ifPresent(user -> SystemTicketFields.applyAssignee(ticket, user));
+        activeOrganization(organizationId)
                 .ifPresent(organization -> SystemTicketFields.applyOrganization(ticket, organization));
-        existingDevice(command.getDeviceId()).ifPresent(device -> SystemTicketFields.applyDevice(ticket, device));
-        ticket.setOrder(computeTopOrder(ticket));
+        existingDevice(deviceId).ifPresent(device -> SystemTicketFields.applyDevice(ticket, device));
+        String topOrder = computeTopOrder(ticket);
+        ticket.setOrder(topOrder);
 
         Ticket savedTicket = ticketRepository.save(ticket);
         log.info("Created {} ticket #{} with ID: {}", savedTicket.getCreationSource(), savedTicket.getTicketNumber(),
