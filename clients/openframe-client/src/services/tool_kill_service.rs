@@ -27,8 +27,7 @@ impl ToolKillService {
     /// Stop a tool process by tool ID
     ///
     /// This method will search for any running processes that match the tool's
-    /// command pattern and attempt to terminate them gracefully, falling back
-    /// to force kill if necessary.
+    /// command pattern and kill them, retrying the kill until they exit.
     pub async fn stop_tool(&self, tool_id: &str) -> Result<()> {
         let pattern = Self::build_tool_cmd_pattern(tool_id);
         self.stop_processes_by_pattern(&pattern, &format!("tool: {}", tool_id))
@@ -38,8 +37,7 @@ impl ToolKillService {
     /// Stop an asset process by asset ID and tool ID
     ///
     /// This method will search for any running processes that match the asset's
-    /// command pattern and attempt to terminate them gracefully, falling back
-    /// to force kill if necessary.
+    /// command pattern and kill them, retrying the kill until they exit.
     pub async fn stop_asset(&self, asset_id: &str, tool_id: &str) -> Result<()> {
         let pattern = Self::build_asset_cmd_pattern(asset_id, tool_id);
         self.stop_processes_by_pattern(
@@ -102,7 +100,7 @@ impl ToolKillService {
     /// Generic method to stop processes matching a command pattern
     ///
     /// This method will search for any running processes that match the given
-    /// pattern and attempt to terminate them gracefully with retries and verification.
+    /// pattern and kill them with retries and verification.
     async fn stop_processes_by_pattern(&self, pattern: &str, description: &str) -> Result<()> {
         info!("Attempting to stop {}", description);
         info!("Using pattern to stop: {}", pattern);
@@ -145,17 +143,14 @@ impl ToolKillService {
 
     /// Stop a single process with retry logic and verification
     ///
-    /// Attempts graceful termination first, waits for process to exit, then falls back
-    /// to force kill with retries if necessary.
+    /// Kills the process and waits for it to exit, then retries the kill while it is still running.
     async fn stop_process_with_retry(&self, pid: Pid, description: &str) -> Result<()> {
         info!("Stopping process {} for {}", pid, description);
 
-        // Try graceful termination first
-        if self.try_graceful_stop(pid, description).await? {
+        if self.try_first_kill(pid, description).await? {
             return Ok(());
         }
 
-        // Graceful stop failed, try force kill with retries
         for attempt in 1..=MAX_KILL_RETRIES {
             info!(
                 "Force kill attempt {}/{} for process {} ({})",
@@ -187,28 +182,22 @@ impl ToolKillService {
         ))
     }
 
-    /// Stops one process: graceful signal, then force kill with retries, each waited for.
+    /// Stops one process: a kill, then kill retries, each waited for.
     pub async fn stop_process(&self, pid: u32, description: &str) -> Result<()> {
         self.stop_process_with_retry(Pid::from_u32(pid), description)
             .await
     }
 
-    /// Try graceful termination and wait for process to exit
-    async fn try_graceful_stop(&self, pid: Pid, description: &str) -> Result<bool> {
+    /// Kill the process and wait for it to exit
+    async fn try_first_kill(&self, pid: Pid, description: &str) -> Result<bool> {
         let mut sys = System::new_all();
         sys.refresh_all();
 
         if sys.process(pid).is_some() {
-            info!(
-                "Sending graceful termination signal to process {} ({})",
-                pid, description
-            );
+            info!("Killing process {} ({})", pid, description);
 
             if let Err(e) = process_kill::terminate(pid.as_u32()) {
-                warn!(
-                    "Failed to send graceful termination signal to process {} ({}): {}",
-                    pid, description, e
-                );
+                warn!("Failed to kill process {} ({}): {}", pid, description, e);
                 return Ok(false);
             }
 
@@ -217,12 +206,12 @@ impl ToolKillService {
                 .wait_for_process_exit(pid, GRACEFUL_SHUTDOWN_TIMEOUT_SECS)
                 .await
             {
-                info!("Process {} ({}) terminated gracefully", pid, description);
+                info!("Process {} ({}) exited after the kill", pid, description);
                 return Ok(true);
             }
 
             warn!(
-                "Process {} ({}) did not exit within {} seconds after graceful signal",
+                "Process {} ({}) did not exit within {} seconds after the kill",
                 pid, description, GRACEFUL_SHUTDOWN_TIMEOUT_SECS
             );
         }

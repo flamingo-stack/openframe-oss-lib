@@ -288,13 +288,8 @@ pub(crate) async fn evict_holders_for_removal(tool_dir: &Path) {
 #[cfg(target_os = "windows")]
 async fn terminate_pid(pid: u32) {
     info!("Lock recovery: terminating lock holder PID {}", pid);
-    match tokio::task::spawn_blocking(move || process_kill::terminate_tree(pid)).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => warn!("Lock recovery: failed to terminate PID {}: {}", pid, e),
-        Err(e) => warn!(
-            "Lock recovery: terminate task for PID {} failed: {}",
-            pid, e
-        ),
+    if let Err(e) = process_kill::terminate_tree_async(pid).await {
+        warn!("Lock recovery: failed to terminate PID {}: {}", pid, e);
     }
 }
 

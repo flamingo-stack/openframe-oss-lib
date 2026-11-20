@@ -151,3 +151,11 @@ fn descendants_survive_a_parent_cycle() {
     let links = vec![(10, Some(11)), (11, Some(10))];
     assert_eq!(descendants(&links, 10), vec![11]);
 }
+
+#[test]
+fn the_calling_process_is_never_a_kill_target() {
+    let links = vec![(10, None), (20, Some(10)), (30, Some(20)), (40, Some(10))];
+    let mut targets = kill_targets(&links, 10, 20);
+    targets.sort();
+    assert_eq!(targets, vec![30, 40]);
+}

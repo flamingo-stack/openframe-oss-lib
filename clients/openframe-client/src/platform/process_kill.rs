@@ -53,12 +53,28 @@ pub(crate) fn terminate_tree(root: u32) -> io::Result<()> {
             (pid.as_u32(), parent)
         })
         .collect();
-    for pid in descendants(&links, root) {
+    for pid in kill_targets(&links, root, std::process::id()) {
         if let Err(e) = terminate(pid) {
             warn!(pid, root, error = %e, "Failed to kill a descendant process");
         }
     }
     terminate(root)
+}
+
+/// `terminate_tree` on a blocking thread, for async callers; a failed task is an error like a failed kill.
+#[cfg(windows)]
+pub(crate) async fn terminate_tree_async(root: u32) -> io::Result<()> {
+    tokio::task::spawn_blocking(move || terminate_tree(root))
+        .await
+        .unwrap_or_else(|e| Err(io::Error::other(e)))
+}
+
+/// The descendants of `root` to kill before it, without the calling process, which can sit under it.
+fn kill_targets(links: &[(u32, Option<u32>)], root: u32, own_pid: u32) -> Vec<u32> {
+    descendants(links, root)
+        .into_iter()
+        .filter(|pid| *pid != own_pid)
+        .collect()
 }
 
 /// All transitive descendants of `root` from (pid, parent) links, excluding `root` itself.
