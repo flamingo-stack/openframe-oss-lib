@@ -10,6 +10,7 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
+import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.PageResult;
@@ -183,7 +184,7 @@ class SoftwareInventoryServiceTest {
         when(response.getSoftwareTitles()).thenReturn(List.of());
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
 
-        SoftwareFilters filters = service.getSoftwareFilters(null);
+        SoftwareFilters filters = service.getSoftwareFilters(null, null);
 
         assertThat(filters.getSources()).isEmpty();
         assertThat(filters.getVersionStatuses()).isEmpty();
@@ -220,7 +221,7 @@ class SoftwareInventoryServiceTest {
                 titleWithSource("Random pkg",       "programs")));      // unknown -> UNMANAGED
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
 
-        SoftwareFilters filters = service.getSoftwareFilters(null);
+        SoftwareFilters filters = service.getSoftwareFilters(null, null);
 
         // Each dimension is capped by SoftwareFilterOption; order follows enum ordinal so we assert as-map.
         java.util.Map<String, Integer> sourceCounts = filters.getSources().stream()
@@ -260,7 +261,7 @@ class SoftwareInventoryServiceTest {
                 titleWithSource("Chocolatey app", "chocolatey_packages")));
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
 
-        service.getSoftwareFilters(null);
+        service.getSoftwareFilters(null, null);
 
         // Invariant: facet reads must never fire the enricher — that would explode into N Fleet
         // /hosts lookups per facet request.
@@ -329,7 +330,7 @@ class SoftwareInventoryServiceTest {
                 .extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getSoftwareVersion)
                 .containsExactlyInAnyOrder(tuple("m-mac", "21.2.4, 26.1.2"), tuple("m-pc", "26.1.2"));
         assertThat(result.filteredCount()).isEqualTo(2);
-        int counted = service.getSoftwareDeviceFilters("103", null).getStatuses().stream()
+        int counted = service.getSoftwareDeviceFilters("103", null, null).getStatuses().stream()
                 .mapToInt(SoftwareFilterOption::getCount).sum();
         assertThat(counted).isEqualTo(2);
     }
@@ -379,7 +380,7 @@ class SoftwareInventoryServiceTest {
         machine.setHostname("host-1");
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(1L, machine));
 
-        SoftwareOnDeviceFilters filters = service.getSoftwareDeviceFilters("42", null);
+        SoftwareOnDeviceFilters filters = service.getSoftwareDeviceFilters("42", null, null);
 
         assertThat(filters.getStatuses()).isNotEmpty();
         int total = filters.getStatuses().stream().mapToInt(SoftwareFilterOption::getCount).sum();
@@ -1022,7 +1023,7 @@ class SoftwareInventoryServiceTest {
 
         // execution
         PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", filter, null, 0, 50, null);
-        SoftwareOnDeviceFilters facets = service.getSoftwareDeviceFilters("42", null);
+        SoftwareOnDeviceFilters facets = service.getSoftwareDeviceFilters("42", null, null);
 
         // verifications
         assertThat(result.items()).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-1");
@@ -1085,7 +1086,7 @@ class SoftwareInventoryServiceTest {
         when(response.getSoftwareTitles()).thenReturn(List.of());
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
 
-        service.getSoftwareFilters(null);
+        service.getSoftwareFilters(null, null);
 
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftware(anyList());
@@ -1390,7 +1391,7 @@ class SoftwareInventoryServiceTest {
         organization.setName("Acme");
         when(organizationRepository.findByOrganizationIdIn(Set.of("org-acme", "org-gone"))).thenReturn(List.of(organization));
 
-        SoftwareOnDeviceFilters filters = service.getSoftwareDeviceFilters("42", null);
+        SoftwareOnDeviceFilters filters = service.getSoftwareDeviceFilters("42", null, null);
 
         assertThat(filters.getInstalledBy()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
                 .containsExactly(tuple("BREW", 3));
@@ -1412,7 +1413,7 @@ class SoftwareInventoryServiceTest {
         organization.setOrganizationId("org-unnamed");
         when(organizationRepository.findByOrganizationIdIn(Set.of("org-unnamed"))).thenReturn(List.of(organization));
 
-        assertThat(service.getSoftwareDeviceFilters("42", null).getOrganizations())
+        assertThat(service.getSoftwareDeviceFilters("42", null, null).getOrganizations())
                 .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getLabel)
                 .containsExactly(tuple("org-unnamed", "org-unnamed"));
     }
@@ -1421,8 +1422,176 @@ class SoftwareInventoryServiceTest {
     void softwareDeviceFilters_noOrganizationOnAnyDevice_noLookup() {
         stubDevices("apps", device("m-1", "1.0"));
 
-        assertThat(service.getSoftwareDeviceFilters("42", null).getOrganizations()).isEmpty();
+        assertThat(service.getSoftwareDeviceFilters("42", null, null).getOrganizations()).isEmpty();
         verifyNoInteractions(organizationRepository);
+    }
+
+    @Test
+    void listSoftware_versionStatusesFilterWithAPage_keepsTheChosenStatusesAndTheTotalFollowsTheFilter() {
+        // setup
+        stubTitles(titleWithSource("node", "homebrew_packages"), titleWithSource("jq", "homebrew_packages"),
+                titleWithSource("Contoso Tool", "programs"), titleWithSource("xz", "homebrew_packages"));
+        catalogSetsVersionStatus(Map.of("node", SoftwareVersionStatus.UP_TO_DATE, "jq", SoftwareVersionStatus.OUTDATED,
+                "Contoso Tool", SoftwareVersionStatus.UNKNOWN, "xz", SoftwareVersionStatus.UP_TO_DATE));
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setVersionStatuses(List.of(SoftwareVersionStatus.UP_TO_DATE));
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 1, sort("name", SortDirection.ASC), null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("node");
+        assertThat(result.filteredCount()).isEqualTo(2);
+        verify(catalogStatus).apply(pageRowsCaptor.capture());
+        assertThat(pageRowsCaptor.getValue()).hasSize(4);
+    }
+
+    @Test
+    void getSoftwareFilters_filter_countsOnlyTheTitlesItKeeps() {
+        // setup
+        stubFacetTitles(titleWithSource("Google Chrome", "programs"), titleWithSource("node", "homebrew_packages"),
+                titleWithSource("git", "chocolatey_packages"));
+        catalogSetsVersionStatus(Map.of("Google Chrome", SoftwareVersionStatus.OUTDATED,
+                "node", SoftwareVersionStatus.OUTDATED, "git", SoftwareVersionStatus.UP_TO_DATE));
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setOsTypes(List.of(OsType.WINDOWS));
+        filter.setVersionStatuses(List.of(SoftwareVersionStatus.OUTDATED));
+
+        // execution
+        SoftwareFilters filters = service.getSoftwareFilters(filter, null);
+
+        // verifications
+        assertThat(filters.getSources()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("UNMANAGED", 1));
+        assertThat(filters.getOsTypes()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("WINDOWS", 1));
+    }
+
+    @Test
+    void getSoftwareFilters_minSeverity_onlyVulnerableTitlesAskedOfFleet() {
+        // setup
+        ArgumentCaptor<SoftwareTitleRequest> request = ArgumentCaptor.forClass(SoftwareTitleRequest.class);
+        when(fleet.listSoftwareTitles(request.capture())).thenReturn(new SoftwareTitlesResponse());
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setMinSeverity(SoftwareCveSeverity.LOW);
+
+        // execution
+        service.getSoftwareFilters(filter, "chr");
+
+        // verifications
+        assertThat(request.getValue())
+                .extracting(SoftwareTitleRequest::getQuery, SoftwareTitleRequest::getVulnerable)
+                .containsExactly("chr", true);
+    }
+
+    @Test
+    void getSoftwareFilters_titlesOfSeveralSystems_osFacetCountsTitlesPerSystem() {
+        // setup
+        stubFacetTitles(titleWithSource("Google Chrome", "programs"), titleWithSource("Slack", "programs"),
+                titleWithSource("node", "homebrew_packages"));
+
+        // execution
+        SoftwareFilters filters = service.getSoftwareFilters(null, null);
+
+        // verifications
+        assertThat(filters.getOsTypes()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactlyInAnyOrder(tuple("WINDOWS", 2), tuple("MAC_OS", 1));
+    }
+
+    @Test
+    void softwareDeviceFilters_filter_countsOnlyTheDevicesItKeeps() {
+        // setup
+        Machine acme = device("m-1", "1.0");
+        acme.setOrganizationId("org-acme");
+        acme.setStatus(DeviceStatus.ONLINE);
+        Machine globex = device("m-2", "1.0");
+        globex.setOrganizationId("org-globex");
+        globex.setStatus(DeviceStatus.OFFLINE);
+        Machine alsoGlobex = device("m-3", "1.0");
+        alsoGlobex.setOrganizationId("org-globex");
+        alsoGlobex.setStatus(DeviceStatus.ONLINE);
+        stubDevices("homebrew_packages", acme, globex, alsoGlobex);
+        autoUpdateOn("m-3");
+        when(organizationRepository.findByOrganizationIdIn(Set.of("org-globex"))).thenReturn(List.of());
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setOrganizationIds(List.of("org-globex"));
+
+        // execution
+        SoftwareOnDeviceFilters filters = service.getSoftwareDeviceFilters("42", filter, null);
+
+        // verifications
+        assertThat(filters.getDeviceStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactlyInAnyOrder(tuple("ONLINE", 1), tuple("OFFLINE", 1));
+        assertThat(filters.getAutoUpdateStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("ON", 1), tuple("OFF", 1));
+        assertThat(filters.getOrganizations()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("org-globex", 2));
+    }
+
+    @Test
+    void softwareDeviceFilters_tagFilter_countsOnlyTheTaggedDevices() {
+        // setup
+        stubDevices("homebrew_packages", device("m-1", "1.0"), device("m-2", "1.0"));
+        when(tagAssignmentRepository.findByEntityIdInAndTagIdInAndEntityType(List.of("m-1", "m-2"), List.of("tag-1"),
+                TagEntityType.DEVICE)).thenReturn(List.of(TagAssignment.builder().entityId("m-2").build()));
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setDeviceTagIds(List.of("tag-1"));
+
+        // execution
+        SoftwareOnDeviceFilters filters = service.getSoftwareDeviceFilters("42", filter, null);
+
+        // verifications
+        assertThat(filters.getInstalledBy()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("BREW", 1));
+    }
+
+    @Test
+    void listVulnerabilitiesForSoftware_sortByAffectedVersion_numericOrderBothDirectionsNullsLast() {
+        // setup
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setVersions(List.of(versionWithCve("10.0", "CVE-A"), versionWithCve("9.2", "CVE-B"),
+                versionWithCve(null, "CVE-C")));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+
+        // execution
+        List<String> ascending = cveIds(service.listVulnerabilitiesForSoftware("42", null, null, 0, 50,
+                "affectedVersion", true));
+        List<String> descending = cveIds(service.listVulnerabilitiesForSoftware("42", null, null, 0, 50,
+                "affectedVersion", false));
+
+        // verifications
+        assertThat(ascending).containsExactly("CVE-B", "CVE-A", "CVE-C");
+        assertThat(descending).containsExactly("CVE-A", "CVE-B", "CVE-C");
+    }
+
+    @Test
+    void listVulnerabilitiesForSoftware_unknownSortField_badRequestBeforeFleet() {
+        // execution
+        BadRequestException thrown = assertThrows(BadRequestException.class,
+                () -> service.listVulnerabilitiesForSoftware("42", null, null, 0, 50, "bogus", true));
+
+        // verifications
+        assertThat(thrown.getMessage()).contains("bogus").contains("affectedVersion");
+        verifyNoInteractions(fleet);
+    }
+
+    private static List<String> cveIds(PageResult<SoftwareVulnerabilityResponse> page) {
+        return page.items().stream().map(SoftwareVulnerabilityResponse::getCveId).toList();
+    }
+
+    private void stubFacetTitles(SoftwareTitle... titles) {
+        SoftwareTitlesResponse response = new SoftwareTitlesResponse();
+        response.setSoftwareTitles(List.of(titles));
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+    }
+
+    private void catalogSetsVersionStatus(Map<String, SoftwareVersionStatus> statusByName) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setVersionStatus(statusByName.get(row.getName())));
+            return null;
+        }).when(catalogStatus).apply(anyList());
     }
 
     @Test

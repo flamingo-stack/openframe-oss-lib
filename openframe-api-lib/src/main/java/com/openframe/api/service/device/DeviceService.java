@@ -136,6 +136,23 @@ public class DeviceService {
         return paginate(scheduleDeviceFilter(filterOptions, null, scope), search, paginationCriteria, sort);
     }
 
+    public CountedGenericQueryResult<Machine> queryDevicesAmong(Collection<String> machineIds,
+                                                  DeviceFilterCriteria filterOptions,
+                                                  CursorPaginationCriteria paginationCriteria,
+                                                  String search,
+                                                  SortInput sort) {
+        Collection<String> scope = machineIds == null ? List.of() : machineIds;
+        MachineQueryFilter filter = machineFilter(filterOptions, null, scope);
+        return paginate(filter, search, paginationCriteria, sort);
+    }
+
+    public DeviceFilters getDeviceFiltersAmong(Collection<String> machineIds,
+                                               DeviceFilterCriteria filterOptions, String search) {
+        Collection<String> scope = machineIds == null ? List.of() : machineIds;
+        MachineQueryFilter filter = machineFilter(filterOptions, null, scope);
+        return deviceFilters(filter, search);
+    }
+
     public CountedGenericQueryResult<Machine> queryDevicesForPlatforms(Collection<OsType> osTypes,
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
