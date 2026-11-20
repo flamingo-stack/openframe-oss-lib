@@ -394,6 +394,7 @@ fn log_finished(execution_id: &str, schedule_id: &str, script_id: &str, result: 
         script_id = %script_id,
         exit_code = result.exit_code,
         timed_out = result.timed_out,
+        failure_reason = ?result.failure_reason,
         execution_time_ms = result.execution_time_ms,
         "Execution finished"
     );
@@ -414,3 +415,7 @@ where
 #[cfg(test)]
 #[path = "execution_listener_tests.rs"]
 mod tests;
+
+#[cfg(all(test, unix))]
+#[path = "execution_integration_tests.rs"]
+mod integration_tests;

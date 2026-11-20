@@ -92,3 +92,26 @@ async fn empty_code_runs_empty() {
     assert_eq!(r.retcode, 0);
     assert_eq!(r.stdout, "");
 }
+
+#[test]
+fn a_missing_interactive_user_is_no_user_session() {
+    let r = ExecResult::not_launched(
+        crate::executor::NoInteractiveUser("no active interactive user").into(),
+    );
+    assert_eq!(r.retcode, 85);
+    assert_eq!(r.stderr, "no active interactive user");
+    assert_eq!(
+        r.agent_failure,
+        Some(crate::executor::AgentFailure::NoUserSession)
+    );
+}
+
+#[tokio::test]
+async fn a_bad_interpreter_could_not_launch() {
+    let r = run("#!/nonexistent/ofcmd-bad\necho hi\n", &[], &[]).await;
+    assert_eq!(r.retcode, 85);
+    assert_eq!(
+        r.agent_failure,
+        Some(crate::executor::AgentFailure::CouldNotLaunch)
+    );
+}

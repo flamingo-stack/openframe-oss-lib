@@ -8,7 +8,7 @@ use super::job::JobHandle;
 use super::Interpreter;
 use crate::executor::env::apply_env_vars;
 use crate::executor::output::{clean_string, join_reads, read_capped};
-use crate::executor::{ExecResult, ScriptParams};
+use crate::executor::{AgentFailure, ExecResult, ScriptParams};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const READ_GRACE: Duration = Duration::from_secs(5);
@@ -31,14 +31,7 @@ pub(super) async fn run_normal(
 
     let mut child = match cmd.spawn() {
         Ok(child) => child,
-        Err(e) => {
-            return ExecResult {
-                stdout: String::new(),
-                stderr: e.to_string(),
-                retcode: 85,
-                timed_out: false,
-            }
-        }
+        Err(e) => return ExecResult::not_launched(e.into()),
     };
 
     let pid = child.id().unwrap_or(0);
@@ -61,6 +54,7 @@ pub(super) async fn run_normal(
                 stderr: clean_string(&err),
                 retcode: status.code().unwrap_or(1),
                 timed_out: false,
+                agent_failure: None,
             }
         }
         Ok(Err(e)) => {
@@ -71,6 +65,7 @@ pub(super) async fn run_normal(
                 stderr: format!("{}\n{}", clean_string(&err), e),
                 retcode: 1,
                 timed_out: false,
+                agent_failure: Some(AgentFailure::CouldNotLaunch),
             }
         }
         Err(_) => {
@@ -88,6 +83,7 @@ pub(super) async fn run_normal(
                 ),
                 retcode: 98,
                 timed_out: true,
+                agent_failure: None,
             }
         }
     }
