@@ -2,11 +2,16 @@
 
 export {
   ExecutionDeviceCell,
+  ExecutionDeviceGridCell,
   ExecutionInitiatorCell,
+  ExecutionInitiatorGridCell,
   ExecutionResultCell,
+  ExecutionResultGridCell,
   ExecutionSourceBadge,
   ExecutionStatusCell,
+  ExecutionStatusGridCell,
   ExecutionTimestampCell,
+  ExecutionTimestampGridCell,
   ScriptExecutionResult,
 } from './execution-cells';
 export { SCRIPT_EXECUTION_STATUS_PRESENTATION, scriptExecutionStatus } from './execution-status';
@@ -16,12 +21,12 @@ export type {
   ScriptExecutionStatusPresentation,
   ScriptExecutionStatusVariant,
 } from './execution-status';
-export { ScheduleDateTimeCell, ScriptNameCell } from './script-cells';
+export { ScheduleDateTimeCell, ScheduleDateTimeGridCell, ScriptNameCell, ScriptNameGridCell } from './script-cells';
 export { ScriptExecutionsTable } from './script-executions-table';
 export type { ScriptExecutionsTableProps, ScriptExecutionTableRow } from './script-executions-table';
 export { ScriptSchedulesTable } from './script-schedules-table';
 export type { ScriptScheduleTableRow, ScriptSchedulesTableProps } from './script-schedules-table';
-export { ScriptShellBadge } from './script-shell-badge';
+export { ScriptShellBadge, ScriptShellGridCell } from './script-shell-badge';
 export type { ScriptShellBadgeProps } from './script-shell-badge';
 export { ScriptsTable } from './scripts-table';
 export type { ScriptsTableProps, ScriptTableRow } from './scripts-table';
@@ -35,7 +40,7 @@ export {
   SCRIPTS_TABLE_COLUMNS,
 } from './scripts-table-columns';
 export type { ScriptsTableColumnLayout } from './scripts-table-columns';
-export { OpenInNewTabCell, RowActionsCell, scriptsColumnMeta } from './scripts-table-shared';
+export { OpenInNewTabCell, RowActionsCell, scriptsColumnMeta, scriptsColumnSize } from './scripts-table-shared';
 export { SCRIPTS_TABS } from './scripts-tabs';
 export type { ScriptsTabId } from './scripts-tabs';
 export { SCRIPT_SHELL_TYPES, scriptShellLabel, scriptShellType } from './shell-types';

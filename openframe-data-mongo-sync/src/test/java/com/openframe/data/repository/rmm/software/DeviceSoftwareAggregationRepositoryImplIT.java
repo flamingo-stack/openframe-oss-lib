@@ -219,6 +219,37 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
     }
 
     @Test
+    @DisplayName("title: the name of the first machine that has a real one, placeholders and bare GUIDs skipped")
+    void rollUpTitle_firstMachinesHaveNoRealName_nameOfTheFirstMachineThatHasOne() {
+        // setup
+        save(row(TENANT, "m1", CHROME).name(null).build());
+        save(row(TENANT, "m2", CHROME).name("${{arpDisplayName}}").build());
+        save(row(TENANT, "m3", CHROME).name("{8A69D345-D564-463C-AFF1-A69D9E530F96}").build());
+        save(row(TENANT, "m4", CHROME).name("Google Chrome").build());
+        save(row(TENANT, "m5", CHROME).name("Google Chrome Beta").build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.name()).isEqualTo("Google Chrome");
+    }
+
+    @Test
+    @DisplayName("title: no machine has a real name -> no name")
+    void rollUpTitle_noMachineHasARealName_noName() {
+        // setup
+        save(row(TENANT, "m1", CHROME).name("${{arpDisplayName}}").build());
+        save(row(TENANT, "m2", CHROME).name(null).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.name()).isNull();
+    }
+
+    @Test
     @DisplayName("title: SystemComponent only when every machine that reports the flag reports it set")
     void title_systemComponent() {
         save(row(TENANT, "m1", CHROME).systemComponent(true).build());

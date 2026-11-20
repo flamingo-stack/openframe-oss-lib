@@ -1,5 +1,6 @@
 package com.openframe.data.repository.rmm.software;
 
+import com.openframe.core.util.SoftwareNames;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -31,7 +32,7 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
     public Optional<SoftwareTitleRollup> rollUpTitle(String tenantId, Long softwareTitleId) {
         Document summaryGroup = new Document("$group", new Document("_id", null)
                         .append("devicesCount", new Document("$sum", ifString("$machineId", 1, 0)))
-                        .append("name", new Document("$first", "$name"))
+                        .append("names", new Document("$push", nonBlankOrRemove("$name")))
                         .append("source", new Document("$first", "$source"))
                         .append("vendors", new Document("$push", nonBlankOrRemove("$vendor")))
                         .append("upgradeCodes", new Document("$push", nonBlankOrRemove("$upgradeCode")))
@@ -50,7 +51,7 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                                 List.of(new Document("$eq", List.of("$systemComponent", true)), 1, 0)))));
         Document summaryProject = new Document("$project", new Document("_id", 0)
                         .append("devicesCount", 1)
-                        .append("name", 1)
+                        .append("names", 1)
                         .append("source", 1)
                         .append("systemComponentReported", 1)
                         .append("systemComponentSet", 1)
@@ -167,7 +168,8 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
 
     private static SoftwareTitleRollup toTitleRollup(Document doc, List<Document> versionCounts) {
         int devicesCount = intValue(doc.get("devicesCount"));
-        String name = doc.getString("name");
+        List<String> names = doc.getList("names", String.class, List.of());
+        String name = SoftwareNames.firstDisplayable(names);
         String source = doc.getString("source");
         String vendor = doc.getString("vendor");
         String upgradeCode = doc.getString("upgradeCode");

@@ -3,14 +3,15 @@
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable } from '../../ui/data-table';
+import { DataTableCell } from '../../ui/data-table/data-table-cell';
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { TruncateText } from '../../ui/truncate-text';
 import { dataTableLayoutProps, type FeatureTableLayoutProps, hasSlotContent } from '../feature-table-layout';
 import { OSTypeBadgeGroup } from '../os-type-badge-group';
-import { ScheduleDateTimeCell, ScriptNameCell } from './script-cells';
+import { ScheduleDateTimeCell, ScheduleDateTimeGridCell, ScriptNameCell, ScriptNameGridCell } from './script-cells';
 import { SCHEDULE_COLUMNS, type ScriptsTableColumnLayout } from './scripts-table-columns';
-import { OpenInNewTabCell, RowActionsCell, scriptsColumnMeta } from './scripts-table-shared';
+import { OpenInNewTabCell, RowActionsCell, scriptsColumnMeta, scriptsColumnSize } from './scripts-table-shared';
 
 /** One schedule, as the table shows it. The host formats the start and the repeat. */
 export interface ScriptScheduleTableRow {
@@ -50,6 +51,12 @@ function ScheduleValueCell({ children }: { children: ReactNode }) {
   return <span className={VALUE_CLASS}>{children}</span>;
 }
 
+/** The same value in a grid cell: one line, a bar while the row is read. */
+function ScheduleValueGridCell({ value }: { value: string | number }) {
+  const loading = useLoadingScope();
+  return <DataTableCell text={loading ? '' : String(value)} />;
+}
+
 /** A schedule still being read: a row the table keys, every field a cell shows empty (each draws its loading form). */
 const loadingSchedule = (id: string): ScriptScheduleTableRow => ({
   id,
@@ -83,36 +90,74 @@ export function ScriptSchedulesTable({
   // rows alike.
   const loading = useLoadingScope() || isLoading;
   const columns = useMemo<ColumnDef<ScriptScheduleTableRow>[]>(() => {
-    const cell = (columnLayout: ScriptsTableColumnLayout, render: (row: ScriptScheduleTableRow) => ReactNode) => ({
+    // `render` is the card row's cell; `renderGrid` its one-line form in the grid layout (the card's cell where the
+    // two are the same).
+    const cell = (
+      columnLayout: ScriptsTableColumnLayout,
+      render: (row: ScriptScheduleTableRow) => ReactNode,
+      renderGrid: (row: ScriptScheduleTableRow) => ReactNode = render,
+    ): ColumnDef<ScriptScheduleTableRow> => ({
       id: columnLayout.id,
       header: columnLayout.header ?? '',
       cell: ({ row }: { row: Row<ScriptScheduleTableRow> }) => render(row.original),
       enableSorting: false,
-      // A picture of the table sorts nothing: the layout's sort icon is the live page's.
-      meta: { ...scriptsColumnMeta(columnLayout), sortable: false },
+      ...scriptsColumnSize(columnLayout),
+      meta: {
+        ...scriptsColumnMeta(columnLayout),
+        // A picture of the table sorts nothing: the layout's sort icon is the live page's.
+        sortable: false,
+        gridCell: ({ row }) => renderGrid(row.original),
+      },
     });
     const all: ColumnDef<ScriptScheduleTableRow>[] = [
-      cell(SCHEDULE_COLUMNS.name, row => <ScriptNameCell name={row.name} description={row.description} />),
-      cell(SCHEDULE_COLUMNS.supportedPlatforms, row => (
-        <OSTypeBadgeGroup osTypes={row.supportedPlatforms} iconSize="w-4 h-4 content-md:w-6 content-md:h-6" />
-      )),
-      cell(SCHEDULE_COLUMNS.dateTime, row =>
-        row.startsAt ? (
-          <ScheduleDateTimeCell date={row.startsAt.date} time={row.startsAt.time} />
-        ) : row.trigger ? (
-          <TruncateText tone="secondary">{row.trigger}</TruncateText>
-        ) : null,
+      cell(
+        SCHEDULE_COLUMNS.name,
+        row => <ScriptNameCell name={row.name} description={row.description} />,
+        row => <ScriptNameGridCell name={row.name} description={row.description} />,
       ),
-      cell(SCHEDULE_COLUMNS.repeat, row =>
-        row.repeat != null ? <ScheduleValueCell>{row.repeat}</ScheduleValueCell> : null,
+      cell(
+        SCHEDULE_COLUMNS.supportedPlatforms,
+        row => <OSTypeBadgeGroup osTypes={row.supportedPlatforms} iconSize="w-4 h-4 content-md:w-6 content-md:h-6" />,
+        row => <OSTypeBadgeGroup osTypes={row.supportedPlatforms} iconSize="w-5 h-5" className="flex-nowrap" />,
       ),
-      cell(SCHEDULE_COLUMNS.deviceCount, row => <ScheduleValueCell>{row.deviceCount}</ScheduleValueCell>),
+      cell(
+        SCHEDULE_COLUMNS.dateTime,
+        row =>
+          row.startsAt ? (
+            <ScheduleDateTimeCell date={row.startsAt.date} time={row.startsAt.time} />
+          ) : row.trigger ? (
+            <TruncateText tone="secondary">{row.trigger}</TruncateText>
+          ) : null,
+        row =>
+          row.startsAt ? (
+            <ScheduleDateTimeGridCell date={row.startsAt.date} time={row.startsAt.time} />
+          ) : row.trigger ? (
+            // What starts a schedule with no date: one muted line, where the date would be.
+            <TruncateText as="span" variant="h4" tone="secondary">
+              {row.trigger}
+            </TruncateText>
+          ) : null,
+      ),
+      cell(
+        SCHEDULE_COLUMNS.repeat,
+        row => (row.repeat != null ? <ScheduleValueCell>{row.repeat}</ScheduleValueCell> : null),
+        row => (row.repeat != null ? <ScheduleValueGridCell value={row.repeat} /> : null),
+      ),
+      cell(
+        SCHEDULE_COLUMNS.deviceCount,
+        row => <ScheduleValueCell>{row.deviceCount}</ScheduleValueCell>,
+        row => <ScheduleValueGridCell value={row.deviceCount} />,
+      ),
     ];
     if (renderActions) {
       all.push(cell(SCHEDULE_COLUMNS.actions, row => <RowActionsCell>{renderActions(row)}</RowActionsCell>));
     }
     all.push(
-      cell(SCHEDULE_COLUMNS.open, row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null)),
+      cell(
+        SCHEDULE_COLUMNS.open,
+        row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null),
+        row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} grid /> : null),
+      ),
     );
     return hideColumns ? all.filter(column => !hideColumns.includes(column.id ?? '')) : all;
   }, [hideColumns, renderActions]);
