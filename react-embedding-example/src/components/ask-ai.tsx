@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
 import { openAskAi } from '@flamingo-stack/openframe-frontend-core/components/navigation'
-import type { AssistantOpenRequest } from '@flamingo-stack/openframe-frontend-core/contexts'
+import {
+  ChatRuntimeContext,
+  useChatRuntime,
+  type AssistantOpenRequest,
+} from '@flamingo-stack/openframe-frontend-core/contexts'
+import { MINGO_CHAT_PATH } from '../../proxy/agent-path.mjs'
 
 /**
  * Embedder-side equivalent of the hub's `global-ask-ai-client.tsx`. It reuses the
@@ -14,12 +19,12 @@ import type { AssistantOpenRequest } from '@flamingo-stack/openframe-frontend-co
  * floating internal trigger is disabled (`showInternalTrigger={false}`),
  * matching the hub's retired-dock model.
  *
- * OpenFrame AGENT MODE (Fae / Mingo): the demo chooser below sets `activeAgentSlug`.
- * Agent mode reuses the same `<EmbeddableChat>` — it just OVERRIDES the empty-state
- * config URL, fetching the agent's display config (greeting + suggested prompts +
- * source chips) from `runtime.endpoints.aiAgentConfigUrl(slug)` (wired in
- * content-runtime.ts → `/content/api/ai-agents/:slug`). `activeAgentSlug = undefined`
- * is the default Guide-mode chat.
+ * The chooser below switches between the two chats:
+ *   - Guide: the hub's own chat (`/api/docs/chat`), the Help Center chat.
+ *   - Mingo: the OpenFrame AI agent, as production runs him: a model loop that reaches the hub ONLY over its MCP
+ *     server (proxy/agent.mjs, a port of the AI service's loop). The chat's turns go to that loop; its opening screen
+ *     is still Mingo's display config (`aiAgentConfigUrl`, `/content/api/ai-agents/mingo`), as in the OpenFrame app.
+ * Fae is not offered: she runs in the desktop client with device tools only, no hub tools and no slash commands.
  *
  * Where a doc or a record opens is the runtime's `composeContentUrl` (content-runtime.ts), for the chat as for
  * every page.
@@ -41,7 +46,6 @@ export function openEmbedChat(request: AssistantOpenRequest): void {
 
 const AGENT_CHOICES: ReadonlyArray<{ slug: string | undefined; label: string }> = [
   { slug: undefined, label: 'Guide' },
-  { slug: 'fae', label: 'Fae' },
   { slug: 'mingo', label: 'Mingo' },
 ]
 
@@ -67,6 +71,15 @@ export function AskAi() {
     openAskAi(undefined, { prompt: pendingOpen.prompt })
     setPendingOpen(null)
   }, [pendingOpen, activeAgentSlug])
+
+  // In Mingo mode the chat's turns go to Mingo's loop. Its "/" menu and "What to ask?" stay the hub's command catalog,
+  // as in the OpenFrame app; the loop keeps no conversation list, so the history rail is left out.
+  const runtime = useChatRuntime()
+  const chatRuntime = useMemo(() => {
+    if (!runtime || activeAgentSlug !== 'mingo') return runtime
+    const { chatConversationsUrl: _list, ...endpoints } = runtime.endpoints
+    return { ...runtime, endpoints: { ...endpoints, chatStreamUrl: MINGO_CHAT_PATH, chatHistoryUrl: undefined } }
+  }, [runtime, activeAgentSlug])
 
   return (
     <>
@@ -104,12 +117,14 @@ export function AskAi() {
           the hub): the shared header's MingoAiButton (SiteHeader's mingo in
           app-shell.tsx) is the ONLY chat entry; it dispatches `ask-ai:open`
           and this always-mounted panel listens. */}
-      <EmbeddableChat
-        modes={{ guide: {} }}
-        defaultActiveMode="guide"
-        showInternalTrigger={false}
-        activeAgentSlug={activeAgentSlug}
-      />
+      <ChatRuntimeContext.Provider value={chatRuntime}>
+        <EmbeddableChat
+          modes={{ guide: {} }}
+          defaultActiveMode="guide"
+          showInternalTrigger={false}
+          activeAgentSlug={activeAgentSlug}
+        />
+      </ChatRuntimeContext.Provider>
     </>
   )
 }
