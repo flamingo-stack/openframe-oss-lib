@@ -30,7 +30,6 @@
  * covers carry their own marks (Flamingo logo top-left) that an overlay would
  * collide with.
  */
-
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
@@ -165,7 +164,6 @@ export function EntityPortraitCard({
             <StatusBadge
               variant="button"
               colorScheme="accentBorder"
-              singleLine
               staticText
               text={typeLabel}
               className="self-start"
@@ -237,7 +235,6 @@ function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel?: stri
             <StatusBadge
               variant="button"
               colorScheme="accentBorder"
-              singleLine
               staticText
               text={typeLabel}
               className="self-start"

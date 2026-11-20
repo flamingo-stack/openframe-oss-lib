@@ -222,7 +222,7 @@ function DataTableCardsBody<T = unknown>({
     // `minRows` promises a STABLE table height. An empty board is exactly when
     // a collapsing table is most visible — the pagination and everything under
     // it jump up the moment a filter matches nothing — so reserve the same row
-    // slots here and center the empty state over them.
+    // slots here and float the empty state at their top.
     if (minRows) {
       return (
         <ReservedEmptyState

@@ -63,6 +63,13 @@ describe('QuickActionRow', () => {
     expect(allTag()).toBeTruthy();
   });
 
+  it('draws its chips at the fixed chip scale, the same size in every content area', () => {
+    render(<QuickActionRow chips={chipsOf(2)} />);
+    const group = screen.getByRole('group', { name: 'Quick actions' });
+    expect(group).toHaveClass('[--font-size-h5-caption:var(--font-size-chip)]');
+    expect(group).toHaveClass('[--spacing-system-xs:var(--spacing-chip-gap)]');
+  });
+
   it('draws nothing with no action: no row, no All', () => {
     const { container } = render(<QuickActionRow chips={[]} />);
     expect(container).toBeEmptyDOMElement();
@@ -482,6 +489,35 @@ describe('MingoQuickActionWall', () => {
   it('draws nothing without actions', () => {
     const { container } = render(<MingoQuickActionWall quickActions={[]} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("puts the topic stamp on the chips' line, never a line of its own", () => {
+    render(
+      <PageTopicsProvider pathname="/devices" showTopic>
+        <MingoQuickActionWall quickActions={ACTIONS} />
+      </PageTopicsProvider>,
+    );
+    const line = screen.getByTestId('quick-action-set-line');
+    expect(line).toHaveClass('items-center');
+    expect(within(line).getByTitle('Page topic')).toHaveTextContent('/devices');
+    expect(within(line).getByRole('group', { name: 'Quick actions' })).toBeTruthy();
+  });
+
+  it('keeps its line with no action when asked to reserve it', () => {
+    render(<MingoQuickActionWall quickActions={[]} reserve />);
+    expect(screen.queryByRole('button', { name: 'Patching' })).toBeNull();
+    expect(loadingTags()).toHaveLength(4);
+  });
+
+  it("prints only the page's topic stamp without actions, where the host asks for the stamp", () => {
+    render(
+      <PageTopicsProvider pathname="/tickets" showTopic>
+        <MingoQuickActionWall quickActions={[]} />
+      </PageTopicsProvider>,
+    );
+    expect(screen.getByTitle('Page topic')).toHaveTextContent('/tickets');
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 
   it("holds the row's place while the actions are read: its tags' loading form, no tag to press", () => {

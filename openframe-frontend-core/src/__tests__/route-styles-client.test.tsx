@@ -40,6 +40,18 @@ describe('RouteStyle: a page the server did not render', () => {
     expect(fullLinks()).toHaveLength(0);
   });
 
+  it.each(['/*next-styles:complete*/', '/*next-styles:route*/'])(
+    'loads the complete sheet when the server left the placeholder %s unfilled',
+    async placeholder => {
+      const style = document.createElement('style');
+      style.setAttribute('data-href', 'next-styles:b3');
+      style.textContent = placeholder;
+      document.head.appendChild(style);
+      await renderInBrowser();
+      expect(fullLinks().map(link => link.getAttribute('href'))).toEqual([FULL_URL]);
+    },
+  );
+
   it('adds no second copy when the loader already started it', async () => {
     const link = document.createElement('link');
     link.setAttribute('data-next-styles-full', '');

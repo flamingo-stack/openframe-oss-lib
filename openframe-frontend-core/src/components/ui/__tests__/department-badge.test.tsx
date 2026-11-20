@@ -8,17 +8,17 @@ import { statusBadgeVariants } from '../status-badge';
 describe('PaletteBadge', () => {
   it('renders a palette key as its ODS colour scheme, with no inline colour', () => {
     render(<PaletteBadge text="Teal" color="cyanSoft" />);
-    const badge = screen.getByText('Teal');
+    const badge = screen.getByTitle('Teal');
     expect(badge).toHaveClass('bg-ods-flamingo-cyan-secondary', 'text-ods-flamingo-cyan');
     expect(badge).not.toHaveAttribute('style');
   });
 
   it('renders the unfilled default badge for anything outside the palette, a hex included', () => {
     const { rerender } = render(<PaletteBadge text="Other" color="#ff0000" />);
-    expect(screen.getByText('Other')).toHaveClass('bg-ods-bg-surface');
+    expect(screen.getByTitle('Other')).toHaveClass('bg-ods-bg-surface');
     rerender(<PaletteBadge text="Other" color={null} />);
-    expect(screen.getByText('Other')).toHaveClass('bg-ods-bg-surface');
-    expect(screen.getByText('Other')).not.toHaveAttribute('style');
+    expect(screen.getByTitle('Other')).toHaveClass('bg-ods-bg-surface');
+    expect(screen.getByTitle('Other')).not.toHaveAttribute('style');
   });
 
   it('gives every palette key a distinct ODS colour scheme', () => {
@@ -31,9 +31,9 @@ describe('PaletteBadge', () => {
 describe('DepartmentBadge', () => {
   it("uses the department's stored palette colour, and the empty label without a department", () => {
     const { rerender } = render(<DepartmentBadge department={{ name: 'Marketing', color: 'pink' }} />);
-    expect(screen.getByText('Marketing')).toHaveClass('bg-ods-flamingo-pink');
+    expect(screen.getByTitle('Marketing')).toHaveClass('bg-ods-flamingo-pink');
     rerender(<DepartmentBadge department={null} emptyLabel="Unassigned" />);
-    expect(screen.getByText('Unassigned')).toHaveClass('bg-ods-bg-surface');
+    expect(screen.getByTitle('Unassigned')).toHaveClass('bg-ods-bg-surface');
   });
 });
 

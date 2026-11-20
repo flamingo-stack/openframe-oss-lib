@@ -13,7 +13,7 @@ import {
 } from './data-table-row-classes';
 
 /**
- * The empty state, floating centred over a full page's worth of reserved row
+ * The empty state, floating at the top of a full page's worth of reserved row
  * slots. `DataTable.Body` renders this — an empty table is exactly when a
  * collapsing one is most visible (the pagination and everything under it jump
  * the moment a filter matches nothing), so the body reserves the page's slots.
@@ -36,7 +36,10 @@ export function ReservedEmptyState({
   // spilled out of the host's horizontal scroller and grew it a vertical
   // scrollbar — the header scrolled away inside a section.
   return (
-    <div className="grid w-full">
+    // `minmax(0,1fr)`: the track is the table's width, never its content's. The overlay below is `w-screen` (capped by
+    // `max-w-full`); in an auto track that cap resolved against the track the overlay itself had widened, so an empty
+    // table grew to the window's width and its host scroller drew a scrollbar.
+    <div className="grid w-full grid-cols-[minmax(0,1fr)]">
       <div className={cn('flex w-full flex-col [grid-area:1/1]', gapClassName)}>
         <PlaceholderRows count={count} rowHeightClassName={rowHeightClassName} />
       </div>
@@ -45,7 +48,8 @@ export function ReservedEmptyState({
           that CANVAS puts the message off-screen on a phone. This centres it on
           the visible area instead, and collapses to plain centring when the
           table is not wider than its container. */}
-      <div className="flex items-center [grid-area:1/1]">
+      {/* Top-aligned: centred over a full page of slots (twenty rows), the message sat below the fold. */}
+      <div className="flex items-start [grid-area:1/1]">
         <div className="sticky left-0 flex w-screen max-w-full justify-center">{children}</div>
       </div>
     </div>
