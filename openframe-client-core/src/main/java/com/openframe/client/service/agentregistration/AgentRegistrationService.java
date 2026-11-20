@@ -1,5 +1,6 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.audit.AuditContext;
 import com.openframe.audit.AuditRecorder;
@@ -188,7 +189,8 @@ public class AgentRegistrationService {
         OAuthClient client = loadOAuthClient(machineId, request);
         clientSecretValidator.validate(client, clientSecret);
         AuditContext device = auditRecorder.context(AuditActor.fromAgent(machineId, List.of(AGENT_ROLE), null));
-        return auditRecorder.runInContext(device, () -> auditedMethodRunner.run(DEVICE_REINSTALL, machineId,
+        AuditCall call = AuditCall.of(DEVICE_REINSTALL, machineId).withRecordsUnchanged(true);
+        return auditRecorder.runInContext(device, () -> auditedMethodRunner.run(call,
                 () -> reinstallMachine(machineId, clientSecret, client, request)));
     }
 

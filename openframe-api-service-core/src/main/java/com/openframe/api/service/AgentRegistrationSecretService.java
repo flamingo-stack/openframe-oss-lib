@@ -3,6 +3,7 @@ package com.openframe.api.service;
 import com.openframe.api.dto.AgentRegistrationSecretResponse;
 import com.openframe.api.exception.AgentRegistrationSecretNotFoundException;
 import com.openframe.api.service.processor.AgentRegistrationSecretProcessor;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.service.SecretKeyGenerator;
 import com.openframe.core.crypto.service.EncryptionService;
@@ -15,6 +16,9 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 
+import static com.openframe.data.document.audit.AuditAction.AGENT_REGISTRATION_SECRET_ROTATE;
+import static com.openframe.data.document.audit.AuditAction.AGENT_REGISTRATION_SECRET_VIEW;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -25,6 +29,7 @@ public class AgentRegistrationSecretService {
     private final SecretKeyGenerator secretGenerator;
     private final AgentRegistrationSecretProcessor secretProcessor;
 
+    @Audited(action = AGENT_REGISTRATION_SECRET_VIEW, details = "secretIds={#result.id}")
     public AgentRegistrationSecretResponse getActiveSecret() {
         return secretRepository.findByActiveTrue()
                 .map(secret -> AgentRegistrationSecretResponse.builder()
@@ -36,6 +41,7 @@ public class AgentRegistrationSecretService {
                 .orElseThrow(() -> new AgentRegistrationSecretNotFoundException(ErrorCode.AGENT_REGISTRATION_SECRET_NOT_FOUND, "Active agent registration secret not found"));
     }
 
+    @Audited(action = AGENT_REGISTRATION_SECRET_VIEW, details = "secretIds=#result.![id]")
     public List<AgentRegistrationSecretResponse> getAllSecrets() {
         List<AgentRegistrationSecret> secrets = secretRepository.findAll();
         return secrets.stream()
@@ -48,6 +54,7 @@ public class AgentRegistrationSecretService {
                 .toList();
     }
 
+    @Audited(action = AGENT_REGISTRATION_SECRET_ROTATE, details = "newSecretId=#result.id", compare = false)
     public AgentRegistrationSecretResponse generateNewSecret() {
         deactivateExisting();
         String newSecretKey = secretGenerator.generate();

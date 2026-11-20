@@ -49,6 +49,7 @@ public class AuditAspect {
                 targetIdInResult,
                 result -> expressions.details(audited.details(), method, arguments, result),
                 audited.compare(),
+                false,
                 result -> !StringUtils.hasText(condition) || expressions.isConditionMet(condition, method, arguments, result),
                 result -> expressions.evaluate(audited.tenantId(), method, arguments, result),
                 result -> expressions.evaluate(audited.targetName(), method, arguments, result),

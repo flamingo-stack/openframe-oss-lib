@@ -157,7 +157,7 @@ public class AuditedMethodRunner {
         LoadedTarget after = read(call, rereadCandidates, targetId);
         LoadedTarget current = firstNonNull(after, before);
         Map<String, AuditChange> changes = changesBetween(call, compares, before, after);
-        if (changedNothing(changes, outcome) && !hasChildren) {
+        if (!call.recordsUnchanged() && changedNothing(changes, outcome) && !hasChildren) {
             return result;
         }
         boolean stored = record(call, context,

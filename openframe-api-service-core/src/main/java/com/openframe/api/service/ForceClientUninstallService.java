@@ -4,6 +4,7 @@ import com.openframe.api.dto.force.request.ForceClientUninstallRequest;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponseItem;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BaseException;
 import com.openframe.core.exception.ConflictException;
@@ -55,7 +56,11 @@ public class ForceClientUninstallService {
 
     private ForceClientUninstallResponseItem processMachine(String machineId) {
         try {
-            auditedMethodRunner.run(DEVICE_UNINSTALL_REQUEST, machineId, () -> uninstall(machineId));
+            AuditCall call = AuditCall.of(DEVICE_UNINSTALL_REQUEST, machineId).withRecordsUnchanged(true);
+            auditedMethodRunner.run(call, () -> {
+                uninstall(machineId);
+                return null;
+            });
             return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
         } catch (BaseException e) {
             log.warn("Skipping client uninstall for machine {}: {}", machineId, e.getMessage());
