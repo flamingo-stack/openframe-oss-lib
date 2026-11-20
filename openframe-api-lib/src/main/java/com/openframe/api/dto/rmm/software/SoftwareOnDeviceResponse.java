@@ -13,5 +13,6 @@ public class SoftwareOnDeviceResponse {
     private String softwareVersion;
     private SoftwareOnDeviceStatus status;
     private SoftwareSource installedBy;
+    private SoftwareAdoptionResponse adoption;
     private SoftwareAutoUpdateStatus autoUpdate;
 }

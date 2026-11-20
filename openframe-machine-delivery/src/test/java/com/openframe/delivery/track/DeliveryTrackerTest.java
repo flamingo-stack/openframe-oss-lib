@@ -4,8 +4,14 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
 import com.openframe.delivery.config.DeliveryTestPolicies;
+import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliverySeed;
+import com.openframe.delivery.spec.DeliverySpec;
+import com.openframe.delivery.spec.DeliverySpecRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +28,7 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -36,10 +43,14 @@ class DeliveryTrackerTest {
     private static final String DISPATCH_ID = "d-1";
     private static final String ERROR = "download failed";
     private static final String REASON = "request revoked";
+    private static final long SPEC_RESULT_TIMEOUT = 1800L;
+    private static final long CONFIGURED_RESULT_TIMEOUT = 900L;
     private static final DeliveryRef REF = new DeliveryRef(DeliveryType.TOOL_INSTALLATION, TARGET_ID, DISPATCH_ID);
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliveryCloser closer;
+    @Mock private DeliverySpecRegistry deliverySpecRegistry;
+    @Mock private DeliverySpec<DeliverySeed, DeliveryPayload> deliverySpec;
 
     @Captor private ArgumentCaptor<Instant> atCaptor;
     @Captor private ArgumentCaptor<Instant> untilCaptor;
@@ -48,7 +59,7 @@ class DeliveryTrackerTest {
 
     @BeforeEach
     void setUp() {
-        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer);
+        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer, deliverySpecRegistry);
     }
 
     @Test
@@ -62,6 +73,40 @@ class DeliveryTrackerTest {
         // verifications
         Instant ackedAt = atCaptor.getValue();
         assertThat(untilCaptor.getValue()).isEqualTo(ackedAt.plusSeconds(RESULT_TIMEOUT));
+    }
+
+    @Test
+    void acknowledge_specSetsItsOwnTimeout_resultDeadlineFromTheSpec() {
+        // setup
+        doReturn(Optional.of(deliverySpec)).when(deliverySpecRegistry).find(DeliveryType.TOOL_INSTALLATION);
+        when(deliverySpec.getResultTimeoutSeconds()).thenReturn(SPEC_RESULT_TIMEOUT);
+        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+
+        // execution
+        tracker.acknowledge(REF, MACHINE_ID);
+
+        // verifications
+        Instant ackedAt = atCaptor.getValue();
+        assertThat(untilCaptor.getValue()).isEqualTo(ackedAt.plusSeconds(SPEC_RESULT_TIMEOUT));
+    }
+
+    @Test
+    void acknowledge_timeoutSetForTheTypeInConfig_configWinsOverTheSpec() {
+        // setup
+        DeliveryProperties properties = DeliveryTestPolicies.properties();
+        PolicyOverride configured = new PolicyOverride();
+        configured.setResultTimeoutSeconds(CONFIGURED_RESULT_TIMEOUT);
+        properties.getTypes().put(DeliveryType.TOOL_INSTALLATION, configured);
+        DeliveryTracker configuredTracker = new DeliveryTracker(repository, properties, closer, deliverySpecRegistry);
+        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
+
+        // execution
+        configuredTracker.acknowledge(REF, MACHINE_ID);
+
+        // verifications
+        Instant ackedAt = atCaptor.getValue();
+        assertThat(untilCaptor.getValue()).isEqualTo(ackedAt.plusSeconds(CONFIGURED_RESULT_TIMEOUT));
+        verifyNoInteractions(deliverySpecRegistry);
     }
 
     @Test
@@ -126,6 +171,20 @@ class DeliveryTrackerTest {
 
         // verifications
         verify(repository).markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class));
+    }
+
+    @Test
+    void done_byKey_rowAlreadyClosedDone_secondCloseChangesNothing() {
+        // setup
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(row()));
+        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class))).thenReturn(false);
+
+        // execution
+        tracker.done(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+
+        // verifications
+        verify(repository).markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class));
+        verifyNoInteractions(closer);
     }
 
     @Test

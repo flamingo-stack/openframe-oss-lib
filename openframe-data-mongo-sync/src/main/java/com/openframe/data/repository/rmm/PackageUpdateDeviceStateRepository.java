@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface PackageUpdateDeviceStateRepository extends MongoRepository<PackageUpdateDeviceState, String> {
+public interface PackageUpdateDeviceStateRepository extends MongoRepository<PackageUpdateDeviceState, String>,
+        CustomPackageUpdateDeviceStateRepository {
 
     Optional<PackageUpdateDeviceState> findByTenantIdAndRequestIdAndMachineId(String tenantId, String requestId, String machineId);
 

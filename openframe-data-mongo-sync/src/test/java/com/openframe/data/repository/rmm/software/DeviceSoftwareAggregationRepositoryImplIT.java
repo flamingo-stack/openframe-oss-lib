@@ -295,6 +295,39 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
     }
 
     @Test
+    @DisplayName("cve machines by title: each title's connected machines of this tenant that carry the CVE")
+    void machineIdsByTitleWithCve_machinesOfTheTenantGroupedByTitle() {
+        // setup
+        save(row(TENANT, "m1", CHROME).vulnerabilities(List.of("CVE-1")).build());
+        save(row(TENANT, "m2", CHROME).vulnerabilities(List.of("CVE-1", "CVE-2")).build());
+        save(row(TENANT, "m2", FIREFOX).vulnerabilities(List.of("CVE-1")).build());
+        save(row(TENANT, "m3", FIREFOX).vulnerabilities(List.of("CVE-1")).machineConnected(false).build());
+        save(row(TENANT, "m4", FIREFOX).vulnerabilities(List.of("CVE-2")).build());
+        save(row(OTHER_TENANT, "m9", CHROME).vulnerabilities(List.of("CVE-1")).build());
+
+        // execution
+        Map<Long, List<String>> machineIds = repository.machineIdsByTitleWithCve(TENANT, "CVE-1");
+
+        // verifications
+        assertThat(machineIds).containsOnlyKeys(CHROME, FIREFOX);
+        assertThat(machineIds.get(CHROME)).containsExactlyInAnyOrder("m1", "m2");
+        assertThat(machineIds.get(FIREFOX)).containsExactly("m2");
+    }
+
+    @Test
+    @DisplayName("cve machines by title: no connected row carries the CVE -> empty")
+    void machineIdsByTitleWithCve_noConnectedRow_empty() {
+        // setup
+        save(row(TENANT, "m1", CHROME).vulnerabilities(List.of("CVE-1")).machineConnected(false).build());
+
+        // execution
+        Map<Long, List<String>> machineIds = repository.machineIdsByTitleWithCve(TENANT, "CVE-1");
+
+        // verifications
+        assertThat(machineIds).isEmpty();
+    }
+
+    @Test
     @DisplayName("title machines: each connected machine of this tenant that has the title, once")
     void titleMachines_distinctConnectedMachinesOfTheTenant() {
         save(row(TENANT, "m1", CHROME).build());

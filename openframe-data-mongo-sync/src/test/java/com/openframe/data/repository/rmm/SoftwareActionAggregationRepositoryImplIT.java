@@ -28,6 +28,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 @SpringBootTest(classes = RmmIntegrationTestApplication.class)
 @Tag("integration")
@@ -218,6 +219,72 @@ class SoftwareActionAggregationRepositoryImplIT extends BaseMongoIntegrationTest
         assertThat(repository.findPage(TENANT, null, null, "dispatchedAt", Sort.Direction.DESC, 0, 50))
                 .extracting(SoftwareActionSummary::getExecutionId)
                 .containsExactly("exec-newer", "exec-sched", "exec-older");
+    }
+
+    @Test
+    void findPage_statusAscending_ordersByMeaning() {
+        // setup
+        action("exec-completed", 1, SoftwareActionStatus.IN_PROGRESS);
+        leaf("exec-completed", "m1", ExecutionStatus.SUCCESS);
+        action("exec-failed", 1, SoftwareActionStatus.IN_PROGRESS);
+        leaf("exec-failed", "m1", ExecutionStatus.FAILED);
+        action("exec-progress", 1, SoftwareActionStatus.IN_PROGRESS);
+        leaf("exec-progress", "m1", ExecutionStatus.RUNNING);
+        action("exec-waiting", 1, SoftwareActionStatus.IN_PROGRESS);
+        waitingLeaf("exec-waiting", "m1");
+
+        // execution
+        List<SoftwareActionSummary> rows = repository.findPage(TENANT, null, null, "status", Sort.Direction.ASC, 0, 50);
+
+        // verifications
+        assertThat(rows).extracting(SoftwareActionSummary::getExecutionId)
+                .containsExactly("exec-failed", "exec-waiting", "exec-progress", "exec-completed");
+    }
+
+    @Test
+    void findPage_respondedMachineCountAscending_ordersByProcessedThenTotal() {
+        // setup
+        action("exec-1-of-3", 3, SoftwareActionStatus.IN_PROGRESS);
+        leaf("exec-1-of-3", "m1", ExecutionStatus.SUCCESS);
+        action("exec-1-of-2", 2, SoftwareActionStatus.IN_PROGRESS);
+        leaf("exec-1-of-2", "m1", ExecutionStatus.SUCCESS);
+        action("exec-0-of-5", 5, SoftwareActionStatus.IN_PROGRESS);
+
+        // execution
+        List<SoftwareActionSummary> rows = repository.findPage(TENANT, null, null, "respondedMachineCount",
+                Sort.Direction.ASC, 0, 50);
+
+        // verifications
+        assertThat(rows).extracting(SoftwareActionSummary::getExecutionId)
+                .containsExactly("exec-0-of-5", "exec-1-of-2", "exec-1-of-3");
+    }
+
+    @Test
+    void findPage_sortFieldTie_brokenOnDispatchedAtInRequestedDirection() {
+        // setup
+        nowRow("exec-a-older", T0);
+        nowRow("exec-b-newer", T0.plusSeconds(60));
+
+        // execution
+        List<SoftwareActionSummary> rows = repository.findPage(TENANT, null, null, "packageName",
+                Sort.Direction.DESC, 0, 50);
+
+        // verifications
+        assertThat(rows).extracting(SoftwareActionSummary::getExecutionId)
+                .containsExactly("exec-b-newer", "exec-a-older");
+    }
+
+    @Test
+    void findPage_unknownSortField_rejected() {
+        // setup
+        nowRow("exec-1", T0);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> repository.findPage(TENANT, null, null, "hostname",
+                Sort.Direction.ASC, 0, 50));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("hostname");
     }
 
     private void firedScheduleRow(String executionId) {
