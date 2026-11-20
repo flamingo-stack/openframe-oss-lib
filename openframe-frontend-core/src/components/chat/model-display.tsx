@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useMdUp } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
 import {
@@ -162,6 +163,8 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
     const formatCount = (count: number) => (isV2 ? count.toLocaleString('en-US') : formatTokenCount(count));
     const [menuOpen, setMenuOpen] = React.useState(false);
+    // A phone drills into a provider in place: there is no room for a menu beside the menu.
+    const phone = useMdUp() === false;
     // A lock closes the open menu; lifting it does not open it again.
     if (modelMenu?.disabled && menuOpen) setMenuOpen(false);
 
@@ -191,6 +194,8 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       <ActionsMenuDropdown
         groups={modelMenu.groups}
         variant="overlay"
+        submenus={phone ? 'drill' : 'side'}
+        className={phone ? 'w-[calc(100vw-var(--spacing-system-mf)*2)] min-w-0' : 'w-60 min-w-0'}
         side="top"
         align="start"
         sideOffset={4}
@@ -203,9 +208,11 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
             type="button"
             aria-label={name ? `Chat model: ${name}` : 'Chat model'}
             aria-disabled={modelMenu.disabled || undefined}
-            className="group flex min-w-0 items-center gap-[var(--spacing-system-xxs)] rounded-sm px-[var(--spacing-system-xxs)] text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ods-text-secondary data-[state=open]:bg-ods-bg-active data-[state=open]:text-ods-text-primary"
+            // Figma mingo/model-trigger: 6 / 4 / 2 around a 20px mark; backgrounds/openframe-background hover / action.
+            className="group flex min-w-0 items-center gap-1.5 rounded py-0.5 pl-1.5 pr-1 text-ods-text-secondary transition-colors hover:bg-ods-bg-base-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ods-text-secondary data-[state=open]:bg-ods-bg-base-active data-[state=open]:text-ods-text-primary"
           >
-            {labelContent}
+            {icon && <span className={cn(PROVIDER_ICON_BOX_CLASS, '[&_svg]:size-5')}>{icon}</span>}
+            <span className="truncate font-body">{name}</span>
             <Chevron02DownIcon
               aria-hidden
               size={16}

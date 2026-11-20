@@ -86,6 +86,12 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
       fontSize: 'var(--font-size-badge)',
       lineHeight: 'var(--font-line-space-badge)',
     },
+    // Note SCALE (v2 Dropdown-menu footer: 12, Regular, grey) — size only, as `text-badge`: a menu's fine print
+    // under its rows, fixed across breakpoints.
+    '.text-note': {
+      fontSize: 'var(--font-size-note)',
+      lineHeight: 'var(--font-line-space-note)',
+    },
   });
 });
 
@@ -224,9 +230,12 @@ const config: Config = {
           panel: 'var(--color-bg-panel)',
           // The deepest ground (ODS v2 backgrounds/openframe-background), never tinted by a surface.
           'bg-base': 'var(--color-bg-base)',
+          'bg-base-hover': 'var(--color-bg-base-hover)',
+          'bg-base-active': 'var(--color-bg-base-active)',
           // A floating menu's ground and its hovered row (ODS v2 backgrounds/overlay).
           menu: 'var(--color-bg-menu)',
           'menu-hover': 'var(--color-bg-menu-hover)',
+          'menu-active': 'var(--color-bg-menu-active)',
 
           // Borders
           border: {

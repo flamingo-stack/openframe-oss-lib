@@ -467,6 +467,8 @@ export interface EmbeddableChatProps {
    * every chat that is not archived, a new one included.
    */
   chatMenuExtraItems?: ActionsMenuItem[];
+  /** The chat's own ⋯ items that come first, before Rename (e.g. the chat's model). */
+  chatMenuLeadingItems?: ActionsMenuItem[];
 
   /**
    * Who draws the chat list. `'auto'` (default): the panel does, from its own
@@ -864,6 +866,7 @@ function EmbeddableChatInner({
   aboveComposer,
   onWhatToAsk,
   chatMenuExtraItems,
+  chatMenuLeadingItems,
   rail = 'auto',
   threadContainer,
   threadHeaderActions,
@@ -2455,7 +2458,11 @@ function EmbeddableChatInner({
                   : () => setComposeOpen(false)
           }
           listOpen={splitActive}
-          menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? mingoHeaderMenuItems : []}
+          menuItems={
+            headerShowBack && !isViewingArchived && !archiveOpen
+              ? [...(chatMenuLeadingItems ?? []), ...mingoHeaderMenuItems]
+              : []
+          }
           renaming={inlineRenaming && !archiveOpen}
           onRenameSubmit={submitInlineRename}
           onRenameCancel={cancelInlineRename}
@@ -3162,7 +3169,11 @@ function EmbeddableChatInner({
       // Over the archive the header is the archive's (see the v2 header).
       title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : draftHeaderTitle}
       meta={archiveOpen || !hasConversation ? undefined : [headerPersonName, chatDayLabel(activeDialog?.timestamp)]}
-      menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? mingoHeaderMenuItems : []}
+      menuItems={
+        headerShowBack && !isViewingArchived && !archiveOpen
+          ? [...(chatMenuLeadingItems ?? []), ...mingoHeaderMenuItems]
+          : []
+      }
       extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
       onRestore={isViewingArchived && !archiveOpen ? headerOnRestore : undefined}
       renaming={inlineRenaming && !archiveOpen}
