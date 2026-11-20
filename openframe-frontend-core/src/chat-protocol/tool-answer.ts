@@ -133,7 +133,13 @@ function isAnswerRow(part: ChatPart): part is Extract<ChatToolPart, { state: 'ou
 export function withToolAnswer(parts: readonly ChatPart[]): readonly ChatPart[] {
   if (parts.some(part => part.type === 'data-error') || !parts.some(isAnswerRow)) return parts;
   const sent = new Set(parts.filter(isSourcePart).map(part => normalizeRecordUri(part.sourceId) ?? part.sourceId));
-  const isNew = (part: ChatPart) => !isSourcePart(part) || !sent.has(part.sourceId);
+  // Grows as rows expand, so two answer rows naming one record draw its source once.
+  const isNew = (part: ChatPart) => {
+    if (!isSourcePart(part)) return true;
+    if (sent.has(part.sourceId)) return false;
+    sent.add(part.sourceId);
+    return true;
+  };
   const shown = parts.flatMap(part =>
     isAnswerRow(part) ? [part, ...toolAnswerParts(part.output).filter(isNew)] : [part],
   );

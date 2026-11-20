@@ -115,6 +115,13 @@ describe('withToolAnswer', () => {
     });
   });
 
+  it('draws a record two answer rows name as one source', () => {
+    const second = { ...toolPart(searchResult), toolCallId: 't2' } as ChatPart;
+    const shown = withToolAnswer([toolPart(searchResult), second]);
+    expect(shown.filter(part => part.type === 'source-url')).toHaveLength(1);
+    expect(shown.filter(part => part.type === 'source-document')).toHaveLength(1);
+  });
+
   it('leaves a row the server did not mark, even when the turn ends on it', () => {
     const parts = [toolPart(JSON.stringify(quickActions), false)];
     expect(withToolAnswer(parts)).toBe(parts);
