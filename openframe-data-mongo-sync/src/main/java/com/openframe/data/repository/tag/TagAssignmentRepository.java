@@ -38,6 +38,8 @@ public interface TagAssignmentRepository extends MongoRepository<TagAssignment, 
 
     void deleteByTagId(String tagId);
 
+    long countByTagId(String tagId);
+
     @Query("{ 'entityType': ?1, 'values': { $in: ?0 } }")
     List<TagAssignment> findByValuesContainingAnyAndEntityType(List<String> values, TagEntityType entityType);
 

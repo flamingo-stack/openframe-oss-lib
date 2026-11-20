@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -130,9 +129,9 @@ public class AssignmentService {
 
     private static AuditCall linkCall(AuditAction action, AssignmentItemType itemType, String itemId,
                                       AssignmentTargetType targetType, String targetId, String targetName) {
-        Map<String, Object> details = new HashMap<>(Map.of("targetType", targetType, "targetId", targetId));
+        Map<String, Object> details = new HashMap<>(Map.of("targetType", targetType, "targetIds", List.of(targetId)));
         if (targetName != null) {
-            details.put("targetName", targetName);
+            details.put("targetNames", List.of(targetName));
         }
         String linkedOrganizationId = targetType == AssignmentTargetType.ORGANIZATION ? targetId : null;
         String linkedDeviceId = targetType == AssignmentTargetType.DEVICE ? targetId : null;
@@ -223,17 +222,8 @@ public class AssignmentService {
     @Transactional
     public void unassignAllByType(String itemId, AssignmentTargetType targetType) {
         log.info("Unassigning all {} from item {}", targetType, itemId);
-        List<ItemAssignment> links = repository.findByItemIdAndTargetType(itemId, targetType);
-        if (links.isEmpty()) {
-            repository.deleteByItemIdAndTargetType(itemId, targetType);
-            return;
-        }
-        Map<String, Object> details = Map.of("targetType", targetType,
-                "targetIds", links.stream().map(ItemAssignment::getTargetId).toList(),
-                "targetNames", links.stream().map(ItemAssignment::getDisplayName).filter(Objects::nonNull).toList());
-        AuditTargetType itemType = targetTypeOf(links.getFirst().getItemType());
-        auditedMethodRunner.runWithoutCompare(LINK_DELETE, itemType, itemId, details,
-                () -> repository.deleteByItemIdAndTargetType(itemId, targetType));
+        repository.findByItemIdAndTargetType(itemId, targetType)
+                .forEach(link -> unassignItem(itemId, targetType, link.getTargetId()));
     }
 
     private String resolveDisplayName(AssignmentTargetType type, String targetId) {

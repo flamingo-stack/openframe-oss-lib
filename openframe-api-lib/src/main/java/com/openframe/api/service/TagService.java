@@ -304,14 +304,17 @@ public class TagService {
     }
 
     @Transactional
-    @Audited(action = TAG_DELETE, targetId = "#tagId")
     public void deleteTag(String tagId) {
         log.info("Deleting tag: {}", tagId);
+        Map<String, Object> details = new HashMap<>();
+        auditedMethodRunner.run(TAG_DELETE, tagId, details, () -> deleteWithAssignments(tagId, details));
+    }
 
-        if (!tagRepository.existsById(tagId)) {
-            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId);
-        }
-
+    private void deleteWithAssignments(String tagId, Map<String, Object> details) {
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId));
+        details.put("entityType", tag.getEntityType());
+        details.put("removedAssignments", tagAssignmentRepository.countByTagId(tagId));
         tagAssignmentRepository.deleteByTagId(tagId);
         tagRepository.deleteById(tagId);
         log.info("Tag deleted with cascade: {}", tagId);
