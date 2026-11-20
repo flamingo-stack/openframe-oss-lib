@@ -11,12 +11,61 @@ pub(crate) fn terminate(pid: u32) -> io::Result<()> {
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
 
+    enable_debug_privilege();
     unsafe {
         let handle =
             OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|_| io::Error::last_os_error())?;
         let terminated = TerminateProcess(handle, 1).map_err(|_| io::Error::last_os_error());
         let _ = CloseHandle(handle);
         terminated
+    }
+}
+
+/// Turns `SeDebugPrivilege` on once, so an elevated admin's kills reach processes it doesn't own.
+#[cfg(windows)]
+fn enable_debug_privilege() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        if let Err(e) = try_enable_debug_privilege() {
+            warn!(error = %e, "Could not enable SeDebugPrivilege");
+        }
+    });
+}
+
+/// A token without the privilege is not an error: `AdjustTokenPrivileges` then succeeds with ERROR_NOT_ALL_ASSIGNED.
+#[cfg(windows)]
+fn try_enable_debug_privilege() -> io::Result<()> {
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{CloseHandle, HANDLE, LUID};
+    use windows::Win32::Security::{
+        AdjustTokenPrivileges, LookupPrivilegeValueW, LUID_AND_ATTRIBUTES, SE_DEBUG_NAME,
+        SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY,
+    };
+    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    unsafe {
+        let mut token = HANDLE::default();
+        OpenProcessToken(
+            GetCurrentProcess(),
+            TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+            &mut token,
+        )
+        .map_err(|_| io::Error::last_os_error())?;
+        let mut luid = LUID::default();
+        let adjusted = LookupPrivilegeValueW(PCWSTR::null(), SE_DEBUG_NAME, &mut luid)
+            .and_then(|()| {
+                let privileges = TOKEN_PRIVILEGES {
+                    PrivilegeCount: 1,
+                    Privileges: [LUID_AND_ATTRIBUTES {
+                        Luid: luid,
+                        Attributes: SE_PRIVILEGE_ENABLED,
+                    }],
+                };
+                AdjustTokenPrivileges(token, false, Some(&privileges), 0, None, None)
+            })
+            .map_err(|_| io::Error::last_os_error());
+        let _ = CloseHandle(token);
+        adjusted
     }
 }
 
