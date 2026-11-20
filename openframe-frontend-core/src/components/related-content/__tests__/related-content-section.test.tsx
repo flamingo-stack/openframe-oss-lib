@@ -76,3 +76,55 @@ describe('RelatedContentSection rows the server read', () => {
     ]);
   });
 });
+
+describe('RelatedContentSection records with no list route, and the host lines under a card', () => {
+  it('draws a type no list route serves from its references, with the host lines under each card', async () => {
+    const refs: ContentRef[] = [
+      {
+        type: 'chat_message',
+        id: 'q1',
+        slug: 'q1',
+        url: '/admin/chat/q1',
+        title: 'Can I suppress a CVE?',
+        summary: 'Mingo question',
+        visibility: 'internal',
+        display_order: 0,
+      },
+    ];
+    render(
+      <RelatedContentSection
+        contentRefs={refs}
+        title="Proofs"
+        renderAfterCard={ref => <p>{`quote for ${ref.id}`}</p>}
+      />,
+    );
+    expect(await screen.findByText('Can I suppress a CVE?')).toBeInTheDocument();
+    expect(screen.getByText('quote for q1')).toBeInTheDocument();
+    expect(screen.getByText('Mingo questions')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('draws a call from its card route as a record card', async () => {
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ items: [{ id: '104', title: 'Onboarding call', preview: 'Sales call' }] }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    const refs: ContentRef[] = [
+      {
+        type: 'recorded_call',
+        id: '104',
+        slug: '104',
+        url: '/admin/calls/sales/x',
+        title: '',
+        visibility: 'internal',
+        display_order: 0,
+      },
+    ];
+    render(<RelatedContentSection contentRefs={refs} title="Proofs" />);
+    expect(await screen.findByText('Onboarding call')).toBeInTheDocument();
+    expect(screen.getByText('Calls')).toBeInTheDocument();
+  });
+});

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { RELATED_CARD_REGISTRY, type RelatedCardContext } from '../card-registry';
+import { RELATED_CARD_REGISTRY, relatedCardEntry, type RelatedCardContext } from '../card-registry';
 
 /**
  * The rail hands each registry entry an UNVALIDATED row — the fetch is
@@ -71,6 +71,9 @@ const ROWS: Record<string, unknown> = {
     step_count: 2,
   },
   roadmap_item: { id: 'r1', title: 'Roadmap Title', description: 'd', status: 'open', quarter: 'Q1' },
+  recorded_call: { id: '104', title: 'Call Title', preview: 'An onboarding call', url: '/admin/calls/sales/x' },
+  hubspot_ticket: { id: '5', title: 'Ticket Title', preview: 'Open' },
+  slack_message: { id: 'u1', title: 'Slack Title', preview: '#general' },
 };
 
 describe('RELATED_CARD_REGISTRY', () => {
@@ -107,5 +110,21 @@ describe('RELATED_CARD_REGISTRY', () => {
       expect(screen.getByTestId('skeleton-host').hasChildNodes(), type).toBe(true);
       unmount();
     }
+  });
+});
+
+describe('relatedCardEntry', () => {
+  it('draws a type with no card of its own as a record card, from its row', () => {
+    const { unmount } = render(
+      <div>
+        {relatedCardEntry('chat_message').render(
+          { id: 'q', title: 'Question Title', preview: 'asked on the site' },
+          CTX,
+        )}
+      </div>,
+    );
+    expect(screen.getByText('Question Title')).toBeTruthy();
+    expect(screen.getByText('asked on the site')).toBeTruthy();
+    unmount();
   });
 });

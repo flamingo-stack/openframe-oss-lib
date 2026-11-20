@@ -56,6 +56,13 @@ export const CONTENT_REF_GROUPS: Record<string, ContentRefGroupConfig> = {
   what_i_shipped: { label: 'What I Shipped', order: 10, layout: 'grid', gridSize: 'default' },
   how_i_work: { label: 'How I Work', order: 11, layout: 'grid', gridSize: 'default' },
   ai_prompt: { label: 'Squawkbox', order: 12, layout: 'grid', gridSize: 'default' },
+  // The records customers said something in (a feature's proofs): drawn as record cards (`recordEntry`).
+  recorded_call: { label: 'Calls', order: 13, layout: 'grid', gridSize: 'default' },
+  hubspot_ticket: { label: 'Support tickets', order: 14, layout: 'grid', gridSize: 'default' },
+  internal_task: { label: 'Tasks', order: 15, layout: 'grid', gridSize: 'default' },
+  slack_message: { label: 'Slack messages', order: 16, layout: 'grid', gridSize: 'default' },
+  chat_message: { label: 'Mingo questions', order: 17, layout: 'grid', gridSize: 'default' },
+  contact_submission: { label: 'Website forms', order: 18, layout: 'grid', gridSize: 'default' },
 };
 
 /** Human-readable label for a content_ref `type`. Returns null when the type

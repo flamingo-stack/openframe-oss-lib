@@ -48,6 +48,7 @@ import type { CustomerInterview } from '../../types/customer-interview';
 import type { EntityAuthor } from '../../types/entity-author';
 import type { MSP } from '../../types/stack';
 import type { UserProfile } from '../../types/user';
+import { defaultTableIdForDocumentType } from '../../utils/source-icons';
 import { AiPromptCard, type AiPromptCardData } from '../chat/entity-cards/ai-prompt-card';
 // DEEP card imports — NOT the `../chat` barrel. See the import note in
 // `related-content-section.tsx`: the barrel statically reaches
@@ -64,10 +65,12 @@ import { buildProductReleaseCardProps } from '../chat/entity-cards/product-relea
 import { ProgramCard } from '../chat/entity-cards/program-card';
 import { RoadmapCard } from '../chat/entity-cards/roadmap-card';
 import { WhatIShippedCard, type WhatIShippedCardData } from '../chat/entity-cards/what-i-shipped-card';
+import { MingoInfoCard } from '../chat/mingo-info-card';
 import type { InvestorUpdate } from '../chat/types/entities/investor-update';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
 import type { BaseProgramItem, ProgramHost, ProgramMedia } from '../chat/types/entities/program-types';
 import type { RoadmapItem } from '../chat/types/entities/roadmap-item';
+import { resolveSourceIcon } from '../chat/utils/source-row-cta';
 import { ProductReleaseCard } from '../shared/product-release/product-release-card';
 
 export type CardSize = 'lg' | 'default' | 'sm';
@@ -667,6 +670,47 @@ function roadmapEntry(cardType: 'roadmap_item' | 'delivery_item' | 'internal_tas
   });
 }
 
+/**
+ * A record drawn as one info card: its source's glyph, its title and one line about it. The card of every record the
+ * hub hydrates as a ChatRef-shaped row (`title`, `preview`: a call, a support ticket, a Slack message), and of any
+ * type the rail has no card for, read from its row or, with no list route, from the reference itself.
+ */
+export function RecordInfoCard({
+  docType,
+  title,
+  description,
+  linkProps,
+}: {
+  docType: string;
+  title: string;
+  description?: string;
+  linkProps: CardLinkAnchorProps | null;
+}) {
+  const { Icon } = resolveSourceIcon({ sourceRepo: defaultTableIdForDocumentType(docType), documentType: docType });
+  return (
+    <MingoInfoCard
+      title={title}
+      description={description}
+      icon={<Icon className="size-6" />}
+      anchorProps={linkProps ?? undefined}
+    />
+  );
+}
+
+/** A record's card entry (see `RecordInfoCard`): its row's `title` and `preview` (or `summary`). */
+export function recordEntry(docType: string): RelatedCardRegistryEntry {
+  return cardEntry({
+    skeleton: () => <MingoInfoCard loading title="" />,
+    decode: row => ({
+      title: rowString(row, 'title') ?? rowString(row, 'name') ?? '',
+      description: rowString(row, 'preview') ?? rowString(row, 'summary'),
+    }),
+    render: (row, ctx) => (
+      <RecordInfoCard docType={docType} title={row.title} description={row.description} linkProps={ctx.linkProps} />
+    ),
+  });
+}
+
 export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
   blog_post_existing: cardEntry({
     skeleton: size => <BlogCard loading size={size === 'sm' ? 'sm' : 'default'} />,
@@ -830,4 +874,13 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
   roadmap_item: roadmapEntry('roadmap_item'),
   delivery_item: roadmapEntry('delivery_item'),
   internal_task: roadmapEntry('internal_task'),
+  // Records the hub hydrates as ChatRef-shaped rows (their per-object card routes): what a customer said, where.
+  recorded_call: recordEntry('recorded_call'),
+  hubspot_ticket: recordEntry('hubspot_ticket'),
+  slack_message: recordEntry('slack_message'),
 };
+
+/** The entry a type is drawn with: its own, else the record card (`recordEntry`), so no group renders empty. */
+export function relatedCardEntry(type: string): RelatedCardRegistryEntry {
+  return RELATED_CARD_REGISTRY[type] ?? recordEntry(type);
+}

@@ -79,7 +79,7 @@ import { useLoadingScope } from '../ui/loading-scope';
 // `CardLinkAnchorProps` are declared alongside the registry, its primary
 // consumer, and re-exported below so the subpath barrel is unchanged.
 import {
-  RELATED_CARD_REGISTRY,
+  relatedCardEntry,
   rowString,
   type CardLinkAnchorProps,
   type CardSize,
@@ -172,8 +172,7 @@ function renderSkeletonForType(
   if (type === 'marketing_campaign') {
     return adminCampaignCard ? <adminCampaignCard.Skeleton size={size === 'sm' ? 'sm' : 'default'} /> : null;
   }
-  const entry: RelatedCardRegistryEntry | undefined = RELATED_CARD_REGISTRY[type];
-  return entry ? entry.skeleton(size, extras) : null;
+  return relatedCardEntry(type).skeleton(size, extras);
 }
 
 /**
@@ -225,8 +224,8 @@ function CardForType({
     return adminCampaignCard ? <adminCampaignCard.Card campaign={item} /> : null;
   }
 
-  const entry: RelatedCardRegistryEntry | undefined = RELATED_CARD_REGISTRY[type];
-  if (!entry) return null;
+  // A type with no card of its own draws the record card (`relatedCardEntry`), never nothing.
+  const entry: RelatedCardRegistryEntry = relatedCardEntry(type);
 
   return entry.render(item, {
     size,
@@ -281,8 +280,14 @@ function useGroupItems(
   if (data != null && dataUrl !== null && !pages.has(dataUrl)) {
     setPages(new Map(pages).set(dataUrl, extractItems(data)));
   }
-  if (url === null) return { items: null, isLoading: false };
+  // A type with no list route is drawn from its references: the reference IS the row (its title and summary).
+  if (url === null) return { items: refs.map(refAsRow), isLoading: false };
   return { items: cached ?? (error ? [] : null), isLoading: !cached && !error };
+}
+
+/** A reference read as its own row, for a type no list route serves. */
+function refAsRow(ref: ContentRef): { id: string; title: string; preview?: string } {
+  return { id: String(ref.id), title: ref.title, preview: ref.summary };
 }
 
 // =============================================================================
@@ -326,6 +331,8 @@ const GROUP_HEADING_CLASS = 'font-semibold text-ods-text-secondary text-h5';
 // The rail is a page section (a `<section>`, loaded and loading). Its groups and each group's cards are read lists
 // (`data-loading-item`): how many there are is the data's, and the skeleton draws ONE FULL PAGE of each group.
 const RAIL_CLASS = 'flex flex-col gap-8';
+/** One card and the host's lines under it (`renderAfterCard`). */
+const CARD_CELL_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-xsf)] content-start';
 /**
  * The card an unknown-type group draws while its type is read: the rail's grid content card (a cover over a title
  * and an excerpt), the shape the read types' grid cards share, so the group holds a grid card's height.
@@ -366,9 +373,12 @@ function ContentGroup({
   onLoadingChange,
   seedRows,
   leadsRail = false,
+  renderAfterCard,
 }: {
   type: string;
   refs: ContentRef[];
+  /** The host's own lines under each card (see `RelatedContentSectionProps.renderAfterCard`). */
+  renderAfterCard?: (ref: ContentRef) => React.ReactNode;
   /** The rows of this group's FIRST page, read by the server (`initialRows`). */
   seedRows?: ReadonlyArray<unknown>;
   /** The rail's first group: its first card's image is fetched at once. */
@@ -417,8 +427,9 @@ function ContentGroup({
   // sides). The pager stays in place while an unfetched page loads.
   if (isLoading) {
     const skeletons = pageRefs.map(r => (
-      <div key={r.id} data-loading-item>
+      <div key={r.id} data-loading-item className={CARD_CELL_CLASS}>
         {renderSkeletonForType(type, cardSize, adminCampaignCard, extras)}
+        {renderAfterCard?.(r)}
       </div>
     ));
     return (
@@ -463,10 +474,12 @@ function ContentGroup({
       // dev gets localhost and prod the right platform domain; default: the
       // ref's stored url as the API composed it).
       const resolved = resolveHref(contentRef);
-      const href = resolved.href ?? '';
+      // A host with no address for the reference (a record type it does not compose) takes the row's own `url`, the
+      // address its card route answers with.
+      const href = resolved.href || rowString(item, 'url') || '';
       const targetPlatform = resolved.targetPlatform ?? contentRef.targetPlatform ?? null;
       return (
-        <div key={itemId} data-loading-item>
+        <div key={itemId} data-loading-item className={CARD_CELL_CLASS}>
           <LinkProvider href={href || null} targetPlatform={targetPlatform}>
             {linkProps => (
               <CardForType
@@ -483,6 +496,7 @@ function ContentGroup({
               />
             )}
           </LinkProvider>
+          {renderAfterCard?.(contentRef)}
         </div>
       );
     })
@@ -561,8 +575,8 @@ export interface RelatedContentSectionProps {
    * seconds after load (CU-17tkuw5xp4q). A group with no entry fetches as before; later pages always fetch.
    */
   initialRows?: Readonly<Record<string, ReadonlyArray<unknown>>>;
-  /** Section title (default: "Related Content") */
-  title?: string;
+  /** Section title (default: "Related Content"). `null`: no title, the host draws the section's heading itself. */
+  title?: string | null;
   /**
    * Grid columns at desktop. 2 = denser cards / wider summary (original
    * investor-update layout); 3 = more cards per row for dashboards.
@@ -619,6 +633,11 @@ export interface RelatedContentSectionProps {
    *  title when `showWhenEmpty` and there are no refs — overrides
    *  `emptyStateText`. Lets a host match its canonical empty state. */
   emptyState?: React.ReactNode;
+  /**
+   * The host's own lines under each card, loaded and loading (what the card stands for on the host's page: a proof's
+   * quote under the call it came from). The card stays the record's; this only adds beneath it.
+   */
+  renderAfterCard?: (ref: ContentRef) => React.ReactNode;
 }
 
 /** The rail's title, loaded and loading. */
@@ -646,6 +665,7 @@ export function RelatedContentSection({
   showWhenEmpty = false,
   emptyStateText = 'No related content yet.',
   emptyState,
+  renderAfterCard,
 }: RelatedContentSectionProps) {
   // ── Hooks above EVERY early return (the original `if (!contentRefs.length)
   // return null` guard moved below them). ──
@@ -760,7 +780,7 @@ export function RelatedContentSection({
     if (!showWhenEmpty) return null; // non-showWhenEmpty consumers stay blank (unchanged)
     return (
       <div className="space-y-8">
-        <h2 className="text-2xl font-bold text-ods-text-primary">{accentSentenceMarks(title)}</h2>
+        {title !== null && <h2 className="text-2xl font-bold text-ods-text-primary">{accentSentenceMarks(title)}</h2>}
         {emptyState ?? <p className="text-ods-text-secondary">{emptyStateText}</p>}
       </div>
     );
@@ -795,7 +815,7 @@ export function RelatedContentSection({
 
   return (
     <LoadingRegion as="section" label="Loading related content" announce={loadingTypes.size > 0} className={RAIL_CLASS}>
-      <h2 className={RAIL_TITLE_CLASS}>{accentSentenceMarks(title)}</h2>
+      {title !== null && <h2 className={RAIL_TITLE_CLASS}>{accentSentenceMarks(title)}</h2>}
       {orderedTypes.map((type, groupIndex) => (
         <ContentGroup
           key={type}
@@ -811,6 +831,7 @@ export function RelatedContentSection({
           onLoadingChange={onGroupLoadingChange}
           seedRows={initialRows?.[type]}
           leadsRail={groupIndex === 0}
+          renderAfterCard={renderAfterCard}
         />
       ))}
     </LoadingRegion>
@@ -863,10 +884,12 @@ function RelatedContentSectionSkeleton({
     ) : null;
   return (
     <LoadingRegion as="section" label="Loading related content" className={RAIL_CLASS}>
-      <h2 className={RAIL_TITLE_CLASS}>
-        {/* A title read with the record (passed empty while it is read) is a bar of its line. */}
-        {title ? accentSentenceMarks(title) : <TextLineSkeleton type="inherit" as="span" className="w-1/2" />}
-      </h2>
+      {title !== null && (
+        <h2 className={RAIL_TITLE_CLASS}>
+          {/* A title read with the record (passed empty while it is read) is a bar of its line. */}
+          {title ? accentSentenceMarks(title) : <TextLineSkeleton type="inherit" as="span" className="w-1/2" />}
+        </h2>
+      )}
       {unknownGroup}
       {orderRailTypes(new Set(types), entityType).map(type => {
         const config = resolveGroupConfig(type);
