@@ -41,6 +41,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +81,15 @@ public class TenantSoftwareReadModelQuery {
     public SoftwareResponse get(String tenantId, String softwareId) {
         Software software = load(tenantId, softwareId);
         return toResponse(software);
+    }
+
+    public List<SoftwareResponse> getTitles(String tenantId, Collection<Long> titleIds) {
+        if (titleIds.isEmpty()) {
+            return List.of();
+        }
+        return softwareRepository.findByTenantIdAndSoftwareTitleIdIn(tenantId, titleIds).stream()
+                .map(TenantSoftwareReadModelQuery::toResponse)
+                .toList();
     }
 
     private Software load(String tenantId, String softwareId) {

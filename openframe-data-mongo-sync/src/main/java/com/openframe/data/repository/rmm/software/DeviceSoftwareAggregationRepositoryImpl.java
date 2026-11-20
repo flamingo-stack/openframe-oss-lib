@@ -127,6 +127,28 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
     }
 
     @Override
+    public Map<Long, List<String>> machineIdsByTitleWithCve(String tenantId, String cveId) {
+        List<AggregationOperation> stages = List.of(
+                ctx -> new Document("$match", new Document("tenantId", tenantId)
+                        .append("vulnerabilities", cveId)
+                        .append("machineConnected", true)),
+                ctx -> new Document("$group", new Document("_id", "$softwareTitleId")
+                        .append("machineIds", new Document("$addToSet", nonNullOrRemove("$machineId")))));
+        Aggregation aggregation = Aggregation.newAggregation(stages);
+        List<Document> titles = mongoTemplate.aggregate(aggregation, DeviceSoftware.class, Document.class)
+                .getMappedResults();
+        return titles.stream()
+                .filter(title -> title.get("_id") instanceof Number)
+                .collect(Collectors.toMap(DeviceSoftwareAggregationRepositoryImpl::titleIdOf,
+                        title -> title.getList("machineIds", String.class, List.of())));
+    }
+
+    private static Long titleIdOf(Document title) {
+        Number softwareTitleId = (Number) title.get("_id");
+        return softwareTitleId.longValue();
+    }
+
+    @Override
     public List<String> machineIdsWithTitle(String tenantId, Long softwareTitleId) {
         Criteria connectedWithTitle = Criteria.where("tenantId").is(tenantId)
                 .and("softwareTitleId").is(softwareTitleId)
