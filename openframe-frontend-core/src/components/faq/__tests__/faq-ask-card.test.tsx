@@ -73,7 +73,7 @@ const RUNTIME: AssistantRuntime = {
   available: true,
   name: 'Mingo',
   source: 'flamingo',
-  askPromptsUrl: '/api/faqs/questions',
+  askPromptsUrl: '/api/quick-actions/questions',
 };
 
 const requestedUrl = () => String(fetchMock.mock.calls[0]?.[0]);
@@ -117,7 +117,7 @@ describe('FaqSection ask card', () => {
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const url = new URL(requestedUrl(), 'https://host.test');
-    expect(url.pathname).toBe('/api/faqs/questions');
+    expect(url.pathname).toBe('/api/quick-actions/questions');
     expect(url.searchParams.get('topic')).toBe('/a topic nobody listed');
     expect(url.searchParams.get('count')).toBe('2');
     expect(url.searchParams.get('exclude')).toBe('a,b');
@@ -215,7 +215,7 @@ describe("FaqSection: the page's topic", () => {
     expect(await screen.findByText('How does pricing work?')).toBeInTheDocument();
     const [faqs] = requested('/content/api/faqs');
     expect(faqs.searchParams.get('topic')).toBe('/pricing');
-    const [questions] = requested('/api/faqs/questions');
+    const [questions] = requested('/api/quick-actions/questions');
     expect(questions.searchParams.get('topic')).toBe('/pricing');
   });
 
@@ -309,7 +309,9 @@ describe('AssistantAskPrompts', () => {
       </>,
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    const card = fetchMock.mock.calls.map(call => String(call[0])).find(url => url.startsWith('/api/faqs/questions'));
+    const card = fetchMock.mock.calls
+      .map(call => String(call[0]))
+      .find(url => url.startsWith('/api/quick-actions/questions'));
     expect(new URL(card ?? '', 'https://host.test').searchParams.get('exclude')).toBeNull();
   });
 

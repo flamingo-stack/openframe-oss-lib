@@ -283,6 +283,77 @@ describe('createMingoDecoder: the table', () => {
     ).toEqual([{ type: 'tool-output-error', toolCallId: 'x', dynamic: true, errorText: 'bad' }]);
   });
 
+  describe('a result the server returned as the answer', () => {
+    const answer = (result: unknown, over: Record<string, unknown> = {}) => ({
+      type: 'EXECUTED_TOOL',
+      toolExecutionRequestId: 'x',
+      toolFunction: 'list_quick_actions',
+      result,
+      success: true,
+      resultIsAnswer: true,
+      ...over,
+    });
+    const quickActions = JSON.stringify({
+      text: 'Pick an action.',
+      groups: [
+        {
+          label: 'Fix',
+          prompts: [
+            {
+              label: 'Patching',
+              prompt: 'Patch my fleet',
+              icons: [
+                { src: 'https://hub.example/light.png', theme: 'light' },
+                { src: 'https://hub.example/dark.png', theme: 'dark' },
+              ],
+            },
+            { label: 'Reboot' },
+          ],
+        },
+      ],
+      note: 'More with /docs.',
+    });
+    const drawn = [
+      { type: 'dynamic-tool', toolCallId: 'x', state: 'output-available' },
+      { type: 'text', text: 'Pick an action.' },
+      {
+        type: 'data-suggestions',
+        data: {
+          groups: [
+            {
+              label: 'Fix',
+              prompts: [
+                { label: 'Patching', prompt: 'Patch my fleet', icon: { url: 'https://hub.example/dark.png' } },
+                { label: 'Reboot' },
+              ],
+            },
+          ],
+          note: 'More with /docs.',
+        },
+      },
+    ];
+
+    it('draws as text and quick actions after its row, live and from a stored row, once', () => {
+      expect(partsOf(decodeAll(answer(quickActions), answer(quickActions)))).toMatchObject(drawn);
+      const decoder = createMingoDecoder();
+      expect(partsOf(decoder.decode(answer(quickActions), { row: {} }).chunks)).toMatchObject(drawn);
+    });
+
+    it('keeps an answer it has no part for visible', () => {
+      expect(partsOf(decodeAll(answer('Plain words'))).slice(1)).toMatchObject([{ type: 'text', text: 'Plain words' }]);
+      expect(partsOf(decodeAll(answer('{"items":[1]}'))).slice(1)).toMatchObject([
+        { type: 'text', text: '```json\n{\n  "items": [\n    1\n  ]\n}\n```' },
+      ]);
+    });
+
+    it('is only a row when not marked or when the tool failed', () => {
+      expect(partsOf(decodeAll(answer(quickActions, { resultIsAnswer: false })))).toHaveLength(1);
+      expect(partsOf(decodeAll(answer(quickActions, { success: false })))).toMatchObject([
+        { type: 'dynamic-tool', state: 'output-error' },
+      ]);
+    });
+  });
+
   it('a result that reached this reader alone still has a row to land on', () => {
     const chunks = decodeAll({
       type: 'EXECUTED_TOOL',

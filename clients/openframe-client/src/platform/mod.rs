@@ -1,3 +1,4 @@
+pub mod app_bundle;
 pub mod app_close;
 pub mod binary_version;
 pub mod binary_writer;

@@ -57,6 +57,7 @@ public class SoftwareScheduleService {
 
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
         validateTiming(input.getStartAt(), input.getRepeat());
+        SoftwareBundleService.rejectAdopt(input.getAction());
         List<SoftwareSchedulePackage> packages = toPackages(input.getPackages());
         List<PackageManagerType> managers = managersOf(packages);
         packageManagerAvailability.requireSoftwareManageable(input.getMachineIds(), managers);
@@ -95,6 +96,7 @@ public class SoftwareScheduleService {
 
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
         validateTiming(input.getStartAt(), input.getRepeat());
+        SoftwareBundleService.rejectAdopt(input.getAction());
         List<SoftwareSchedulePackage> packages = toPackages(input.getPackages());
         List<PackageManagerType> managers = managersOf(packages);
         packageManagerAvailability.requireSoftwareManageable(input.getMachineIds(), managers);

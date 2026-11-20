@@ -31,6 +31,12 @@
       "require": "./dist/build/optimize-imports-loader.cjs",
       "default": "./dist/build/optimize-imports-loader.cjs"
     },
+    "./route-paths": {
+      "types": "./dist/build/route-paths.d.ts",
+      "import": "./dist/build/route-paths.cjs",
+      "require": "./dist/build/route-paths.cjs",
+      "default": "./dist/build/route-paths.cjs"
+    },
     "./style-sources": {
       "types": "./dist/build/style-sources.d.ts",
       "import": "./dist/build/style-sources.cjs",

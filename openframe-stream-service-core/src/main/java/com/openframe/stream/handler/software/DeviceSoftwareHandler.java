@@ -2,6 +2,7 @@ package com.openframe.stream.handler.software;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.openframe.core.util.SoftwareNames;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetSource;
@@ -18,6 +19,7 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -60,11 +62,16 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private static final Pattern APP_PATH = Pattern.compile("(?:.*/)?([^/]+)\\.app", Pattern.CASE_INSENSITIVE);
     private static final Pattern TOP_LEVEL_APP_PATH = Pattern.compile(
             "(/Users/[^/]+)?/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
+    private static final Pattern USER_APPLICATIONS_APP_PATH = Pattern.compile(
+            "/Users/[^/]+/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
 
     private final FleetHostResolver fleetHostResolver;
+    private final MachineFleetMembership machineFleetMembership;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
+    @Value("${openframe.fleet.software-cdc.skipped-hosts}")
+    private final Set<Long> skippedHosts;
 
     private final Cache<Long, Boolean> snapshotReconciledHosts = Caffeine.newBuilder()
             .expireAfterWrite(SNAPSHOT_HOST_WINDOW)
@@ -103,7 +110,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return;
         }
         Long hostId = longOrNull(row, "host_id");
-        if (hostId == null) {
+        if (hostId == null || skippedHosts.contains(hostId)) {
             return;
         }
         boolean untrackedOnly = onlyUntrackedColumnsChanged(payload);
@@ -129,7 +136,12 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
-        reconcile(host, hostId, commit);
+        if (machineFleetMembership.isInFleet(host)) {
+            reconcile(host, hostId, commit);
+        } else {
+            log.debug("[software-cdc] host_software for Fleet host {} of machine {} out of the fleet — skipping",
+                    hostId, host.machineId());
+        }
         recentlyReconciledHosts.put(hostId, Boolean.TRUE);
         if (snapshotRead) {
             snapshotReconciledHosts.put(hostId, Boolean.TRUE);
@@ -187,11 +199,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             }
             if (existing != null) {
                 reported.setId(existing.getId());
-                reported.setMachineConnected(existing.isMachineConnected());
                 List<String> previousCves = vulnerabilitiesOf(existing);
                 affectedCves.addAll(previousCves);
-            } else {
-                reported.setMachineConnected(true);
             }
             reported.setUpdatedAt(now);
             changed.add(reported);
@@ -222,7 +231,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private static DeviceSoftware reportedRow(FleetHostRef host, Long titleId, HostSoftwareTitle title) {
         String tenantId = host.tenantId();
         String machineId = host.machineId();
-        String name = title.getName();
+        String reportedName = title.getName();
+        String name = SoftwareNames.displayable(reportedName);
         String source = title.getSource();
         List<String> versions = versionsOf(title);
         String upgradeCode = title.getUpgradeCode();
@@ -237,6 +247,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         String bundleIdentifier = app ? title.getBundleIdentifier() : null;
         List<String> appFileNames = appFileNamesOf(appPaths);
         Boolean topLevelApp = topLevelAppOf(appPaths);
+        Boolean userApplicationsOnly = userApplicationsOnlyOf(appPaths);
         List<String> vulnerabilities = vulnerabilitiesOf(title);
 
         DeviceSoftware row = new DeviceSoftware();
@@ -256,12 +267,15 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         row.setBundleIdentifier(bundleIdentifier);
         row.setAppFileNames(appFileNames);
         row.setTopLevelApp(topLevelApp);
+        row.setUserApplicationsOnly(userApplicationsOnly);
         row.setVulnerabilities(vulnerabilities);
+        row.setMachineConnected(true);
         return row;
     }
 
     private static boolean sameContent(DeviceSoftware existing, DeviceSoftware reported) {
-        return Objects.equals(existing.getName(), reported.getName())
+        return existing.isMachineConnected() == reported.isMachineConnected()
+                && Objects.equals(existing.getName(), reported.getName())
                 && Objects.equals(existing.getSource(), reported.getSource())
                 && Objects.equals(existing.getVersions(), reported.getVersions())
                 && Objects.equals(existing.getUpgradeCode(), reported.getUpgradeCode())
@@ -274,6 +288,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
                 && Objects.equals(existing.getBundleIdentifier(), reported.getBundleIdentifier())
                 && Objects.equals(existing.getAppFileNames(), reported.getAppFileNames())
                 && Objects.equals(existing.getTopLevelApp(), reported.getTopLevelApp())
+                && Objects.equals(existing.getUserApplicationsOnly(), reported.getUserApplicationsOnly())
                 && Objects.equals(existing.getVulnerabilities(), reported.getVulnerabilities());
     }
 
@@ -343,6 +358,17 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return null;
         }
         return installedPaths.stream().anyMatch(path -> TOP_LEVEL_APP_PATH.matcher(path).matches());
+    }
+
+    private static Boolean userApplicationsOnlyOf(List<String> installedPaths) {
+        if (installedPaths.isEmpty()) {
+            return null;
+        }
+        List<String> topLevelPaths = installedPaths.stream()
+                .filter(path -> TOP_LEVEL_APP_PATH.matcher(path).matches())
+                .toList();
+        return !topLevelPaths.isEmpty()
+                && topLevelPaths.stream().allMatch(path -> USER_APPLICATIONS_APP_PATH.matcher(path).matches());
     }
 
     private static List<HostSoftwareInstalledVersion> installedVersionsOf(HostSoftwareTitle title) {

@@ -1,10 +1,11 @@
 use serde::Deserialize;
 use std::cmp::Ordering;
 
-use super::{last_line, Probe, ProbeState, QueryError, UpgradeOutcome, PROBE_TIMEOUT_SECS};
+use super::{Probe, ProbeState, QueryError, UpgradeOutcome, PROBE_TIMEOUT_SECS};
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::PackageRef;
 use crate::services::package_manager::choco::{report, root, SCRIPT_PRELUDE};
+use crate::services::package_manager::last_line;
 use crate::services::package_manager::update_gate;
 
 const PROBE_SCRIPT: &str = r#"$id = $args[1]

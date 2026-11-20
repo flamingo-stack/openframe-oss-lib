@@ -13,6 +13,7 @@ import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Waiting;
 import lombok.experimental.UtilityClass;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Reduces a device's package-update state from an incoming status event.
@@ -128,6 +129,27 @@ public class PackageUpdateDeviceStateReducer {
         if (waiting != null && waiting.getPhase() == Waiting.Phase.APPROVED) {
             state.setDeadlineAt(Instant.now());
         }
+    }
+
+    public SoftwareActionStatus rollUpStatus(List<PackageUpdateDeviceState> all) {
+        if (all.isEmpty()) {
+            return null;
+        }
+        boolean allTerminal = all.stream().allMatch(PackageUpdateDeviceStateReducer::isTerminal);
+        if (allTerminal) {
+            return all.stream().anyMatch(s -> s.getStatus() == SoftwareActionStatus.FAILED) ? SoftwareActionStatus.FAILED : SoftwareActionStatus.COMPLETED;
+        }
+        if (all.stream().anyMatch(s -> s.getStatus() == SoftwareActionStatus.WAITING)) {
+            return SoftwareActionStatus.WAITING;
+        }
+        if (all.stream().anyMatch(s -> s.getStatus() == SoftwareActionStatus.IN_PROGRESS)) {
+            return SoftwareActionStatus.IN_PROGRESS;
+        }
+        return SoftwareActionStatus.SCHEDULED;
+    }
+
+    public boolean isTerminal(PackageUpdateDeviceState s) {
+        return s.getStatus() == SoftwareActionStatus.COMPLETED || s.getStatus() == SoftwareActionStatus.FAILED;
     }
 
     private String name(Enum<?> value) {

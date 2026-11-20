@@ -64,11 +64,6 @@ public class BrewCaskIndex {
                 .collect(toSet());
     }
 
-    public boolean namesBundleIds(String token) {
-        PackageCatalogEntry cask = caskByToken.get(token);
-        return !cask.getBundleIds().isEmpty() || !cask.getBundleIdPrefixes().isEmpty();
-    }
-
     public PackageCatalogEntry caskOf(String token) {
         return caskByToken.get(token);
     }

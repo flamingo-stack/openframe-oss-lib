@@ -46,8 +46,8 @@ use crate::config::update_config::{
 };
 use crate::listener::command::{
     ClientUninstallHandler, ClientUpdateHandler, CommandContext, CommandListener,
-    FeatureFlagsHandler, PackageUpdateHandler, RestartGate, ToolInstallationHandler,
-    ToolUpdateHandler,
+    FeatureFlagsHandler, PackageAdoptHandler, PackageUpdateHandler, RestartGate,
+    ToolInstallationHandler, ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
@@ -78,6 +78,8 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::package_manager::adopt::PackageAdoptRunner;
+use crate::services::package_manager::brew::BrewLock;
 use crate::services::package_manager::package_update::{
     OrderStore, PackageUpdateRunManager, RestartSignals, StatusReporter,
 };
@@ -172,6 +174,11 @@ struct PackageUpdate {
     manager: PackageUpdateRunManager,
 }
 
+struct PackageAdopt {
+    listener: CommandListener<PackageAdoptHandler>,
+    runner: Arc<PackageAdoptRunner>,
+}
+
 pub struct Client {
     config: Arc<RwLock<ClientConfiguration>>,
     directory_manager: DirectoryManager,
@@ -185,6 +192,7 @@ pub struct Client {
     client_update_listener: CommandListener<ClientUpdateHandler>,
     client_uninstall_listener: CommandListener<ClientUninstallHandler>,
     package_update: Option<PackageUpdate>,
+    package_adopt: PackageAdopt,
     restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
@@ -549,6 +557,25 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let brew_lock = BrewLock::default();
+        let package_adopt_runner = Arc::new(PackageAdoptRunner::new(
+            nats_message_publisher.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+            RestartSignals {
+                client_update: tool_run_manager.client_update_pending(),
+                agent_restart: agent_restart.view(),
+            },
+            package_upgrades.clone(),
+            brew_lock.clone(),
+        ));
+        let package_adopt = PackageAdopt {
+            listener: CommandListener::new(
+                PackageAdoptHandler::new(package_adopt_runner.clone()),
+                command_context.clone(),
+            ),
+            runner: package_adopt_runner,
+        };
         let package_update = package_auto_update_enabled.then(|| {
             let orders = Arc::new(OrderStore::load(
                 directory_manager.secured_dir().join("package_updates.json"),
@@ -573,6 +600,7 @@ impl Client {
                 },
                 package_upgrades.clone(),
                 tool_run_manager.clone(),
+                brew_lock,
             );
             PackageUpdate { listener, manager }
         });
@@ -686,6 +714,7 @@ impl Client {
             client_update_listener,
             client_uninstall_listener,
             package_update,
+            package_adopt,
             restart_gate,
             command_execution_listener,
             script_execution_listener,
@@ -785,6 +814,7 @@ impl Client {
         if let Some(package_update) = &self.package_update {
             package_update.listener.start().await?;
         }
+        self.package_adopt.listener.start().await?;
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
             restart_gate.requested().await;
@@ -878,6 +908,7 @@ impl Client {
         if let Some(package_update) = &self.package_update {
             package_update.manager.start();
         }
+        self.package_adopt.runner.start();
         tokio::spawn(crate::doctor::prerequisites::heal_on_start(
             crate::doctor::prerequisites::record_path(&self.directory_manager),
             crate::services::package_manager::chocolatey_enabled(),

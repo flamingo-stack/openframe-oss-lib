@@ -10,7 +10,7 @@ extend type Query {
 
     """Paginated list of software titles installed across the tenant's fleet.
     One row = one software title (aggregated across devices).
-    Sortable fields: name, devicesCount, cveCount, highestSeverity, adoptionCount (default: Fleet order by name).
+    Sortable fields: name, devicesCount, cveCount, highestSeverity (default: Fleet order by name).
     An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error."""
     softwares(
         filter: SoftwareFilterInput,
@@ -37,7 +37,9 @@ extend type Query {
         sort: SortInput
     ): SoftwareOnDeviceConnection!
 
-    """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab."""
+    """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab.
+    Sortable fields: cveId, severity, cvssScore, discoveredAt, affectedVersion (version order, missing versions last).
+    An unknown sort field is rejected as a client error (BAD_REQUEST)."""
     softwareVulnerabilities(
         softwareId: ID!,
         filter: SoftwareVulnerabilityFilterInput,
@@ -50,11 +52,12 @@ extend type Query {
     ): SoftwareVulnerabilityConnection!
 
     """Faceted filter-option counts for the software list — Type / Source / Version-status /
-    Vulnerability-severity dropdowns. Mirrors scriptFilters / deviceFilters."""
+    Vulnerability-severity / OS dropdowns. Mirrors scriptFilters / deviceFilters.
+    Counts only the titles that match filter and search; send each dropdown's facet without its own dimension."""
     softwareFilters(filter: SoftwareFilterInput, search: String): SoftwareFilters!
 
     """Faceted filter-option counts for a software title's Devices tab — the Status dropdown.
-    Mirrors softwareFilters; scoped to the devices that have this software installed."""
+    Mirrors softwareFilters; scoped to the devices that have this software installed and match filter and search."""
     softwareDeviceFilters(softwareId: ID!, filter: SoftwareOnDeviceFilterInput, search: String): SoftwareOnDeviceFilters!
 
     """Auto-update of a software title, for its Auto-update form: on or off, the settings and the devices."""
@@ -83,9 +86,12 @@ extend type Query {
 
     """Devices affected by a given CVE — the hosts that have an affected software version, correlated
     to their OpenFrame Machine. Powers the vulnerability-detail "Devices" table. Each node is a Machine
-    (same shape as the top-level `devices` query)."""
+    (same shape as the top-level `devices` query). With the software read model on, `filter`, `search` and
+    `sort` work as on `devices` (deleted devices hidden unless `filter.statuses` asks for them; sortable fields
+    as on `devices`, default hostname ASC). With it off, Fleet lists the devices: `filter` and `sort` are ignored."""
     vulnerabilityDevices(
         cveId: String!,
+        filter: DeviceFilterInput,
         first: Int,
         after: String,
         last: Int,
@@ -93,6 +99,11 @@ extend type Query {
         search: String,
         sort: SortInput
     ): DeviceConnection!
+
+    """Faceted filter-option counts for a CVE's Devices table — the Customer and Status dropdowns, same scope as
+    vulnerabilityDevices(cveId, filter, search). `tagKeys`, `directorySources` and `userLinks` are []. With the
+    software read model off every option list is [] and filteredCount is 0."""
+    vulnerabilityDeviceFilters(cveId: String!, filter: DeviceFilterInput, search: String): DeviceFilters!
 
     """Software installed on one device. One row = one installed title, the same node as `softwares`.
     Version fields are read in this device's scope: `currentVersion` is the version installed here.
@@ -176,8 +187,7 @@ type Software {
 
     """Devices that have this title installed manually (installedBy UNMANAGED) and can be adopted — the
     ADOPTION column and the "N devices have … installed manually" banner with Adopt. Null or 0 = "–", no banner;
-    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with).
-    Sortable as adoptionCount."""
+    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with)."""
     adoptionCount: Int
 
     """The package Adopt reinstalls this title with, shown to the admin for confirmation: the best match of a
@@ -342,6 +352,8 @@ type SoftwareFilters {
     severities: [SoftwareFilterOption!]!
     "AUTO-UPDATE dropdown: ON / OFF / NO_PACKAGE / NEEDS_ADOPTION."
     autoUpdateStatuses: [SoftwareFilterOption!]!
+    "OS dropdown: the systems of the titles (Software.os)."
+    osTypes: [SoftwareFilterOption!]!
 }
 
 type SoftwareOnDeviceFilters {
@@ -366,6 +378,7 @@ type SoftwareFilterOption {
 
 input SoftwareFilterInput {
     sources: [SoftwareSource!]
+    """The CURRENT VERSION filter (Software.versionStatus). With Fleet paging it is left out, like sources."""
     versionStatuses: [SoftwareVersionStatus!]
     minSeverity: SoftwareCveSeverity
     deviceTagIds: [ID!]
@@ -470,11 +483,13 @@ input VulnerabilityFilterInput {
 #
 # PackageManagerType and BrewPackageType are declared in package-search.graphqls and reused here.
 
-"""Install vs update — the two software management actions. Also scopes a package's Execution
-History (softwareExecutions)."""
+"""The software management actions. Also scopes a package's Execution History (softwareExecutions)."""
 enum SoftwareAction {
     INSTALL
     UPDATE
+    """A hand-installed copy reinstalled with a package manager (adoptSoftware). Not a bundle or schedule action:
+    BAD_REQUEST there."""
+    ADOPT
 }
 
 extend type Mutation {
@@ -486,11 +501,16 @@ extend type Mutation {
     dispatched as its own RMM execution; returns one result (with its executionId) per package."""
     updateSoftware(input: SoftwareManagementInput!): [SoftwareDispatchResult!]!
 
-    """Adopt a software title on devices that have it installed manually: reinstall it with a package manager,
-    so it can be updated. Runs now; an offline device starts when it comes online. The device picker lists
-    softwareDevices(softwareId, filter: {installedBy: [UNMANAGED]}). Returns one result per package manager used
-    (each its own execution, shown as an ADOPT row in Software Actions)."""
-    adoptSoftware(input: AdoptSoftwareInput!): [SoftwareDispatchResult!]!
+    """Adopt a software title on devices that have it installed by hand: the device reinstalls it with the title's
+    adoption package (Software.adoptionPackage), so it can be updated later. Sends the order to the devices now.
+    SoftwareOnDevice.adoption shows the device's latest adoption of the title: ADOPTING until the device reports the
+    reinstall done, then null; FAILED with the error when the reinstall or its delivery failed. Each call is one ADOPT
+    row in Software Actions with one Execution History row per device.
+    Returns the devices (Machine global ids) the order was sent to. Left out: devices of another OS, devices without
+    the package manager reported PRESENT, devices whose copy is only in ~/Applications, and devices the order cannot
+    reach (the order is switched off or the agent is too old for it). NOT_FOUND for an unknown title. BAD_REQUEST
+    when the title has no adoption package, when no device is left, and when a device is not managed."""
+    adoptSoftware(input: AdoptSoftwareInput!): [ID!]!
 
     """Save the Auto-update form: on with these settings for the bundle's devices, off for the title's other
     devices. Runs no update; the bundle becomes COMPLETED."""
@@ -506,25 +526,11 @@ extend type Mutation {
 # ────────── Adopt ──────────
 
 input AdoptSoftwareInput {
-    "The software title (Software.id) to adopt."
+    """The software title (Software.id). It is adopted into its Software.adoptionPackage: a Homebrew cask on
+    macOS, a Chocolatey package on Windows."""
     softwareId: ID!
-    """Selected devices (Machine global ids), 1..100. Devices that do not have the title installed manually are
-    skipped. Null = every device matching filter + search ("Add All Devices")."""
-    machineIds: [ID!]
-    """With machineIds null: the devices to adopt, as the picker's softwareDevices(softwareId, filter, search) lists
-    them. Always narrowed to installedBy UNMANAGED. Ignored when machineIds is set."""
-    filter: SoftwareOnDeviceFilterInput
-    search: String
-    "Package Manager for Windows. macOS devices always adopt with Brew."
-    windowsPackageManager: SoftwareAdoptionWindowsManager! = MATCH_CUSTOMER
-}
-
-"""Which package manager adopts the title on Windows devices."""
-enum SoftwareAdoptionWindowsManager {
-    "The manager each customer already uses for this app; Winget if none."
-    MATCH_CUSTOMER
-    WINGET
-    CHOCOLATEY
+    "The devices (Machine global ids), 1..100."
+    machineIds: [ID!]!
 }
 
 """A set of catalog packages to install/update on a set of devices."""

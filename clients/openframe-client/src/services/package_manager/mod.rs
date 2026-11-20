@@ -1,9 +1,12 @@
+pub mod adopt;
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) mod brew;
 mod choco;
 pub mod package_update;
 pub mod report_publisher;
 pub mod report_run_manager;
 mod state;
+mod status_outbox;
 mod support;
 pub mod update_gate;
 
@@ -168,3 +171,17 @@ fn winget_client_module_presence() -> Presence {
 fn winget_client_module_presence() -> Presence {
     Presence::Unknown
 }
+
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
+fn last_line(output: &str) -> &str {
+    output
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+#[path = "mod_tests.rs"]
+mod tests;

@@ -13,9 +13,12 @@ import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -48,6 +51,36 @@ public class DeviceSoftwareReadModelQuery {
                 .toList();
     }
 
+    public Set<String> machinesWithUserApplicationsOnlyCopy(String tenantId, Long softwareTitleId,
+                                                            List<String> machineIds) {
+        return deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineIdIn(tenantId, softwareTitleId, machineIds)
+                .stream()
+                .filter(row -> Boolean.TRUE.equals(row.getUserApplicationsOnly()))
+                .map(DeviceSoftware::getMachineId)
+                .collect(Collectors.toSet());
+    }
+
+    public Map<Long, List<String>> machinesOutsideUserApplicationsByTitleId(String tenantId,
+                                                                           Collection<Long> softwareTitleIds) {
+        return deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdInAndMachineConnectedTrue(tenantId,
+                        softwareTitleIds).stream()
+                .filter(row -> !Boolean.TRUE.equals(row.getUserApplicationsOnly()))
+                .collect(Collectors.groupingBy(DeviceSoftware::getSoftwareTitleId,
+                        Collectors.mapping(DeviceSoftware::getMachineId, Collectors.toList())));
+    }
+
+    // a homebrew_casks row is named by the cask's token
+    public Map<String, Set<String>> caskTokensByMachineId(String tenantId, Collection<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return Map.of();
+        }
+        String casks = FleetSource.HOMEBREW_CASKS.getFleetName();
+        return deviceSoftwareRepository.findByTenantIdAndMachineIdInAndSource(tenantId, machineIds, casks).stream()
+                .filter(row -> row.getName() != null)
+                .collect(Collectors.groupingBy(DeviceSoftware::getMachineId,
+                        Collectors.mapping(row -> row.getName().toLowerCase(Locale.ROOT), Collectors.toSet())));
+    }
+
     private static SoftwareResponse toResponse(Software sw, DeviceSoftware installed) {
         List<String> versions = versionsOnDevice(installed);
         String currentVersion = versions.isEmpty() ? null : versions.getFirst();
@@ -76,6 +109,7 @@ public class DeviceSoftwareReadModelQuery {
         row.setBundleIdentifier(sw.getBundleIdentifier());
         row.setAppFileNames(sw.getAppFileNames());
         row.setTopLevelApp(sw.getTopLevelApp());
+        row.setUserApplicationsOnly(installed.getUserApplicationsOnly());
         row.setPackageMatch(sw.getPackageMatch());
         row.setAdoptionMatch(sw.getAdoptionMatch());
         row.setType(type);

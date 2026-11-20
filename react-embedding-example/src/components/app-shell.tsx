@@ -12,36 +12,63 @@ import { WalkthroughVideo } from './walkthrough-video'
 import { DOCS_BASE_ROUTE } from '../config/content'
 import { EP } from '../config/endpoints'
 
-const NAV = [
-  // No "Home" item — the header wordmark links home.
-  { to: '/onboarding-guides', label: 'Onboarding' },
-  { to: DOCS_BASE_ROUTE, label: 'Knowledge Hub' },
-  { to: '/roadmap', label: 'Roadmap' },
-  { to: '/bug-fixes-and-enhancements', label: 'Delivery' },
-  { to: '/releases', label: 'Releases' },
-  { to: '/authors', label: 'Authors' },
-  { to: '/faqs', label: 'FAQ' },
-  { to: '/trust-center', label: 'Trust' },
-  { to: '/download', label: 'Download' },
-  { to: '/contact', label: 'Contact' },
-  { to: '/schedule-a-call', label: 'Schedule' },
-  { to: '/tickets', label: 'Tickets' },
-  { to: '/mcp', label: 'MCP' },
-] as const
+type NavEntry = { to: string; label: string }
+
+// No "Home" item: the header wordmark links home. The pages are grouped into a
+// few menus, as on every hub platform: one top-level item per page did not fit
+// the bar and ran under the assistant launcher.
+const NAV: ReadonlyArray<{ id: string; label: string; links: ReadonlyArray<NavEntry> }> = [
+  {
+    id: 'learn',
+    label: 'Learn',
+    links: [
+      { to: '/onboarding-guides', label: 'Onboarding' },
+      { to: DOCS_BASE_ROUTE, label: 'Knowledge Hub' },
+      { to: '/faqs', label: 'FAQ' },
+      { to: '/authors', label: 'Authors' },
+    ],
+  },
+  {
+    id: 'product',
+    label: 'Product',
+    links: [
+      { to: '/roadmap', label: 'Roadmap' },
+      { to: '/bug-fixes-and-enhancements', label: 'Delivery' },
+      { to: '/releases', label: 'Releases' },
+      { to: '/download', label: 'Download' },
+      { to: '/trust-center', label: 'Trust' },
+    ],
+  },
+  {
+    id: 'support',
+    label: 'Support',
+    links: [
+      { to: '/tickets', label: 'Tickets' },
+      { to: '/contact', label: 'Contact' },
+      { to: '/schedule-a-call', label: 'Schedule' },
+      { to: '/mcp', label: 'MCP' },
+    ],
+  },
+]
+
+const menuOf = (id: string, label: string, links: ReadonlyArray<NavEntry>) => ({
+  id,
+  label,
+  match: links.map((l) => l.to),
+  columns: [{ id, links: links.map((l) => ({ id: l.to, label: l.label, href: l.to })) }],
+})
 
 // The site navigation model: plain data, the same shape every hub platform
-// hands the shared `SiteHeader`. Each entry is a plain link (no panels), and
-// `match` marks the current section. The legal documents follow, one link
+// hands the shared `SiteHeader`. Each menu is one dropdown list, and `match`
+// marks the current section. The legal documents are the last menu, one link
 // each, from the hub's list: the host names none of them.
 function siteNav(legal: ReadonlyArray<{ docType: string; title: string }>): SiteNav {
-  const links = [...NAV, ...legal.map((doc) => ({ to: `/legal/${doc.docType}`, label: doc.title }))]
+  const legalLinks = legal.map((doc) => ({ to: `/legal/${doc.docType}`, label: doc.title }))
   return {
-    menus: links.map((n) => ({
-      id: n.to,
-      label: n.label,
-      href: n.to,
-      match: [n.to],
-    })),
+    menus: [
+      ...NAV.map((m) => menuOf(m.id, m.label, m.links)),
+      ...(legalLinks.length > 0 ? [menuOf('legal', 'Legal', legalLinks)] : []),
+    ],
     footerColumns: [],
     primaryCta: 'none',
     legal: { company: 'OpenFrame', notes: [], links: [] },

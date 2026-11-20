@@ -10,7 +10,10 @@ import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.service.rmm.fleet.FleetSoftwareOs;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
@@ -54,6 +57,8 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -102,10 +107,21 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     private static Machine machine(String machineId, String hostname) {
+        return machine(machineId, hostname, DeviceStatus.MANAGED);
+    }
+
+    private static Machine machine(String machineId, String hostname, DeviceStatus status) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
         machine.setHostname(hostname);
+        machine.setStatus(status);
         return machine;
+    }
+
+    private static Vulnerability affecting42(String cveId, String installedVersion) {
+        Vulnerability.AffectedSoftware affected = Vulnerability.AffectedSoftware.builder()
+                .softwareTitleId(42L).installedVersion(installedVersion).build();
+        return Vulnerability.builder().cveId(cveId).affectedSoftware(List.of(affected)).build();
     }
 
     @Test
@@ -170,6 +186,32 @@ class TenantSoftwareReadModelQueryTest {
 
         assertThatThrownBy(() -> query.get(TENANT, "7")).isInstanceOf(NotFoundException.class);
         assertThatThrownBy(() -> query.get(TENANT, "x")).isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void getTitles_theTenantsTitlesShapedAsTheSoftwareListRows() {
+        // setup
+        List<Long> titleIds = List.of(42L, 99L);
+        List<Software> stored = List.of(software(42L, "programs"), software(99L, "homebrew_packages"));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleIdIn(TENANT, titleIds)).thenReturn(stored);
+
+        // execution
+        List<SoftwareResponse> rows = query.getTitles(TENANT, titleIds);
+
+        // verifications
+        assertThat(rows).extracting(SoftwareResponse::getId, SoftwareResponse::getSource, SoftwareResponse::getFleetSource)
+                .containsExactly(tuple("42", SoftwareSource.UNMANAGED, FleetSource.PROGRAMS),
+                        tuple("99", SoftwareSource.BREW, FleetSource.HOMEBREW_PACKAGES));
+    }
+
+    @Test
+    void getTitles_noTitle_noneWithoutQuerying() {
+        // execution
+        List<SoftwareResponse> rows = query.getTitles(TENANT, List.of());
+
+        // verifications
+        assertThat(rows).isEmpty();
+        verifyNoInteractions(softwareRepository);
     }
 
     @Test
@@ -444,14 +486,98 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
-    void allForFilters_withAndWithoutSearch() {
+    void allTitles_withAndWithoutSearch() {
         when(softwareRepository.findTitles(titles().build(), Pageable.unpaged()))
                 .thenReturn(new PageImpl<>(List.of(software(1L, "apps", 1))));
         when(softwareRepository.findTitles(titles().nameLower("jq").build(), Pageable.unpaged()))
                 .thenReturn(Page.empty());
 
-        assertThat(query.allForFilters(TENANT, null)).extracting(SoftwareResponse::getType).containsExactly(SoftwareType.APPLICATION);
-        assertThat(query.allForFilters(TENANT, "JQ")).isEmpty();
+        assertThat(query.allTitles(TENANT, null, null, null)).extracting(SoftwareResponse::getType)
+                .containsExactly(SoftwareType.APPLICATION);
+        assertThat(query.allTitles(TENANT, "JQ", null, null)).isEmpty();
+    }
+
+    @Test
+    void allTitles_vulnerableAndFilter_reachTheUnpagedQuery() {
+        // setup
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setManageable(true);
+        filter.setOsTypes(List.of(OsType.WINDOWS));
+        Set<String> windowsSources = FleetSoftwareOs.fleetSources(List.of(OsType.WINDOWS));
+        SoftwareTitleQuery expected = titles().vulnerableOnly(true).manageable(true).osSources(windowsSources).build();
+        when(softwareRepository.findTitles(expected, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(software(1L, "programs", 1))));
+
+        // execution
+        List<SoftwareResponse> result = query.allTitles(TENANT, null, true, filter);
+
+        // verifications
+        assertThat(result).extracting(SoftwareResponse::getId).containsExactly("1");
+    }
+
+    @Test
+    void devicesForSoftwareRows_frozenMachine_droppedOthersKept() {
+        // setup
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps")));
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of(installed("m1", "1.0"), installed("m2", "1.0"), installed("m3", "1.0"),
+                        installed("m4", "1.0"), installed("m5", "1.0"), installed("m6", "1.0")));
+        when(machineRepository.findByMachineIdIn(anyList())).thenReturn(List.of(
+                machine("m1", "managed", DeviceStatus.MANAGED),
+                machine("m2", "deleted", DeviceStatus.DELETED),
+                machine("m3", "archived", DeviceStatus.ARCHIVED),
+                machine("m4", "leaving", DeviceStatus.PENDING_DELETION),
+                machine("m5", "reinstalled", DeviceStatus.PENDING),
+                machine("m6", "offline", DeviceStatus.OFFLINE)));
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = query.devicesForSoftwareRows(TENANT, "42", null, "1.0");
+
+        // verifications
+        assertThat(rows).extracting(row -> row.getDevice().getMachineId()).containsExactly("m1", "m5", "m6");
+    }
+
+    @Test
+    void listVulnerabilitiesForSoftware_sortByAffectedVersionAscending_numericOrderNullsLast() {
+        // setup
+        when(vulnerabilityRepository.findByTenantIdAndAffectedSoftwareSoftwareTitleId(TENANT, 42L))
+                .thenReturn(List.of(affecting42("CVE-A", "10.0"), affecting42("CVE-B", null), affecting42("CVE-C", "9.2")));
+
+        // execution
+        PageResult<SoftwareVulnerabilityResponse> result =
+                query.listVulnerabilitiesForSoftware(TENANT, "42", null, 0, 10, "affectedVersion", true);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareVulnerabilityResponse::getCveId)
+                .containsExactly("CVE-C", "CVE-A", "CVE-B");
+    }
+
+    @Test
+    void listVulnerabilitiesForSoftware_sortByAffectedVersionDescending_numericOrderNullsLast() {
+        // setup
+        when(vulnerabilityRepository.findByTenantIdAndAffectedSoftwareSoftwareTitleId(TENANT, 42L))
+                .thenReturn(List.of(affecting42("CVE-A", "10.0"), affecting42("CVE-B", null), affecting42("CVE-C", "9.2")));
+
+        // execution
+        PageResult<SoftwareVulnerabilityResponse> result =
+                query.listVulnerabilitiesForSoftware(TENANT, "42", null, 0, 10, "affectedVersion", false);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareVulnerabilityResponse::getCveId)
+                .containsExactly("CVE-A", "CVE-C", "CVE-B");
+    }
+
+    @Test
+    void listVulnerabilitiesForSoftware_unknownSortField_badRequestNamingTheSortableFields() {
+        // execution
+        Throwable thrown = catchThrowable(
+                () -> query.listVulnerabilitiesForSoftware(TENANT, "42", null, 0, 10, "bogus", true));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("bogus")
+                .hasMessageContaining("affectedVersion");
+        verifyNoInteractions(vulnerabilityRepository);
     }
 
     @Test

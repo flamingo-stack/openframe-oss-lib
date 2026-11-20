@@ -105,17 +105,3 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
         },
     }
 }
-
-#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
-fn last_line(output: &str) -> &str {
-    output
-        .lines()
-        .rev()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .unwrap_or_default()
-}
-
-#[cfg(test)]
-#[path = "mod_tests.rs"]
-mod tests;

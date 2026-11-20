@@ -21,8 +21,8 @@ class AgentKeyServiceTest {
     @ParameterizedTest
     @EnumSource(AgentKeyType.class)
     void currentAndRotateReachTheProviderOfTheType(AgentKeyType type) {
-        assertThat(service.current(type).key()).isEqualTo(type.path() + "-current");
-        assertThat(service.rotate(type).key()).isEqualTo(type.path() + "-rotated");
+        assertThat(service.current(type).key()).isEqualTo(type.name() + "-current");
+        assertThat(service.rotate(type).key()).isEqualTo(type.name() + "-rotated");
     }
 
     @Test
@@ -48,12 +48,12 @@ class AgentKeyServiceTest {
 
         @Override
         public AgentKeyResponse current() {
-            return new AgentKeyResponse(type.path() + "-current", CREATED_AT);
+            return new AgentKeyResponse(type.name() + "-current", CREATED_AT);
         }
 
         @Override
         public AgentKeyResponse rotate() {
-            return new AgentKeyResponse(type.path() + "-rotated", CREATED_AT);
+            return new AgentKeyResponse(type.name() + "-rotated", CREATED_AT);
         }
     }
 }

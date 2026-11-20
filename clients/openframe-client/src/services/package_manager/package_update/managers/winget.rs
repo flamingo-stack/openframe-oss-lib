@@ -1,11 +1,11 @@
 use serde::Deserialize;
 
 use super::{
-    last_line, Probe, ProbeState, QueryError, UpgradeOutcome, PROBE_TIMEOUT_SECS,
-    UPGRADE_TIMEOUT_SECS,
+    Probe, ProbeState, QueryError, UpgradeOutcome, PROBE_TIMEOUT_SECS, UPGRADE_TIMEOUT_SECS,
 };
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::PackageRef;
+use crate::services::package_manager::last_line;
 
 /// The installed rows of one id with their source and update flag; exit 3 means no WinGet module.
 const PROBE_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
