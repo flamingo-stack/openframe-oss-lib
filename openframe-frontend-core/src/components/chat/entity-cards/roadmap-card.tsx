@@ -9,7 +9,6 @@
  * anchor for the compact branch and supplies vote handlers for the
  * default branch.
  */
-
 import { Globe, Lock, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
@@ -199,9 +198,7 @@ export function RoadmapCard(props: RoadmapCardProps) {
 function LoadedRoadmapCard({
   item,
   href,
-
   target,
-
   rel,
   size = 'default',
   cardType = 'roadmap_item',
@@ -252,7 +249,6 @@ function LoadedRoadmapCard({
                 text={item.status.toUpperCase()}
                 colorScheme={getStatusColorScheme(item.status)}
                 variant="button"
-                singleLine
                 className="max-w-[60%] shrink-0 truncate whitespace-nowrap border border-ods-border"
               />
             ) : null}

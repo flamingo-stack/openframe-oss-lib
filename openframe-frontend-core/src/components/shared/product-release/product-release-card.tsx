@@ -362,7 +362,6 @@ function LoadedProductReleaseCard({
                     text={cell.value}
                     variant="card"
                     colorScheme={cell.colorScheme}
-                    singleLine
                     className="justify-self-start"
                   />
                 ) : (

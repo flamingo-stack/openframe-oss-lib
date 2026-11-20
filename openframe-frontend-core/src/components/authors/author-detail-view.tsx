@@ -22,7 +22,6 @@
  * `<p>` (like the hub profile header) so a hosting page can own its `<h1>`
  * (the hub uses an sr-only h1 for crawlers).
  */
-
 import type React from 'react';
 import Image from '../../embed-shims/next-image';
 import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
@@ -152,7 +151,7 @@ export function AuthorDetailView({ author, proxyImageUrl, children, className }:
         // Optional per author (not drawn while loading): marked so for the loading-state check.
         <div className={TOPICS_CLASS} data-loading-optional>
           {author.knowsAbout.map(topic => (
-            <StatusBadge key={topic} text={topic} variant="button" colorScheme="cyan" singleLine />
+            <StatusBadge key={topic} text={topic} variant="button" colorScheme="cyan" />
           ))}
         </div>
       )}
