@@ -115,6 +115,22 @@ describe('onCaughtUp', () => {
     expect(log).toEqual([`msg:${retained}`, 'replay-complete', `msg:${fresh}`, 'caught-up']);
   });
 
+  it('reports a consumer created with nothing pending complete before the first live request', async () => {
+    // The stopped turn has left the stream: the tail resumes past everything it still retains.
+    const retained = server.current.publish(SUBJECT, { type: 'TEXT', text: 'retained' });
+
+    await subscribe({
+      deliverPolicy: 'byStartSequence',
+      optStartSeq: retained + 1,
+      onReplayComplete: () => log.push('replay-complete'),
+    });
+    await vi.waitFor(() => expect(log).toContain('replay-complete'));
+    const live = server.current.publish(SUBJECT, { type: 'TEXT', text: 'live' });
+    await vi.waitFor(() => expect(log).toContain(`msg:${live}`));
+
+    expect(log).toEqual(['replay-complete', 'caught-up', `msg:${live}`]);
+  });
+
   it('fires after the last backlog message has been handled, and not again for live ones', async () => {
     const seqs = [0, 1, 2].map(i => {
       server.current.publishNoise(2);

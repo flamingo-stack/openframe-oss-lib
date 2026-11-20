@@ -507,6 +507,31 @@ describe('useChatEngine: a reload while a reply streams', () => {
     expect(result.current.messages.filter(m => m.role === 'user')).toHaveLength(2);
   });
 
+  it('draws a fresh repeat of a legacy stopped prompt as soon as the replay finishes, with no history reload', async () => {
+    const history: HistoricalMessage[] = [
+      ...persisted,
+      {
+        id: 'u2',
+        createdAt: '2026-11-04T10:01:00Z',
+        owner: { type: 'ADMIN' },
+        parts: [{ type: 'TEXT', text: 'Stopped' }],
+      },
+    ];
+    const { result, tail } = setup({
+      dialogId: 'd1',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: history, nextCursor: null }) },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => {
+      tail.current?.onReplayComplete?.();
+    });
+
+    repeatFromAnotherSession(tail, 'Stopped', 20);
+
+    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    expect(result.current.messages.filter(m => m.role === 'user')).toHaveLength(2);
+  });
+
   it('resumes after a stopped prompt the backend stamped with its own seq, and draws a repeat of it', async () => {
     const history: HistoricalMessage[] = [
       ...persisted,
