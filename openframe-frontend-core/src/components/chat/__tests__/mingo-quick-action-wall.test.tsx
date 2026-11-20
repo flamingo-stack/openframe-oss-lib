@@ -484,6 +484,24 @@ describe('MingoQuickActionWall', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("puts the topic stamp on the chips' line, never a line of its own", () => {
+    render(
+      <PageTopicsProvider pathname="/devices" showTopic>
+        <MingoQuickActionWall quickActions={ACTIONS} />
+      </PageTopicsProvider>,
+    );
+    const line = screen.getByTestId('quick-action-set-line');
+    expect(line).toHaveClass('items-center');
+    expect(within(line).getByTitle('Page topic')).toHaveTextContent('/devices');
+    expect(within(line).getByRole('group', { name: 'Quick actions' })).toBeTruthy();
+  });
+
+  it('keeps its line with no action when asked to reserve it', () => {
+    render(<MingoQuickActionWall quickActions={[]} reserve />);
+    expect(screen.queryByRole('button', { name: 'Patching' })).toBeNull();
+    expect(loadingTags()).toHaveLength(4);
+  });
+
   it("prints only the page's topic stamp without actions, where the host asks for the stamp", () => {
     render(
       <PageTopicsProvider pathname="/tickets" showTopic>

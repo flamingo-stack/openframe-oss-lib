@@ -44,7 +44,6 @@ import { type ChatMessage, writingMessageIndex } from '../../chat-protocol/chat-
 import { recordHref, replaceRecordLinks } from '../../chat-protocol/record-link';
 import { WHAT_CAN_YOU_DO_MESSAGE } from '../../chat-protocol/what-can-you-do';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
-import { usePageTopicStamp } from '../../contexts/page-topics-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import { getSourceIconName } from '../../utils/source-icons';
@@ -1725,9 +1724,6 @@ function EmbeddableChatInner({
     agentConfigUrl && guideSuggestedActions.length > 0
       ? guideSuggestedActions
       : (guideWelcome?.quickActions ?? guideSuggestedActions);
-  // Whether the host asked surfaces to print the page's topic stamp: a lone composer's quick-action row is kept for it
-  // on a page with no action.
-  const topicStamp = usePageTopicStamp();
 
   // Dialog-history concerns (archive page, read-only archived conversation,
   // rename/archive/unarchive modals) live in one hook so this component stays
@@ -2747,9 +2743,7 @@ function EmbeddableChatInner({
   const composerQuickActionsLoading =
     activeMode === 'mingo' ? !!mingoWelcome?.quickActionsLoading : !!emptyStateUrl && emptyStateLoading;
   const composerQuickActionsNode =
-    showComposerQuickActions &&
-    splitMode &&
-    (composerQuickActions.length > 0 || composerQuickActionsLoading || topicStamp) ? (
+    showComposerQuickActions && splitMode ? (
       <div
         data-testid="chat-composer-quick-actions"
         className={cn(
@@ -2761,6 +2755,8 @@ function EmbeddableChatInner({
           quickActions={composerQuickActions}
           loading={composerQuickActionsLoading && composerQuickActions.length === 0}
           accent={activeMode === 'mingo' ? mingoWelcome?.quickActionAccent : quickActionAccent}
+          // One line whatever the page holds (its actions, none, or still loading): the composer under it never moves.
+          reserve
         />
       </div>
     ) : null;

@@ -209,13 +209,15 @@ describe('EmbeddableChat split: quick actions over a lone composer', () => {
     expect(screen.queryByTestId('chat-composer-quick-actions')).toBeNull();
   });
 
-  it('draws no row when the page has no quick action', () => {
+  it("keeps the row's line when the page has no quick action: the composer never moves", () => {
     renderChat(createState(), {
       threadContainer: null,
       composerQuickActions: true,
       mingoWelcome: { quickActions: [] },
     });
-    expect(screen.queryByTestId('chat-composer-quick-actions')).toBeNull();
+    const row = screen.getByTestId('chat-composer-quick-actions');
+    expect(within(row).queryByRole('button', { name: 'Reboot a device' })).toBeNull();
+    expect(row).not.toBeEmptyDOMElement();
   });
 });
 
