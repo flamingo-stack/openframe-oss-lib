@@ -1,5 +1,8 @@
 package com.openframe.external.controller;
 
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.ForbiddenException;
+import com.openframe.external.exception.ToolProxyException;
 import com.openframe.external.service.RestProxyService;
 import com.openframe.external.support.ExternalApiMockMvc;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,7 +19,13 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,12 +37,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class IntegrationControllerTest {
 
     private static final String TOOL_ID = "tactical-rmm";
+    private static final String FLEET = "fleetmdm-server";
 
     @Mock
     private RestProxyService restProxyService;
@@ -149,12 +160,58 @@ class IntegrationControllerTest {
     }
 
     @Test
-    void proxyExceptionBecomes500WithItsMessage() throws Exception {
+    void unexpectedProxyExceptionBecomesJson500WithoutItsMessage() throws Exception {
         when(restProxyService.proxyApiRequest(eq(TOOL_ID), any(), isNull()))
-                .thenThrow(new IllegalStateException("boom"));
+                .thenThrow(new IllegalStateException("boom at http://10.0.0.7:8080"));
 
         mockMvc.perform(get("/tools/tactical-rmm/api/v1/agents"))
                 .andExpect(status().isInternalServerError())
-                .andExpect(content().string("Internal server error: boom"));
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(content().string(not(containsString("10.0.0.7"))));
+    }
+
+    @Test
+    void proxy_endpointNotAllowed_403JsonEndpointNotAllowed() throws Exception {
+        // setup
+        when(restProxyService.proxyApiRequest(eq(FLEET), any(), isNull()))
+                .thenThrow(new ForbiddenException(ErrorCode.ENDPOINT_NOT_ALLOWED, "Fleet endpoint not allowed: POST /api/v1/fleet/hosts/1/refetch"));
+
+        // execution
+        ResultActions result = mockMvc.perform(post("/tools/fleetmdm-server/api/v1/fleet/hosts/1/refetch"));
+
+        // verifications
+        result.andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("ENDPOINT_NOT_ALLOWED"));
+    }
+
+    @Test
+    void proxy_toolUnreachable_502JsonToolUnreachable() throws Exception {
+        // setup
+        when(restProxyService.proxyApiRequest(eq(FLEET), any(), isNull()))
+                .thenThrow(ToolProxyException.unreachable(FLEET, new ConnectException("Connection refused")));
+
+        // execution
+        ResultActions result = mockMvc.perform(get("/tools/fleetmdm-server/api/v1/fleet/hosts"));
+
+        // verifications
+        result.andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.code").value("TOOL_UNREACHABLE"))
+                .andExpect(content().string(not(containsString("Connection refused"))));
+    }
+
+    @Test
+    void proxy_toolTimeout_504JsonToolTimeout() throws Exception {
+        // setup
+        when(restProxyService.proxyApiRequest(eq(FLEET), any(), isNull()))
+                .thenThrow(ToolProxyException.timeout(FLEET, new SocketTimeoutException("Read timed out")));
+
+        // execution
+        ResultActions result = mockMvc.perform(get("/tools/fleetmdm-server/api/v1/fleet/hosts"));
+
+        // verifications
+        result.andExpect(status().isGatewayTimeout())
+                .andExpect(jsonPath("$.code").value("TOOL_TIMEOUT"))
+                .andExpect(content().string(not(containsString("Read timed out"))));
     }
 }
