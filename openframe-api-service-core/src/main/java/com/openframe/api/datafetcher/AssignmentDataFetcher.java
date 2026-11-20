@@ -24,7 +24,6 @@ import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
-import com.openframe.data.document.ticket.TicketStatus;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -114,21 +113,8 @@ public class AssignmentDataFetcher {
     }
 
     /**
-     * The legacy status, kept for clients built before the lifecycle rollout — the mobile and
-     * desktop shells ship a frozen web bundle. Nothing stores it any more, so it is derived from
-     * the lifecycle kind; this schema exposes no kind of its own.
-     * TODO(lifecycle-rollout): drop once no released shell reads it.
-     */
-    @DgsData(parentType = "Ticket", field = "status")
-    public String ticketLegacyStatus(DgsDataFetchingEnvironment dfe) {
-        Ticket ticket = dfe.getSource();
-        return TicketStatus.fromKind(ticket.getStatusKind()).name();
-    }
-
-    /**
      * The lifecycle status drives the chip the assigned-ticket lists render: the kind selects the
-     * canonical styling, and a custom column takes its name and colour from the definition. The
-     * legacy string next to it cannot stand in — it reports every custom column as TECH_REQUIRED.
+     * canonical styling, and a custom column takes its name and colour from the definition.
      */
     @DgsData(parentType = "Ticket", field = "statusKind")
     public TicketStatusKind ticketStatusKind(DgsDataFetchingEnvironment dfe) {
