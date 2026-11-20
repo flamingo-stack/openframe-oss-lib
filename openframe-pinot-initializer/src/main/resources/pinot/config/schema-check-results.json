@@ -1,0 +1,28 @@
+{
+  "schemaName": "${pinot.tables.check-results.name}",
+  "dimensionFieldSpecs": [
+    { "name": "tenantId",           "dataType": "STRING", "singleValueField": true },
+    { "name": "organizationId",     "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
+    { "name": "deviceId",           "dataType": "STRING", "singleValueField": true },
+    { "name": "check",              "dataType": "STRING", "singleValueField": true },
+    { "name": "kind",               "dataType": "STRING", "singleValueField": true },
+    { "name": "subject",            "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
+    { "name": "metric",             "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
+    { "name": "status",             "dataType": "STRING", "singleValueField": true },
+    { "name": "severity",           "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
+    { "name": "thresholdParameter", "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
+    { "name": "thresholdScope",     "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" }
+  ],
+  "metricFieldSpecs": [
+    { "name": "value",     "dataType": "DOUBLE" },
+    { "name": "threshold", "dataType": "DOUBLE" }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "runTimestamp",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}
