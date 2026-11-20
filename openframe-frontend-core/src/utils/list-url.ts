@@ -115,6 +115,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   // Product-hub internal objects — per-object card-hydration routes
   // (ChatRef-shaped items, `handleEntityCardList`), like github / slack.
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
+  product_feature: (ids, b) => `${b}/api/product-features?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
   recorded_call: (ids, b) => `${b}/api/recorded-calls?ids=${ids.join(',')}`,
   // One story of the AI daily digest (people-hub and product-hub), ChatRef-shaped like the objects above.

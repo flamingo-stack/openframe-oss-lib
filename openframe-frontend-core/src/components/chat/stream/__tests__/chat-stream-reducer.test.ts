@@ -614,6 +614,46 @@ describe('createChatStreamReducer — participant dedup', () => {
     expect(r.state.messages[r.state.messages.length - 1].role).toBe('assistant');
   });
 
+  it('a repeat of a stopped trailing prompt is a new send when the tail opened on new messages only', () => {
+    // A chat's first prompt, stopped before any chunk was saved: the history holds no seq, so the tail opens live.
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
+    r.initializeWithState([
+      {
+        id: 'm1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Same' }],
+        metadata: { author: { authorType: 'admin' } },
+      },
+    ]);
+    r.setTailReplaysHistory(false);
+    r.apply(participant({ kind: 'message-request', text: 'Same', ownerType: 'ADMIN', userId: 'other', seq: 20 }));
+    expect(r.state.messages.filter(m => m.role === 'user')).toHaveLength(2);
+  });
+
+  it('a dialog switch gives the next thread the replay check back', () => {
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
+    r.setTailReplaysHistory(false);
+    r.resetForDialogSwitch();
+    r.initializeWithState(persistedThread('Reload check'));
+    r.apply(participant({ kind: 'message-request', text: 'Reload check', ownerType: 'ADMIN', seq: 8 }));
+    expect(r.state.messages.filter(m => m.role === 'user').map(m => m.id)).toEqual(['m1', 'm3']);
+  });
+
+  it('a stopped prompt stamped with its own seq leaves a repeat from another session to seq coverage', () => {
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
+    r.initializeWithState([
+      ...persistedThread('Stopped').slice(0, 2),
+      {
+        id: 'm3',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Stopped' }],
+        metadata: { streamSeq: 8, author: { authorType: 'admin' } },
+      },
+    ]);
+    r.apply(participant({ kind: 'message-request', text: 'Stopped', ownerType: 'ADMIN', seq: 20 }));
+    expect(r.state.messages.filter(m => m.role === 'user')).toHaveLength(3);
+  });
+
   it('a new send repeating an answered prompt still renders: its twin is the older turn', () => {
     const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
     r.initializeWithState([

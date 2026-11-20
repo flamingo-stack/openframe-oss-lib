@@ -448,4 +448,83 @@ describe('useChatEngine: a reload while a reply streams', () => {
     const prompts = result.current.messages.filter(m => m.role === 'user');
     expect(prompts.map(m => m.id)).toEqual(['u2']);
   });
+
+  /** The same prompt sent from another session, and its answer. */
+  const repeatFromAnotherSession = (tail: { current: ChatLiveTailOptions | null }, text: string, from: number) => {
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_REQUEST', text, ownerType: 'ADMIN', streamSeq: from }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: from + 1 }, 'message');
+      tail.current?.onEvent({ type: 'TEXT', text: 'Here it is', streamSeq: from + 2 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: from + 3 }, 'message');
+    });
+  };
+
+  it("draws a repeat of a chat's stopped first prompt: a tail with no seq to resume after replays nothing", async () => {
+    const history: HistoricalMessage[] = [
+      {
+        id: 'u1',
+        createdAt: '2026-11-04T10:00:00Z',
+        owner: { type: 'ADMIN' },
+        parts: [{ type: 'TEXT', text: 'Same' }],
+      },
+    ];
+    const { result, tail } = setup({
+      dialogId: 'd1',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: history, nextCursor: null }) },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    repeatFromAnotherSession(tail, 'Same', 20);
+    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    expect(result.current.messages.filter(m => m.role === 'user')).toHaveLength(2);
+    expect(result.current.messages.map(m => m.role)).toEqual(['user', 'user', 'assistant']);
+  });
+
+  it('resumes after a stopped prompt the backend stamped with its own seq, and draws a repeat of it', async () => {
+    const history: HistoricalMessage[] = [
+      ...persisted,
+      {
+        id: 'u2',
+        createdAt: '2026-11-04T10:01:00Z',
+        owner: { type: 'ADMIN' },
+        lastChunkStreamSeq: 8,
+        parts: [{ type: 'TEXT', text: 'Stopped' }],
+      },
+    ];
+    const { result, tail } = setup({
+      dialogId: 'd1',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: history, nextCursor: null }) },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(8));
+    repeatFromAnotherSession(tail, 'Stopped', 20);
+    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    expect(result.current.messages.filter(m => m.role === 'user')).toHaveLength(2);
+  });
+
+  it("keeps a reply's start after a reload when the prompt carries its own seq: the tail resumes right after it", async () => {
+    const history: HistoricalMessage[] = [
+      ...persisted,
+      {
+        id: 'u2',
+        createdAt: '2026-11-04T10:01:00Z',
+        owner: { type: 'ADMIN' },
+        lastChunkStreamSeq: 8,
+        parts: [{ type: 'TEXT', text: 'Reload check' }],
+      },
+    ];
+    const { result, tail } = setup({
+      dialogId: 'd1',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: history, nextCursor: null }) },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(8));
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 9 }, 'message');
+      tail.current?.onEvent({ type: 'TEXT', text: 'Backups matter', streamSeq: 10 }, 'message');
+    });
+    await waitFor(() => expect(result.current.streamingPhase).toBe('streaming'));
+    const after = result.current.messages.slice(result.current.messages.findIndex(m => m.id === 'u2') + 1);
+    expect(after).toHaveLength(1);
+    expect(after[0].role).toBe('assistant');
+    expect(JSON.stringify(after[0].parts)).toContain('Backups matter');
+    expect(result.current.messages.filter(m => m.role === 'user').map(m => m.id)).toEqual(['u2']);
+  });
 });

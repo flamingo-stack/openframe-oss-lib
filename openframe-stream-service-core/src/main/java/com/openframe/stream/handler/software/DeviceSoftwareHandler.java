@@ -18,6 +18,7 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -65,6 +66,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
+    @Value("${openframe.fleet.software-cdc.skipped-hosts}")
+    private final Set<Long> skippedHosts;
 
     private final Cache<Long, Boolean> snapshotReconciledHosts = Caffeine.newBuilder()
             .expireAfterWrite(SNAPSHOT_HOST_WINDOW)
@@ -103,7 +106,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return;
         }
         Long hostId = longOrNull(row, "host_id");
-        if (hostId == null) {
+        if (hostId == null || skippedHosts.contains(hostId)) {
             return;
         }
         boolean untrackedOnly = onlyUntrackedColumnsChanged(payload);
