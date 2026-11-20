@@ -23,13 +23,9 @@ async fn startup_report_carries_the_running_os_on_the_machine_subject() {
     let mut reports = backend.subscribe("machine.machine.os-info").await.unwrap();
     backend.flush().await.unwrap();
 
-    OsInfoReportPublisher::new(
-        NatsMessagePublisher::new(manager),
-        config,
-        DeviceDataFetcher::new(),
-    )
-    .publish()
-    .await;
+    OsInfoReportPublisher::new(NatsMessagePublisher::new(manager), config)
+        .publish()
+        .await;
 
     let report = timeout(BOUND, reports.next())
         .await

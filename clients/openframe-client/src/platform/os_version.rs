@@ -41,7 +41,8 @@ fn detect() -> OsVersion {
 }
 
 /// Parses `sw_vers` output into `15.6.1` / `24G90`.
-pub fn parse_sw_vers(output: &str) -> OsVersion {
+#[cfg(any(target_os = "macos", test))]
+fn parse_sw_vers(output: &str) -> OsVersion {
     let field = |name: &str| {
         output
             .lines()
@@ -59,7 +60,8 @@ pub fn parse_sw_vers(output: &str) -> OsVersion {
 }
 
 /// Builds `10.0.22631` / `22631.3007` from the CurrentVersion registry values.
-pub fn windows_version(
+#[cfg(any(target_os = "windows", test))]
+fn windows_version(
     kernel_version: Option<(u32, u32)>,
     build_number: &str,
     ubr: Option<u32>,

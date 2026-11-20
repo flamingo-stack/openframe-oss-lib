@@ -217,14 +217,10 @@ impl CommandHandler for ToolUninstallHandler {
         command: Self::Command,
         op: ToolOpGuard,
     ) -> Outcome {
-        match self
-            .service
+        self.service
             .uninstall_reserved(&command.tool_agent_id, op, &self.tool_run_manager)
             .await
-        {
-            Ok(()) => Outcome::Done,
-            Err(e) => Outcome::Failed(format!("{e:#}")),
-        }
+            .into()
     }
 }
 

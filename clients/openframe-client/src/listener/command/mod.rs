@@ -20,7 +20,7 @@ use crate::models::DeliveryRef;
 use crate::services::delivery_results::DeliveryResults;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::result_store::ResultStore;
-use crate::services::tool_ops::ToolChange;
+use crate::services::tool_os_gate::ToolChange;
 use crate::services::AgentConfigurationService;
 
 use delivery::Delivery;

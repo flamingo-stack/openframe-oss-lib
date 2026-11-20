@@ -1,5 +1,4 @@
 use crate::config::update_config::ALLOW_DOWNGRADE;
-use crate::models::download_configuration::os_version_shortfall;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 use crate::models::{Installation, InstalledAsset, InstalledTool, ToolRecordState};
 use crate::platform::{
@@ -7,7 +6,8 @@ use crate::platform::{
     run_migration, run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::tool_ops::{ToolChange, ToolOpGuard};
+use crate::services::tool_ops::ToolOpGuard;
+use crate::services::tool_os_gate::{os_version_shortfall, ToolChange};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;

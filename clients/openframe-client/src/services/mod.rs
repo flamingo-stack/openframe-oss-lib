@@ -43,6 +43,7 @@ pub mod tool_connection_service;
 pub mod tool_installation_service;
 pub mod tool_kill_service;
 pub mod tool_ops;
+pub mod tool_os_gate;
 pub mod tool_restart_service;
 pub mod tool_run_manager;
 pub mod tool_uninstall_service;

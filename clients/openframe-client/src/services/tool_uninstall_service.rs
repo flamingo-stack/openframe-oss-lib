@@ -149,10 +149,13 @@ impl ToolUninstallService {
             .with_context(|| format!("Failed to remove {}", tool_folder.display()))?;
         remove_fleet_orbit_state(&self.tool_kill_service, tool_agent_id).await;
 
-        self.tool_connection_service
+        if let Err(e) = self
+            .tool_connection_service
             .delete_by_tool_agent_id(tool_agent_id)
             .await
-            .context("Failed to remove the tool connection")?;
+        {
+            warn!("Failed to remove tool connection: {:#}", e);
+        }
         self.installed_tools_service
             .delete_by_tool_agent_id(tool_agent_id)
             .await

@@ -1,7 +1,5 @@
 use tracing::{debug, info, warn};
 
-use crate::platform::os_version::{self, OsVersion};
-
 #[derive(Clone)]
 pub struct DeviceDataFetcher;
 
@@ -110,10 +108,6 @@ impl DeviceDataFetcher {
         let version = env!("OPENFRAME_VERSION").to_string();
         info!("Agent version: {}", version);
         Some(version)
-    }
-
-    pub fn get_os_version(&self) -> OsVersion {
-        os_version::current().clone()
     }
 
     pub fn get_os_type(&self) -> String {

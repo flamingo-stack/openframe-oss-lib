@@ -1,7 +1,5 @@
 use crate::clients::tool_api_client::ToolApiClient;
-use crate::models::download_configuration::{
-    os_version_shortfall, DownloadConfiguration, InstallationType,
-};
+use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
 use crate::models::tool_installation_message::AssetSource;
 use crate::models::ToolInstallationMessage;
 use crate::models::{Installation, InstalledTool, ToolRecordState};
@@ -12,7 +10,8 @@ use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::tool_connection_processing_manager::ToolConnectionProcessingManager;
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_kill_service::ToolKillService;
-use crate::services::tool_ops::{ToolChange, ToolOpGuard};
+use crate::services::tool_ops::ToolOpGuard;
+use crate::services::tool_os_gate::{os_version_shortfall, ToolChange};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::tool_uninstall_service::remove_fleet_orbit_state;
 use crate::services::GithubDownloadService;

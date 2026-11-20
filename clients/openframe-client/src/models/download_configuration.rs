@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
 
 use super::OsVersionNumber;
@@ -26,26 +26,28 @@ pub struct DownloadConfiguration {
     pub bundle_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "lenient_min_os_version",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub min_os_version: Option<OsVersionNumber>,
 }
 
-pub fn os_version_shortfall(
-    configs: &[DownloadConfiguration],
-    current: Option<&OsVersionNumber>,
-) -> Option<String> {
-    let config = configs.iter().find(|c| c.matches_current_os())?;
-    let minimum = config.min_os_version.as_ref()?;
-    let current = current?;
-    (current < minimum).then(|| {
-        let os = match config.os.to_ascii_lowercase().as_str() {
-            "macos" => "macOS",
-            "windows" => "Windows",
-            "linux" => "Linux",
-            _ => config.os.as_str(),
-        };
-        format!("needs {os} {minimum} or later, this device runs {current}")
-    })
+fn lenient_min_os_version<'de, D>(deserializer: D) -> Result<Option<OsVersionNumber>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let Some(raw) = Option::<String>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    if raw.trim().is_empty() {
+        return Ok(None);
+    }
+    Ok(raw
+        .parse()
+        .map_err(|e| tracing::warn!("Ignoring minOsVersion {:?}: {:#}", raw, e))
+        .ok())
 }
 
 impl DownloadConfiguration {

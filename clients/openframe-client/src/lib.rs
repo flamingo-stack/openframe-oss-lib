@@ -709,11 +709,8 @@ impl Client {
             config_service.clone(),
             device_data_fetcher.clone(),
         );
-        let os_info_report_publisher = OsInfoReportPublisher::new(
-            nats_message_publisher.clone(),
-            config_service.clone(),
-            device_data_fetcher.clone(),
-        );
+        let os_info_report_publisher =
+            OsInfoReportPublisher::new(nats_message_publisher.clone(), config_service.clone());
 
         let machine_timezone_run_manager = MachineTimezoneRunManager::new(
             MachineTimezonePublisher::new(nats_message_publisher.clone(), config_service.clone()),
