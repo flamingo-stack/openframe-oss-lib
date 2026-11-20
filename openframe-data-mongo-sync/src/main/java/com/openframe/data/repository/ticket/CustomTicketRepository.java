@@ -63,6 +63,10 @@ public interface CustomTicketRepository {
     /** Stamps activity and sets (or, with a null {@code awaitingSince}, clears) the client wait. */
     Optional<Ticket> updateActivityAndAwaiting(String ticketId, Instant lastActivityAt, Instant awaitingSince);
 
+    Optional<Ticket> findByIdFromPrimary(String ticketId);
+
+    boolean existsByIdFromPrimary(String ticketId);
+
     boolean isSortableField(String field);
 
     String getDefaultSortField();
