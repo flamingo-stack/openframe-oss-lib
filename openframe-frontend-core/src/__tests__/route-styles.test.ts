@@ -239,6 +239,117 @@ describe('route-styles: a finished build', () => {
   });
 });
 
+/**
+ * A finished static export (`output: 'export'`) of three pages that carry the complete sheet (`RouteStyles complete`),
+ * laid out as Next 16 writes it: the manifests stay in `.next`, the site goes to `site` (the custom `distDir`, else
+ * `out`). `manifest: false` leaves out the prerender manifest, so no page path names a route.
+ */
+function exportedBuild({ distDir, site, manifest = true }: { distDir: string; site: string; manifest?: boolean }) {
+  const root = mkdtempSync(join(tmpdir(), 'route-styles-export-'));
+  mkdirSync(join(root, 'app'), { recursive: true });
+  mkdirSync(join(root, '.next'), { recursive: true });
+  mkdirSync(join(root, site, 'devices'), { recursive: true });
+  mkdirSync(join(root, site, 'blog'), { recursive: true });
+  mkdirSync(join(root, site, '_next', 'static'), { recursive: true });
+  mkdirSync(join(root, '.next-styles'), { recursive: true });
+  writeFileSync(join(root, 'app', 'page.tsx'), 'export default () => <p className="p-2 text-center underline" />');
+  writeFileSync(
+    join(root, 'app', 'globals.css'),
+    `@tailwind base;\n${routeStyles.UTILITIES_MARK}\n@tailwind components;\n@tailwind utilities;\n`,
+  );
+  writeFileSync(
+    join(root, 'tailwind.config.cjs'),
+    `module.exports = { content: [${JSON.stringify(join(root, 'app', 'page.tsx'))}] }`,
+  );
+  writeFileSync(
+    join(root, 'postcss.config.cjs'),
+    `module.exports = { plugins: { ${JSON.stringify(require.resolve('tailwindcss'))}: {} } }`,
+  );
+  writeFileSync(join(root, '.next-styles', 'build.json'), JSON.stringify({ buildId: 'b4', distDir, output: 'export' }));
+  if (manifest) {
+    writeFileSync(
+      join(root, '.next', 'prerender-manifest.json'),
+      JSON.stringify({
+        routes: {
+          '/': { srcRoute: '/' },
+          '/devices': { srcRoute: '/devices' },
+          '/blog/a': { srcRoute: '/blog/[slug]' },
+        },
+      }),
+    );
+  }
+  const page = (classes: string) =>
+    `<html><head><style data-href="next-styles:b4" data-precedence="next-styles">${routeStyles.COMPLETE_PLACEHOLDER}</style></head><body class="${classes}"></body></html>`;
+  writeFileSync(join(root, site, 'index.html'), page('p-2'));
+  // `trailingSlash: true` exports a page as a folder's index; otherwise as a file of its own.
+  writeFileSync(join(root, site, 'devices', 'index.html'), page('text-center'));
+  writeFileSync(join(root, site, 'blog', 'a.html'), page('underline'));
+  writeFileSync(join(root, site, '404.html'), page('underline'));
+  return root;
+}
+
+const exportedPages = (root: string, site: string) =>
+  ['index.html', 'devices/index.html', 'blog/a.html', '404.html'].map(file =>
+    readFileSync(join(root, site, file), 'utf8'),
+  );
+
+describe('route-styles: a static export', () => {
+  const roots: string[] = [];
+  const write = (root: string) =>
+    routeStyles.writeRouteStyles({
+      root,
+      input: 'app/globals.css',
+      config: 'tailwind.config.cjs',
+      fullConfig: 'tailwind.config.cjs',
+    });
+
+  afterAll(() => {
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('fills every exported page with the complete sheet when the build keeps its manifests apart (custom distDir)', async () => {
+    const root = exportedBuild({ distDir: 'dist', site: 'dist' });
+    roots.push(root);
+    const manifest = await write(root);
+    expect(Object.keys(manifest.routes).sort()).toEqual(['/', '/_not-found', '/blog/[slug]', '/devices']);
+    for (const html of exportedPages(root, 'dist')) {
+      expect(html).not.toContain('/*next-styles:');
+      // The complete sheet: every class the app's content names, whichever page it is.
+      expect(html).toContain('.p-2');
+      expect(html).toContain('.underline');
+    }
+    expect(
+      readFileSync(
+        join(root, 'dist', '_next', 'static', 'next-styles', manifest.fullUrl.split('/').pop() as string),
+        'utf8',
+      ),
+    ).toContain('.underline');
+  });
+
+  it('fills the pages Next exports into out/ under the default distDir', async () => {
+    const root = exportedBuild({ distDir: '.next', site: 'out' });
+    roots.push(root);
+    const manifest = await write(root);
+    for (const html of exportedPages(root, 'out')) expect(html).not.toContain('/*next-styles:');
+    expect(
+      readFileSync(
+        join(root, 'out', '_next', 'static', 'next-styles', manifest.fullUrl.split('/').pop() as string),
+        'utf8',
+      ),
+    ).toContain('.underline');
+  });
+
+  it('gives a page no prerender entry names the complete sheet instead of leaving its placeholder', async () => {
+    const root = exportedBuild({ distDir: 'dist', site: 'dist', manifest: false });
+    roots.push(root);
+    await write(root);
+    for (const html of exportedPages(root, 'dist')) {
+      expect(html).not.toContain('/*next-styles:');
+      expect(html).toContain('.text-center');
+    }
+  });
+});
+
 describe('route-styles: a build on a skew-protected host', () => {
   let root: string;
   beforeAll(() => {
