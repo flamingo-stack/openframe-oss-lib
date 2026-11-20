@@ -24,7 +24,8 @@ import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(name = {"openframe.rmm.software.enabled", "openframe.rmm.software.package-update.enabled"}, havingValue = "true")
+// the adopt status processor records through it as well, and runs without the package-update key
+@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class PackageUpdateExecutionRecorder {
 
@@ -61,13 +62,26 @@ public class PackageUpdateExecutionRecorder {
     }
 
     public void recordUndelivered(PackageUpdateRequest request, String machineId, DeliveryFailure failure) {
+        String error = UNDELIVERED_ERROR + " (" + failure + ")";
+        finish(request, machineId, ExecutionStatus.FAILED, ExecutionFailureReason.NO_ACK, null, error);
+    }
+
+    public void recordDone(PackageUpdateRequest request, String machineId, String summary) {
+        finish(request, machineId, ExecutionStatus.SUCCESS, null, summary, null);
+    }
+
+    public void recordFailed(PackageUpdateRequest request, String machineId, String error) {
+        finish(request, machineId, ExecutionStatus.FAILED, ExecutionFailureReason.SYSTEM_SCRIPT_ERROR, null, error);
+    }
+
+    private void finish(PackageUpdateRequest request, String machineId, ExecutionStatus status,
+                        ExecutionFailureReason failureReason, String stdout, String error) {
         ScriptExecution row = historyRow(request, machineId).orElse(null);
         if (row == null) {
             return;
         }
         Instant now = Instant.now();
-        update(row, ExecutionStatus.FAILED, ExecutionFailureReason.NO_ACK, now, null, null,
-                UNDELIVERED_ERROR + " (" + failure + ")");
+        update(row, status, failureReason, now, null, stdout, error);
         row.setStatusChangedAt(now);
         scriptExecutionRepository.save(row);
     }

@@ -70,6 +70,7 @@ export function useJetStreamDialogSubscription({
   onConnect,
   onDisconnect,
   onSubscribed,
+  onReplayComplete,
   onBeforeReconnect,
   getNatsWsUrl,
   clientConfig = {},
@@ -140,6 +141,11 @@ export function useJetStreamDialogSubscription({
   useEffect(() => {
     onSubscribedRef.current = onSubscribed;
   }, [onSubscribed]);
+
+  const onReplayCompleteRef = useRef(onReplayComplete);
+  useEffect(() => {
+    onReplayCompleteRef.current = onReplayComplete;
+  }, [onReplayComplete]);
 
   const onBeforeReconnectRef = useRef(onBeforeReconnect);
   useEffect(() => {
@@ -452,6 +458,9 @@ export function useJetStreamDialogSubscription({
               setRecoveryCount(c => c + 1);
             },
             onCaughtUp: settleCatchUp,
+            onReplayComplete: () => {
+              if (!cancelled) onReplayCompleteRef.current?.();
+            },
           },
         );
       } catch {

@@ -218,7 +218,7 @@ public class SoftwareActionService {
                         .executionId(executionId)
                         .software(pkg.getPackageName())
                         .action(schedule.getAction())
-                        .kind(schedule.getAction().kind())
+                        .kind(SoftwareActionKindMapper.kindOf(schedule.getAction()))
                         .engine(pkg.getPackageManager())
                         .status(SoftwareActionStatus.SCHEDULED)
                         .totalMachineCount(deviceCount)
@@ -266,7 +266,7 @@ public class SoftwareActionService {
                 return false;
             }
             if (filter.getKinds() != null && !filter.getKinds().isEmpty()
-                    && !filter.getKinds().contains(schedule.getAction().kind())) {
+                    && !filter.getKinds().contains(SoftwareActionKindMapper.kindOf(schedule.getAction()))) {
                 return false;
             }
             if (filter.getEngines() != null && !filter.getEngines().isEmpty()

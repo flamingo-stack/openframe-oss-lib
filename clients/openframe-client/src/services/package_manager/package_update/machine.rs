@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use async_trait::async_trait;
+use tokio::sync::OwnedMutexGuard;
 use tracing::warn;
 
 use super::close;
@@ -8,6 +9,7 @@ use super::managers::{self, Probe, QueryError, UpgradeOutcome};
 use crate::models::{PackageRef, CHAT_TOOL_AGENT_ID};
 use crate::platform::process_snapshot::RunningProcess;
 use crate::platform::{app_close, user_session};
+use crate::services::package_manager::brew::BrewLock;
 use crate::services::package_manager::update_gate::{self, AppIdentity, Undetermined};
 use crate::services::package_manager::{ManagerId, Presence};
 use crate::services::ToolRunManager;
@@ -26,6 +28,9 @@ pub(super) trait Machine: Send + Sync {
     /// The manager's view after an upgrade, without refreshing its catalog first.
     async fn reread(&self, package: &PackageRef) -> Result<Probe, QueryError>;
     async fn reopen(&self, image: &Path, session: Option<u32>, user: Option<&str>) -> bool;
+    async fn brew_turn(&self, _package: &PackageRef) -> Option<OwnedMutexGuard<()>> {
+        None
+    }
     fn session_user(&self, session: Option<u32>) -> Option<String>;
     /// Starts the chat if it is not running, so the user sees the prompt; returns at once.
     fn wake_chat(&self);
@@ -34,6 +39,7 @@ pub(super) trait Machine: Send + Sync {
 /// The device the agent runs on.
 pub(super) struct System {
     pub(super) tool_run_manager: ToolRunManager,
+    pub(super) brew: BrewLock,
 }
 
 #[async_trait]
@@ -47,10 +53,12 @@ impl Machine for System {
     }
 
     async fn probe(&self, package: &PackageRef) -> Result<Probe, QueryError> {
+        let _turn = self.brew_turn(package).await;
         managers::probe(package).await
     }
 
     async fn resolve(&self, package: &PackageRef) -> Result<AppIdentity, Undetermined> {
+        let _turn = self.brew_turn(package).await;
         update_gate::resolve(package).await
     }
 
@@ -72,6 +80,13 @@ impl Machine for System {
 
     async fn reopen(&self, image: &Path, session: Option<u32>, user: Option<&str>) -> bool {
         app_close::reopen(image, session, user).await
+    }
+
+    async fn brew_turn(&self, package: &PackageRef) -> Option<OwnedMutexGuard<()>> {
+        match package {
+            PackageRef::Brew { .. } => Some(self.brew.turn().await),
+            _ => None,
+        }
     }
 
     fn session_user(&self, session: Option<u32>) -> Option<String> {
