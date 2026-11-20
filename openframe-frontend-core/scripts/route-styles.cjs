@@ -151,14 +151,29 @@ function filesUnder(dir, suffix, out = []) {
 }
 
 /**
- * The prerendered pages of the build, each with the route it belongs to: `{ file, route }`. A server build keeps
+ * Where the build keeps its manifests (`build`) and where its pages and static files go (`site`). A server build keeps
+ * both in `distDir`. A static export writes the site apart from the build: into a custom `distDir`, the build itself
+ * staying in `.next`, and into `out` under the default `distDir` (Next's `getBuildDistDir` and `hasCustomExportOutput`,
+ * next/dist/export/utils). Read as one folder, the export's manifests were missing, so no exported page but the home
+ * page found its route and the rest kept their placeholders (the OpenFrame desktop app, 2026-11-20).
+ */
+function buildDirs(root, info) {
+  const distDir = info.distDir || '.next';
+  if (info.output !== 'export') return { build: resolve(root, distDir), site: resolve(root, distDir) };
+  const custom = distDir !== '.next';
+  return { build: resolve(root, '.next'), site: resolve(root, custom ? distDir : 'out') };
+}
+
+/**
+ * The prerendered pages of the build, each with the route it belongs to: `{ file, path, route }`. A server build keeps
  * them under `<distDir>/server/app` (its static 404 under `<distDir>/server/pages`), a static export writes them
- * into `distDir`.
- * The route of a page is the prerender manifest's `srcRoute` (`/blog/[slug]` for `/blog/x`).
+ * into its site folder (`buildDirs`).
+ * The route of a page is the prerender manifest's `srcRoute` (`/blog/[slug]` for `/blog/x`). A page no entry names
+ * has `route: null`: it is not sampled, and it gets the complete sheet, as the server gives a path no route matches.
  */
 function prerenderedPages(root, info) {
-  const distDir = resolve(root, info.distDir);
-  const manifestFile = join(distDir, 'prerender-manifest.json');
+  const dirs = buildDirs(root, info);
+  const manifestFile = join(dirs.build, 'prerender-manifest.json');
   const routes = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manifestFile, 'utf8')).routes : {};
   const routeOf = new Map();
   for (const [path, entry] of Object.entries(routes)) routeOf.set(path, entry.srcRoute ?? path);
@@ -174,15 +189,15 @@ function prerenderedPages(root, info) {
     return path === '' ? '/' : path;
   };
   const bases =
-    info.output === 'export' ? [distDir] : [join(distDir, 'server', 'app'), join(distDir, 'server', 'pages')];
+    info.output === 'export' ? [dirs.site] : [join(dirs.build, 'server', 'app'), join(dirs.build, 'server', 'pages')];
   const pages = [];
   for (const base of bases) {
     for (const file of filesUnder(base, '.html')) {
-      if (info.output === 'export' && relative(distDir, file).startsWith(`_next`)) continue;
+      if (info.output === 'export' && relative(dirs.site, file).startsWith(`_next`)) continue;
       const path = pathOfFile(base, file);
       const route = routeOf.get(path) ?? routeOf.get(`${path}/`) ?? (path === '/' ? '/' : null);
       // `global-error` renders its own document, never the root layout's sheet.
-      if (route && route !== '/_global-error') pages.push({ file, path, route });
+      if (route !== '/_global-error' && path !== '/_global-error') pages.push({ file, path, route });
     }
   }
   return pages;
@@ -295,7 +310,7 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
     for (const name of renderedClasses(html)) classes.add(name);
     classesByRoute.set(route, classes);
   };
-  for (const page of pages) sample(page.route, fs.readFileSync(page.file, 'utf8'));
+  for (const page of pages) if (page.route) sample(page.route, fs.readFileSync(page.file, 'utf8'));
   // A static export has no server; every other build is asked for the pages it renders per request.
   const unsampled =
     info.output === 'export' || !crawl ? [] : unsampledStaticRoutes(root, info, new Set(classesByRoute.keys()));
@@ -320,16 +335,14 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
     sheets.set(file, css);
     routes[route] = { file, raw: Buffer.byteLength(css), brotli: brotli(css), pages: 0 };
   }
-  for (const page of [...pages, ...crawled]) routes[page.route].pages += 1;
+  for (const page of [...pages, ...crawled]) if (page.route) routes[page.route].pages += 1;
 
   // The server reads these (added to every server function by the adapter); the complete sheet is also a static file.
   fs.mkdirSync(join(stylesDir, 'sheets'), { recursive: true });
   for (const [file, css] of sheets) fs.writeFileSync(join(stylesDir, 'sheets', file), css);
   fs.writeFileSync(join(stylesDir, 'sheets', fullFile), full);
-  const staticDir =
-    info.output === 'export'
-      ? join(resolve(root, info.distDir), '_next', 'static')
-      : join(resolve(root, info.distDir), 'static');
+  const { site } = buildDirs(root, info);
+  const staticDir = info.output === 'export' ? join(site, '_next', 'static') : join(site, 'static');
   fs.mkdirSync(join(staticDir, 'next-styles'), { recursive: true });
   fs.writeFileSync(join(staticDir, 'next-styles', fullFile), full);
   // The live build's complete sheet under one name every build writes: where a page from a build whose files are
@@ -341,7 +354,8 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
   for (const page of pages) {
     const html = fs.readFileSync(page.file, 'utf8');
     if (html.includes(PLACEHOLDER) || html.includes(COMPLETE_PLACEHOLDER)) {
-      fs.writeFileSync(page.file, fillPlaceholder(html, { css: sheets.get(routes[page.route].file), full }));
+      const css = page.route ? sheets.get(routes[page.route].file) : full;
+      fs.writeFileSync(page.file, fillPlaceholder(html, { css, full }));
     }
   }
 
