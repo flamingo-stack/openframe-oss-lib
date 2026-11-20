@@ -2,24 +2,25 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.MachineTag;
-import com.openframe.core.exception.ConflictException;
-import com.openframe.core.exception.ErrorCode;
-import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseService;
-import com.openframe.data.document.audit.AuditAction;
-import com.openframe.data.document.audit.AuditOutcome;
-import com.openframe.data.document.audit.AuditTargetType;
-import com.openframe.data.document.tag.Tag;
-import com.openframe.data.model.audit.AuditEntry;
-import com.openframe.data.document.tag.TagAssignment;
-import com.openframe.data.document.tag.TagEntityType;
-import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
-import com.openframe.data.repository.tag.TagAssignmentRepository;
-import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.Audited;
 import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.audit.AuditTargetType;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
+import com.openframe.data.repository.tag.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -291,7 +292,7 @@ public class TagService {
     }
 
     @Transactional
-    @Audited(action = TAG_UPDATE, targetId = "#tagId")
+    @Audited(action = TAG_UPDATE, targetId = "#tagId", details = "entityType=#result?.entityType")
     public Tag updateTag(String tagId, String key, String description, String color) {
         log.info("Updating tag: {}", tagId);
 
@@ -334,7 +335,7 @@ public class TagService {
     }
 
     private List<AuditEntry> removalsOf(Tag tag, List<TagAssignment> assignments) {
-        List<String> entityIds = assignments.stream().map(TagAssignment::getEntityId).toList();
+        List<String> entityIds = assignments.stream().map(TagAssignment::getEntityId).distinct().toList();
         return switch (tag.getEntityType()) {
             case TICKET -> entityIds.stream()
                     .map(ticketId -> removalOf(TICKET_TAG_REMOVE, AuditTargetType.TICKET, ticketId, tag))
@@ -342,24 +343,29 @@ public class TagService {
             case SCRIPT -> entityIds.stream()
                     .map(scriptId -> removalOf(SCRIPT_TAG_REMOVE, AuditTargetType.SCRIPT, scriptId, tag))
                     .toList();
-            case KNOWLEDGE_ARTICLE -> knowledgeBaseItemRepository.findAllById(entityIds).stream()
-                    .map(item -> removalOf(KB_ITEM_TAG_REMOVE, KnowledgeBaseService.targetTypeOf(item), item.getId(), tag))
-                    .toList();
+            case KNOWLEDGE_ARTICLE -> knowledgeBaseRemovalsOf(tag, entityIds);
             case DEVICE -> List.of();
         };
     }
 
-    private static AuditEntry removalOf(AuditAction action, AuditTargetType targetType, String entityId, Tag tag) {
-        Map<String, Object> details = new HashMap<>(Map.of("tagId", tag.getId()));
-        if (tag.getKey() != null) {
-            details.put("tagKey", tag.getKey());
+    private List<AuditEntry> knowledgeBaseRemovalsOf(Tag tag, List<String> itemIds) {
+        List<KnowledgeBaseItem> items = knowledgeBaseItemRepository.findAllById(itemIds);
+        int gone = itemIds.size() - items.size();
+        if (gone > 0) {
+            log.info("Tag {} was on {} knowledge base item(s) that no longer exist", tag.getId(), gone);
         }
+        return items.stream()
+                .map(item -> removalOf(KB_ITEM_TAG_REMOVE, KnowledgeBaseService.targetTypeOf(item), item.getId(), tag))
+                .toList();
+    }
+
+    private static AuditEntry removalOf(AuditAction action, AuditTargetType targetType, String entityId, Tag tag) {
         return AuditEntry.builder()
                 .action(action)
                 .outcome(AuditOutcome.SUCCESS)
                 .targetType(targetType)
                 .targetId(entityId)
-                .details(details)
+                .details(Map.of("tagId", tag.getId(), "tagKey", tag.getKey()))
                 .build();
     }
 

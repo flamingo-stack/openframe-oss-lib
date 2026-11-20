@@ -101,6 +101,7 @@ public class RegistrationTagAssignmentService {
                     tagRepository.save(existing);
                     log.info("Appended values {} to existing tag '{}' during registration", values, key);
                     auditRecorder.record(tagEntry(TAG_UPDATE, existing)
+                            .details(Map.of("entityType", TagEntityType.DEVICE))
                             .changes(Map.of("values", new AuditChange(valuesBefore, existing.getValues())))
                             .build());
                 }
@@ -117,7 +118,9 @@ public class RegistrationTagAssignmentService {
 
         Tag saved = tagRepository.save(tag);
         log.info("Created tag '{}' (id={}) with DEVICE entity type during registration", key, saved.getId());
-        auditRecorder.record(tagEntry(TAG_CREATE, saved).details(Map.of("entityType", TagEntityType.DEVICE)).build());
+        auditRecorder.record(tagEntry(TAG_CREATE, saved)
+                .details(Map.of("entityType", TagEntityType.DEVICE, "key", key))
+                .build());
         return saved;
     }
 
