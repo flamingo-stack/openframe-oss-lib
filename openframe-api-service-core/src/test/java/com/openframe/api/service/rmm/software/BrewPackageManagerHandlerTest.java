@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BrewPackageManagerHandlerTest {
 
@@ -28,6 +29,18 @@ class BrewPackageManagerHandlerTest {
     void scriptCode() {
         assertThat(handler.scriptCode(SoftwareAction.INSTALL)).isEqualTo(SoftwareScriptCode.BREW_INSTALL);
         assertThat(handler.scriptCode(SoftwareAction.UPDATE)).isEqualTo(SoftwareScriptCode.BREW_UPDATE);
+    }
+
+    @Test
+    void scriptCode_adopt_badRequestAsNoScriptAdopts() {
+        // setup
+        SoftwareAction adopt = SoftwareAction.ADOPT;
+
+        // execution
+        BadRequestException refused = assertThrows(BadRequestException.class, () -> handler.scriptCode(adopt));
+
+        // verifications
+        assertThat(refused.getMessage()).isEqualTo("No software script adopts a package: an adoption is an order");
     }
 
     @Test

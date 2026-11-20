@@ -7,6 +7,11 @@ public enum SoftwareScriptCode {
     WINGET_INSTALL("__software__winget-install"),
     WINGET_UPDATE("__software__winget-update");
 
+    // the scriptId of an adoption's history rows: no script document has it, an adoption is an order. Not values of
+    // the enum, as every value is seeded as a script
+    public static final String BREW_ADOPT_SCRIPT_ID = "__software__brew-adopt";
+    public static final String CHOCO_ADOPT_SCRIPT_ID = "__software__choco-adopt";
+
     private final String canonicalName;
 
     SoftwareScriptCode(String canonicalName) {

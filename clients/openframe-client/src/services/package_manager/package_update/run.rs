@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use tokio::sync::OwnedMutexGuard;
 
 use tracing::{info, warn};
 
@@ -76,6 +77,11 @@ struct ReportKey {
 pub(super) enum Verdict {
     Continue { next_at: u64 },
     Finished(Ending),
+}
+
+struct Held {
+    _running: InProgressGuard,
+    _brew: Option<OwnedMutexGuard<()>>,
 }
 
 impl Worker {
@@ -315,6 +321,7 @@ impl Worker {
         }
         info!(request_id = %order.request_id, ?holders, "Countdown over, closing the app to update it");
         // Held through the install: a restart between the close and the install would strand the user.
+        let brew = self.machine.brew_turn(&order.package).await;
         let running = self.package_upgrades.begin();
         if self.signals.pending() {
             info!(request_id = %order.request_id, "Agent restart pending, the forced close waits for it");
@@ -350,7 +357,17 @@ impl Worker {
                 )
                 .await;
         }
-        self.install(machine_id, order, p, now, Some(running)).await
+        self.install(
+            machine_id,
+            order,
+            p,
+            now,
+            Some(Held {
+                _running: running,
+                _brew: brew,
+            }),
+        )
+        .await
     }
 
     async fn install(
@@ -359,12 +376,13 @@ impl Worker {
         order: &Order,
         p: &mut Progress,
         now: u64,
-        running: Option<InProgressGuard>,
+        held: Option<Held>,
     ) -> Verdict {
         // Held until the closed apps are back and the result is reported: both are lost on restart.
-        let _running = match running {
-            Some(running) => running,
+        let _held = match held {
+            Some(held) => held,
             None => {
+                let brew = self.machine.brew_turn(&order.package).await;
                 let running = self.package_upgrades.begin();
                 if self.signals.pending() {
                     info!(request_id = %order.request_id, "Agent restart pending, the update waits for it");
@@ -377,7 +395,10 @@ impl Worker {
                     self.relaunch_closed(p).await;
                     return Verdict::Finished(Ending::Done);
                 }
-                running
+                Held {
+                    _running: running,
+                    _brew: brew,
+                }
             }
         };
         let outcome = self.machine.upgrade(&order.package).await;
