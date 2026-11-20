@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm.software;
 
+import com.openframe.core.util.SoftwareNames;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.Software;
@@ -12,6 +13,7 @@ import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -21,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -55,7 +58,8 @@ public class SoftwareProjector {
         software.setSoftwareTitleId(softwareTitleId);
         InstalledProgram program = programOf(rollup);
         boolean keysChanged = !hasKeysOf(software, program);
-        applyName(software, rollup);
+        applyName(software, program);
+        software.setSource(rollup.source());
         applyProgram(software, program);
         software.setInstallerTypes(rollup.installerTypes());
         if (keysChanged || isStale(software)) {
@@ -74,17 +78,31 @@ public class SoftwareProjector {
         return rollup.devicesCount();
     }
 
-    private void applyName(Software software, SoftwareTitleRollup rollup) {
-        software.setName(rollup.name());
-        software.setNameLower(rollup.name() == null ? null : rollup.name().toLowerCase());
-        software.setSource(rollup.source());
+    private static void applyName(Software software, InstalledProgram program) {
+        String name = nameOf(program);
+        software.setName(name);
+        software.setNameLower(name == null ? null : name.toLowerCase());
+    }
+
+    private static String nameOf(InstalledProgram program) {
+        String name = program.getName();
+        if (name != null) {
+            return name;
+        }
+        return Stream.of(program.getWingetIds(), program.getAppFileNames(), program.getPackageFamilyNames())
+                .flatMap(List::stream)
+                .filter(StringUtils::isNotBlank)
+                .findFirst()
+                .orElse(null);
     }
 
     // the title's keys are the union over its devices: one program can sit under different ARP keys
     private static InstalledProgram programOf(SoftwareTitleRollup rollup) {
+        String rolledUpName = rollup.name();
+        String name = SoftwareNames.displayable(rolledUpName);
         return InstalledProgram.builder()
                 .fleetSource(FleetSource.of(rollup.source()))
-                .name(rollup.name())
+                .name(name)
                 .publisher(rollup.vendor())
                 .upgradeCode(rollup.upgradeCode())
                 .productCodes(rollup.arpKeys())
@@ -113,7 +131,7 @@ public class SoftwareProjector {
     // when a key changed or the match is older than MATCH_TTL: a catalog change still reaches it within a day
     private static boolean hasKeysOf(Software software, InstalledProgram program) {
         return FleetSource.of(software.getSource()) == program.getFleetSource()
-                && Objects.equals(software.getName(), program.getName())
+                && Objects.equals(software.getName(), nameOf(program))
                 && Objects.equals(software.getVendor(), program.getPublisher())
                 && Objects.equals(software.getUpgradeCode(), program.getUpgradeCode())
                 && Objects.equals(orEmpty(software.getArpKeys()), program.getProductCodes())

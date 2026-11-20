@@ -45,7 +45,7 @@ export interface ActionsMenuItem {
   /**
    * `checkbox`: one of many options, a box, the menu stays open. `radio`: one
    * option of a set (a choice, not a toggle) — a check on the chosen one, the
-   * menu closes on a pick.
+   * menu closes on a pick. `submenu`: the chosen option is inside it, a check before its chevron.
    */
   type?: 'item' | 'checkbox' | 'radio' | 'submenu' | 'separator';
   checked?: boolean;
@@ -56,6 +56,8 @@ export interface ActionsMenuItem {
    */
   closeOnSelect?: boolean;
   submenu?: ActionsMenuItem[];
+  /** Under a submenu's rows, in place while they scroll (e.g. a note about the choices). */
+  footer?: React.ReactNode;
   /** Submenu placement boundary, inherited by descendants. Defaults to the owning surface. */
   submenuBoundary?: 'surface' | 'viewport';
   /** Render the row in the error/destructive color (label + icon). */
@@ -377,7 +379,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
         </span>
       )}
 
-      {item.type === 'radio' && item.checked && (
+      {(item.type === 'radio' || item.type === 'submenu') && item.checked && (
         <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />
       )}
 
@@ -419,12 +421,22 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
   }
 
   if (item.type === 'submenu' && item.submenu) {
+    const submenuRows = item.submenu.map((subItem, index) => (
+      <MenuItem
+        key={subItem.id || index}
+        item={subItem}
+        onItemClick={onItemClick}
+        depth={depth + 1}
+        submenuBoundary={boundary}
+      />
+    ));
     return (
       <div className={skin.wrapper}>
         <DropdownMenuPrimitive.Sub open={subOpen} onOpenChange={setSubOpen}>
           <DropdownMenuPrimitive.SubTrigger
             ref={subTriggerRef}
             disabled={item.disabled}
+            aria-current={item.checked || undefined}
             className={subTriggerClasses}
             onPointerLeave={event => {
               if (
@@ -456,7 +468,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
               }
               hideWhenDetached
               className={cn(
-                'z-[1500] max-h-[var(--radix-popper-available-height)] overflow-y-auto rounded-md border p-0 shadow-xl',
+                'z-[1500] max-h-[var(--radix-popper-available-height)] rounded-md border p-0 shadow-xl',
+                item.footer ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
                 viewport
                   ? 'min-w-[min(256px,calc((100vw-var(--spacing-system-mf)*3)/2))] max-w-[calc((100vw-var(--spacing-system-mf)*3)/2)]'
                   : 'min-w-[256px]',
@@ -464,15 +477,19 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
               )}
             >
               <ActionsMenuRowContext.Provider value={submenuRowContext}>
-                {item.submenu.map((subItem, index) => (
-                  <MenuItem
-                    key={subItem.id || index}
-                    item={subItem}
-                    onItemClick={onItemClick}
-                    depth={depth + 1}
-                    submenuBoundary={boundary}
-                  />
-                ))}
+                {item.footer ? (
+                  <>
+                    <div
+                      data-testid="actions-menu-submenu-rows"
+                      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+                    >
+                      {submenuRows}
+                    </div>
+                    <div className="shrink-0 border-t border-ods-border">{item.footer}</div>
+                  </>
+                ) : (
+                  submenuRows
+                )}
               </ActionsMenuRowContext.Provider>
             </DropdownMenuPrimitive.SubContent>
           </DropdownMenuPrimitive.Portal>
