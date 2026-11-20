@@ -89,7 +89,14 @@ function QuickActionRowBody({
     <div
       role="group"
       aria-label={label}
-      className={cn('flex shrink-0 items-center gap-[var(--spacing-system-xs)]', className)}
+      className={cn(
+        'flex shrink-0 items-center gap-[var(--spacing-system-xs)]',
+        // The chips at the fixed chip scale (`--font-size-chip`, `--spacing-chip-gap`): one size and width in every
+        // mode and content area.
+        '[--font-line-space-h5-caption:var(--font-line-space-chip)] [--font-size-h5-caption:var(--font-size-chip)]',
+        '[--spacing-system-xs:var(--spacing-chip-gap)]',
+        className,
+      )}
     >
       <div className="relative min-w-0 flex-1">
         {/* The scroller. Its padding (taken back by the margin) is the room a focused tag's ring needs: a box that

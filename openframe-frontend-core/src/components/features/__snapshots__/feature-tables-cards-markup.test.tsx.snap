@@ -605,11 +605,12 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                     class="flex h-20 items-center gap-3"
                   >
                     <span
-                      aria-label="Online. Never seen"
-                      class="inline-flex shrink-0 text-ods-text-secondary"
+                      aria-label="Online"
+                      class="inline-flex shrink-0 rounded-sm text-ods-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
                       data-connectivity="online"
                       data-state="closed"
                       role="img"
+                      tabindex="0"
                     >
                       <svg
                         aria-hidden="true"
@@ -783,10 +784,11 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                   >
                     <span
                       aria-label="Offline. Never seen"
-                      class="inline-flex shrink-0 text-ods-text-secondary"
+                      class="inline-flex shrink-0 rounded-sm text-ods-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
                       data-connectivity="offline"
                       data-state="closed"
                       role="img"
+                      tabindex="0"
                     >
                       <svg
                         aria-hidden="true"
@@ -799,7 +801,7 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                       >
                         <path
                           d="M23 5A4 4 0 1 1 15 5 4 4 0 0 1 23 5"
-                          fill="var(--color-border)"
+                          fill="var(--color-error)"
                         />
                         <path
                           d="M10.876 17a1.125 1.125 0 0 1 2.25 0v2.875H16l.115.006a1.125 1.125 0 0 1 0 2.239l-.115.005H8a1.125 1.125 0 0 1 0-2.25h2.876z"
