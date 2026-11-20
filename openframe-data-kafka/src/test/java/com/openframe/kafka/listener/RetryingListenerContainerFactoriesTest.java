@@ -6,7 +6,10 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -25,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,6 +37,7 @@ import static org.mockito.Mockito.when;
 
 // A listener container factory with retries and a dead-letter topic, built on any consumer factory, so a consumer
 // picks it by name and configures nothing of its own.
+@ExtendWith(OutputCaptureExtension.class)
 class RetryingListenerContainerFactoriesTest {
 
     private static final String TOPIC = "tenants.cluster-1.email-inbound.to-tenant";
@@ -128,6 +133,35 @@ class RetryingListenerContainerFactoriesTest {
         verify(objects, never()).send(any(ProducerRecord.class));
         assertThat(sent.getValue().topic()).isEqualTo(TOPIC + "-dlt");
         assertThat(sent.getValue().value()).isEqualTo(raw);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void recoverer_published_logsKeyTopicPartitionOffset_neverTheValue(CapturedOutput output) {
+        // setup
+        when(objects.send(any(ProducerRecord.class))).thenReturn(CompletableFuture.completedFuture(null));
+
+        // execution
+        recoverer(factory(ClassifyingRetryPolicy.defaults()))
+                .accept(record("secret-body"), mock(Consumer.class), new IllegalStateException("boom"));
+
+        // verifications
+        assertThat(output).contains("Record mailbox-1 of " + TOPIC + "-0 at offset 7 went to " + TOPIC + "-dlt")
+                .doesNotContain("secret-body");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void recoverer_publishFails_throws_andLogsNoDeadLetter(CapturedOutput output) {
+        // setup
+        when(objects.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("broker down")));
+        ConsumerAwareRecordRecoverer recoverer = recoverer(factory(ClassifyingRetryPolicy.defaults()));
+
+        // execution and verifications
+        assertThatThrownBy(() -> recoverer.accept(record("{}"), mock(Consumer.class), new IllegalStateException()))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(output).doesNotContain(" went to ");
     }
 
     private ConcurrentKafkaListenerContainerFactory<Object, Object> factory(ConsumerRetryPolicy policy) {
