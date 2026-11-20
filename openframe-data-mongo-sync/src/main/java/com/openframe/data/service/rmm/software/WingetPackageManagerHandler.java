@@ -24,7 +24,11 @@ public class WingetPackageManagerHandler implements PackageManagerHandler {
 
     @Override
     public SoftwareScriptCode scriptCode(SoftwareAction action) {
-        return action.select(SoftwareScriptCode.WINGET_INSTALL, SoftwareScriptCode.WINGET_UPDATE);
+        return switch (action) {
+            case INSTALL -> SoftwareScriptCode.WINGET_INSTALL;
+            case UPDATE -> SoftwareScriptCode.WINGET_UPDATE;
+            case ADOPT -> throw new BadRequestException("No software script adopts a package: an adoption is an order");
+        };
     }
 
     @Override

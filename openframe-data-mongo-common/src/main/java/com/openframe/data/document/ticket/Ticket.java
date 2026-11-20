@@ -33,7 +33,10 @@ import java.time.Instant;
         @CompoundIndex(name = "status_id_order", def = "{'statusId': 1, 'order': 1}"),
         // Board activity filter: per-column staleness scan. Never edit a live index def in place.
         @CompoundIndex(name = "tenant_status_activity", def = "{'tenantId': 1, 'statusId': 1, 'lastActivityAt': 1}"),
-        @CompoundIndex(name = "tenant_creation_source", def = "{'tenantId': 1, 'creationSource': 1}")
+        @CompoundIndex(name = "tenant_creation_source", def = "{'tenantId': 1, 'creationSource': 1}"),
+        // Rule 3 of the inbound email pipeline's Match: the email tickets of a sender with a normalised subject.
+        @CompoundIndex(name = "tenant_email_sender_subject",
+                def = "{'tenantId': 1, 'emailOrigin.senderAddress': 1, 'emailOrigin.subjectKey': 1}")
 })
 public class Ticket implements TenantScoped {
     @Id

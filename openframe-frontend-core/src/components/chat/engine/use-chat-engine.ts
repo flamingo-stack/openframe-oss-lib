@@ -421,6 +421,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     currentDialogIdRef.current = dialogId;
   });
 
+  const replayCompletedForDialogRef = useRef<string | null>(null);
+  useEffect(() => {
+    replayCompletedForDialogRef.current = null;
+  }, [dialogId]);
+
   // A dialog a stream's server minted mid-turn: its thread stays under the key the turn writes into (the draft's), until
   // the dialog is left.
   const [mintedAlias, setMintedAlias] = useState<{ dialogId: string; key: string } | null>(null);
@@ -743,6 +748,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
 
   // The back-fill of a tail that does not replay: chunks emitted while the engine was inactive or before the tail came up.
   const backfills = liveTail !== null && !liveTail.replays;
+  /** A tail that replays from the history's last seq itself (JetStream). */
+  const tailReplays = liveTail !== null && liveTail.replays === true;
   const {
     processChunk: catchupProcessChunk,
     catchUpChunks,
@@ -812,22 +819,40 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
           approvalStatuses: store.snapshotOf(key).state.approvalStatuses,
         }).messages;
       if (cursor === undefined) {
+        const historyMaxSeq = maxStreamSeq(processed);
         if (isStream && store.snapshotOf(key).messages.length > 0) {
           // A send that went out before the history landed: nothing typed is lost, the history goes before it.
           store.mutate(key, r => r.prependMessages(processed));
         } else {
           // The first page: THE hydration door. Adoption is armed only while a back-fill is still buffering, the replay
-          // that would consume it.
-          store.hydrate(key, processed, { expectingReplay: backfills && isBufferingActive() });
+          // that would consume it. A replaying tail with no seq to resume after opens on new messages only, so it can
+          // never deliver again a prompt this history holds.
+          store.hydrate(key, processed, {
+            expectingReplay: backfills && isBufferingActive(),
+            tailReplaysHistory: !(
+              tailReplays &&
+              (historyMaxSeq === null || replayCompletedForDialogRef.current === id)
+            ),
+          });
         }
-        setHistorySeq({ dialogId: id, seq: maxStreamSeq(processed) });
+        setHistorySeq({ dialogId: id, seq: historyMaxSeq });
       } else {
         store.mutate(key, r => r.prependMessages(processed));
       }
       if (page.tokenUsage !== undefined) store.mutate(key, r => r.setDialogTokenUsage(page.tokenUsage ?? null));
       setCursorEntry({ dialogId: id, cursor: page.nextCursor });
     },
-    [store, assistantName, assistantAvatar, assistantType, chatTypeFilter, isBufferingActive, backfills, isStream],
+    [
+      store,
+      assistantName,
+      assistantAvatar,
+      assistantType,
+      chatTypeFilter,
+      isBufferingActive,
+      backfills,
+      tailReplays,
+      isStream,
+    ],
   );
 
   const loadDialogHistory = useCallback(
@@ -981,6 +1006,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     onConnect: handleConnect,
     onResync: () => {
       if (dialogId) void loadDialogHistory(dialogId);
+    },
+    onReplayComplete: () => {
+      if (!tailReplays || !dialogId || currentDialogIdRef.current !== dialogId) return;
+      replayCompletedForDialogRef.current = dialogId;
+      store.mutate(keyOfDialog(dialogId), reducer => reducer.setTailReplaysHistory(false));
     },
     onSubscribed: () => {
       if (!dialogId) return;

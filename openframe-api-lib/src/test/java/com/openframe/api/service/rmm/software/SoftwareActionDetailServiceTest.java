@@ -1,7 +1,9 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
+import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.device.Machine;
@@ -287,6 +289,144 @@ class SoftwareActionDetailServiceTest {
         assertThat(row.getDeviceStatus()).isEqualTo(DeviceStatus.OFFLINE);
         assertThat(row.getConnectivity()).isEqualTo(TelemetryStatus.ONLINE);
         assertThat(row.getLastSeen()).isEqualTo(lastSeen);
+    }
+
+    @Test
+    void devices_searchByCustomerName_matchesTheCustomersDevices() {
+        // setup
+        threeDevicesOfTwoCustomers();
+
+        // execution
+        List<SoftwareActionDeviceResponse> rows = service.devices(EXEC, null, null, null, "acme");
+
+        // verifications
+        assertThat(rows).extracting(SoftwareActionDeviceResponse::getMachineId).containsExactlyInAnyOrder("alpha", "gamma");
+    }
+
+    @Test
+    void devices_searchByStatusLabel_matchesDevicesInThatStatus() {
+        // setup
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of(
+                leaf("m-done", ExecutionStatus.SUCCESS),
+                leaf("m-running", ExecutionStatus.RUNNING)));
+
+        // execution
+        List<SoftwareActionDeviceResponse> rows = service.devices(EXEC, null, null, null, "In Progress");
+
+        // verifications
+        assertThat(rows).extracting(SoftwareActionDeviceResponse::getMachineId).containsExactly("m-running");
+    }
+
+    @Test
+    void devices_searchByOutput_matchesStdoutStderrAndError() {
+        // setup
+        ScriptExecution stdout = leaf("m-stdout", ExecutionStatus.SUCCESS);
+        stdout.setStdout("slack 4.41 already installed");
+        ScriptExecution stderr = leaf("m-stderr", ExecutionStatus.FAILED);
+        stderr.setStderr("Error: slack is ALREADY INSTALLED by another user");
+        ScriptExecution error = leaf("m-error", ExecutionStatus.FAILED);
+        error.setError("package already installed");
+        ScriptExecution other = leaf("m-other", ExecutionStatus.FAILED);
+        other.setStdout("download failed");
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC))
+                .thenReturn(List.of(stdout, stderr, error, other));
+
+        // execution
+        List<SoftwareActionDeviceResponse> rows = service.devices(EXEC, null, null, null, "already installed");
+
+        // verifications
+        assertThat(rows).extracting(SoftwareActionDeviceResponse::getMachineId)
+                .containsExactlyInAnyOrder("m-stdout", "m-stderr", "m-error");
+    }
+
+    @Test
+    void filters_statusFacet_countsUnderTheCustomerFilterNotTheStatusFilter() {
+        // setup
+        threeDevicesOfTwoCustomers();
+        SoftwareActionDeviceFilterInput filter = filter(List.of(SoftwareActionStatus.COMPLETED), List.of("org-1"));
+
+        // execution
+        SoftwareActionDeviceFilters filters = service.filters(EXEC, null, null, filter, null);
+
+        // verifications
+        assertThat(filters.getStatuses())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getLabel, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("COMPLETED", "Completed", 1), tuple("FAILED", "Failed", 1));
+    }
+
+    @Test
+    void filters_organizationFacet_countsUnderTheStatusFilterNotTheCustomerFilter() {
+        // setup
+        threeDevicesOfTwoCustomers();
+        SoftwareActionDeviceFilterInput filter = filter(List.of(SoftwareActionStatus.COMPLETED), List.of("org-1"));
+
+        // execution
+        SoftwareActionDeviceFilters filters = service.filters(EXEC, null, null, filter, null);
+
+        // verifications
+        assertThat(filters.getOrganizations())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getLabel, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("org-1", "Acme", 1), tuple("org-2", "Globex", 1));
+    }
+
+    @Test
+    void filters_filteredCount_appliesEveryFilter() {
+        // setup
+        threeDevicesOfTwoCustomers();
+        SoftwareActionDeviceFilterInput filter = filter(List.of(SoftwareActionStatus.COMPLETED), List.of("org-1"));
+
+        // execution
+        SoftwareActionDeviceFilters filters = service.filters(EXEC, null, null, filter, null);
+
+        // verifications
+        assertThat(filters.getFilteredCount()).isEqualTo(1);
+    }
+
+    @Test
+    void filters_search_narrowsEveryFacet() {
+        // setup
+        threeDevicesOfTwoCustomers();
+
+        // execution
+        SoftwareActionDeviceFilters filters = service.filters(EXEC, null, null, null, "acme");
+
+        // verifications
+        assertThat(filters.getOrganizations()).extracting(SoftwareFilterOption::getValue).containsExactly("org-1");
+        assertThat(filters.getStatuses())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("COMPLETED", 1), tuple("FAILED", 1));
+        assertThat(filters.getFilteredCount()).isEqualTo(2);
+    }
+
+    @Test
+    void filters_deviceTagFilter_narrowsEveryFacet() {
+        // setup
+        threeDevicesOfTwoCustomers();
+        when(tagAssignmentRepository.findByEntityIdInAndTagIdInAndEntityType(any(), eq(List.of("tag-vip")),
+                eq(TagEntityType.DEVICE))).thenReturn(List.of(tagged("beta", "tag-vip")));
+        SoftwareActionDeviceFilterInput filter = new SoftwareActionDeviceFilterInput();
+        filter.setDeviceTagIds(List.of("tag-vip"));
+
+        // execution
+        SoftwareActionDeviceFilters filters = service.filters(EXEC, null, null, filter, null);
+
+        // verifications
+        assertThat(filters.getOrganizations()).extracting(SoftwareFilterOption::getValue).containsExactly("org-2");
+        assertThat(filters.getStatuses()).extracting(SoftwareFilterOption::getValue).containsExactly("COMPLETED");
+        assertThat(filters.getFilteredCount()).isEqualTo(1);
+    }
+
+    private void threeDevicesOfTwoCustomers() {
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of(
+                leaf("alpha", ExecutionStatus.SUCCESS),
+                leaf("beta", ExecutionStatus.SUCCESS),
+                leaf("gamma", ExecutionStatus.FAILED)));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(
+                machine("alpha", "alpha-host", "org-1"),
+                machine("beta", "beta-host", "org-2"),
+                machine("gamma", "gamma-host", "org-1")));
+        when(organizationRepository.findByOrganizationIdIn(any())).thenReturn(List.of(
+                org("org-1", "Acme"), org("org-2", "Globex")));
     }
 
     private static SoftwareActionDeviceFilterInput filter(List<SoftwareActionStatus> statuses, List<String> organizationIds) {

@@ -6,6 +6,7 @@ import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import com.openframe.delivery.track.DeliveryTracker;
 import io.nats.client.Connection;
@@ -31,17 +32,18 @@ class PackageUpdateWiringTest {
             .withBean(PackageUpdateDeviceStateRepository.class, () -> mock(PackageUpdateDeviceStateRepository.class))
             .withBean(PackageUpdateRequestRepository.class, () -> mock(PackageUpdateRequestRepository.class))
             .withBean(ScriptExecutionRepository.class, () -> mock(ScriptExecutionRepository.class))
+            .withBean(PackageCatalogVersions.class, () -> mock(PackageCatalogVersions.class))
             .withUserConfiguration(PackageUpdateStatusListener.class, PackageUpdateStatusProcessor.class,
                     PackageUpdateExecutionRecorder.class, PackageUpdateDeliveryFailureListener.class,
                     PackageAutoUpdateRetry.class);
 
     @Test
-    void packageUpdateOff_nothingOfTheFeatureRuns() {
+    void packageUpdateOff_nothingOfTheFeatureRunsButTheHistoryRecorderAdoptionsUse() {
         runner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).doesNotHaveBean(PackageUpdateStatusListener.class);
             assertThat(context).doesNotHaveBean(PackageUpdateStatusProcessor.class);
-            assertThat(context).doesNotHaveBean(PackageUpdateExecutionRecorder.class);
+            assertThat(context).hasSingleBean(PackageUpdateExecutionRecorder.class);
             assertThat(context).doesNotHaveBean(PackageUpdateDeliveryFailureListener.class);
             assertThat(context).doesNotHaveBean(PackageAutoUpdateRetry.class);
         });
