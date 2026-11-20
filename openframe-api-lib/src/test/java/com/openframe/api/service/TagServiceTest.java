@@ -1,6 +1,8 @@
 package com.openframe.api.service;
 
 import org.mockito.Answers;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.device.MachineTag;
 import com.openframe.core.exception.ConflictException;
@@ -38,6 +40,8 @@ class TagServiceTest {
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
+    @Mock private AuditRecorder auditRecorder;
+    @Mock private KnowledgeBaseItemRepository knowledgeBaseItemRepository;
 
     private TagService tagService;
 
@@ -49,7 +53,8 @@ class TagServiceTest {
 
     @BeforeEach
     void setUp() {
-        tagService = new TagService(tagRepository, tagAssignmentRepository, auditedMethodRunner);
+        tagService = new TagService(tagRepository, tagAssignmentRepository, auditedMethodRunner, auditRecorder,
+                knowledgeBaseItemRepository);
     }
 
     @Test

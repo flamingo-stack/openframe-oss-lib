@@ -5,12 +5,19 @@ import com.openframe.api.dto.device.MachineTag;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.api.service.knowledgebase.KnowledgeBaseService;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.tag.Tag;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.Audited;
 import com.openframe.audit.AuditedMethodRunner;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +30,12 @@ import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.KB_ITEM_TAG_REMOVE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_TAG_REMOVE;
 import static com.openframe.data.document.audit.AuditAction.TAG_CREATE;
 import static com.openframe.data.document.audit.AuditAction.TAG_DELETE;
 import static com.openframe.data.document.audit.AuditAction.TAG_UPDATE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_TAG_REMOVE;
 
 @Service
 @Slf4j
@@ -36,6 +46,8 @@ public class TagService {
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
+    private final KnowledgeBaseItemRepository knowledgeBaseItemRepository;
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
 
@@ -254,7 +266,7 @@ public class TagService {
         if (existing != null) {
             return existing;
         }
-        AuditCall call = AuditCall.of(TAG_CREATE, null, Map.of("entityType", entityType))
+        AuditCall call = AuditCall.of(TAG_CREATE, null, Map.of("entityType", entityType, "key", key))
                 .withCompare(false)
                 .withTargetIdInResult(true)
                 .withTargetIdFromResult(created -> ((Tag) created).getId());
@@ -311,13 +323,44 @@ public class TagService {
     }
 
     private void deleteWithAssignments(String tagId, Map<String, Object> details) {
-        Tag tag = tagRepository.findById(tagId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId));
+        Tag tag = requireTag(tagId);
+        List<TagAssignment> assignments = tagAssignmentRepository.findByTagId(tagId);
         details.put("entityType", tag.getEntityType());
-        details.put("removedAssignments", tagAssignmentRepository.countByTagId(tagId));
+        details.put("removedAssignments", assignments.size());
         tagAssignmentRepository.deleteByTagId(tagId);
         tagRepository.deleteById(tagId);
+        auditRecorder.recordAll(removalsOf(tag, assignments));
         log.info("Tag deleted with cascade: {}", tagId);
+    }
+
+    private List<AuditEntry> removalsOf(Tag tag, List<TagAssignment> assignments) {
+        List<String> entityIds = assignments.stream().map(TagAssignment::getEntityId).toList();
+        return switch (tag.getEntityType()) {
+            case TICKET -> entityIds.stream()
+                    .map(ticketId -> removalOf(TICKET_TAG_REMOVE, AuditTargetType.TICKET, ticketId, tag))
+                    .toList();
+            case SCRIPT -> entityIds.stream()
+                    .map(scriptId -> removalOf(SCRIPT_TAG_REMOVE, AuditTargetType.SCRIPT, scriptId, tag))
+                    .toList();
+            case KNOWLEDGE_ARTICLE -> knowledgeBaseItemRepository.findAllById(entityIds).stream()
+                    .map(item -> removalOf(KB_ITEM_TAG_REMOVE, KnowledgeBaseService.targetTypeOf(item), item.getId(), tag))
+                    .toList();
+            case DEVICE -> List.of();
+        };
+    }
+
+    private static AuditEntry removalOf(AuditAction action, AuditTargetType targetType, String entityId, Tag tag) {
+        Map<String, Object> details = new HashMap<>(Map.of("tagId", tag.getId()));
+        if (tag.getKey() != null) {
+            details.put("tagKey", tag.getKey());
+        }
+        return AuditEntry.builder()
+                .action(action)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetType(targetType)
+                .targetId(entityId)
+                .details(details)
+                .build();
     }
 
     private MachineTag buildMachineTag(TagAssignment assignment, Tag tag) {

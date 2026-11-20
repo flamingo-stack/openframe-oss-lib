@@ -315,10 +315,12 @@ public class AuditedMethodRunner {
                 .targetTenantId(current == null ? null : current.tenantId())
                 .details(CollectionUtils.isEmpty(details) ? null : details)
                 .changes(CollectionUtils.isEmpty(changes) ? null : changes);
-        String organizationId = firstNonNull(fromTarget(current, LoadedTarget::organizationId, "organization id", call),
-                fromTarget(before, LoadedTarget::organizationId, "organization id", call));
-        String deviceId = firstNonNull(fromTarget(current, LoadedTarget::deviceId, "device id", call),
-                fromTarget(before, LoadedTarget::deviceId, "device id", call));
+        LoadedTarget loaded = call.ownsOrganizationAndDevice() ? null : current;
+        LoadedTarget loadedBefore = call.ownsOrganizationAndDevice() ? null : before;
+        String organizationId = firstNonNull(fromTarget(loaded, LoadedTarget::organizationId, "organization id", call),
+                fromTarget(loadedBefore, LoadedTarget::organizationId, "organization id", call));
+        String deviceId = firstNonNull(fromTarget(loaded, LoadedTarget::deviceId, "device id", call),
+                fromTarget(loadedBefore, LoadedTarget::deviceId, "device id", call));
         return entry.targetName(orFromResult(fromTarget(current, LoadedTarget::name, "target name", call),
                         "target name", call, call.targetNameOf(), result))
                 .organizationId(orFromResult(organizationId, "organization id", call, call.organizationIdOf(), result))

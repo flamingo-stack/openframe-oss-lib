@@ -1,5 +1,6 @@
 package com.openframe.api.integration.service;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.mongodb.client.MongoClient;
@@ -136,7 +137,8 @@ class MachineFieldLevelWritesIT {
     void updateStatusByMachineId_concurrentDirectoryAndFleetSetAfterTheRead_survives() {
         // setup
         DeviceService service = new DeviceService(interleavingMachines, mock(DeletedMachineCleanup.class),
-                mock(DeviceSoftwareConnectivitySync.class), machineWriter, mock(TagRepository.class),
+                mock(AuditRecorder.class), mock(DeviceSoftwareConnectivitySync.class), machineWriter,
+                mock(TagRepository.class),
                 mock(TagAssignmentRepository.class),
                 mock(DeviceStatusProcessor.class), mock(DeviceFilterOptionMapper.class),
                 mock(TenantIdProvider.class), mock(ApplicationEventPublisher.class));

@@ -18,6 +18,7 @@ public record AuditCall(AuditAction action,
                         Function<Object, Map<String, Object>> detailsFromResult,
                         boolean compare,
                         boolean recordsUnchanged,
+                        boolean ownsOrganizationAndDevice,
                         Predicate<Object> recordsResult,
                         Function<Object, String> tenantIdOf,
                         Function<Object, String> targetNameOf,
@@ -35,6 +36,6 @@ public record AuditCall(AuditAction action,
     public static AuditCall of(AuditAction action, AuditTargetType targetType, String targetId,
                                Map<String, Object> details) {
         return new AuditCall(action, targetType, () -> targetId, _ -> null, false, _ -> details, true, false,
-                _ -> true, _ -> null, _ -> null, _ -> null, _ -> null);
+                false, _ -> true, _ -> null, _ -> null, _ -> null, _ -> null);
     }
 }

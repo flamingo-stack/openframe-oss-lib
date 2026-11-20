@@ -129,7 +129,8 @@ public class AssignmentService {
 
     private static AuditCall linkCall(AuditAction action, AssignmentItemType itemType, String itemId,
                                       AssignmentTargetType targetType, String targetId, String targetName) {
-        Map<String, Object> details = new HashMap<>(Map.of("targetType", targetType, "targetIds", List.of(targetId)));
+        Map<String, Object> details = new HashMap<>(Map.of("targetType", linkedTypeOf(targetType),
+                "targetIds", List.of(targetId)));
         if (targetName != null) {
             details.put("targetNames", List.of(targetName));
         }
@@ -137,8 +138,18 @@ public class AssignmentService {
         String linkedDeviceId = targetType == AssignmentTargetType.DEVICE ? targetId : null;
         return AuditCall.of(action, targetTypeOf(itemType), itemId, details)
                 .withCompare(false)
+                .withOwnsOrganizationAndDevice(linkedOrganizationId != null || linkedDeviceId != null)
                 .withOrganizationIdOf(_ -> linkedOrganizationId)
                 .withDeviceIdOf(_ -> linkedDeviceId);
+    }
+
+    private static AuditTargetType linkedTypeOf(AssignmentTargetType targetType) {
+        return switch (targetType) {
+            case ORGANIZATION -> AuditTargetType.ORGANIZATION;
+            case DEVICE -> AuditTargetType.DEVICE;
+            case TICKET -> AuditTargetType.TICKET;
+            case KNOWLEDGE_ARTICLE -> AuditTargetType.KB_ARTICLE;
+        };
     }
 
     private static AuditTargetType targetTypeOf(AssignmentItemType itemType) {

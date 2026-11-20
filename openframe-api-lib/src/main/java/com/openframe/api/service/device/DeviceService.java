@@ -12,6 +12,7 @@ import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
@@ -70,6 +71,7 @@ public class DeviceService {
 
     private final MachineRepository machineRepository;
     private final DeletedMachineCleanup deletedMachineCleanup;
+    private final AuditRecorder auditRecorder;
     private final DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
@@ -412,7 +414,7 @@ public class DeviceService {
         boolean inFleet = !DeviceStatus.FROZEN.contains(status);
         boolean wasInFleet = !DeviceStatus.FROZEN.contains(previousStatus);
         if (status == DeviceStatus.DELETED) {
-            deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
+            auditRecorder.recordAll(deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId));
         } else if (wasInFleet != inFleet) {
             deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, inFleet);
         }

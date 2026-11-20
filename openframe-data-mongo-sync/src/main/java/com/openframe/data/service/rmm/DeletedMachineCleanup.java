@@ -1,6 +1,9 @@
 package com.openframe.data.service.rmm;
 
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -11,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -23,15 +27,19 @@ public class DeletedMachineCleanup {
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
 
-    public void cleanUpDeletedMachine(String tenantId, String machineId) {
+    public List<AuditEntry> cleanUpDeletedMachine(String tenantId, String machineId) {
         if (tenantId == null || machineId == null) {
-            return;
+            return List.of();
         }
-        removeFromSchedules(tenantId, machineId);
+        List<AuditEntry> scheduleRemovals = removeFromSchedules(tenantId, machineId);
         removeFromSoftwareReadModel(tenantId, machineId);
+        return scheduleRemovals;
     }
 
-    private void removeFromSchedules(String tenantId, String machineId) {
+    private List<AuditEntry> removeFromSchedules(String tenantId, String machineId) {
+        List<AuditEntry> scheduleRemovals = assignedRepository.findByTenantIdAndMachineId(tenantId, machineId).stream()
+                .map(assigned -> scheduleRemovalOf(assigned.getScriptScheduleId(), machineId))
+                .toList();
         long removed = assignedRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
         long removedDispatch = onlineDeviceDispatchRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
         if (removed > 0) {
@@ -41,6 +49,16 @@ public class DeletedMachineCleanup {
         if (removedDispatch > 0) {
             log.info("Removed first-online dispatch record(s) for deleted machineId={}, count={}", machineId, removedDispatch);
         }
+        return scheduleRemovals;
+    }
+
+    private static AuditEntry scheduleRemovalOf(String scheduleId, String machineId) {
+        return AuditEntry.builder()
+                .action(AuditAction.SCRIPT_SCHEDULE_DEVICES_REMOVE)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(scheduleId)
+                .details(Map.of("machineIds", List.of(machineId)))
+                .build();
     }
 
     private void removeFromSoftwareReadModel(String tenantId, String machineId) {

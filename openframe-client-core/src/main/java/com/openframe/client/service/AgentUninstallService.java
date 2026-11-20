@@ -77,7 +77,7 @@ public class AgentUninstallService {
 
         toolConnectionService.disconnectAll(machineId);
         installedAgentService.disconnectAll(machineId);
-        deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
+        auditRecorder.recordAll(deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId));
 
         eventPublisher.publishEvent(new DeviceUninstalledEvent(this, machine));
 
