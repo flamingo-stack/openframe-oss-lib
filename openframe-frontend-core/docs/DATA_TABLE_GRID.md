@@ -89,9 +89,14 @@ needs the checklist above before a host asks it for the grid:
 
 | Table | Still to do |
 |---|---|
-| `ScriptsTable`, `ScriptSchedulesTable`, `ScriptExecutionsTable` | `size` / `minSize` in `scripts-table-columns.ts` (their `width` classes are card-only), `gridCell` for the name + description, date + time and initiator cells, `actions` and `open` as action columns |
 | `KnowledgeBaseTableBody` | `size` / `minSize`, `gridCell` for the name cell (icon, name, status, summary), `open` and the host's `actionsColumn` as action columns |
 | `DeviceSelector` | `size` / `minSize`, `gridCell` for the device and customer cells, its add / remove column as an action column |
+
+`ScriptsTable`, `ScriptSchedulesTable` and `ScriptExecutionsTable` are ready. Their layout is data
+(`features/scripts/scripts-table-columns.ts`: per column a `size`, a `minSize`, a `label`, and `gridKind: 'action'` on
+the row menu and the open button), read through `scriptsColumnSize()` and `scriptsColumnMeta()`; the one-line cells are
+the `...GridCell` components beside the card cells (`script-cells.tsx`, `execution-cells.tsx`). A host that builds its
+own columns on that layout (the web app's live Scripts tables) reads the same two helpers and cells.
 
 `DevicesTableBody` (`features/devices/devices-table-columns.tsx`) is the worked example: every column has a `size`, a
 `minSize` and a `gridCell`, its open column is kept by hand, and it adds `selectionColumn()` itself when the host
