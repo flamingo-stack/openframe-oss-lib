@@ -21,7 +21,5 @@ public interface ItemAssignmentRepository extends MongoRepository<ItemAssignment
     Optional<ItemAssignment> findByItemIdAndTargetTypeAndTargetId(String itemId, AssignmentTargetType targetType,
                                                                   String targetId);
 
-    void deleteByItemIdAndTargetTypeAndTargetId(String itemId, AssignmentTargetType targetType, String targetId);
-
-    void deleteByItemIdAndTargetType(String itemId, AssignmentTargetType targetType);
+    long deleteByItemIdAndTargetTypeAndTargetId(String itemId, AssignmentTargetType targetType, String targetId);
 }

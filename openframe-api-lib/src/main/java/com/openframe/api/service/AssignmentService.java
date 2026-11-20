@@ -23,6 +23,7 @@ import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -196,11 +197,10 @@ public class AssignmentService {
         AssignmentTargetType targetType = assignment.getTargetType();
         String targetId = assignment.getTargetId();
         AuditCall call = linkCall(LINK_DELETE, assignment.getItemType(), itemId, targetType, targetId,
-                assignment.getDisplayName());
-        auditedMethodRunner.run(call, () -> {
-            repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
-            return assignment;
-        });
+                assignment.getDisplayName())
+                .withRecordsResult(deleted -> (Long) deleted > 0);
+        auditedMethodRunner.run(call,
+                () -> repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId));
     }
 
     /**
@@ -248,10 +248,13 @@ public class AssignmentService {
             case ORGANIZATION -> organizationRepository.findByOrganizationId(targetId)
                     .map(Organization::getName).orElse(targetId);
             case DEVICE -> machineRepository.findByMachineId(targetId)
-                    .map(m -> m.getHostname() != null ? m.getHostname() : m.getDisplayName())
+                    .map(m -> ObjectUtils.firstNonNull(m.getHostname(), m.getDisplayName()))
                     .orElse(targetId);
             case TICKET -> ticketRepository.findById(targetId)
-                    .map(t -> t.getTicketNumber() + " - " + t.getTitle()).orElse(targetId);
+                    .map(t -> t.getTitle() == null
+                            ? String.valueOf(t.getTicketNumber())
+                            : t.getTicketNumber() + " - " + t.getTitle())
+                    .orElse(targetId);
             case KNOWLEDGE_ARTICLE -> knowledgeBaseItemRepository.findById(targetId)
                     .map(KnowledgeBaseItem::getName).orElse(targetId);
         };
