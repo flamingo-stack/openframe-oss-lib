@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.springframework.util.Assert;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -24,14 +25,20 @@ public class TicketEmailOrigin {
     private String mailboxAddress;
     private String senderAddress;
     private List<String> cc;
+    // Rule 3 of the inbound pipeline's Match: the normalised subject and the time of the latest email.
+    private String subjectKey;
+    private Instant lastEmailAt;
 
     @Builder
-    private TicketEmailOrigin(String mailboxId, String mailboxAddress, String senderAddress, List<String> cc) {
+    private TicketEmailOrigin(String mailboxId, String mailboxAddress, String senderAddress, List<String> cc,
+                              String subjectKey, Instant lastEmailAt) {
         Assert.hasText(mailboxAddress, "mailboxAddress must not be blank");
         Assert.hasText(senderAddress, "senderAddress must not be blank");
         this.mailboxId = mailboxId;
         this.mailboxAddress = mailboxAddress;
         this.senderAddress = senderAddress;
         this.cc = cc;
+        this.subjectKey = subjectKey;
+        this.lastEmailAt = lastEmailAt;
     }
 }

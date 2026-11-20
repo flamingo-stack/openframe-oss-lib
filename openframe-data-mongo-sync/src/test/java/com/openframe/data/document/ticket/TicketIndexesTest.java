@@ -47,6 +47,7 @@ class TicketIndexesTest {
                 "status_id_order",
                 "tenant_status_activity",
                 TENANT_CREATION_SOURCE,
+                "tenant_email_sender_subject",
                 "deviceId",
                 "organizationId",
                 "assignedTo",
@@ -56,6 +57,8 @@ class TicketIndexesTest {
         assertIndex(indexes, "status_id_order", false, "statusId:1", "order:1");
         assertIndex(indexes, "tenant_status_activity", false, "tenantId:1", "statusId:1", "lastActivityAt:1");
         assertIndex(indexes, TENANT_CREATION_SOURCE, false, "tenantId:1", "creationSource:1");
+        assertIndex(indexes, "tenant_email_sender_subject", false,
+                "tenantId:1", "emailOrigin.senderAddress:1", "emailOrigin.subjectKey:1");
         assertIndex(indexes, "deviceId", false, "deviceId:1");
         assertIndex(indexes, "organizationId", false, "organizationId:1");
         assertIndex(indexes, "assignedTo", false, "assignedTo:1");
