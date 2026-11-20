@@ -4,6 +4,7 @@ import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.repository.TenantAwareRepository;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.ReadPreference;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,8 +14,10 @@ import java.util.Optional;
 @TenantAwareRepository
 public interface ItemAssignmentRepository extends MongoRepository<ItemAssignment, String>, CustomItemAssignmentRepository {
 
+    @ReadPreference("primary")
     List<ItemAssignment> findByItemIdAndTargetType(String itemId, AssignmentTargetType targetType);
 
+    @ReadPreference("primary")
     Optional<ItemAssignment> findByItemIdAndTargetTypeAndTargetId(String itemId, AssignmentTargetType targetType,
                                                                   String targetId);
 
