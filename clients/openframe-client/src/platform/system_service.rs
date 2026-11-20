@@ -11,6 +11,7 @@ use crate::config::service_stop::{
 use crate::utils::timed_permit_pool::PermitPoolError;
 use anyhow::{Context, Result};
 use std::time::Duration;
+#[cfg(unix)]
 use tokio::process::Command;
 #[cfg(target_os = "windows")]
 use tokio::time::sleep;
@@ -515,26 +516,21 @@ async fn force_stop_service_windows(service_name: &str, allow_delete: bool) -> R
                     service_name, pid, attempt, SERVICE_FORCE_KILL_MAX_ATTEMPTS
                 );
 
-                let output = Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .output()
-                    .await
-                    .with_context(|| {
-                        format!(
-                            "Failed to execute taskkill for service {} (pid {})",
-                            service_name, pid
-                        )
-                    })?;
+                let killed = tokio::task::spawn_blocking(move || {
+                    crate::platform::process_kill::terminate_tree(pid)
+                })
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to run the kill for service {} (pid {})",
+                        service_name, pid
+                    )
+                })?;
 
-                if !output.status.success() {
-                    let kill_stdout = String::from_utf8_lossy(&output.stdout);
-                    let kill_stderr = String::from_utf8_lossy(&output.stderr);
+                if let Err(e) = killed {
                     warn!(
-                        "taskkill for service {} (pid {}) reported: stdout={} stderr={}",
-                        service_name,
-                        pid,
-                        kill_stdout.trim(),
-                        kill_stderr.trim()
+                        "Force-kill of service {} (pid {}) failed: {}",
+                        service_name, pid, e
                     );
                 }
             }
@@ -888,10 +884,16 @@ async fn kill_processes_by_exe_path_windows(exe_path: &std::path::Path) -> usize
             .map(|p| p.to_string_lossy().to_lowercase())
             .unwrap_or_default();
         if !proc_exe.is_empty() && proc_exe == target {
-            let _ = Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid.to_string()])
-                .output()
-                .await;
+            let pid = pid.as_u32();
+            match tokio::task::spawn_blocking(move || {
+                crate::platform::process_kill::terminate_tree(pid)
+            })
+            .await
+            {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => warn!("Force-kill of pid {} failed: {}", pid, e),
+                Err(e) => warn!("Force-kill task for pid {} failed: {}", pid, e),
+            }
             killed += 1;
         }
     }

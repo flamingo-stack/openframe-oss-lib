@@ -3,9 +3,9 @@ use crate::config::service_stop::{
     PROCESS_CHECK_INTERVAL_MS,
 };
 use crate::models::{Installation, InstalledTool};
-use crate::platform::system_service;
+use crate::platform::{process_kill, system_service};
 use anyhow::Result;
-use sysinfo::{Pid, ProcessRefreshKind, Signal, System, UpdateKind};
+use sysinfo::{Pid, ProcessRefreshKind, System, UpdateKind};
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 
@@ -198,16 +198,16 @@ impl ToolKillService {
         let mut sys = System::new_all();
         sys.refresh_all();
 
-        if let Some(process) = sys.process(pid) {
+        if sys.process(pid).is_some() {
             info!(
                 "Sending graceful termination signal to process {} ({})",
                 pid, description
             );
 
-            if !process.kill() {
+            if let Err(e) = process_kill::terminate(pid.as_u32()) {
                 warn!(
-                    "Failed to send graceful termination signal to process {} ({})",
-                    pid, description
+                    "Failed to send graceful termination signal to process {} ({}): {}",
+                    pid, description, e
                 );
                 return Ok(false);
             }
@@ -235,30 +235,23 @@ impl ToolKillService {
         let mut sys = System::new_all();
         sys.refresh_all();
 
-        if let Some(process) = sys.process(pid) {
+        if sys.process(pid).is_some() {
             info!(
                 "Sending force kill signal to process {} ({})",
                 pid, description
             );
 
-            match process.kill_with(Signal::Kill) {
-                Some(true) => {
+            match process_kill::terminate(pid.as_u32()) {
+                Ok(()) => {
                     info!(
                         "Force kill signal sent to process {} ({})",
                         pid, description
                     );
                 }
-                Some(false) => {
+                Err(e) => {
                     warn!(
-                        "Force kill signal failed for process {} ({})",
-                        pid, description
-                    );
-                    return Ok(false);
-                }
-                None => {
-                    error!(
-                        "Failed to send force kill signal to process {} ({})",
-                        pid, description
+                        "Force kill signal failed for process {} ({}): {}",
+                        pid, description, e
                     );
                     return Ok(false);
                 }

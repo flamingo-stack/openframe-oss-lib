@@ -13,6 +13,7 @@ pub mod lock_recovery;
 pub mod machine_info_persistence;
 pub mod orphan_reaper;
 pub mod permissions;
+pub mod process_kill;
 pub mod process_snapshot;
 pub mod process_tree;
 pub mod system_service;

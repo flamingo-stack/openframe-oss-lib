@@ -136,6 +136,8 @@ pub(crate) fn classify_holder(
 #[cfg(target_os = "windows")]
 use crate::platform::file_lock::{get_directory_lock_holders, LockHolder};
 #[cfg(target_os = "windows")]
+use crate::platform::process_kill;
+#[cfg(target_os = "windows")]
 use crate::platform::system_service;
 #[cfg(target_os = "windows")]
 use sysinfo::{Pid, System};
@@ -286,19 +288,11 @@ pub(crate) async fn evict_holders_for_removal(tool_dir: &Path) {
 #[cfg(target_os = "windows")]
 async fn terminate_pid(pid: u32) {
     info!("Lock recovery: terminating lock holder PID {}", pid);
-    match tokio::process::Command::new("taskkill")
-        .args(["/F", "/T", "/PID", &pid.to_string()])
-        .output()
-        .await
-    {
-        Ok(out) if !out.status.success() => warn!(
-            "Lock recovery: taskkill for PID {} reported: {}",
-            pid,
-            String::from_utf8_lossy(&out.stderr).trim()
-        ),
-        Ok(_) => {}
+    match tokio::task::spawn_blocking(move || process_kill::terminate_tree(pid)).await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => warn!("Lock recovery: failed to terminate PID {}: {}", pid, e),
         Err(e) => warn!(
-            "Lock recovery: failed to run taskkill for PID {}: {}",
+            "Lock recovery: terminate task for PID {} failed: {}",
             pid, e
         ),
     }
