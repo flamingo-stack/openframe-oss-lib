@@ -3,6 +3,7 @@ package com.openframe.data.service.rmm;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.when;
 class DeletedMachineCleanupTest {
 
     @Mock private ScriptScheduleMachineAssignedRepository assignedRepository;
+    @Mock private ScriptScheduleRepository scheduleRepository;
     @Mock private DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjectionTrigger projectionTrigger;

@@ -2,10 +2,15 @@ package com.openframe.data.service.rmm;
 
 import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +28,7 @@ import java.util.Set;
 public class DeletedMachineCleanup {
 
     private final ScriptScheduleMachineAssignedRepository assignedRepository;
+    private final ScriptScheduleRepository scheduleRepository;
     private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
@@ -37,8 +43,12 @@ public class DeletedMachineCleanup {
     }
 
     private List<AuditEntry> removeFromSchedules(String tenantId, String machineId) {
-        List<AuditEntry> scheduleRemovals = assignedRepository.findByTenantIdAndMachineId(tenantId, machineId).stream()
-                .map(assigned -> scheduleRemovalOf(assigned.getScriptScheduleId(), machineId))
+        List<String> scheduleIds = assignedRepository.findByTenantIdAndMachineId(tenantId, machineId).stream()
+                .map(ScheduleScriptMachineAssigned::getScriptScheduleId)
+                .toList();
+        List<AuditEntry> scheduleRemovals = scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds).stream()
+                .filter(DeletedMachineCleanup::listsDevices)
+                .map(schedule -> scheduleRemovalOf(schedule.getId(), machineId))
                 .toList();
         long removed = assignedRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
         long removedDispatch = onlineDeviceDispatchRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
@@ -50,6 +60,11 @@ public class DeletedMachineCleanup {
             log.info("Removed first-online dispatch record(s) for deleted machineId={}, count={}", machineId, removedDispatch);
         }
         return scheduleRemovals;
+    }
+
+    private static boolean listsDevices(ScheduleScript schedule) {
+        return schedule.getStatus() != ScriptStatus.DELETED
+                && schedule.getSelectionMode() == ScheduleDeviceSelectionMode.SPECIFIC;
     }
 
     private static AuditEntry scheduleRemovalOf(String scheduleId, String machineId) {
