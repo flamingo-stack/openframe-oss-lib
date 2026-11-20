@@ -421,6 +421,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     currentDialogIdRef.current = dialogId;
   });
 
+  const replayCompletedForDialogRef = useRef<string | null>(null);
+  useEffect(() => {
+    replayCompletedForDialogRef.current = null;
+  }, [dialogId]);
+
   // A dialog a stream's server minted mid-turn: its thread stays under the key the turn writes into (the draft's), until
   // the dialog is left.
   const [mintedAlias, setMintedAlias] = useState<{ dialogId: string; key: string } | null>(null);
@@ -824,7 +829,10 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
           // never deliver again a prompt this history holds.
           store.hydrate(key, processed, {
             expectingReplay: backfills && isBufferingActive(),
-            tailReplaysHistory: !(tailReplays && historyMaxSeq === null),
+            tailReplaysHistory: !(
+              tailReplays &&
+              (historyMaxSeq === null || replayCompletedForDialogRef.current === id)
+            ),
           });
         }
         setHistorySeq({ dialogId: id, seq: historyMaxSeq });
@@ -998,6 +1006,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     onConnect: handleConnect,
     onResync: () => {
       if (dialogId) void loadDialogHistory(dialogId);
+    },
+    onReplayComplete: () => {
+      if (!tailReplays || !dialogId || currentDialogIdRef.current !== dialogId) return;
+      replayCompletedForDialogRef.current = dialogId;
+      store.mutate(keyOfDialog(dialogId), reducer => reducer.setTailReplaysHistory(false));
     },
     onSubscribed: () => {
       if (!dialogId) return;

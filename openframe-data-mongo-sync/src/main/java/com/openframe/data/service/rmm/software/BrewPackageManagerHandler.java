@@ -23,7 +23,11 @@ public class BrewPackageManagerHandler implements PackageManagerHandler {
 
     @Override
     public SoftwareScriptCode scriptCode(SoftwareAction action) {
-        return action.select(SoftwareScriptCode.BREW_INSTALL, SoftwareScriptCode.BREW_UPDATE);
+        return switch (action) {
+            case INSTALL -> SoftwareScriptCode.BREW_INSTALL;
+            case UPDATE -> SoftwareScriptCode.BREW_UPDATE;
+            case ADOPT -> throw new BadRequestException("No software script adopts a package: an adoption is an order");
+        };
     }
 
     @Override

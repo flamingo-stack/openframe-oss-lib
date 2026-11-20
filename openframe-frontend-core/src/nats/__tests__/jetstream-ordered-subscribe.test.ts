@@ -23,10 +23,14 @@ const SUBJECT = 'chat.dialog-1.admin-message';
 
 let client: NatsClient;
 let handle: JetStreamSubscriptionHandle | null = null;
-/** What the subscription reported, in order: `msg:<seq>`, `caught-up`, `recovered`. */
+/** What the subscription reported, in order. */
 let log: string[];
 
-async function subscribe(options: { deliverPolicy: 'new' | 'byStartSequence'; optStartSeq?: number }) {
+async function subscribe(options: {
+  deliverPolicy: 'new' | 'byStartSequence';
+  optStartSeq?: number;
+  onReplayComplete?: () => void;
+}) {
   handle = await client.subscribeJetStreamOrdered(
     msg => {
       log.push(`msg:${msg.info.streamSequence}`);
@@ -94,6 +98,39 @@ describe('deliver policy', () => {
 });
 
 describe('onCaughtUp', () => {
+  it('reports the creation backlog complete before a fresh request queued before the first pull', async () => {
+    const retained = server.current.publish(SUBJECT, { type: 'TEXT', text: 'retained' });
+    const fresh = server.current.nextSeq;
+    server.current.beforeFirstPull = () => {
+      server.current.publish(SUBJECT, { type: 'TEXT', text: 'fresh' });
+    };
+
+    await subscribe({
+      deliverPolicy: 'byStartSequence',
+      optStartSeq: retained,
+      onReplayComplete: () => log.push('replay-complete'),
+    });
+    await vi.waitFor(() => expect(log).toContain('caught-up'));
+
+    expect(log).toEqual([`msg:${retained}`, 'replay-complete', `msg:${fresh}`, 'caught-up']);
+  });
+
+  it('reports a consumer created with nothing pending complete before the first live request', async () => {
+    // The stopped turn has left the stream: the tail resumes past everything it still retains.
+    const retained = server.current.publish(SUBJECT, { type: 'TEXT', text: 'retained' });
+
+    await subscribe({
+      deliverPolicy: 'byStartSequence',
+      optStartSeq: retained + 1,
+      onReplayComplete: () => log.push('replay-complete'),
+    });
+    await vi.waitFor(() => expect(log).toContain('replay-complete'));
+    const live = server.current.publish(SUBJECT, { type: 'TEXT', text: 'live' });
+    await vi.waitFor(() => expect(log).toContain(`msg:${live}`));
+
+    expect(log).toEqual(['replay-complete', 'caught-up', `msg:${live}`]);
+  });
+
   it('fires after the last backlog message has been handled, and not again for live ones', async () => {
     const seqs = [0, 1, 2].map(i => {
       server.current.publishNoise(2);

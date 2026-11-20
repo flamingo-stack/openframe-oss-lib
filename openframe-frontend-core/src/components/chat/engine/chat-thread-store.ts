@@ -90,7 +90,7 @@ export interface ChatThreadHydrateOptions {
   expectingReplay?: boolean;
   /**
    * Whether the live tail can deliver again what this history holds (default true). False for a replaying tail that
-   * opens on new messages only because the history held no stream seq: see the reducer's `setTailReplaysHistory`.
+   * opens on new messages only or has already completed its initial replay.
    */
   tailReplaysHistory?: boolean;
 }

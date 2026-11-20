@@ -42,7 +42,7 @@ public class DeliveryProperties {
     // every nested object it binds on that object's own annotations, @Valid or not
     private Map<DeliveryType, PolicyOverride> types = new EnumMap<>(DeliveryType.class);
 
-    // a type not listed here is off: every environment switches each type on explicitly
+    // a type not listed here is off
     private Map<DeliveryType, Boolean> enabled = new EnumMap<>(DeliveryType.class);
 
     // Kafka topic client-service reads dispatches from; set where the Kafka hand-off or its consumer runs
