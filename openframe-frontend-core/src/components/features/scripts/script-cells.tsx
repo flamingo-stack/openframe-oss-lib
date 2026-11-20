@@ -2,6 +2,7 @@
 
 import { DataTableCell } from '../../ui/data-table/data-table-cell';
 import { TruncateText } from '../../ui/truncate-text';
+import { GridTextWithDetailCell } from '../feature-table-grid-cells';
 
 /** A name over its description: the first column of both Scripts tables. */
 export function ScriptNameCell({ name, description }: { name: string; description?: string | null }) {
@@ -30,17 +31,17 @@ export function ScheduleDateTimeCell({ date, time }: { date: string; time: strin
 }
 
 /*
- * The same cells in the grid layout: one 48px line each, the second line as the secondary text beside the first.
+ * The same cells in the grid layout: one 48px line each, the card cell's second line after its first.
  * A row still being read (a host's placeholder row in a loading scope) has no field yet: the main text is then empty,
  * never absent, so the cell draws its bar.
  */
 
-/** A name with its description beside it. */
+/** A name with its description beside it: the name keeps its width, the description is the part a narrow column cuts. */
 export function ScriptNameGridCell({ name, description }: { name: string; description?: string | null }) {
-  return <DataTableCell text={name || ''} secondary={description || undefined} />;
+  return <GridTextWithDetailCell text={name || ''} detail={description || undefined} />;
 }
 
-/** When a schedule starts: the date with the time beside it. */
+/** When a schedule starts: the date with the time beside it (a short text, kept whole). */
 export function ScheduleDateTimeGridCell({ date, time }: { date: string; time: string }) {
   return <DataTableCell text={date || ''} secondary={time || undefined} />;
 }

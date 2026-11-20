@@ -9,6 +9,7 @@ import { DataTableCell, type DataTableCellLeading } from '../../ui/data-table/da
 import { useLoadingScope } from '../../ui/loading-scope';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { GridTextWithDetailCell } from '../feature-table-grid-cells';
 import { scriptExecutionStatus } from './execution-status';
 
 /**
@@ -133,16 +134,18 @@ export function ExecutionResultCell({ result, empty = null }: { result?: string 
 }
 
 /*
- * The same cells in the grid layout: one 48px line each, the second line as the secondary text beside the first.
+ * The same cells in the grid layout: one 48px line each, the card cell's second line after its first. Where that
+ * second line is long (an id, a customer) the cell is `GridTextWithDetailCell`: the subject keeps its width and the
+ * detail is the part a narrow column cuts.
  * A row still being read (a host's placeholder row in a loading scope) has no field yet: the main text is then empty,
  * never absent, so the cell draws its bar.
  */
 
 const GRID_ICON_CLASS = 'size-5';
 
-/** When an execution was dispatched, with its id beside it. */
+/** When an execution was dispatched, with its id beside it. The time stays whole; the id is the part cut. */
 export function ExecutionTimestampGridCell({ timestamp, executionId }: { timestamp: string; executionId: string }) {
-  return <DataTableCell text={timestamp || ''} secondary={executionId || undefined} />;
+  return <GridTextWithDetailCell text={timestamp || ''} detail={executionId || undefined} />;
 }
 
 /** A status as its tag. */
@@ -155,20 +158,24 @@ export function ExecutionStatusGridCell({ status }: { status: string | null | un
   );
 }
 
-/** The device an execution ran on, with its customer beside it. */
+/** The device an execution ran on, with its customer beside it. The device stays whole; the customer is the part cut. */
 export function ExecutionDeviceGridCell({ name, organization }: { name: string; organization?: string | null }) {
   return (
-    <DataTableCell
-      leading={{ type: 'icon', icon: <MonitorIcon className={GRID_ICON_CLASS} /> }}
-      text={name || ''}
-      secondary={organization || undefined}
-    />
+    <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]">
+      <span data-part="leading" className="flex size-5 shrink-0 items-center justify-center text-ods-text-secondary">
+        <MonitorIcon className={GRID_ICON_CLASS} />
+      </span>
+      <GridTextWithDetailCell text={name || ''} detail={organization || undefined} />
+    </div>
   );
 }
 
 /**
  * Who an execution ran for: the avatar, the name, the chip of what dispatched it, and the script's name where a list
  * runs several. The grid's cell is text, so the name is not a link here: the row opens the execution.
+ *
+ * This one stays `DataTable.Cell`, which draws the avatar and the chip: beside a long script name the person's name
+ * keeps its first characters and the chip is never cut.
  */
 export function ExecutionInitiatorGridCell({
   leading,

@@ -40,6 +40,22 @@ function gridRows(container: HTMLElement): string[] {
   return gridBodyMarkup(container).split('group/gridrow').slice(1);
 }
 
+/**
+ * A cell of a subject and its detail (`GridTextWithDetailCell`), as markup: the subject's text takes its own width and
+ * the detail right after it takes what the column leaves (`flex-1`), so the detail is the part a narrow column cuts.
+ */
+function subjectThenDetail(subject: string, detail: string): RegExp {
+  return new RegExp(
+    `<span class="(?![^"]*flex-1)[^"]*"><span[^>]*>${subject}</span></span>` +
+      `<span class="[^"]*flex-1[^"]*"><span[^>]*>${detail}</span>`,
+  );
+}
+
+/** The same cell with no detail: the subject closes its line. */
+function subjectAlone(subject: string): RegExp {
+  return new RegExp(`<span[^>]*>${subject}</span></span></div>`);
+}
+
 /** The grid header's data columns, in drawn order. An action column has no header cell of this kind. */
 function headerColumns(container: HTMLElement): string[] {
   return [...container.innerHTML.matchAll(/<[a-z]+[^>]*data-grid-header-cell[^>]*>/g)].map(
@@ -110,6 +126,15 @@ describe('the Scripts tables, grid layout', () => {
       const { container: loaded } = render(cell);
       expect(loaded.innerHTML).not.toContain(BAR);
     });
+
+    it('holds the shell icon’s place while the shell is read, as the card cell does', () => {
+      const cell = <ScriptShellGridCell value={absent} />;
+      const { container: loading } = render(<LoadingWhen loading>{cell}</LoadingWhen>);
+      expect(loading.innerHTML).toContain('data-part="leading"');
+      // A shell the table does not know (no icon) has no icon box once loaded.
+      const { container: loaded } = render(<ScriptShellGridCell value="fish" />);
+      expect(loaded.innerHTML).not.toContain('data-part="leading"');
+    });
   });
 
   describe('the chip of what dispatched a run', () => {
@@ -130,12 +155,11 @@ describe('the Scripts tables, grid layout', () => {
   describe('ScriptsTable', () => {
     it('puts the description beside the name, not under it', () => {
       const { container } = render(<ScriptsTable {...SCRIPTS_TABLE.loaded} layout="grid" />);
+      // The name keeps its width; the description after it is the part a narrow column cuts.
       const [first, second] = gridRows(container);
-      expect(first).toMatch(
-        /Restart print spooler[\s\S]*data-part="secondary"[^>]*>[\s\S]*Stops and starts the spooler/,
-      );
-      // A script with no description has no secondary text.
-      expect(second).not.toContain('data-part="secondary"');
+      expect(first).toMatch(subjectThenDetail('Restart print spooler', 'Stops and starts the spooler service'));
+      // A script with no description is its name alone.
+      expect(second).toMatch(subjectAlone('Clear temp files'));
       // No cell of the grid stacks two lines.
       expect(gridBodyMarkup(container)).not.toContain('flex-col');
     });
@@ -223,11 +247,14 @@ describe('the Scripts tables, grid layout', () => {
   describe('ScriptExecutionsTable', () => {
     it('puts the id beside the time and the customer beside the device', () => {
       const { container } = render(<ScriptExecutionsTable {...SCRIPT_EXECUTIONS_TABLE.loaded} layout="grid" />);
+      // The time and the device keep their width; the id and the customer are the parts a narrow column cuts.
       const [first, second] = gridRows(container);
-      expect(first).toMatch(/11 Nov 2026, 10:15[\s\S]*data-part="secondary"[^>]*>EX-1001</);
-      expect(first).toMatch(/reception-01[\s\S]*data-part="secondary"[^>]*>[\s\S]*Acme Logistics/);
-      // A device with no customer has the id's secondary text only.
-      expect(second.split('data-part="secondary"')).toHaveLength(1 + 1);
+      expect(first).toMatch(subjectThenDetail('11 Nov 2026, 10:15', 'EX-1001'));
+      expect(first).toMatch(subjectThenDetail('reception-01', 'Acme Logistics'));
+      // The device's icon stays before its name.
+      expect(first).toMatch(/data-part="leading"[\s\S]*reception-01/);
+      // A device with no customer is its name alone.
+      expect(second).toMatch(subjectAlone('maya-mba'));
     });
 
     it('draws the status as the cell’s tag', () => {

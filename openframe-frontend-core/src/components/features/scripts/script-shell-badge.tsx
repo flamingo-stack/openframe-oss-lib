@@ -36,13 +36,18 @@ export function ScriptShellBadge({ value, className, iconClassName }: ScriptShel
   );
 }
 
-/** A script's shell in a grid table's cell: its icon and label on one line; a bar while the shell is read. */
+/**
+ * A script's shell in a grid table's cell: its icon and label on one line; the icon's box and a bar while the shell is
+ * read, as the card cell draws them.
+ */
 export function ScriptShellGridCell({ value }: { value: string }) {
+  const reading = useLoadingScope() && !value;
   const shell = scriptShellType(value);
   const Icon = shell?.icon;
+  const icon = reading ? <UnifiedSkeleton className="size-5" /> : Icon ? <Icon className="size-5" /> : null;
   return (
     <DataTableCell
-      leading={Icon ? { type: 'icon', icon: <Icon className="size-5" /> } : undefined}
+      leading={icon ? { type: 'icon', icon } : undefined}
       // Empty while the shell is read (a placeholder row): the cell then draws its bar.
       text={(shell?.label ?? value) || ''}
     />

@@ -5,6 +5,7 @@ import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { Button } from '../../ui/button';
 import { useLoadingScope } from '../../ui/loading-scope';
+import { GRID_ACTION_BUTTON_CLASS } from '../feature-table-grid-cells';
 import type { ScriptsTableColumnLayout } from './scripts-table-columns';
 
 /**
@@ -65,7 +66,7 @@ export function OpenInNewTabCell({
         size="icon"
         leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
         aria-label={label}
-        className={grid ? 'size-10 border-0 md:size-10' : 'bg-ods-card'}
+        className={grid ? GRID_ACTION_BUTTON_CLASS : 'bg-ods-card'}
       />
     </div>
   );
