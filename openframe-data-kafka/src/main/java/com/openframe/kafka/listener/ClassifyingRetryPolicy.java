@@ -49,7 +49,9 @@ public class ClassifyingRetryPolicy implements ConsumerRetryPolicy {
 
     @Override
     public BackOff backOffFor(ConsumerRecord<?, ?> record, Exception failure) {
-        if (causedByAny(failure, Stream.concat(BUILT_IN_NOT_RETRYABLE.stream(), notRetryable.stream()).toList())) {
+        List<Class<? extends Throwable>> notRetryableTypes =
+                Stream.concat(BUILT_IN_NOT_RETRYABLE.stream(), notRetryable.stream()).toList();
+        if (causedByAny(failure, notRetryableTypes)) {
             return new FixedBackOff(0L, 0L);
         }
         if (isUnavailable(failure)) {

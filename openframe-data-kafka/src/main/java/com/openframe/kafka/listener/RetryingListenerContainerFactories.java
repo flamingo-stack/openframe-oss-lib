@@ -37,8 +37,8 @@ public final class RetryingListenerContainerFactories {
         DefaultKafkaConsumerFactory<Object, Object> consumers = new DefaultKafkaConsumerFactory<>(config,
                 RetryingListenerContainerFactories::stringKeys,
                 () -> new ErrorHandlingDeserializer<>(KafkaJsonSerdes.valueDeserializer()));
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(deadLetterRecoverer(deadLetterBytes,
-                deadLetterObjects));
+        ConsumerRecordRecoverer recoverer = deadLetterRecoverer(deadLetterBytes, deadLetterObjects);
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer);
         errorHandler.setBackOffFunction(policy::backOffFor);
         ConcurrentKafkaListenerContainerFactory<Object, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
@@ -54,16 +54,21 @@ public final class RetryingListenerContainerFactories {
         templates.put(byte[].class, deadLetterBytes);
         templates.put(Object.class, deadLetterObjects);
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(templates,
-                (record, failure) -> new TopicPartition(DeadLetterTopics.of(record.topic()), -1));
-        return (record, failure) -> {
-            logDeadLetter(record);
-            recoverer.accept(record, failure);
-        };
+                RetryingListenerContainerFactories::deadLetterPartition);
+        return (record, failure) -> publishAndLog(recoverer, record, failure);
     }
 
-    // The value is never logged: it can carry customer content.
-    private static void logDeadLetter(ConsumerRecord<?, ?> record) {
-        log.error("Record {} of {}-{} at offset {} goes to {}", record.key(), record.topic(), record.partition(),
+    private static TopicPartition deadLetterPartition(ConsumerRecord<?, ?> record, Exception failure) {
+        String deadLetterTopic = DeadLetterTopics.of(record.topic());
+        return new TopicPartition(deadLetterTopic, -1);
+    }
+
+    // Logged once the publish is confirmed (the recoverer throws when it fails); the value is never logged, it can
+    // carry customer content.
+    private static void publishAndLog(DeadLetterPublishingRecoverer recoverer, ConsumerRecord<?, ?> record,
+                                      Exception failure) {
+        recoverer.accept(record, failure);
+        log.error("Record {} of {}-{} at offset {} went to {}", record.key(), record.topic(), record.partition(),
                 record.offset(), DeadLetterTopics.of(record.topic()));
     }
 
