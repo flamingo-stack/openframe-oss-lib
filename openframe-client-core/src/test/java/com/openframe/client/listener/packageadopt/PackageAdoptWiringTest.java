@@ -7,6 +7,7 @@ import com.openframe.client.scheduler.PackageAdoptEngineFailureScheduler;
 import com.openframe.data.nats.delivery.PackageAdoptDeliveryFailureReader;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -33,6 +34,7 @@ class PackageAdoptWiringTest {
             .withBean(ScriptExecutionRepository.class, () -> mock(ScriptExecutionRepository.class))
             .withBean(MachineDeliveryRepository.class, () -> mock(MachineDeliveryRepository.class))
             .withBean(TenantIdProvider.class, () -> mock(TenantIdProvider.class))
+            .withBean(PackageCatalogVersions.class, () -> mock(PackageCatalogVersions.class))
             .withUserConfiguration(PackageAdoptStatusListener.class, PackageAdoptStatusProcessor.class,
                     PackageUpdateExecutionRecorder.class, PackageAdoptDeliveryFailureReader.class,
                     PackageAdoptEngineFailureSweep.class, PackageAdoptEngineFailureScheduler.class);
