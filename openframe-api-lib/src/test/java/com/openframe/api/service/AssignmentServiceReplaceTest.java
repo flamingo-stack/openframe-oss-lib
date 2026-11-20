@@ -87,6 +87,7 @@ class AssignmentServiceReplaceTest {
                 .itemType(AssignmentItemType.KNOWLEDGE_ARTICLE)
                 .targetType(ORGANIZATION)
                 .targetId(targetId)
+                .displayName("Customer " + targetId)
                 .build();
     }
 }

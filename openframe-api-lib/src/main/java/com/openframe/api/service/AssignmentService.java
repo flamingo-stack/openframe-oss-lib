@@ -28,7 +28,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -122,24 +121,16 @@ public class AssignmentService {
         return repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
                 .orElseGet(() -> {
                     String displayName = resolveDisplayName(targetType, targetId);
-                    AuditCall call = linkCall(LINK_CREATE, itemType, itemId, targetType, targetId, displayName)
-                            .withRecordsResult(saved -> ((SavedAssignment) saved).created());
-                    SavedAssignment saved = auditedMethodRunner.run(call,
+                    AuditCall call = linkCall(LINK_CREATE, itemType, itemId, targetType, targetId, displayName);
+                    return auditedMethodRunner.run(call,
                             () -> createAssignment(itemId, itemType, targetType, targetId, displayName));
-                    return saved.assignment();
                 });
-    }
-
-    private record SavedAssignment(ItemAssignment assignment, boolean created) {
     }
 
     private static AuditCall linkCall(AuditAction action, AssignmentItemType itemType, String itemId,
                                       AssignmentTargetType targetType, String targetId, String targetName) {
-        Map<String, Object> details = new HashMap<>(Map.of("targetType", linkedTypeOf(targetType),
-                "targetIds", List.of(targetId)));
-        if (targetName != null) {
-            details.put("targetNames", List.of(targetName));
-        }
+        Map<String, Object> details = Map.of("targetType", linkedTypeOf(targetType),
+                "targetIds", List.of(targetId), "targetNames", List.of(targetName));
         String linkedOrganizationId = targetType == AssignmentTargetType.ORGANIZATION ? targetId : null;
         String linkedDeviceId = targetType == AssignmentTargetType.DEVICE ? targetId : null;
         return AuditCall.of(action, targetTypeOf(itemType), itemId, details)
@@ -166,7 +157,7 @@ public class AssignmentService {
         };
     }
 
-    private SavedAssignment createAssignment(String itemId, AssignmentItemType itemType,
+    private ItemAssignment createAssignment(String itemId, AssignmentItemType itemType,
                                             AssignmentTargetType targetType, String targetId, String displayName) {
         log.info("Assigning {}:{} ({}) to {} {}", targetType, targetId, displayName, itemType, itemId);
         ItemAssignment assignment = ItemAssignment.builder()
@@ -177,12 +168,11 @@ public class AssignmentService {
                 .displayName(displayName)
                 .build();
         try {
-            return new SavedAssignment(repository.save(assignment), true);
+            return repository.save(assignment);
         } catch (DuplicateKeyException alreadyAssigned) {
             log.debug("{}:{} is already assigned to item {}", targetType, targetId, itemId);
-            ItemAssignment existing = repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
+            return repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
                     .orElseThrow(() -> alreadyAssigned);
-            return new SavedAssignment(existing, false);
         }
     }
 
@@ -197,10 +187,11 @@ public class AssignmentService {
         AssignmentTargetType targetType = assignment.getTargetType();
         String targetId = assignment.getTargetId();
         AuditCall call = linkCall(LINK_DELETE, assignment.getItemType(), itemId, targetType, targetId,
-                assignment.getDisplayName())
-                .withRecordsResult(deleted -> (Long) deleted > 0);
-        auditedMethodRunner.run(call,
-                () -> repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId));
+                assignment.getDisplayName());
+        auditedMethodRunner.run(call, () -> {
+            repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+            return assignment;
+        });
     }
 
     /**
