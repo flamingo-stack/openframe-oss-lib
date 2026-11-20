@@ -3,9 +3,15 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
-import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
+import {
+  AnthropicLogoGreyIcon,
+  Chevron02DownIcon,
+  GeminiLogoGreyIcon,
+  OpenaiLogoGreyIcon,
+} from '../icons-v2-generated';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '../popover';
+import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { CircularProgress } from '../ui/circular-progress';
 import { useLoadingScope } from '../ui/loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
@@ -139,6 +145,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       outputTokens,
       onModelClick,
       modelTooltip,
+      modelMenu,
       usagePanel,
       loading = false,
       ...props
@@ -154,6 +161,9 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // v2 spells the counts out ("372 / 50,000 context budget"); classic keeps them short.
     const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
     const formatCount = (count: number) => (isV2 ? count.toLocaleString('en-US') : formatTokenCount(count));
+    const [menuOpen, setMenuOpen] = React.useState(false);
+    // A lock closes the open menu; lifting it does not open it again.
+    if (modelMenu?.disabled && menuOpen) setMenuOpen(false);
 
     if (isLoading) {
       return (
@@ -177,7 +187,34 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
         <span className="font-body">{name}</span>
       </>
     );
-    const label = onModelClick ? (
+    const label = modelMenu ? (
+      <ActionsMenuDropdown
+        groups={modelMenu.groups}
+        variant="overlay"
+        side="top"
+        align="start"
+        sideOffset={4}
+        avoidCollisions={false}
+        open={menuOpen}
+        onOpenChange={open => setMenuOpen(open && !modelMenu.disabled)}
+        customTrigger={
+          // Disabled by aria only: a lock that lands while the button has focus must not drop it.
+          <button
+            type="button"
+            aria-label={name ? `Chat model: ${name}` : 'Chat model'}
+            aria-disabled={modelMenu.disabled || undefined}
+            className="group flex min-w-0 items-center gap-[var(--spacing-system-xxs)] rounded-sm px-[var(--spacing-system-xxs)] text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ods-text-secondary data-[state=open]:bg-ods-bg-active data-[state=open]:text-ods-text-primary"
+          >
+            {labelContent}
+            <Chevron02DownIcon
+              aria-hidden
+              size={16}
+              className="shrink-0 transition-transform group-data-[state=open]:rotate-180"
+            />
+          </button>
+        }
+      />
+    ) : onModelClick ? (
       <button
         type="button"
         onClick={onModelClick}
@@ -192,18 +229,19 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       // Neither: the same two spans the row always had.
       labelContent
     );
-    const labelWithTooltip = modelTooltip ? (
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>{label}</TooltipTrigger>
-          <TooltipContent side="top" align="start">
-            {modelTooltip}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ) : (
-      label
-    );
+    const labelWithTooltip =
+      modelTooltip && !modelMenu ? (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>{label}</TooltipTrigger>
+            <TooltipContent side="top" align="start">
+              {modelTooltip}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        label
+      );
 
     // Inline pill: provider icon + model name + "X / Y context budget".
     // `contextWindow` is the agent's context budget, not the model's window:
