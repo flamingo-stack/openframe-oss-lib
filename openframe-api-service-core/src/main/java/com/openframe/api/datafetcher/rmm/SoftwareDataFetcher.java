@@ -9,7 +9,6 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.software.SoftwareAutoUpdatePolicyResponse;
-import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
@@ -66,9 +65,7 @@ public class SoftwareDataFetcher {
             @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
         int perPage = PageCursors.pageSize(first, last);
-        Boolean vulnerable = filter != null && filter.getMinSeverity() != null
-                && filter.getMinSeverity() != SoftwareCveSeverity.NONE
-                ? Boolean.TRUE : null;
+        Boolean vulnerable = SoftwareInventoryService.vulnerableOnly(filter);
         PageResult<SoftwareResponse> softwarePage = softwareInventoryService.listSoftware(
                 search, page, perPage, sort, vulnerable, filter);
         return PageCursors.toConnection(softwarePage);
@@ -120,8 +117,8 @@ public class SoftwareDataFetcher {
     }
 
     @DgsQuery
-    public SoftwareFilters softwareFilters(@InputArgument Object filter, @InputArgument String search) {
-        return softwareInventoryService.getSoftwareFilters(search);
+    public SoftwareFilters softwareFilters(@InputArgument SoftwareFilterInput filter, @InputArgument String search) {
+        return softwareInventoryService.getSoftwareFilters(filter, search);
     }
 
     @DgsQuery
@@ -132,8 +129,9 @@ public class SoftwareDataFetcher {
 
     @DgsQuery
     public SoftwareOnDeviceFilters softwareDeviceFilters(@InputArgument String softwareId,
-                                                         @InputArgument Object filter, @InputArgument String search) {
-        return softwareInventoryService.getSoftwareDeviceFilters(softwareId, search);
+                                                         @InputArgument SoftwareOnDeviceFilterInput filter,
+                                                         @InputArgument String search) {
+        return softwareInventoryService.getSoftwareDeviceFilters(softwareId, filter, search);
     }
 
     @DgsQuery

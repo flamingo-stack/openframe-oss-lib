@@ -12,5 +12,7 @@ public interface ScheduleDeviceLocalDispatchRepository extends MongoRepository<S
 
     List<ScheduleLocalMachineTimeDispatch> findByScheduleIdAndMachineIdIn(String scheduleId, Collection<String> machineIds);
 
+    List<ScheduleLocalMachineTimeDispatch> findByScheduleIdIn(Collection<String> scheduleIds);
+
     long deleteByScheduleId(String scheduleId);
 }

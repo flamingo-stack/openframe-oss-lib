@@ -6,6 +6,9 @@ import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.software.SoftwareAutoUpdatePolicyResponse;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
@@ -82,6 +85,36 @@ class SoftwareDataFetcherTest {
 
         // verifications
         assertThat(result.getEdges()).extracting(GenericEdge::getNode).containsExactly(node);
+    }
+
+    @Test
+    void softwareFilters_filterAndSearch_passedToTheService() {
+        // setup
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setOsTypes(List.of(OsType.WINDOWS));
+        SoftwareFilters filters = SoftwareFilters.empty();
+        when(softwareInventoryService.getSoftwareFilters(filter, "chr")).thenReturn(filters);
+
+        // execution
+        SoftwareFilters result = dataFetcher.softwareFilters(filter, "chr");
+
+        // verifications
+        assertThat(result).isSameAs(filters);
+    }
+
+    @Test
+    void softwareDeviceFilters_filterAndSearch_passedToTheService() {
+        // setup
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setOrganizationIds(List.of("org-1"));
+        SoftwareOnDeviceFilters filters = SoftwareOnDeviceFilters.builder().build();
+        when(softwareInventoryService.getSoftwareDeviceFilters(SOFTWARE_ID, filter, "host")).thenReturn(filters);
+
+        // execution
+        SoftwareOnDeviceFilters result = dataFetcher.softwareDeviceFilters(SOFTWARE_ID, filter, "host");
+
+        // verifications
+        assertThat(result).isSameAs(filters);
     }
 
     @Test

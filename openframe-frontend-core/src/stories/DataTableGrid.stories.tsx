@@ -12,6 +12,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useMemo, useState } from 'react';
 import { ExternalLinkIcon, Ellipsis01Icon, MonitorIcon } from '../components/icons-v2-generated';
+import { Button } from '../components/ui/button';
 import {
   actionColumn,
   DataTable,
@@ -228,6 +229,39 @@ function actionColumns(): ColumnDef<Device>[] {
   ];
 }
 
+/**
+ * What a host draws under a row (`renderSubRow`): two controls and a line far longer than any screen, as an approval
+ * request's command is.
+ */
+function DeviceSubRow({ device }: { device: Device }) {
+  const command = [
+    'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command',
+    `"Get-ChildItem -Path C:\\ProgramData\\OpenFrame\\logs\\${device.serial} -Recurse`,
+    '| Where-Object LastWriteTime -lt (Get-Date).AddDays(-30) | Remove-Item -Force"',
+    // One word wider than a phone: it breaks instead of widening the table.
+    `--working-directory C:\\ProgramData\\OpenFrame\\agents\\${device.id}\\a-path-with-no-space-in-it-that-is-longer-than-a-phone-is-wide`,
+  ].join(' ');
+  return (
+    <div className="flex flex-col gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-sf)]">
+      <p className="text-ods-text-secondary text-h6">
+        Approval requested by {device.user} to run on {device.name}:
+      </p>
+      <p className="text-ods-text-primary text-code">{command}</p>
+      <div className="flex gap-[var(--spacing-system-xsf)]" data-no-row-click>
+        <Button size="small">Approve</Button>
+        <Button size="small" variant="outline">
+          Reject
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Every third device has a sub-row. */
+function renderDeviceSubRow(device: Device) {
+  return Number(device.id.replace('device-', '')) % 3 === 1 ? <DeviceSubRow device={device} /> : null;
+}
+
 /* ───────────────────────────── table ───────────────────────────── */
 
 interface GridDemoProps {
@@ -247,6 +281,8 @@ interface GridDemoProps {
   dateColumn?: boolean;
   /** The date column's range as the story opens. */
   initialDateRange?: DateRange;
+  /** A block under every third row (`renderSubRow`). */
+  subRows?: boolean;
 }
 
 function GridDemo({
@@ -261,6 +297,7 @@ function GridDemo({
   actions = true,
   dateColumn = false,
   initialDateRange,
+  subRows = false,
 }: GridDemoProps) {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [data] = useState(() => makeDevices(rowCount));
@@ -327,7 +364,12 @@ function GridDemo({
           setSort(current => (current?.id === id ? { id, desc: !current.desc } : { id, desc: false }))
         }
       />
-      <DataTable.Body<Device> loading={loading} skeletonRows={6} rowHref={device => `#${device.id}`} />
+      <DataTable.Body<Device>
+        loading={loading}
+        skeletonRows={6}
+        rowHref={device => `#${device.id}`}
+        renderSubRow={subRows ? renderDeviceSubRow : undefined}
+      />
     </DataTable>
   );
 }
@@ -399,3 +441,24 @@ export const DateColumnApplied: Story = {
     initialDateRange: { from: daysBefore(LAST_ENROLMENT, 9), to: daysBefore(LAST_ENROLMENT, 3) },
   },
 };
+
+/**
+ * A block under a row (`renderSubRow`). It is as wide as the visible table: its long line wraps and adds nothing to
+ * the table's scroll width, and while the columns scroll sideways it stays where it is.
+ */
+export const SubRow: Story = { args: { subRows: true, rowCount: 8 } };
+
+/**
+ * The same table on a 375px phone: the columns are far wider than the screen, the sub-row is one screen wide. Scroll
+ * the table sideways: the cells move, the sub-row and its buttons stay in view.
+ */
+export const SubRowPhone: Story = {
+  ...SubRow,
+  parameters: {
+    viewport: { options: { phone375: { name: 'Phone 375', styles: { width: '375px', height: '812px' } } } },
+  },
+  globals: { viewport: { value: 'phone375', isRotated: false } },
+};
+
+/** Sub-rows in a table of a stated height: they pass under the sticky header and under the top and bottom shades. */
+export const SubRowFixedHeight: Story = { args: { subRows: true, rowCount: 20, maxHeight: 420 } };
