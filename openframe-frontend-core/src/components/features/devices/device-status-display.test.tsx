@@ -153,6 +153,13 @@ describe('DeviceConnectivityIcon states (CU-17tkuw68jdu)', () => {
     expect(openTooltip(icon)).toBe('Never seen');
   });
 
+  it('reads a never-reported device as "Never seen" even when it carries a last seen', () => {
+    render(<DeviceConnectivityIcon connectivity={null} lastSeen={daysAgo(2)} />);
+    const icon = screen.getByRole('img', { name: 'Never seen' });
+    expect(dotFill(icon)).toBe('var(--color-border)');
+    expect(openTooltip(icon)).toBe('Never seen');
+  });
+
   it('says "Never seen" for an offline device with no readable last seen, still red', () => {
     render(<DeviceConnectivityIcon connectivity="OFFLINE" lastSeen="not a date" />);
     const icon = screen.getByRole('img', { name: 'Offline. Never seen' });

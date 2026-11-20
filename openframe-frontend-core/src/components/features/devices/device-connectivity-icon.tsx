@@ -43,14 +43,16 @@ function readableLastSeen(lastSeen: string | null | undefined): string | null {
 /** The accessible name: the state and the exact time, which does not age while the page stays open. */
 function accessibleName(state: ConnectivityState, lastSeen: string | null): string {
   if (state === 'online') return 'Online';
-  if (!lastSeen) return state === 'offline' ? 'Offline. Never seen' : 'Never seen';
+  // Never reported reads as the grey dot and its tooltip do, whatever `lastSeen` holds.
+  if (state === 'unknown') return 'Never seen';
+  if (!lastSeen) return 'Offline. Never seen';
   return `Offline. Last seen ${formatDate(lastSeen)} ${formatTime(lastSeen)}`;
 }
 
 /** The tooltip's one line, relative to `openedAt`, the moment the tooltip opened. */
 function tooltipText(state: ConnectivityState, lastSeen: string | null, openedAt: number): string {
   if (state === 'online') return 'Online';
-  if (!lastSeen) return 'Never seen';
+  if (state === 'unknown' || !lastSeen) return 'Never seen';
   return `Last seen ${getDetailedTimeDifferenceFrom(lastSeen, openedAt)}`;
 }
 
