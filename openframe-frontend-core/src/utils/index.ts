@@ -205,6 +205,7 @@ export {
   formatAbsoluteDate,
   formatDateTime,
   getDetailedTimeDifference,
+  getDetailedTimeDifferenceFrom,
   isToday,
   isWithinMinutes,
   createUTCTimestamp,
