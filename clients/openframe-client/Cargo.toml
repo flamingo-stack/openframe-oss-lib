@@ -97,7 +97,7 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 iana-time-zone = "0.1"
 sysinfo = "0.30"
-zip = "0.6"
+zip = "9"
 tempfile = "3.10"
 semver = "1.0"
 sys-info = "0.9"
