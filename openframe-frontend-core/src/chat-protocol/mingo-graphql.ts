@@ -122,6 +122,7 @@ export const MINGO_MESSAGES_QUERY = `
               integratedToolType
               toolFunction
               result
+              resultIsAnswer
               success
               requiredApproval
               approvalStatus
