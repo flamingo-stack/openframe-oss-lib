@@ -8,7 +8,7 @@ import React, { useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
 import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
-import { Chevron02RightIcon } from '../icons-v2-generated';
+import { CheckFillIcon, Chevron02RightIcon } from '../icons-v2-generated';
 import { ActionsMenuHeaderContext } from './actions-menu-header-context';
 import { ActionsMenuTriggerButton } from './actions-menu-trigger';
 import { Button } from './button';
@@ -183,6 +183,12 @@ const MENU_SKIN: Record<
     glyph: '[&_svg]:h-5 [&_svg]:w-5',
     label: 'min-w-0 flex-1 text-h4',
   },
+};
+
+/** The chosen option's mark: the design system's check-fill on its dropdown (`overlay`), the lib's check otherwise. */
+const CHECK_MARK: Record<ActionsMenuVariant, React.ReactNode> = {
+  default: <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />,
+  overlay: <CheckFillIcon size={20} aria-hidden className="shrink-0 text-ods-accent" />,
 };
 
 // The row's trailing icon action: a cell of the row (its full height, an icon, secondary until hovered), after a
@@ -379,9 +385,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
         </span>
       )}
 
-      {(item.type === 'radio' || item.type === 'submenu') && item.checked && (
-        <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />
-      )}
+      {(item.type === 'radio' || item.type === 'submenu') && item.checked && CHECK_MARK[variant]}
 
       {item.type === 'checkbox' && (
         <div
