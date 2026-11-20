@@ -30,12 +30,16 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -78,6 +82,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -95,6 +100,9 @@ class SoftwareInventoryServiceTest {
     private static final int PAGE_SIZE = 50;
     private static final String CVE_CRITICAL = "CVE-2024-0001";
     private static final String CVE_MEDIUM = "CVE-2024-0002";
+    private static final SoftwareBundlePackage HIDDENBAR_CASK = SoftwareBundlePackage.builder()
+            .packageManager(PackageManagerType.BREW).packageName("hiddenbar").brewPackageType(BrewPackageType.CASK)
+            .build();
 
     @Mock private FleetMdmClient fleet;
     @Mock private FleetDeviceCountEnricher deviceCountEnricher;
@@ -110,6 +118,9 @@ class SoftwareInventoryServiceTest {
     @Mock private OrganizationRepository organizationRepository;
     @Mock private SoftwareScheduleRepository softwareScheduleRepository;
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
+    @Mock private SoftwareAdoptionService softwareAdoptionService;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private PackageAdoptReach packageAdoptReach;
 
     @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
     @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
@@ -122,7 +133,8 @@ class SoftwareInventoryServiceTest {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
-                softwareScheduleRepository, softwareScheduleTargetResolver);
+                softwareScheduleRepository, softwareScheduleTargetResolver,
+                softwareAdoptionService, packageManagerAvailability, packageAdoptReach);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -1103,9 +1115,9 @@ class SoftwareInventoryServiceTest {
 
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
-        order.verify(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList());
+        order.verify(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList(), anySet());
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
-        order.verify(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList());
+        order.verify(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList(), anySet());
     }
 
     // null matches every row
@@ -1124,7 +1136,7 @@ class SoftwareInventoryServiceTest {
             rows.stream().filter(row -> name == null || name.equals(row.getName()))
                     .forEach(row -> row.setSource(SoftwareSource.WINGET));
             return null;
-        }).when(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList());
+        }).when(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList(), anySet());
     }
 
     private void catalogManagesWith(PackageCatalogEntry managingPackage) {
@@ -1629,6 +1641,89 @@ class SoftwareInventoryServiceTest {
         assertThat(page.filteredCount()).isEqualTo(1);
         assertThat(service.getDeviceSoftwareFilters(MACHINE_ID, null).getAutoUpdateStatuses())
                 .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount).containsExactly(tuple("ON", 1));
+    }
+
+    @Test
+    void withoutCopiesNotToAdopt_readModel_devicesWhoseCopyIsOnlyInTheUsersFolderLeftOut() {
+        // setup
+        ReflectionTestUtils.setField(service, "softwareReadModel", true);
+        List<String> machineIds = List.of("m1", "m2", "m3");
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        when(deviceSoftwareReadModelQuery.machinesWithUserApplicationsOnlyCopy("t1", 42L, machineIds))
+                .thenReturn(Set.of("m2"));
+        when(deviceSoftwareReadModelQuery.caskTokensByMachineId("t1", machineIds)).thenReturn(Map.of());
+
+        // execution
+        List<String> result = service.withoutCopiesNotToAdopt("42", HIDDENBAR_CASK, machineIds);
+
+        // verifications
+        assertThat(result).containsExactly("m1", "m3");
+    }
+
+    @Test
+    void withoutCopiesNotToAdopt_readModel_devicesWhereBrewInstalledThatCaskLeftOut() {
+        // setup
+        ReflectionTestUtils.setField(service, "softwareReadModel", true);
+        List<String> machineIds = List.of("m1", "m2", "m3");
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        when(deviceSoftwareReadModelQuery.machinesWithUserApplicationsOnlyCopy("t1", 42L, machineIds))
+                .thenReturn(Set.of());
+        when(deviceSoftwareReadModelQuery.caskTokensByMachineId("t1", machineIds))
+                .thenReturn(Map.of("m1", Set.of("hiddenbar", "zed"), "m2", Set.of("zed")));
+
+        // execution
+        List<String> result = service.withoutCopiesNotToAdopt("42", HIDDENBAR_CASK, machineIds);
+
+        // verifications
+        assertThat(result).containsExactly("m2", "m3");
+    }
+
+    @Test
+    void withoutCopiesNotToAdopt_chocoPackage_noCaskLookedUp() {
+        // setup
+        ReflectionTestUtils.setField(service, "softwareReadModel", true);
+        List<String> machineIds = List.of("m1");
+        SoftwareBundlePackage chocoPackage = SoftwareBundlePackage.builder()
+                .packageManager(PackageManagerType.CHOCO).packageName("7zip").build();
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        when(deviceSoftwareReadModelQuery.machinesWithUserApplicationsOnlyCopy("t1", 42L, machineIds))
+                .thenReturn(Set.of());
+
+        // execution
+        List<String> result = service.withoutCopiesNotToAdopt("42", chocoPackage, machineIds);
+
+        // verifications
+        assertThat(result).containsExactly("m1");
+        verify(deviceSoftwareReadModelQuery, never()).caskTokensByMachineId("t1", machineIds);
+    }
+
+    @Test
+    void withoutCopiesNotToAdopt_fleetPath_everyDeviceStays() {
+        // setup
+        ReflectionTestUtils.setField(service, "softwareReadModel", false);
+        List<String> machineIds = List.of("m1", "m2");
+
+        // execution
+        List<String> result = service.withoutCopiesNotToAdopt("42", HIDDENBAR_CASK, machineIds);
+
+        // verifications
+        assertThat(result).containsExactly("m1", "m2");
+        verifyNoInteractions(deviceSoftwareReadModelQuery);
+    }
+
+    @Test
+    void getDeviceSoftwareFilters_fleetPath_casksAmongTheDevicesRowsGoToTheCatalog() {
+        // setup
+        HostInventory inventory = HostInventory.of(List.of(
+                title(10L, "Hidden Bar", "apps", "1.9"),
+                title(11L, "HiddenBar", "homebrew_casks", "1.9")), List.of());
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(inventory);
+
+        // execution
+        service.getDeviceSoftwareFilters(MACHINE_ID, null);
+
+        // verifications
+        verify(catalogStatus).applyOnDevice(eq(MACHINE_ID), anyList(), eq(Set.of("hiddenbar")));
     }
 
     private List<String> machineIds(SoftwareOnDeviceFilterInput filter) {

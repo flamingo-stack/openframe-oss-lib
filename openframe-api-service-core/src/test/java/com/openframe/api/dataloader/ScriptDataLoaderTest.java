@@ -2,6 +2,7 @@ package com.openframe.api.dataloader;
 
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -54,6 +56,20 @@ class ScriptDataLoaderTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(0).getName()).isEqualTo("alpha");
         assertThat(result.get(1)).isNull();
+    }
+
+    @Test
+    void load_adoptIdOfNoScript_resolvesToNull() throws Exception {
+        // setup
+        List<String> adoptIds = List.of(SoftwareScriptCode.BREW_ADOPT_SCRIPT_ID, SoftwareScriptCode.CHOCO_ADOPT_SCRIPT_ID);
+        Set<String> asked = Set.copyOf(adoptIds);
+        when(scriptService.getScriptsByIds(asked)).thenReturn(List.of());
+
+        // execution
+        List<ScriptResponse> result = loader.load(adoptIds).toCompletableFuture().get();
+
+        // verifications
+        assertThat(result).containsExactly(null, null);
     }
 
     @Test

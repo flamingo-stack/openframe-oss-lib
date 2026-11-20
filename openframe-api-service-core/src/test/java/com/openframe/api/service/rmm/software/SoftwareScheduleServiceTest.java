@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -198,6 +199,38 @@ class SoftwareScheduleServiceTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("[slack]");
         verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    void create_adoptAction_badRequestAndNothingSaved() {
+        // setup
+        createInput.setAction(SoftwareAction.ADOPT);
+
+        // execution
+        BadRequestException refused = assertThrows(BadRequestException.class, () -> service.create(createInput, ACTOR));
+
+        // verifications
+        assertThat(refused.getMessage()).isEqualTo("ADOPT is not a bundle or schedule action: use adoptSoftware");
+        verify(scheduleRepository, never()).save(any(SoftwareSchedule.class));
+    }
+
+    @Test
+    void update_adoptAction_badRequestAndNothingSaved() {
+        // setup
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existingActive()));
+        UpdateSoftwareScheduleInput input = new UpdateSoftwareScheduleInput();
+        input.setId(SCHEDULE_ID);
+        input.setName("Renamed");
+        input.setAction(SoftwareAction.ADOPT);
+        input.setPackages(List.of(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)));
+        input.setStartAt(Instant.parse("2026-09-16T03:30:00Z"));
+
+        // execution
+        BadRequestException refused = assertThrows(BadRequestException.class, () -> service.update(input, ACTOR));
+
+        // verifications
+        assertThat(refused.getMessage()).isEqualTo("ADOPT is not a bundle or schedule action: use adoptSoftware");
+        verify(scheduleRepository, never()).save(any(SoftwareSchedule.class));
     }
 
     @Test
