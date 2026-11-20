@@ -56,6 +56,8 @@ const BASELINE: Record<string, string> = {
   ai_prompt: '/api/prompts?ids=a,b&limit=2',
   design_doc: '/api/design-docs?ids=a,b',
   product_feature: '/api/product-features?ids=a,b',
+  market_proof: '/api/market-proofs?ids=a,b',
+  hubspot_company: '/api/hubspot-companies?ids=a,b',
   openframe_tenant: '/api/openframe-tenants?ids=a,b',
   recorded_call: '/api/recorded-calls?ids=a,b',
   ai_digest_story: '/api/ai-digest/cards?ids=a,b',
