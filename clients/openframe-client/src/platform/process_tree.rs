@@ -31,49 +31,8 @@ impl ProcessTree {
         if let Some(job) = &self.job {
             job.terminate();
         }
+        // Stays in the client's process group (unlike setpgid) so launchd's group kill on client stop still reaches it.
         #[cfg(unix)]
-        kill_unix_tree(self.root);
+        let _ = super::process_kill::terminate_tree(self.root);
     }
 }
-
-// Stays in the client's process group (unlike setpgid) so launchd's group kill on client stop still reaches it.
-#[cfg(unix)]
-fn kill_unix_tree(root: u32) {
-    use sysinfo::{ProcessRefreshKind, System};
-
-    if root == 0 {
-        return;
-    }
-    let mut sys = System::new();
-    sys.refresh_processes_specifics(ProcessRefreshKind::new());
-    let links: Vec<(u32, Option<u32>)> = sys
-        .processes()
-        .iter()
-        .map(|(pid, p)| (pid.as_u32(), p.parent().map(|pp| pp.as_u32())))
-        .collect();
-    for pid in descendants(&links, root).into_iter().chain([root]) {
-        unsafe {
-            libc::kill(pid as i32, libc::SIGKILL);
-        }
-    }
-}
-
-/// All transitive descendants of `root` from (pid, parent) links, excluding `root` itself.
-#[cfg(any(unix, test))]
-pub(crate) fn descendants(links: &[(u32, Option<u32>)], root: u32) -> Vec<u32> {
-    let mut found = Vec::new();
-    let mut frontier = vec![root];
-    while let Some(parent) = frontier.pop() {
-        for &(pid, pp) in links {
-            if pp == Some(parent) && pid != root && !found.contains(&pid) {
-                found.push(pid);
-                frontier.push(pid);
-            }
-        }
-    }
-    found
-}
-
-#[cfg(test)]
-#[path = "process_tree_tests.rs"]
-mod tests;

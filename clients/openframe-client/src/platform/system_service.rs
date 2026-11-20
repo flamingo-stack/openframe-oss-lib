@@ -11,6 +11,7 @@ use crate::config::service_stop::{
 use crate::utils::timed_permit_pool::PermitPoolError;
 use anyhow::{Context, Result};
 use std::time::Duration;
+#[cfg(unix)]
 use tokio::process::Command;
 #[cfg(target_os = "windows")]
 use tokio::time::sleep;
@@ -515,26 +516,10 @@ async fn force_stop_service_windows(service_name: &str, allow_delete: bool) -> R
                     service_name, pid, attempt, SERVICE_FORCE_KILL_MAX_ATTEMPTS
                 );
 
-                let output = Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .output()
-                    .await
-                    .with_context(|| {
-                        format!(
-                            "Failed to execute taskkill for service {} (pid {})",
-                            service_name, pid
-                        )
-                    })?;
-
-                if !output.status.success() {
-                    let kill_stdout = String::from_utf8_lossy(&output.stdout);
-                    let kill_stderr = String::from_utf8_lossy(&output.stderr);
+                if let Err(e) = crate::platform::process_kill::terminate_tree_async(pid).await {
                     warn!(
-                        "taskkill for service {} (pid {}) reported: stdout={} stderr={}",
-                        service_name,
-                        pid,
-                        kill_stdout.trim(),
-                        kill_stderr.trim()
+                        "Force-kill of service {} (pid {}) failed: {}",
+                        service_name, pid, e
                     );
                 }
             }
@@ -560,13 +545,13 @@ async fn force_stop_service_windows(service_name: &str, allow_delete: bool) -> R
                 });
                 match image_path {
                     Some(exe) => {
-                        let killed = kill_processes_by_exe_path_windows(&exe).await;
-                        if killed > 0 {
-                            info!("Force-killed {} process(es) for service {} by image path {} (attempt {}/{})",
-                                  killed, service_name, exe.display(), attempt, SERVICE_FORCE_KILL_MAX_ATTEMPTS);
-                        } else {
+                        let (matched, killed) = kill_processes_by_exe_path_windows(&exe).await;
+                        if matched == 0 {
                             info!("Service {} has no reportable PID and no live process at {} (attempt {}/{}); waiting for SCM to settle",
                                   service_name, exe.display(), attempt, SERVICE_FORCE_KILL_MAX_ATTEMPTS);
+                        } else {
+                            info!("Force-killed {} of {} process(es) for service {} by image path {} (attempt {}/{})",
+                                  killed, matched, service_name, exe.display(), attempt, SERVICE_FORCE_KILL_MAX_ATTEMPTS);
                         }
                     }
                     None => {
@@ -873,29 +858,33 @@ fn parse_exe_from_image_path(image_path: &str) -> Option<std::path::PathBuf> {
 
 /// Force-kill every running process whose executable is exactly `exe_path`. Matching on the
 /// full path (not the image name) avoids killing sibling tools that share an `agent.exe` name.
-/// Returns the number of processes a kill was issued for.
+/// The calling process is skipped. Returns (processes matched, processes killed).
 #[cfg(target_os = "windows")]
-async fn kill_processes_by_exe_path_windows(exe_path: &std::path::Path) -> usize {
+async fn kill_processes_by_exe_path_windows(exe_path: &std::path::Path) -> (usize, usize) {
     use sysinfo::System;
     let target = exe_path.to_string_lossy().to_lowercase();
+    let own_pid = std::process::id();
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    let mut killed = 0usize;
+    let (mut matched, mut killed) = (0usize, 0usize);
     for (pid, process) in sys.processes() {
+        if pid.as_u32() == own_pid {
+            continue;
+        }
         let proc_exe = process
             .exe()
             .map(|p| p.to_string_lossy().to_lowercase())
             .unwrap_or_default();
         if !proc_exe.is_empty() && proc_exe == target {
-            let _ = Command::new("taskkill")
-                .args(["/F", "/T", "/PID", &pid.to_string()])
-                .output()
-                .await;
-            killed += 1;
+            matched += 1;
+            match crate::platform::process_kill::terminate_tree_async(pid.as_u32()).await {
+                Ok(()) => killed += 1,
+                Err(e) => warn!("Force-kill of pid {} failed: {}", pid, e),
+            }
         }
     }
-    killed
+    (matched, killed)
 }
 
 #[cfg(target_os = "windows")]
