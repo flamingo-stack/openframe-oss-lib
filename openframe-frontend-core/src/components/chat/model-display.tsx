@@ -190,6 +190,8 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     const label = modelMenu ? (
       <ActionsMenuDropdown
         groups={modelMenu.groups}
+        mobileDrillDown={modelMenu.mobileDrillDown}
+        className={modelMenu.mobileDrillDown ? 'w-60 min-w-0' : undefined}
         variant="overlay"
         side="top"
         align="start"

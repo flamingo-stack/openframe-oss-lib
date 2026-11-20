@@ -72,6 +72,20 @@
   --font-size-badge: 0.625rem; /* 10px */
   --font-line-space-badge: 0.75rem; /* 12px */
 
+  /* The inline Figma tag stamp fits beside a menu title without growing the row. */
+  --font-size-tag-stamp: 0.6875rem;
+  --font-line-space-tag-stamp: 1rem;
+  --spacing-tag-stamp-inline: 0.375rem;
+
+  /* Menu text keeps the same size when the popup becomes a drill-down panel. */
+  --font-size-menu-label: 1rem;
+  --font-line-space-menu-label: 1.25rem;
+  --font-size-menu-heading: 1.125rem;
+  --font-line-space-menu-heading: 1.5rem;
+  --font-size-menu-description: 0.875rem;
+  --font-size-menu-note: 0.75rem;
+  --font-line-space-menu-note: 1rem;
+
   /* QUICK-ACTION CHIP SCALE — COMPONENT tokens, like the badge: the caption a
    * quick-action chip's label renders at and its gap, FIXED across breakpoints
    * and content areas. The chip's own caption (`text-h5`) follows the content area, so the

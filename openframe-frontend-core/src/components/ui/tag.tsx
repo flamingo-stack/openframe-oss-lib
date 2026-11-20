@@ -20,11 +20,13 @@ const TAG_FRAME_CLASS = 'inline-flex items-center justify-center rounded-md';
  * a visitor can ask), on the same chip surface. One line, always: a longer sentence clips and shows whole in the
  * label's tooltip. `compact` is the tag as the design system draws it today (Figma `tag`, node 650:4300): 28px, a 16px
  * icon, the same mono-uppercase label. The chat's quick actions row uses it; the other tags keep `default` until they
- * are moved over.
+ * are moved over. `stamp` is an 18px tag for recording a status inline next to a label.
  */
 export const TAG_SIZE_CLASS = {
   default: 'h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
   compact: 'h-7 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
+  stamp:
+    'h-[1.125rem] gap-[var(--spacing-system-xxs)] px-[var(--spacing-tag-stamp-inline)] text-h5 [--font-size-h5-caption:var(--font-size-tag-stamp)] [--font-line-space-h5-caption:var(--font-line-space-tag-stamp)]',
   large: 'h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] font-bold text-h3',
   sentence: 'h-9 gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h6',
 } as const;
@@ -33,6 +35,7 @@ export const TAG_SIZE_CLASS = {
 const TAG_WRAP_HEIGHT_CLASS: Record<keyof typeof TAG_SIZE_CLASS, string> = {
   default: 'h-auto min-h-8',
   compact: 'h-auto min-h-7',
+  stamp: 'h-auto min-h-[1.125rem]',
   large: 'h-auto min-h-12',
   sentence: 'h-auto min-h-9',
 };
@@ -41,6 +44,7 @@ const TAG_WRAP_HEIGHT_CLASS: Record<keyof typeof TAG_SIZE_CLASS, string> = {
 const TAG_ICON_BOX_CLASS: Record<keyof typeof TAG_SIZE_CLASS, string> = {
   default: 'size-5',
   compact: 'size-4',
+  stamp: 'size-3',
   large: 'size-6',
   sentence: 'size-5',
 };
