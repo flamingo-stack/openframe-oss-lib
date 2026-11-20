@@ -4,7 +4,6 @@ import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.service.agentkey.AgentKeyService;
 import com.openframe.api.service.agentkey.AgentKeyType;
-import com.openframe.api.service.agentkey.AgentKeyTypeConverter;
 import com.openframe.core.agentkey.AgentKeyResponse;
 import com.openframe.core.exception.BaseGlobalExceptionHandler;
 import com.openframe.data.document.audit.AuditAction;
@@ -15,9 +14,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.format.support.FormattingConversionService;
+import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -50,10 +50,8 @@ class AgentKeyControllerTest {
 
     @BeforeEach
     void setUp() {
-        FormattingConversionService conversion = new FormattingConversionService();
-        conversion.addConverter(new AgentKeyTypeConverter());
         mockMvc = MockMvcBuilders.standaloneSetup(new AgentKeyController(agentKeyService, auditedMethodRunner))
-                .setConversionService(conversion)
+                .setConversionService(new ApplicationConversionService())
                 .setControllerAdvice(new BaseGlobalExceptionHandler())
                 .build();
     }
@@ -67,11 +65,12 @@ class AgentKeyControllerTest {
                 .andExpect(jsonPath("$.key").value("new-key"));
     }
 
-    @Test
-    void rotateIs201WithTheNewKey() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"log", "LOG", "Log"})
+    void rotateIs201WithTheNewKeyForAnyCaseOfTheType(String type) throws Exception {
         when(agentKeyService.rotate(AgentKeyType.LOG)).thenReturn(KEY);
 
-        mockMvc.perform(post("/agent/keys/log/rotate"))
+        mockMvc.perform(post("/agent/keys/{type}/rotate", type))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.key").value("new-key"));
     }

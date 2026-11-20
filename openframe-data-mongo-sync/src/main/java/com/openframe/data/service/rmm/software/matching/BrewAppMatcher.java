@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toSet;
 
-// an app brew did not install has no token: its bundle id decides, its name alone only when no cask knows the id
+// an app brew did not install has no token: its bundle id decides, a name alone never matches
 @Component
 @RequiredArgsConstructor
 public class BrewAppMatcher implements PackageMatcher {
@@ -72,13 +72,10 @@ public class BrewAppMatcher implements PackageMatcher {
         if (!idAndWeakNameCasks.isEmpty()) {
             return oneOfAgreedByIdAndName(idAndWeakNameCasks, exactIdCasks, index);
         }
-        if (!exactIdCasks.isEmpty()) {
-            return oneOfSharingAWord(exactIdCasks, names, index);
-        }
-        if (!prefixIdCasks.isEmpty()) {
+        if (exactIdCasks.isEmpty()) {
             return PackageMatch.noPackage();
         }
-        return matchByNameOnly(strongNameCasks, weakNameCasks, index);
+        return oneOfSharingAWord(exactIdCasks, names, index);
     }
 
     // topLevelApp is null when Fleet sent no path: unknown is allowed, only a known nested app is refused
@@ -122,23 +119,6 @@ public class BrewAppMatcher implements PackageMatcher {
     private static String tokenOf(String lowerCaseName) {
         String token = lowerCaseName.replace("+", " plus ").replaceAll("[^a-z0-9]+", TOKEN_SEPARATOR);
         return StringUtils.strip(token, TOKEN_SEPARATOR);
-    }
-
-    // a cask that alone is refused must not win among several either
-    private static PackageMatch matchByNameOnly(Set<String> strongNameCasks, Set<String> weakNameCasks,
-                                                BrewCaskIndex index) {
-        boolean byWeakName = strongNameCasks.isEmpty();
-        Set<String> named = withoutVariantsOfTheirBase(byWeakName ? weakNameCasks : strongNameCasks);
-        Set<String> candidates = named.stream()
-                .filter(token -> !isRefusedByNameOnly(token, byWeakName, index))
-                .collect(toSet());
-        return candidates.isEmpty() ? PackageMatch.noPackage() : oneOf(candidates, index);
-    }
-
-    private static boolean isRefusedByNameOnly(String token, boolean byWeakName, BrewCaskIndex index) {
-        boolean variantByWeakName = byWeakName && token.contains(VARIANT_SEPARATOR);
-        boolean caskOfAnotherBundleId = index.namesBundleIds(token);
-        return variantByWeakName || caskOfAnotherBundleId;
     }
 
     // casks an exact id and the name agree on are editions of one app (zoom, zoom-for-it-admins): the base is offered

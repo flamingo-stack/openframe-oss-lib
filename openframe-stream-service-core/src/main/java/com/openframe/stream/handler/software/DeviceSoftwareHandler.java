@@ -2,6 +2,7 @@ package com.openframe.stream.handler.software;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.openframe.core.util.SoftwareNames;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetSource;
@@ -18,22 +19,28 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.openframe.stream.handler.software.FleetRowFields.differsOnlyIn;
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.isSnapshotRead;
+import static com.openframe.stream.handler.software.FleetRowFields.isUpdate;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -44,29 +51,41 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     static final Duration SNAPSHOT_HOST_WINDOW = Duration.ofHours(24);
-    static final Duration SNAPSHOT_UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
+    static final Duration UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
     static final Duration RECONCILED_COMMIT_WINDOW = Duration.ofHours(1);
     static final long RECONCILED_COMMIT_CAPACITY = 100_000;
     static final String NO_COMMIT = "0";
+    static final Set<String> UNTRACKED_COLUMNS = Set.of("last_opened_at", "updated_at");
+    static final Duration HOST_REFRESH_WINDOW = Duration.ofHours(6);
+    static final long HOST_REFRESH_CAPACITY = 100_000;
 
     private static final Pattern APP_PATH = Pattern.compile("(?:.*/)?([^/]+)\\.app", Pattern.CASE_INSENSITIVE);
     private static final Pattern TOP_LEVEL_APP_PATH = Pattern.compile(
             "(/Users/[^/]+)?/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
+    private static final Pattern USER_APPLICATIONS_APP_PATH = Pattern.compile(
+            "/Users/[^/]+/Applications/[^/]+\\.app", Pattern.CASE_INSENSITIVE);
 
     private final FleetHostResolver fleetHostResolver;
+    private final MachineFleetMembership machineFleetMembership;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
+    @Value("${openframe.fleet.software-cdc.skipped-hosts}")
+    private final Set<Long> skippedHosts;
 
     private final Cache<Long, Boolean> snapshotReconciledHosts = Caffeine.newBuilder()
             .expireAfterWrite(SNAPSHOT_HOST_WINDOW)
             .build();
-    private final Cache<Long, Boolean> snapshotUnresolvedHosts = Caffeine.newBuilder()
-            .expireAfterWrite(SNAPSHOT_UNRESOLVED_HOST_WINDOW)
+    private final Cache<Long, Boolean> unresolvedHosts = Caffeine.newBuilder()
+            .expireAfterWrite(UNRESOLVED_HOST_WINDOW)
             .build();
     private final Cache<HostCommit, Boolean> reconciledCommits = Caffeine.newBuilder()
             .expireAfterWrite(RECONCILED_COMMIT_WINDOW)
             .maximumSize(RECONCILED_COMMIT_CAPACITY)
+            .build();
+    private final Cache<Long, Boolean> recentlyReconciledHosts = Caffeine.newBuilder()
+            .expireAfterWrite(HOST_REFRESH_WINDOW)
+            .maximumSize(HOST_REFRESH_CAPACITY)
             .build();
 
     @Override
@@ -85,17 +104,22 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (payload == null) {
             return;
         }
-        JsonNode row = isDelete(payload.getOperation()) ? payload.getBefore() : payload.getAfter();
+        String operation = payload.getOperation();
+        JsonNode row = isDelete(operation) ? payload.getBefore() : payload.getAfter();
         if (row == null) {
             return;
         }
         Long hostId = longOrNull(row, "host_id");
-        if (hostId == null) {
+        if (hostId == null || skippedHosts.contains(hostId)) {
             return;
         }
-        boolean snapshotRead = isSnapshotRead(payload.getOperation());
-        if (snapshotRead && (snapshotReconciledHosts.getIfPresent(hostId) != null
-                || snapshotUnresolvedHosts.getIfPresent(hostId) != null)) {
+        boolean untrackedOnly = onlyUntrackedColumnsChanged(payload);
+        boolean unresolved = unresolvedHosts.getIfPresent(hostId) != null;
+        if (untrackedOnly && (recentlyReconciledHosts.getIfPresent(hostId) != null || unresolved)) {
+            return;
+        }
+        boolean snapshotRead = isSnapshotRead(operation);
+        if (snapshotRead && (snapshotReconciledHosts.getIfPresent(hostId) != null || unresolved)) {
             return;
         }
         String commit = commitOf(payload);
@@ -105,14 +129,20 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         }
         String fleetHostId = String.valueOf(hostId);
         if (!fleetHostResolver.isResolvable(fleetHostId)) {
-            if (snapshotRead) {
-                snapshotUnresolvedHosts.put(hostId, Boolean.TRUE);
+            if (snapshotRead || untrackedOnly) {
+                unresolvedHosts.put(hostId, Boolean.TRUE);
             }
             log.debug("[software-cdc] host_software for unresolved Fleet host {} — skipping", hostId);
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
-        reconcile(host, hostId, commit);
+        if (machineFleetMembership.isInFleet(host)) {
+            reconcile(host, hostId, commit);
+        } else {
+            log.debug("[software-cdc] host_software for Fleet host {} of machine {} out of the fleet — skipping",
+                    hostId, host.machineId());
+        }
+        recentlyReconciledHosts.put(hostId, Boolean.TRUE);
         if (snapshotRead) {
             snapshotReconciledHosts.put(hostId, Boolean.TRUE);
         }
@@ -122,6 +152,13 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     }
 
     private record HostCommit(long hostId, String commit) {
+    }
+
+    private static boolean onlyUntrackedColumnsChanged(DebeziumMessage.Payload<JsonNode> payload) {
+        String operation = payload.getOperation();
+        JsonNode before = payload.getBefore();
+        JsonNode after = payload.getAfter();
+        return isUpdate(operation) && differsOnlyIn(before, after, UNTRACKED_COLUMNS);
     }
 
     private static String commitOf(DebeziumMessage.Payload<JsonNode> payload) {
@@ -137,68 +174,126 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     }
 
     private void reconcile(FleetHostRef host, Long hostId, String commit) {
-        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId, commit);
+        String tenantId = host.tenantId();
+        String machineId = host.machineId();
+        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(tenantId, hostId, commit);
+        List<DeviceSoftware> existingRows = deviceSoftwareRepository.findByTenantIdAndMachineId(tenantId, machineId);
+        Map<Long, DeviceSoftware> existingByTitle = new HashMap<>();
+        for (DeviceSoftware existing : existingRows) {
+            existingByTitle.put(existing.getSoftwareTitleId(), existing);
+        }
         Instant now = Instant.now();
-        Set<Long> present = new HashSet<>();
+        List<DeviceSoftware> changed = new ArrayList<>();
         Set<Long> affectedTitles = new HashSet<>();
         Set<String> affectedCves = new HashSet<>();
-
-        List<DeviceSoftware> existingRows = deviceSoftwareRepository
-                .findByTenantIdAndMachineId(host.tenantId(), host.machineId());
-        for (DeviceSoftware existing : existingRows) {
-            if (existing.getVulnerabilities() != null) {
-                affectedCves.addAll(existing.getVulnerabilities());
-            }
-        }
 
         for (HostSoftwareTitle title : titles) {
             Long titleId = title.getId();
             if (titleId == null) {
                 continue;
             }
-            present.add(titleId);
-            List<String> vulnerabilities = vulnerabilitiesOf(title);
-            DeviceSoftware deviceSoftware = deviceSoftwareRepository
-                    .findByTenantIdAndMachineIdAndSoftwareTitleId(host.tenantId(), host.machineId(), titleId)
-                    .orElseGet(DeviceSoftware::new);
-            boolean newRow = deviceSoftware.getId() == null;
-            deviceSoftware.setTenantId(host.tenantId());
-            deviceSoftware.setMachineId(host.machineId());
-            deviceSoftware.setSoftwareTitleId(titleId);
-            deviceSoftware.setName(title.getName());
-            deviceSoftware.setSource(title.getSource());
-            deviceSoftware.setVersions(versionsOf(title));
-            deviceSoftware.setUpgradeCode(title.getUpgradeCode());
-            deviceSoftware.setVendor(firstOf(title, HostSoftwareInstalledVersion::getVendor));
-            deviceSoftware.setArpKeys(valuesOf(title, HostSoftwareInstalledVersion::getArpKey));
-            deviceSoftware.setPackageFamilyNames(valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName));
-            deviceSoftware.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
-            deviceSoftware.setSystemComponent(systemComponentOf(title));
-            deviceSoftware.setWingetId(firstOf(title, HostSoftwareInstalledVersion::getWingetId));
-            boolean app = FleetSource.of(title.getSource()) == FleetSource.APPS;
-            List<String> appPaths = app ? installedPathsOf(title) : List.of();
-            deviceSoftware.setBundleIdentifier(app ? title.getBundleIdentifier() : null);
-            deviceSoftware.setAppFileNames(appFileNamesOf(appPaths));
-            deviceSoftware.setTopLevelApp(topLevelAppOf(appPaths));
-            deviceSoftware.setVulnerabilities(vulnerabilities);
-            deviceSoftware.setUpdatedAt(now);
-            if (newRow) {
-                deviceSoftware.setMachineConnected(true);
+            DeviceSoftware existing = existingByTitle.remove(titleId);
+            DeviceSoftware reported = reportedRow(host, titleId, title);
+            if (existing != null && sameContent(existing, reported)) {
+                continue;
             }
-            deviceSoftwareRepository.save(deviceSoftware);
+            if (existing != null) {
+                reported.setId(existing.getId());
+                List<String> previousCves = vulnerabilitiesOf(existing);
+                affectedCves.addAll(previousCves);
+            }
+            reported.setUpdatedAt(now);
+            changed.add(reported);
             affectedTitles.add(titleId);
-            affectedCves.addAll(vulnerabilities);
+            List<String> reportedCves = reported.getVulnerabilities();
+            affectedCves.addAll(reportedCves);
         }
 
-        for (DeviceSoftware existing : existingRows) {
-            if (!present.contains(existing.getSoftwareTitleId())) {
-                deviceSoftwareRepository.delete(existing);
-                affectedTitles.add(existing.getSoftwareTitleId());
-            }
+        List<String> staleIds = new ArrayList<>();
+        for (DeviceSoftware stale : existingByTitle.values()) {
+            staleIds.add(stale.getId());
+            affectedTitles.add(stale.getSoftwareTitleId());
+            List<String> staleCves = vulnerabilitiesOf(stale);
+            affectedCves.addAll(staleCves);
         }
 
-        projectionTrigger.titlesChanged(host.tenantId(), affectedTitles);
-        projectionTrigger.cvesChanged(host.tenantId(), affectedCves);
+        if (!changed.isEmpty()) {
+            deviceSoftwareRepository.saveAll(changed);
+        }
+        if (!staleIds.isEmpty()) {
+            deviceSoftwareRepository.deleteAllById(staleIds);
+        }
+
+        projectionTrigger.titlesChanged(tenantId, affectedTitles);
+        projectionTrigger.cvesChanged(tenantId, affectedCves);
+    }
+
+    private static DeviceSoftware reportedRow(FleetHostRef host, Long titleId, HostSoftwareTitle title) {
+        String tenantId = host.tenantId();
+        String machineId = host.machineId();
+        String reportedName = title.getName();
+        String name = SoftwareNames.displayable(reportedName);
+        String source = title.getSource();
+        List<String> versions = versionsOf(title);
+        String upgradeCode = title.getUpgradeCode();
+        String vendor = firstOf(title, HostSoftwareInstalledVersion::getVendor);
+        List<String> arpKeys = valuesOf(title, HostSoftwareInstalledVersion::getArpKey);
+        List<String> packageFamilyNames = valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName);
+        List<String> installerTypes = valuesOf(title, HostSoftwareInstalledVersion::getInstallerType);
+        Boolean systemComponent = systemComponentOf(title);
+        String wingetId = firstOf(title, HostSoftwareInstalledVersion::getWingetId);
+        boolean app = FleetSource.of(source) == FleetSource.APPS;
+        List<String> appPaths = app ? installedPathsOf(title) : List.of();
+        String bundleIdentifier = app ? title.getBundleIdentifier() : null;
+        List<String> appFileNames = appFileNamesOf(appPaths);
+        Boolean topLevelApp = topLevelAppOf(appPaths);
+        Boolean userApplicationsOnly = userApplicationsOnlyOf(appPaths);
+        List<String> vulnerabilities = vulnerabilitiesOf(title);
+
+        DeviceSoftware row = new DeviceSoftware();
+        row.setTenantId(tenantId);
+        row.setMachineId(machineId);
+        row.setSoftwareTitleId(titleId);
+        row.setName(name);
+        row.setSource(source);
+        row.setVersions(versions);
+        row.setUpgradeCode(upgradeCode);
+        row.setVendor(vendor);
+        row.setArpKeys(arpKeys);
+        row.setPackageFamilyNames(packageFamilyNames);
+        row.setInstallerTypes(installerTypes);
+        row.setSystemComponent(systemComponent);
+        row.setWingetId(wingetId);
+        row.setBundleIdentifier(bundleIdentifier);
+        row.setAppFileNames(appFileNames);
+        row.setTopLevelApp(topLevelApp);
+        row.setUserApplicationsOnly(userApplicationsOnly);
+        row.setVulnerabilities(vulnerabilities);
+        row.setMachineConnected(true);
+        return row;
+    }
+
+    private static boolean sameContent(DeviceSoftware existing, DeviceSoftware reported) {
+        return existing.isMachineConnected() == reported.isMachineConnected()
+                && Objects.equals(existing.getName(), reported.getName())
+                && Objects.equals(existing.getSource(), reported.getSource())
+                && Objects.equals(existing.getVersions(), reported.getVersions())
+                && Objects.equals(existing.getUpgradeCode(), reported.getUpgradeCode())
+                && Objects.equals(existing.getVendor(), reported.getVendor())
+                && Objects.equals(existing.getArpKeys(), reported.getArpKeys())
+                && Objects.equals(existing.getPackageFamilyNames(), reported.getPackageFamilyNames())
+                && Objects.equals(existing.getInstallerTypes(), reported.getInstallerTypes())
+                && Objects.equals(existing.getSystemComponent(), reported.getSystemComponent())
+                && Objects.equals(existing.getWingetId(), reported.getWingetId())
+                && Objects.equals(existing.getBundleIdentifier(), reported.getBundleIdentifier())
+                && Objects.equals(existing.getAppFileNames(), reported.getAppFileNames())
+                && Objects.equals(existing.getTopLevelApp(), reported.getTopLevelApp())
+                && Objects.equals(existing.getUserApplicationsOnly(), reported.getUserApplicationsOnly())
+                && Objects.equals(existing.getVulnerabilities(), reported.getVulnerabilities());
+    }
+
+    private static List<String> vulnerabilitiesOf(DeviceSoftware row) {
+        return row.getVulnerabilities() == null ? List.of() : row.getVulnerabilities();
     }
 
     private static List<String> versionsOf(HostSoftwareTitle title) {
@@ -263,6 +358,17 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return null;
         }
         return installedPaths.stream().anyMatch(path -> TOP_LEVEL_APP_PATH.matcher(path).matches());
+    }
+
+    private static Boolean userApplicationsOnlyOf(List<String> installedPaths) {
+        if (installedPaths.isEmpty()) {
+            return null;
+        }
+        List<String> topLevelPaths = installedPaths.stream()
+                .filter(path -> TOP_LEVEL_APP_PATH.matcher(path).matches())
+                .toList();
+        return !topLevelPaths.isEmpty()
+                && topLevelPaths.stream().allMatch(path -> USER_APPLICATIONS_APP_PATH.matcher(path).matches());
     }
 
     private static List<HostSoftwareInstalledVersion> installedVersionsOf(HostSoftwareTitle title) {

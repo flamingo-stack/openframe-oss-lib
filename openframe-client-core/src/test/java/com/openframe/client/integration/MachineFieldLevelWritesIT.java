@@ -247,7 +247,8 @@ class MachineFieldLevelWritesIT {
                     mock(AgentRegistrationToolInstallationService.class), mock(AgentRegistrationProcessor.class),
                     mock(RegistrationTagAssignmentService.class), mock(InstalledAgentService.class),
                     mock(ToolConnectionService.class), mock(AgentRegistrationClientFeatureFlagsService.class),
-                    mock(AgentRegistrationClientUpdateService.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
+                    mock(AgentRegistrationClientUpdateService.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS),
+                    mock(AuditRecorder.class, CALLS_REAL_METHODS), mock(DeletedMachineCleanup.class));
         }
 
         private static OAuthClientRepository knownClient(boolean concurrentWriteAfterTheRead) {

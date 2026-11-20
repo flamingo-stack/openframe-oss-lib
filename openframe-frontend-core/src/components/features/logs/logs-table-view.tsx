@@ -17,6 +17,8 @@ import {
   type ColumnDef,
   DataTable,
   dataTableLoadingRows,
+  GRID_ACTION_COLUMN_SIZE,
+  GRID_MIN_WIDTH,
   multiSelectFilterFn,
   type Row,
   useDataTable,
@@ -27,6 +29,7 @@ import { useLoadingScope } from '../../ui/loading-scope';
 import { NoData, type NoDataProps } from '../../ui/no-data';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { GRID_ACTION_BUTTON_CLASS, GridTextWithDetailCell } from '../feature-table-grid-cells';
 import { dataTableLayoutProps, type FeatureTableLayoutProps } from '../feature-table-layout';
 import { logSourceLabels } from './log-source-labels';
 import { LOG_COLUMN_WIDTHS } from './logs-table-columns';
@@ -70,7 +73,10 @@ export interface LogsTableViewProps<T extends UiLogEntry = UiLogEntry> extends F
   search?: string;
   /** The applied date filter: its range counts as a query, and the mobile filter modal edits it. */
   dateFilter?: LogsTableDateFilter;
-  /** Header of the Log ID column (the host's date sort and range control). Default: the label. */
+  /**
+   * Header of the Log ID column in the cards layout (the host's date sort and range control). Default: the label. The
+   * grid layout draws the column's date header itself, from `dateFilter`.
+   */
   logIdHeader?: ReactNode;
   /** The table shows one device's logs (a device tab). */
   deviceScoped?: boolean;
@@ -78,7 +84,10 @@ export interface LogsTableViewProps<T extends UiLogEntry = UiLogEntry> extends F
   organizationLocked?: boolean;
   /** Where a row leads; also what the "Open in new tab" button opens. */
   getLogHref?: (log: T) => string;
-  /** The row's copy action (the host fetches the full log). */
+  /**
+   * The row's copy action (the host fetches the full log). In the grid layout the host draws its bare form
+   * (`<LogCopyIconButton grid />`): the cell is the button's frame.
+   */
   renderCopyAction?: (log: T) => ReactNode;
   /** The eye button of a row. */
   onQuickView?: (log: T) => void;
@@ -131,15 +140,24 @@ function LogSourceCell({ device }: { device: UiLogEntry['device'] }) {
   );
 }
 
+/** The grid's Source cell: the device, then its customer on the same line. */
+function LogSourceGridCell({ device }: { device: UiLogEntry['device'] }) {
+  const { deviceName, organization } = logSourceLabels(device);
+  return <GridTextWithDetailCell text={deviceName} detail={organization} />;
+}
+
 /** A row's icon button (quick view, open in a new tab): static chrome, drawn real and inert while the row is read. */
 function LogRowButton({
   onClick,
   icon,
   label,
+  grid = false,
 }: {
   onClick?: (event: MouseEvent) => void;
   icon: ReactNode;
   label: string;
+  /** The grid layout's form: a bare 40px icon button, the cell being its frame. */
+  grid?: boolean;
 }) {
   const loading = useLoadingScope();
   return (
@@ -147,11 +165,11 @@ function LogRowButton({
       <Button
         onClick={loading ? undefined : onClick}
         disabled={loading}
-        variant="outline"
+        variant={grid ? 'transparent' : 'outline'}
         size="icon"
         leftIcon={icon}
         aria-label={label}
-        className="bg-ods-card"
+        className={grid ? GRID_ACTION_BUTTON_CLASS : 'bg-ods-card'}
       />
     </div>
   );
@@ -191,12 +209,36 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
 }: LogsTableViewProps<T>) {
   // ONE switch: in a page's loading state the table is loading (its body draws the row skeletons, never the empty state).
   const loading = useLoadingScope() || loadingProp;
+  const grid = layout === 'grid';
   const columns = useMemo<ColumnDef<T>[]>(() => {
     const multiSelect = multiSelectFor<T>();
+    const quickView = (log: T, inGrid: boolean) => (
+      <LogRowButton
+        onClick={() => onQuickView?.(log)}
+        icon={<EyeIcon className="h-5 w-5" />}
+        label="Quick view"
+        grid={inGrid}
+      />
+    );
+    const open = (log: T, inGrid: boolean) => (
+      <LogRowButton
+        onClick={getLogHref ? openInNewTab(getLogHref(log)) : undefined}
+        icon={<ArrowRightUpIcon className="h-5 w-5" />}
+        label="Open in new tab"
+        grid={inGrid}
+      />
+    );
+    const copy = (log: T) => (
+      <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
+        {renderCopyAction?.(log)}
+      </div>
+    );
     const all: ColumnDef<T>[] = [
       {
         accessorKey: 'logId',
-        header: logIdHeader ? () => logIdHeader : 'Log ID',
+        // The grid header is the table's own date header (`meta.dateFilter`), which needs the label as text; a card
+        // header is the host's control.
+        header: !grid && logIdHeader ? () => logIdHeader : 'Log ID',
         cell: ({ row }: { row: Row<T> }) => (
           <div className="flex shrink-0 flex-col justify-center">
             <TruncateText>{row.original.timestamp}</TruncateText>
@@ -206,7 +248,15 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
           </div>
         ),
         enableSorting: false,
-        meta: { width: LOG_COLUMN_WIDTHS.logId, alwaysShowHeader: true },
+        size: 320,
+        meta: {
+          label: 'Log ID',
+          width: LOG_COLUMN_WIDTHS.logId,
+          alwaysShowHeader: true,
+          dateFilter,
+          // The time stays whole; the id after it is the part a narrow column cuts.
+          gridCell: ({ row }) => <GridTextWithDetailCell text={row.original.timestamp} detail={row.original.logId} />,
+        },
       },
       {
         accessorKey: 'status',
@@ -218,8 +268,13 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
         ),
         enableSorting: false,
         filterFn: multiSelect,
+        size: 160,
         meta: {
+          label: 'Status',
           width: LOG_COLUMN_WIDTHS.status,
+          gridCell: ({ row }) => (
+            <DataTable.Cell tag={<Tag label={row.original.status.label} variant={row.original.status.variant} />} />
+          ),
           filter: {
             options:
               facets?.severities.map(severity => ({
@@ -241,9 +296,20 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
         ),
         enableSorting: false,
         filterFn: multiSelect,
+        size: 200,
+        minSize: GRID_MIN_WIDTH.icon,
         meta: {
+          label: 'Tool',
           width: LOG_COLUMN_WIDTHS.tool,
           hideAt: 'md',
+          gridCell: ({ row }) => (
+            <ToolBadge
+              toolType={normalizeToolTypeWithFallback(row.original.source.toolType)}
+              iconClassName="h-5 w-5"
+              // One line: the label is the part cut, the mark keeps its size.
+              className="min-w-0 [&>span]:min-w-0 [&>span]:truncate"
+            />
+          ),
           filter: {
             options:
               facets?.toolTypes.map(toolType => ({
@@ -260,9 +326,12 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
         cell: ({ row }: { row: Row<T> }) => <LogSourceCell device={row.original.device} />,
         enableSorting: false,
         filterFn: multiSelect,
+        size: 280,
         meta: {
+          label: 'Source',
           width: LOG_COLUMN_WIDTHS.source,
           hideAt: 'md',
+          gridCell: ({ row }) => <LogSourceGridCell device={row.original.device} />,
           filter: organizationLocked ? undefined : { options: [...(facets?.organizations ?? [])] },
         },
       },
@@ -275,46 +344,62 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
           </TruncateText>
         ),
         enableSorting: false,
-        meta: { width: LOG_COLUMN_WIDTHS.description, hideAt: 'lg' },
+        // The last data column: it takes the width the others leave.
+        size: 400,
+        meta: {
+          label: 'Log details',
+          width: LOG_COLUMN_WIDTHS.description,
+          hideAt: 'lg',
+          gridCell: ({ row }) => <DataTable.Cell text={row.original.description.title} />,
+        },
       },
       {
         id: 'copy',
-        cell: ({ row }: { row: Row<T> }) => (
-          <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
-            {renderCopyAction?.(row.original)}
-          </div>
-        ),
+        cell: ({ row }: { row: Row<T> }) => copy(row.original),
         enableSorting: false,
-        meta: { width: `${LOG_COLUMN_WIDTHS.action} ml-auto`, align: 'right' },
+        size: GRID_ACTION_COLUMN_SIZE,
+        meta: { width: `${LOG_COLUMN_WIDTHS.action} ml-auto`, align: 'right', gridKind: 'action' },
       },
       {
         id: 'quickView',
-        cell: ({ row }: { row: Row<T> }) => (
-          <LogRowButton
-            onClick={() => onQuickView?.(row.original)}
-            icon={<EyeIcon className="h-5 w-5" />}
-            label="Quick view"
-          />
-        ),
+        cell: ({ row }: { row: Row<T> }) => quickView(row.original, false),
         enableSorting: false,
-        meta: { width: LOG_COLUMN_WIDTHS.action, align: 'right' },
+        size: GRID_ACTION_COLUMN_SIZE,
+        meta: {
+          width: LOG_COLUMN_WIDTHS.action,
+          align: 'right',
+          gridKind: 'action',
+          gridCell: ({ row }) => quickView(row.original, true),
+        },
       },
       {
         id: 'open',
-        cell: ({ row }: { row: Row<T> }) => (
-          <LogRowButton
-            onClick={getLogHref ? openInNewTab(getLogHref(row.original)) : undefined}
-            icon={<ArrowRightUpIcon className="h-5 w-5" />}
-            label="Open in new tab"
-          />
-        ),
+        cell: ({ row }: { row: Row<T> }) => open(row.original, false),
         enableSorting: false,
-        meta: { width: LOG_COLUMN_WIDTHS.action, hideAt: 'md', align: 'right' },
+        size: GRID_ACTION_COLUMN_SIZE,
+        // Kept by hand, not `actionColumn()`: the cards table hides the button below `md`.
+        meta: {
+          width: LOG_COLUMN_WIDTHS.action,
+          hideAt: 'md',
+          align: 'right',
+          gridKind: 'action',
+          gridCell: ({ row }) => open(row.original, true),
+        },
       },
     ];
     if (!hiddenColumns?.length) return all;
     return all.filter(column => !hiddenColumns.includes(columnId(column) as LogsTableColumnId));
-  }, [facets, getLogHref, organizationLocked, logIdHeader, renderCopyAction, onQuickView, hiddenColumns]);
+  }, [
+    facets,
+    getLogHref,
+    organizationLocked,
+    logIdHeader,
+    dateFilter,
+    grid,
+    renderCopyAction,
+    onQuickView,
+    hiddenColumns,
+  ]);
 
   // Mobile filter groups reuse the column filter options the desktop headers
   // show, so the modal is never empty.
@@ -415,7 +500,7 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
     <>
       <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
         {/* The grid's results count sits above the table; the card header carries its own (`rightSlot`). */}
-        {showHeader && layout === 'grid' && (
+        {showHeader && grid && (
           <DataTable.Meta>
             <DataTable.RowCount loading={loading} />
           </DataTable.Meta>

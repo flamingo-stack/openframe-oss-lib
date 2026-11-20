@@ -56,6 +56,7 @@ import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -221,6 +222,25 @@ class SoftwareBundleServiceTest {
                 .hasMessageContaining("m-intel");
         verify(bundleRepository, never()).save(any());
         verifyNoInteractions(machinePlatformResolver, onlineDispatchRepository);
+    }
+
+    @Test
+    void submit_adoptAction_badRequestAndNothingSaved() {
+        // setup
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"),
+                SoftwareBundlePackage.builder().packageManager(PackageManagerType.BREW).packageName("x").build());
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        SoftwarePackageInput slack = brewPkg("slack");
+        SubmitSoftwareBundleInput input = submitInput(slack);
+        input.setAction(SoftwareAction.ADOPT);
+
+        // execution
+        BadRequestException refused = assertThrows(BadRequestException.class, () -> service.submit(input, USER));
+
+        // verifications
+        assertThat(refused.getMessage()).isEqualTo("ADOPT is not a bundle or schedule action: use adoptSoftware");
+        verify(bundleRepository, never()).save(any(SoftwareBundle.class));
+        verifyNoInteractions(onlineDispatchRepository, softwareScheduleService);
     }
 
     @Test

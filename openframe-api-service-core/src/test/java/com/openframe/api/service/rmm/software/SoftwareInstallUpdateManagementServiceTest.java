@@ -23,6 +23,7 @@ import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
@@ -75,6 +76,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Mock private DeviceService deviceService;
     @Mock private SoftwareInventoryService softwareInventoryService;
     @Mock private SoftwareActionResultRepository softwareActionResultRepository;
+    @Mock private PackageAdoptReach packageAdoptReach;
 
     private final PackageManagerProperties packageManagerProperties = new PackageManagerProperties();
 
@@ -89,7 +91,7 @@ class SoftwareInstallUpdateManagementServiceTest {
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
                 platformResolver, packageUpdateEligibility, packageUpdateDispatchService, deviceService,
                 new SoftwarePackageSelectionResolver(softwareInventoryService), softwareActionResultRepository,
-                tenantIdProvider);
+                tenantIdProvider, packageAdoptReach, softwareInventoryService, packageManagerAvailability);
         // A real brew handler so we exercise real script-code + arg building.
         when(registry.handlerFor(PackageManagerType.BREW)).thenReturn(new BrewPackageManagerHandler());
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);

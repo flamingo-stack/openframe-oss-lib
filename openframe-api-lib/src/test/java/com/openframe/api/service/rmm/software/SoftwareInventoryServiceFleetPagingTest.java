@@ -25,10 +25,11 @@ import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
-import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -90,7 +91,9 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private OrganizationRepository organizationRepository;
     @Mock private SoftwareScheduleRepository softwareScheduleRepository;
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
-    @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
+    @Mock private SoftwareAdoptionService softwareAdoptionService;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private PackageAdoptReach packageAdoptReach;
 
     private SoftwareInventoryService service;
 
@@ -100,7 +103,8 @@ class SoftwareInventoryServiceFleetPagingTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
+                softwareAdoptionService, packageManagerAvailability, packageAdoptReach,
+                mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -128,6 +132,20 @@ class SoftwareInventoryServiceFleetPagingTest {
         assertThat(result.hasPrevious()).isTrue();
         verifyNoInteractions(deviceCountEnricher);
         verify(autoUpdateService).applyToSoftware(result.items());   // AUTO-UPDATE for the page only
+    }
+
+    @Test
+    void listSoftware_fleetPage_adoptionCountLeftUnknown() {
+        // setup
+        SoftwareTitle chrome = fleetTitle("Chrome", 42L, 31);
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(titlesPage(1, false, chrome));
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getAdoptionCount).containsOnlyNulls();
+        verifyNoInteractions(packageAdoptReach, packageManagerAvailability);
     }
 
     @Test
@@ -255,12 +273,13 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Test
     void getSoftwareFilters_emptyFacetsWithoutFleet() {
         // execution
-        SoftwareFilters filters = service.getSoftwareFilters(null);
+        SoftwareFilters filters = service.getSoftwareFilters(null, null);
 
         // verifications
         assertThat(filters.getSources()).isEmpty();
         assertThat(filters.getVersionStatuses()).isEmpty();
         assertThat(filters.getSeverities()).isEmpty();
+        assertThat(filters.getOsTypes()).isEmpty();
         verifyNoInteractions(fleet);
     }
 

@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareAdoptionResponse;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
@@ -32,7 +33,6 @@ import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMappe
 import com.openframe.api.util.FleetSoftwareMapper;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.api.util.FleetVulnerabilityMapper;
-import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
@@ -43,7 +43,7 @@ import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
-import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -51,7 +51,6 @@ import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;
-import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -69,9 +68,11 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -80,6 +81,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -110,6 +112,7 @@ public class SoftwareInventoryService {
     private static final String SORTABLE_FIELDS = "name, devicesCount, cveCount, highestSeverity";
     private static final String DEFAULT_SORT_FIELD = "name";
     private static final String DEVICE_SORT_FIELD = "softwareVersion";
+    private static final String DEFAULT_VULNERABILITY_SORT_FIELD = "cveId";
     private static final int TITLES_FETCH_PAGE = 500;
     private static final int TITLES_FETCH_CAP = 5000;
     private static final Map<String, String> FLEET_ORDER_KEY = Map.of(
@@ -131,7 +134,9 @@ public class SoftwareInventoryService {
     private final OrganizationRepository organizationRepository;
     private final SoftwareScheduleRepository softwareScheduleRepository;
     private final SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
-    private final ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
+    private final SoftwareAdoptionService softwareAdoptionService;
+    private final PackageManagerAvailability packageManagerAvailability;
+    private final PackageAdoptReach packageAdoptReach;
     private final AuditedMethodRunner auditedMethodRunner;
 
     @Value("${TENANT_ID:}")
@@ -187,6 +192,7 @@ public class SoftwareInventoryService {
         SoftwareResponse row = tenantSoftwareReadModelQuery.get(tenantId, softwareId);
         List<SoftwareResponse> rows = List.of(row);
         applyStatuses(rows);
+        applyAdoptionCounts(rows);
         return Optional.of(row);
     }
 
@@ -196,12 +202,61 @@ public class SoftwareInventoryService {
     }
 
     private SoftwareResponse getManagedSoftware(String softwareId) {
-        SoftwareResponse software = findById(softwareId)
-                .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
+        SoftwareResponse software = getSoftware(softwareId);
         if (software.getManagingPackage() == null) {
             throw new BadRequestException("No package manager manages " + software.getName());
         }
         return software;
+    }
+
+    public SoftwareResponse getAdoptableSoftware(String softwareId) {
+        SoftwareResponse software = getSoftware(softwareId);
+        if (software.getAdoptionPackage() == null) {
+            throw new BadRequestException("No package to adopt " + software.getName() + " into");
+        }
+        return software;
+    }
+
+    // only the read model knows where a device keeps its copy and which casks brew installed there: on the Fleet
+    // path every device stays
+    public List<String> withoutCopiesNotToAdopt(String softwareId, SoftwareBundlePackage adoptionPackage,
+                                                List<String> machineIds) {
+        if (!softwareReadModel) {
+            return machineIds;
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        Long softwareTitleId = Long.valueOf(softwareId);
+        Set<String> userApplicationsOnly = deviceSoftwareReadModelQuery.machinesWithUserApplicationsOnlyCopy(
+                tenantId, softwareTitleId, machineIds);
+        Set<String> withCask = machinesWithCask(tenantId, machineIds, adoptionPackage);
+        return machineIds.stream()
+                .filter(machineId -> !userApplicationsOnly.contains(machineId))
+                .filter(machineId -> !withCask.contains(machineId))
+                .toList();
+    }
+
+    private Set<String> machinesWithCask(String tenantId, Collection<String> machineIds,
+                                         SoftwareBundlePackage adoptionPackage) {
+        String cask = caskTokenOf(adoptionPackage);
+        if (cask == null) {
+            return Set.of();
+        }
+        return deviceSoftwareReadModelQuery.caskTokensByMachineId(tenantId, machineIds).entrySet().stream()
+                .filter(casksOnMachine -> casksOnMachine.getValue().contains(cask))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+    }
+
+    private static String caskTokenOf(SoftwareBundlePackage adoptionPackage) {
+        boolean cask = adoptionPackage != null && adoptionPackage.getPackageManager() == PackageManagerType.BREW
+                && adoptionPackage.getBrewPackageType() == BrewPackageType.CASK
+                && adoptionPackage.getPackageName() != null;
+        return cask ? adoptionPackage.getPackageName().toLowerCase(Locale.ROOT) : null;
+    }
+
+    private SoftwareResponse getSoftware(String softwareId) {
+        return findById(softwareId)
+                .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
     }
 
     public SoftwareResponse turnOnAutoUpdate(String softwareId, List<String> machineIds, PackageUpdateSettings settings,
@@ -248,8 +303,22 @@ public class SoftwareInventoryService {
         return inFleet || autoUpdateService.hasPolicy(softwareId);
     }
 
+    private PageResult<SoftwareResponse> readModelSoftware(String search, int page, Integer perPage, SortInput sort,
+                                                           Boolean vulnerable, SoftwareFilterInput filter) {
+        if (hasVersionStatuses(filter)) {
+            String field = sort == null ? null : sort.getField();
+            boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
+            return readModelSoftwareOfVersionStatuses(search, page, perPage, field, desc, vulnerable, filter);
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        PageResult<SoftwareResponse> readModelPage = tenantSoftwareReadModelQuery.listSoftware(tenantId, search,
+                page, perPage, sort, vulnerable, filter);
+        return withStatuses(readModelPage);
+    }
+
     // manageable: the titles a package manager manages (true) or the others (false). A Fleet page cannot be narrowed
-    // by it, sources, autoUpdateStatuses or osTypes and leaves them out; the read model and the full fetch apply them
+    // by it, sources, autoUpdateStatuses, osTypes or versionStatuses and leaves them out; the read model and the full
+    // fetch apply them
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
                                                      SortInput sort, Boolean vulnerable, SoftwareFilterInput filter) {
         String field = sort == null ? null : sort.getField();
@@ -258,10 +327,10 @@ public class SoftwareInventoryService {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
         if (softwareReadModel) {
-            String tenantId = tenantIdProvider.getTenantId();
-            PageResult<SoftwareResponse> readModelPage = tenantSoftwareReadModelQuery.listSoftware(tenantId, search,
-                    page, perPage, sort, vulnerable, filter);
-            return withStatuses(readModelPage);
+            PageResult<SoftwareResponse> readModelPage =
+                    readModelSoftware(search, page, perPage, sort, vulnerable, filter);
+            applyAdoptionCounts(readModelPage.items());
+            return readModelPage;
         }
         if (fleetPaging) {
             return withStatuses(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
@@ -290,9 +359,83 @@ public class SoftwareInventoryService {
         return statusesOnEveryRow ? result : withStatuses(result);
     }
 
+    private PageResult<SoftwareResponse> readModelSoftwareOfVersionStatuses(String search, int page, Integer perPage,
+                                                                            String field, boolean desc,
+                                                                            Boolean vulnerable,
+                                                                            SoftwareFilterInput filter) {
+        List<SoftwareResponse> chosen = readModelTitles(search, vulnerable, filter);
+        String sortField = field == null ? DEFAULT_SORT_FIELD : field;
+        Comparator<SoftwareResponse> order = comparatorFor(sortField, desc);
+        List<SoftwareResponse> ordered = chosen.stream().sorted(order).toList();
+        return paginateList(ordered, page, perPage);
+    }
+
+    private List<SoftwareResponse> readModelTitles(String search, Boolean vulnerable, SoftwareFilterInput filter) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<SoftwareResponse> titles = tenantSoftwareReadModelQuery.allTitles(tenantId, search, vulnerable, filter);
+        applyStatuses(titles);
+        return titles.stream()
+                .filter(row -> matchesVersionStatus(row, filter))
+                .toList();
+    }
+
+    public static Boolean vulnerableOnly(SoftwareFilterInput filter) {
+        return filter == null || isNoCutoff(filter.getMinSeverity()) ? null : Boolean.TRUE;
+    }
+
+    private static boolean hasVersionStatuses(SoftwareFilterInput filter) {
+        return filter != null && !isEmpty(filter.getVersionStatuses());
+    }
+
     private static boolean hasStatusFilter(SoftwareFilterInput filter) {
         return filter != null && (filter.getManageable() != null || !isEmpty(filter.getSources())
-                || !isEmpty(filter.getAutoUpdateStatuses()));
+                || !isEmpty(filter.getAutoUpdateStatuses()) || !isEmpty(filter.getVersionStatuses()));
+    }
+
+    private static boolean matchesVersionStatus(SoftwareResponse row, SoftwareFilterInput filter) {
+        return filter == null || selected(filter.getVersionStatuses(), row.getVersionStatus());
+    }
+
+    // read model only: a device counts where adoptSoftware would send the order
+    private void applyAdoptionCounts(List<SoftwareResponse> rows) {
+        rows.forEach(row -> row.setAdoptionCount(0));
+        List<SoftwareResponse> adoptable = rows.stream().filter(row -> row.getAdoptionPackage() != null).toList();
+        if (adoptable.isEmpty()) {
+            return;
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        List<Long> titleIds = adoptable.stream().map(SoftwareResponse::getId).map(Long::valueOf).toList();
+        Map<Long, List<String>> machinesByTitleId =
+                deviceSoftwareReadModelQuery.machinesOutsideUserApplicationsByTitleId(tenantId, titleIds);
+        List<String> machineIds = machinesByTitleId.values().stream().flatMap(List::stream).distinct().toList();
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        List<String> reachable = packageAdoptReach.filterReachable(machineIds);
+        Map<PackageManagerType, Set<String>> adoptableByManager = adoptable.stream()
+                .map(row -> row.getAdoptionPackage().getPackageManager())
+                .distinct()
+                .collect(Collectors.toMap(Function.identity(),
+                        manager -> Set.copyOf(packageManagerAvailability.adoptableOn(reachable, manager))));
+        Map<String, Set<String>> casksByMachineId =
+                deviceSoftwareReadModelQuery.caskTokensByMachineId(tenantId, reachable);
+        for (SoftwareResponse row : adoptable) {
+            Long titleId = Long.valueOf(row.getId());
+            List<String> titleMachineIds = machinesByTitleId.getOrDefault(titleId, List.of());
+            SoftwareBundlePackage adoptionPackage = row.getAdoptionPackage();
+            Set<String> withManager = adoptableByManager.get(adoptionPackage.getPackageManager());
+            String cask = caskTokenOf(adoptionPackage);
+            long count = titleMachineIds.stream()
+                    .filter(withManager::contains)
+                    .filter(machineId -> !hasCask(casksByMachineId, machineId, cask))
+                    .count();
+            row.setAdoptionCount(Math.toIntExact(count));
+        }
+    }
+
+    private static boolean hasCask(Map<String, Set<String>> casksByMachineId, String machineId, String cask) {
+        Set<String> casks = casksByMachineId.getOrDefault(machineId, Set.of());
+        return cask != null && casks.contains(cask);
     }
 
     private PageResult<SoftwareResponse> withStatuses(PageResult<SoftwareResponse> page) {
@@ -457,6 +600,8 @@ public class SoftwareInventoryService {
             return tenantSoftwareReadModelQuery.listVulnerabilitiesForSoftware(
                     tenantIdProvider.getTenantId(), softwareId, search, page, perPage, sortField, sortAsc);
         }
+        Comparator<SoftwareVulnerabilityResponse> order =
+                SoftwareVulnerabilityOrder.of(sortField, DEFAULT_VULNERABILITY_SORT_FIELD, sortAsc);
         Optional<Long> parsed = parseNumericId(softwareId);
         if (parsed.isEmpty()) {
             return PageResult.empty(page);
@@ -485,7 +630,7 @@ public class SoftwareInventoryService {
                 .filter(Objects::nonNull)
                 .filter(v -> matchesSearch(v, search))
                 .filter(v -> filter == null || selected(filter.getSeverities(), v.getSeverity()))
-                .sorted(comparator(sortField, sortAsc))
+                .sorted(order)
                 .toList();
         return paginate(all, page, perPage);
     }
@@ -495,13 +640,34 @@ public class SoftwareInventoryService {
                                                                        String search, int page, Integer perPage,
                                                                        SortInput sort) {
         Comparator<SoftwareOnDeviceResponse> order = deviceOrder(sort);
-        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
-        Set<String> tagged = taggedMachines(rows, filter);
-        List<SoftwareOnDeviceResponse> all = rows.stream()
-                .filter(row -> matchesDeviceFilter(row, filter, tagged))
+        List<SoftwareOnDeviceResponse> chosen = chosenDevices(softwareId, filter, search);
+        List<SoftwareOnDeviceResponse> all = chosen.stream()
                 .sorted(order)
                 .toList();
-        return paginateList(all, page, perPage);
+        PageResult<SoftwareOnDeviceResponse> result = paginateList(all, page, perPage);
+        applyAdoptions(softwareId, result.items());
+        return result;
+    }
+
+    private void applyAdoptions(String softwareId, List<SoftwareOnDeviceResponse> rows) {
+        List<String> machineIds = rows.stream().map(row -> row.getDevice().getMachineId()).toList();
+        Map<String, SoftwareAdoptionResponse> adoptions = softwareAdoptionService.getAdoptionsByMachineId(softwareId, machineIds);
+        rows.forEach(row -> applyAdoption(row, adoptions));
+    }
+
+    private static void applyAdoption(SoftwareOnDeviceResponse row, Map<String, SoftwareAdoptionResponse> adoptions) {
+        String machineId = row.getDevice().getMachineId();
+        SoftwareAdoptionResponse adoption = adoptions.get(machineId);
+        row.setAdoption(adoption);
+    }
+
+    private List<SoftwareOnDeviceResponse> chosenDevices(String softwareId, SoftwareOnDeviceFilterInput filter,
+                                                         String search) {
+        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
+        Set<String> tagged = taggedMachines(rows, filter);
+        return rows.stream()
+                .filter(row -> matchesDeviceFilter(row, filter, tagged))
+                .toList();
     }
 
     // the filters read auto-update, so it is set on every row, not only on the page
@@ -546,8 +712,19 @@ public class SoftwareInventoryService {
         List<SoftwareOnDeviceResponse> rows = tenantSoftwareReadModelQuery
                 .devicesForSoftwareRows(tenantId, softwareId, search, latestVersion);
         rows.forEach(row -> row.setInstalledBy(managedByOn(row.getDevice(), installedBy)));
+        markInstalledCasks(titleRow, rows);
         markScheduledUpdates(softwareId, titleRow, rows);
         return rows;
+    }
+
+    private void markInstalledCasks(SoftwareResponse title, List<SoftwareOnDeviceResponse> rows) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<String> machineIds = rows.stream().map(row -> row.getDevice().getMachineId()).toList();
+        SoftwareBundlePackage adoptionPackage = title.getAdoptionPackage();
+        Set<String> withCask = machinesWithCask(tenantId, machineIds, adoptionPackage);
+        rows.stream()
+                .filter(row -> isOn(row, withCask))
+                .forEach(row -> row.setInstalledBy(SoftwareSource.BREW));
     }
 
     // scheduled = an active update schedule with a run still ahead on the device
@@ -562,12 +739,14 @@ public class SoftwareInventoryService {
                 .map(softwareScheduleTargetResolver::resolveMachineIds)
                 .flatMap(List::stream)
                 .toList();
-        List<String> atDeviceTime = softwareScheduleRepository
+        List<SoftwareSchedule> atDeviceTimeSchedules = softwareScheduleRepository
                 .findByTenantIdAndStatusAndTriggerAndTimeReference(tenantId, ScriptStatus.ACTIVE,
                         ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)
                 .stream()
                 .filter(schedule -> updates(schedule, softwareId, managingPackage))
-                .map(this::machinesAwaitingDeviceTime)
+                .toList();
+        List<String> atDeviceTime = softwareScheduleTargetResolver
+                .resolveMachineIdsAwaitingDeviceTime(atDeviceTimeSchedules).values().stream()
                 .flatMap(List::stream)
                 .toList();
         Set<String> scheduled = new HashSet<>(atServerTime);
@@ -575,21 +754,6 @@ public class SoftwareInventoryService {
         rows.stream()
                 .filter(row -> isOn(row, scheduled))
                 .forEach(row -> row.setStatus(SoftwareOnDeviceStatus.SCHEDULED_UPDATE));
-    }
-
-    // a device-time schedule keeps no nextRunAt: its one-off run is ahead until the device's own run is recorded
-    private List<String> machinesAwaitingDeviceTime(SoftwareSchedule schedule) {
-        List<String> machineIds = softwareScheduleTargetResolver.resolveMachineIds(schedule);
-        if (schedule.getRepeat() != null || machineIds.isEmpty()) {
-            return machineIds;
-        }
-        String scheduleId = schedule.getId();
-        Set<String> ran = scheduleDeviceLocalDispatchRepository
-                .findByScheduleIdAndMachineIdIn(scheduleId, machineIds).stream()
-                .filter(run -> run.getLastOccurrenceAt() != null)
-                .map(ScheduleLocalMachineTimeDispatch::getMachineId)
-                .collect(Collectors.toSet());
-        return machineIds.stream().filter(machineId -> !ran.contains(machineId)).toList();
     }
 
     private static boolean updates(SoftwareSchedule schedule, String softwareId, PackageCatalogEntry managingPackage) {
@@ -671,7 +835,8 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> rows = deviceSoftware(machineId, filter, search);
         // the filter reads source and auto-update, so they are set on every row, not only on the page
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
-        catalogStatus.applyOnDevice(machineId, rows);
+        Set<String> installedCasks = installedCasksOn(machineId, rows);
+        catalogStatus.applyOnDevice(machineId, rows, installedCasks);
         List<SoftwareResponse> chosen = rows.stream()
                 .filter(row -> matchesCatalogFilter(row, filter))
                 .toList();
@@ -695,8 +860,23 @@ public class SoftwareInventoryService {
     public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
         List<SoftwareResponse> rows = deviceSoftware(machineId, null, search);
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
-        catalogStatus.applyOnDevice(machineId, rows);
+        Set<String> installedCasks = installedCasksOn(machineId, rows);
+        catalogStatus.applyOnDevice(machineId, rows, installedCasks);
         return softwareFilters(rows);
+    }
+
+    // a search can leave the cask's own row out of the rows: the read model is asked for every cask on the device
+    private Set<String> installedCasksOn(String machineId, List<SoftwareResponse> rows) {
+        if (!softwareReadModel) {
+            return rows.stream()
+                    .filter(row -> row.getFleetSource() == FleetSource.HOMEBREW_CASKS && row.getName() != null)
+                    .map(row -> row.getName().toLowerCase(Locale.ROOT))
+                    .collect(Collectors.toSet());
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        List<String> machineIds = List.of(machineId);
+        Map<String, Set<String>> casks = deviceSoftwareReadModelQuery.caskTokensByMachineId(tenantId, machineIds);
+        return casks.getOrDefault(machineId, Set.of());
     }
 
     private static List<SoftwareResponse> deviceSoftwareRows(HostInventory inventory, SoftwareFilterInput filter,
@@ -789,6 +969,7 @@ public class SoftwareInventoryService {
                 || (selected(filter.getSources(), row.getSource())
                 && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate())
                 && selected(filter.getOsTypes(), osOf(row))
+                && selected(filter.getVersionStatuses(), row.getVersionStatus())
                 && manageable(filter.getManageable(), row.getSource()));
     }
 
@@ -814,8 +995,9 @@ public class SoftwareInventoryService {
                 || containsIgnoreCase(row.getPublisher(), search);
     }
 
-    public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, String search) {
-        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
+    public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, SoftwareOnDeviceFilterInput filter,
+                                                            String search) {
+        List<SoftwareOnDeviceResponse> rows = chosenDevices(softwareId, filter, search);
         return SoftwareOnDeviceFilters.builder()
                 .statuses(facet(rows, SoftwareOnDeviceResponse::getStatus))
                 .installedBy(facet(rows, SoftwareOnDeviceResponse::getInstalledBy))
@@ -826,24 +1008,8 @@ public class SoftwareInventoryService {
     }
 
     private List<SoftwareFilterOption> organizationFacet(List<SoftwareOnDeviceResponse> rows) {
-        Map<String, Long> counts = rows.stream()
-                .map(row -> row.getDevice().getOrganizationId())
-                .filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-        if (counts.isEmpty()) {
-            return List.of();
-        }
-        Map<String, String> names = organizationRepository.findByOrganizationIdIn(counts.keySet()).stream()
-                .filter(organization -> organization.getName() != null)
-                .collect(Collectors.toMap(Organization::getOrganizationId, Organization::getName, (a, b) -> a));
-        return counts.entrySet().stream()
-                .map(e -> SoftwareFilterOption.builder()
-                        .value(e.getKey())
-                        .label(names.getOrDefault(e.getKey(), e.getKey()))
-                        .count(e.getValue().intValue())
-                        .build())
-                .sorted(Comparator.comparing(SoftwareFilterOption::getLabel, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        Stream<String> organizationIds = rows.stream().map(row -> row.getDevice().getOrganizationId());
+        return SoftwareFilterOptions.organizations(organizationIds, organizationRepository);
     }
 
     private List<SoftwareOnDeviceResponse> allDevicesForSoftware(String softwareId, String search) {
@@ -966,11 +1132,10 @@ public class SoftwareInventoryService {
     private record HostVersion(Host host, String version) {
     }
 
-    public SoftwareFilters getSoftwareFilters(String search) {
+    public SoftwareFilters getSoftwareFilters(SoftwareFilterInput filter, String search) {
+        Boolean vulnerable = vulnerableOnly(filter);
         if (softwareReadModel) {
-            String tenantId = tenantIdProvider.getTenantId();
-            List<SoftwareResponse> titles = tenantSoftwareReadModelQuery.allForFilters(tenantId, search);
-            applyStatuses(titles);
+            List<SoftwareResponse> titles = readModelTitles(search, vulnerable, filter);
             return softwareFilters(titles);
         }
         if (fleetPaging) {
@@ -980,10 +1145,13 @@ public class SoftwareInventoryService {
         }
         // Facet counts don't depend on the enriched devicesCount, so bypass enrichRealDevicesCount
         // here — it would fire N Fleet /hosts lookups just to produce numbers we don't use.
-        List<SoftwareTitle> fetched = fetchAllTitles(search, null);
+        List<SoftwareTitle> fetched = fetchAllTitles(search, vulnerable);
         List<SoftwareResponse> titles = mapTitles(fetched);
         applyStatuses(titles);
-        return softwareFilters(titles);
+        List<SoftwareResponse> chosen = titles.stream()
+                .filter(row -> matchesCatalogFilter(row, filter))
+                .toList();
+        return softwareFilters(chosen);
     }
 
     private static SoftwareFilters softwareFilters(List<SoftwareResponse> titles) {
@@ -993,27 +1161,12 @@ public class SoftwareInventoryService {
                 .severities(facet(titles, row -> row.getVulnerabilitySummary() == null
                         ? null : row.getVulnerabilitySummary().getHighestSeverity()))
                 .autoUpdateStatuses(facet(titles, SoftwareResponse::getAutoUpdate))
+                .osTypes(facet(titles, SoftwareInventoryService::osOf))
                 .build();
     }
 
     private static <T, E extends Enum<E>> List<SoftwareFilterOption> facet(List<T> rows, Function<T, E> dimension) {
-        Map<E, Long> counts = rows.stream()
-                .map(dimension)
-                .filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-        return counts.entrySet().stream()
-                .sorted(Comparator.comparingInt(e -> e.getKey().ordinal()))
-                .map(e -> SoftwareFilterOption.builder()
-                        .value(e.getKey().name())
-                        .label(humanize(e.getKey().name()))
-                        .count(e.getValue().intValue())
-                        .build())
-                .toList();
-    }
-
-    private static String humanize(String enumName) {
-        String lower = enumName.toLowerCase(Locale.ROOT).replace('_', ' ');
-        return lower.isEmpty() ? lower : Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+        return SoftwareFilterOptions.enumFacet(rows, dimension);
     }
 
     private static Optional<Long> parseNumericId(String softwareId) {
@@ -1082,21 +1235,6 @@ public class SoftwareInventoryService {
         }
         String needle = search.toLowerCase(Locale.ROOT);
         return row.getCveId() != null && row.getCveId().toLowerCase(Locale.ROOT).contains(needle);
-    }
-
-    private static Comparator<SoftwareVulnerabilityResponse> comparator(String field, boolean ascending) {
-        Comparator<SoftwareVulnerabilityResponse> base = switch (field == null ? "" : field) {
-            case "severity", "cvssScore" -> Comparator.comparing(
-                    SoftwareVulnerabilityResponse::getCvssScore,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "discoveredAt", "discovered" -> Comparator.comparing(
-                    SoftwareVulnerabilityResponse::getDiscoveredAt,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            default -> Comparator.comparing(
-                    SoftwareVulnerabilityResponse::getCveId,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-        };
-        return ascending ? base : base.reversed();
     }
 
     private static PageResult<SoftwareVulnerabilityResponse> paginate(List<SoftwareVulnerabilityResponse> all,

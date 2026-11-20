@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.1",
     "@flamingo-stack/openframe-frontend-core": "file:.yalc/@flamingo-stack/openframe-frontend-core",
     "@hookform/resolvers": "~5.2.2",
     "@modelcontextprotocol/client": "2.2.0",

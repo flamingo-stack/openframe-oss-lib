@@ -2,16 +2,17 @@
 
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable } from '../../ui/data-table';
+import { DataTableCell } from '../../ui/data-table/data-table-cell';
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { TruncateText } from '../../ui/truncate-text';
 import { dataTableLayoutProps, type FeatureTableLayoutProps, hasSlotContent } from '../feature-table-layout';
 import { OSTypeBadgeGroup } from '../os-type-badge-group';
-import { ScriptNameCell } from './script-cells';
-import { ScriptShellBadge } from './script-shell-badge';
+import { ScriptNameCell, ScriptNameGridCell } from './script-cells';
+import { ScriptShellBadge, ScriptShellGridCell } from './script-shell-badge';
 import { SCRIPT_COLUMNS, type ScriptsTableColumnLayout } from './scripts-table-columns';
-import { OpenInNewTabCell, RowActionsCell, scriptsColumnMeta } from './scripts-table-shared';
+import { OpenInNewTabCell, RowActionsCell, scriptsColumnMeta, scriptsColumnSize } from './scripts-table-shared';
 
 /** One script of the library, as the table shows it. */
 export interface ScriptTableRow {
@@ -44,6 +45,8 @@ export interface ScriptsTableProps extends FeatureTableLayoutProps {
 }
 
 const BADGE_ICON = 'h-4 w-4 content-md:h-6 content-md:w-6';
+/** The OS icons of a grid cell: 20px, on one line. */
+const GRID_OS_ICON = 'w-5 h-5';
 
 /** A script still being read: a row the table keys, every field a cell shows empty (each cell draws its loading form). */
 const loadingScript = (id: string): ScriptTableRow => ({
@@ -78,41 +81,73 @@ export function ScriptsTable({
   // rows alike.
   const loading = useLoadingScope() || isLoading;
   const columns = useMemo<ColumnDef<ScriptTableRow>[]>(() => {
-    const cell = (columnLayout: ScriptsTableColumnLayout, render: (row: ScriptTableRow) => ReactNode) => ({
+    // `render` is the card row's cell; `renderGrid` its one-line form in the grid layout (the card's cell where the
+    // two are the same).
+    const cell = (
+      columnLayout: ScriptsTableColumnLayout,
+      render: (row: ScriptTableRow) => ReactNode,
+      renderGrid: (row: ScriptTableRow) => ReactNode = render,
+    ): ColumnDef<ScriptTableRow> => ({
       id: columnLayout.id,
       header: columnLayout.header ?? '',
       cell: ({ row }: { row: Row<ScriptTableRow> }) => render(row.original),
       enableSorting: false,
-      meta: scriptsColumnMeta(columnLayout),
+      ...scriptsColumnSize(columnLayout),
+      meta: { ...scriptsColumnMeta(columnLayout), gridCell: ({ row }) => renderGrid(row.original) },
     });
     const all: ColumnDef<ScriptTableRow>[] = [
-      cell(SCRIPT_COLUMNS.name, row => <ScriptNameCell name={row.name} description={row.description} />),
-      cell(SCRIPT_COLUMNS.shellType, row => <ScriptShellBadge value={row.shellType} iconClassName={BADGE_ICON} />),
-      cell(SCRIPT_COLUMNS.supportedPlatforms, row => (
-        <OSTypeBadgeGroup osTypes={row.supportedPlatforms} iconSize="w-4 h-4 content-md:w-6 content-md:h-6" />
-      )),
-      cell(SCRIPT_COLUMNS.authorId, row =>
-        row.author ? (
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <SquareAvatar
-              variant="round"
-              size="sm"
-              src={row.author.image}
-              fallback={row.author.initials}
-              alt={row.author.name}
-              initialsClassName="text-ods-text-secondary"
-            />
-            <div className="min-w-0 flex-1">
-              <TruncateText>{row.author.name}</TruncateText>
+      cell(
+        SCRIPT_COLUMNS.name,
+        row => <ScriptNameCell name={row.name} description={row.description} />,
+        row => <ScriptNameGridCell name={row.name} description={row.description} />,
+      ),
+      cell(
+        SCRIPT_COLUMNS.shellType,
+        row => <ScriptShellBadge value={row.shellType} iconClassName={BADGE_ICON} />,
+        row => <ScriptShellGridCell value={row.shellType} />,
+      ),
+      cell(
+        SCRIPT_COLUMNS.supportedPlatforms,
+        row => <OSTypeBadgeGroup osTypes={row.supportedPlatforms} iconSize="w-4 h-4 content-md:w-6 content-md:h-6" />,
+        row => <OSTypeBadgeGroup osTypes={row.supportedPlatforms} iconSize={GRID_OS_ICON} className="flex-nowrap" />,
+      ),
+      cell(
+        SCRIPT_COLUMNS.authorId,
+        row =>
+          row.author ? (
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <SquareAvatar
+                variant="round"
+                size="sm"
+                src={row.author.image}
+                fallback={row.author.initials}
+                alt={row.author.name}
+                initialsClassName="text-ods-text-secondary"
+              />
+              <div className="min-w-0 flex-1">
+                <TruncateText>{row.author.name}</TruncateText>
+              </div>
             </div>
-          </div>
-        ) : null,
+          ) : null,
+        row =>
+          row.author ? (
+            <DataTableCell
+              leading={{ type: 'avatar', src: row.author.image, name: row.author.name }}
+              text={row.author.name}
+            />
+          ) : null,
       ),
     ];
     if (renderActions) {
       all.push(cell(SCRIPT_COLUMNS.actions, row => <RowActionsCell>{renderActions(row)}</RowActionsCell>));
     }
-    all.push(cell(SCRIPT_COLUMNS.open, row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null)));
+    all.push(
+      cell(
+        SCRIPT_COLUMNS.open,
+        row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null),
+        row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} grid /> : null),
+      ),
+    );
     return hideColumns ? all.filter(column => !hideColumns.includes(column.id ?? '')) : all;
   }, [hideColumns, renderActions]);
 

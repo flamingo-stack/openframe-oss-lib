@@ -11,6 +11,8 @@ import java.util.List;
 public class ConnectorStatus {
 
     private static final String FAILED = "FAILED";
+    private static final String RUNNING = "RUNNING";
+    private static final String STOPPED = "STOPPED";
 
     private String name;
     private Connector connector;
@@ -22,6 +24,17 @@ public class ConnectorStatus {
 
     public boolean hasFailedTasks() {
         return tasks != null && tasks.stream().anyMatch(TaskStatus::isFailed);
+    }
+
+    public boolean isRunning() {
+        boolean connectorRunning = connector != null && RUNNING.equals(connector.getState());
+        boolean tasksRunning = tasks != null && !tasks.isEmpty()
+                && tasks.stream().allMatch(task -> RUNNING.equals(task.getState()));
+        return connectorRunning && tasksRunning;
+    }
+
+    public boolean isStopped() {
+        return connector != null && STOPPED.equals(connector.getState());
     }
 
     public boolean hasFailures() {

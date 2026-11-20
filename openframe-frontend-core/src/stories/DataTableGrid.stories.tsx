@@ -12,6 +12,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useMemo, useState } from 'react';
 import { ExternalLinkIcon, Ellipsis01Icon, MonitorIcon } from '../components/icons-v2-generated';
+import { Button } from '../components/ui/button';
 import {
   actionColumn,
   DataTable,
@@ -20,9 +21,11 @@ import {
   useDataTable,
   type ColumnDef,
   type ColumnFiltersState,
+  type DataTableDateFilter,
   type DataTableSortState,
   type RowSelectionState,
 } from '../components/ui/data-table';
+import type { DateRange } from '../components/ui/date-picker';
 import { Tag } from '../components/ui/tag';
 import Link from '../embed-shims/next-link';
 
@@ -33,6 +36,7 @@ interface Device {
   name: string;
   online: boolean;
   lastSeen: string;
+  enrolled: Date;
   customer: string;
   model: string;
   serial: string;
@@ -50,12 +54,32 @@ function pick(pool: string[], index: number): string {
   return pool[index % pool.length] ?? '';
 }
 
+/** The newest enrolment of the sample; each device after it enrolled a day earlier. */
+const LAST_ENROLMENT = new Date(2026, 10, 18);
+
+function daysBefore(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() - days);
+}
+
+function formatDay(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** Whether a day is inside a picked range, both ends included; a range with one end is that day alone. */
+function inRange(day: Date, range: DateRange | undefined): boolean {
+  if (!range?.from) return true;
+  const from = range.from.getTime();
+  const to = (range.to ?? range.from).getTime();
+  return day.getTime() >= from && day.getTime() <= to;
+}
+
 function makeDevices(count: number): Device[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `device-${index}`,
     name: index % 3 === 0 ? `Romans-MacBook-Pro-${index}.local` : `srv-db-prod-${String(index).padStart(3, '0')}`,
     online: index % 4 !== 2,
     lastSeen: `${(index % 5) + 1} hours ago`,
+    enrolled: daysBefore(LAST_ENROLMENT, index),
     customer: pick(CUSTOMERS, index),
     model: pick(MODELS, index),
     serial: `C02X${String(1000 + index)}JG5H`,
@@ -77,10 +101,13 @@ function deviceColumns({
   selectable,
   wide,
   actions,
+  dateFilter,
 }: {
   selectable: boolean;
   wide: boolean;
   actions: boolean;
+  /** The "Enrolled" date column and its applied sort and range. */
+  dateFilter?: DataTableDateFilter;
 }): ColumnDef<Device>[] {
   const columns: ColumnDef<Device>[] = [
     {
@@ -135,6 +162,15 @@ function deviceColumns({
     },
     { id: 'model', accessorKey: 'model', header: 'Details', size: 240, meta: { hideAt: 'lg' } },
   ];
+  if (dateFilter) {
+    columns.splice(1, 0, {
+      id: 'enrolled',
+      accessorFn: device => formatDay(device.enrolled),
+      header: 'Enrolled',
+      size: 200,
+      meta: { dateFilter },
+    });
+  }
   if (wide) {
     columns.push(
       { id: 'serial', accessorKey: 'serial', header: 'Serial', size: 200, meta: { hideAt: 'lg' } },
@@ -193,6 +229,39 @@ function actionColumns(): ColumnDef<Device>[] {
   ];
 }
 
+/**
+ * What a host draws under a row (`renderSubRow`): two controls and a line far longer than any screen, as an approval
+ * request's command is.
+ */
+function DeviceSubRow({ device }: { device: Device }) {
+  const command = [
+    'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command',
+    `"Get-ChildItem -Path C:\\ProgramData\\OpenFrame\\logs\\${device.serial} -Recurse`,
+    '| Where-Object LastWriteTime -lt (Get-Date).AddDays(-30) | Remove-Item -Force"',
+    // One word wider than a phone: it breaks instead of widening the table.
+    `--working-directory C:\\ProgramData\\OpenFrame\\agents\\${device.id}\\a-path-with-no-space-in-it-that-is-longer-than-a-phone-is-wide`,
+  ].join(' ');
+  return (
+    <div className="flex flex-col gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-sf)]">
+      <p className="text-ods-text-secondary text-h6">
+        Approval requested by {device.user} to run on {device.name}:
+      </p>
+      <p className="text-ods-text-primary text-code">{command}</p>
+      <div className="flex gap-[var(--spacing-system-xsf)]" data-no-row-click>
+        <Button size="small">Approve</Button>
+        <Button size="small" variant="outline">
+          Reject
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Every third device has a sub-row. */
+function renderDeviceSubRow(device: Device) {
+  return Number(device.id.replace('device-', '')) % 3 === 1 ? <DeviceSubRow device={device} /> : null;
+}
+
 /* ───────────────────────────── table ───────────────────────────── */
 
 interface GridDemoProps {
@@ -208,6 +277,12 @@ interface GridDemoProps {
   storageKey?: string;
   /** The row-action columns. Without them a table with settings gets a column of its own for the gear. */
   actions?: boolean;
+  /** A date column (`meta.dateFilter`): its header opens the date menu, which sorts and narrows the list. */
+  dateColumn?: boolean;
+  /** The date column's range as the story opens. */
+  initialDateRange?: DateRange;
+  /** A block under every third row (`renderSubRow`). */
+  subRows?: boolean;
 }
 
 function GridDemo({
@@ -220,19 +295,46 @@ function GridDemo({
   settings = false,
   storageKey,
   actions = true,
+  dateColumn = false,
+  initialDateRange,
+  subRows = false,
 }: GridDemoProps) {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [data] = useState(() => makeDevices(rowCount));
-  const columns = useMemo(() => deviceColumns({ selectable, wide, actions }), [selectable, wide, actions]);
+  const [dateSort, setDateSort] = useState<'asc' | 'desc'>('desc');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange);
+  const columns = useMemo(
+    () =>
+      deviceColumns({
+        selectable,
+        wide,
+        actions,
+        dateFilter: dateColumn
+          ? {
+              sortDirection: dateSort,
+              range: dateRange,
+              onApply: result => {
+                setDateSort(result.sort);
+                setDateRange(result.range);
+              },
+            }
+          : undefined,
+      }),
+    [selectable, wide, actions, dateColumn, dateSort, dateRange],
+  );
   const [sort, setSort] = useState<DataTableSortState | null>(null);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const sorted = useMemo(() => {
-    if (!sort) return data;
-    const direction = sort.desc ? -1 : 1;
-    return [...data].sort((a, b) => a.name.localeCompare(b.name) * direction);
-  }, [data, sort]);
+    const listed = dateColumn ? data.filter(device => inRange(device.enrolled, dateRange)) : data;
+    if (sort) {
+      const direction = sort.desc ? -1 : 1;
+      return [...listed].sort((a, b) => a.name.localeCompare(b.name) * direction);
+    }
+    // The sample is newest first, the list's own order.
+    return dateColumn && dateSort === 'asc' ? [...listed].reverse() : listed;
+  }, [data, sort, dateColumn, dateSort, dateRange]);
 
   const table = useDataTable<Device>({
     data: loading ? [] : sorted,
@@ -262,7 +364,12 @@ function GridDemo({
           setSort(current => (current?.id === id ? { id, desc: !current.desc } : { id, desc: false }))
         }
       />
-      <DataTable.Body<Device> loading={loading} skeletonRows={6} rowHref={device => `#${device.id}`} />
+      <DataTable.Body<Device>
+        loading={loading}
+        skeletonRows={6}
+        rowHref={device => `#${device.id}`}
+        renderSubRow={subRows ? renderDeviceSubRow : undefined}
+      />
     </DataTable>
   );
 }
@@ -319,3 +426,39 @@ export const Settings: Story = { args: { settings: true, storageKey: 'storybook-
 
 /** A table with settings and no row actions: the gear gets a column of its own. */
 export const SettingsWithoutActions: Story = { args: { settings: true, actions: false, wide: false, rowCount: 5 } };
+
+/**
+ * A date column (`meta.dateFilter`): the header is the label and a calendar, and opens the date menu. Pick a direction
+ * or a range and Apply: the label turns primary and the calendar takes the accent, as an applied filter's funnel does.
+ */
+export const DateColumn: Story = { args: { dateColumn: true, rowCount: 30 } };
+
+/** The date column with a range applied. */
+export const DateColumnApplied: Story = {
+  args: {
+    dateColumn: true,
+    rowCount: 30,
+    initialDateRange: { from: daysBefore(LAST_ENROLMENT, 9), to: daysBefore(LAST_ENROLMENT, 3) },
+  },
+};
+
+/**
+ * A block under a row (`renderSubRow`). It is as wide as the visible table: its long line wraps and adds nothing to
+ * the table's scroll width, and while the columns scroll sideways it stays where it is.
+ */
+export const SubRow: Story = { args: { subRows: true, rowCount: 8 } };
+
+/**
+ * The same table on a 375px phone: the columns are far wider than the screen, the sub-row is one screen wide. Scroll
+ * the table sideways: the cells move, the sub-row and its buttons stay in view.
+ */
+export const SubRowPhone: Story = {
+  ...SubRow,
+  parameters: {
+    viewport: { options: { phone375: { name: 'Phone 375', styles: { width: '375px', height: '812px' } } } },
+  },
+  globals: { viewport: { value: 'phone375', isRotated: false } },
+};
+
+/** Sub-rows in a table of a stated height: they pass under the sticky header and under the top and bottom shades. */
+export const SubRowFixedHeight: Story = { args: { subRows: true, rowCount: 20, maxHeight: 420 } };

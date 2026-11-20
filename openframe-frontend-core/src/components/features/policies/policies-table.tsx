@@ -1,14 +1,17 @@
 'use client';
 
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { cn } from '../../../utils/cn';
 import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
+import { Ellipsis01Icon } from '../../icons-v2-generated/interface/ellipsis-01-icon';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
 import {
   type ColumnDef,
   DataTable,
   dataTableLoadingRows,
+  GRID_ACTION_COLUMN_SIZE,
   type Row,
   type SortingState,
   useDataTable,
@@ -19,6 +22,7 @@ import { MoreActionsMenu } from '../../ui/more-actions-menu';
 import type { NoDataProps } from '../../ui/no-data';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { GRID_ACTION_BUTTON_CLASS, GridTextWithDetailCell } from '../feature-table-grid-cells';
 import { dataTableLayoutProps, type FeatureTableLayoutProps, hasSlotContent } from '../feature-table-layout';
 import { OSTypeBadgeGroup } from '../os-type-badge-group';
 import type { PolicyTableRow } from './policy-table-row';
@@ -33,6 +37,12 @@ const EMPTY_COLUMN_FILTERS: never[] = [];
 // full set of OS icons rather than a plain-text "All" label.
 const ALL_PLATFORMS = ['windows', 'darwin', 'linux'];
 
+/** The platforms a policy applies to: its own, or every OS when it names none. */
+function policyPlatforms(row: PolicyTableRow): string[] {
+  const platforms = row.platforms ?? [];
+  return platforms.length > 0 ? platforms : ALL_PLATFORMS;
+}
+
 /** A policy still being read: a row the table keys, every field a cell shows empty (each draws its loading form). */
 const loadingPolicy = (id: string): PolicyTableRow => ({
   id,
@@ -43,6 +53,11 @@ const loadingPolicy = (id: string): PolicyTableRow => ({
   href: '',
 });
 
+const NOTE_TONE_CLASS = {
+  error: 'text-ods-error',
+  warning: 'text-ods-warning',
+} as const;
+
 /** The Severity cell; a bar while the row is read. */
 function PolicySeverity({ label }: { label: string }) {
   if (useLoadingScope() && !label) return <TextLineSkeleton type="h6" className="w-16" />;
@@ -50,27 +65,60 @@ function PolicySeverity({ label }: { label: string }) {
 }
 
 /** The row's open button: static chrome, drawn real and inert while the row is read. */
-function OpenPolicyButton({ href, name }: { href: string; name: string }) {
+function OpenPolicyButton({ href, name, grid = false }: { href: string; name: string; grid?: boolean }) {
   const loading = useLoadingScope();
   return (
     <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
       <Button
         onClick={loading ? undefined : openInNewTab(href)}
         disabled={loading}
-        variant="outline"
+        // In the grid the action is a bare 40px icon button: the cell is its frame.
+        variant={grid ? 'transparent' : 'outline'}
         size="icon"
         leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
         aria-label={`Open ${name}`}
-        className="bg-ods-card"
+        className={grid ? GRID_ACTION_BUTTON_CLASS : 'bg-ods-card'}
       />
     </div>
   );
 }
 
-const NOTE_TONE_CLASS = {
-  error: 'text-ods-error',
-  warning: 'text-ods-warning',
-} as const;
+/** The row's menu in the grid: the same items behind a bare 40px button. Nothing for a row with no action. */
+function PolicyActionsGridCell({ row }: { row: PolicyTableRow }) {
+  if (!row.actions || row.actions.length === 0) return null;
+  return (
+    <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
+      <MoreActionsMenu
+        items={row.actions}
+        trigger={
+          <Button
+            variant="transparent"
+            size="icon"
+            leftIcon={<Ellipsis01Icon className="h-5 w-5" />}
+            aria-label="More actions"
+            className={GRID_ACTION_BUTTON_CLASS}
+          />
+        }
+      />
+    </div>
+  );
+}
+
+/** The grid's STATUS cell: the tag, then its note on the same line (the one part cut when the column is narrow). */
+function PolicyStatusGridCell({ status }: { status: PolicyTableRow['status'] }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xxs)]">
+      <span className="flex shrink-0">
+        <Tag label={status.label} variant={status.variant} />
+      </span>
+      {status.note && (
+        <span className={cn('min-w-0 flex-1 truncate text-h6', NOTE_TONE_CLASS[status.note.tone])}>
+          {status.note.text}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export interface PoliciesTableProps extends FeatureTableLayoutProps {
   rows: PolicyTableRow[];
@@ -146,7 +194,12 @@ export function PoliciesTable({
             )}
           </div>
         ),
-        meta: { width: 'flex-1 min-w-0' },
+        size: 480,
+        meta: {
+          label: 'Name',
+          width: 'flex-1 min-w-0',
+          gridCell: ({ row }) => <GridTextWithDetailCell text={row.original.name} detail={row.original.description} />,
+        },
       },
       {
         id: 'severity',
@@ -154,7 +207,14 @@ export function PoliciesTable({
         header: 'SEVERITY',
         cell: ({ row }: { row: Row<PolicyTableRow> }) => <PolicySeverity label={row.original.severityLabel} />,
         enableSorting: sortable,
-        meta: { width: 'w-[100px]', sortable, hideAt: 'md' },
+        size: 140,
+        meta: {
+          label: 'Severity',
+          width: 'w-[100px]',
+          sortable,
+          hideAt: 'md',
+          gridCell: ({ row }) => <DataTable.Cell text={row.original.severityLabel} />,
+        },
       },
     ];
 
@@ -162,12 +222,18 @@ export function PoliciesTable({
       cols.push({
         id: 'platform',
         header: 'PLATFORM',
-        cell: ({ row }: { row: Row<PolicyTableRow> }) => {
-          const platforms = row.original.platforms ?? [];
-          const osTypes = platforms.length > 0 ? platforms : ALL_PLATFORMS;
-          return <OSTypeBadgeGroup osTypes={osTypes} iconSize="w-6 h-6" />;
+        cell: ({ row }: { row: Row<PolicyTableRow> }) => (
+          <OSTypeBadgeGroup osTypes={policyPlatforms(row.original)} iconSize="w-6 h-6" />
+        ),
+        size: 160,
+        meta: {
+          label: 'Platform',
+          width: 'w-[140px]',
+          hideAt: 'lg',
+          gridCell: ({ row }) => (
+            <OSTypeBadgeGroup osTypes={policyPlatforms(row.original)} iconSize="w-5 h-5" className="flex-nowrap" />
+          ),
         },
-        meta: { width: 'w-[140px]', hideAt: 'lg' },
       });
     }
 
@@ -185,7 +251,14 @@ export function PoliciesTable({
         );
       },
       enableSorting: sortable,
-      meta: { width: 'w-[140px]', sortable, hideAt: 'md' },
+      size: 240,
+      meta: {
+        label: 'Status',
+        width: 'w-[140px]',
+        sortable,
+        hideAt: 'md',
+        gridCell: ({ row }) => <PolicyStatusGridCell status={row.original.status} />,
+      },
     });
 
     if (hasActions) {
@@ -199,7 +272,13 @@ export function PoliciesTable({
             </div>
           ) : null,
         enableSorting: false,
-        meta: { width: 'w-12 content-md:w-auto content-md:min-w-[100px] shrink-0 flex-none', align: 'right' },
+        size: GRID_ACTION_COLUMN_SIZE,
+        meta: {
+          width: 'w-12 content-md:w-auto content-md:min-w-[100px] shrink-0 flex-none',
+          align: 'right',
+          gridKind: 'action',
+          gridCell: ({ row }) => <PolicyActionsGridCell row={row.original} />,
+        },
       });
     }
 
@@ -209,7 +288,18 @@ export function PoliciesTable({
       cell: ({ row }: { row: Row<PolicyTableRow> }) =>
         row.original.href !== undefined ? <OpenPolicyButton href={row.original.href} name={row.original.name} /> : null,
       enableSorting: false,
-      meta: { width: 'w-12 shrink-0 flex-none', hideAt: 'md', align: 'right' },
+      size: GRID_ACTION_COLUMN_SIZE,
+      // Kept by hand, not `actionColumn()`: the cards table hides the button below `md`.
+      meta: {
+        width: 'w-12 shrink-0 flex-none',
+        hideAt: 'md',
+        align: 'right',
+        gridKind: 'action',
+        gridCell: ({ row }) =>
+          row.original.href !== undefined ? (
+            <OpenPolicyButton href={row.original.href} name={row.original.name} grid />
+          ) : null,
+      },
     });
 
     return cols;

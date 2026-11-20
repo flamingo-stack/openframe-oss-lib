@@ -5,6 +5,8 @@ import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
@@ -529,8 +531,9 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: archiving a PENDING device was never CONNECTED, so the counters are not touched")
-    void archivingPending_noConnectivitySync() {
+    @DisplayName("updateStatusByMachineId: a PENDING device counts in Software, so archiving it takes it out of the counters")
+    void archivingPending_syncsConnectivityOff() {
+        // setup
         Machine m = new Machine();
         m.setMachineId("m-pen");
         m.setTenantId("t-1");
@@ -538,10 +541,30 @@ class DeviceServiceTest {
         when(machineRepository.findByMachineId("m-pen")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
+        // execution
         service().updateStatusByMachineId("m-pen", DeviceStatus.ARCHIVED);
 
+        // verifications
+        verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-pen", false);
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: archiving a DELETED device has nothing left in Software to take out")
+    void archivingDeleted_noConnectivitySync() {
+        // setup
+        Machine m = new Machine();
+        m.setMachineId("m-del");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.DELETED);
+        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
+
+        // execution
+        service().updateStatusByMachineId("m-del", DeviceStatus.ARCHIVED);
+
+        // verifications
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
-        verify(machineWriter).update(eq("m-pen"), any(MachineUpdate.class));
+        verify(machineWriter).update(eq("m-del"), any(MachineUpdate.class));
     }
 
     @ParameterizedTest
@@ -781,6 +804,87 @@ class DeviceServiceTest {
         CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(2, "id-0"), null, null);
 
         assertThat(result.getPageInfo().isHasPreviousPage()).isTrue();
+    }
+
+    @Test
+    void queryDevicesAmong_restrictedToTheMachines_hidingWhatTheDevicesListHides() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.queryDevicesAmong(List.of("m1", "m2"), null, page(10, null), null, null);
+
+        // verifications
+        MachineQueryFilter filter = capturedFilter();
+        assertThat(filter.getRestrictToMachineIds()).containsExactly("m1", "m2");
+        assertThat(filter.getStatuses()).isNull();
+        assertThat(filter.getExcludeStatuses()).isNull();
+    }
+
+    @Test
+    void queryDevicesAmong_customerAndStatusFilter_narrowTheQuery() {
+        // setup
+        DeviceService s = service();
+        DeviceFilterCriteria criteria = DeviceFilterCriteria.builder()
+                .organizationIds(List.of("org-a"))
+                .statuses(List.of(DeviceStatus.MANAGED))
+                .build();
+
+        // execution
+        s.queryDevicesAmong(List.of("m1"), criteria, page(10, null), "mac", null);
+
+        // verifications
+        verify(machineRepository).countMachines(eq(TENANT_ID), machineQueryFilterCaptor.capture(), eq("mac"));
+        MachineQueryFilter filter = machineQueryFilterCaptor.getValue();
+        assertThat(filter.getOrganizationIds()).containsExactly("org-a");
+        assertThat(filter.getStatuses()).containsExactly(DeviceStatus.MANAGED.name());
+        assertThat(filter.getRestrictToMachineIds()).containsExactly("m1");
+    }
+
+    @Test
+    void queryDevicesAmong_sort_reachesThePageQuery() {
+        // setup
+        DeviceService s = service();
+        when(machineRepository.isSortableField("hostname")).thenReturn(true);
+        SortInput byHostname = SortInput.builder().field("hostname").direction(SortDirection.ASC).build();
+
+        // execution
+        s.queryDevicesAmong(List.of("m1"), null, page(10, null), null, byHostname);
+
+        // verifications
+        verify(machineRepository).findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                isNull(), eq(11), eq("hostname"), eq("ASC"));
+    }
+
+    @Test
+    void queryDevicesAmong_noMachines_restrictedToNoDevice() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.queryDevicesAmong(null, null, page(10, null), null, null);
+
+        // verifications
+        assertThat(capturedFilter().getRestrictToMachineIds()).isEmpty();
+    }
+
+    @Test
+    void getDeviceFiltersAmong_facetsAndCountRestrictedToTheMachines() {
+        // setup
+        DeviceService s = service();
+        DeviceFilterCriteria criteria = DeviceFilterCriteria.builder().organizationIds(List.of("org-a")).build();
+
+        // execution
+        s.getDeviceFiltersAmong(List.of("m1", "m2"), criteria, "mac");
+
+        // verifications
+        verify(machineRepository).facet(eq(TENANT_ID), machineQueryFilterCaptor.capture(), eq("mac"),
+                eq(DeviceFacetDimension.ORGANIZATION_ID));
+        MachineQueryFilter facetFilter = machineQueryFilterCaptor.getValue();
+        assertThat(facetFilter.getRestrictToMachineIds()).containsExactly("m1", "m2");
+        assertThat(facetFilter.getOrganizationIds()).containsExactly("org-a");
+        assertThat(facetFilter.getExcludeStatuses()).isNull();
+        assertThat(capturedFilter().getRestrictToMachineIds()).containsExactly("m1", "m2");
     }
 
     private static CursorPaginationCriteria page(int limit, String cursor) {

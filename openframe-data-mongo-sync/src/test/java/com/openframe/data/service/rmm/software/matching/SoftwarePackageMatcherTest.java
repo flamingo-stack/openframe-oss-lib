@@ -181,8 +181,8 @@ class SoftwarePackageMatcherTest {
         // setup
         PackageCatalogEntry slackCask = PackageCatalogEntry.builder().manager(PackageManagerType.BREW)
                 .brewType(BrewPackageType.CASK).packageId("slack").name("Slack").aliases(List.of())
-                .appNames(List.of("slack")).weakAppNames(List.of()).bundleIds(List.of()).bundleIdPrefixes(List.of())
-                .build();
+                .appNames(List.of("slack")).weakAppNames(List.of()).bundleIds(List.of("com.tinyspeck.slackmacgap"))
+                .bundleIdPrefixes(List.of()).build();
         BrewCaskIndex brewCaskIndex = new BrewCaskIndex(List.of(slackCask));
         when(brewCaskIndexCache.getBrewCaskIndex()).thenReturn(brewCaskIndex);
         BrewAppMatcher brewAppMatcher = new BrewAppMatcher(brewCaskIndexCache);
