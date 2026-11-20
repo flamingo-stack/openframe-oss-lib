@@ -179,8 +179,15 @@ export type {
 } from './query-report-table';
 
 // Pagination components
-export { CursorPagination, CursorPaginationSimple } from './cursor-pagination';
+export { CursorPagination, CursorPaginationSimple, cursorPaginationText } from './cursor-pagination';
 export type { CursorPaginationProps } from './cursor-pagination';
+export {
+  AUTO_REFRESH_OFF,
+  AutoRefreshControl,
+  DEFAULT_AUTO_REFRESH_OPTIONS,
+  autoRefreshIntervalMs,
+} from './auto-refresh-control';
+export type { AutoRefreshControlProps, AutoRefreshOption } from './auto-refresh-control';
 
 // DataTable (headless, TanStack Table-based): the lib's one table.
 export * from './data-table';

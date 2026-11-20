@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useMemo } from 'react';
+import type { CursorPagerFooterProps } from '../../../hooks/state/use-cursor-pager';
 import { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
 import {
   type ColumnFiltersState,
@@ -10,6 +11,7 @@ import {
   type NoDataProps,
   type OnChangeFn,
 } from '../../ui';
+import { AutoRefreshControl, type AutoRefreshControlProps } from '../../ui/auto-refresh-control';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { useDeviceStatusDisplay } from './device-status-display';
 import { deviceStatusFilterGroups, joinStatusFilterValue, splitStatusFilterValue } from './device-statuses';
@@ -136,6 +138,13 @@ export interface DevicesListProps<T extends DeviceRow = DeviceRow> {
     onLoadMore: () => void;
     skeletonRows?: number;
   };
+  /**
+   * A paged list: the First · Prev · Next footer with the range ("21–40 of 340 devices"), from the host's
+   * `useCursorPager` `footerProps`. Wins over `infiniteScroll`.
+   */
+  pager?: CursorPagerFooterProps;
+  /** The auto-refresh picker, above the table at its right edge. Only a list that refetches its page passes it. */
+  refresh?: AutoRefreshControlProps;
 
   /**
    * Pins the search / tag toolbar to the top of the scroll area, as the fleet
@@ -206,6 +215,8 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
   narrowedEmptyState,
   skeletonRows = DEVICES_LIST_SKELETON_ROWS,
   infiniteScroll,
+  pager,
+  refresh,
   stickyToolbar = true,
   stickyHeaderOffset,
   className,
@@ -347,6 +358,11 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
       {/* Dim (don't unmount) the stale rows while a refetch is in flight, the
           subtle fade is the pending feedback, and the search box above keeps its
           focus because nothing under it is torn down. */}
+      {refresh && (
+        <div className="flex justify-end pb-[var(--spacing-system-xxs)]">
+          <AutoRefreshControl {...refresh} />
+        </div>
+      )}
       <div className={`transition-opacity duration-200 ${isPending ? 'opacity-60' : ''}`}>
         <DevicesTableBody
           devices={devices}
@@ -374,13 +390,24 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
           disableColumnFilters={hideFilters}
           totalCount={totalCount}
           footerSlot={
-            infiniteScroll && (
-              <DataTable.InfiniteFooter
-                hasNextPage={infiniteScroll.hasNextPage}
-                isFetchingNextPage={infiniteScroll.isFetchingNextPage}
-                onLoadMore={infiniteScroll.onLoadMore}
-                skeletonRows={infiniteScroll.skeletonRows}
+            pager ? (
+              <DataTable.CursorFooter
+                {...pager}
+                itemName={totalCount === 1 ? 'device' : 'devices'}
+                totalCount={totalCount}
+                // While the next page is read the rows on screen are the last page's: the buttons wait for it (the
+                // count stays), so a second Next cannot resend the same cursor under the next page's index.
+                loading={isLoading || !!isPending}
               />
+            ) : (
+              infiniteScroll && (
+                <DataTable.InfiniteFooter
+                  hasNextPage={infiniteScroll.hasNextPage}
+                  isFetchingNextPage={infiniteScroll.isFetchingNextPage}
+                  onLoadMore={infiniteScroll.onLoadMore}
+                  skeletonRows={infiniteScroll.skeletonRows}
+                />
+              )
             )
           }
         />
