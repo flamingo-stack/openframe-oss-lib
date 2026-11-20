@@ -4,10 +4,12 @@ import com.netflix.graphql.dgs.DgsComponent;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.rmm.software.AdoptSoftwareInput;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.service.rmm.software.SoftwareInstallUpdateManagementService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,8 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+
 @DgsComponent
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -27,6 +31,7 @@ import java.util.List;
 public class SoftwareInstallUpdatedDataFetcher {
 
     private final SoftwareInstallUpdateManagementService softwareInstallUpdateManagementService;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsMutation
     public List<SoftwareDispatchResult> installSoftware(@InputArgument @Valid SoftwareManagementInput input) {
@@ -36,6 +41,18 @@ public class SoftwareInstallUpdatedDataFetcher {
     @DgsMutation
     public List<SoftwareDispatchResult> updateSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.update(input, getCurrentUserId(), ExecutionSource.PACKAGE_UPDATE);
+    }
+
+    @DgsMutation
+    public List<String> adoptSoftware(@InputArgument @Valid AdoptSoftwareInput input) {
+        List<String> machineGlobalIds = input.getMachineIds();
+        List<String> machineIds = relayIdCodec.decodeAll(machineGlobalIds, MACHINE);
+        input.setMachineIds(machineIds);
+        String initiatedBy = getCurrentUserId();
+        List<String> orderedMachineIds = softwareInstallUpdateManagementService.adopt(input, initiatedBy);
+        return orderedMachineIds.stream()
+                .map(machineId -> relayIdCodec.encode(MACHINE, machineId))
+                .toList();
     }
 
     private String getCurrentUserId() {

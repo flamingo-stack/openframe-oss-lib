@@ -5,9 +5,11 @@ import { cn } from '../../../utils/cn';
 import { AgentMark } from '../../agent-mark';
 import { MonitorIcon } from '../../icons-v2-generated/devices/monitor-icon';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { DataTableCell, type DataTableCellLeading } from '../../ui/data-table/data-table-cell';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { GridTextWithDetailCell } from '../feature-table-grid-cells';
 import { scriptExecutionStatus } from './execution-status';
 
 /**
@@ -17,19 +19,25 @@ import { scriptExecutionStatus } from './execution-status';
  * page, the deleted-user avatar) as slots.
  */
 
-/** How an execution was dispatched, as the chip beside the person it ran for. */
-export function ExecutionSourceBadge({ source, className }: { source: string | null | undefined; className?: string }) {
-  // A `span`: the chip sits inside a line of text. It never shrinks; the name beside it ellipsizes.
-  // Labels are sentence case here; the Tag's h5 type scale uppercases them.
-  const tagProps = { as: 'span', variant: 'outline', className: cn('shrink-0', className) } as const;
-
-  if (source === 'SCHEDULED') return <Tag {...tagProps} label="Scheduled" />;
-  if (source === 'AI_ASSISTANT') {
-    // Mingo's own mark, the way the product stamps it everywhere else.
-    return <Tag {...tagProps} label="Mingo" icon={<AgentMark agent="mingo" className="size-4" />} />;
-  }
+/**
+ * The chip a source draws beside the person an execution ran for, or `null` where it draws none. The ONE place that
+ * says which sources have a chip: the badge draws it, and a grid cell asks it whether there is a tag to make room for.
+ * Labels are sentence case here; the Tag's h5 type scale uppercases them.
+ */
+function executionSourceChip(source: string | null | undefined): { label: string; icon?: ReactNode } | null {
+  if (source === 'SCHEDULED') return { label: 'Scheduled' };
+  // Mingo's own mark, the way the product stamps it everywhere else.
+  if (source === 'AI_ASSISTANT') return { label: 'Mingo', icon: <AgentMark agent="mingo" className="size-4" /> };
   // MANUAL draws nothing: the person is the technician who clicked Run, so a chip would restate the name.
   return null;
+}
+
+/** How an execution was dispatched, as the chip beside the person it ran for. */
+export function ExecutionSourceBadge({ source, className }: { source: string | null | undefined; className?: string }) {
+  const chip = executionSourceChip(source);
+  if (!chip) return null;
+  // A `span`: the chip sits inside a line of text. It never shrinks; the name beside it ellipsizes.
+  return <Tag as="span" variant="outline" className={cn('shrink-0', className)} label={chip.label} icon={chip.icon} />;
 }
 
 /**
@@ -123,6 +131,80 @@ export function ExecutionResultCell({ result, empty = null }: { result?: string 
   // While the row is read (a loading scope) the output is two bars (`TruncateText`'s own loading form).
   const loading = useLoadingScope();
   return result || loading ? <TruncateText lines={2}>{result ?? ''}</TruncateText> : <>{empty}</>;
+}
+
+/*
+ * The same cells in the grid layout: one 48px line each, the card cell's second line after its first. Where that
+ * second line is long (an id, a customer) the cell is `GridTextWithDetailCell`: the subject keeps its width and the
+ * detail is the part a narrow column cuts.
+ * A row still being read (a host's placeholder row in a loading scope) has no field yet: the main text is then empty,
+ * never absent, so the cell draws its bar.
+ */
+
+const GRID_ICON_CLASS = 'size-5';
+
+/** When an execution was dispatched, with its id beside it. The time stays whole; the id is the part cut. */
+export function ExecutionTimestampGridCell({ timestamp, executionId }: { timestamp: string; executionId: string }) {
+  return <GridTextWithDetailCell text={timestamp || ''} detail={executionId || undefined} />;
+}
+
+/** A status as its tag. */
+export function ExecutionStatusGridCell({ status }: { status: string | null | undefined }) {
+  const presentation = scriptExecutionStatus(status);
+  return (
+    <DataTableCell
+      tag={<Tag label={presentation?.label ?? String(status ?? '')} variant={presentation?.variant ?? 'grey'} />}
+    />
+  );
+}
+
+/** The device an execution ran on, with its customer beside it. The device stays whole; the customer is the part cut. */
+export function ExecutionDeviceGridCell({ name, organization }: { name: string; organization?: string | null }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]">
+      <span data-part="leading" className="flex size-5 shrink-0 items-center justify-center text-ods-text-secondary">
+        <MonitorIcon className={GRID_ICON_CLASS} />
+      </span>
+      <GridTextWithDetailCell text={name || ''} detail={organization || undefined} />
+    </div>
+  );
+}
+
+/**
+ * Who an execution ran for: the avatar, the name, the chip of what dispatched it, and the script's name where a list
+ * runs several. The grid's cell is text, so the name is not a link here: the row opens the execution.
+ *
+ * This one stays `DataTable.Cell`, which draws the avatar and the chip: beside a long script name the person's name
+ * keeps its first characters and the chip is never cut.
+ */
+export function ExecutionInitiatorGridCell({
+  leading,
+  name,
+  source,
+  scriptName,
+}: {
+  /** The person's avatar (`{ type: 'avatar', src, name }`), or the host's own mark for a deleted account. */
+  leading?: DataTableCellLeading;
+  name: string;
+  source?: string | null;
+  scriptName?: string | null;
+}) {
+  return (
+    <DataTableCell
+      leading={leading}
+      text={name || ''}
+      // No chip, no tag: an empty tag would still take its gap in the line.
+      tag={executionSourceChip(source) ? <ExecutionSourceBadge source={source} /> : undefined}
+      secondary={scriptName || undefined}
+    />
+  );
+}
+
+/** The Result column in one line: what the run printed, or the host's empty mark. */
+export function ExecutionResultGridCell({ result, empty = null }: { result?: string | null; empty?: ReactNode }) {
+  // While the row is read (a loading scope) the output is a bar (the text's own loading form).
+  const loading = useLoadingScope();
+  return result || loading ? <DataTableCell text={result ?? ''} /> : <>{empty}</>;
 }
 
 /**

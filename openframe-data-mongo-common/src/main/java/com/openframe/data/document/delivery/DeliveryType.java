@@ -9,5 +9,6 @@ public enum DeliveryType {
     CLIENT_FEATURE_FLAGS,
     PACKAGE_UPDATE,
     REMOTE_ACCESS_REQUEST,
+    PACKAGE_ADOPT,
     TOOL_UNINSTALL
 }

@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
@@ -45,6 +46,22 @@ class NatsStreamConfigurationInitializerTest {
                 .contains("EXECUTION_ACKNOWLEDGE", "INSTALLED_AGENTS")
                 .doesNotContainAnyElementsOf(REMOVED);
         REMOVED.forEach(name -> verify(streams).deleteIfExists(name));
+    }
+
+    @Test
+    void run_packageAdoptStatusStream_savedForTheAgentsStatusSubject() {
+        // setup
+        when(additional.provide()).thenReturn(List.of());
+
+        // execution
+        initializer.run(null);
+
+        // verifications
+        ArgumentCaptor<StreamConfiguration> saved = ArgumentCaptor.forClass(StreamConfiguration.class);
+        verify(streams, atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues())
+                .extracting(StreamConfiguration::getName, StreamConfiguration::getSubjects)
+                .contains(tuple("PACKAGE_ADOPT_STATUS", List.of("machine.*.package-adopt.status")));
     }
 
     @Test

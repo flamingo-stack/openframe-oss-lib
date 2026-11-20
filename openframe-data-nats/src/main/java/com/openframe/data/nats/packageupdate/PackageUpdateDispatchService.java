@@ -10,6 +10,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.nats.delivery.PackageAdoptDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
@@ -68,61 +69,104 @@ public class PackageUpdateDispatchService {
     // PackageUpdateEligibilityService first, a state written for such a device would stay SCHEDULED for good.
     public String dispatch(RunningExecutionRows execution, BrewPackageType brewPackageType, PackageUpdateSource source,
                            PackageUpdateMode mode, Integer forceCountdownSeconds, Long deadlineSeconds) {
-        String tenantId = tenantIdProvider.getTenantId();
-        String requestId = UUID.randomUUID().toString();
-        Instant now = Instant.now();
         // the device state is unique per request and machine, so a repeated id would fail the whole dispatch
         List<String> targets = execution.getMachineIds().stream().distinct().toList();
         requireReachable(targets);
 
-        scriptExecutionRepository.saveQueued(execution.toBuilder()
-                .tenantId(tenantId)
-                .machineIds(targets)
-                .packageUpdateRequestId(requestId)
-                .build());
-
-        PackageUpdateRequest request = PackageUpdateRequest.builder()
-                .tenantId(tenantId)
-                .requestId(requestId)
-                .executionId(execution.getExecutionId())
-                .action(SoftwareAction.UPDATE)
-                .source(source)
-                .packageManager(execution.getPackageManager())
-                .packageName(execution.getPackageName())
+        PackageUpdateRequest request = newRequest(execution, targets, SoftwareAction.UPDATE, SoftwareActionStatus.SCHEDULED)
                 .brewPackageType(brewPackageType)
+                .source(source)
                 .mode(mode)
                 .forceCountdownSeconds(forceCountdownSeconds)
                 .deadlineSeconds(deadlineSeconds)
-                .status(SoftwareActionStatus.SCHEDULED)
-                .machineIds(targets)
-                .totalMachineCount(targets.size())
-                .attempts(1)
-                .initiatedBy(execution.getInitiatedBy())
-                .createdAt(now)
-                .updatedAt(now)
                 .build();
-        requestRepository.save(request);
-
-        deviceStateRepository.saveAll(targets.stream()
-                .map(machineId -> PackageUpdateDeviceState.builder()
-                        .tenantId(tenantId)
-                        .requestId(requestId)
-                        .machineId(machineId)
-                        .status(SoftwareActionStatus.SCHEDULED)
-                        .mode(mode)
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build())
-                .toList());
+        record(execution, request);
 
         targets.stream()
                 .map(machineId -> PackageUpdateWire.seed(machineId, request))
                 .forEach(deliveryRouter::dispatch);
 
+        String requestId = request.getRequestId();
         log.info("Package-update dispatched requestId={} executionId={} source={} mode={} machines={} package={}/{}",
                 requestId, execution.getExecutionId(), source, mode, targets.size(), execution.getPackageManager(),
                 execution.getPackageName());
         return requestId;
+    }
+
+    // the caller checks that the PACKAGE_ADOPT order reaches every device; the agent reports no progress, only the
+    // outcome, so the request starts IN_PROGRESS
+    public String dispatchAdopt(RunningExecutionRows execution, BrewPackageType brewPackageType, String softwareId,
+                                String bundleId) {
+        List<String> targets = execution.getMachineIds().stream().distinct().toList();
+        PackageUpdateRequest request = newRequest(execution, targets, SoftwareAction.ADOPT, SoftwareActionStatus.IN_PROGRESS)
+                .brewPackageType(brewPackageType)
+                .source(PackageUpdateSource.ADMIN)
+                .softwareId(softwareId)
+                .build();
+        record(execution, request);
+
+        String requestId = request.getRequestId();
+        PackageReference packageRef = PackageUpdateWire.reference(execution.getPackageManager(),
+                execution.getPackageName(), brewPackageType);
+        targets.stream()
+                .map(machineId -> PackageAdoptDeliverySeed.builder()
+                        .machineId(machineId)
+                        .requestId(requestId)
+                        .packageRef(packageRef)
+                        .bundleId(bundleId)
+                        .build())
+                .forEach(deliveryRouter::dispatch);
+
+        log.info("Package-adopt dispatched requestId={} executionId={} machines={} package={}/{}",
+                requestId, execution.getExecutionId(), targets.size(), execution.getPackageManager(),
+                execution.getPackageName());
+        return requestId;
+    }
+
+    private PackageUpdateRequest.PackageUpdateRequestBuilder newRequest(RunningExecutionRows execution, List<String> targets,
+                                                                        SoftwareAction action, SoftwareActionStatus status) {
+        String tenantId = tenantIdProvider.getTenantId();
+        String requestId = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        return PackageUpdateRequest.builder()
+                .tenantId(tenantId)
+                .requestId(requestId)
+                .executionId(execution.getExecutionId())
+                .action(action)
+                .packageManager(execution.getPackageManager())
+                .packageName(execution.getPackageName())
+                .status(status)
+                .machineIds(targets)
+                .totalMachineCount(targets.size())
+                .attempts(1)
+                .initiatedBy(execution.getInitiatedBy())
+                .createdAt(now)
+                .updatedAt(now);
+    }
+
+    private void record(RunningExecutionRows execution, PackageUpdateRequest request) {
+        String tenantId = request.getTenantId();
+        String requestId = request.getRequestId();
+        List<String> targets = request.getMachineIds();
+        scriptExecutionRepository.saveQueued(execution.toBuilder()
+                .tenantId(tenantId)
+                .machineIds(targets)
+                .packageUpdateRequestId(requestId)
+                .build());
+        requestRepository.save(request);
+
+        Instant createdAt = request.getCreatedAt();
+        deviceStateRepository.saveAll(targets.stream()
+                .map(machineId -> PackageUpdateDeviceState.builder()
+                        .tenantId(tenantId)
+                        .requestId(requestId)
+                        .machineId(machineId)
+                        .status(request.getStatus())
+                        .mode(request.getMode())
+                        .createdAt(createdAt)
+                        .updatedAt(createdAt)
+                        .build())
+                .toList());
     }
 
     private void requireReachable(List<String> targets) {

@@ -1,6 +1,7 @@
 package com.openframe.management.initializer;
 
 import com.openframe.data.nats.delivery.DeliveryResultMessage;
+import com.openframe.data.nats.packageadopt.PackageAdoptStatusMessage;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
 import com.openframe.data.nats.model.MachineOsInfoMessage;
 import com.openframe.data.nats.rmm.model.MachinePackageManagersMessage;
@@ -83,6 +84,13 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
             StreamConfiguration.builder()
                     .name(PackageUpdateStatusMessage.STREAM)
                     .subjects(List.of(PackageUpdateStatusMessage.SUBJECT_FILTER))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .maxAge(Duration.ofDays(1))
+                    .build(),
+            StreamConfiguration.builder()
+                    .name(PackageAdoptStatusMessage.STREAM)
+                    .subjects(List.of(PackageAdoptStatusMessage.SUBJECT_FILTER))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .maxAge(Duration.ofDays(1))

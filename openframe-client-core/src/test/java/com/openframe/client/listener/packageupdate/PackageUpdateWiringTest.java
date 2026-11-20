@@ -38,12 +38,12 @@ class PackageUpdateWiringTest {
                     PackageAutoUpdateRetry.class);
 
     @Test
-    void packageUpdateOff_nothingOfTheFeatureRuns() {
+    void packageUpdateOff_nothingOfTheFeatureRunsButTheHistoryRecorderAdoptionsUse() {
         runner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).doesNotHaveBean(PackageUpdateStatusListener.class);
             assertThat(context).doesNotHaveBean(PackageUpdateStatusProcessor.class);
-            assertThat(context).doesNotHaveBean(PackageUpdateExecutionRecorder.class);
+            assertThat(context).hasSingleBean(PackageUpdateExecutionRecorder.class);
             assertThat(context).doesNotHaveBean(PackageUpdateDeliveryFailureListener.class);
             assertThat(context).doesNotHaveBean(PackageAutoUpdateRetry.class);
         });

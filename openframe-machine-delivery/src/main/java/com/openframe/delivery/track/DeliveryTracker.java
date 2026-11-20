@@ -6,7 +6,10 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
+import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliverySpec;
+import com.openframe.delivery.spec.DeliverySpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,6 +26,7 @@ public class DeliveryTracker {
     private final MachineDeliveryRepository repository;
     private final DeliveryProperties properties;
     private final DeliveryCloser closer;
+    private final DeliverySpecRegistry deliverySpecRegistry;
     private final ApplicationEventPublisher eventPublisher;
 
     // ref = the delivery block the agent copied back from the command; the row is looked up by that exact dispatch
@@ -32,8 +36,7 @@ public class DeliveryTracker {
         String dispatchId = ref.getDispatchId();
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
-        Policy policy = properties.resolve(type);
-        long resultTimeoutSeconds = policy.getResultTimeoutSeconds();
+        long resultTimeoutSeconds = resultTimeoutSeconds(type);
         Instant resultDueAt = now.plusSeconds(resultTimeoutSeconds);
         boolean acked = repository.markAcked(id, dispatchId, DeliveryStatus.UNACKED, now, resultDueAt);
         if (acked) {
@@ -103,5 +106,20 @@ public class DeliveryTracker {
         Policy policy = properties.resolve(type);
         long ttlSeconds = policy.getTtlSeconds();
         return now.plusSeconds(ttlSeconds);
+    }
+
+    private long resultTimeoutSeconds(DeliveryType type) {
+        PolicyOverride configured = properties.getTypes().get(type);
+        if (configured != null && configured.getResultTimeoutSeconds() != null) {
+            return configured.getResultTimeoutSeconds();
+        }
+        Long specTimeout = deliverySpecRegistry.find(type)
+                .map(DeliverySpec::getResultTimeoutSeconds)
+                .orElse(null);
+        if (specTimeout != null) {
+            return specTimeout;
+        }
+        Policy policy = properties.resolve(type);
+        return policy.getResultTimeoutSeconds();
     }
 }
