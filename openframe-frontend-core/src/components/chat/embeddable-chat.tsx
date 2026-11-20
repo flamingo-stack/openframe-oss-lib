@@ -534,8 +534,8 @@ export interface EmbeddableChatProps {
   onModelClick?: () => void;
   /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
   modelTooltip?: string;
-  /** Replaces the composer’s model label, leaving its usage details in place. */
-  renderComposerModelLabel?: ModelDisplayProps['renderLabel'];
+  /** The model is picked from the composer: its model name opens this menu. */
+  composerModelMenu?: ModelDisplayProps['modelMenu'];
   /** The composer's own ⋯ menu, at the end of its input row (e.g. "Compact
    *  Chat Memory", disabled when there is nothing to compact). */
   composerMenuItems?: ActionsMenuItem[];
@@ -874,7 +874,7 @@ function EmbeddableChatInner({
   showModel = true,
   onModelClick,
   modelTooltip,
-  renderComposerModelLabel,
+  composerModelMenu,
   composerMenuItems,
   composerFooterActions,
   composerContextLeading,
@@ -2767,7 +2767,7 @@ function EmbeddableChatInner({
               usagePanel: usagePanel ?? undefined,
               onModelClick,
               modelTooltip,
-              renderLabel: renderComposerModelLabel,
+              modelMenu: composerModelMenu,
             }
           : undefined
       }

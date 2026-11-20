@@ -6,31 +6,11 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Button } from '../../ui/button';
 import { ModelDisplay } from '../model-display';
 
 describe('ModelDisplay context budget', () => {
   it('shows the tokens held against the budget', () => {
     render(<ModelDisplay provider="anthropic" modelName="Claude" usedTokens={12_300} contextWindow={150_000} />);
-    expect(screen.getByText('12.3K/150K context budget')).toBeInTheDocument();
-  });
-
-  it('renders a host model control alongside the context budget', () => {
-    render(
-      <ModelDisplay
-        provider="anthropic"
-        modelName="claude"
-        displayName="Claude"
-        usedTokens={12_300}
-        contextWindow={150_000}
-        renderLabel={({ name, provider }) => (
-          <Button type="button">
-            {provider} {name}
-          </Button>
-        )}
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'anthropic Claude' })).toBeInTheDocument();
     expect(screen.getByText('12.3K/150K context budget')).toBeInTheDocument();
   });
 
