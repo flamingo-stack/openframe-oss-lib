@@ -5,6 +5,8 @@ import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
@@ -781,6 +783,87 @@ class DeviceServiceTest {
         CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(2, "id-0"), null, null);
 
         assertThat(result.getPageInfo().isHasPreviousPage()).isTrue();
+    }
+
+    @Test
+    void queryDevicesAmong_restrictedToTheMachines_hidingWhatTheDevicesListHides() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.queryDevicesAmong(List.of("m1", "m2"), null, page(10, null), null, null);
+
+        // verifications
+        MachineQueryFilter filter = capturedFilter();
+        assertThat(filter.getRestrictToMachineIds()).containsExactly("m1", "m2");
+        assertThat(filter.getStatuses()).isNull();
+        assertThat(filter.getExcludeStatuses()).isNull();
+    }
+
+    @Test
+    void queryDevicesAmong_customerAndStatusFilter_narrowTheQuery() {
+        // setup
+        DeviceService s = service();
+        DeviceFilterCriteria criteria = DeviceFilterCriteria.builder()
+                .organizationIds(List.of("org-a"))
+                .statuses(List.of(DeviceStatus.MANAGED))
+                .build();
+
+        // execution
+        s.queryDevicesAmong(List.of("m1"), criteria, page(10, null), "mac", null);
+
+        // verifications
+        verify(machineRepository).countMachines(eq(TENANT_ID), machineQueryFilterCaptor.capture(), eq("mac"));
+        MachineQueryFilter filter = machineQueryFilterCaptor.getValue();
+        assertThat(filter.getOrganizationIds()).containsExactly("org-a");
+        assertThat(filter.getStatuses()).containsExactly(DeviceStatus.MANAGED.name());
+        assertThat(filter.getRestrictToMachineIds()).containsExactly("m1");
+    }
+
+    @Test
+    void queryDevicesAmong_sort_reachesThePageQuery() {
+        // setup
+        DeviceService s = service();
+        when(machineRepository.isSortableField("hostname")).thenReturn(true);
+        SortInput byHostname = SortInput.builder().field("hostname").direction(SortDirection.ASC).build();
+
+        // execution
+        s.queryDevicesAmong(List.of("m1"), null, page(10, null), null, byHostname);
+
+        // verifications
+        verify(machineRepository).findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                isNull(), eq(11), eq("hostname"), eq("ASC"));
+    }
+
+    @Test
+    void queryDevicesAmong_noMachines_restrictedToNoDevice() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.queryDevicesAmong(null, null, page(10, null), null, null);
+
+        // verifications
+        assertThat(capturedFilter().getRestrictToMachineIds()).isEmpty();
+    }
+
+    @Test
+    void getDeviceFiltersAmong_facetsAndCountRestrictedToTheMachines() {
+        // setup
+        DeviceService s = service();
+        DeviceFilterCriteria criteria = DeviceFilterCriteria.builder().organizationIds(List.of("org-a")).build();
+
+        // execution
+        s.getDeviceFiltersAmong(List.of("m1", "m2"), criteria, "mac");
+
+        // verifications
+        verify(machineRepository).facet(eq(TENANT_ID), machineQueryFilterCaptor.capture(), eq("mac"),
+                eq(DeviceFacetDimension.ORGANIZATION_ID));
+        MachineQueryFilter facetFilter = machineQueryFilterCaptor.getValue();
+        assertThat(facetFilter.getRestrictToMachineIds()).containsExactly("m1", "m2");
+        assertThat(facetFilter.getOrganizationIds()).containsExactly("org-a");
+        assertThat(facetFilter.getExcludeStatuses()).isNull();
+        assertThat(capturedFilter().getRestrictToMachineIds()).containsExactly("m1", "m2");
     }
 
     private static CursorPaginationCriteria page(int limit, String cursor) {
