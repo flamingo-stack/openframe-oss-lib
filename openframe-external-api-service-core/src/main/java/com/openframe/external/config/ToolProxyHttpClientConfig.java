@@ -15,7 +15,7 @@ import java.time.Duration;
 @Configuration
 public class ToolProxyHttpClientConfig {
 
-    static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
     static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(25);
     static final Duration CONNECTION_REQUEST_TIMEOUT = Duration.ofSeconds(3);
     static final int MAX_CONNECTIONS_PER_ROUTE = 20;
