@@ -14,7 +14,7 @@
  * Every other tool row stays a row: only the server says a result is the answer.
  */
 import type { ChatPart, ChatSourcePart, ChatSuggestionGroup, ChatSuggestionPrompt, ChatToolPart } from './chat-message';
-import { isToolPart } from './chat-message';
+import { isSourcePart, isToolPart } from './chat-message';
 import { normalizeRecordUri } from './record-link';
 
 type JsonObject = Record<string, unknown>;
@@ -127,10 +127,15 @@ function isAnswerRow(part: ChatPart): part is Extract<ChatToolPart, { state: 'ou
 
 /**
  * The message's parts, with the result of each row marked as the answer drawn right after that row. The same array when
- * no row is marked, or a marked result holds nothing to draw.
+ * no row is marked, or a marked result holds nothing to draw. A source the server already sent for the message (the
+ * agent publishes the records a result names) is not added again.
  */
 export function withToolAnswer(parts: readonly ChatPart[]): readonly ChatPart[] {
   if (parts.some(part => part.type === 'data-error') || !parts.some(isAnswerRow)) return parts;
-  const shown = parts.flatMap(part => (isAnswerRow(part) ? [part, ...toolAnswerParts(part.output)] : [part]));
+  const sent = new Set(parts.filter(isSourcePart).map(part => normalizeRecordUri(part.sourceId) ?? part.sourceId));
+  const isNew = (part: ChatPart) => !isSourcePart(part) || !sent.has(part.sourceId);
+  const shown = parts.flatMap(part =>
+    isAnswerRow(part) ? [part, ...toolAnswerParts(part.output).filter(isNew)] : [part],
+  );
   return shown.length === parts.length ? parts : shown;
 }

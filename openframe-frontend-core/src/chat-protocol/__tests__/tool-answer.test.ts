@@ -98,6 +98,23 @@ describe('withToolAnswer', () => {
     expect(shown.map(part => part.type)).toEqual(['text', 'dynamic-tool', 'text', 'data-suggestions', 'text']);
   });
 
+  it('does not add again a source the server already sent for the message', () => {
+    const sent: ChatPart = {
+      type: 'source-url',
+      sourceId: 'record://blog_post/12',
+      url: 'https://www.flamingo.run/blog/a',
+    };
+    const shown = withToolAnswer([sent, toolPart(searchResult)]);
+    expect(shown.filter(part => part.type === 'source-url').map(part => part.sourceId)).toEqual([
+      'record://blog_post/12',
+    ]);
+    expect(shown.filter(part => part.type === 'source-document')).toHaveLength(1);
+    expect(shown.find(part => part.type === 'data-record-cards')).toEqual({
+      type: 'data-record-cards',
+      data: { records: ['record://blog_post/12', 'record://hubspot_ticket_anon/48'] },
+    });
+  });
+
   it('leaves a row the server did not mark, even when the turn ends on it', () => {
     const parts = [toolPart(JSON.stringify(quickActions), false)];
     expect(withToolAnswer(parts)).toBe(parts);
