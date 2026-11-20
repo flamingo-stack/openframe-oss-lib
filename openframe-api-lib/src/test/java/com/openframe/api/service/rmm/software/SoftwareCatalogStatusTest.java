@@ -125,13 +125,46 @@ class SoftwareCatalogStatusTest {
     }
 
     @Test
-    void devicesOnDifferentVersions_areOutdatedWithoutTheCatalog() {
+    void apply_olderVersionsInUseWithoutACatalogMatch_unknownAndOlderCountKept() {
+        // setup
         SoftwareResponse chrome = row("Google Chrome", SoftwareSource.UNMANAGED, "141.0", 2);
 
+        // execution
         status().apply(List.of(chrome));
 
-        assertThat(chrome.getVersionStatus()).isEqualTo(SoftwareVersionStatus.OUTDATED);
+        // verifications
+        assertThat(chrome)
+                .extracting(SoftwareResponse::getVersionStatus, SoftwareResponse::getOlderVersionsCount)
+                .containsExactly(SoftwareVersionStatus.UNKNOWN, 2);
         verifyNoInteractions(catalogRepository);
+    }
+
+    @Test
+    void apply_currentAtTheCatalogLatestWithOlderVersionsInUse_upToDateAndOlderCountKept() {
+        // setup
+        SoftwareResponse xz = row("xz", SoftwareSource.BREW, "5.8.4", 3);
+        catalog(entry("xz", "5.8.4", BrewPackageType.FORMULA));
+
+        // execution
+        status().apply(List.of(xz));
+
+        // verifications
+        assertThat(xz)
+                .extracting(SoftwareResponse::getVersionStatus, SoftwareResponse::getOlderVersionsCount)
+                .containsExactly(SoftwareVersionStatus.UP_TO_DATE, 3);
+    }
+
+    @Test
+    void apply_currentBehindTheCatalogLatestWithOlderVersionsInUse_outdated() {
+        // setup
+        SoftwareResponse xz = row("xz", SoftwareSource.BREW, "5.8.3", 3);
+        catalog(entry("xz", "5.8.4", BrewPackageType.FORMULA));
+
+        // execution
+        status().apply(List.of(xz));
+
+        // verifications
+        assertThat(xz.getVersionStatus()).isEqualTo(SoftwareVersionStatus.OUTDATED);
     }
 
     // with one version everywhere and no catalog entry nothing says whether a newer release is out

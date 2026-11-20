@@ -17,6 +17,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.delivery.dispatch.DeliveryDispatcher;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.track.DeliveryTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -84,6 +85,7 @@ public class PackageUpdateStatusProcessor {
         timeNextPrompt(state, event);
         driveNextPrompt(state, request, machineId);
         driveDeadlineForce(state, request, deadlineBefore, machineId);
+        closeDeliveredOrder(requestId, machineId);
         autoUpdateRetry.scheduleIfDue(state, request);
         autoUpdateRetry.turnOffIfPackageRemoved(state, request);
         executionRecorder.record(request, machineId, event);
@@ -199,6 +201,16 @@ public class PackageUpdateStatusProcessor {
         deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, requestId, machineId, "finished by the deadline force");
         log.info("[package-update] wait order withdrawn, the deadline force finished it requestId={} machineId={} status={}",
                 requestId, machineId, state.getStatus());
+    }
+
+    // a status proves the order arrived, and the update's own state leads from here: the agent sends its result only
+    // after the update, so a row left open times out while the user decides. PENDING is left alone: that row is the
+    // next prompt held for its moment
+    private void closeDeliveredOrder(String requestId, String machineId) {
+        deliveryTracker.find(DeliveryType.PACKAGE_UPDATE, requestId, machineId)
+                .filter(order -> order.getStatus() == DeliveryStatus.ACKED)
+                .map(order -> new DeliveryRef(DeliveryType.PACKAGE_UPDATE, requestId, order.getDispatchId()))
+                .ifPresent(delivery -> deliveryTracker.done(delivery, machineId));
     }
 
     private PackageUpdateDeviceState newState(String tenantId, String requestId, String machineId) {

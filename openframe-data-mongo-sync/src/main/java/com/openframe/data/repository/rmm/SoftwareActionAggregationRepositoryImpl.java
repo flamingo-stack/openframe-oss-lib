@@ -27,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 @Repository
@@ -40,18 +39,34 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
     private static final List<String> UNSUCCESSFUL = List.of(ExecutionStatus.SCRIPT_ERROR.name(), ExecutionStatus.FAILED.name());
     private static final List<String> IN_PROGRESS = List.of(ExecutionStatus.QUEUED.name(), ExecutionStatus.RUNNING.name());
     private static final List<String> FINISHED = List.of(SoftwareActionStatus.COMPLETED.name(), SoftwareActionStatus.FAILED.name());
-    private static final String DEFAULT_SORT = "dispatchedAt";
-    private static final Set<String> SORTABLE = Set.of("dispatchedAt", "status", "packageName", "totalMachineCount");
+    private static final String DISPATCHED_AT = "dispatchedAt";
+    private static final String STATUS_RANK = "statusRank";
+    private static final Map<String, List<String>> SORT_KEYS = Map.of(
+            DISPATCHED_AT, List.of(DISPATCHED_AT),
+            "status", List.of(STATUS_RANK),
+            "packageName", List.of("packageName"),
+            "totalMachineCount", List.of("totalMachineCount"),
+            "respondedMachineCount", List.of("respondedMachineCount", "totalMachineCount"));
 
     private final MongoTemplate mongoTemplate;
 
     @Override
     public List<SoftwareActionSummary> findPage(String tenantId, SoftwareActionQueryFilter filter, String search,
                                                 String sortField, Sort.Direction direction, int skip, int limit) {
+        List<String> sortKeys = SORT_KEYS.get(sortField);
+        if (sortKeys == null) {
+            throw new IllegalArgumentException("Unknown sort field '" + sortField + "'");
+        }
         List<AggregationOperation> stages = new ArrayList<>(pipeline(tenantId, filter, search));
-        String sort = SORTABLE.contains(sortField) ? sortField : DEFAULT_SORT;
         int dir = direction == Sort.Direction.ASC ? 1 : -1;
-        stages.add(ctx -> new Document("$sort", new Document(sort, dir).append("executionId", 1)));
+        Document sort = new Document();
+        sortKeys.forEach(key -> sort.append(key, dir));
+        sort.append(DISPATCHED_AT, dir).append("executionId", 1);
+        if (sortKeys.contains(STATUS_RANK)) {
+            Document rank = statusRank();
+            stages.add(ctx -> new Document("$addFields", new Document(STATUS_RANK, rank)));
+        }
+        stages.add(ctx -> new Document("$sort", sort));
         stages.add(ctx -> new Document("$skip", (long) Math.max(0, skip)));
         stages.add(ctx -> new Document("$limit", limit));
 
@@ -90,16 +105,6 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         stages.add(ctx -> new Document("$project", projectDoc()));
         List<Document> docs = aggregate(stages).getMappedResults();
         return docs.isEmpty() ? Optional.empty() : Optional.of(toSummary(docs.get(0)));
-    }
-
-    @Override
-    public boolean isSortableField(String field) {
-        return field != null && SORTABLE.contains(field);
-    }
-
-    @Override
-    public String getDefaultSortField() {
-        return DEFAULT_SORT;
     }
 
     private AggregationResults<Document> aggregate(List<AggregationOperation> stages) {
@@ -186,6 +191,12 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("dispatchedAt", new Document("$ifNull", Arrays.asList("$dispatchedAt", "$_exec.firstDispatchedAt")))
                 .append("finishedAt", cond(inArr("$status", FINISHED), "$_exec.lastFinishedAt", null))));
         return stages;
+    }
+
+    private static Document statusRank() {
+        List<String> order = names(SoftwareActionStatus.SORT_ORDER);
+        List<Object> arguments = Arrays.asList(order, "$status");
+        return new Document("$indexOfArray", arguments);
     }
 
     private static Document isWaiting() {

@@ -1,7 +1,9 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
+import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
@@ -28,7 +30,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -36,7 +37,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -45,6 +48,15 @@ import static org.springframework.util.StringUtils.hasText;
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class SoftwareActionDetailService {
+
+    private static final List<Function<SoftwareActionDeviceResponse, String>> SEARCHABLE = List.of(
+            SoftwareActionDeviceResponse::getHostname,
+            SoftwareActionDeviceResponse::getMachineId,
+            SoftwareActionDeviceResponse::getOrganizationName,
+            SoftwareActionDetailService::statusLabel,
+            SoftwareActionDeviceResponse::getStdout,
+            SoftwareActionDeviceResponse::getStderr,
+            SoftwareActionDeviceResponse::getError);
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final SoftwareBundleOnlineDispatchRepository bundleOnlineDispatchRepository;
@@ -58,6 +70,45 @@ public class SoftwareActionDetailService {
 
     public List<SoftwareActionDeviceResponse> devices(String executionId, String bundleId, String scheduleId,
                                                       SoftwareActionDeviceFilterInput filter, String search) {
+        List<SoftwareActionDeviceResponse> rows = rows(executionId, bundleId, scheduleId);
+        Set<String> tagged = taggedMachines(rows, filter);
+        return rows.stream()
+                .filter(row -> matchesStatus(row, filter))
+                .filter(row -> matchesCustomer(row, filter))
+                .filter(row -> matchesTags(row, tagged))
+                .filter(row -> matchesSearch(row, search))
+                .toList();
+    }
+
+    public SoftwareActionDeviceFilters filters(String executionId, String bundleId, String scheduleId,
+                                               SoftwareActionDeviceFilterInput filter, String search) {
+        List<SoftwareActionDeviceResponse> rows = rows(executionId, bundleId, scheduleId);
+        Set<String> tagged = taggedMachines(rows, filter);
+        List<SoftwareActionDeviceResponse> inScope = rows.stream()
+                .filter(row -> matchesTags(row, tagged))
+                .filter(row -> matchesSearch(row, search))
+                .toList();
+        List<SoftwareActionDeviceResponse> ofCustomers = inScope.stream()
+                .filter(row -> matchesCustomer(row, filter))
+                .toList();
+        Stream<String> organizationIds = inScope.stream()
+                .filter(row -> matchesStatus(row, filter))
+                .map(SoftwareActionDeviceResponse::getOrganizationId);
+        long filteredCount = ofCustomers.stream()
+                .filter(row -> matchesStatus(row, filter))
+                .count();
+        List<SoftwareFilterOption> statuses =
+                SoftwareFilterOptions.enumFacet(ofCustomers, SoftwareActionDeviceResponse::getStatus);
+        List<SoftwareFilterOption> organizations =
+                SoftwareFilterOptions.organizations(organizationIds, organizationRepository);
+        return SoftwareActionDeviceFilters.builder()
+                .statuses(statuses)
+                .organizations(organizations)
+                .filteredCount((int) filteredCount)
+                .build();
+    }
+
+    private List<SoftwareActionDeviceResponse> rows(String executionId, String bundleId, String scheduleId) {
         String tenantId = tenantIdProvider.getTenantId();
         Map<String, SoftwareActionDeviceResponse> byMachine = new LinkedHashMap<>();
 
@@ -82,26 +133,24 @@ public class SoftwareActionDetailService {
         }
 
         enrichWithCustomer(tenantId, byMachine);
-        Set<String> tagged = taggedMachines(byMachine.keySet(), filter);
+        return byMachine.values().stream().toList();
+    }
 
-        return byMachine.values().stream()
-                .filter(row -> matchesStatus(row, filter))
-                .filter(row -> matchesCustomer(row, filter))
-                .filter(row -> tagged == null || tagged.contains(row.getMachineId()))
-                .filter(row -> matchesSearch(row, search))
-                .toList();
+    private static boolean matchesTags(SoftwareActionDeviceResponse row, Set<String> tagged) {
+        return tagged == null || tagged.contains(row.getMachineId());
     }
 
     // null = no tag filter; a device matches when it carries any of the tags
-    private Set<String> taggedMachines(Set<String> machineIds, SoftwareActionDeviceFilterInput filter) {
+    private Set<String> taggedMachines(List<SoftwareActionDeviceResponse> rows, SoftwareActionDeviceFilterInput filter) {
         if (filter == null || filter.getDeviceTagIds() == null || filter.getDeviceTagIds().isEmpty()) {
             return null;
         }
-        if (machineIds.isEmpty()) {
+        if (rows.isEmpty()) {
             return Set.of();
         }
+        List<String> machineIds = rows.stream().map(SoftwareActionDeviceResponse::getMachineId).toList();
         return tagAssignmentRepository.findByEntityIdInAndTagIdInAndEntityType(
-                        new ArrayList<>(machineIds), filter.getDeviceTagIds(), TagEntityType.DEVICE).stream()
+                        machineIds, filter.getDeviceTagIds(), TagEntityType.DEVICE).stream()
                 .map(TagAssignment::getEntityId)
                 .collect(Collectors.toSet());
     }
@@ -208,7 +257,14 @@ public class SoftwareActionDetailService {
             return true;
         }
         String needle = search.trim().toLowerCase(Locale.ROOT);
-        return contains(row.getHostname(), needle) || contains(row.getMachineId(), needle);
+        return SEARCHABLE.stream()
+                .map(field -> field.apply(row))
+                .anyMatch(value -> contains(value, needle));
+    }
+
+    private static String statusLabel(SoftwareActionDeviceResponse row) {
+        SoftwareActionStatus status = row.getStatus();
+        return status == null ? null : SoftwareFilterOptions.label(status);
     }
 
     private static boolean contains(String value, String needle) {

@@ -144,6 +144,8 @@ function main() {
   copyFileSync(join(ROOT, 'scripts', 'optimize-imports-loader.cjs'), join(OUT_DIR, 'optimize-imports-loader.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'style-sources.cjs'), join(OUT_DIR, 'style-sources.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'style-sources.d.ts'), join(OUT_DIR, 'style-sources.d.ts'));
+  copyFileSync(join(ROOT, 'scripts', 'route-paths.cjs'), join(OUT_DIR, 'route-paths.cjs'));
+  copyFileSync(join(ROOT, 'scripts', 'route-paths.d.ts'), join(OUT_DIR, 'route-paths.d.ts'));
   copyFileSync(join(ROOT, 'scripts', 'next-styles.cjs'), join(OUT_DIR, 'next-styles.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'next-styles.d.ts'), join(OUT_DIR, 'next-styles.d.ts'));
   copyFileSync(join(ROOT, 'scripts', 'route-styles.cjs'), join(OUT_DIR, 'route-styles.cjs'));
