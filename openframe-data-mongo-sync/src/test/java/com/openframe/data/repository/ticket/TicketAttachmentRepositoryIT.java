@@ -39,14 +39,14 @@ class TicketAttachmentRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    void findByTicketIdAndStoragePath_matchesOnlyThatTicketAndPath() {
+    void findByTicketIdAndStoragePathFromPrimary_matchesOnlyThatTicketAndPath() {
         // setup
         TicketAttachment target = repository.save(attachment(TICKET_ID, PATH));
         repository.save(attachment(TICKET_ID, OTHER_PATH));
         repository.save(attachment(OTHER_TICKET_ID, PATH));
 
         // execution
-        Optional<TicketAttachment> found = repository.findByTicketIdAndStoragePath(TICKET_ID, PATH);
+        Optional<TicketAttachment> found = repository.findByTicketIdAndStoragePathFromPrimary(TICKET_ID, PATH);
 
         // verifications
         assertThat(found).map(TicketAttachment::getId).contains(target.getId());
