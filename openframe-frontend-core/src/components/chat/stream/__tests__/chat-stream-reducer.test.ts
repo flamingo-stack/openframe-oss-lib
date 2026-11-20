@@ -445,10 +445,11 @@ describe('createChatStreamReducer — the message a stream builds', () => {
       providerName: 'anthropic',
       contextWindow: 200000,
     });
+    // The ai-agent's window is the model's, not the budget: the budget waits for the token usage.
     expect(r.state.liveModel).toEqual({
       provider: 'anthropic',
       modelLabel: 'Claude Sonnet',
-      contextWindowMaxTokens: 200000,
+      contextWindowMaxTokens: null,
     });
     expect(trailing(r).metadata).toMatchObject({ model: 'claude-sonnet-x', provider: 'anthropic' });
   });
@@ -457,7 +458,7 @@ describe('createChatStreamReducer — the message a stream builds', () => {
     const effects: unknown[] = [];
     const { send } = onWire({ onEffect: effect => effects.push(effect) });
     send({ type: 'AI_METADATA', modelName: 'm', providerName: 'p', contextWindow: 1 });
-    expect(effects).toEqual([{ name: 'onMetadata', args: [{ modelName: 'm', providerName: 'p', contextWindow: 1 }] }]);
+    expect(effects).toEqual([{ name: 'onMetadata', args: [{ modelName: 'm', providerName: 'p' }] }]);
   });
 
   it('a failed turn keeps what it said and ends with the failure on the same message', () => {
@@ -587,6 +588,87 @@ describe('createChatStreamReducer — what this client knows about a card', () =
 });
 
 describe('createChatStreamReducer — participant dedup', () => {
+  // History after a reload mid-reply: the prompt is persisted with no seq (the backend never stamps user rows), so the
+  // live tail starts after the last answer's seq and replays the prompt's MESSAGE_REQUEST echo.
+  const persistedThread = (prompt: string): ChatMessage[] => [
+    { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'first' }], metadata: { author: { authorType: 'admin' } } },
+    { id: 'm2', role: 'assistant', parts: [{ type: 'text', text: 'answer' }], metadata: { streamSeq: 7 } },
+    {
+      id: 'm3',
+      role: 'user',
+      parts: [{ type: 'text', text: prompt }],
+      metadata: { author: { name: 'Roman', authorType: 'admin', avatar: '/images/u.png' } },
+    },
+  ];
+
+  it('a replayed echo of the prompt history already holds draws no second bubble (a reload mid-reply)', () => {
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
+    r.initializeWithState(persistedThread('Reload check'));
+    r.apply(participant({ kind: 'message-request', text: 'Reload check', ownerType: 'ADMIN', seq: 8 }));
+    r.apply(start(9));
+    r.apply(text('Backups matter', 10));
+    r.apply(end(11));
+    const users = r.state.messages.filter(m => m.role === 'user');
+    expect(users.map(m => m.id)).toEqual(['m1', 'm3']);
+    expect(users[1].metadata?.author?.avatar).toBe('/images/u.png');
+    expect(r.state.messages[r.state.messages.length - 1].role).toBe('assistant');
+  });
+
+  it('a repeat of a stopped trailing prompt is a new send when the tail opened on new messages only', () => {
+    // A chat's first prompt, stopped before any chunk was saved: the history holds no seq, so the tail opens live.
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
+    r.initializeWithState([
+      {
+        id: 'm1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Same' }],
+        metadata: { author: { authorType: 'admin' } },
+      },
+    ]);
+    r.setTailReplaysHistory(false);
+    r.apply(participant({ kind: 'message-request', text: 'Same', ownerType: 'ADMIN', userId: 'other', seq: 20 }));
+    expect(r.state.messages.filter(m => m.role === 'user')).toHaveLength(2);
+  });
+
+  it('a dialog switch gives the next thread the replay check back', () => {
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
+    r.setTailReplaysHistory(false);
+    r.resetForDialogSwitch();
+    r.initializeWithState(persistedThread('Reload check'));
+    r.apply(participant({ kind: 'message-request', text: 'Reload check', ownerType: 'ADMIN', seq: 8 }));
+    expect(r.state.messages.filter(m => m.role === 'user').map(m => m.id)).toEqual(['m1', 'm3']);
+  });
+
+  it('a stopped prompt stamped with its own seq leaves a repeat from another session to seq coverage', () => {
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
+    r.initializeWithState([
+      ...persistedThread('Stopped').slice(0, 2),
+      {
+        id: 'm3',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Stopped' }],
+        metadata: { streamSeq: 8, author: { authorType: 'admin' } },
+      },
+    ]);
+    r.apply(participant({ kind: 'message-request', text: 'Stopped', ownerType: 'ADMIN', seq: 20 }));
+    expect(r.state.messages.filter(m => m.role === 'user')).toHaveLength(3);
+  });
+
+  it('a new send repeating an answered prompt still renders: its twin is the older turn', () => {
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true });
+    r.initializeWithState([
+      {
+        id: 'm1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'continue' }],
+        metadata: { author: { authorType: 'admin' } },
+      },
+      { id: 'm2', role: 'assistant', parts: [{ type: 'text', text: 'answer' }], metadata: { streamSeq: 7 } },
+    ]);
+    r.apply(participant({ kind: 'message-request', text: 'continue', ownerType: 'ADMIN', seq: 8 }));
+    expect(r.state.messages.filter(m => m.role === 'user')).toHaveLength(2);
+  });
+
   it('optimistic echo consumes exactly one MESSAGE_REQUEST twin', () => {
     const r = createChatStreamReducer();
     r.pushOptimisticSend('yes');

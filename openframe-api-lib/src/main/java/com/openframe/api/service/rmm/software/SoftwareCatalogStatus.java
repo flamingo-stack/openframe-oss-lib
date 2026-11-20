@@ -8,11 +8,17 @@ import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import com.openframe.core.util.SoftwareVersions;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
+import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -24,9 +30,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 @Service
@@ -37,30 +43,59 @@ public class SoftwareCatalogStatus {
     private static final Map<PackageManagerType, SoftwareSource> SOURCE_BY_MANAGER =
             Map.of(PackageManagerType.WINGET, SoftwareSource.WINGET);
 
-    // a formula and a cask can share a token: the title is taken as the formula then
-    private static final Comparator<PackageCatalogEntry> FORMULA_FIRST =
-            Comparator.comparing(entry -> entry.getBrewType() != BrewPackageType.FORMULA);
-
     private final PackageCatalogRepository catalogRepository;
     private final SoftwarePackageMatcher packageMatcher;
+    private final PackageManagerAvailability packageManagerAvailability;
+    private final MachineRepository machineRepository;
+    private final TenantIdProvider tenantIdProvider;
 
     // Runs after SoftwareAutoUpdateService: a policy's ON / OFF stays, a row without one gets what the catalog allows.
     public void apply(List<SoftwareResponse> rows) {
+        apply(rows, manager -> true, packageManagerAvailability::isEnabled);
+    }
+
+    // a manager counts on a device only where it runs: there winget's package gives way to the one to adopt into
+    public void applyOnDevice(String machineId, List<SoftwareResponse> rows) {
+        String tenantId = tenantIdProvider.getTenantId();
+        machineRepository.findByTenantIdAndMachineId(tenantId, machineId)
+                .ifPresentOrElse(device -> applyOn(device, rows), () -> apply(rows));
+    }
+
+    private void applyOn(Machine device, List<SoftwareResponse> rows) {
+        apply(rows, manager -> PackageManagerAvailability.isPresentOn(device, manager),
+                manager -> packageManagerAvailability.isAdoptableOn(device, manager));
+    }
+
+    private void apply(List<SoftwareResponse> rows, Predicate<PackageManagerType> manages,
+                       Predicate<PackageManagerType> adopts) {
         if (rows == null || rows.isEmpty()) {
             return;
         }
-        Map<String, PackageCatalogEntry> brewPackages = brewPackagesByToken(rows);
-        Map<SoftwareResponse, PackageMatch> matches = matches(rows);
-        rows.forEach(row -> apply(row, brewPackages, matches));
-    }
-
-    private Map<SoftwareResponse, PackageMatch> matches(List<SoftwareResponse> rows) {
+        Map<String, List<PackageCatalogEntry>> brewPackages = brewPackagesByToken(rows);
         Map<InstalledProgram, SoftwareResponse> rowByProgram = new IdentityHashMap<>();
         rows.forEach(row -> rowByProgram.put(programOf(row), row));
-        Map<SoftwareResponse, PackageMatch> matches = new IdentityHashMap<>();
-        packageMatcher.match(List.copyOf(rowByProgram.keySet()))
-                .forEach((program, match) -> matches.put(rowByProgram.get(program), match));
-        return matches;
+        List<InstalledProgram> programs = List.copyOf(rowByProgram.keySet());
+        Map<InstalledProgram, PackageMatch> matches = packageMatcher.match(programs);
+        Map<InstalledProgram, PackageMatch> adoptionMatches = packageMatcher.matchForAdoption(programs);
+        for (Map.Entry<InstalledProgram, SoftwareResponse> rowOfProgram : rowByProgram.entrySet()) {
+            InstalledProgram program = rowOfProgram.getKey();
+            SoftwareResponse row = rowOfProgram.getValue();
+            PackageMatch match = matches.get(program);
+            PackageMatch adoptionMatch = adoptionMatches.get(program);
+            PackageCatalogEntry managing = entryOf(match, manages);
+            PackageCatalogEntry adoption = entryOf(adoptionMatch, adopts);
+            // a Mac app is taken by no managing matcher: what is known about its package is the adoption match
+            PackageMatch known = match != null ? match : adoptionMatch;
+            apply(row, brewPackages, known, managing, adoption);
+        }
+    }
+
+    private static PackageCatalogEntry entryOf(PackageMatch match, Predicate<PackageManagerType> counts) {
+        if (match == null || !match.isMatched()) {
+            return null;
+        }
+        PackageCatalogEntry entry = match.getEntry();
+        return counts.test(entry.getManager()) ? entry : null;
     }
 
     static InstalledProgram programOf(SoftwareResponse row) {
@@ -72,25 +107,29 @@ public class SoftwareCatalogStatus {
                 .productCodes(row.getProductCodes() == null ? List.of() : row.getProductCodes())
                 .packageFamilyNames(row.getPackageFamilyNames() == null ? List.of() : row.getPackageFamilyNames())
                 .systemComponent(Boolean.TRUE.equals(row.getSystemComponent()))
+                .bundleIdentifier(row.getBundleIdentifier())
+                .appFileNames(row.getAppFileNames() == null ? List.of() : row.getAppFileNames())
+                .topLevelApp(row.getTopLevelApp())
                 .storedMatch(row.getPackageMatch())
+                .storedAdoptionMatch(row.getAdoptionMatch())
                 .build();
     }
 
-    private static void apply(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages,
-                              Map<SoftwareResponse, PackageMatch> matches) {
-        PackageMatch match = matches.get(row);
+    private static void apply(SoftwareResponse row, Map<String, List<PackageCatalogEntry>> brewPackages,
+                              PackageMatch match, PackageCatalogEntry managing, PackageCatalogEntry adoption) {
         if (isBrewPackage(row)) {
             applyBrewPackage(row, brewPackages);
-        } else if (match != null) {
-            applyMatch(row, match);
+        } else if (managing != null) {
+            applyManagingPackage(row, managing);
+        } else if (adoption != null) {
+            applyAdoptionPackage(row, adoption);
         } else {
-            applyLatest(row, null);
+            applyNoPackage(row, match);
         }
     }
 
-    private static void applyBrewPackage(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages) {
-        String token = brewTokenOf(row);
-        PackageCatalogEntry entry = token == null ? null : brewPackages.get(token);
+    private static void applyBrewPackage(SoftwareResponse row, Map<String, List<PackageCatalogEntry>> brewPackages) {
+        PackageCatalogEntry entry = brewEntryOf(row, brewPackages);
         String latest = entry == null ? null : PackageCatalogVersions.shownVersionOf(entry);
         applyLatest(row, latest);
         row.setManagingPackage(entry);
@@ -100,21 +139,40 @@ public class SoftwareCatalogStatus {
     }
 
     // winget updates a program it matches whoever installed it, so a match alone makes the program manageable
-    private static void applyMatch(SoftwareResponse row, PackageMatch match) {
-        PackageCatalogEntry entry = match.getEntry();
-        String latest = match.isMatched() ? PackageCatalogVersions.shownVersionOf(entry) : null;
+    private static void applyManagingPackage(SoftwareResponse row, PackageCatalogEntry entry) {
+        String latest = PackageCatalogVersions.shownVersionOf(entry);
         applyLatest(row, latest);
-        if (match.isMatched()) {
-            SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
-            row.setSource(source);
-            row.setManagingPackage(entry);
-        }
-        if (row.getAutoUpdate() != null) {
-            return;
-        }
-        if (match.isMatched()) {
+        SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
+        row.setSource(source);
+        row.setManagingPackage(entry);
+        if (row.getAutoUpdate() == null) {
             row.setAutoUpdate(SoftwareAutoUpdateStatus.OFF);
-        } else if (match.hasNoPackage()) {
+        }
+    }
+
+    // the package's manager updates only what it installed: nothing manages the program until it is adopted
+    private static void applyAdoptionPackage(SoftwareResponse row, PackageCatalogEntry entry) {
+        String latest = PackageCatalogVersions.shownVersionOf(entry);
+        applyLatest(row, latest);
+        SoftwareBundlePackage adoptionPackage = SoftwareBundlePackage.builder()
+                .packageManager(entry.getManager())
+                .packageName(entry.getPackageId())
+                .brewPackageType(entry.getBrewType())
+                .version(latest)
+                .build();
+        row.setAdoptionPackage(adoptionPackage);
+        if (row.getAutoUpdate() == null) {
+            row.setAutoUpdate(SoftwareAutoUpdateStatus.NEEDS_ADOPTION);
+        }
+    }
+
+    // a package whose manager does not count here still tells the latest version; several packages leave it unknown
+    private static void applyNoPackage(SoftwareResponse row, PackageMatch match) {
+        boolean matched = match != null && match.isMatched();
+        String latest = matched ? PackageCatalogVersions.shownVersionOf(match.getEntry()) : null;
+        applyLatest(row, latest);
+        boolean noPackage = match != null && (matched || match.hasNoPackage());
+        if (row.getAutoUpdate() == null && noPackage) {
             row.setAutoUpdate(SoftwareAutoUpdateStatus.NO_PACKAGE);
         }
     }
@@ -127,13 +185,7 @@ public class SoftwareCatalogStatus {
         row.setVersionStatus(status);
     }
 
-    // Devices behind each other are outdated whatever the catalog says; with one version everywhere only the catalog
-    // can tell whether a newer release is out.
     private static SoftwareVersionStatus versionStatus(SoftwareResponse row, String catalogLatest) {
-        Integer older = row.getOlderVersionsCount();
-        if (older != null && older > 0) {
-            return SoftwareVersionStatus.OUTDATED;
-        }
         String installed = row.getCurrentVersion();
         if (catalogLatest == null || installed == null) {
             return SoftwareVersionStatus.UNKNOWN;
@@ -142,7 +194,22 @@ public class SoftwareCatalogStatus {
                 ? SoftwareVersionStatus.UP_TO_DATE : SoftwareVersionStatus.OUTDATED;
     }
 
-    private Map<String, PackageCatalogEntry> brewPackagesByToken(List<SoftwareResponse> rows) {
+    // a formula and a cask can share a token: the type brew reported the title under decides
+    private static PackageCatalogEntry brewEntryOf(SoftwareResponse row,
+                                                   Map<String, List<PackageCatalogEntry>> brewPackages) {
+        String token = brewTokenOf(row);
+        List<PackageCatalogEntry> entries = token == null ? null : brewPackages.get(token);
+        if (entries == null) {
+            return null;
+        }
+        boolean cask = row.getFleetSource() == FleetSource.HOMEBREW_CASKS;
+        BrewPackageType reportedType = cask ? BrewPackageType.CASK : BrewPackageType.FORMULA;
+        Comparator<PackageCatalogEntry> reportedTypeFirst =
+                Comparator.comparing(entry -> entry.getBrewType() != reportedType);
+        return entries.stream().min(reportedTypeFirst).orElseThrow();
+    }
+
+    private Map<String, List<PackageCatalogEntry>> brewPackagesByToken(List<SoftwareResponse> rows) {
         Set<String> tokens = rows.stream()
                 .filter(SoftwareCatalogStatus::isBrewPackage)
                 .map(SoftwareCatalogStatus::brewTokenOf)
@@ -153,9 +220,7 @@ public class SoftwareCatalogStatus {
         }
         return catalogRepository.findByManagerAndPackageIdIn(PackageManagerType.BREW, tokens).stream()
                 .filter(entry -> entry.getPackageId() != null && entry.getVersion() != null)
-                .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)))
-                .entrySet().stream()
-                .collect(toMap(Map.Entry::getKey, e -> e.getValue().stream().min(FORMULA_FIRST).orElseThrow()));
+                .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)));
     }
 
     private static boolean isBrewPackage(SoftwareResponse row) {

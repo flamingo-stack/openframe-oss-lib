@@ -72,6 +72,94 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
     }
 
     @Test
+    @DisplayName("title: the smallest bundle id its machines report, without the blank ones")
+    void rollUpTitle_machinesDisagreeOnTheBundleId_smallestNonBlank() {
+        // setup
+        save(row(TENANT, "m1", CHROME).bundleIdentifier("com.google.Chrome.canary").build());
+        save(row(TENANT, "m2", CHROME).bundleIdentifier("com.google.Chrome").build());
+        save(row(TENANT, "m3", CHROME).bundleIdentifier(" ").build());
+        save(row(TENANT, "m4", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.bundleIdentifier()).isEqualTo("com.google.Chrome");
+    }
+
+    @Test
+    @DisplayName("title: no machine reports a bundle id -> none")
+    void rollUpTitle_noBundleId_null() {
+        // setup
+        save(row(TENANT, "m1", CHROME).bundleIdentifier("").build());
+        save(row(TENANT, "m2", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.bundleIdentifier()).isNull();
+    }
+
+    @Test
+    @DisplayName("title: unions the app file names of its machines, without blanks, sorted")
+    void rollUpTitle_appFileNamesOnSeveralMachines_sortedUnionWithoutBlanks() {
+        // setup
+        save(row(TENANT, "m1", CHROME).appFileNames(List.of("Google Chrome", " ")).build());
+        save(row(TENANT, "m2", CHROME).appFileNames(List.of("Chrome", "Google Chrome")).build());
+        save(row(TENANT, "m3", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.appFileNames()).containsExactly("Chrome", "Google Chrome");
+    }
+
+    @Test
+    @DisplayName("title: top level when one machine has the app top level")
+    void rollUpTitle_oneMachineHasTheAppTopLevel_topLevel() {
+        // setup
+        save(row(TENANT, "m1", CHROME).topLevelApp(false).build());
+        save(row(TENANT, "m2", CHROME).topLevelApp(true).build());
+        save(row(TENANT, "m3", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.topLevelApp()).isTrue();
+    }
+
+    @Test
+    @DisplayName("title: not top level when the machines that sent paths have it nested")
+    void rollUpTitle_noMachineHasTheAppTopLevel_notTopLevel() {
+        // setup
+        save(row(TENANT, "m1", CHROME).topLevelApp(false).build());
+        save(row(TENANT, "m2", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.topLevelApp()).isFalse();
+    }
+
+    @Test
+    @DisplayName("title: no machine sent paths -> top level unknown")
+    void rollUpTitle_noMachineSentPaths_topLevelUnknown() {
+        // setup
+        save(row(TENANT, "m1", CHROME).build());
+
+        // execution
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        // verifications
+        assertThat(rollup.topLevelApp()).isNull();
+        assertThat(rollup.appFileNames()).isEmpty();
+    }
+
+    @Test
     @DisplayName("title: unions versions, CVEs and Windows keys across machines, without blanks, sorted")
     void title_unionsAcrossMachines() {
         save(row(TENANT, "m1", CHROME)
@@ -204,6 +292,39 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
 
         assertThat(repository.machineIdsWithCve(TENANT, "CVE-1")).isEmpty();
         assertThat(repository.machineIdsWithCve(TENANT, "CVE-404")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("cve machines by title: each title's connected machines of this tenant that carry the CVE")
+    void machineIdsByTitleWithCve_machinesOfTheTenantGroupedByTitle() {
+        // setup
+        save(row(TENANT, "m1", CHROME).vulnerabilities(List.of("CVE-1")).build());
+        save(row(TENANT, "m2", CHROME).vulnerabilities(List.of("CVE-1", "CVE-2")).build());
+        save(row(TENANT, "m2", FIREFOX).vulnerabilities(List.of("CVE-1")).build());
+        save(row(TENANT, "m3", FIREFOX).vulnerabilities(List.of("CVE-1")).machineConnected(false).build());
+        save(row(TENANT, "m4", FIREFOX).vulnerabilities(List.of("CVE-2")).build());
+        save(row(OTHER_TENANT, "m9", CHROME).vulnerabilities(List.of("CVE-1")).build());
+
+        // execution
+        Map<Long, List<String>> machineIds = repository.machineIdsByTitleWithCve(TENANT, "CVE-1");
+
+        // verifications
+        assertThat(machineIds).containsOnlyKeys(CHROME, FIREFOX);
+        assertThat(machineIds.get(CHROME)).containsExactlyInAnyOrder("m1", "m2");
+        assertThat(machineIds.get(FIREFOX)).containsExactly("m2");
+    }
+
+    @Test
+    @DisplayName("cve machines by title: no connected row carries the CVE -> empty")
+    void machineIdsByTitleWithCve_noConnectedRow_empty() {
+        // setup
+        save(row(TENANT, "m1", CHROME).vulnerabilities(List.of("CVE-1")).machineConnected(false).build());
+
+        // execution
+        Map<Long, List<String>> machineIds = repository.machineIdsByTitleWithCve(TENANT, "CVE-1");
+
+        // verifications
+        assertThat(machineIds).isEmpty();
     }
 
     @Test

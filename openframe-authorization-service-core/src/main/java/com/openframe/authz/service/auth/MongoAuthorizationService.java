@@ -1,8 +1,11 @@
 package com.openframe.authz.service.auth;
 
+import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.core.util.Sha256;
 import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import com.openframe.data.document.oauth.RetiredRefreshToken;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +17,8 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -23,6 +28,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.springframework.security.oauth2.server.authorization.OAuth2Authorization.Token.INVALIDATED_METADATA_NAME;
+import static org.springframework.util.StringUtils.hasText;
 
 @Service
 @RequiredArgsConstructor
@@ -41,9 +47,27 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
         log.debug("Saving authorization: {}", authorization.getId());
 
         MongoOAuth2Authorization entity = MongoAuthorizationMapper.toEntity(authorization);
-        List<RetiredRefreshToken> retiredRefreshTokens = retiredTokensAfterSaving(entity);
-        entity.setRetiredRefreshTokens(retiredRefreshTokens);
+        if (entity.getSessionId() == null && entity.getAccessTokenValue() == null) {
+            entity.setSessionId(loginSessionId());
+        }
+        MongoOAuth2Authorization stored = repository.findById(entity.getId()).orElse(null);
+        entity.setTenantId(owningTenantId(stored));
+        entity.setRetiredRefreshTokens(retiredTokensAfterSaving(entity, stored));
         repository.save(entity);
+    }
+
+    /**
+     * The tenant whose token endpoint issued the authorization, so the gateway can route a refresh that
+     * names no tenant. Only the authorization-code grant also leaves the tenant in the saved authorize
+     * URI; the custom grants (signup-ticket, apple-native) have nothing else to route by. A save outside
+     * a tenant request (revoking every session of a user) keeps the tenant already stored.
+     */
+    private static String owningTenantId(MongoOAuth2Authorization stored) {
+        String tenantId = TenantContext.getTenantId();
+        if (hasText(tenantId)) {
+            return tenantId;
+        }
+        return stored == null ? null : stored.getTenantId();
     }
 
     /**
@@ -53,9 +77,8 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
      * instead of ending it. A list rather than one slot, so a retry that rotates again doesn't kill the
      * token a concurrent request has just received.
      */
-    private List<RetiredRefreshToken> retiredTokensAfterSaving(MongoOAuth2Authorization entity) {
-        String authorizationId = entity.getId();
-        MongoOAuth2Authorization stored = repository.findById(authorizationId).orElse(null);
+    private List<RetiredRefreshToken> retiredTokensAfterSaving(MongoOAuth2Authorization entity,
+                                                               MongoOAuth2Authorization stored) {
         if (stored == null) {
             return null;
         }
@@ -72,6 +95,14 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
             retired.add(new RetiredRefreshToken(replaced, now));
         }
         return retired.isEmpty() ? null : retired;
+    }
+
+    private static String loginSessionId() {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            return null;
+        }
+        HttpSession session = attributes.getRequest().getSession(false);
+        return session == null ? null : Sha256.hex(session.getId());
     }
 
     private boolean isWithinGrace(RetiredRefreshToken token, Instant now) {

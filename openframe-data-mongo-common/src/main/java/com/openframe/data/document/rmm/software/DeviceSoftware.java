@@ -58,6 +58,10 @@ public class DeviceSoftware implements TenantScoped {
     private List<String> installerTypes;
     // set for a winget_packages row: the id winget installed the package under, the one `winget upgrade --id` takes
     private String wingetId;
+    private String bundleIdentifier;
+    // names only: an installed path carries the name of its user and is never stored
+    private List<String> appFileNames;
+    private Boolean topLevelApp;
     private boolean machineConnected;
 
     private Instant updatedAt;

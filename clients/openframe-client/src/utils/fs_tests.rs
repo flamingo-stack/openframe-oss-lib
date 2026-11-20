@@ -224,3 +224,56 @@ fn read_json_or_quarantine_replaces_an_older_quarantined_copy() {
         b"new garbage"
     );
 }
+
+#[test]
+fn read_json_reads_a_missing_file_as_none() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let read: Option<Sample> = read_json(&dir.path().join("absent.json")).unwrap();
+
+    assert_eq!(read, None);
+}
+
+#[test]
+fn read_json_parses_a_valid_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("ok.json");
+    std::fs::write(&path, br#"{"a":7}"#).unwrap();
+
+    let read: Option<Sample> = read_json(&path).unwrap();
+
+    assert_eq!(read, Some(Sample { a: 7 }));
+}
+
+#[test]
+fn read_json_reports_a_corrupt_file_and_leaves_it_in_place() {
+    for (contents, all_zero) in [
+        (&[0u8; 16][..], true),
+        (b"", false),
+        (br#"{"a":"#, false),
+        (&[0xff, 0xfe, 0x7b, 0x7d], false),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.json");
+        std::fs::write(&path, contents).unwrap();
+
+        let err = read_json::<Sample>(&path).unwrap_err();
+
+        assert!(err.is::<CorruptJson>(), "{err:#}");
+        let expected = format!("size {}, all zero: {}", contents.len(), all_zero);
+        assert!(err.to_string().contains(&expected), "{err}");
+        assert_eq!(std::fs::read(&path).unwrap(), contents);
+        assert!(!dir.path().join("bad.json.corrupt").exists());
+    }
+}
+
+#[test]
+fn a_corrupt_json_error_never_quotes_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("secret.json");
+    std::fs::write(&path, br#""token-abc123""#).unwrap();
+
+    let err = read_json::<Sample>(&path).unwrap_err();
+
+    assert!(!format!("{err:#}").contains("token-abc123"), "{err:#}");
+}

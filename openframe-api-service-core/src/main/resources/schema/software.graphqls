@@ -37,7 +37,9 @@ extend type Query {
         sort: SortInput
     ): SoftwareOnDeviceConnection!
 
-    """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab."""
+    """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab.
+    Sortable fields: cveId, severity, cvssScore, discoveredAt, affectedVersion (version order, missing versions last).
+    An unknown sort field is rejected as a client error (BAD_REQUEST)."""
     softwareVulnerabilities(
         softwareId: ID!,
         filter: SoftwareVulnerabilityFilterInput,
@@ -50,11 +52,12 @@ extend type Query {
     ): SoftwareVulnerabilityConnection!
 
     """Faceted filter-option counts for the software list — Type / Source / Version-status /
-    Vulnerability-severity dropdowns. Mirrors scriptFilters / deviceFilters."""
+    Vulnerability-severity / OS dropdowns. Mirrors scriptFilters / deviceFilters.
+    Counts only the titles that match filter and search; send each dropdown's facet without its own dimension."""
     softwareFilters(filter: SoftwareFilterInput, search: String): SoftwareFilters!
 
     """Faceted filter-option counts for a software title's Devices tab — the Status dropdown.
-    Mirrors softwareFilters; scoped to the devices that have this software installed."""
+    Mirrors softwareFilters; scoped to the devices that have this software installed and match filter and search."""
     softwareDeviceFilters(softwareId: ID!, filter: SoftwareOnDeviceFilterInput, search: String): SoftwareOnDeviceFilters!
 
     """Auto-update of a software title, for its Auto-update form: on or off, the settings and the devices."""
@@ -83,9 +86,12 @@ extend type Query {
 
     """Devices affected by a given CVE — the hosts that have an affected software version, correlated
     to their OpenFrame Machine. Powers the vulnerability-detail "Devices" table. Each node is a Machine
-    (same shape as the top-level `devices` query)."""
+    (same shape as the top-level `devices` query). With the software read model on, `filter`, `search` and
+    `sort` work as on `devices` (deleted devices hidden unless `filter.statuses` asks for them; sortable fields
+    as on `devices`, default hostname ASC). With it off, Fleet lists the devices: `filter` and `sort` are ignored."""
     vulnerabilityDevices(
         cveId: String!,
+        filter: DeviceFilterInput,
         first: Int,
         after: String,
         last: Int,
@@ -93,6 +99,11 @@ extend type Query {
         search: String,
         sort: SortInput
     ): DeviceConnection!
+
+    """Faceted filter-option counts for a CVE's Devices table — the Customer and Status dropdowns, same scope as
+    vulnerabilityDevices(cveId, filter, search). `tagKeys`, `directorySources` and `userLinks` are []. With the
+    software read model off every option list is [] and filteredCount is 0."""
+    vulnerabilityDeviceFilters(cveId: String!, filter: DeviceFilterInput, search: String): DeviceFilters!
 
     """Software installed on one device. One row = one installed title, the same node as `softwares`.
     Version fields are read in this device's scope: `currentVersion` is the version installed here.
@@ -179,6 +190,11 @@ type Software {
     always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with).
     Sortable as adoptionCount."""
     adoptionCount: Int
+
+    """The package Adopt reinstalls this title with, shown to the admin for confirmation: the best match of a
+    package manager that updates only what it installed itself. softwareId is not set.
+    Null = no package to adopt into, or a package manager already manages the title."""
+    adoptionPackage: SoftwareBundlePackage
 
     "Devices that have this title installed."
     devicesCount: Int
@@ -337,6 +353,8 @@ type SoftwareFilters {
     severities: [SoftwareFilterOption!]!
     "AUTO-UPDATE dropdown: ON / OFF / NO_PACKAGE / NEEDS_ADOPTION."
     autoUpdateStatuses: [SoftwareFilterOption!]!
+    "OS dropdown: the systems of the titles (Software.os)."
+    osTypes: [SoftwareFilterOption!]!
 }
 
 type SoftwareOnDeviceFilters {
@@ -361,6 +379,7 @@ type SoftwareFilterOption {
 
 input SoftwareFilterInput {
     sources: [SoftwareSource!]
+    """The CURRENT VERSION filter (Software.versionStatus). With Fleet paging it is left out, like sources."""
     versionStatuses: [SoftwareVersionStatus!]
     minSeverity: SoftwareCveSeverity
     deviceTagIds: [ID!]

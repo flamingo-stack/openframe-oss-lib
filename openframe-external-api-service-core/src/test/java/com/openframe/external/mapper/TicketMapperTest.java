@@ -10,6 +10,7 @@ import com.openframe.api.dto.ticket.TicketStatusDefinitionCount;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.ticket.AdminTicketOwner;
 import com.openframe.data.document.ticket.ClientTicketOwner;
+import com.openframe.data.document.ticket.EmailTicketOwner;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketAttachment;
 import com.openframe.data.document.ticket.TicketCreationSource;
@@ -226,6 +227,28 @@ class TicketMapperTest {
         owner.setType(TicketOwnerType.ADMIN);
 
         assertEquals(new TicketOwnerResponse(TicketOwnerType.ADMIN, null, null), mapper.toOwnerResponse(owner));
+    }
+
+    // guard: green before implementation
+    @Test
+    void emailOwnerExposesOnlyTheType() {
+        TicketOwnerResponse response = mapper.toOwnerResponse(new EmailTicketOwner("ann@acme.com"));
+
+        assertEquals(new TicketOwnerResponse(TicketOwnerType.EMAIL, null, null), response);
+    }
+
+    // guard: green before implementation
+    @Test
+    void emailTicketKeepsItsCreationSource() {
+        Ticket ticket = Ticket.builder()
+                .id("t-1")
+                .creationSource(TicketCreationSource.EMAIL)
+                .owner(new EmailTicketOwner("ann@acme.com"))
+                .build();
+
+        TicketResponse response = mapper.toTicketResponse(ticket, null);
+
+        assertEquals(TicketCreationSource.EMAIL, response.getCreationSource());
     }
 
     @Test

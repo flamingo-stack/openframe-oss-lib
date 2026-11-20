@@ -1,13 +1,18 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
+import com.openframe.api.dto.rmm.software.SoftwareFilterOption;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
+import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
 import com.openframe.api.dto.shared.PageResult;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
@@ -15,19 +20,18 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
-import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.organization.OrganizationRepository;
-import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
@@ -50,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -78,7 +83,6 @@ class SoftwareInventoryServiceReadModelTest {
     @Mock private OrganizationRepository organizationRepository;
     @Mock private SoftwareScheduleRepository softwareScheduleRepository;
     @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
-    @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
 
     private SoftwareInventoryService service;
 
@@ -87,8 +91,7 @@ class SoftwareInventoryServiceReadModelTest {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
-                softwareScheduleRepository, softwareScheduleTargetResolver,
-                scheduleDeviceLocalDispatchRepository);
+                softwareScheduleRepository, softwareScheduleTargetResolver);
         ReflectionTestUtils.setField(service, "softwareReadModel", true);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
@@ -101,6 +104,18 @@ class SoftwareInventoryServiceReadModelTest {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
         return SoftwareOnDeviceResponse.builder().device(machine).status(SoftwareOnDeviceStatus.UP_TO_DATE).build();
+    }
+
+    private static SoftwareResponse named(String id, String name) {
+        return SoftwareResponse.builder().id(id).name(name).source(SoftwareSource.BREW).build();
+    }
+
+    private void catalogSetsVersionStatus(Map<String, SoftwareVersionStatus> statusById) {
+        doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(r -> r.setVersionStatus(statusById.get(r.getId())));
+            return null;
+        }).when(catalogStatus).apply(anyList());
     }
 
     private void verifyPoliciesThenCatalog() {
@@ -117,11 +132,6 @@ class SoftwareInventoryServiceReadModelTest {
     private void stubDeviceTimeSchedules(SoftwareSchedule... schedules) {
         when(softwareScheduleRepository.findByTenantIdAndStatusAndTriggerAndTimeReference(TENANT, ScriptStatus.ACTIVE,
                 ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)).thenReturn(List.of(schedules));
-    }
-
-    private static ScheduleLocalMachineTimeDispatch ranOn(String machineId) {
-        return ScheduleLocalMachineTimeDispatch.builder()
-                .machineId(machineId).lastOccurrenceAt(Instant.parse("2026-11-01T09:00:00Z")).build();
     }
 
     private static SoftwareSchedule schedule(SoftwareAction action, SoftwareSchedulePackage scheduledPackage) {
@@ -294,7 +304,7 @@ class SoftwareInventoryServiceReadModelTest {
     }
 
     @Test
-    void listDevicesForSoftware_oneOffUpdateAtDeviceTime_onlyDevicesWithoutARecordedRunAreScheduledUpdate() {
+    void listDevicesForSoftware_updateAtDeviceTime_onlyDevicesStillAwaitingTheRunAreScheduledUpdate() {
         // setup
         when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
         when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
@@ -304,9 +314,8 @@ class SoftwareInventoryServiceReadModelTest {
         update.setId("s1");
         SoftwareSchedule install = schedule(SoftwareAction.INSTALL, scheduledPackage("42", "xz"));
         stubDeviceTimeSchedules(update, install);
-        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m1", "m2"));
-        when(scheduleDeviceLocalDispatchRepository.findByScheduleIdAndMachineIdIn("s1", List.of("m1", "m2")))
-                .thenReturn(List.of(ranOn("m2")));
+        when(softwareScheduleTargetResolver.resolveMachineIdsAwaitingDeviceTime(List.of(update)))
+                .thenReturn(Map.of("s1", List.of("m1")));
 
         // execution
         PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 20, null);
@@ -316,44 +325,127 @@ class SoftwareInventoryServiceReadModelTest {
                 .containsExactly(tuple("m1", SoftwareOnDeviceStatus.SCHEDULED_UPDATE),
                         tuple("m2", SoftwareOnDeviceStatus.UP_TO_DATE),
                         tuple("m3", SoftwareOnDeviceStatus.UP_TO_DATE));
-        verify(softwareScheduleTargetResolver, never()).resolveMachineIds(install);
-    }
-
-    @Test
-    void listDevicesForSoftware_repeatingUpdateAtDeviceTime_aDeviceThatAlreadyRanStaysScheduledUpdate() {
-        // setup
-        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
-        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
-        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
-                .thenReturn(List.of(onDevice("m1")));
-        SoftwareSchedule update = schedule(SoftwareAction.UPDATE, scheduledPackage("42", "xz"));
-        update.setRepeat(86400L);
-        stubDeviceTimeSchedules(update);
-        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m1"));
-
-        // execution
-        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 20, null);
-
-        // verifications
-        assertThat(result.items()).extracting(SoftwareOnDeviceResponse::getStatus)
-                .containsExactly(SoftwareOnDeviceStatus.SCHEDULED_UPDATE);
-        verifyNoInteractions(scheduleDeviceLocalDispatchRepository);
     }
 
     @Test
     void getSoftwareFilters_facetsCountTheStatuses() {
         SoftwareResponse title = row("1", SoftwareSource.BREW);
-        when(tenantSoftwareReadModelQuery.allForFilters(TENANT, null)).thenReturn(List.of(title));
+        when(tenantSoftwareReadModelQuery.allTitles(TENANT, null, null, null)).thenReturn(List.of(title));
         doAnswer(inv -> {
             List<SoftwareResponse> rows = inv.getArgument(0);
             rows.forEach(r -> r.setAutoUpdate(SoftwareAutoUpdateStatus.OFF));
             return null;
         }).when(catalogStatus).apply(anyList());
 
-        SoftwareFilters filters = service.getSoftwareFilters(null);
+        SoftwareFilters filters = service.getSoftwareFilters(null, null);
 
         assertThat(filters.getAutoUpdateStatuses()).extracting("value").containsExactly("OFF");
         verifyPoliciesThenCatalog();
+    }
+
+    @Test
+    void getSoftwareFilters_filterWithMinSeverity_titlesOfTheFilterAndVulnerableOnlyCounted() {
+        // setup
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setOsTypes(List.of(OsType.WINDOWS));
+        filter.setMinSeverity(SoftwareCveSeverity.HIGH);
+        SoftwareResponse chrome = row("1", SoftwareSource.WINGET);
+        when(tenantSoftwareReadModelQuery.allTitles(TENANT, "chr", true, filter)).thenReturn(List.of(chrome));
+
+        // execution
+        SoftwareFilters filters = service.getSoftwareFilters(filter, "chr");
+
+        // verifications
+        assertThat(filters.getSources()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("WINGET", 1));
+    }
+
+    @Test
+    void getSoftwareFilters_versionStatusesFilter_onlyTitlesWithTheChosenStatusesCounted() {
+        // setup
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setVersionStatuses(List.of(SoftwareVersionStatus.OUTDATED));
+        when(tenantSoftwareReadModelQuery.allTitles(TENANT, null, null, filter)).thenReturn(List.of(
+                row("1", SoftwareSource.BREW), row("2", SoftwareSource.WINGET), row("3", SoftwareSource.WINGET)));
+        catalogSetsVersionStatus(Map.of("1", SoftwareVersionStatus.OUTDATED, "2", SoftwareVersionStatus.UP_TO_DATE,
+                "3", SoftwareVersionStatus.OUTDATED));
+
+        // execution
+        SoftwareFilters filters = service.getSoftwareFilters(filter, null);
+
+        // verifications
+        assertThat(filters.getSources()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("WINGET", 1), tuple("BREW", 1));
+        assertThat(filters.getVersionStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("OUTDATED", 2));
+    }
+
+    @Test
+    void getSoftwareFilters_titlesOfSeveralSystems_osFacetCountsTitlesPerSystem() {
+        // setup
+        SoftwareResponse chrome = row("1", SoftwareSource.UNMANAGED);
+        chrome.setFleetSource(FleetSource.PROGRAMS);
+        SoftwareResponse slack = row("2", SoftwareSource.UNMANAGED);
+        slack.setFleetSource(FleetSource.PROGRAMS);
+        SoftwareResponse node = row("3", SoftwareSource.BREW);
+        node.setFleetSource(FleetSource.HOMEBREW_PACKAGES);
+        SoftwareResponse extension = row("4", SoftwareSource.UNMANAGED);
+        when(tenantSoftwareReadModelQuery.allTitles(TENANT, null, null, null))
+                .thenReturn(List.of(chrome, slack, node, extension));
+
+        // execution
+        SoftwareFilters filters = service.getSoftwareFilters(null, null);
+
+        // verifications
+        assertThat(filters.getOsTypes()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactlyInAnyOrder(tuple("WINDOWS", 2), tuple("MAC_OS", 1));
+    }
+
+    @Test
+    void listSoftware_versionStatusesFilter_everyTitleOfTheOtherFiltersNarrowedSortedAndPaged() {
+        // setup
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setVersionStatuses(List.of(SoftwareVersionStatus.UP_TO_DATE));
+        filter.setSources(List.of(SoftwareSource.BREW));
+        SoftwareResponse jq = named("1", "jq");
+        SoftwareResponse curl = named("2", "curl");
+        SoftwareResponse git = named("3", "Git");
+        SoftwareResponse xz = named("4", "xz");
+        when(tenantSoftwareReadModelQuery.allTitles(TENANT, "x", null, filter)).thenReturn(List.of(jq, curl, git, xz));
+        catalogSetsVersionStatus(Map.of("1", SoftwareVersionStatus.UP_TO_DATE, "2", SoftwareVersionStatus.OUTDATED,
+                "3", SoftwareVersionStatus.UP_TO_DATE, "4", SoftwareVersionStatus.UP_TO_DATE));
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware("x", 0, 2, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Git", "jq");
+        assertThat(result.filteredCount()).isEqualTo(3);
+        assertThat(result.hasNext()).isTrue();
+        verify(tenantSoftwareReadModelQuery, never()).listSoftware(any(), any(), anyInt(), any(), any(), any(), any());
+        verifyPoliciesThenCatalog();
+    }
+
+    @Test
+    void listSoftware_versionStatusesFilterSortedByDevicesCountDescending_inMemoryOrder() {
+        // setup
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setVersionStatuses(List.of(SoftwareVersionStatus.OUTDATED));
+        SoftwareResponse few = named("1", "few");
+        few.setDevicesCount(1);
+        SoftwareResponse many = named("2", "many");
+        many.setDevicesCount(9);
+        when(tenantSoftwareReadModelQuery.allTitles(TENANT, null, null, filter)).thenReturn(List.of(few, many));
+        catalogSetsVersionStatus(Map.of("1", SoftwareVersionStatus.OUTDATED, "2", SoftwareVersionStatus.OUTDATED));
+        SortInput sort = new SortInput();
+        sort.setField("devicesCount");
+        sort.setDirection(SortDirection.DESC);
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, sort, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("many", "few");
     }
 
     @Test
@@ -375,7 +467,7 @@ class SoftwareInventoryServiceReadModelTest {
         assertThat(result.items()).extracting(SoftwareResponse::getId).containsExactly("1");
         InOrder order = inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq("m1"), anyList());
-        order.verify(catalogStatus).apply(anyList());
+        order.verify(catalogStatus).applyOnDevice(eq("m1"), anyList());
         verifyNoInteractions(deviceHostInventoryLoader, deviceCountEnricher);
     }
 
@@ -387,7 +479,7 @@ class SoftwareInventoryServiceReadModelTest {
 
         InOrder order = inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq("m1"), anyList());
-        order.verify(catalogStatus).apply(anyList());
+        order.verify(catalogStatus).applyOnDevice(eq("m1"), anyList());
     }
 
     @Test

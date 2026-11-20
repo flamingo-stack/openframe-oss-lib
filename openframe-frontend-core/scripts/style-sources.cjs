@@ -48,6 +48,7 @@
 const { execFileSync } = require('node:child_process');
 const { existsSync, readdirSync, realpathSync, rmSync, statSync } = require('node:fs');
 const { dirname, isAbsolute, join, relative, resolve, sep } = require('node:path');
+const { isPageFile, isPrivateSegment, routeSegmentPaths } = require('./route-paths.cjs');
 
 /** This package's directory: the nearest package.json up from here (`scripts/` in the repo, `dist/build/` installed). */
 function packageDir() {
@@ -82,7 +83,7 @@ function routeFiles(appRoot, dir, exclude, out) {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) {
       const rel = relative(appRoot, path).split(sep).join('/');
-      if (name.startsWith('_') || name === 'api' || exclude.includes(rel)) continue;
+      if (isPrivateSegment(name) || name === 'api' || exclude.includes(rel)) continue;
       routeFiles(appRoot, path, exclude, out);
     } else if (ROUTE_FILE.test(name)) {
       out.push(path);
@@ -98,16 +99,10 @@ function routeFiles(appRoot, dir, exclude, out) {
  * under it and a filter that lists exact paths ('/ai-copilots-for-msps') knows none of them as '/x'.
  */
 function routePaths(appRoot, dir) {
-  const segments = relative(appRoot, dir)
-    .split(sep)
-    .filter(segment => segment && !/^\(.*\)$/.test(segment) && !segment.startsWith('@'));
-  const firstDynamic = segments.findIndex(segment => segment.startsWith('['));
-  const sample = `/${segments.map(segment => (segment.startsWith('[') ? 'x' : segment)).join('/')}`;
-  if (firstDynamic === -1) return [sample];
-  return [sample, `/${segments.slice(0, firstDynamic).join('/')}`];
+  return routeSegmentPaths(relative(appRoot, dir).split(sep));
 }
 
-const isPage = file => /^page\.[cm]?[jt]sx?$/.test(file.slice(file.lastIndexOf(sep) + 1));
+const isPage = file => isPageFile(file.slice(file.lastIndexOf(sep) + 1));
 
 /**
  * The route files this build serves: every page the filter accepts at one of its paths (`routePaths`),

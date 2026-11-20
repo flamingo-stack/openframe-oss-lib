@@ -17,6 +17,7 @@ import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.FleetSource;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
@@ -31,6 +32,8 @@ import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareTitleQuery;
 import com.openframe.data.repository.rmm.software.SoftwareTitleQuery.SoftwareTitleQueryBuilder;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,6 +41,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +59,7 @@ public class TenantSoftwareReadModelQuery {
 
     private static final int DEFAULT_PER_PAGE = 20;
     private static final String DEFAULT_SORT_PROPERTY = "nameLower";
+    private static final String DEFAULT_VULNERABILITY_SORT_FIELD = "discoveredAt";
     private static final Map<String, String> SORT_FIELD = Map.of(
             "name", "nameLower",
             "devicesCount", "devicesCount",
@@ -66,6 +71,7 @@ public class TenantSoftwareReadModelQuery {
     private final VulnerabilityRepository vulnerabilityRepository;
     private final MachineRepository machineRepository;
     private final PackageAutoUpdatePolicyRepository packageAutoUpdatePolicyRepository;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     public boolean exists(String tenantId, String softwareId) {
         Long titleId = parseLong(softwareId);
@@ -75,6 +81,15 @@ public class TenantSoftwareReadModelQuery {
     public SoftwareResponse get(String tenantId, String softwareId) {
         Software software = load(tenantId, softwareId);
         return toResponse(software);
+    }
+
+    public List<SoftwareResponse> getTitles(String tenantId, Collection<Long> titleIds) {
+        if (titleIds.isEmpty()) {
+            return List.of();
+        }
+        return softwareRepository.findByTenantIdAndSoftwareTitleIdIn(tenantId, titleIds).stream()
+                .map(TenantSoftwareReadModelQuery::toResponse)
+                .toList();
     }
 
     private Software load(String tenantId, String softwareId) {
@@ -100,6 +115,8 @@ public class TenantSoftwareReadModelQuery {
     public PageResult<SoftwareVulnerabilityResponse> listVulnerabilitiesForSoftware(
             String tenantId, String softwareId, String search, int page, Integer perPage,
             String sortField, boolean sortAsc) {
+        Comparator<SoftwareVulnerabilityResponse> order =
+                SoftwareVulnerabilityOrder.of(sortField, DEFAULT_VULNERABILITY_SORT_FIELD, sortAsc);
         Long titleId = parseLong(softwareId);
         if (titleId == null) {
             return PageResult.empty(page);
@@ -108,7 +125,7 @@ public class TenantSoftwareReadModelQuery {
                 .findByTenantIdAndAffectedSoftwareSoftwareTitleId(tenantId, titleId).stream()
                 .map(v -> toSoftwareVuln(v, titleId))
                 .filter(v -> isBlank(search) || (v.getCveId() != null && v.getCveId().toLowerCase().contains(search.toLowerCase())))
-                .sorted(vulnComparator(sortField, sortAsc))
+                .sorted(order)
                 .toList();
         return paginate(all, page, perPage);
     }
@@ -127,13 +144,6 @@ public class TenantSoftwareReadModelQuery {
         return v;
     }
 
-    private Comparator<SoftwareVulnerabilityResponse> vulnComparator(String sortField, boolean sortAsc) {
-        Comparator<SoftwareVulnerabilityResponse> base = "cveId".equals(sortField)
-                ? Comparator.comparing(SoftwareVulnerabilityResponse::getCveId, Comparator.nullsLast(Comparator.naturalOrder()))
-                : Comparator.comparing(SoftwareVulnerabilityResponse::getDiscoveredAt, Comparator.nullsLast(Comparator.naturalOrder()));
-        return sortAsc ? base : base.reversed();
-    }
-
     // Every device that has the title, each compared with latestVersion (the catalog's newest release or the highest
     // version installed): a device is up to date only when every version it carries is at or past it.
     public List<SoftwareOnDeviceResponse> devicesForSoftwareRows(String tenantId, String softwareId, String search,
@@ -145,12 +155,18 @@ public class TenantSoftwareReadModelQuery {
         List<String> machineIds = installed.stream()
                 .map(DeviceSoftware::getMachineId).filter(Objects::nonNull).distinct().toList();
         Map<String, Machine> machineById = machineRepository.findByMachineIdIn(machineIds).stream()
+                .filter(TenantSoftwareReadModelQuery::isCounted)
                 .collect(Collectors.toMap(Machine::getMachineId, Function.identity(), (a, b) -> a));
         return installed.stream()
                 .filter(row -> machineById.containsKey(row.getMachineId()))
                 .map(row -> toOnDevice(row, machineById, latestVersion))
                 .filter(row -> matchesHostname(row, search))
                 .toList();
+    }
+
+    private static boolean isCounted(Machine machine) {
+        DeviceStatus status = machine.getStatus();
+        return !DeviceStatus.FROZEN.contains(status);
     }
 
     public List<String> machineIdsForSoftware(String tenantId, String softwareId) {
@@ -188,8 +204,9 @@ public class TenantSoftwareReadModelQuery {
         return hostname != null && hostname.toLowerCase().contains(search.toLowerCase());
     }
 
-    public List<SoftwareResponse> allForFilters(String tenantId, String search) {
-        SoftwareTitleQuery titles = titles(tenantId, search, null, null);
+    public List<SoftwareResponse> allTitles(String tenantId, String search, Boolean vulnerable,
+                                            SoftwareFilterInput filter) {
+        SoftwareTitleQuery titles = titles(tenantId, search, vulnerable, filter);
         Page<Software> page = softwareRepository.findTitles(titles, Pageable.unpaged());
         return page.getContent().stream().map(TenantSoftwareReadModelQuery::toResponse).toList();
     }
@@ -275,9 +292,11 @@ public class TenantSoftwareReadModelQuery {
         List<String> softwareIds = packageAutoUpdatePolicyRepository.findSoftwareIds(tenantId);
         Set<Long> enabledPolicyTitleIds = titleIds(enabledSoftwareIds);
         Set<Long> policyTitleIds = titleIds(softwareIds);
+        List<PackageManagerType> adoptionManagers = packageManagerAvailability.enabledManagers();
         titles.autoUpdateStatuses(autoUpdateStatuses)
                 .enabledPolicyTitleIds(enabledPolicyTitleIds)
-                .policyTitleIds(policyTitleIds);
+                .policyTitleIds(policyTitleIds)
+                .adoptionManagers(adoptionManagers);
     }
 
     // a policy names the Software by its id as text; the read model keys a title by the same id as a number
@@ -319,7 +338,11 @@ public class TenantSoftwareReadModelQuery {
         row.setProductCodes(sw.getArpKeys());
         row.setPackageFamilyNames(sw.getPackageFamilyNames());
         row.setSystemComponent(sw.getSystemComponent());
+        row.setBundleIdentifier(sw.getBundleIdentifier());
+        row.setAppFileNames(sw.getAppFileNames());
+        row.setTopLevelApp(sw.getTopLevelApp());
         row.setPackageMatch(sw.getPackageMatch());
+        row.setAdoptionMatch(sw.getAdoptionMatch());
         row.setType(type);
         row.setCurrentVersion(sw.getCurrentVersion());
         row.setLatestVersion(sw.getLatestVersion());

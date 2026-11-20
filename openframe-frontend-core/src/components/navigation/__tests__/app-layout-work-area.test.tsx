@@ -12,7 +12,12 @@ import { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from '../../../utils
 import { Collapse02Icon } from '../../icons-v2-generated';
 import { AppColumnHeader } from '../app-column-header';
 import { AppLayout } from '../app-layout';
-import { AppLayoutWorkArea, type AppLayoutWorkAreaMode, useWorkAreaColumn } from '../app-layout-work-area';
+import {
+  AppLayoutWorkArea,
+  type AppLayoutWorkAreaMode,
+  useWorkAreaColumn,
+  WORK_AREA_RAISE_ATTRIBUTE,
+} from '../app-layout-work-area';
 
 /** jsdom has no layout: every element reports this width. */
 function rowWidth(px: number) {
@@ -134,6 +139,33 @@ describe('AppLayoutWorkArea', () => {
     render(area('page'));
     expect(chatColumn()).toHaveClass('hidden');
     expect(chatColumn()).not.toHaveClass('opacity-0');
+  });
+});
+
+describe('AppLayoutWorkArea raise', () => {
+  // jsdom applies no stylesheet: what can be checked here is that the class keys on the exported
+  // attribute (renaming one without the other silently drops the raise) and that the selector
+  // matches only while a marked element is inside the page column.
+  const raised = () => pageColumn().matches(`:has([${WORK_AREA_RAISE_ATTRIBUTE}])`);
+  const page = (marked: boolean) => (
+    <AppLayoutWorkArea
+      mode="split"
+      chat={<h2>Thread</h2>}
+      page={<div {...(marked ? { [WORK_AREA_RAISE_ATTRIBUTE]: '' } : {})}>Remote screen</div>}
+    />
+  );
+
+  it('raises the page column only while an element inside it carries the raise attribute', () => {
+    rowWidth(1000);
+    const { rerender } = render(page(false));
+    expect(pageColumn()).toHaveClass(`has-[[${WORK_AREA_RAISE_ATTRIBUTE}]]:z-50`);
+    expect(raised()).toBe(false);
+
+    rerender(page(true));
+    expect(raised()).toBe(true);
+
+    rerender(page(false));
+    expect(raised()).toBe(false);
   });
 });
 

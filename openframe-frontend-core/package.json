@@ -31,6 +31,12 @@
       "require": "./dist/build/optimize-imports-loader.cjs",
       "default": "./dist/build/optimize-imports-loader.cjs"
     },
+    "./route-paths": {
+      "types": "./dist/build/route-paths.d.ts",
+      "import": "./dist/build/route-paths.cjs",
+      "require": "./dist/build/route-paths.cjs",
+      "default": "./dist/build/route-paths.cjs"
+    },
     "./style-sources": {
       "types": "./dist/build/style-sources.d.ts",
       "import": "./dist/build/style-sources.cjs",
@@ -291,6 +297,12 @@
       "import": "./dist/utils/page-topics.js",
       "require": "./dist/utils/page-topics.cjs",
       "default": "./dist/utils/page-topics.js"
+    },
+    "./utils/named-icon": {
+      "types": "./dist/utils/named-icon.d.ts",
+      "import": "./dist/utils/named-icon.js",
+      "require": "./dist/utils/named-icon.cjs",
+      "default": "./dist/utils/named-icon.js"
     },
     "./utils/mobile-app": {
       "types": "./dist/utils/mobile-app.d.ts",
