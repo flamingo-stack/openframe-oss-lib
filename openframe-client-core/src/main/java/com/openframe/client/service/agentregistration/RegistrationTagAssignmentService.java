@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -118,9 +119,11 @@ public class RegistrationTagAssignmentService {
 
         Tag saved = tagRepository.save(tag);
         log.info("Created tag '{}' (id={}) with DEVICE entity type during registration", key, saved.getId());
-        auditRecorder.record(tagEntry(TAG_CREATE, saved)
-                .details(Map.of("entityType", TagEntityType.DEVICE, "key", key))
-                .build());
+        Map<String, Object> details = new HashMap<>();
+        details.put("entityType", TagEntityType.DEVICE);
+        details.put("key", key);
+        details.put("values", saved.getValues());
+        auditRecorder.record(tagEntry(TAG_CREATE, saved).details(details).build());
         return saved;
     }
 

@@ -5,7 +5,6 @@ import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseService;
 import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditRecorder;
-import com.openframe.audit.Audited;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -267,7 +266,12 @@ public class TagService {
         if (existing != null) {
             return existing;
         }
-        AuditCall call = AuditCall.of(TAG_CREATE, null, Map.of("entityType", entityType, "key", key))
+        Map<String, Object> details = new HashMap<>();
+        details.put("entityType", entityType);
+        details.put("key", key);
+        details.put("description", description);
+        details.put("color", color);
+        AuditCall call = AuditCall.of(TAG_CREATE, null, details)
                 .withCompare(false)
                 .withTargetIdInResult(true)
                 .withTargetIdFromResult(created -> ((Tag) created).getId());
@@ -292,11 +296,16 @@ public class TagService {
     }
 
     @Transactional
-    @Audited(action = TAG_UPDATE, targetId = "#tagId", details = "entityType=#result?.entityType")
     public Tag updateTag(String tagId, String key, String description, String color) {
         log.info("Updating tag: {}", tagId);
+        Map<String, Object> details = new HashMap<>();
+        return auditedMethodRunner.run(TAG_UPDATE, tagId, details,
+                () -> applyUpdate(tagId, key, description, color, details));
+    }
 
+    private Tag applyUpdate(String tagId, String key, String description, String color, Map<String, Object> details) {
         Tag tag = requireTag(tagId);
+        details.put("entityType", tag.getEntityType());
 
         if (key != null) {
             TagEntityType entityType = tag.getEntityType();
@@ -325,17 +334,19 @@ public class TagService {
 
     private void deleteWithAssignments(String tagId, Map<String, Object> details) {
         Tag tag = requireTag(tagId);
-        List<TagAssignment> assignments = tagAssignmentRepository.findByTagId(tagId);
+        List<String> entityIds = tagAssignmentRepository.findByTagId(tagId).stream()
+                .map(TagAssignment::getEntityId)
+                .distinct()
+                .toList();
         details.put("entityType", tag.getEntityType());
-        details.put("removedAssignments", assignments.size());
+        details.put("removedAssignments", entityIds.size());
         tagAssignmentRepository.deleteByTagId(tagId);
         tagRepository.deleteById(tagId);
-        auditRecorder.recordAll(removalsOf(tag, assignments));
+        auditRecorder.recordAll(removalsOf(tag, entityIds));
         log.info("Tag deleted with cascade: {}", tagId);
     }
 
-    private List<AuditEntry> removalsOf(Tag tag, List<TagAssignment> assignments) {
-        List<String> entityIds = assignments.stream().map(TagAssignment::getEntityId).distinct().toList();
+    private List<AuditEntry> removalsOf(Tag tag, List<String> entityIds) {
         return switch (tag.getEntityType()) {
             case TICKET -> entityIds.stream()
                     .map(ticketId -> removalOf(TICKET_TAG_REMOVE, AuditTargetType.TICKET, ticketId, tag))
