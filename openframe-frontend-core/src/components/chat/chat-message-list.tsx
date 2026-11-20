@@ -1146,7 +1146,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                           actions={index > lastUserMessageIndex ? actions : actionsWithoutAsk}
                           displayApprovalTypes={displayApprovalTypes}
                           progress={metadata?.progress}
-                          interrupted={metadata?.aborted === true || metadata?.finishReason === 'interrupted'}
+                          interrupted={metadata?.finishReason === 'interrupted'}
+                          aborted={metadata?.aborted === true}
                           NavLinkAnchor={NavLinkAnchor}
                         />
                         {ownedContent}

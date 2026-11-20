@@ -4,6 +4,7 @@ import { applyChunk, applyChunkToMessages, createWireState } from '../../../chat
 import type { ChatPart } from '../../../chat-protocol/chat-message';
 import { createMingoDecoder } from '../../../chat-protocol/message-decoder';
 import { historicalMessageOfNode } from '../../../chat-protocol/mingo-graphql';
+import { CHAT_INTERRUPTED_NOTICE } from '../../../chat-protocol/ui-chunks';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import { ChatMessageList } from '../chat-message-list';
 
@@ -113,5 +114,16 @@ describe('ChatMessageEnhanced direct tool answers', () => {
     expect(stopped[0].metadata?.aborted).toBe(true);
     render(<ChatMessageList messages={stopped} actions={{ pickSuggestion: vi.fn() }} />);
     expect(screen.queryByRole('button', { name: 'Patching' })).toBeNull();
+  });
+
+  it('does not draw the interrupted notice on a turn the user stopped', () => {
+    const wire = createWireState();
+    const started = applyChunkToMessages([], { type: 'start', messageId: 'stopped' }, wire);
+    const chunks = createMingoDecoder().decode(executed).chunks;
+    const running = chunks.reduce((messages, chunk) => applyChunkToMessages(messages, chunk, wire), started);
+    const stopped = applyChunkToMessages(running, { type: 'abort' }, wire);
+    expect(stopped[0].metadata?.finishReason).not.toBe('interrupted');
+    render(<ChatMessageList messages={stopped} actions={{ pickSuggestion: vi.fn() }} />);
+    expect(screen.queryByText(CHAT_INTERRUPTED_NOTICE)).toBeNull();
   });
 });

@@ -192,6 +192,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       displayApprovalTypes,
       progress,
       interrupted = false,
+      aborted = false,
       NavLinkAnchor,
       ...props
     },
@@ -215,7 +216,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // What the renderer maps over: source parts are not drawn in the body, and a source arriving mid-answer (a cited
     // collection) must not shift an index and remount every part after it. A system row's words are its name line.
     // A tool row the server marked as the answer shows its result (a slash command's MCP answer, returned as is).
-    const shownParts = useMemo(() => (interrupted ? parts : withToolAnswer(parts)), [interrupted, parts]);
+    const shownParts = useMemo(
+      () => (interrupted || aborted ? parts : withToolAnswer(parts)),
+      [interrupted, aborted, parts],
+    );
     const bodyParts = useMemo(
       () => (isSystemRow ? [] : shownParts.filter(part => !isSourcePart(part))),
       [isSystemRow, shownParts],
@@ -718,6 +722,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.displayApprovalTypes === nextProps.displayApprovalTypes &&
     prevProps.progress === nextProps.progress &&
     prevProps.interrupted === nextProps.interrupted &&
+    prevProps.aborted === nextProps.aborted &&
     prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
   );
 });

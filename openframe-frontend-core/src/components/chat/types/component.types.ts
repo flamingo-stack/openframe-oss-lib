@@ -156,6 +156,8 @@ export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement>
   progress?: ChatMessageMetadata['progress'];
   /** The stream ended with no completion signal (`metadata.finishReason`): what it said stays, over a notice. */
   interrupted?: boolean;
+  /** The user stopped the turn (`metadata.aborted`): a tool result marked as the answer is not drawn. */
+  aborted?: boolean;
   /**
    * Entity-context items attached to this (user) message. When present the
    * bubble renders a read-only chip strip beneath its text (Figma node
