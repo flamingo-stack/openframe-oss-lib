@@ -21,7 +21,6 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.MutationDeleteInput;
 import com.openframe.api.dto.shared.MutationDeletePayload;
 import com.openframe.api.mapper.GraphQLKnowledgeBaseMapper;
-import com.openframe.audit.Audited;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseAttachmentService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseTempAttachmentService;
@@ -48,7 +47,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_ADD;
 import static com.openframe.graphql.relay.NodeType.KNOWLEDGE_BASE_ITEM;
 import static com.openframe.graphql.relay.NodeType.TAG;
 
@@ -273,9 +271,6 @@ public class KnowledgeBaseDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = KB_ATTACHMENT_ADD, targetId = "rawId(#input.articleId)", compare = false,
-            condition = "!#result.isEmpty()",
-            details = {"attachmentIds=#result.![id]", "fileNames=#result.![fileName]"})
     public List<KnowledgeBaseItemAttachment> linkKnowledgeBaseTempAttachmentsToArticle(@InputArgument @Valid LinkKnowledgeBaseTempAttachmentsInput input) {
         String currentUserId = getCurrentUserId();
         String articleId = input.getArticleId();

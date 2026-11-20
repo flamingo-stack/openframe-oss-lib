@@ -59,7 +59,6 @@ import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_PUBLISH;
 import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_UNARCHIVE;
 import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_UNPUBLISH;
 import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_UPDATE;
-import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_ADD;
 import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_DELETE;
 import static com.openframe.data.document.audit.AuditAction.KB_FOLDER_CREATE;
 import static com.openframe.data.document.audit.AuditAction.KB_FOLDER_DELETE;
@@ -308,8 +307,8 @@ public class KnowledgeBaseService {
         createAssignments(saved.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
         createAssignments(saved.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
         createAssignments(saved.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
-        recordAttachments(KB_ATTACHMENT_ADD, saved.getId(), knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
-                saved.getId(), cmd.getAttachmentTempIds(), currentUserId));
+        knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(saved.getId(), cmd.getAttachmentTempIds(),
+                currentUserId);
 
         return saved;
     }
@@ -373,7 +372,6 @@ public class KnowledgeBaseService {
         replaceAssignments(article.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
         List<KnowledgeBaseItemAttachment> linked = knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
                 article.getId(), cmd.getAttachmentTempIds(), currentUserId);
-        recordAttachments(KB_ATTACHMENT_ADD, article.getId(), linked);
         KnowledgeBaseArticleStatus statusBefore = article.getStatus();
         String parentBefore = article.getParentId();
 
@@ -406,17 +404,17 @@ public class KnowledgeBaseService {
                 .map(KnowledgeBaseItemAttachment::getStoragePath)
                 .collect(Collectors.toSet());
         knowledgeBaseAttachmentService.deleteAttachments(attachmentsToDelete, pathsStillInUse);
-        recordAttachments(KB_ATTACHMENT_DELETE, saved.getId(), attachmentsToDelete);
+        recordDeletedAttachments(saved.getId(), attachmentsToDelete);
         return saved;
     }
 
-    private void recordAttachments(AuditAction action, String articleId, List<KnowledgeBaseItemAttachment> attachments) {
+    private void recordDeletedAttachments(String articleId, List<KnowledgeBaseItemAttachment> attachments) {
         if (attachments.isEmpty()) {
             return;
         }
         List<String> ids = attachments.stream().map(KnowledgeBaseItemAttachment::getId).toList();
         List<String> fileNames = attachments.stream().map(KnowledgeBaseItemAttachment::getFileName).toList();
-        auditRecorder.record(subChange(action, articleId)
+        auditRecorder.record(subChange(KB_ATTACHMENT_DELETE, articleId)
                 .details(Map.of("attachmentIds", ids, "fileNames", fileNames))
                 .build());
     }

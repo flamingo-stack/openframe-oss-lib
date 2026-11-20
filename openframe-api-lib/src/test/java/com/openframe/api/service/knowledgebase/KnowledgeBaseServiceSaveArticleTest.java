@@ -32,7 +32,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
-import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_ADD;
 import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_DELETE;
 import static com.openframe.data.document.audit.AuditAction.KB_FOLDER_RENAME;
 import static com.openframe.data.document.audit.AuditAction.KB_ITEM_MOVE;
@@ -335,7 +334,7 @@ class KnowledgeBaseServiceSaveArticleTest {
     }
 
     @Test
-    void updateArticle_attachmentsLinkedAndDeleted_recordsEachWithItsFile() {
+    void updateArticle_attachmentsLinkedAndDeleted_recordsTheDeletedFiles() {
         givenArticle(KnowledgeBaseArticleStatus.DRAFT, "f1");
         when(attachmentService.getArticleAttachments(ARTICLE_ID, List.of("x1"))).thenReturn(List.of(
                 KnowledgeBaseItemAttachment.builder().id("x1").fileName("old.pdf").itemId(ARTICLE_ID).build()));
@@ -349,11 +348,10 @@ class KnowledgeBaseServiceSaveArticleTest {
                 .build());
 
         ArgumentCaptor<AuditEntry> entries = ArgumentCaptor.forClass(AuditEntry.class);
-        verify(auditRecorder, times(2)).record(entries.capture());
+        verify(auditRecorder).record(entries.capture());
         assertThat(entries.getAllValues())
                 .extracting(AuditEntry::getAction, AuditEntry::getDetails)
                 .containsExactly(
-                        tuple(KB_ATTACHMENT_ADD, Map.of("attachmentIds", List.of("n1"), "fileNames", List.of("new.pdf"))),
                         tuple(KB_ATTACHMENT_DELETE, Map.of("attachmentIds", List.of("x1"), "fileNames", List.of("old.pdf"))));
     }
 
