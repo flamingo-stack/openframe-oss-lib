@@ -1,0 +1,56 @@
+{
+  "osState": {
+    "osVersion": "Windows 11 Pro",
+    "osBuild": "26100.4061",
+    "architecture": "X86_64",
+    "restartPending": false,
+    "lastScanAt": "2026-11-19T10:14:51Z",
+    "lastScanError": null,
+    "managementState": "MANAGED",
+    "osUpdateAuthorization": "NOT_REQUIRED",
+    "scheduleOwned": false,
+    "windows": {
+      "osEdition": "Professional",
+      "osDisplayVersion": "24H2",
+      "installationType": "Client",
+      "domainJoined": false,
+      "serverRoles": { "domainController": false, "clusterNode": false },
+      "bitLockerPreBootPin": false,
+      "managementSignals": {
+        "wsusConfigured": false, "wuServer": null, "scanSourcePerClass": null,
+        "wuPolicyKeysPresent": false, "mdmEnrolled": false, "configMgrPresent": false,
+        "writeFilterEnabled": false
+      },
+      "defender": {
+        "signatureVersion": "1.421.112.0", "signaturesUpdatedAt": "2026-11-19T04:02:00Z",
+        "amRunningMode": "Normal", "fallbackOrderConfigured": false, "lastRepairAt": null
+      },
+      "microsoftUpdateRegistered": false
+    }
+  },
+  "pendingUpdates": [
+    {
+      "updateKey": "7d2f1c0e-3b0a-4c59-9d53-0c8f4d1f6a21:201",
+      "title": "2026-11 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5068861)",
+      "kbArticleIds": ["5068861"],
+      "msrcSeverity": "Critical",
+      "categories": [{ "id": "0fa1201d-4330-4fa8-8ae9-b877473b6441", "name": "Security Updates" }],
+      "browseOnly": false,
+      "publishedAt": "2026-11-10T18:00:00Z",
+      "sizeBytes": 812646400,
+      "isDownloaded": false,
+      "restartBehaviour": "ALWAYS",
+      "requiresExclusiveInstall": false
+    }
+  ],
+  "installHistory": [
+    {
+      "updateKey": "b0a7e1d4-52c3-4f0e-8a6d-91f3c2e4d7aa:200",
+      "title": "2026-10 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5066835)",
+      "installedAt": "2026-10-16T02:41:10Z",
+      "operation": "INSTALL",
+      "result": "SUCCEEDED",
+      "hresult": "0x00000000"
+    }
+  ]
+}
