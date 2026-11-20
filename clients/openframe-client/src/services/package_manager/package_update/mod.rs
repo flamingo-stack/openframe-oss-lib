@@ -19,6 +19,7 @@ use tracing::{info, warn};
 
 use crate::models::{DeliveryRef, DeliveryResultMessage};
 use crate::services::delivery_results::DeliveryResults;
+use crate::services::package_manager::brew::BrewLock;
 use crate::services::tool_run_manager::ClientUpdatePending;
 use crate::services::{AgentConfigurationService, ToolRunManager};
 use crate::utils::in_progress::InProgress;
@@ -33,7 +34,7 @@ pub struct RestartSignals {
 }
 
 impl RestartSignals {
-    fn pending(&self) -> bool {
+    pub(crate) fn pending(&self) -> bool {
         self.client_update.is_pending() || self.agent_restart.is_set()
     }
 }
@@ -55,7 +56,8 @@ struct Worker {
 }
 
 impl PackageUpdateRunManager {
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(
         orders: Arc<OrderStore>,
         status: StatusReporter,
         results: DeliveryResults,
@@ -63,10 +65,14 @@ impl PackageUpdateRunManager {
         signals: RestartSignals,
         package_upgrades: InProgress,
         tool_run_manager: ToolRunManager,
+        brew: BrewLock,
     ) -> Self {
         Self {
             worker: Arc::new(Worker {
-                machine: Box::new(System { tool_run_manager }),
+                machine: Box::new(System {
+                    tool_run_manager,
+                    brew,
+                }),
                 orders,
                 status,
                 results,

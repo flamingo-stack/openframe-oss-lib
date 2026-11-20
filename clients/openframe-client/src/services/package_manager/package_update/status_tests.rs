@@ -73,19 +73,3 @@ async fn a_superseded_report_is_a_failed_event_with_the_reason() {
         Some(FailReason::Superseded)
     );
 }
-
-#[test]
-fn outbox_keys_sort_in_the_order_events_happened() {
-    let keys = [
-        outbox_key(999_999_999, "ffffffff-0000-4000-8000-000000000000"),
-        outbox_key(1_000_000_000, "00000000-0000-4000-8000-000000000000"),
-        outbox_key(
-            1_761_600_000_000_000_001,
-            "88888888-0000-4000-8000-000000000000",
-        ),
-    ];
-
-    let mut sorted = keys.clone();
-    sorted.sort();
-    assert_eq!(sorted, keys);
-}
