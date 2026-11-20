@@ -195,6 +195,7 @@ public enum AuditAction {
     SOFTWARE_SCHEDULE_RUN("software_schedule.run", CHANGE, SOFTWARE_SCHEDULE),
     SOFTWARE_INSTALL("software.install", CHANGE, DEVICE),
     SOFTWARE_UPDATE("software.update", CHANGE, DEVICE),
+    SOFTWARE_ADOPT("software.adopt", CHANGE, DEVICE),
     SOFTWARE_AUTO_UPDATE_ENABLE("software.auto_update.enable", CHANGE, SOFTWARE),
     SOFTWARE_AUTO_UPDATE_DISABLE("software.auto_update.disable", CHANGE, SOFTWARE),
     FLEET_POLICY_CREATE("fleet.policy.create", CHANGE, FLEET_POLICY),
