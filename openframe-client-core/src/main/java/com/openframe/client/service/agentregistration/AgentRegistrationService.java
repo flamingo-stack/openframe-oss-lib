@@ -20,6 +20,7 @@ import com.openframe.data.service.machine.MachineField;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
+import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
@@ -78,6 +80,7 @@ public class AgentRegistrationService {
     private final ToolConnectionService toolConnectionService;
     private final AgentRegistrationClientFeatureFlagsService agentRegistrationClientFeatureFlagsService;
     private final AgentRegistrationClientUpdateService agentRegistrationClientUpdateService;
+    private final DeletedMachineCleanup deletedMachineCleanup;
 
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
@@ -105,8 +108,11 @@ public class AgentRegistrationService {
     // forever. A write, not a read-then-write: a read this soon after the insert can miss the machine on a secondary
     private void discardFailedRegistration(String machineId) {
         try {
-            machineWriter.update(machineId, machineUpdate().set(STATUS, DeviceStatus.DELETED));
+            Optional<Machine> discarded = machineWriter.update(machineId, machineUpdate().set(STATUS, DeviceStatus.DELETED))
+                    .map(MachineWriteResult::after);
             installedAgentService.disconnectAll(machineId);
+            discarded.map(Machine::getTenantId)
+                    .ifPresent(tenantId -> deletedMachineCleanup.cleanUpDeletedMachine(tenantId, machineId));
             log.warn("Registration failed after the machine was saved, machine {} marked DELETED", machineId);
         } catch (RuntimeException e) {
             log.error("Failed to discard machine {} of a failed registration", machineId, e);

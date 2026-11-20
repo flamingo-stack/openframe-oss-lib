@@ -405,11 +405,12 @@ public class DeviceService {
             return;
         }
         DeviceStatus previousStatus = machine.getStatus();
-        boolean connected = status.isConnected();
+        boolean inFleet = !DeviceStatus.FROZEN.contains(status);
+        boolean wasInFleet = !DeviceStatus.FROZEN.contains(previousStatus);
         if (status == DeviceStatus.DELETED) {
             deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
-        } else if (previousStatus.isConnected() != connected) {
-            deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, connected);
+        } else if (wasInFleet != inFleet) {
+            deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, inFleet);
         }
 
         // Field-level: a whole-document save would overwrite what other writers set on the machine since the read

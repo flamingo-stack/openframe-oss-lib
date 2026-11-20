@@ -62,6 +62,16 @@ const SCHEDULES: ScriptScheduleTableRow[] = [
     deviceCount: 36,
     href: '#',
   },
+  {
+    // A time with a note: in the grid the date stays whole and the note is the part cut.
+    id: 'disk-report',
+    name: 'Disk health report',
+    supportedPlatforms: ['darwin', 'linux'],
+    startsAt: { date: '04/09/2026', time: '6:00 PM · device local time' },
+    repeat: 'Once',
+    deviceCount: 12,
+    href: '#',
+  },
 ];
 
 /** A row menu, so the grid stories show both action columns. */

@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -48,6 +49,7 @@ class DeviceSoftwareHandlerTest {
     private static final long SKIPPED_HOST = 4806L;
 
     @Mock private FleetHostResolver fleetHostResolver;
+    @Mock private MachineFleetMembership machineFleetMembership;
     @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjectionTrigger projectionTrigger;
@@ -58,8 +60,9 @@ class DeviceSoftwareHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new DeviceSoftwareHandler(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository,
-                projectionTrigger, Set.of(SKIPPED_HOST));
+        handler = new DeviceSoftwareHandler(fleetHostResolver, machineFleetMembership, fleetHostSoftwareCache,
+                deviceSoftwareRepository, projectionTrigger, Set.of(SKIPPED_HOST));
+        lenient().when(machineFleetMembership.isInFleet(any())).thenReturn(true);
     }
 
     private DeserializedDebeziumMessage msg(String op, JsonNode before, JsonNode after) {
@@ -120,7 +123,7 @@ class DeviceSoftwareHandlerTest {
         return DeviceSoftware.builder().id(id).tenantId("t1").machineId("m1").softwareTitleId(titleId)
                 .name(name).source("apps").versions(List.of(version)).vulnerabilities(List.of(cves))
                 .arpKeys(List.of()).packageFamilyNames(List.of()).installerTypes(List.of())
-                .appFileNames(List.of()).machineConnected(false).build();
+                .appFileNames(List.of()).machineConnected(true).build();
     }
 
     private HostSoftwareTitle titleWithCves(long id, String name, String version, String... cves) {
@@ -194,7 +197,6 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getSource()).isEqualTo("apps");
         assertThat(saved.getVersions()).containsExactly("1.0", "2.0");
         assertThat(saved.getUpdatedAt()).isNotNull();
-        // a new row is written for a device reporting software, so it counts until a lifecycle change says otherwise
         assertThat(saved.isMachineConnected()).isTrue();
 
         verify(deviceSoftwareRepository).deleteAllById(List.of("ds-99"));
@@ -659,7 +661,7 @@ class DeviceSoftwareHandlerTest {
     }
 
     @Test
-    void handle_reconcile_changedRowKeepsItsIdAndConnectivityAndProjectsOldAndNewCves() {
+    void handle_reconcile_changedRowKeepsItsIdAndProjectsOldAndNewCves() {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenReturn(List.of(
@@ -673,7 +675,7 @@ class DeviceSoftwareHandlerTest {
 
         DeviceSoftware saved = savedRow();
         assertThat(saved.getId()).isEqualTo("ds-42");
-        assertThat(saved.isMachineConnected()).isFalse();
+        assertThat(saved.isMachineConnected()).isTrue();
         assertThat(saved.getVersions()).containsExactly("2.0");
         assertThat(saved.getUpdatedAt()).isNotNull();
         verify(deviceSoftwareRepository, never()).deleteAllById(any());
@@ -697,21 +699,108 @@ class DeviceSoftwareHandlerTest {
     }
 
     @Test
-    void handle_reconcile_changedRowOfAConnectedDeviceStaysConnected() {
-        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
-        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, GTID_1)).thenReturn(List.of(
-                titleWithCves(42L, "Google Chrome", "2.0")));
-        DeviceSoftware connected = stored("ds-42", 42L, "Google Chrome", "1.0");
-        connected.setMachineConnected(true);
-        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(connected));
+    void handle_reconcile_storedRowNotCountedOfADeviceInTheFleet_isWrittenCounted() {
+        // setup
+        stubHostSoftware(title(42L, "Google Chrome", "apps", "1.0"));
+        DeviceSoftware notCounted = stored("ds-42", 42L, "Google Chrome", "1.0");
+        notCounted.setMachineConnected(false);
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(notCounted));
 
-        handler.handle(msgIn("c", null, row().put("host_id", 100), COMMIT_TS, GTID_1), null);
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
+        // verifications
         DeviceSoftware saved = savedRow();
         assertThat(saved.getId()).isEqualTo("ds-42");
         assertThat(saved.isMachineConnected()).isTrue();
-        assertThat(saved.getVersions()).containsExactly("2.0");
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
+    }
+
+    @Test
+    void handle_hostOfADeviceOutOfTheFleet_isNeitherFetchedNorWritten() {
+        // setup
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(machineFleetMembership.isInFleet(new FleetHostRef("t1", "m1"))).thenReturn(false);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verifyNoInteractions(fleetHostSoftwareCache, deviceSoftwareRepository, projectionTrigger);
+    }
+
+    @Test
+    void handle_hostOfADeviceOutOfTheFleet_nextRowOfTheCommitIsNotLookedUpAgain() {
+        // setup
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(machineFleetMembership.isInFleet(new FleetHostRef("t1", "m1"))).thenReturn(false);
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 1), COMMIT_TS, GTID_1), null);
+
+        // execution
+        handler.handle(msgIn("c", null, row().put("host_id", 100).put("software_id", 2), COMMIT_TS, GTID_1), null);
+
+        // verifications
+        verify(machineFleetMembership, times(1)).isInFleet(new FleetHostRef("t1", "m1"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"${{arpDisplayName}}", "${{ arpDisplayName }}", "Contoso ${{productVersion}}",
+            "{8A69D345-D564-463C-AFF1-A69D9E530F96}", "8a69d345-d564-463c-aff1-a69d9e530f96", " ", ""})
+    void handle_reconcile_placeholderOrGuidOnlyName_isStoredWithoutAName(String reportedName) {
+        // setup
+        stubHostSoftware(title(42L, reportedName, "programs", "1.0"));
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        assertThat(savedRow().getName()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Google Chrome", "Microsoft Visual C++ 2015-2022 Redistributable (x64) - 14.38.33130",
+            "{Contoso} Agent", "Agent 8a69d345-d564-463c-aff1-a69d9e530f96"})
+    void handle_reconcile_realName_isStoredAsReported(String reportedName) {
+        // setup
+        stubHostSoftware(title(42L, reportedName, "programs", "1.0"));
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        assertThat(savedRow().getName()).isEqualTo(reportedName);
+    }
+
+    @Test
+    void handle_reconcile_storedRowWithoutANameReportedWithAPlaceholder_isNotWritten() {
+        // setup
+        stubHostSoftware(title(42L, "${{arpDisplayName}}", "apps", "1.0"));
+        DeviceSoftware nameless = stored("ds-42", 42L, null, "1.0");
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(nameless));
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void handle_reconcile_storedRowWithAPlaceholderName_isWrittenWithoutIt() {
+        // setup
+        stubHostSoftware(title(42L, "${{arpDisplayName}}", "apps", "1.0"));
+        DeviceSoftware placeholder = stored("ds-42", 42L, "${{arpDisplayName}}", "1.0");
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(placeholder));
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        DeviceSoftware saved = savedRow();
+        assertThat(saved.getId()).isEqualTo("ds-42");
+        assertThat(saved.getName()).isNull();
     }
 
     @Test

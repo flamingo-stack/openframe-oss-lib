@@ -212,9 +212,17 @@ describe('the Scripts tables, grid layout', () => {
     it('puts the time beside the date, and what starts a schedule with no date in its place', () => {
       const { container } = render(<ScriptSchedulesTable {...SCRIPT_SCHEDULES_TABLE.loaded} layout="grid" />);
       const [first, second] = gridRows(container);
-      expect(first).toMatch(/12 Nov 2026[\s\S]*data-part="secondary"[^>]*>02:00</);
+      // The date keeps its width; the time after it is the part a narrow column cuts.
+      expect(first).toMatch(subjectThenDetail('12 Nov 2026', '02:00'));
       expect(second).toContain('Device Online');
       expect(gridBodyMarkup(container)).not.toContain('flex-col');
+    });
+
+    it('keeps the date whole beside a time that carries a note', () => {
+      // `DataTable.Cell` would cut the date first here: a secondary text this long makes its main text give way.
+      const { container } = render(<ScheduleDateTimeGridCell date="04/09/2026" time="18:00 · device local time" />);
+      expect(container.innerHTML).toMatch(subjectThenDetail('04/09/2026', '18:00 · device local time'));
+      expect(container.innerHTML).not.toContain('min-w-[9ch]');
     });
 
     it('draws the repeat and the device count as one line each, and no repeat where there is none', () => {

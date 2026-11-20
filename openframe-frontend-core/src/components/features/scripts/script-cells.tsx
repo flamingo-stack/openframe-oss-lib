@@ -1,6 +1,5 @@
 'use client';
 
-import { DataTableCell } from '../../ui/data-table/data-table-cell';
 import { TruncateText } from '../../ui/truncate-text';
 import { GridTextWithDetailCell } from '../feature-table-grid-cells';
 
@@ -41,7 +40,10 @@ export function ScriptNameGridCell({ name, description }: { name: string; descri
   return <GridTextWithDetailCell text={name || ''} detail={description || undefined} />;
 }
 
-/** When a schedule starts: the date with the time beside it (a short text, kept whole). */
+/**
+ * When a schedule starts: the date with the time right after it. The date keeps its width: a time with a note
+ * ("15:30 · device local time") is long enough for `DataTable.Cell` to cut the date's last characters instead.
+ */
 export function ScheduleDateTimeGridCell({ date, time }: { date: string; time: string }) {
-  return <DataTableCell text={date || ''} secondary={time || undefined} />;
+  return <GridTextWithDetailCell text={date || ''} detail={time || undefined} />;
 }
