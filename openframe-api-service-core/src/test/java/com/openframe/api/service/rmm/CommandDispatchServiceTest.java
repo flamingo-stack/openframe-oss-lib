@@ -206,8 +206,8 @@ class CommandDispatchServiceTest {
         CancelExecutionInput cancelInput = new CancelExecutionInput();
         cancelInput.setMachineId(MACHINE_ID);
         cancelInput.setExecutionId("exec-abc-123");
-        when(scriptExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, "exec-abc-123"))
-                .thenReturn(Optional.of(ScriptExecution.builder().id("row-1").build()));
+        when(scriptExecutionRepository.findAllByMachineIdAndExecutionId(MACHINE_ID, "exec-abc-123"))
+                .thenReturn(List.of(ScriptExecution.builder().id("row-1").build()));
 
         commandDispatchService.cancelExecution(cancelInput);
 

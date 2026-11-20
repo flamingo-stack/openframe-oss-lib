@@ -18,6 +18,8 @@ import org.bson.Document;
 import org.bson.types.Decimal128;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.retry.RetryContext;
+import org.springframework.retry.support.RetrySynchronizationManager;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.context.request.RequestAttributes;
@@ -128,9 +130,12 @@ public class AuditedMethodRunner {
         try {
             result = recorder.runInContext(declared, work);
         } catch (Throwable failure) {
+            boolean versionConflict = isVersionConflict(failure);
+            if (versionConflict && isRetriedByCaller()) {
+                throw failure;
+            }
             LoadedTarget after = read(call, rereadCandidates, targetIdBeforeCall);
-            Map<String, AuditChange> changes = isVersionConflict(failure)
-                    ? null : changesBetween(call, compares, before, after);
+            Map<String, AuditChange> changes = versionConflict ? null : changesBetween(call, compares, before, after);
             if (record(call, context, () -> entry(call, targetIdBeforeCall, firstNonNull(after, before), before,
                     changes, detailsOf(call, null), null, outcomeResolver.ofFailure(failure)).id(eventId).build())) {
                 RecordedFailures.add(failure);
@@ -190,6 +195,15 @@ public class AuditedMethodRunner {
 
     private static boolean isVersionConflict(Throwable failure) {
         return ExceptionUtils.indexOfType(failure, OptimisticLockingFailureException.class) >= 0;
+    }
+
+    private static boolean isRetriedByCaller() {
+        RetryContext retry = RetrySynchronizationManager.getContext();
+        if (retry == null) {
+            return false;
+        }
+        Integer maxAttempts = (Integer) retry.getAttribute(RetryContext.MAX_ATTEMPTS);
+        return maxAttempts != null && retry.getRetryCount() + 1 < maxAttempts;
     }
 
     private Map<String, AuditChange> changesBetween(AuditCall call, boolean compares, LoadedTarget before, LoadedTarget after) {

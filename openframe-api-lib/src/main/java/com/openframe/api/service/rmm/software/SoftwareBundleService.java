@@ -156,6 +156,13 @@ public class SoftwareBundleService {
                 () -> doSubmit(entity, input, actor, details));
     }
 
+    private static List<SoftwareBundlePackage> withTargetDevice(List<SoftwareBundlePackage> packages,
+                                                                Map<String, OsType> deviceOsTypes) {
+        return packages.stream()
+                .filter(bundlePackage -> deviceOsTypes.containsValue(osTypeOf(bundlePackage.getPackageManager())))
+                .toList();
+    }
+
     private static List<String> packageNamesOf(List<SoftwareBundlePackage> packages) {
         return packages.stream()
                 .map(bundlePackage -> ObjectUtils.firstNonNull(bundlePackage.getPackageName(),
@@ -187,6 +194,10 @@ public class SoftwareBundleService {
         details.put("packages", packageNamesOf(packages));
         validatePackages(packages);
         Map<String, OsType> deviceOsTypes = requireEligibleDeviceOsTypes(machineIds, packages);
+        List<SoftwareBundlePackage> sent = withTargetDevice(packages, deviceOsTypes);
+        if (input.getSchedule() == null) {
+            details.put("packages", packageNamesOf(sent));
+        }
         PackageUpdateSettings updateSettings = PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings());
         SoftwareAutoUpdate autoUpdate = PackageUpdateSettingsMapper.autoUpdate(input.getAction(), input.getAutoUpdate());
 
@@ -205,6 +216,10 @@ public class SoftwareBundleService {
             packages.forEach(this::fillLatestVersion);
             armOnlineDispatch(entity, now);
             entity.setExecutionIds(executionIds(entity));
+            details.put("executionIds", sent.stream()
+                    .map(bundlePackage -> SoftwareExecutionId.forBundle(entity.getId(),
+                            bundlePackage.getPackageManager(), bundlePackage.getPackageName()))
+                    .toList());
         }
 
         saveCompleted(entity, now);

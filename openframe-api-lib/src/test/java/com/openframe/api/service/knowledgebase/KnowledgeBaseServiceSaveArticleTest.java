@@ -353,7 +353,7 @@ class KnowledgeBaseServiceSaveArticleTest {
         assertThat(entries.getAllValues())
                 .extracting(AuditEntry::getAction, AuditEntry::getDetails)
                 .containsExactly(
-                        tuple(KB_ATTACHMENT_ADD, Map.of("attachmentId", "n1", "fileName", "new.pdf")),
+                        tuple(KB_ATTACHMENT_ADD, Map.of("attachmentIds", List.of("n1"), "fileNames", List.of("new.pdf"))),
                         tuple(KB_ATTACHMENT_DELETE, Map.of("attachmentId", "x1", "fileName", "old.pdf")));
     }
 

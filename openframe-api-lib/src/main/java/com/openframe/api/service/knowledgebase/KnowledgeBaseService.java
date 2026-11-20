@@ -285,8 +285,7 @@ public class KnowledgeBaseService {
             details = {"parentId=#cmd.parentId", "status=#cmd.status", "tagIds=#cmd.tagIds",
                     "assignedOrganizationIds=#cmd.assignedOrganizationIds", "assignedDeviceIds=#cmd.assignedDeviceIds",
                     "assignedTicketIds=#cmd.assignedTicketIds",
-                    "assignedKnowledgeArticleIds=#cmd.assignedKnowledgeArticleIds",
-                    "attachmentTempIds=#cmd.attachmentTempIds"})
+                    "assignedKnowledgeArticleIds=#cmd.assignedKnowledgeArticleIds"})
     public KnowledgeBaseItem createArticle(String currentUserId, CreateArticleCommand cmd) {
         log.info("Creating article: {} by user: {} under parent: {}", cmd.getName(), currentUserId, cmd.getParentId());
         validateParentIsFolder(cmd.getParentId());
@@ -309,9 +308,8 @@ public class KnowledgeBaseService {
         createAssignments(saved.getId(), AssignmentTargetType.DEVICE, cmd.getAssignedDeviceIds());
         createAssignments(saved.getId(), AssignmentTargetType.TICKET, cmd.getAssignedTicketIds());
         createAssignments(saved.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
-        knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
-                        saved.getId(), cmd.getAttachmentTempIds(), currentUserId)
-                .forEach(attachment -> recordAttachment(KB_ATTACHMENT_ADD, saved.getId(), attachment));
+        recordAttachmentsAdded(saved.getId(), knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
+                saved.getId(), cmd.getAttachmentTempIds(), currentUserId));
 
         return saved;
     }
@@ -348,8 +346,6 @@ public class KnowledgeBaseService {
         details.put("assignedDeviceIds", cmd.getAssignedDeviceIds());
         details.put("assignedTicketIds", cmd.getAssignedTicketIds());
         details.put("assignedKnowledgeArticleIds", cmd.getAssignedKnowledgeArticleIds());
-        details.put("attachmentTempIds", cmd.getAttachmentTempIds());
-        details.put("deleteAttachmentIds", cmd.getDeleteAttachmentIds());
         return details;
     }
 
@@ -377,7 +373,7 @@ public class KnowledgeBaseService {
         replaceAssignments(article.getId(), AssignmentTargetType.KNOWLEDGE_ARTICLE, cmd.getAssignedKnowledgeArticleIds());
         List<KnowledgeBaseItemAttachment> linked = knowledgeBaseTempAttachmentService.linkTempAttachmentsToArticle(
                 article.getId(), cmd.getAttachmentTempIds(), currentUserId);
-        linked.forEach(attachment -> recordAttachment(KB_ATTACHMENT_ADD, article.getId(), attachment));
+        recordAttachmentsAdded(article.getId(), linked);
         KnowledgeBaseArticleStatus statusBefore = article.getStatus();
         String parentBefore = article.getParentId();
 
@@ -410,12 +406,23 @@ public class KnowledgeBaseService {
                 .map(KnowledgeBaseItemAttachment::getStoragePath)
                 .collect(Collectors.toSet());
         knowledgeBaseAttachmentService.deleteAttachments(attachmentsToDelete, pathsStillInUse);
-        attachmentsToDelete.forEach(attachment -> recordAttachment(KB_ATTACHMENT_DELETE, saved.getId(), attachment));
+        attachmentsToDelete.forEach(attachment -> recordAttachmentDeleted(saved.getId(), attachment));
         return saved;
     }
 
-    private void recordAttachment(AuditAction action, String articleId, KnowledgeBaseItemAttachment attachment) {
-        auditRecorder.record(subChange(action, articleId)
+    private void recordAttachmentsAdded(String articleId, List<KnowledgeBaseItemAttachment> attachments) {
+        if (attachments.isEmpty()) {
+            return;
+        }
+        List<String> ids = attachments.stream().map(KnowledgeBaseItemAttachment::getId).toList();
+        List<String> fileNames = attachments.stream().map(KnowledgeBaseItemAttachment::getFileName).toList();
+        auditRecorder.record(subChange(KB_ATTACHMENT_ADD, articleId)
+                .details(Map.of("attachmentIds", ids, "fileNames", fileNames))
+                .build());
+    }
+
+    private void recordAttachmentDeleted(String articleId, KnowledgeBaseItemAttachment attachment) {
+        auditRecorder.record(subChange(KB_ATTACHMENT_DELETE, articleId)
                 .details(Map.of("attachmentId", attachment.getId(), "fileName", attachment.getFileName()))
                 .build());
     }

@@ -22,7 +22,7 @@ public class AgentRegistrationSecretController {
     private final AgentRegistrationSecretService secretService;
 
     @GetMapping("/active")
-    @Audited(action = AGENT_REGISTRATION_SECRET_VIEW, details = "secretId=#result.id")
+    @Audited(action = AGENT_REGISTRATION_SECRET_VIEW, details = "secretIds={#result.id}")
     public AgentRegistrationSecretResponse getActiveSecret() {
         return secretService.getActiveSecret();
     }

@@ -100,7 +100,7 @@ public class KnowledgeBaseAttachmentService {
 
     @Transactional
     @Audited(action = KB_ATTACHMENT_ADD, targetId = "#articleId", compare = false,
-            details = {"fileName=#fileName", "attachmentId=#result.attachment?.id"})
+            details = {"fileNames={#fileName}", "attachmentIds={#result.attachment?.id}"})
     public KnowledgeBaseAttachmentUpload createUploadUrl(String uploaderId,
                                                          String articleId,
                                                          String fileName,

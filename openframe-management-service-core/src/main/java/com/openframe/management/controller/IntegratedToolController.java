@@ -31,7 +31,7 @@ public class IntegratedToolController {
     private final List<IntegratedToolPostSaveHook> postSaveHooks;
 
     @GetMapping
-    @Audited(action = TOOL_CREDENTIALS_VIEW, details = "toolKeys=#result['tools'].![key]")
+    @Audited(action = TOOL_CREDENTIALS_VIEW, details = "toolIds=#result['tools'].![id]")
     public Map<String, Object> getTools() {
         return Map.of(
             "status", "success",

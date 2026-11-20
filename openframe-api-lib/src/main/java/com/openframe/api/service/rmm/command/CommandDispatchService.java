@@ -43,8 +43,8 @@ public class CommandDispatchService {
     private final AuditedMethodRunner auditedMethodRunner;
 
     @Audited(action = COMMAND_RUN, targetId = "rawId(#input.machineId)", compare = false,
-            details = {"command=#input.command", "shell=#input.shell", "privilegeLevel=#input.privilegeLevel",
-                    "executionId=#result.executionId"})
+            details = {"machineIds={#input.machineId}", "command=#input.command", "shell=#input.shell",
+                    "privilegeLevel=#input.privilegeLevel", "executionId=#result.executionId"})
     public DispatchResponse runCommand(RunCommandInput input, String initiatedBy) {
         deviceService.verifyDispatchable(input.getMachineId());
 
