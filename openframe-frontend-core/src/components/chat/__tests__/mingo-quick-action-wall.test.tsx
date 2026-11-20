@@ -484,6 +484,17 @@ describe('MingoQuickActionWall', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("prints only the page's topic stamp without actions, where the host asks for the stamp", () => {
+    render(
+      <PageTopicsProvider pathname="/tickets" showTopic>
+        <MingoQuickActionWall quickActions={[]} />
+      </PageTopicsProvider>,
+    );
+    expect(screen.getByTitle('Page topic')).toHaveTextContent('/tickets');
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
   it("holds the row's place while the actions are read: its tags' loading form, no tag to press", () => {
     render(<MingoQuickActionWall quickActions={[]} loading />);
     expect(loadingTags()).toHaveLength(4);

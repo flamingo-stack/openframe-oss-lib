@@ -87,6 +87,8 @@ const toChip = (action: MingoQuickAction): QuickActionChip => ({
 /**
  * Mingo's quick actions as the chat's empty state draws them (`MingoWelcome`): the {@link QuickActionSet}. One
  * component, so a host that shows the actions outside the chat (a docked composer's home) draws the very same row.
+ * A page with no action draws nothing, except the page's topic stamp where the host asks for it: whoever tags quick
+ * actions on the hub reads the path to tag on exactly the pages that have none yet.
  */
 export function MingoQuickActionWall({
   quickActions,
@@ -96,7 +98,10 @@ export function MingoQuickActionWall({
   showTopic,
   className,
 }: MingoQuickActionWallProps) {
-  if (quickActions.length === 0 && leading.length === 0 && !loading) return null;
+  const topicStamp = usePageTopicStamp();
+  if (quickActions.length === 0 && leading.length === 0 && !loading) {
+    return (showTopic ?? topicStamp) ? <PageTopicLabel className={cn('shrink-0 text-right', className)} /> : null;
+  }
   return (
     <QuickActionSet
       chips={quickActions.map(toChip)}
