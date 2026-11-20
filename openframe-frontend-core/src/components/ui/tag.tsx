@@ -26,7 +26,7 @@ export const TAG_SIZE_CLASS = {
   default: 'h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
   compact: 'h-7 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
   stamp:
-    'h-[1.125rem] gap-[var(--spacing-system-xxs)] px-[var(--spacing-tag-stamp-inline)] text-h5 text-[length:var(--font-size-tag-stamp)] leading-[var(--font-line-space-tag-stamp)]',
+    'h-[1.125rem] gap-[var(--spacing-system-xxs)] px-[var(--spacing-tag-stamp-inline)] text-h5 [--font-size-h5-caption:var(--font-size-tag-stamp)] [--font-line-space-h5-caption:var(--font-line-space-tag-stamp)]',
   large: 'h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] font-bold text-h3',
   sentence: 'h-9 gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h6',
 } as const;
