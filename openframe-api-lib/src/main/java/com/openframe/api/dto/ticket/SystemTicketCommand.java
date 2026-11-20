@@ -4,22 +4,26 @@ import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketEmailOrigin;
 import com.openframe.data.document.ticket.TicketOwner;
 import com.openframe.data.document.ticket.TicketRequester;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Value
+@Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SystemTicketCommand {
-    String id;
-    TicketCreationSource creationSource;
-    TicketOwner owner;
-    String title;
-    String description;
-    String statusId;
-    String assigneeId;
-    String organizationId;
-    String deviceId;
-    TicketEmailOrigin emailOrigin;
-    TicketRequester requester;
-    String reporterName;
+    private String id;
+    private TicketCreationSource creationSource;
+    private TicketOwner owner;
+    private String title;
+    private String description;
+    private String statusId;
+    private String assigneeId;
+    private String organizationId;
+    private String deviceId;
+    private TicketEmailOrigin emailOrigin;
+    private TicketRequester requester;
+    private String reporterName;
 }
