@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { CONTENT_PREFIX } from './proxy/content-prefix.mjs'
 import { hubTarget, rewrite } from './proxy/inject.mjs'
+import { handleMingoRequest } from './proxy/agent.mjs'
 
 // The dev server + `vite preview` both proxy /content (and the documented bare-/api
 // exception) to the hub. CREDENTIAL-FREE: auth headers come from the client
@@ -20,8 +21,15 @@ export default defineConfig(({ mode }) => {
     // `runtime.endpoints` → /content, see content-runtime.ts.)
     '/api/docs/search': inject,
   }
+  // Mingo's chat loop (proxy/agent.mjs) answers its one route on the dev and preview servers alike.
+  // Returns nothing: a function returned from configureServer is run by Vite as a post-hook.
+  const mingo = (server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) => {
+    server.middlewares.use((req, res, next) => {
+      handleMingoRequest(req, res, env).then((handled) => { if (!handled) next() }, next)
+    })
+  }
   return {
-    plugins: [react()],
+    plugins: [react(), { name: 'mingo-agent', configureServer: mingo, configurePreviewServer: mingo }],
     resolve: {
       // Single React (+ peer singletons) across the app AND the pre-bundled linked lib.
       // Without this, optimizeDeps could bundle the lib's OWN React copy → "invalid hook
