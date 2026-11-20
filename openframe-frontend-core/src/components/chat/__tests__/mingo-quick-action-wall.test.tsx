@@ -63,6 +63,13 @@ describe('QuickActionRow', () => {
     expect(allTag()).toBeTruthy();
   });
 
+  it('draws its chips at the fixed chip scale, the same size in every content area', () => {
+    render(<QuickActionRow chips={chipsOf(2)} />);
+    const group = screen.getByRole('group', { name: 'Quick actions' });
+    expect(group).toHaveClass('[--font-size-h5-caption:var(--font-size-chip)]');
+    expect(group).toHaveClass('[--spacing-system-xs:var(--spacing-chip-gap)]');
+  });
+
   it('draws nothing with no action: no row, no All', () => {
     const { container } = render(<QuickActionRow chips={[]} />);
     expect(container).toBeEmptyDOMElement();
