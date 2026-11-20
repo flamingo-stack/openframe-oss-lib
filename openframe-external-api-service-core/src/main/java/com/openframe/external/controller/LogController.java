@@ -52,7 +52,7 @@ public class LogController {
     @ResponseStatus(OK)
     @Audited(action = AUDIT_LOG_VIEW, condition = "#cursor == null", details = {"startDate=#startDate",
             "endDate=#endDate", "timestampFrom=#timestampFrom", "timestampTo=#timestampTo", "toolTypes=#toolTypes", "eventTypes=#eventTypes", "severities=#severities",
-            "customerIds=#customerIds", "deviceId=#deviceId", "search=#search"})
+            "organizationIds=#customerIds", "deviceId=#deviceId", "search=#search"})
     public LogsResponse getLogs(
             @Parameter(description = "Start date in YYYY-MM-DD format")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,

@@ -132,8 +132,7 @@ public class SoftwareScheduleDataFetcher {
         String rawScheduleId = relayIdCodec.decode(scheduleId, SOFTWARE_SCHEDULE);
         List<String> rawMachineIds = relayIdCodec.decodeAll(machineIds, MACHINE);
         String userId = principal.getId();
-        scheduleService.setDevices(rawScheduleId, rawMachineIds, userId);
-        return scheduleService.get(rawScheduleId);
+        return scheduleService.setDevices(rawScheduleId, rawMachineIds, userId).schedule();
     }
 
     @DgsMutation

@@ -281,7 +281,7 @@ public class AgentRegistrationService {
                 .action(DEVICE_ORGANIZATION_CHANGE)
                 .outcome(AuditOutcome.SUCCESS)
                 .targetId(machine.getMachineId())
-                .targetName(machine.getHostname())
+                .targetName(machine.deviceName())
                 .organizationId(organizationId)
                 .deviceId(machine.getMachineId())
                 .changes(Map.of("organizationId", new AuditChange(previousOrganizationId, organizationId)))

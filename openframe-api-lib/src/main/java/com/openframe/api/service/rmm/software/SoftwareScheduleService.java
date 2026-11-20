@@ -127,7 +127,7 @@ public class SoftwareScheduleService {
         if (input.getMachineIds() != null) {
             List<String> before = assignedMachineIds(tenantId, saved.getId());
             replaceDevices(tenantId, saved.getId(), input.getMachineIds(), updatedBy);
-            recordDeviceChange(saved.getId(), ScheduleDeviceChange.between(before, input.getMachineIds()));
+            recordDeviceChange(saved.getId(), ScheduleDeviceChange.between(before, input.getMachineIds(), false));
         }
         return toResponse(saved);
     }
@@ -180,29 +180,35 @@ public class SoftwareScheduleService {
     }
 
     @Audited(action = SOFTWARE_SCHEDULE_DEVICES_SET, targetId = "#scheduleId", compare = false,
-            condition = "!#result.isEmpty()", details = {"added=#result.added", "removed=#result.removed"})
-    public ScheduleDeviceChange setDevices(String scheduleId, List<String> machineIds, String actor) {
+            condition = "!#result.devices().isEmpty()",
+            details = {"added=#result.devices().added()", "removed=#result.devices().removed()",
+            "switchedFromCriteria=#result.devices().switchedFromCriteria() ? true : null",
+            "machineIds=#result == null ? #machineIds : null"})
+    public SoftwareScheduleDevicesChange setDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
         List<PackageManagerType> managers = managersOf(entity.getPackages());
         packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
-        ensureSpecificMode(entity);
+        boolean switchedFromCriteria = ensureSpecificMode(entity);
         List<String> before = assignedMachineIds(tenantId, scheduleId);
         replaceDevices(tenantId, scheduleId, machineIds, actor);
-        return ScheduleDeviceChange.between(before, Objects.requireNonNullElse(machineIds, List.of()));
+        List<String> after = Objects.requireNonNullElse(machineIds, List.of());
+        ScheduleDeviceChange devices = ScheduleDeviceChange.between(before, after, switchedFromCriteria);
+        return new SoftwareScheduleDevicesChange(toResponse(entity), devices);
     }
 
     @Audited(action = SOFTWARE_SCHEDULE_DEVICES_ADD, targetId = "#scheduleId", compare = false,
-            condition = "!#result.isEmpty()", details = "machineIds=#result")
-    public List<String> addDevices(String scheduleId, List<String> machineIds, String actor) {
+            condition = "!#result.isEmpty()", details = {"machineIds=#result == null ? #machineIds : #result.added",
+            "switchedFromCriteria=#result.switchedFromCriteria() ? true : null"})
+    public ScheduleDeviceChange addDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
         if (machineIds == null || machineIds.isEmpty()) {
-            return List.of();
+            return new ScheduleDeviceChange(List.of(), List.of(), false);
         }
         List<PackageManagerType> managers = managersOf(entity.getPackages());
         packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
-        ensureSpecificMode(entity);
+        boolean switchedFromCriteria = ensureSpecificMode(entity);
         Set<String> existing = new HashSet<>(assignedMachineIds(tenantId, scheduleId));
         List<SoftwareScheduleMachineAssigned> rows = machineIds.stream().distinct()
                 .filter(id -> !existing.contains(id))
@@ -212,11 +218,12 @@ public class SoftwareScheduleService {
         if (!rows.isEmpty()) {
             assignedRepository.saveAll(rows);
         }
-        return rows.stream().map(SoftwareScheduleMachineAssigned::getMachineId).toList();
+        List<String> added = rows.stream().map(SoftwareScheduleMachineAssigned::getMachineId).toList();
+        return new ScheduleDeviceChange(added, List.of(), switchedFromCriteria);
     }
 
     @Audited(action = SOFTWARE_SCHEDULE_DEVICES_REMOVE, targetId = "#scheduleId", compare = false,
-            condition = "!#result.isEmpty()", details = "machineIds=#result")
+            condition = "!#result.isEmpty()", details = "machineIds=#result == null ? #machineIds : #result")
     public List<String> removeDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         loadVisibleOrThrow(tenantId, scheduleId);
@@ -272,12 +279,14 @@ public class SoftwareScheduleService {
                 .toList();
     }
 
-    private void ensureSpecificMode(SoftwareSchedule schedule) {
-        if (schedule.getSelectionMode() != ScheduleDeviceSelectionMode.SPECIFIC) {
+    private boolean ensureSpecificMode(SoftwareSchedule schedule) {
+        ScheduleDeviceSelectionMode mode = schedule.getSelectionMode();
+        if (mode != ScheduleDeviceSelectionMode.SPECIFIC) {
             schedule.setSelectionMode(ScheduleDeviceSelectionMode.SPECIFIC);
             schedule.setDeviceCriteria(null);
             scheduleRepository.save(schedule);
         }
+        return mode == ScheduleDeviceSelectionMode.CRITERIA;
     }
 
     private void replaceDevices(String tenantId, String scheduleId, List<String> machineIds, String actor) {

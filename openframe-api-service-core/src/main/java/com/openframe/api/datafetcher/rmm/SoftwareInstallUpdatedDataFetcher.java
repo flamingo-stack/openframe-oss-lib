@@ -33,17 +33,21 @@ public class SoftwareInstallUpdatedDataFetcher {
     private final SoftwareInstallUpdateManagementService softwareInstallUpdateManagementService;
 
     @DgsMutation
-    @Audited(action = SOFTWARE_INSTALL, compare = false,
+    @Audited(action = SOFTWARE_INSTALL, compare = false, condition = "!#result.isEmpty()",
             targetId = "#input.machineIds.size() == 1 ? rawId(#input.machineIds[0]) : null",
-            details = {"machineIds=#input.machineIds", "packages=#input.packages.![packageName ?: softwareId]"})
+            details = {"machineIds=#input.machineIds",
+                    "packages=#result == null ? #input.packages.![packageName ?: softwareId] : #result.![packageName]",
+                    "executionIds=#result.![executionId]"})
     public List<SoftwareDispatchResult> installSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.install(input, getCurrentUserId(), ExecutionSource.PACKAGE_INSTALLATION);
     }
 
     @DgsMutation
-    @Audited(action = SOFTWARE_UPDATE, compare = false,
+    @Audited(action = SOFTWARE_UPDATE, compare = false, condition = "!#result.isEmpty()",
             targetId = "#input.machineIds.size() == 1 ? rawId(#input.machineIds[0]) : null",
-            details = {"machineIds=#input.machineIds", "packages=#input.packages.![packageName ?: softwareId]"})
+            details = {"machineIds=#input.machineIds",
+                    "packages=#result == null ? #input.packages.![packageName ?: softwareId] : #result.![packageName]",
+                    "executionIds=#result.![executionId]"})
     public List<SoftwareDispatchResult> updateSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.update(input, getCurrentUserId(), ExecutionSource.PACKAGE_UPDATE);
     }

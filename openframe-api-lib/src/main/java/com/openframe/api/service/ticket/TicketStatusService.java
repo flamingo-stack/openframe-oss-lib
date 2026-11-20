@@ -100,10 +100,12 @@ public class TicketStatusService {
 
     @Transactional
     public boolean delete(AuthPrincipal principal, @Valid DeleteTicketStatusInput input) {
-        validateAdminAccess(principal);
         AuditCall call = AuditCall.of(TICKET_STATUS_DELETE, input.getId())
                 .withDetailsFromResult(moved -> deleteDetails(input, moved));
-        auditedMethodRunner.run(call, () -> deleteStatus(input));
+        auditedMethodRunner.run(call, () -> {
+            validateAdminAccess(principal);
+            return deleteStatus(input);
+        });
         return true;
     }
 

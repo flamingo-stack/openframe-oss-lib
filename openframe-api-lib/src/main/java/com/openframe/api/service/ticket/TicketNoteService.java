@@ -1,6 +1,7 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.exception.ticket.TicketNotFoundException;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.audit.Audited;
 import com.openframe.core.exception.ErrorCode;
@@ -57,15 +58,15 @@ public class TicketNoteService {
         validateAdminAccess(principal);
         log.info("Updating note {} by: {}", noteId, principal.getDisplayName());
         TicketNote note = requireNote(noteId);
-        auditedMethodRunner.runWhenChanged(TICKET_NOTE_UPDATE, TICKET, note.getTicketId(), Map.of("noteId", noteId),
-                () -> {
-                    requireAuthor(note, principal, "Only the author can update this note");
-                    boolean changed = !content.equals(note.getContent());
-                    note.setContent(content);
-                    noteRepository.save(note);
-                    return changed;
-                });
-        return note;
+        boolean changed = !content.equals(note.getContent());
+        AuditCall call = AuditCall.of(TICKET_NOTE_UPDATE, TICKET, note.getTicketId(), Map.of("noteId", noteId))
+                .withCompare(false)
+                .withRecordsResult(_ -> changed);
+        return auditedMethodRunner.run(call, () -> {
+            requireAuthor(note, principal, "Only the author can update this note");
+            note.setContent(content);
+            return noteRepository.save(note);
+        });
     }
 
     @Transactional

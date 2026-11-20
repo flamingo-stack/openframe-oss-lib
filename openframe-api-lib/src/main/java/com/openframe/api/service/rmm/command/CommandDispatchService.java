@@ -126,10 +126,16 @@ public class CommandDispatchService {
     }
 
     private String executionRowId(String machineId, String executionId) {
-        return scriptExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
-                .map(ScriptExecution::getId)
-                .or(() -> commandExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
-                        .map(CommandExecution::getId))
+        List<ScriptExecution> scripts =
+                scriptExecutionRepository.findAllByMachineIdAndExecutionId(machineId, executionId);
+        if (scripts.size() == 1) {
+            return scripts.getFirst().getId();
+        }
+        if (!scripts.isEmpty()) {
+            return executionId;
+        }
+        return commandExecutionRepository.findByMachineIdAndExecutionId(machineId, executionId)
+                .map(CommandExecution::getId)
                 .orElse(executionId);
     }
 
