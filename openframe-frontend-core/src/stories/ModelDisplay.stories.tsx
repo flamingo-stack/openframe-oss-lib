@@ -4,55 +4,91 @@ import { type ReactNode, useState } from 'react';
 import { ModelDisplay } from '../components/chat/model-display';
 import type { ModelMenu } from '../components/chat/types';
 import { AnthropicLogoGreyIcon, OpenaiLogoGreyIcon, ShieldCheckIcon } from '../components/icons-v2-generated';
+import type { ActionsMenuItem } from '../components/ui/actions-menu';
 
-const ANTHROPIC = ['Claude Opus 5.5', 'Claude Sonnet 5.5', 'Claude Fable 5', 'Claude Opus 5', 'Claude Sonnet 5'].concat(
-  ['Claude Opus 4.8', 'Claude Opus 4.7', 'Claude Sonnet 4.6', 'Claude Haiku 4.5', 'Claude Opus 4.1'],
-  ['Claude Sonnet 4', 'Claude Opus 4', 'Claude Sonnet 3.7', 'Claude Haiku 3.5'],
-);
-const OPENAI = ['GPT-5.5', 'GPT-5.5 mini'];
+/** Name, rate read, rate written. */
+type StoryModel = [string, number, number];
+
+const ANTHROPIC: StoryModel[] = [
+  ['Claude Opus 5.5', 1.33, 6.67],
+  ['Claude Sonnet 5.5', 0.67, 3.33],
+  ['Claude Fable 5', 3.33, 16.67],
+  ['Claude Opus 5', 1.67, 8.33],
+  ['Claude Sonnet 5', 0.67, 3.33],
+  ['Claude Opus 4.8', 1.67, 8.33],
+  ['Claude Opus 4.7', 1.67, 8.33],
+  ['Claude Sonnet 4.6', 1, 5],
+  ['Claude Haiku 4.5', 0.33, 1.67],
+  ['Claude Opus 4.1', 1.67, 8.33],
+  ['Claude Sonnet 4', 1, 5],
+  ['Claude Opus 4', 1.67, 8.33],
+];
+const OPENAI: StoryModel[] = [
+  ['GPT-5.5', 1.25, 10],
+  ['GPT-5.5 mini', 0.25, 2],
+];
+
+/** 1× is $10 per 1M tokens: whole dollars from $10, cents under it. */
+function price(rate: number): string {
+  const amount = rate * 10;
+  return amount >= 10 ? `$${Math.round(amount)}` : `$${amount.toFixed(2)}`;
+}
 
 const footer = (
-  <div className="flex max-w-[440px] items-start gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-mf)] text-ods-text-secondary text-h6">
-    <ShieldCheckIcon aria-hidden size={16} className="shrink-0" />
-    <p>Your chats aren’t used to train AI models. Model providers keep requests for up to 30 days, then delete them.</p>
+  <div className="w-[438px] min-w-full max-w-full font-normal text-ods-text-secondary text-note">
+    <p className="border-b border-ods-border px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
+      Rate: OpenFrame tokens charged per token read / written.
+      <br />
+      Price: per 1M tokens, read / write.
+    </p>
+    <div className="flex items-start gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
+      <ShieldCheckIcon aria-hidden size={16} className="shrink-0" />
+      <p>
+        Your chats aren’t used to train AI models. Model providers keep requests for up to 30 days, then delete them.
+      </p>
+    </div>
   </div>
 );
 
 function ModelMenuRow({ disabled = false }: { disabled?: boolean }) {
-  const [model, setModel] = useState<string | null>('Claude Opus 4.8');
-  const provider = (name: string, icon: ReactNode, models: string[]) => ({
+  const [model, setModel] = useState<string | null>(null);
+  const shown = model ?? 'Claude Opus 4.8';
+  const provider = (name: string, icon: ReactNode, models: StoryModel[]): ActionsMenuItem => ({
     id: name,
     label: name,
     icon,
-    type: 'submenu' as const,
-    submenuBoundary: 'viewport' as const,
-    checked: model !== null && models.includes(model),
+    type: 'submenu',
+    submenuBoundary: 'viewport',
+    submenuAlign: 'end',
+    checked: models.some(([label]) => label === shown),
     footer,
-    submenu: models.map(label => ({
+    submenu: models.map(([label, read, written]) => ({
       id: label,
       label,
-      type: 'radio' as const,
-      checked: label === model,
-      onClick: () => setModel(label),
+      type: 'radio',
+      checked: label === shown,
+      aside: (
+        <span className="flex gap-[var(--spacing-system-xsf)] font-normal">
+          <span>
+            {read}× / {written}×
+          </span>
+          <span>
+            {price(read)} / {price(written)}
+          </span>
+        </span>
+      ),
+      onClick: label === shown ? undefined : () => setModel(label),
     })),
   });
   const menu: ModelMenu = {
     disabled,
     groups: [
       {
-        separator: true,
         items: [
-          {
-            id: 'default',
-            label: 'Use Default Model',
-            type: 'radio',
-            checked: model === null,
-            onClick: () => setModel(null),
-          },
-        ],
-      },
-      {
-        items: [
+          model === null
+            ? { id: 'default', label: 'Using default model', disabled: true }
+            : { id: 'default', label: 'Use default model', onClick: () => setModel(null) },
+          { id: 'separator', label: '', type: 'separator' },
           provider('Anthropic', <AnthropicLogoGreyIcon />, ANTHROPIC),
           provider('OpenAI', <OpenaiLogoGreyIcon />, OPENAI),
         ],
@@ -63,8 +99,8 @@ function ModelMenuRow({ disabled = false }: { disabled?: boolean }) {
     <div className="flex h-screen items-end bg-ods-bg p-[var(--spacing-system-l)]">
       <ModelDisplay
         className="w-full max-w-[720px]"
-        provider={model && OPENAI.includes(model) ? 'openai' : 'anthropic'}
-        modelName={model ?? 'Claude Opus 4.8'}
+        provider={OPENAI.some(([label]) => label === shown) ? 'openai' : 'anthropic'}
+        modelName={shown}
         usedTokens={372}
         contextWindow={50_000}
         modelMenu={menu}

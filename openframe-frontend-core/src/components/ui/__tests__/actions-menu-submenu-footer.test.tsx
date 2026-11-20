@@ -40,3 +40,36 @@ describe('ActionsMenu submenu', () => {
     expect(screen.getByText('Retention note')).toBeInTheDocument();
   });
 });
+
+describe('ActionsMenu drill-down', () => {
+  async function openDrill() {
+    render(
+      <ActionsMenuDropdown
+        triggerAriaLabel="Model"
+        submenus="drill"
+        groups={[{ items: [provider(true, 'Retention note')] }]}
+      />,
+    );
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Model' }), { button: 0, pointerType: 'mouse' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'OpenAI' }));
+    return screen.findByRole('menuitem', { name: 'Back from OpenAI' });
+  }
+
+  it('opens a submenu in place of the rows, with its footer, and goes back', async () => {
+    const back = await openDrill();
+    expect(screen.getByRole('menuitemradio', { name: 'GPT-5.5' })).toBeInTheDocument();
+    expect(screen.getByText('Retention note')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'OpenAI' })).not.toBeInTheDocument();
+
+    fireEvent.click(back);
+    expect(await screen.findByRole('menuitem', { name: 'OpenAI' })).toBeInTheDocument();
+  });
+
+  it('goes back on Escape before it closes', async () => {
+    await openDrill();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(await screen.findByRole('menuitem', { name: 'OpenAI' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+  });
+});

@@ -107,7 +107,8 @@ Key distinctions:
 **Component scale tokens.** `text-badge` (10/12, fixed across breakpoints) is the badge/chip stamp
 size. It is **not** a step in the scale above and carries no family, weight or casing — it sets size
 and line-height only, so it composes with whichever h5/h6 treatment the badge already uses. Reach
-for it on badges and chips instead of a raw `text-[10px]`; anything a user reads belongs on
+for it on badges and chips instead of a raw `text-[10px]`; `text-note` (12/16, fixed) is the same kind of token for a
+menu's fine print under its rows (the v2 Dropdown-menu footer); anything a user reads belongs on
 `text-h5`/`text-h6` or larger. Stamps are fixed on purpose — growing them on desktop is what
 balloons a badge out of the row it sits in.
 

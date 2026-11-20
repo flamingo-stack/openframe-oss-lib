@@ -216,6 +216,9 @@ export function MingoChatHeader({
           triggerAriaLabel="Chat actions"
           onCloseAutoFocus={e => e.preventDefault()}
           groups={menuGroups}
+          // The design system's Dropdown-menu, 280 wide (Figma "chat actions").
+          variant="overlay"
+          className="w-[280px] min-w-0"
           customTrigger={
             <Button variant="cell" className={foldedCellClass} aria-label="Chat actions">
               <Ellipsis01Icon size={glyph} />

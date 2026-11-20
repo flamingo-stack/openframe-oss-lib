@@ -8,7 +8,7 @@ import React, { useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
 import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
-import { CheckFillIcon, Chevron02RightIcon } from '../icons-v2-generated';
+import { CheckFillIcon, Chevron02LeftIcon, Chevron02RightIcon } from '../icons-v2-generated';
 import { ActionsMenuHeaderContext } from './actions-menu-header-context';
 import { ActionsMenuTriggerButton } from './actions-menu-trigger';
 import { Button } from './button';
@@ -58,6 +58,11 @@ export interface ActionsMenuItem {
   submenu?: ActionsMenuItem[];
   /** Under a submenu's rows, in place while they scroll (e.g. a note about the choices). */
   footer?: React.ReactNode;
+  /** `end`: the submenu ends where its menu ends (shifted up to fit) and takes the height above that, its rows
+   *  scrolling. Default `start`: it starts at its row. */
+  submenuAlign?: 'start' | 'end';
+  /** Right-aligned on the description's line (e.g. a model's rates); a radio row with it keeps the check's slot. */
+  aside?: React.ReactNode;
   /** Submenu placement boundary, inherited by descendants. Defaults to the owning surface. */
   submenuBoundary?: 'surface' | 'viewport';
   /** Render the row in the error/destructive color (label + icon). */
@@ -115,6 +120,8 @@ export interface ActionsMenuProps {
    * stays above the rows. Default off: the frame itself scrolls, with no fade.
    */
   scrollFade?: boolean;
+  /** `drill`: a submenu opens in place of the rows, under a back row, instead of beside the menu (a phone). */
+  submenus?: 'side' | 'drill';
 }
 
 interface ActionsMenuRowContextValue {
@@ -132,6 +139,9 @@ interface OpenSubmenu {
 }
 
 const OpenSubmenusContext = React.createContext<Map<string, OpenSubmenu> | null>(null);
+
+/** In a drill-down menu: opens a submenu row in place of the rows. */
+const DrillContext = React.createContext<((item: ActionsMenuItem) => void) | null>(null);
 
 interface MenuItemProps {
   item: ActionsMenuItem;
@@ -161,6 +171,9 @@ const MENU_SKIN: Record<
     glyphBox: string;
     glyph: string;
     label: string;
+    disabled: string;
+    separator: string;
+    groupSeparator: string;
   }
 > = {
   default: {
@@ -172,16 +185,25 @@ const MENU_SKIN: Record<
     glyphBox: 'h-4 w-4 md:h-6 md:w-6',
     glyph: ROW_GLYPH_CLASSES,
     label: 'flex-1 font-medium leading-6 text-h4',
+    disabled: 'pointer-events-none cursor-not-allowed text-ods-text-secondary opacity-60',
+    separator: 'h-1 w-full bg-ods-divider',
+    groupSeparator: 'h-[3px] w-full bg-ods-bg-surface',
   },
   overlay: {
     frame: 'border-ods-border bg-ods-menu',
     row: 'flex min-h-10 min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)] py-[var(--spacing-system-xs)] pl-[var(--spacing-system-mf)] pr-[var(--spacing-system-xs)] cursor-pointer transition-colors bg-ods-menu outline-none',
     wrapper: 'relative flex items-stretch border-b border-ods-border-panel last:border-b-0',
     rowIdle: 'text-ods-text-primary hover:bg-ods-menu-hover focus-visible:bg-ods-menu-hover',
-    rowOpen: 'focus:bg-ods-menu-hover data-[state=open]:bg-ods-menu-hover',
+    // The row a submenu is open from stays marked (backgrounds/overlay action).
+    rowOpen: 'focus:bg-ods-menu-hover data-[state=open]:bg-ods-menu-active',
     glyphBox: 'h-5 w-5',
     glyph: '[&_svg]:h-5 [&_svg]:w-5',
-    label: 'min-w-0 flex-1 text-h4',
+    // v2 "h4 - body", 16/20.
+    label: 'min-w-0 flex-1 text-shell-body',
+    disabled: 'pointer-events-none cursor-default',
+    // The design system's dropdown-item type=separator.
+    separator: 'h-[3px] w-full bg-ods-border',
+    groupSeparator: 'h-[3px] w-full bg-ods-border',
   },
 };
 
@@ -247,6 +269,37 @@ function useViewportSubmenuOffset(trigger: React.RefObject<HTMLDivElement | null
   return offset;
 }
 
+/**
+ * `submenuAlign: 'end'`: the offset that lines the submenu's bottom up with its menu's, and the height above that
+ * bottom it may take (the window's top, less its padding). Radix shifts it up from there when it does not fit.
+ */
+function useEndAlignedSubmenu(
+  trigger: React.RefObject<HTMLDivElement | null>,
+  content: HTMLDivElement | null,
+  topPadding: number,
+) {
+  const [placement, setPlacement] = React.useState<{ alignOffset: number; maxHeight: number } | null>(null);
+  React.useLayoutEffect(() => {
+    const anchor = trigger.current;
+    const menu = anchor?.closest<HTMLElement>('[role="menu"]');
+    if (!anchor || !menu || !content) return undefined;
+    const measure = () => {
+      const bottom = menu.getBoundingClientRect().bottom;
+      const maxHeight = Math.max(0, Math.floor(bottom - topPadding));
+      const alignOffset = Math.round(
+        bottom - anchor.getBoundingClientRect().top - Math.min(content.offsetHeight, maxHeight),
+      );
+      setPlacement(previous =>
+        previous?.alignOffset === alignOffset && previous.maxHeight === maxHeight
+          ? previous
+          : { alignOffset, maxHeight },
+      );
+    };
+    return autoUpdate(anchor, content, measure);
+  }, [trigger, content, topPadding]);
+  return placement;
+}
+
 const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, submenuBoundary = 'surface' }) => {
   // Submenus below portal + collide against the OWNING surface, matching the
   // root menu (`DropdownMenuContent`). Read unconditionally — hooks first.
@@ -266,6 +319,13 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
   const subTriggerRef = React.useRef<HTMLDivElement>(null);
   const [subContent, setSubContent] = React.useState<HTMLDivElement | null>(null);
   const viewportSideOffset = useViewportSubmenuOffset(subTriggerRef, subContent);
+  const endAligned = item.submenuAlign === 'end';
+  const endPlacement = useEndAlignedSubmenu(
+    subTriggerRef,
+    endAligned ? subContent : null,
+    viewportPadding.top + COLLISION_PADDING_PX,
+  );
+  const drill = React.useContext(DrillContext);
   const submenuId = React.useId();
   const openSubmenus = React.useContext(OpenSubmenusContext);
   React.useEffect(() => {
@@ -296,10 +356,13 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
       onItemClick?.(item);
       return;
     }
-    if (item.type === 'submenu') return;
+    if (item.type === 'submenu') {
+      drill?.(item);
+      return;
+    }
     item.onClick?.();
     onItemClick?.(item);
-  }, [item, onItemClick]);
+  }, [item, onItemClick, drill]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -334,12 +397,13 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
   );
 
   if (item.type === 'separator') {
-    return <div className="h-1 w-full bg-ods-divider" />;
+    return <div className={skin.separator} />;
   }
 
   const itemClasses = cn(
     skin.row,
-    item.disabled ? 'pointer-events-none cursor-not-allowed text-ods-text-secondary opacity-60' : skin.rowIdle,
+    item.aside && 'gap-[var(--spacing-system-sf)]',
+    item.disabled ? skin.disabled : skin.rowIdle,
   );
 
   const subTriggerClasses = cn(itemClasses, skin.rowOpen);
@@ -362,7 +426,17 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
         </div>
       )}
 
-      {item.description ? (
+      {item.description && item.aside ? (
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className={cn(skin.label, item.disabled ? 'text-ods-text-secondary' : 'text-ods-text-primary')}>
+            {item.label}
+          </span>
+          <span className="flex min-w-0 items-center gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h6">
+            <span className="min-w-0 flex-1 truncate">{item.description}</span>
+            <span className="shrink-0 whitespace-nowrap">{item.aside}</span>
+          </span>
+        </span>
+      ) : item.description ? (
         <span className="flex min-w-0 flex-1 flex-col">
           <span
             className={cn(
@@ -373,6 +447,13 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
             {item.label}
           </span>
           <span className="text-ods-text-secondary text-h6">{item.description}</span>
+        </span>
+      ) : item.aside ? (
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className={cn(skin.label, item.disabled ? 'text-ods-text-secondary' : 'text-ods-text-primary')}>
+            {item.label}
+          </span>
+          <span className="ml-auto whitespace-nowrap text-ods-text-secondary text-h6">{item.aside}</span>
         </span>
       ) : (
         <span
@@ -385,7 +466,12 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
         </span>
       )}
 
-      {(item.type === 'radio' || item.type === 'submenu') && item.checked && CHECK_MARK[variant]}
+      {item.type === 'radio' && item.aside ? (
+        // A fixed slot, so the aside's figures never move under the check.
+        <span className="flex size-5 shrink-0 items-center justify-center">{item.checked && CHECK_MARK[variant]}</span>
+      ) : (
+        (item.type === 'radio' || item.type === 'submenu') && item.checked && CHECK_MARK[variant]
+      )}
 
       {item.type === 'checkbox' && (
         <div
@@ -424,6 +510,30 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
     );
   }
 
+  if (item.type === 'submenu' && item.submenu && drill) {
+    return (
+      <div className={skin.wrapper}>
+        <div
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-current={item.checked || undefined}
+          tabIndex={item.disabled ? -1 : 0}
+          aria-disabled={item.disabled}
+          className={itemClasses}
+          onClick={handleClick}
+          onKeyDown={event => {
+            if (event.key === 'ArrowRight') {
+              event.preventDefault();
+              activate();
+            } else handleKeyDown(event);
+          }}
+        >
+          {rowContent}
+        </div>
+      </div>
+    );
+  }
+
   if (item.type === 'submenu' && item.submenu) {
     const submenuRows = item.submenu.map((subItem, index) => (
       <MenuItem
@@ -456,8 +566,10 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
           </DropdownMenuPrimitive.SubTrigger>
           <DropdownMenuPrimitive.Portal container={viewport ? undefined : (portalContainer ?? undefined)}>
             <DropdownMenuPrimitive.SubContent
-              ref={viewport ? setSubContent : undefined}
+              ref={viewport || endAligned ? setSubContent : undefined}
               sideOffset={viewport ? viewportSideOffset : 4}
+              alignOffset={endPlacement?.alignOffset}
+              style={endPlacement ? { maxHeight: endPlacement.maxHeight } : undefined}
               onKeyDownCapture={() => {
                 submenuKeyboardMoved.current = true;
               }}
@@ -485,7 +597,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
                   <>
                     <div
                       data-testid="actions-menu-submenu-rows"
-                      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+                      className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
                     >
                       {submenuRows}
                     </div>
@@ -544,8 +656,6 @@ const MENU_ROW_KEYS: Record<string, (index: number, count: number) => number> = 
   End: (_index, count) => count - 1,
 };
 
-const GroupSeparator: React.FC = () => <div className="h-[3px] w-full bg-ods-bg-surface" />;
-
 export const ActionsMenu: React.FC<ActionsMenuProps> = ({
   groups,
   className = '',
@@ -553,39 +663,107 @@ export const ActionsMenu: React.FC<ActionsMenuProps> = ({
   header,
   variant = 'default',
   scrollFade = false,
+  submenus = 'side',
 }) => {
   // A menu inside a dropdown keeps the dropdown's keyboard flag; one drawn on its own (a sheet) has none.
   const { keyboardMoved } = React.useContext(ActionsMenuRowContext);
   const rowContext = React.useMemo(() => ({ variant, keyboardMoved }), [variant, keyboardMoved]);
+  const skin = MENU_SKIN[variant];
+  // Drill-down: the submenu shown in place of the rows. Escape goes back to the rows first, as from a submenu.
+  const [drilled, setDrilled] = React.useState<ActionsMenuItem | null>(null);
+  const frameRef = React.useRef<HTMLDivElement>(null);
+  const openSubmenus = React.useContext(OpenSubmenusContext);
+  const drilledId = drilled?.id;
+  React.useEffect(() => {
+    if (drilledId === undefined) return undefined;
+    const frame = requestAnimationFrame(() => menuRows(frameRef.current)[0]?.focus());
+    openSubmenus?.set('drill', { depth: 1, close: () => setDrilled(null) });
+    return () => {
+      cancelAnimationFrame(frame);
+      openSubmenus?.delete('drill');
+    };
+  }, [drilledId, openSubmenus]);
+  if (drilled?.submenu) {
+    return (
+      <ActionsMenuRowContext.Provider value={rowContext}>
+        <ActionsMenuFrame
+          frameRef={frameRef}
+          className={className}
+          header={<DrillBackRow label={drilled.label} onBack={() => setDrilled(null)} />}
+          footer={drilled.footer}
+          variant={variant}
+          scrollFade={scrollFade}
+        >
+          {drilled.submenu.map((item, index) => (
+            <MenuItem key={item.id || index} item={item} onItemClick={onItemClick} />
+          ))}
+        </ActionsMenuFrame>
+      </ActionsMenuRowContext.Provider>
+    );
+  }
   return (
     <ActionsMenuRowContext.Provider value={rowContext}>
-      <ActionsMenuFrame className={className} header={header} variant={variant} scrollFade={scrollFade}>
-        {groups.map((group, groupIndex) => {
-          const groupKey = group.id || group.items.map(i => i.id).join('|');
-          return (
-            <React.Fragment key={groupKey}>
-              {group.items.map((item, itemIndex) => (
-                <MenuItem key={item.id || `${groupKey}-${itemIndex}`} item={item} onItemClick={onItemClick} />
-              ))}
-              {group.separator && groupIndex < groups.length - 1 && <GroupSeparator />}
-            </React.Fragment>
-          );
-        })}
-      </ActionsMenuFrame>
+      <DrillContext.Provider value={submenus === 'drill' ? setDrilled : null}>
+        <ActionsMenuFrame
+          frameRef={frameRef}
+          className={className}
+          header={header}
+          variant={variant}
+          scrollFade={scrollFade}
+        >
+          {groups.map((group, groupIndex) => {
+            const groupKey = group.id || group.items.map(i => i.id).join('|');
+            return (
+              <React.Fragment key={groupKey}>
+                {group.items.map((item, itemIndex) => (
+                  <MenuItem key={item.id || `${groupKey}-${itemIndex}`} item={item} onItemClick={onItemClick} />
+                ))}
+                {group.separator && groupIndex < groups.length - 1 && <div className={skin.groupSeparator} />}
+              </React.Fragment>
+            );
+          })}
+        </ActionsMenuFrame>
+      </DrillContext.Provider>
     </ActionsMenuRowContext.Provider>
   );
 };
 
+/** A drill-down's first row: back to the menu's own rows, named after the submenu it is in. */
+function DrillBackRow({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <div
+      role="menuitem"
+      tabIndex={0}
+      aria-label={`Back from ${label}`}
+      onClick={onBack}
+      onKeyDown={event => {
+        if (!['Enter', ' ', 'ArrowLeft'].includes(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onBack();
+      }}
+      className="flex cursor-pointer items-center gap-[var(--spacing-system-xsf)] bg-ods-bg-base px-[var(--spacing-system-xs)] py-[var(--spacing-system-s)] text-ods-text-secondary outline-none transition-colors hover:bg-ods-bg-base-hover focus-visible:bg-ods-bg-base-hover"
+    >
+      <Chevron02LeftIcon size={24} aria-hidden className="shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-shell-body">{label}</span>
+    </div>
+  );
+}
+
 /** The menu's box: its frame per variant, the optional header row, then the rows. */
 function ActionsMenuFrame({
+  frameRef,
   className,
   header,
+  footer,
   variant,
   scrollFade,
   children,
 }: {
+  frameRef?: React.Ref<HTMLDivElement>;
   className: string;
   header: React.ReactNode;
+  footer?: React.ReactNode;
   variant: ActionsMenuVariant;
   scrollFade: boolean;
   children: React.ReactNode;
@@ -599,9 +777,10 @@ function ActionsMenuFrame({
       <div className="shrink-0 border-b border-ods-border">{header}</div>
     </ActionsMenuHeaderContext.Provider>
   );
-  if (scrollFade) {
+  if (scrollFade || footer) {
     return (
       <div
+        ref={frameRef}
         className={cn(
           'relative flex max-h-[var(--radix-popper-available-height)] min-w-[256px] flex-col overflow-hidden rounded-md border shadow-lg',
           MENU_SKIN[variant].frame,
@@ -617,16 +796,21 @@ function ActionsMenuFrame({
           data-testid="actions-menu-rows"
           data-fade-top={fadeTop || undefined}
           data-fade-bottom={fadeBottom || undefined}
-          className="min-h-0 flex-1 scroll-py-10 overflow-y-auto overscroll-y-contain"
-          style={scrollFadeMask('vertical', fadeTop, fadeBottom)}
+          className={cn(
+            'min-h-0 flex-1 scroll-py-10 overflow-y-auto overscroll-y-contain',
+            footer && !scrollFade && 'scrollbar-hide',
+          )}
+          style={scrollFade ? scrollFadeMask('vertical', fadeTop, fadeBottom) : undefined}
         >
           {children}
         </div>
+        {footer && <div className="shrink-0 border-t border-ods-border">{footer}</div>}
       </div>
     );
   }
   return (
     <div
+      ref={frameRef}
       className={cn(
         'relative max-h-[var(--radix-popper-available-height)] min-w-[256px] overflow-y-auto rounded-md border shadow-lg',
         MENU_SKIN[variant].frame,
@@ -683,6 +867,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
   avoidCollisions,
   variant = 'default',
   scrollFade = false,
+  submenus,
   loading: loadingProp = false,
 }) => {
   // ONE switch: in a page's loading state (or while the host reads the menu's subject) the menu is its trigger's box.
@@ -841,6 +1026,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
               header={header}
               variant={variant}
               scrollFade={scrollFade}
+              submenus={submenus}
             />
           </ActionsMenuRowContext.Provider>
         </OpenSubmenusContext.Provider>

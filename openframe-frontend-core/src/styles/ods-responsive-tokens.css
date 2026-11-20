@@ -71,6 +71,9 @@
    * moved onto the 14/20 caption step. */
   --font-size-badge: 0.625rem; /* 10px */
   --font-line-space-badge: 0.75rem; /* 12px */
+  /* NOTE SCALE — a menu's fine print under its rows (the model picker's footer). Fixed, as the badge. */
+  --font-size-note: 0.75rem; /* 12px */
+  --font-line-space-note: 1rem; /* 16px */
 
   /* CHIP WALL PITCH — THE gap between quick-action chips, wherever a wall of
    * them is drawn: the in-app QuickActionWall (its `copyGap` default, which

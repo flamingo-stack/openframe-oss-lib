@@ -137,6 +137,7 @@
   --ods-backgrounds-panel: #191919;
   --ods-backgrounds-overlay: #272727;
   --ods-backgrounds-overlay-hover: #2e2e2e;
+  --ods-backgrounds-overlay-action: #393939;
   --ods-borders-subtle: #2e2e2e;
   --ods-borders-default: #393939;
   --ods-borders-strong: #4a4a4a;
@@ -261,6 +262,7 @@
   --ods-backgrounds-panel: #ffffff;
   --ods-backgrounds-overlay: #f5f5f5;
   --ods-backgrounds-overlay-hover: #f0f0f0;
+  --ods-backgrounds-overlay-action: #e7e7e7;
   --ods-borders-subtle: #f0f0f0;
   --ods-borders-default: #e7e7e7;
   --ods-borders-strong: #d3d3d3;
@@ -402,6 +404,11 @@
    * `--color-bg-overlay` is the dimmed BACKDROP behind a dialog, not this. */
   --color-bg-menu: var(--ods-backgrounds-overlay);
   --color-bg-menu-hover: var(--ods-backgrounds-overlay-hover);
+  /* The row a submenu is open from (backgrounds/overlay action). */
+  --color-bg-menu-active: var(--ods-backgrounds-overlay-action);
+  /* A control on the deepest ground, hovered and pressed (backgrounds/openframe-background hover / action). */
+  --color-bg-base-hover: var(--ods-backgrounds-openframe-background-hover);
+  --color-bg-base-active: var(--ods-backgrounds-openframe-background-action);
   --color-text-panel-secondary: var(--ods-shell-system-greys-grey);
   --color-accent-tint: var(--ods-shell-open-yellow-sec);
   --color-accent-tint-hover: var(--ods-shell-open-yellow-sec-hover);
