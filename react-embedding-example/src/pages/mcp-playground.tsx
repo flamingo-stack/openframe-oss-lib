@@ -327,7 +327,6 @@ export function McpPlaygroundPage() {
         </p>
         <div className="flex flex-wrap items-center gap-[var(--spacing-system-xsf)]">
           <StatusBadge
-            singleLine
             colorScheme={status === 'ready' ? 'success' : status === 'error' ? 'error' : 'default'}
             text={
               status === 'ready'

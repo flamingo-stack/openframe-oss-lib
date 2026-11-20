@@ -27,7 +27,6 @@ export function PaletteBadge({ text, color, className, variant = 'button' }: Pal
       text={text}
       colorScheme={isBadgePaletteKey(color) ? color : 'default'}
       variant={variant}
-      singleLine
       className={className}
     />
   );

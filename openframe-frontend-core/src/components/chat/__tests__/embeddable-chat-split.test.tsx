@@ -185,6 +185,42 @@ describe('EmbeddableChat split: composer only (threadContainer null)', () => {
   });
 });
 
+describe('EmbeddableChat split: quick actions over a lone composer', () => {
+  const ACTIONS = [
+    { id: 'qa-1', label: 'Reboot a device', prompt: 'Reboot the device I name.' },
+    { id: 'qa-2', label: 'Disk scan', prompt: 'Run a disk scan.' },
+  ];
+
+  it("draws the page's quick actions over the composer, and a click sends the prompt where the host says", () => {
+    const onQuickActionSend = vi.fn();
+    renderChat(createState(), {
+      threadContainer: null,
+      composerQuickActions: true,
+      mingoWelcome: { quickActions: ACTIONS },
+      onQuickActionSend,
+    });
+    const row = screen.getByTestId('chat-composer-quick-actions');
+    fireEvent.click(within(row).getByRole('button', { name: 'Reboot a device' }));
+    expect(onQuickActionSend).toHaveBeenCalledWith('Reboot the device I name.');
+  });
+
+  it('draws none unless the host asks: its thread may be on screen', () => {
+    renderChat(createState(), { threadContainer: null, mingoWelcome: { quickActions: ACTIONS } });
+    expect(screen.queryByTestId('chat-composer-quick-actions')).toBeNull();
+  });
+
+  it("keeps the row's line when the page has no quick action: the composer never moves", () => {
+    renderChat(createState(), {
+      threadContainer: null,
+      composerQuickActions: true,
+      mingoWelcome: { quickActions: [] },
+    });
+    const row = screen.getByTestId('chat-composer-quick-actions');
+    expect(within(row).queryByRole('button', { name: 'Reboot a device' })).toBeNull();
+    expect(row).not.toBeEmptyDOMElement();
+  });
+});
+
 describe('EmbeddableChat split: thread portalled into the page', () => {
   it('renders the header and the thread into the container, the composer in place', () => {
     const page = pageNode();

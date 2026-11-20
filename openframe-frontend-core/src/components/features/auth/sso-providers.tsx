@@ -104,13 +104,7 @@ export function SsoProviderButtons({
               // so the badge is a flex item of the button itself and can give up width (`min-w-0`)
               // where a long organization name would otherwise push the label out of a phone-width
               // button. `block` over its inline-flex, because an ellipsis only renders on a block box.
-              <StatusBadge
-                text={tag}
-                variant="button"
-                singleLine
-                title={tag}
-                className="block min-w-0 max-w-32 truncate"
-              />
+              <StatusBadge text={tag} variant="button" title={tag} className="block min-w-0 max-w-32 truncate" />
             )}
           </Button>
         );

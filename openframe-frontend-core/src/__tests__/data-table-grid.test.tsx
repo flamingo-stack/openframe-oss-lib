@@ -434,6 +434,27 @@ describe('DataTable grid layout', () => {
     expect(screen.getAllByRole('separator')).toHaveLength(2);
   });
 
+  it('places every resize handle against its own header cell at every width, the pinned first column included', () => {
+    const { container } = render(<Grid />);
+    // The header cells of the data columns, by column id: each one holds a resize handle.
+    const cells = new Map(
+      [
+        ...gridHeaderMarkup(container).matchAll(
+          /<div class="([^"]*)"[^>]*data-grid-header-cell="true"[^>]*data-grid-col="([^"]+)"/g,
+        ),
+      ].map(match => [match[2] ?? '', (match[1] ?? '').split(' ')] as const),
+    );
+    expect([...cells.keys()]).toEqual(['name', 'owner']);
+    expect(screen.getAllByRole('separator')).toHaveLength(cells.size);
+    // A positioned box with no breakpoint on it: the left pin's `lg:content-md:sticky` is not one on a tablet, a
+    // phone or in a narrow content column, where the handle would be placed against the header's frame instead.
+    for (const classes of cells.values()) {
+      expect(classes.some(name => name === 'relative' || name === 'sticky')).toBe(true);
+    }
+    // The first data column is the pinned one, and it still pins where there is room.
+    expect(cells.get('name')).toContain('lg:content-md:sticky');
+  });
+
   it('marks the column being dragged, and clears the mark on release', () => {
     const { container } = render(<Grid />);
     const handle = screen.getByRole('separator', { name: 'Resize Owner column' });

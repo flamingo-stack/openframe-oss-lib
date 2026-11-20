@@ -13,7 +13,6 @@
  * shown (no drawers, no "view all", no collapsing), and a controls SEARCH the
  * server answers as one flat, grouped, counted list.
  */
-
 import { createElement, useState, type CSSProperties, type ReactNode } from 'react';
 import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
@@ -97,7 +96,6 @@ const ACTION_COLUMN = 'shrink-0 content-md:w-36';
 // ---------------------------------------------------------------------------
 // Section frame
 // ---------------------------------------------------------------------------
-
 /** One anchored page section: an `h2` + optional lead line + content. */
 export function TrustSection({
   id,
@@ -132,7 +130,6 @@ export function TrustSection({
 // ---------------------------------------------------------------------------
 // AI & data use
 // ---------------------------------------------------------------------------
-
 /**
  * The AI statements — the company's Vanta Trust Center FAQs in its AI category,
  * in Vanta's order: the question as the row title, the answer beneath. The
@@ -169,7 +166,6 @@ export function AiSection({
 // ---------------------------------------------------------------------------
 // Compliance
 // ---------------------------------------------------------------------------
-
 /**
  * One row per framework, in the Vanta Trust Center's order: its name, its
  * Vanta description, and ONE badge: Vanta's completion ("16% complete") or
@@ -204,7 +200,7 @@ export function ComplianceSection({
           key: 'monitoring',
           width: ACTION_COLUMN,
           align: 'right',
-          content: <StatusBadge text={trustFrameworkBadge(framework)} colorScheme={entry.color} singleLine />,
+          content: <StatusBadge text={trustFrameworkBadge(framework)} colorScheme={entry.color} />,
         },
       ],
     };
@@ -215,7 +211,6 @@ export function ComplianceSection({
 // ---------------------------------------------------------------------------
 // Controls
 // ---------------------------------------------------------------------------
-
 /**
  * Every control row is ONE fixed height (one line of name, one of description),
  * so the list box shows exactly 5 of them and scrolls for
@@ -407,7 +402,6 @@ function ControlsSectionLoaded({ endpoint, seed }: { endpoint: string; seed: Tru
 // ---------------------------------------------------------------------------
 // Documents
 // ---------------------------------------------------------------------------
-
 export function DocumentsSection({
   documents,
   documentUrl,
@@ -520,7 +514,6 @@ export function DocumentRequestModal({
 // ---------------------------------------------------------------------------
 // Subprocessors
 // ---------------------------------------------------------------------------
-
 /** A row's glyph mark (a subprocessor's icon, a document's glyph): read by the rows and their skeleton. */
 const TRUST_GLYPH_SIZE_CLASS = ICON_SIZE.lg;
 
@@ -590,7 +583,6 @@ export function SubprocessorsSection({
 // ---------------------------------------------------------------------------
 // Contact
 // ---------------------------------------------------------------------------
-
 /**
  * Security & compliance questions, routed through the page's ONE request flow
  * (`/api/contact`) — no address is published and no disclosure programme is
@@ -632,7 +624,6 @@ export function ContactSection({ onContact }: { onContact: () => void }) {
 // ---------------------------------------------------------------------------
 // Skeleton
 // ---------------------------------------------------------------------------
-
 /**
  * Rows a panel's skeleton draws when its host states no count. A panel lists every record the host's data holds (no
  * page, no limit), so this is a typical count, drawn at every width; a host whose list is curated passes its length
