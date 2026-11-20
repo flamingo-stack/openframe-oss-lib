@@ -63,7 +63,7 @@ const STATUS_BADGE_SCHEME: Record<string, NonNullable<StatusBadgeProps['colorSch
 /** An entity's own badge (discipline, level, step count): the standard `StatusBadge`
  *  stamp, so it sits at exactly the size and height of the status badge beside it. */
 export function EmployeeEntryBadge({ children }: { children: string }) {
-  return <StatusBadge text={children} colorScheme="default" variant="button" singleLine />;
+  return <StatusBadge text={children} colorScheme="default" variant="button" />;
 }
 
 /** ONE switch: in a loading scope (or `loading`) the card is the admin card's loading form, box for box. */
@@ -116,7 +116,6 @@ function LoadedEmployeeEntryCard({
                 text={entry.status}
                 colorScheme={STATUS_BADGE_SCHEME[entry.status] ?? 'default'}
                 variant="button"
-                singleLine
               />
             ) : null}
             {extraBadges}

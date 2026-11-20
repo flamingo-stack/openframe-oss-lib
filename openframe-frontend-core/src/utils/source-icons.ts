@@ -88,6 +88,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'hubspot-tickets': 'hubspot',
   'hubspot-tickets-anon': 'hubspot',
   'hubspot-tickets-self': 'hubspot',
+  'hubspot-companies': 'hubspot',
 
   // Communications
   'slack-messages': 'slack',
@@ -101,6 +102,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   // Product-hub internal
   'design-docs': 'file-text',
   'product-features': 'puzzle-01',
+  'market-proofs': 'message-quote',
   'openframe-tenants': 'openframe',
   'recorded-calls': 'call',
 
@@ -189,6 +191,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   // distinct scope.
   'hubspot-tickets-anon': 'Tickets',
   'hubspot-tickets-self': 'My Tickets',
+  'hubspot-companies': 'HubSpot Companies',
 
   // Communications
   'slack-messages': 'OpenMSP Community',
@@ -202,6 +205,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   // Product-hub internal
   'design-docs': 'Design Docs',
   'product-features': 'Product Features',
+  'market-proofs': 'Proofs',
   'openframe-tenants': 'OpenFrame Tenants',
   'recorded-calls': 'Recorded calls',
 
@@ -292,6 +296,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   hubspot_ticket: 'hubspot-tickets',
   hubspot_ticket_anon: 'hubspot-tickets-anon',
   hubspot_ticket_self: 'hubspot-tickets-self',
+  hubspot_company: 'hubspot-companies',
 
   // Communications
   slack_message: 'slack-messages',
@@ -305,6 +310,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   // Product-hub internal
   design_doc: 'design-docs',
   product_feature: 'product-features',
+  market_proof: 'market-proofs',
   openframe_tenant: 'openframe-tenants',
   recorded_call: 'recorded-calls',
 
