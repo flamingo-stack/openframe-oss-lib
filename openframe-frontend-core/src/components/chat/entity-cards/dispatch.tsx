@@ -1428,6 +1428,10 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   openframe_tenant: { label: 'OpenFrame tenant' },
   // One feature customers asked for (the GTM and product shared base): a glyph card, opening its drawer.
   product_feature: { label: 'Feature' },
+  // What a customer said in one record, backing a feature: a glyph card, opening the proof's drawer.
+  market_proof: { label: 'Proof' },
+  // A HubSpot company (an account): a glyph card, opening the company in HubSpot.
+  hubspot_company: { label: 'HubSpot company' },
   recorded_call: { label: 'Call', media: true },
   // One story of the AI daily digest: a glyph card (a story has no cover), opening the digest screen.
   ai_digest_story: { label: 'AI digest story' },
