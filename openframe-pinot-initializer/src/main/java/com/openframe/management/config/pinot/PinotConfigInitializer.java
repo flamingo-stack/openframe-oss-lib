@@ -59,7 +59,8 @@ public class PinotConfigInitializer {
 
     private static final List<PinotConfig> PINOT_CONFIGS = Arrays.asList(
             new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
-            new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
+            new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null),
+            new PinotConfig("check-results", "schema-check-results.json", "table-config-check-results-realtime.json", null)
     );
 
     // Two constructors and none marked: Spring would look for a no-arg one and fail.

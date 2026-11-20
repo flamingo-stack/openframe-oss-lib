@@ -63,6 +63,33 @@ class PinotTableConfigTest {
         assertThat(table.path("upsertConfig").has("snapshot")).isFalse();
     }
 
+    @Test
+    void checkResultsKeepsNinetyDaysAppendOnly() throws IOException {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("pinot.tables.check-results.name", "check_results")
+                .withProperty("pinot.tables.check-results.replication", "1")
+                .withProperty("openframe.oss-tenant.kafka.topics.inbound.check-results.name", "shared.insight.check-results.pinot");
+
+        JsonNode table = read("table-config-check-results-realtime.json", environment);
+
+        assertThat(table.path("tableName").asString()).isEqualTo("check_results");
+        assertThat(table.path("segmentsConfig").path("retentionTimeValue").asString()).isEqualTo("90");
+        assertThat(table.path("tableIndexConfig").path("streamConfigs").path("stream.kafka.topic.name").asString())
+                .isEqualTo("shared.insight.check-results.pinot");
+        assertThat(table.has("upsertConfig")).isFalse();
+    }
+
+    @Test
+    void checkResultsSchemaNamesTheTable() throws IOException {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("pinot.tables.check-results.name", "check_results");
+
+        JsonNode schema = read("schema-check-results.json", environment);
+
+        assertThat(schema.path("schemaName").asString()).isEqualTo("check_results");
+        assertThat(schema.path("dateTimeFieldSpecs").path(0).path("name").asString()).isEqualTo("runTimestamp");
+    }
+
     private static void assertReplicaConsensusWithoutCap(JsonNode task) {
         assertThat(task.has("tableMaxNumTasks")).isFalse();
         assertThat(task.path("validDocIdsConsensusMode").asString()).isEqualTo("EQUAL");
