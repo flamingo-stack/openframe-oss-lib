@@ -464,7 +464,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     public List<Ticket> findAuditFieldsByStatusId(String statusId) {
         Query query = new Query(Criteria.where(FIELD_STATUS_ID).is(statusId))
                 .withReadPreference(ReadPreference.primary());
-        query.fields().include(FIELD_TITLE, FIELD_ORGANIZATION_ID, FIELD_DEVICE_ID, FIELD_STATUS_ID);
+        query.fields().include(FIELD_TITLE, FIELD_ORGANIZATION_ID, FIELD_DEVICE_ID, FIELD_STATUS_ID, FIELD_STATUS_KIND);
         return mongoTemplate.find(query, Ticket.class);
     }
 

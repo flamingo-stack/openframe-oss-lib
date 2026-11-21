@@ -278,13 +278,19 @@ public class TicketStatusService {
                 status.getId(), replacement.getId(), replacement.getKind());
         statusRepository.delete(status);
         auditRecorder.recordAllWithTargetFields(moved.stream()
-                .map(ticket -> movedEntry(ticket, replacement.getId()))
+                .map(ticket -> movedEntry(ticket, replacement))
                 .toList());
         log.info("Deleted custom status {} with {} tickets reassigned to {}",
                 status.getId(), reassigned, replacement.getId());
     }
 
-    private static AuditEntry movedEntry(Ticket ticket, String replacementStatusId) {
+    private static AuditEntry movedEntry(Ticket ticket, TicketStatusDefinition replacement) {
+        Map<String, AuditChange> changes = new HashMap<>();
+        changes.put("statusId", new AuditChange(ticket.getStatusId(), replacement.getId()));
+        if (ticket.getStatusKind() != replacement.getKind()) {
+            changes.put("statusKind",
+                    new AuditChange(kindName(ticket.getStatusKind()), kindName(replacement.getKind())));
+        }
         return AuditEntry.builder()
                 .action(TICKET_STATUS_CHANGE)
                 .outcome(AuditOutcome.SUCCESS)
@@ -292,9 +298,12 @@ public class TicketStatusService {
                 .targetName(ticket.getTitle())
                 .organizationId(ticket.getOrganizationId())
                 .deviceId(ticket.getDeviceId())
-                .changes(Map.of("statusId", new AuditChange(ticket.getStatusId(), replacementStatusId)))
-                .details(Map.of("source", "status_delete"))
+                .changes(changes)
                 .build();
+    }
+
+    private static String kindName(TicketStatusKind kind) {
+        return kind == null ? null : kind.name();
     }
 
     private TicketStatusDefinition requireStatus(String id) {

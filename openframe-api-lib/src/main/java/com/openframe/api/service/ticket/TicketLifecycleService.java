@@ -91,7 +91,6 @@ public class TicketLifecycleService {
         details.put("toStatusId", input.getToStatusId());
         details.put("reason", input.getReason());
         details.put("reopenReason", input.getReopenReason());
-        details.put("source", source);
         return auditedMethodRunner.run(TICKET_STATUS_CHANGE, input.getTicketId(), details,
                 () -> transitionTicket(principal, input, source));
     }
@@ -262,12 +261,12 @@ public class TicketLifecycleService {
         ticketRepository.reassignTicketsToStatus(updateQuery, archived.getId(), archived.getKind());
         log.info("Archived {} resolved tickets (lifecycle)", resolvedTickets.size());
         auditRecorder.recordAllWithTargetFields(resolvedTickets.stream()
-                .map(ticket -> archivedEntry(ticket, archived.getId()))
+                .map(ticket -> archivedEntry(ticket, archived))
                 .toList());
         return resolvedTickets.stream().map(Ticket::getId).toList();
     }
 
-    private static AuditEntry archivedEntry(Ticket ticket, String archivedStatusId) {
+    private static AuditEntry archivedEntry(Ticket ticket, TicketStatusDefinition archived) {
         return AuditEntry.builder()
                 .action(TICKET_ARCHIVE)
                 .outcome(AuditOutcome.SUCCESS)
@@ -275,8 +274,13 @@ public class TicketLifecycleService {
                 .targetName(ticket.getTitle())
                 .organizationId(ticket.getOrganizationId())
                 .deviceId(ticket.getDeviceId())
-                .changes(Map.of("statusId", new AuditChange(ticket.getStatusId(), archivedStatusId)))
+                .changes(Map.of("statusId", new AuditChange(ticket.getStatusId(), archived.getId()),
+                        "statusKind", new AuditChange(kindName(ticket.getStatusKind()), kindName(archived.getKind()))))
                 .build();
+    }
+
+    private static String kindName(TicketStatusKind kind) {
+        return kind == null ? null : kind.name();
     }
 
     @Transactional

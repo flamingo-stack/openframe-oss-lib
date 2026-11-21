@@ -265,7 +265,7 @@ class TicketStatusServiceTest {
             when(ticketRepository.countByStatusId("st-hold")).thenReturn(7L);
             when(transitionPolicy.allowedKinds(CUSTOM)).thenReturn(Set.of(TECH_REQUIRED, RESOLVED));
             Ticket printer = Ticket.builder().id("t-1").title("Printer offline").organizationId("org-1")
-                    .deviceId("machine-1").statusId("st-hold").build();
+                    .deviceId("machine-1").statusId("st-hold").statusKind(CUSTOM).build();
             when(ticketRepository.findAuditFieldsByStatusId("st-hold")).thenReturn(List.of(printer));
 
             assertThat(service.delete(admin, delete("st-hold", "st-tech"))).isTrue();
@@ -279,7 +279,8 @@ class TicketStatusServiceTest {
                     .returns("t-1", AuditEntry::getTargetId)
                     .returns("org-1", AuditEntry::getOrganizationId)
                     .returns("machine-1", AuditEntry::getDeviceId)
-                    .returns(Map.of("statusId", new AuditChange("st-hold", "st-tech")), AuditEntry::getChanges);
+                    .returns(Map.of("statusId", new AuditChange("st-hold", "st-tech"),
+                            "statusKind", new AuditChange("CUSTOM", "TECH_REQUIRED")), AuditEntry::getChanges);
         }
 
         @Test

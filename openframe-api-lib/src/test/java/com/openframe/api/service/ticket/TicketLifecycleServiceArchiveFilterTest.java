@@ -98,7 +98,7 @@ class TicketLifecycleServiceArchiveFilterTest {
     @Test
     void archiveResolvedTickets_eachArchivedTicket_recordedWithItsCustomerDeviceAndStatusChange() {
         Ticket printer = Ticket.builder().id("t-1").title("Printer offline").organizationId("org-1")
-                .deviceId("machine-1").statusId("st-resolved").build();
+                .deviceId("machine-1").statusId("st-resolved").statusKind(TicketStatusKind.RESOLVED).build();
         resolvedTickets = List.of(printer);
 
         List<String> archivedIds = service.archiveResolvedTickets(admin, null);
@@ -112,7 +112,8 @@ class TicketLifecycleServiceArchiveFilterTest {
                 .returns("Printer offline", AuditEntry::getTargetName)
                 .returns("org-1", AuditEntry::getOrganizationId)
                 .returns("machine-1", AuditEntry::getDeviceId)
-                .returns(Map.of("statusId", new AuditChange("st-resolved", "st-archived")), AuditEntry::getChanges);
+                .returns(Map.of("statusId", new AuditChange("st-resolved", "st-archived"),
+                        "statusKind", new AuditChange("RESOLVED", "ARCHIVED")), AuditEntry::getChanges);
     }
 
     @Test
