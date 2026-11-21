@@ -47,7 +47,7 @@ use crate::config::update_config::{
 use crate::listener::command::{
     ClientUninstallHandler, ClientUpdateHandler, CommandContext, CommandListener,
     FeatureFlagsHandler, PackageAdoptHandler, PackageUpdateHandler, RestartGate,
-    ToolInstallationHandler, ToolUpdateHandler,
+    ToolInstallationHandler, ToolUninstallHandler, ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
@@ -78,6 +78,7 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::os_info_report_publisher::OsInfoReportPublisher;
 use crate::services::package_manager::adopt::PackageAdoptRunner;
 use crate::services::package_manager::brew::BrewLock;
 use crate::services::package_manager::package_update::{
@@ -101,7 +102,7 @@ use crate::services::MachineIdService;
 use crate::services::{
     AgentAuthService, AgentRegistrationService, InitialConfigurationService,
     ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolOps,
-    ToolRunManager, ToolUrlParamsResolver,
+    ToolRunManager, ToolUninstallService, ToolUrlParamsResolver,
 };
 use crate::services::{
     LastKnownGoodService, LogKeyService, UpdateCleanupService, UpdateHandlerService,
@@ -189,6 +190,7 @@ pub struct Client {
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
     tool_installation_listener: CommandListener<ToolInstallationHandler>,
     tool_update_listener: CommandListener<ToolUpdateHandler>,
+    tool_uninstall_listener: CommandListener<ToolUninstallHandler>,
     client_update_listener: CommandListener<ClientUpdateHandler>,
     client_uninstall_listener: CommandListener<ClientUninstallHandler>,
     package_update: Option<PackageUpdate>,
@@ -206,6 +208,7 @@ pub struct Client {
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
     package_manager_report_run_manager: PackageManagerReportRunManager,
     hostname_report_publisher: HostnameReportPublisher,
+    os_info_report_publisher: OsInfoReportPublisher,
     machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
@@ -622,6 +625,20 @@ impl Client {
             ),
             command_context.clone(),
         );
+        let tool_uninstall_listener = CommandListener::new(
+            ToolUninstallHandler::new(
+                ToolUninstallService::new(
+                    installed_tools_service.clone(),
+                    tool_command_params_resolver.clone(),
+                    tool_kill_service.clone(),
+                    directory_manager.clone(),
+                    tool_connection_service.clone(),
+                ),
+                tool_run_manager.clone(),
+                tool_ops.clone(),
+            ),
+            command_context.clone(),
+        );
         let client_update_listener = CommandListener::new(
             ClientUpdateHandler::new(openframe_client_update_service, tool_run_manager.clone()),
             command_context.clone(),
@@ -692,6 +709,8 @@ impl Client {
             config_service.clone(),
             device_data_fetcher.clone(),
         );
+        let os_info_report_publisher =
+            OsInfoReportPublisher::new(nats_message_publisher.clone(), config_service.clone());
 
         let machine_timezone_run_manager = MachineTimezoneRunManager::new(
             MachineTimezonePublisher::new(nats_message_publisher.clone(), config_service.clone()),
@@ -709,6 +728,7 @@ impl Client {
             feature_flags_listener,
             tool_installation_listener,
             tool_update_listener,
+            tool_uninstall_listener,
             client_update_listener,
             client_uninstall_listener,
             package_update,
@@ -726,6 +746,7 @@ impl Client {
             machine_heartbeat_run_manager,
             package_manager_report_run_manager,
             hostname_report_publisher,
+            os_info_report_publisher,
             machine_timezone_run_manager,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
@@ -869,11 +890,13 @@ impl Client {
         self.machine_heartbeat_run_manager.start();
         self.machine_timezone_run_manager.start();
 
-        // One-shot hostname report: client startup covers both machine and client restarts.
+        // One-shot hostname and OS reports: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
+        self.os_info_report_publisher.publish().await;
 
         self.tool_installation_listener.start().await?;
         self.tool_update_listener.start().await?;
+        self.tool_uninstall_listener.start().await?;
         self.client_update_listener.start().await?;
         self.client_uninstall_listener.start().await?;
 
