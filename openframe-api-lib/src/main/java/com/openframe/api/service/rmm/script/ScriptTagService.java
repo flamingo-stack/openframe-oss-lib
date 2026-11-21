@@ -140,9 +140,9 @@ public class ScriptTagService {
     }
 
     private static AuditEntry tagEntry(AuditAction action, String scriptId, String tagId, String tagKey) {
-        Map<String, Object> details = new HashMap<>(Map.of("tagId", tagId));
+        Map<String, Object> details = new HashMap<>(Map.of("tagIds", List.of(tagId)));
         if (tagKey != null) {
-            details.put("tagKey", tagKey);
+            details.put("tagKeys", List.of(tagKey));
         }
         return AuditEntry.builder()
                 .action(action)

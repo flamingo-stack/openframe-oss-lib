@@ -112,9 +112,9 @@ public class KnowledgeBaseTagService {
     }
 
     private static Map<String, Object> tagDetails(String tagId, Tag tag) {
-        Map<String, Object> details = new HashMap<>(Map.of("tagId", tagId));
+        Map<String, Object> details = new HashMap<>(Map.of("tagIds", List.of(tagId)));
         if (tag != null) {
-            details.put("tagKey", tag.getKey());
+            details.put("tagKeys", List.of(tag.getKey()));
         }
         return details;
     }
@@ -160,11 +160,9 @@ public class KnowledgeBaseTagService {
 
     public void requireTagAttachment(String itemId, String tagId) {
         requireExistingTag(tagId);
-        requireItem(itemId);
-    }
-
-    private KnowledgeBaseItem requireItem(String itemId) {
-        return itemRepository.findById(itemId).orElseThrow(() -> itemNotFound(itemId));
+        if (!itemRepository.existsById(itemId)) {
+            throw itemNotFound(itemId);
+        }
     }
 
     private void requireExistingTag(String tagId) {

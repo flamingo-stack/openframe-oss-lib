@@ -103,8 +103,8 @@ public class TicketTagService {
     }
 
     private Map<String, Object> tagDetails(String tagId) {
-        Map<String, Object> details = new HashMap<>(Map.of("tagId", tagId));
-        tagRepository.findById(tagId).ifPresent(tag -> details.put("tagKey", tag.getKey()));
+        Map<String, Object> details = new HashMap<>(Map.of("tagIds", List.of(tagId)));
+        tagRepository.findById(tagId).ifPresent(tag -> details.put("tagKeys", List.of(tag.getKey())));
         return details;
     }
 

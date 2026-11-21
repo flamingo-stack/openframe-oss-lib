@@ -110,7 +110,7 @@ class KnowledgeBaseTagServiceTest {
                 .returns(TAG_ID, TagAssignment::getTagId)
                 .returns(TagEntityType.KNOWLEDGE_ARTICLE, TagAssignment::getEntityType);
         verify(auditedMethodRunner).runWhenChanged(eq(KB_ITEM_TAG_ADD), eq(AuditTargetType.KB_ARTICLE), eq(ITEM_ID),
-                eq(Map.of("tagId", TAG_ID, "tagKey", "env")), any());
+                eq(Map.of("tagIds", List.of(TAG_ID), "tagKeys", List.of("env"))), any());
     }
 
     @Test
@@ -122,7 +122,7 @@ class KnowledgeBaseTagServiceTest {
         service.addTagToItem(ITEM_ID, TAG_ID);
 
         verify(auditedMethodRunner).runWhenChanged(eq(KB_ITEM_TAG_ADD), eq(AuditTargetType.KB_FOLDER), eq(ITEM_ID),
-                eq(Map.of("tagId", TAG_ID, "tagKey", "env")), any());
+                eq(Map.of("tagIds", List.of(TAG_ID), "tagKeys", List.of("env"))), any());
     }
 
     @Test
@@ -132,7 +132,7 @@ class KnowledgeBaseTagServiceTest {
         service.removeTagFromItem(ITEM_ID, TAG_ID);
 
         verify(auditedMethodRunner).runWhenChanged(eq(KB_ITEM_TAG_REMOVE), eq(AuditTargetType.KB_ARTICLE),
-                eq(ITEM_ID), eq(Map.of("tagId", TAG_ID)), any());
+                eq(ITEM_ID), eq(Map.of("tagIds", List.of(TAG_ID))), any());
     }
 
     @Test

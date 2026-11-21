@@ -52,8 +52,8 @@ class TicketTagServiceSyncTest {
         assertThat(entries.getAllValues())
                 .extracting(AuditEntry::getAction, AuditEntry::getTargetId, AuditEntry::getDetails)
                 .containsExactly(
-                        tuple(TICKET_TAG_REMOVE, TICKET_ID, Map.of("tagId", "t1")),
-                        tuple(TICKET_TAG_ADD, TICKET_ID, Map.of("tagId", "t3")));
+                        tuple(TICKET_TAG_REMOVE, TICKET_ID, Map.of("tagIds", List.of("t1"))),
+                        tuple(TICKET_TAG_ADD, TICKET_ID, Map.of("tagIds", List.of("t3"))));
     }
 
     private static TagAssignment assigned(String tagId) {

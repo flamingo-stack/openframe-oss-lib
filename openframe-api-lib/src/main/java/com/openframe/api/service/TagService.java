@@ -376,7 +376,7 @@ public class TagService {
                 .outcome(AuditOutcome.SUCCESS)
                 .targetType(targetType)
                 .targetId(entityId)
-                .details(Map.of("tagId", tag.getId(), "tagKey", tag.getKey()))
+                .details(Map.of("tagIds", List.of(tag.getId()), "tagKeys", List.of(tag.getKey())))
                 .build();
     }
 
