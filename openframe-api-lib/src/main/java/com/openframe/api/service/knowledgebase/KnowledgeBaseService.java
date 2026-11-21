@@ -243,12 +243,14 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
-    @Audited(action = KB_FOLDER_RENAME, targetId = "#id")
     public KnowledgeBaseItem renameFolder(String id, String name) {
         log.info("Renaming folder {} to {}", id, name);
-        KnowledgeBaseItem folder = getById(id);
-        folder.setName(name);
-        return repository.save(folder);
+        KnowledgeBaseItem item = getById(id);
+        AuditAction action = item.getType() == KnowledgeBaseItemType.FOLDER ? KB_FOLDER_RENAME : KB_ARTICLE_UPDATE;
+        return auditedMethodRunner.run(action, id, () -> {
+            item.setName(name);
+            return repository.save(item);
+        });
     }
 
     /**
@@ -339,6 +341,7 @@ public class KnowledgeBaseService {
 
     private static Map<String, Object> requestedDetails(UpdateArticleCommand cmd) {
         Map<String, Object> details = new HashMap<>();
+        details.put("name", cmd.getName());
         details.put("parentId", cmd.getParentId());
         details.put("moveToRoot", cmd.isMoveToRoot() ? Boolean.TRUE : null);
         details.put("status", cmd.getStatus());
@@ -347,6 +350,8 @@ public class KnowledgeBaseService {
         details.put("deviceIds", cmd.getAssignedDeviceIds());
         details.put("ticketIds", cmd.getAssignedTicketIds());
         details.put("articleIds", cmd.getAssignedKnowledgeArticleIds());
+        details.put("attachmentTempIds", cmd.getAttachmentTempIds());
+        details.put("deleteAttachmentIds", cmd.getDeleteAttachmentIds());
         return details;
     }
 
