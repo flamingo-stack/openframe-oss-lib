@@ -638,6 +638,72 @@ class AgentRegistrationServiceTest {
         assertSame(failure, thrown);
     }
 
+    @Test
+    void registerAgent_WithOsVersionAndBuild_CopiesThemOntoTheNewMachine() {
+        // setup
+        stubNewMachineRegistration();
+        request.setOsVersion("11.7.10");
+        request.setOsBuild("20G1427");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("11.7.10", "20G1427");
+    }
+
+    @Test
+    void registerAgent_WithBlankOsVersionAndBuild_LeavesThemUnset() {
+        // setup
+        stubNewMachineRegistration();
+        request.setOsVersion(" ");
+        request.setOsBuild("");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly(null, null);
+    }
+
+    @Test
+    void reinstall_WithOsVersionAndBuild_OverwritesTheStoredOnes() {
+        // setup
+        stubReinstallOf(machineWithOsInfo());
+        request.setOsVersion("14.2.1");
+        request.setOsBuild("23C71");
+
+        // execution
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertThat(writtenOver(machineWithOsInfo()))
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("14.2.1", "23C71");
+    }
+
+    @Test
+    void reinstall_WithBlankOsVersionAndBuild_KeepsTheStoredOnes() {
+        // setup
+        stubReinstallOf(machineWithOsInfo());
+        request.setOsVersion(" ");
+        request.setOsBuild(null);
+
+        // execution
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertThat(writtenOver(machineWithOsInfo()))
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("13.6.1", "22G313");
+    }
+
     private void stubNewMachineRegistration() {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
@@ -698,6 +764,14 @@ class AgentRegistrationServiceTest {
         machine.setModel("ThinkPad T14");
         machine.setOsUuid("old-os-uuid");
         machine.setUserId("old-user");
+        return machine;
+    }
+
+    private static Machine machineWithOsInfo() {
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE_ID);
+        machine.setOsVersion("13.6.1");
+        machine.setOsBuild("22G313");
         return machine;
     }
 }
