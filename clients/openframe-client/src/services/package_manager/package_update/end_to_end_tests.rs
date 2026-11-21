@@ -93,7 +93,7 @@ impl Fake {
 fn name_of(package: &PackageRef) -> String {
     match package {
         PackageRef::Brew { name, .. } => name.clone(),
-        PackageRef::Winget { id } | PackageRef::Choco { id } => id.clone(),
+        PackageRef::Winget { id } | PackageRef::Choco { id, .. } => id.clone(),
     }
 }
 

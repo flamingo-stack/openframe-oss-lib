@@ -18,13 +18,19 @@ enum Session {
 }
 
 pub async fn state_of(id: ManagerId, console_user_present: bool) -> ManagerState {
-    let session = if console_user_present {
+    resolve(
+        id.presence().await,
+        support::is_supported(id),
+        session_for(id, console_user_present),
+    )
+}
+
+fn session_for(id: ManagerId, console_user_present: bool) -> Session {
+    if console_user_present || !id.needs_user_session() {
         Session::Active
     } else {
         Session::None
-    };
-
-    resolve(id.presence().await, support::is_supported(id), session)
+    }
 }
 
 fn resolve(presence: Presence, supported: bool, session: Session) -> ManagerState {

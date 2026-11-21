@@ -7,6 +7,7 @@ fn windows(edition: Option<&str>, product_type: ProductType, build: Option<u32>)
         product_type,
         edition_id: edition.map(str::to_string),
         build,
+        dotnet_release: Some(DOTNET_4_8_RELEASE),
     }
 }
 
@@ -17,11 +18,16 @@ fn mac(arch: Arch) -> OsSpec {
         product_type: ProductType::Unknown,
         edition_id: None,
         build: None,
+        dotnet_release: None,
     }
 }
 
+fn support(id: ManagerId, spec: &OsSpec) -> Support {
+    support_of(id, spec, true)
+}
+
 fn is_gated(id: ManagerId, spec: &OsSpec) -> bool {
-    matches!(support_of(id, spec), Support::Unsupported(_))
+    matches!(support(id, spec), Support::Unsupported(_))
 }
 
 #[test]
@@ -32,7 +38,7 @@ fn brew_is_unsupported_on_intel() {
 #[test]
 fn brew_is_supported_on_apple_silicon() {
     assert_eq!(
-        support_of(ManagerId::Brew, &mac(Arch::Arm64)),
+        support(ManagerId::Brew, &mac(Arch::Arm64)),
         Support::Supported
     );
 }
@@ -40,7 +46,7 @@ fn brew_is_supported_on_apple_silicon() {
 #[test]
 fn winget_is_supported_on_a_desktop_edition() {
     let spec = windows(Some("Professional"), ProductType::Workstation, Some(19045));
-    assert_eq!(support_of(ManagerId::Winget, &spec), Support::Supported);
+    assert_eq!(support(ManagerId::Winget, &spec), Support::Supported);
 }
 
 #[test]
@@ -74,22 +80,22 @@ fn winget_is_gated_on_server_before_2025() {
 #[test]
 fn winget_is_supported_on_server_2025() {
     let spec = windows(Some("ServerStandard"), ProductType::Server, Some(26100));
-    assert_eq!(support_of(ManagerId::Winget, &spec), Support::Supported);
+    assert_eq!(support(ManagerId::Winget, &spec), Support::Supported);
 }
 
 #[test]
 fn an_unreadable_build_never_gates() {
     let server = windows(Some("ServerStandard"), ProductType::Server, None);
-    assert_eq!(support_of(ManagerId::Winget, &server), Support::Supported);
+    assert_eq!(support(ManagerId::Winget, &server), Support::Supported);
 
     let desktop = windows(Some("Professional"), ProductType::Workstation, None);
-    assert_eq!(support_of(ManagerId::Winget, &desktop), Support::Supported);
+    assert_eq!(support(ManagerId::Winget, &desktop), Support::Supported);
 }
 
 #[test]
 fn winget_is_supported_on_multi_session_despite_the_server_product_type() {
     let spec = windows(Some("ServerRdsh"), ProductType::Server, Some(19044));
-    assert_eq!(support_of(ManagerId::Winget, &spec), Support::Supported);
+    assert_eq!(support(ManagerId::Winget, &spec), Support::Supported);
 }
 
 #[test]
@@ -101,11 +107,11 @@ fn an_unreadable_edition_still_gates_an_old_server() {
 #[test]
 fn unknown_facts_fail_open_on_the_right_platform() {
     assert_eq!(
-        support_of(ManagerId::Brew, &mac(Arch::Unknown)),
+        support(ManagerId::Brew, &mac(Arch::Unknown)),
         Support::Supported
     );
     assert_eq!(
-        support_of(
+        support(
             ManagerId::Winget,
             &windows(None, ProductType::Unknown, None)
         ),
@@ -118,27 +124,55 @@ fn every_manager_is_gated_off_its_platform() {
     let desktop = windows(Some("Professional"), ProductType::Workstation, Some(19045));
     assert!(is_gated(ManagerId::Brew, &desktop));
     assert!(is_gated(ManagerId::Winget, &mac(Arch::Arm64)));
+    assert!(is_gated(ManagerId::Choco, &mac(Arch::Arm64)));
 }
 
 #[test]
-fn choco_is_gated_everywhere_while_disabled() {
-    assert!(is_gated(ManagerId::Choco, &mac(Arch::Arm64)));
-    assert!(is_gated(
-        ManagerId::Choco,
-        &windows(Some("Professional"), ProductType::Workstation, Some(19045))
-    ));
+fn choco_is_supported_on_any_windows_with_dotnet_4_8() {
+    for spec in [
+        windows(Some("Professional"), ProductType::Workstation, Some(19045)),
+        windows(Some("EnterpriseS"), ProductType::Workstation, Some(17763)),
+        windows(Some("ServerStandard"), ProductType::Server, Some(17763)),
+    ] {
+        assert_eq!(support(ManagerId::Choco, &spec), Support::Supported);
+    }
+}
+
+#[test]
+fn choco_is_gated_below_dotnet_4_8() {
+    let spec = OsSpec {
+        dotnet_release: Some(461814),
+        ..windows(Some("ServerStandard"), ProductType::Server, Some(17763))
+    };
+    assert!(is_gated(ManagerId::Choco, &spec));
+}
+
+#[test]
+fn an_unreadable_dotnet_release_never_gates_choco() {
+    let spec = OsSpec {
+        dotnet_release: None,
+        ..windows(None, ProductType::Unknown, None)
+    };
+    assert_eq!(support(ManagerId::Choco, &spec), Support::Supported);
 }
 
 #[test]
 fn each_manager_is_judged_independently() {
     let apple_silicon = mac(Arch::Arm64);
-    assert_eq!(
-        support_of(ManagerId::Brew, &apple_silicon),
-        Support::Supported
-    );
+    assert_eq!(support(ManagerId::Brew, &apple_silicon), Support::Supported);
     assert!(is_gated(ManagerId::Winget, &apple_silicon));
 
     let desktop = windows(Some("Professional"), ProductType::Workstation, Some(19045));
-    assert_eq!(support_of(ManagerId::Winget, &desktop), Support::Supported);
+    assert_eq!(support(ManagerId::Winget, &desktop), Support::Supported);
     assert!(is_gated(ManagerId::Brew, &desktop));
+}
+
+#[test]
+fn choco_stays_off_until_its_feature_flag_is_on() {
+    let spec = windows(Some("Professional"), ProductType::Workstation, Some(19045));
+    assert_eq!(
+        support_of(ManagerId::Choco, &spec, false),
+        Support::Unsupported("Chocolatey is not enabled")
+    );
+    assert_eq!(support(ManagerId::Choco, &spec), Support::Supported);
 }
