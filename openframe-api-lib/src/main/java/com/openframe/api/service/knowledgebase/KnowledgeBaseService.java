@@ -244,7 +244,7 @@ public class KnowledgeBaseService {
 
     @Transactional
     public KnowledgeBaseItem renameFolder(String id, String name) {
-        log.info("Renaming folder {} to {}", id, name);
+        log.info("Renaming knowledge base item {} to {}", id, name);
         KnowledgeBaseItem item = getById(id);
         AuditAction action = item.getType() == KnowledgeBaseItemType.FOLDER ? KB_FOLDER_RENAME : KB_ARTICLE_UPDATE;
         return auditedMethodRunner.run(action, id, () -> {
@@ -342,6 +342,7 @@ public class KnowledgeBaseService {
     private static Map<String, Object> requestedDetails(UpdateArticleCommand cmd) {
         Map<String, Object> details = new HashMap<>();
         details.put("name", cmd.getName());
+        details.put("summary", cmd.getSummary());
         details.put("parentId", cmd.getParentId());
         details.put("moveToRoot", cmd.isMoveToRoot() ? Boolean.TRUE : null);
         details.put("status", cmd.getStatus());
