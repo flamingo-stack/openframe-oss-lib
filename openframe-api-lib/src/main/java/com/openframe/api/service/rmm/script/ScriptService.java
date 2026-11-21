@@ -56,7 +56,8 @@ public class ScriptService {
     private final ScriptPrivilegeValidator privilegeValidator;
     private final ScheduleDeliveryRefresher deliveryRefresher;
 
-    @Audited(action = SCRIPT_CREATE, targetId = "#result.id", details = "creationSource=#creationSource")
+    @Audited(action = SCRIPT_CREATE, targetId = "#result.id", targetName = "#input.name",
+            details = "creationSource=#creationSource")
     public ScriptResponse create(CreateScriptInput input, String createdBy, ScriptCreationSource creationSource) {
         String tenantId = tenantIdProvider.getTenantId();
 
@@ -194,7 +195,11 @@ public class ScriptService {
                 .build();
     }
 
-    @Audited(action = SCRIPT_UPDATE, targetId = "#input.id")
+    @Audited(action = SCRIPT_UPDATE, targetId = "#input.id",
+            details = {"name=#result == null ? #input.name : null", "shell=#result == null ? #input.shell : null",
+                    "privilegeLevel=#result == null ? #input.privilegeLevel : null",
+                    "supportedPlatforms=#result == null ? #input.supportedPlatforms : null",
+                    "defaultTimeoutSeconds=#result == null ? #input.defaultTimeoutSeconds : null"})
     public ScriptResponse update(UpdateScriptInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();

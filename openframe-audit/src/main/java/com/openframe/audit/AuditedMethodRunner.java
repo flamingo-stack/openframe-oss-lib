@@ -23,6 +23,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
 
@@ -247,18 +249,31 @@ public class AuditedMethodRunner {
     }
 
     private static boolean sameValue(Object before, Object after) {
+        if (isEmpty(before) && isEmpty(after)) {
+            return true;
+        }
         if (before instanceof Decimal128 first && after instanceof Decimal128 second) {
             return first.compareTo(second) == 0;
         }
         if (before instanceof Map<?, ?> first && after instanceof Map<?, ?> second) {
-            return first.keySet().equals(second.keySet())
-                    && first.keySet().stream().allMatch(key -> sameValue(first.get(key), second.get(key)));
+            return Stream.of(first.keySet(), second.keySet()).flatMap(Collection::stream).distinct()
+                    .allMatch(key -> sameValue(first.get(key), second.get(key)));
         }
         if (before instanceof List<?> first && after instanceof List<?> second) {
             return first.size() == second.size()
                     && IntStream.range(0, first.size()).allMatch(index -> sameValue(first.get(index), second.get(index)));
         }
         return Objects.equals(before, after);
+    }
+
+    private static boolean isEmpty(Object value) {
+        return switch (value) {
+            case null -> true;
+            case String text -> text.isEmpty();
+            case Collection<?> items -> items.isEmpty();
+            case Map<?, ?> fields -> fields.isEmpty();
+            default -> false;
+        };
     }
 
     private static boolean changedNothing(Map<String, AuditChange> changes, ActionOutcome outcome) {

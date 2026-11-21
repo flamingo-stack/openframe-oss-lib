@@ -197,7 +197,7 @@ public class ScriptDataFetcher {
 
     @DgsData(parentType = "Script", field = "scriptBody")
     @Audited(action = SCRIPT_OUTPUT_VIEW, targetType = AuditTargetType.SCRIPT, targetId = "rawId(#dfe.source.id)",
-            condition = "#result != null")
+            condition = "#result != null && #dfe.operationDefinition.operation.name() != 'MUTATION'")
     public String scriptBody(DgsDataFetchingEnvironment dfe) {
         ScriptResponse script = dfe.getSource();
         return script.getScriptBody();
