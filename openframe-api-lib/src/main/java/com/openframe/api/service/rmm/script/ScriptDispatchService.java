@@ -119,7 +119,7 @@ public class ScriptDispatchService {
         log.info("Dispatched script executionId={} scriptId={} machineId={} shell={} privilegeLevel={}",
                 executionId, input.getScriptId(), input.getMachineId(), script.getShell(), input.getPrivilegeLevel());
         return new Dispatched(DispatchResponse.builder().executionId(executionId).build(),
-                runDetails(executionId, script, input.getEnvVars()));
+                List.of(input.getMachineId()), runDetails(executionId, script, input.getEnvVars(), input.getArgs()));
     }
 
     public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy, ExecutionSource source) {
@@ -144,7 +144,11 @@ public class ScriptDispatchService {
 
         DispatchResponse response = dispatchBatch(executionId, script, machineIds, input.getPrivilegeLevel(),
                 input.getArgs(), input.getTimeoutSeconds(), input.getEnvVars(), initiatedBy, source);
-        return new Dispatched(response, runDetails(executionId, script, input.getEnvVars()));
+        Map<String, Object> details = runDetails(executionId, script, input.getEnvVars(), input.getArgs());
+        if (StringUtils.hasText(input.getScriptBody())) {
+            details.put("shell", script.getShell());
+        }
+        return new Dispatched(response, machineIds, details);
     }
 
     /**
@@ -166,6 +170,7 @@ public class ScriptDispatchService {
     public DispatchResponse runSchedule(String scheduleId, String initiatedBy) {
         AuditCall call = AuditCall.of(SCRIPT_SCHEDULE_RUN, scheduleId)
                 .withCompare(false)
+                .withDeviceIdOf(result -> result instanceof Dispatched run ? onlyDevice(run.machineIds()) : null)
                 .withDetailsFromResult(result -> result instanceof Dispatched run ? run.details() : Map.of());
         return auditedMethodRunner.run(call, () -> dispatchSchedule(scheduleId, initiatedBy)).response();
     }
@@ -275,7 +280,7 @@ public class ScriptDispatchService {
 
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
                 scheduleId, executionId, runnableScripts.size(), machineIds.size());
-        return new Dispatched(DispatchResponse.builder().executionId(executionId).build(),
+        return new Dispatched(DispatchResponse.builder().executionId(executionId).build(), machineIds,
                 Map.of("executionIds", List.of(executionId), "machineIds", machineIds,
                         "scriptIds", runnableScripts.stream().map(ScriptResponse::getId).toList()));
     }
@@ -289,7 +294,7 @@ public class ScriptDispatchService {
         asked.put("source", source);
         return AuditCall.of(SCRIPT_RUN, scriptId)
                 .withCompare(false)
-                .withDeviceIdOf(_ -> machineIds.size() == 1 ? machineIds.getFirst() : null)
+                .withDeviceIdOf(result -> onlyDevice(result instanceof Dispatched run ? run.machineIds() : machineIds))
                 .withDetailsFromResult(result -> {
                     Map<String, Object> details = new HashMap<>(asked);
                     details.putAll(result instanceof Dispatched run
@@ -307,10 +312,18 @@ public class ScriptDispatchService {
         return details;
     }
 
+    private static String onlyDevice(List<String> machineIds) {
+        return machineIds.size() == 1 ? machineIds.getFirst() : null;
+    }
+
     private static Map<String, Object> runDetails(String executionId, ScriptResponse script,
-                                                  List<ScriptEnvVarInput> envVars) {
-        return Map.of("executionIds", List.of(executionId),
-                "envVarNames", overriddenEnvVarNames(script.getEnvVars(), envVars));
+                                                  List<ScriptEnvVarInput> envVars, List<String> args) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("executionIds", List.of(executionId));
+        details.put("envVarNames", overriddenEnvVarNames(script.getEnvVars(), envVars));
+        boolean argsOverridden = args != null && !args.equals(Objects.requireNonNullElse(script.getDefaultArgs(), List.of()));
+        details.put("argsOverridden", argsOverridden ? true : null);
+        return details;
     }
 
     private static List<String> overriddenEnvVarNames(List<ScriptEnvVarInput> stored, List<ScriptEnvVarInput> asked) {
@@ -412,7 +425,7 @@ public class ScriptDispatchService {
         return byName.isEmpty() ? null : new ArrayList<>(byName.values());
     }
 
-    private record Dispatched(DispatchResponse response, Map<String, Object> details) {
+    private record Dispatched(DispatchResponse response, List<String> machineIds, Map<String, Object> details) {
     }
 
     private static void putEnvVars(Map<String, ScriptEnvVar> target, List<ScriptEnvVarInput> envVars) {
