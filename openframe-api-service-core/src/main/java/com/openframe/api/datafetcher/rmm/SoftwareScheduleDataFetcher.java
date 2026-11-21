@@ -80,7 +80,8 @@ public class SoftwareScheduleDataFetcher {
 
     @DgsMutation
     @Audited(action = SOFTWARE_SCHEDULE_CREATE, targetId = "rawId(#result.id)", targetName = "#input.name",
-            details = "machineIds=rawId(#input.machineIds)")
+            details = {"machineIds=rawId(#input.machineIds)", "softwareAction=#input.action",
+                    "packages=#input.packages.![packageName ?: softwareId]"})
     public SoftwareScheduleResponse createSoftwareSchedule(@InputArgument @Valid CreateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         List<String> machineGlobalIds = input.getMachineIds();

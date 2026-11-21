@@ -500,7 +500,7 @@ class SoftwareBundleServiceTest {
                 .thenReturn(java.util.Map.of("m1", OsType.WINDOWS, "m2", OsType.WINDOWS));
         SoftwareResponse chrome = SoftwareResponse.builder().id("title-7").name("Chrome").build();
         when(softwareInventoryService.turnOnAutoUpdate("title-7", List.of("m1", "m2"), AUTO_UPDATE_SETTINGS, USER))
-                .thenReturn(chrome);
+                .thenReturn(new SoftwareInventoryService.AutoUpdateTurnedOn(chrome, List.of("m1", "m2"), List.of()));
 
         SoftwareResponse result = service.turnOnAutoUpdate(turnOnInput(), USER);
 

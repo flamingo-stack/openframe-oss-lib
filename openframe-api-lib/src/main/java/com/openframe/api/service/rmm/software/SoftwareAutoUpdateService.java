@@ -66,17 +66,24 @@ public class SoftwareAutoUpdateService {
                 .build();
     }
 
-    public void turnOn(String softwareId, PackageCatalogEntry managingPackage, List<String> machineIds,
-                       PackageUpdateSettings settings, String actor) {
+    public TurnedOn turnOn(String softwareId, PackageCatalogEntry managingPackage, List<String> machineIds,
+                           PackageUpdateSettings settings, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         PackageManagerType packageManager = managingPackage.getManager();
         String packageName = managingPackage.getPackageId();
         BrewPackageType brewPackageType = managingPackage.getBrewType();
         List<String> softwareIds = List.of(softwareId);
-        Set<String> alreadyOn = policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, softwareIds).stream()
+        List<PackageAutoUpdatePolicy> policies = policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, softwareIds);
+        Set<String> alreadyOn = policies.stream()
                 .filter(policy -> isOnFor(policy, managingPackage))
                 .map(PackageAutoUpdatePolicy::getMachineId)
                 .collect(toSet());
+        List<String> removed = policies.stream()
+                .filter(PackageAutoUpdatePolicy::isEnabled)
+                .map(PackageAutoUpdatePolicy::getMachineId)
+                .filter(machineId -> !machineIds.contains(machineId))
+                .distinct()
+                .toList();
         Map<Boolean, List<String>> byAlreadyOn = machineIds.stream().collect(partitioningBy(alreadyOn::contains));
         List<String> kept = byAlreadyOn.get(true);
         List<String> added = byAlreadyOn.get(false);
@@ -99,6 +106,10 @@ public class SoftwareAutoUpdateService {
                 .forEach(this::withdrawTurnedOff);
         log.info("Auto-update turned on softwareId={} package={}/{} kept={} added={} turnedOff={} actor={}",
                 softwareId, packageManager, packageName, kept.size(), added.size(), turnedOff, actor);
+        return new TurnedOn(added, removed);
+    }
+
+    public record TurnedOn(List<String> added, List<String> removed) {
     }
 
     public long turnOff(String softwareId, String actor) {

@@ -10,6 +10,7 @@ import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
+import com.openframe.api.service.rmm.software.SoftwareInventoryService.AutoUpdateTurnedOn;
 import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
@@ -150,10 +151,15 @@ public class SoftwareBundleService {
             return toResponse(entity);
         }
         Map<String, Object> details = new HashMap<>();
-        details.put("bundleId", input.getId());
+        details.put("bundleIds", List.of(input.getId()));
         details.put("softwareAction", input.getAction());
         List<String> machineIds = currentMachineIds(entity);
         details.put("machineIds", machineIds);
+        details.put("packages", input.getPackages().stream()
+                .map(softwarePackage -> ObjectUtils.firstNonNull(softwarePackage.getPackageName(),
+                        softwarePackage.getSoftwareId()))
+                .filter(Objects::nonNull)
+                .toList());
         return auditedMethodRunner.run(submitCall(input, machineIds, details),
                 () -> doSubmit(entity, input, actor, details));
     }
@@ -178,6 +184,7 @@ public class SoftwareBundleService {
         if (input.getSchedule() != null) {
             return AuditCall.of(SOFTWARE_SCHEDULE_CREATE, null, details)
                     .withCompare(false)
+                    .withTargetNameOf(_ -> input.getSchedule().getName())
                     .withTargetIdInResult(true)
                     .withTargetIdFromResult(result -> ((SoftwareBundleResponse) result).getScheduleId());
         }
@@ -207,6 +214,8 @@ public class SoftwareBundleService {
         }
         PackageUpdateSettings updateSettings = PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings());
         SoftwareAutoUpdate autoUpdate = PackageUpdateSettingsMapper.autoUpdate(input.getAction(), input.getAutoUpdate());
+        details.putAll(settingsDetails(updateSettings));
+        details.put("autoUpdate", autoUpdate != null && autoUpdate.isEnabled() ? true : null);
 
         entity.setAction(input.getAction());
         entity.setPackages(packages);
@@ -237,7 +246,7 @@ public class SoftwareBundleService {
 
     public SoftwareResponse turnOnAutoUpdate(TurnOnSoftwareAutoUpdateInput input, String actor) {
         Map<String, Object> details = new HashMap<>();
-        details.put("bundleId", input.getBundleId());
+        details.put("bundleIds", List.of(input.getBundleId()));
         AuditCall call = AuditCall.of(SOFTWARE_AUTO_UPDATE_ENABLE, input.getSoftwareId(), details)
                 .withCompare(false)
                 .withTargetNameOf(result -> result instanceof SoftwareResponse software ? software.getName() : null);
@@ -261,12 +270,26 @@ public class SoftwareBundleService {
         requireDeviceEligibility(machineIds, packages);
         PackageUpdateSettingsInput settingsInput = input.getSettings();
         PackageUpdateSettings settings = PackageUpdateSettingsMapper.updateSettings(SoftwareAction.UPDATE, settingsInput);
-        SoftwareResponse software = softwareInventoryService.turnOnAutoUpdate(softwareId, machineIds, settings, actor);
+        details.putAll(settingsDetails(settings));
+        AutoUpdateTurnedOn turnedOn = softwareInventoryService.turnOnAutoUpdate(softwareId, machineIds, settings, actor);
+        details.put("added", turnedOn.added());
+        details.put("removed", turnedOn.removed());
         Instant now = Instant.now();
         saveCompleted(entity, now);
         log.info("Turned on auto-update from software bundle id={} softwareId={} devices={} actor={}",
                 bundleId, softwareId, machineIds.size(), actor);
-        return software;
+        return turnedOn.software();
+    }
+
+    private static Map<String, Object> settingsDetails(PackageUpdateSettings settings) {
+        if (settings == null) {
+            return Map.of();
+        }
+        Map<String, Object> details = new HashMap<>();
+        details.put("updateMode", settings.getMode());
+        details.put("deadlineSeconds", settings.getDeadlineSeconds());
+        details.put("countdownSeconds", settings.getCountdownSeconds());
+        return details;
     }
 
     private void saveCompleted(SoftwareBundle entity, Instant now) {

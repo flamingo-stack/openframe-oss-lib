@@ -220,9 +220,11 @@ class SoftwareInventoryServiceFleetPagingTest {
             return null;
         }).when(catalogStatus).apply(anyList());
         List<String> machineIds = List.of("m1", "m2");
+        when(autoUpdateService.turnOn("42", chrome, machineIds, WAIT, "admin@x"))
+                .thenReturn(new SoftwareAutoUpdateService.TurnedOn(machineIds, List.of()));
 
         // execution
-        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x");
+        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x").software();
 
         // verifications
         assertThat(result.getName()).isEqualTo("Chrome");

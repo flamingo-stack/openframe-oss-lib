@@ -259,14 +259,18 @@ public class SoftwareInventoryService {
                 .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
     }
 
-    public SoftwareResponse turnOnAutoUpdate(String softwareId, List<String> machineIds, PackageUpdateSettings settings,
-                                             String actor) {
+    public AutoUpdateTurnedOn turnOnAutoUpdate(String softwareId, List<String> machineIds,
+                                               PackageUpdateSettings settings, String actor) {
         SoftwareResponse software = getManagedSoftware(softwareId);
         PackageCatalogEntry managingPackage = software.getManagingPackage();
-        autoUpdateService.turnOn(softwareId, managingPackage, machineIds, settings, actor);
+        SoftwareAutoUpdateService.TurnedOn devices =
+                autoUpdateService.turnOn(softwareId, managingPackage, machineIds, settings, actor);
         List<SoftwareResponse> rows = List.of(software);
         applyStatuses(rows);
-        return software;
+        return new AutoUpdateTurnedOn(software, devices.added(), devices.removed());
+    }
+
+    public record AutoUpdateTurnedOn(SoftwareResponse software, List<String> added, List<String> removed) {
     }
 
     // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there
