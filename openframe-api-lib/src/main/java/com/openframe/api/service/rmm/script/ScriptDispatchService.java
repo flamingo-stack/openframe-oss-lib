@@ -321,7 +321,8 @@ public class ScriptDispatchService {
         Map<String, Object> details = new HashMap<>();
         details.put("executionIds", List.of(executionId));
         details.put("envVarNames", overriddenEnvVarNames(script.getEnvVars(), envVars));
-        boolean argsOverridden = args != null && !args.equals(Objects.requireNonNullElse(script.getDefaultArgs(), List.of()));
+        boolean argsOverridden = args != null && !ScriptArgsTokenizer.tokenize(args)
+                .equals(ScriptArgsTokenizer.tokenize(Objects.requireNonNullElse(script.getDefaultArgs(), List.of())));
         details.put("argsOverridden", argsOverridden ? true : null);
         return details;
     }
@@ -335,15 +336,15 @@ public class ScriptDispatchService {
                 .collect(Collectors.toMap(ScriptEnvVarInput::getName, Function.identity(), (_, last) -> last));
         return asked.stream()
                 .filter(envVar -> envVar.getName() != null && !(envVar.isSecret() && envVar.getValue() == null))
-                .filter(envVar -> !sameEnvVar(storedByName.get(envVar.getName()), envVar))
+                .filter(envVar -> overrides(storedByName.get(envVar.getName()), envVar))
                 .map(ScriptEnvVarInput::getName)
                 .distinct()
                 .toList();
     }
 
-    private static boolean sameEnvVar(ScriptEnvVarInput stored, ScriptEnvVarInput asked) {
-        return stored != null && stored.isSecret() == asked.isSecret()
-                && Objects.equals(stored.getValue(), asked.getValue());
+    private static boolean overrides(ScriptEnvVarInput stored, ScriptEnvVarInput asked) {
+        return stored == null || stored.isSecret() != asked.isSecret()
+                || !Objects.equals(stored.getValue(), asked.getValue());
     }
 
     // the delivery engine stores the batch: its secrets stay encrypted until the wire form
