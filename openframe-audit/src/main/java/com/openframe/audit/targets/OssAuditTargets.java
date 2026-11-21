@@ -21,9 +21,9 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.User;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
 import static com.openframe.data.document.audit.AuditTargetType.API_KEY;
@@ -113,6 +113,6 @@ public class OssAuditTargets implements AuditTargetProvider {
     }
 
     private static String ticketName(Ticket ticket) {
-        return Objects.requireNonNullElse(ticket.getTitle(), String.valueOf(ticket.getTicketNumber()));
+        return StringUtils.hasText(ticket.getTitle()) ? ticket.getTitle() : String.valueOf(ticket.getTicketNumber());
     }
 }
