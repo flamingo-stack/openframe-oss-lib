@@ -57,7 +57,10 @@ public class ScriptService {
     private final ScheduleDeliveryRefresher deliveryRefresher;
 
     @Audited(action = SCRIPT_CREATE, targetId = "#result.id", targetName = "#input.name",
-            details = "creationSource=#creationSource")
+            details = {"creationSource=#creationSource", "shell=#result == null ? #input.shell : null",
+                    "privilegeLevel=#result == null ? #input.privilegeLevel : null",
+                    "supportedPlatforms=#result == null ? #input.supportedPlatforms : null",
+                    "defaultTimeoutSeconds=#result == null ? #input.defaultTimeoutSeconds : null"})
     public ScriptResponse create(CreateScriptInput input, String createdBy, ScriptCreationSource creationSource) {
         String tenantId = tenantIdProvider.getTenantId();
 

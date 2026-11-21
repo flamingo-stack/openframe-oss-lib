@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -154,7 +155,7 @@ public class ScriptTagService {
 
     private void applyTags(String scriptId, List<String> tagIds) {
         tagAssignmentRepository.deleteByEntityIdAndEntityType(scriptId, ENTITY_TYPE);
-        if (tagIds == null || tagIds.isEmpty()) {
+        if (CollectionUtils.isEmpty(tagIds)) {
             return;
         }
         tagIds.stream().distinct().forEach(tagId ->
