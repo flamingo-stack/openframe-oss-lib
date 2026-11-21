@@ -65,7 +65,6 @@ import java.util.stream.Collectors;
 
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_ARCHIVE;
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_CRITERIA_SET;
-import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_RUN;
 import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_UNARCHIVE;
 import static com.openframe.graphql.relay.NodeType.MACHINE;
 import static com.openframe.graphql.relay.NodeType.SCRIPT;
@@ -269,8 +268,6 @@ public class ScriptScheduleDataFetcher {
      * Ad-hoc "run now" of a schedule.
      */
     @DgsMutation
-    @Audited(action = SCRIPT_SCHEDULE_RUN, targetId = "rawId(#scheduleId)", compare = false,
-            details = "executionIds={#result.executionId}")
     public DispatchResponse runScheduleJobNow(@InputArgument @NotBlank String scheduleId) {
         String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
         String userId = getCurrentUserId();
