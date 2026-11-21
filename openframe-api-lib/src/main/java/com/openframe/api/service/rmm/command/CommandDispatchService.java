@@ -44,7 +44,7 @@ public class CommandDispatchService {
 
     @Audited(action = COMMAND_RUN, targetId = "rawId(#input.machineId)", compare = false,
             details = {"machineIds={#input.machineId}", "command=#input.command", "shell=#input.shell",
-                    "privilegeLevel=#input.privilegeLevel", "executionId=#result.executionId"})
+                    "privilegeLevel=#input.privilegeLevel", "executionIds={#result.executionId}"})
     public DispatchResponse runCommand(RunCommandInput input, String initiatedBy) {
         deviceService.verifyDispatchable(input.getMachineId());
 
@@ -80,7 +80,7 @@ public class CommandDispatchService {
     @Audited(action = COMMAND_RUN, compare = false,
             targetId = "#input.machineIds.size() == 1 ? rawId(#input.machineIds[0]) : null",
             details = {"machineIds=#input.machineIds", "command=#input.command", "shell=#input.shell",
-                    "privilegeLevel=#input.privilegeLevel", "executionId=#result.executionId"})
+                    "privilegeLevel=#input.privilegeLevel", "executionIds={#result.executionId}"})
     public DispatchResponse batchRunCommand(BatchRunCommandInput input, String initiatedBy) {
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 
@@ -118,9 +118,10 @@ public class CommandDispatchService {
     public DispatchResponse cancelExecution(CancelExecutionInput input) {
         String machineId = input.getMachineId();
         String executionId = input.getExecutionId();
-        AuditCall call = AuditCall.of(EXECUTION_CANCEL, executionRowId(machineId, executionId),
-                        Map.of("executionId", executionId))
+        AuditCall call = AuditCall.of(EXECUTION_CANCEL, null, Map.of("executionIds", List.of(executionId)))
+                .withTargetIdBeforeCall(() -> executionRowId(machineId, executionId))
                 .withCompare(false)
+                .withTargetNameOf(_ -> executionId)
                 .withDeviceIdOf(_ -> machineId);
         return auditedMethodRunner.run(call, () -> publishCancel(input));
     }

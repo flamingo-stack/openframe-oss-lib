@@ -270,7 +270,7 @@ public class ScriptScheduleDataFetcher {
      */
     @DgsMutation
     @Audited(action = SCRIPT_SCHEDULE_RUN, targetId = "rawId(#scheduleId)", compare = false,
-            details = "executionId=#result.executionId")
+            details = "executionIds={#result.executionId}")
     public DispatchResponse runScheduleJobNow(@InputArgument @NotBlank String scheduleId) {
         String rawScheduleId = relayIdCodec.decode(scheduleId, SCRIPT_SCHEDULE);
         String userId = getCurrentUserId();

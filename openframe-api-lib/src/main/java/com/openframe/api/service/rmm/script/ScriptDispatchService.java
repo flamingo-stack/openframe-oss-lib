@@ -78,7 +78,7 @@ public class ScriptDispatchService {
 
     @Audited(action = SCRIPT_RUN, targetId = "#input.scriptId", deviceId = "rawId(#input.machineId)", compare = false,
             details = {"machineIds={#input.machineId}", "privilegeLevel=#input.privilegeLevel", "source=#source",
-                    "envVarNames=#input.envVars?.![name]", "executionId=#result.executionId"})
+                    "envVarNames=#input.envVars?.![name]", "executionIds={#result.executionId}"})
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
         ScriptEnvVarMapper.validate(input.getEnvVars());
@@ -118,7 +118,7 @@ public class ScriptDispatchService {
     @Audited(action = SCRIPT_RUN, targetId = "#input.scriptId", compare = false,
             deviceId = "#input.machineIds.size() == 1 ? rawId(#input.machineIds[0]) : null",
             details = {"machineIds=#input.machineIds", "privilegeLevel=#input.privilegeLevel", "source=#source",
-                    "envVarNames=#input.envVars?.![name]", "executionId=#result.executionId",
+                    "envVarNames=#input.envVars?.![name]", "executionIds={#result.executionId}",
                     "unsavedDraft=T(org.springframework.util.StringUtils).hasText(#input.scriptBody) ? true : null"})
     public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
