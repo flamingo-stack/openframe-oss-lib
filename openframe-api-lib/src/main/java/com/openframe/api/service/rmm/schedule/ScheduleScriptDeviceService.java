@@ -56,7 +56,7 @@ public class ScheduleScriptDeviceService {
 
     @Transactional
     @Audited(action = SCRIPT_SCHEDULE_DEVICES_SET, targetId = "#scheduleId", compare = false,
-            condition = "!#result.isEmpty()", details = {"added=#result.added", "removed=#result.removed",
+            condition = "!#result.isEmpty()", details = {"added=#result.added()", "removed=#result.removed()",
             "switchedFromCriteria=#result.switchedFromCriteria() ? true : null",
             "machineIds=#result == null ? #machineIds : null"})
     public ScheduleDeviceChange setDevices(String scheduleId, List<String> machineIds, String actorUserId) {
@@ -109,7 +109,7 @@ public class ScheduleScriptDeviceService {
      */
     @Transactional
     @Audited(action = SCRIPT_SCHEDULE_DEVICES_ADD, targetId = "#scheduleId", compare = false,
-            condition = "!#result.isEmpty()", details = {"machineIds=#result == null ? #machineIds : #result.added",
+            condition = "!#result.isEmpty()", details = {"machineIds=#result == null ? #machineIds : #result.added()",
             "switchedFromCriteria=#result.switchedFromCriteria() ? true : null"})
     public ScheduleDeviceChange addDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
