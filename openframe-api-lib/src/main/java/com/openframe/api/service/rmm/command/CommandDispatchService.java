@@ -118,7 +118,8 @@ public class CommandDispatchService {
     public DispatchResponse cancelExecution(CancelExecutionInput input) {
         String machineId = input.getMachineId();
         String executionId = input.getExecutionId();
-        AuditCall call = AuditCall.of(EXECUTION_CANCEL, null, Map.of("executionIds", List.of(executionId)))
+        AuditCall call = AuditCall.of(EXECUTION_CANCEL, null,
+                        Map.of("executionIds", List.of(executionId), "machineIds", List.of(machineId)))
                 .withTargetIdBeforeCall(() -> executionRowId(machineId, executionId))
                 .withCompare(false)
                 .withTargetNameOf(_ -> executionId)
