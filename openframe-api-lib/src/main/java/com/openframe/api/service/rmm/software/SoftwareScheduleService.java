@@ -31,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -200,12 +201,12 @@ public class SoftwareScheduleService {
     }
 
     @Audited(action = SOFTWARE_SCHEDULE_DEVICES_ADD, targetId = "#scheduleId", compare = false,
-            condition = "!#result.isEmpty()", details = {"machineIds=#result == null ? #machineIds : #result.added",
+            condition = "!#result.isEmpty()", details = {"machineIds=#result == null ? #machineIds : #result.added()",
             "switchedFromCriteria=#result.switchedFromCriteria() ? true : null"})
     public ScheduleDeviceChange addDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
-        if (machineIds == null || machineIds.isEmpty()) {
+        if (CollectionUtils.isEmpty(machineIds)) {
             return new ScheduleDeviceChange(List.of(), List.of(), false);
         }
         List<PackageManagerType> managers = managersOf(entity.getPackages());
@@ -229,7 +230,7 @@ public class SoftwareScheduleService {
     public List<String> removeDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         loadVisibleOrThrow(tenantId, scheduleId);
-        if (machineIds == null || machineIds.isEmpty()) {
+        if (CollectionUtils.isEmpty(machineIds)) {
             return List.of();
         }
         Set<String> assigned = new HashSet<>(assignedMachineIds(tenantId, scheduleId));
@@ -293,7 +294,7 @@ public class SoftwareScheduleService {
 
     private void replaceDevices(String tenantId, String scheduleId, List<String> machineIds, String actor) {
         assignedRepository.deleteByTenantIdAndSoftwareScheduleId(tenantId, scheduleId);
-        if (machineIds == null || machineIds.isEmpty()) {
+        if (CollectionUtils.isEmpty(machineIds)) {
             return;
         }
         List<SoftwareScheduleMachineAssigned> rows = machineIds.stream().distinct()

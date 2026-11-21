@@ -81,7 +81,10 @@ public class SoftwareScheduleDataFetcher {
     @DgsMutation
     @Audited(action = SOFTWARE_SCHEDULE_CREATE, targetId = "rawId(#result.id)", targetName = "#input.name",
             details = {"machineIds=rawId(#input.machineIds)", "softwareAction=#input.action",
-                    "packages=#input.packages.![packageName ?: softwareId]"})
+                    "packages=#input.packages.![packageName ?: softwareId]",
+                    "updateMode=#result.updateSettings?.mode", "deadlineSeconds=#result.updateSettings?.deadlineSeconds",
+                    "countdownSeconds=#result.updateSettings?.countdownSeconds",
+                    "autoUpdate=#result.autoUpdate?.enabled == true ? true : null"})
     public SoftwareScheduleResponse createSoftwareSchedule(@InputArgument @Valid CreateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         List<String> machineGlobalIds = input.getMachineIds();
@@ -92,7 +95,12 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = SOFTWARE_SCHEDULE_UPDATE, targetId = "rawId(#input.id)")
+    @Audited(action = SOFTWARE_SCHEDULE_UPDATE, targetId = "rawId(#input.id)",
+            details = {"name=#result == null ? #input.name : null", "startAt=#result == null ? #input.startAt : null",
+                    "repeat=#result == null ? #input.repeat : null",
+                    "softwareAction=#result == null ? #input.action : null",
+                    "packages=#result == null ? #input.packages?.![packageName ?: softwareId] : null",
+                    "machineIds=#result == null ? #input.machineIds : null"})
     public SoftwareScheduleResponse updateSoftwareSchedule(@InputArgument @Valid UpdateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         String scheduleGlobalId = input.getId();
