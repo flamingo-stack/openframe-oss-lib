@@ -1,5 +1,6 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.knowledgebase.CreateArticleCommand;
@@ -30,13 +31,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 
 import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_DELETE;
 import static com.openframe.data.document.audit.AuditAction.KB_FOLDER_RENAME;
 import static com.openframe.data.document.audit.AuditAction.KB_ITEM_MOVE;
 import static org.assertj.core.api.Assertions.tuple;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -365,7 +364,9 @@ class KnowledgeBaseServiceSaveArticleTest {
 
         service.updateArticle(USER_ID, UpdateArticleCommand.builder().id(ARTICLE_ID).name("New folder").build());
 
-        verify(auditedMethodRunner).run(eq(KB_FOLDER_RENAME), eq(ARTICLE_ID), any(Map.class), any(Supplier.class));
+        ArgumentCaptor<AuditCall> call = ArgumentCaptor.forClass(AuditCall.class);
+        verify(auditedMethodRunner).run(call.capture(), any());
+        assertThat(call.getValue().action()).isEqualTo(KB_FOLDER_RENAME);
     }
 
     private AuditEntry recordedSubChange() {

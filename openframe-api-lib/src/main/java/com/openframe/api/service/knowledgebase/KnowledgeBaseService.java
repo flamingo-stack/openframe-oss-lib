@@ -12,6 +12,7 @@ import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.audit.AuditCall;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.Audited;
@@ -281,10 +282,9 @@ public class KnowledgeBaseService {
 
     @Transactional
     @Audited(action = KB_ARTICLE_CREATE, targetId = "#result.id",
-            details = {"parentId=#cmd.parentId", "status=#cmd.status", "tagIds=#cmd.tagIds",
-                    "assignedOrganizationIds=#cmd.assignedOrganizationIds", "assignedDeviceIds=#cmd.assignedDeviceIds",
-                    "assignedTicketIds=#cmd.assignedTicketIds",
-                    "assignedKnowledgeArticleIds=#cmd.assignedKnowledgeArticleIds"})
+            details = {"parentId=#cmd.parentId", "status=#result?.status", "tagIds=#cmd.tagIds",
+                    "organizationIds=#cmd.assignedOrganizationIds", "deviceIds=#cmd.assignedDeviceIds",
+                    "ticketIds=#cmd.assignedTicketIds", "articleIds=#cmd.assignedKnowledgeArticleIds"})
     public KnowledgeBaseItem createArticle(String currentUserId, CreateArticleCommand cmd) {
         log.info("Creating article: {} by user: {} under parent: {}", cmd.getName(), currentUserId, cmd.getParentId());
         validateParentIsFolder(cmd.getParentId());
@@ -331,20 +331,22 @@ public class KnowledgeBaseService {
         log.info("Updating article {} by user {}", cmd.getId(), currentUserId);
         KnowledgeBaseItem article = getById(cmd.getId());
         AuditAction action = article.getType() == KnowledgeBaseItemType.FOLDER ? KB_FOLDER_RENAME : KB_ARTICLE_UPDATE;
-        return auditedMethodRunner.run(action, cmd.getId(), updateDetails(cmd),
-                () -> applyArticleUpdate(currentUserId, cmd, article));
+        Map<String, Object> requested = requestedDetails(cmd);
+        AuditCall call = AuditCall.of(action, cmd.getId(), requested)
+                .withDetailsFromResult(saved -> saved == null ? requested : Map.of());
+        return auditedMethodRunner.run(call, () -> applyArticleUpdate(currentUserId, cmd, article));
     }
 
-    private static Map<String, Object> updateDetails(UpdateArticleCommand cmd) {
+    private static Map<String, Object> requestedDetails(UpdateArticleCommand cmd) {
         Map<String, Object> details = new HashMap<>();
         details.put("parentId", cmd.getParentId());
         details.put("moveToRoot", cmd.isMoveToRoot() ? Boolean.TRUE : null);
         details.put("status", cmd.getStatus());
         details.put("tagIds", cmd.getTagIds());
-        details.put("assignedOrganizationIds", cmd.getAssignedOrganizationIds());
-        details.put("assignedDeviceIds", cmd.getAssignedDeviceIds());
-        details.put("assignedTicketIds", cmd.getAssignedTicketIds());
-        details.put("assignedKnowledgeArticleIds", cmd.getAssignedKnowledgeArticleIds());
+        details.put("organizationIds", cmd.getAssignedOrganizationIds());
+        details.put("deviceIds", cmd.getAssignedDeviceIds());
+        details.put("ticketIds", cmd.getAssignedTicketIds());
+        details.put("articleIds", cmd.getAssignedKnowledgeArticleIds());
         return details;
     }
 
@@ -464,27 +466,27 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
-    @Audited(action = KB_ARTICLE_PUBLISH, targetId = "#id")
     public KnowledgeBaseItem publishArticle(String id) {
         log.info("Publishing article {}", id);
-        KnowledgeBaseItem article = getById(id);
-        if (article.getType() != KnowledgeBaseItemType.ARTICLE) {
-            throw new ConflictException(ErrorCode.CONFLICT, "Only articles can be published.");
-        }
-        article.setStatus(KnowledgeBaseArticleStatus.PUBLISHED);
-        return repository.save(article);
+        return changeStatus(id, KnowledgeBaseArticleStatus.PUBLISHED, "Only articles can be published.");
     }
 
     @Transactional
-    @Audited(action = KB_ARTICLE_UNPUBLISH, targetId = "#id")
     public KnowledgeBaseItem unpublishArticle(String id) {
         log.info("Unpublishing article {}", id);
+        return changeStatus(id, KnowledgeBaseArticleStatus.DRAFT, "Only articles can be unpublished.");
+    }
+
+    private KnowledgeBaseItem changeStatus(String id, KnowledgeBaseArticleStatus status, String folderRefusal) {
         KnowledgeBaseItem article = getById(id);
-        if (article.getType() != KnowledgeBaseItemType.ARTICLE) {
-            throw new ConflictException(ErrorCode.CONFLICT, "Only articles can be unpublished.");
-        }
-        article.setStatus(KnowledgeBaseArticleStatus.DRAFT);
-        return repository.save(article);
+        AuditAction action = statusAction(article.getStatus(), status);
+        return auditedMethodRunner.run(action, id, () -> {
+            if (article.getType() != KnowledgeBaseItemType.ARTICLE) {
+                throw new ConflictException(ErrorCode.CONFLICT, folderRefusal);
+            }
+            article.setStatus(status);
+            return repository.save(article);
+        });
     }
 
     @Transactional
