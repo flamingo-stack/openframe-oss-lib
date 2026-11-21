@@ -158,8 +158,8 @@ public class SoftwareBundleService {
         List<String> machineIds = currentMachineIds(entity);
         details.put("machineIds", machineIds);
         details.put("packages", input.getPackages().stream()
-                .map(softwarePackage -> ObjectUtils.firstNonNull(softwarePackage.getPackageName(),
-                        softwarePackage.getSoftwareId()))
+                .map(softwarePackage -> hasText(softwarePackage.getPackageName())
+                        ? softwarePackage.getPackageName() : softwarePackage.getSoftwareId())
                 .filter(Objects::nonNull)
                 .toList());
         return auditedMethodRunner.run(submitCall(input, machineIds, details),
@@ -168,10 +168,12 @@ public class SoftwareBundleService {
 
     private List<SoftwareBundlePackage> withTargetDevice(List<SoftwareBundlePackage> packages,
                                                          Map<String, OsType> deviceOsTypes) {
+        Set<PackageManagerType> supported = managersOf(packages).stream()
+                .filter(manager -> !packageManagerAvailability.supporting(
+                        devicesWithOs(deviceOsTypes, osTypeOf(manager)), manager).isEmpty())
+                .collect(Collectors.toSet());
         return packages.stream()
-                .filter(bundlePackage -> !packageManagerAvailability.supporting(
-                        devicesWithOs(deviceOsTypes, osTypeOf(bundlePackage.getPackageManager())),
-                        bundlePackage.getPackageManager()).isEmpty())
+                .filter(bundlePackage -> supported.contains(bundlePackage.getPackageManager()))
                 .toList();
     }
 
@@ -216,13 +218,8 @@ public class SoftwareBundleService {
         }
         rejectAdopt(input.getAction());
         List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
-        details.put("packages", packageNamesOf(packages));
         validatePackages(packages);
         Map<String, OsType> deviceOsTypes = requireEligibleDeviceOsTypes(machineIds, packages);
-        List<SoftwareBundlePackage> sent = withTargetDevice(packages, deviceOsTypes);
-        if (input.getSchedule() == null) {
-            details.put("packages", packageNamesOf(sent));
-        }
         PackageUpdateSettings updateSettings = PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings());
         SoftwareAutoUpdate autoUpdate = PackageUpdateSettingsMapper.autoUpdate(input.getAction(), input.getAutoUpdate());
         details.putAll(settingsDetails(updateSettings));
@@ -238,11 +235,14 @@ public class SoftwareBundleService {
             entity.setMode(SoftwareBundleMode.SCHEDULED);
             entity.setStartAt(input.getSchedule().getStartAt());
             submitScheduled(entity, input, actor);
+            details.put("packages", packageNamesOf(packages));
         } else {
             entity.setMode(SoftwareBundleMode.NOW);
             packages.forEach(this::fillLatestVersion);
             armOnlineDispatch(entity, now);
             entity.setExecutionIds(executionIds(entity.getId(), entity.getPackages()));
+            List<SoftwareBundlePackage> sent = withTargetDevice(packages, deviceOsTypes);
+            details.put("packages", packageNamesOf(sent));
             details.put("executionIds", executionIds(entity.getId(), sent));
         }
 
