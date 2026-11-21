@@ -73,7 +73,7 @@ public class ScheduleScriptService {
      *
      * @throws ConflictException if a schedule with the same name already exists.
      */
-    @Audited(action = SCRIPT_SCHEDULE_CREATE, targetId = "#result.id")
+    @Audited(action = SCRIPT_SCHEDULE_CREATE, targetId = "#result.id", targetName = "#input.name")
     public ScriptScheduleResponse create(CreateScriptScheduleInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
@@ -204,7 +204,10 @@ public class ScheduleScriptService {
                 .build();
     }
 
-    @Audited(action = SCRIPT_SCHEDULE_UPDATE, targetId = "#input.id")
+    @Audited(action = SCRIPT_SCHEDULE_UPDATE, targetId = "#input.id",
+            details = {"name=#result == null ? #input.name : null", "startAt=#result == null ? #input.startAt : null",
+                    "repeat=#result == null ? #input.repeat : null", "trigger=#result == null ? #input.trigger : null",
+                    "scriptIds=#result == null ? #input.scriptIds : null"})
     public ScriptScheduleResponse update(UpdateScriptScheduleInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();

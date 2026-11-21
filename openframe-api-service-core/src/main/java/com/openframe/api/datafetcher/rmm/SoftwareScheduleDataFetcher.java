@@ -79,7 +79,7 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
-    @Audited(action = SOFTWARE_SCHEDULE_CREATE, targetId = "rawId(#result.id)",
+    @Audited(action = SOFTWARE_SCHEDULE_CREATE, targetId = "rawId(#result.id)", targetName = "#input.name",
             details = "machineIds=rawId(#input.machineIds)")
     public SoftwareScheduleResponse createSoftwareSchedule(@InputArgument @Valid CreateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
