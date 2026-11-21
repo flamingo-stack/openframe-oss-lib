@@ -280,8 +280,9 @@ public class SoftwareInventoryService {
                 .withCompare(false)
                 .withTargetNameOf(SoftwareInventoryService::nameOf)
                 .withDetailsFromResult(result -> result instanceof TurnedOff turnedOff
-                        ? Map.of("machineIds", turnedOff.machineIds()) : Map.of())
-                .withRecordsResult(result -> !((TurnedOff) result).machineIds().isEmpty());
+                        ? Map.of("machineIds", turnedOff.machineIds(), "removed", turnedOff.machineIds()) : Map.of())
+                .withRecordsResult(result -> result instanceof TurnedOff turnedOff
+                        && !turnedOff.machineIds().isEmpty());
         return auditedMethodRunner.run(call, () -> disableAutoUpdate(softwareId, actor)).software();
     }
 
