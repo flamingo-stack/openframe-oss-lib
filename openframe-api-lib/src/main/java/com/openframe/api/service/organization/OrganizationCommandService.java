@@ -57,7 +57,9 @@ public class OrganizationCommandService {
      * @param request update organization request
      * @return updated organization
      */
-    @Audited(action = ORGANIZATION_UPDATE, targetId = "#id")
+    @Audited(action = ORGANIZATION_UPDATE, targetId = "#id",
+            details = {"contractStartDate=#result == null ? #request.contractStartDate : null",
+                    "contractEndDate=#result == null ? #request.contractEndDate : null"})
     public Organization updateOrganization(String id, UpdateOrganizationRequest request) {
         log.debug("Updating organization {} from request", id);
         
