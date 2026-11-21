@@ -40,7 +40,7 @@ public class TicketNoteService {
     private final AuditedMethodRunner auditedMethodRunner;
 
     @Transactional
-    @Audited(action = TICKET_NOTE_ADD, targetId = "#ticketId", compare = false, details = "noteId=#result.id")
+    @Audited(action = TICKET_NOTE_ADD, targetId = "#ticketId", compare = false, details = "noteIds={#result.id}")
     public TicketNote addNote(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String content) {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);
@@ -55,14 +55,14 @@ public class TicketNoteService {
 
     @Transactional
     public TicketNote updateNote(AuthPrincipal principal, @NotBlank String noteId, @NotBlank String content) {
-        validateAdminAccess(principal);
         log.info("Updating note {} by: {}", noteId, principal.getDisplayName());
         TicketNote note = requireNote(noteId);
         boolean changed = !content.equals(note.getContent());
-        AuditCall call = AuditCall.of(TICKET_NOTE_UPDATE, TICKET, note.getTicketId(), Map.of("noteId", noteId))
+        AuditCall call = AuditCall.of(TICKET_NOTE_UPDATE, note.getTicketId(), Map.of("noteIds", List.of(noteId)))
                 .withCompare(false)
                 .withRecordsResult(_ -> changed);
         return auditedMethodRunner.run(call, () -> {
+            validateAdminAccess(principal);
             requireAuthor(note, principal, "Only the author can update this note");
             note.setContent(content);
             return noteRepository.save(note);
@@ -71,11 +71,11 @@ public class TicketNoteService {
 
     @Transactional
     public void deleteNote(AuthPrincipal principal, @NotBlank String noteId) {
-        validateAdminAccess(principal);
         log.info("Deleting note {} by: {}", noteId, principal.getDisplayName());
         TicketNote note = requireNote(noteId);
-        auditedMethodRunner.runWithoutCompare(TICKET_NOTE_DELETE, TICKET, note.getTicketId(), Map.of("noteId", noteId),
-                () -> {
+        auditedMethodRunner.runWithoutCompare(TICKET_NOTE_DELETE, TICKET, note.getTicketId(),
+                Map.of("noteIds", List.of(noteId)), () -> {
+                    validateAdminAccess(principal);
                     requireAuthor(note, principal, "Only the author can delete this note");
                     noteRepository.delete(note);
                 });

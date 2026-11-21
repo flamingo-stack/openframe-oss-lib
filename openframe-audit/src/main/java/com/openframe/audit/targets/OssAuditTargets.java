@@ -23,6 +23,7 @@ import com.openframe.data.document.user.User;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import static com.openframe.data.document.audit.AuditTargetType.API_KEY;
@@ -52,7 +53,7 @@ public class OssAuditTargets implements AuditTargetProvider {
     @Override
     public List<AuditTarget<?>> targets() {
         return List.of(
-                AuditTarget.of(TICKET, Ticket.class, Ticket::getTitle)
+                AuditTarget.of(TICKET, Ticket.class, OssAuditTargets::ticketName)
                         .withOrganizationId(Ticket::getOrganizationId)
                         .withDeviceId(Ticket::getDeviceId)
                         .withIgnoredFields(Set.of("lastActivityAt", "awaitingClientSince", "hasPendingApproval")),
@@ -109,5 +110,9 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(SSO_CONFIG, SSOConfig.class, SSOConfig::getProvider)
                         .withIdField("provider")
                         .withMaskedFields(Set.of("clientSecret")));
+    }
+
+    private static String ticketName(Ticket ticket) {
+        return Objects.requireNonNullElse(ticket.getTitle(), String.valueOf(ticket.getTicketNumber()));
     }
 }
