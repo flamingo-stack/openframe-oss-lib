@@ -1,10 +1,15 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.dto.agent.AgentRegistrationTagInput;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.document.tag.TagValidation;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +18,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+
+import static com.openframe.data.document.audit.AuditAction.TAG_CREATE;
+import static com.openframe.data.document.audit.AuditAction.TAG_UPDATE;
 
 /**
  * Handles tag creation and assignment during agent registration.
@@ -33,6 +43,7 @@ public class RegistrationTagAssignmentService {
 
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
+    private final AuditRecorder auditRecorder;
 
     /**
      * Creates tags (if they don't exist) and assigns them to the newly registered device.
@@ -86,9 +97,14 @@ public class RegistrationTagAssignmentService {
                 }
                 HashSet<String> merged = new HashSet<>(existingValues);
                 if (merged.addAll(values)) {
+                    List<String> valuesBefore = new ArrayList<>(existingValues);
                     existing.setValues(new ArrayList<>(merged));
                     tagRepository.save(existing);
                     log.info("Appended values {} to existing tag '{}' during registration", values, key);
+                    auditRecorder.record(tagEntry(TAG_UPDATE, existing)
+                            .details(Map.of("entityType", TagEntityType.DEVICE))
+                            .changes(Map.of("values", new AuditChange(valuesBefore, existing.getValues())))
+                            .build());
                 }
             }
             return existing;
@@ -103,6 +119,19 @@ public class RegistrationTagAssignmentService {
 
         Tag saved = tagRepository.save(tag);
         log.info("Created tag '{}' (id={}) with DEVICE entity type during registration", key, saved.getId());
+        Map<String, Object> details = new HashMap<>();
+        details.put("entityType", TagEntityType.DEVICE);
+        details.put("key", key);
+        details.put("values", saved.getValues());
+        auditRecorder.record(tagEntry(TAG_CREATE, saved).details(details).build());
         return saved;
+    }
+
+    private static AuditEntry.AuditEntryBuilder tagEntry(AuditAction action, Tag tag) {
+        return AuditEntry.builder()
+                .action(action)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(tag.getId())
+                .targetName(tag.getKey());
     }
 }

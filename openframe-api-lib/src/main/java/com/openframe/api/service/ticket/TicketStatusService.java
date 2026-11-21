@@ -12,8 +12,16 @@ import com.openframe.api.exception.ticket.SystemTicketStatusModificationExceptio
 import com.openframe.api.exception.ticket.TicketStatusInUseException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusOperation;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.security.authentication.AuthPrincipal;
@@ -24,11 +32,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.api.exception.ticket.TicketStatusOperation.*;
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CHANGE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CREATE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_DELETE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_MOVE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_UPDATE;
 import static com.openframe.data.document.ticket.TicketStatusKind.*;
 
 /**
@@ -42,6 +57,8 @@ import static com.openframe.data.document.ticket.TicketStatusKind.*;
 public class TicketStatusService {
 
     private final TicketStatusDefinitionRepository statusRepository;
+    private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
     private final TicketRepository ticketRepository;
     private final TicketTransitionPolicyValidator transitionPolicy;
 
@@ -50,6 +67,7 @@ public class TicketStatusService {
     }
 
     @Transactional
+    @Audited(action = TICKET_STATUS_CREATE, targetId = "#result.id")
     public TicketStatusDefinition create(AuthPrincipal principal, @Valid CreateTicketStatusInput input) {
         validateAdminAccess(principal);
         ensureUniqueName(input.getName());
@@ -68,6 +86,7 @@ public class TicketStatusService {
     }
 
     @Transactional
+    @Audited(action = TICKET_STATUS_UPDATE, targetId = "#input.id")
     public TicketStatusDefinition update(AuthPrincipal principal, @Valid UpdateTicketStatusInput input) {
         validateAdminAccess(principal);
         TicketStatusDefinition status = requireStatus(input.getId());
@@ -81,22 +100,40 @@ public class TicketStatusService {
 
     @Transactional
     public boolean delete(AuthPrincipal principal, @Valid DeleteTicketStatusInput input) {
-        validateAdminAccess(principal);
+        AuditCall call = AuditCall.of(TICKET_STATUS_DELETE, input.getId())
+                .withDetailsFromResult(moved -> deleteDetails(input, moved));
+        auditedMethodRunner.run(call, () -> {
+            validateAdminAccess(principal);
+            return deleteStatus(input);
+        });
+        return true;
+    }
+
+    private static Map<String, Object> deleteDetails(DeleteTicketStatusInput input, Object ticketsMoved) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("replacementStatusId", input.getReplacementStatusId());
+        details.put("ticketsMoved", ticketsMoved);
+        return details;
+    }
+
+    private long deleteStatus(DeleteTicketStatusInput input) {
         TicketStatusDefinition status = requireStatus(input.getId());
         ensureCustomStatus(status, DELETE);
 
         long inUseCount = ticketRepository.countByStatusId(status.getId());
         if (inUseCount > 0) {
             deleteWithReplacement(status, input.getReplacementStatusId(), inUseCount);
-            return true;
+            return inUseCount;
         }
 
         statusRepository.delete(status);
         log.info("Deleted custom status {}", status.getId());
-        return true;
+        return inUseCount;
     }
 
     @Transactional
+    @Audited(action = TICKET_STATUS_MOVE, targetId = "#input.id",
+            details = {"afterStatusId=#input.afterStatusId", "beforeStatusId=#input.beforeStatusId"})
     public TicketStatusDefinition reorder(AuthPrincipal principal, @Valid ReorderTicketStatusInput input) {
         validateAdminAccess(principal);
         TicketStatusDefinition status = requireStatus(input.getId());
@@ -236,11 +273,37 @@ public class TicketStatusService {
         TicketStatusDefinition replacement = requireStatus(replacementStatusId);
         ensureValidReplacement(status, replacement);
 
+        List<Ticket> moved = ticketRepository.findAuditFieldsByStatusId(status.getId());
         int reassigned = ticketRepository.reassignTicketsToStatus(
                 status.getId(), replacement.getId(), replacement.getKind());
         statusRepository.delete(status);
+        auditRecorder.recordAllWithTargetFields(moved.stream()
+                .map(ticket -> movedEntry(ticket, replacement))
+                .toList());
         log.info("Deleted custom status {} with {} tickets reassigned to {}",
                 status.getId(), reassigned, replacement.getId());
+    }
+
+    private static AuditEntry movedEntry(Ticket ticket, TicketStatusDefinition replacement) {
+        Map<String, AuditChange> changes = new HashMap<>();
+        changes.put("statusId", new AuditChange(ticket.getStatusId(), replacement.getId()));
+        if (ticket.getStatusKind() != replacement.getKind()) {
+            changes.put("statusKind",
+                    new AuditChange(kindName(ticket.getStatusKind()), kindName(replacement.getKind())));
+        }
+        return AuditEntry.builder()
+                .action(TICKET_STATUS_CHANGE)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(ticket.getId())
+                .targetName(ticket.getTitle())
+                .organizationId(ticket.getOrganizationId())
+                .deviceId(ticket.getDeviceId())
+                .changes(changes)
+                .build();
+    }
+
+    private static String kindName(TicketStatusKind kind) {
+        return kind == null ? null : kind.name();
     }
 
     private TicketStatusDefinition requireStatus(String id) {

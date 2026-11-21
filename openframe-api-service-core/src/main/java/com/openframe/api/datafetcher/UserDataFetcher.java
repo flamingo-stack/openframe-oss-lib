@@ -19,6 +19,9 @@ import com.openframe.api.dto.user.UserPayload;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLUserMapper;
 import com.openframe.api.service.user.UserService;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
@@ -29,6 +32,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 
 import static com.openframe.api.support.CurrentPrincipalSupport.requireHumanUserId;
+import static com.openframe.data.document.audit.AuditAction.USER_DELETE;
+import static com.openframe.data.document.audit.AuditAction.USER_OWNERSHIP_TRANSFER;
+import static com.openframe.data.document.audit.AuditAction.USER_OWN_ACCOUNT_DELETE;
+import static com.openframe.data.document.audit.AuditAction.USER_UPDATE;
 import static com.openframe.graphql.relay.NodeType.USER;
 
 @DgsComponent
@@ -43,6 +50,7 @@ public class UserDataFetcher {
     private final UserService userService;
     private final GraphQLUserMapper mapper;
     private final RelayIdCodec relayIdCodec;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     @DgsQuery
     public CountedGenericConnection<GenericEdge<UserResponse>> users(
@@ -74,6 +82,7 @@ public class UserDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = USER_UPDATE, targetId = "rawId(#input.id)")
     public UserPayload updateUser(@InputArgument @Valid UpdateUserInput input) {
         String id = relayIdCodec.decode(input.getId(), USER);
         UpdateUserRequest request = new UpdateUserRequest();
@@ -86,11 +95,14 @@ public class UserDataFetcher {
     public UserPayload deleteUser(@InputArgument @Valid DeleteUserInput input,
                                   @AuthenticationPrincipal AuthPrincipal principal) {
         String id = relayIdCodec.decode(input.getId(), USER);
-        userService.softDeleteUser(id, requireHumanUserId(principal));
+        String requesterId = requireHumanUserId(principal);
+        AuditAction action = id.equals(requesterId) ? USER_OWN_ACCOUNT_DELETE : USER_DELETE;
+        auditedMethodRunner.run(action, id, () -> userService.softDeleteUser(id, requesterId));
         return new UserPayload(userService.getUserById(id));
     }
 
     @DgsMutation
+    @Audited(action = USER_OWNERSHIP_TRANSFER, targetId = "rawId(#input.newOwnerId)")
     public TransferOwnershipPayload transferOwnership(@InputArgument @Valid TransferOwnershipInput input,
                                                       @AuthenticationPrincipal AuthPrincipal principal) {
         String requesterId = requireHumanUserId(principal);

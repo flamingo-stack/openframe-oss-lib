@@ -1,8 +1,14 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.exception.ticket.TicketNotFoundException;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -18,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +33,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
+import static com.openframe.data.document.audit.AuditAction.TICKET_TAG_ADD;
+import static com.openframe.data.document.audit.AuditAction.TICKET_TAG_REMOVE;
 
 @Service
 @Slf4j
@@ -37,6 +46,8 @@ public class TicketTagService {
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final TicketRepository ticketRepository;
+    private final AuditRecorder auditRecorder;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     public List<Tag> getTags(AuthPrincipal principal) {
         validateAdminAccess(principal);
@@ -58,26 +69,57 @@ public class TicketTagService {
     }
 
     @Transactional
-    public void addTagToTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
+    public boolean addTagToTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
+        return auditedMethodRunner.run(tagCall(TICKET_TAG_ADD, ticketId, tagId),
+                () -> assignTag(principal, ticketId, tagId));
+    }
+
+    private boolean assignTag(AuthPrincipal principal, String ticketId, String tagId) {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);
         log.info("Adding tag {} to ticket {} by: {}", tagId, ticketId, principal.getDisplayName());
-        if (tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ticketId, tagId, TagEntityType.TICKET).isEmpty()) {
-            TagAssignment assignment = TagAssignment.builder()
-                    .entityId(ticketId)
-                    .tagId(tagId)
-                    .entityType(TagEntityType.TICKET)
-                    .build();
-            tagAssignmentRepository.save(assignment);
+        if (isAssigned(ticketId, tagId)) {
+            return false;
         }
+        TagAssignment assignment = TagAssignment.builder()
+                .entityId(ticketId)
+                .tagId(tagId)
+                .entityType(TagEntityType.TICKET)
+                .build();
+        tagAssignmentRepository.save(assignment);
+        return true;
     }
 
     @Transactional
-    public void removeTagFromTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
+    public boolean removeTagFromTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
+        return auditedMethodRunner.run(tagCall(TICKET_TAG_REMOVE, ticketId, tagId),
+                () -> unassignTag(principal, ticketId, tagId));
+    }
+
+    private AuditCall tagCall(AuditAction action, String ticketId, String tagId) {
+        return AuditCall.of(action, ticketId, tagDetails(tagId))
+                .withCompare(false)
+                .withRecordsResult(changed -> (Boolean) changed);
+    }
+
+    private Map<String, Object> tagDetails(String tagId) {
+        Map<String, Object> details = new HashMap<>(Map.of("tagIds", List.of(tagId)));
+        tagRepository.findById(tagId).ifPresent(tag -> details.put("tagKeys", List.of(tag.getKey())));
+        return details;
+    }
+
+    private boolean unassignTag(AuthPrincipal principal, String ticketId, String tagId) {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);
         log.info("Removing tag {} from ticket {} by: {}", tagId, ticketId, principal.getDisplayName());
+        boolean assigned = isAssigned(ticketId, tagId);
         tagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(ticketId, tagId, TagEntityType.TICKET);
+        return assigned;
+    }
+
+    private boolean isAssigned(String ticketId, String tagId) {
+        return tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(ticketId, tagId, TagEntityType.TICKET)
+                .isPresent();
     }
 
     @Transactional
@@ -94,6 +136,7 @@ public class TicketTagService {
                         .build())
                 .toList();
         tagAssignmentRepository.saveAll(assignments);
+        tagIds.forEach(tagId -> recordTagChange(TICKET_TAG_ADD, ticketId, tagId));
     }
 
     @Transactional
@@ -109,8 +152,19 @@ public class TicketTagService {
                 .map(TagAssignment::getTagId)
                 .collect(Collectors.toSet());
         Set<String> newTagIds = new HashSet<>(tagIds);
-        removeStaleAssignments(currentAssignments, newTagIds);
-        addNewAssignments(ticketId, tagIds, currentTagIds);
+        List<String> removed = removeStaleAssignments(currentAssignments, newTagIds);
+        List<String> added = addNewAssignments(ticketId, tagIds, currentTagIds);
+        removed.forEach(tagId -> recordTagChange(TICKET_TAG_REMOVE, ticketId, tagId));
+        added.forEach(tagId -> recordTagChange(TICKET_TAG_ADD, ticketId, tagId));
+    }
+
+    private void recordTagChange(AuditAction action, String ticketId, String tagId) {
+        auditRecorder.record(AuditEntry.builder()
+                .action(action)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(ticketId)
+                .details(tagDetails(tagId))
+                .build());
     }
 
     public List<String> getTicketIdsByTagIds(List<String> tagIds) {
@@ -162,7 +216,7 @@ public class TicketTagService {
         }
     }
 
-    private void removeStaleAssignments(List<TagAssignment> currentAssignments, Set<String> newTagIds) {
+    private List<String> removeStaleAssignments(List<TagAssignment> currentAssignments, Set<String> newTagIds) {
         List<TagAssignment> toRemove = currentAssignments.stream()
                 .filter(a -> !newTagIds.contains(a.getTagId()))
                 .toList();
@@ -170,9 +224,10 @@ public class TicketTagService {
             tagAssignmentRepository.deleteAll(toRemove);
             log.debug("Removed {} tags from ticket", toRemove.size());
         }
+        return toRemove.stream().map(TagAssignment::getTagId).toList();
     }
 
-    private void addNewAssignments(String ticketId, List<String> tagIds, Set<String> currentTagIds) {
+    private List<String> addNewAssignments(String ticketId, List<String> tagIds, Set<String> currentTagIds) {
         List<String> toAdd = tagIds.stream()
                 .filter(id -> !currentTagIds.contains(id))
                 .toList();
@@ -187,6 +242,7 @@ public class TicketTagService {
             tagAssignmentRepository.saveAll(newAssignments);
             log.debug("Added {} tags to ticket {}", toAdd.size(), ticketId);
         }
+        return toAdd;
     }
 
     private void validateTicketExists(String ticketId) {

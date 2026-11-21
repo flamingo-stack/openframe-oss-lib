@@ -21,6 +21,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
 import static com.openframe.data.document.sso.SSOConfig.OPENFRAME_PROVIDER;
 import static java.lang.Boolean.TRUE;
@@ -97,14 +98,17 @@ public class SSOConfigService {
         return ssoConfigMapper.toResponse(savedConfig, request.getClientSecret());
     }
 
-    public void deleteConfig(String provider) {
-        ssoConfigRepository.findByProvider(isOpenframeLogin(provider) ? OPENFRAME_PROVIDER : provider)
-                .ifPresent(config -> {
+    public boolean deleteConfig(String provider) {
+        boolean passwordLogin = isOpenframeLogin(provider);
+        return ssoConfigRepository.findByProvider(passwordLogin ? OPENFRAME_PROVIDER : provider)
+                .map(config -> {
                     ssoConfigRepository.delete(config);
                     log.info("Successfully deleted SSO configuration for provider '{}'", provider);
 
                     ssoConfigProcessor.postProcessConfigDeleted(config);
-                });
+                    return !passwordLogin || !config.isEnabled();
+                })
+                .orElse(false);
     }
 
     public SSOConfigResponse upsertConfig(String provider, @Valid SSOConfigRequest request) {
@@ -125,20 +129,22 @@ public class SSOConfigService {
                 });
     }
 
-    public void toggleEnabled(String provider, boolean enabled) {
+    public boolean toggleEnabled(String provider, boolean enabled) {
         if (isOpenframeLogin(provider)) {
-            toggleOpenframeLogin(enabled);
-            return;
+            return toggleOpenframeLogin(enabled);
         }
-        ssoConfigRepository.findByProvider(provider)
-                .ifPresent(config -> {
+        return ssoConfigRepository.findByProvider(provider)
+                .map(config -> {
+                    boolean changed = config.isEnabled() != enabled;
                     config.setEnabled(enabled);
                     SSOConfig savedConfig = ssoConfigRepository.save(config);
                     log.info("Successfully {} SSO configuration for provider '{}'",
                             enabled ? "enabled" : "disabled", provider);
 
                     ssoConfigProcessor.postProcessConfigToggled(savedConfig);
-                });
+                    return changed;
+                })
+                .orElse(false);
     }
 
     /**
@@ -146,18 +152,20 @@ public class SSOConfigService {
      * exists purely as the per-tenant on/off switch, so unlike external providers the toggle
      * creates the document on first use. No document means enabled.
      */
-    private void toggleOpenframeLogin(boolean enabled) {
-        SSOConfig config = ssoConfigRepository.findByProvider(OPENFRAME_PROVIDER)
-                .orElseGet(() -> {
-                    SSOConfig created = new SSOConfig();
-                    created.setProvider(OPENFRAME_PROVIDER);
-                    return created;
-                });
+    private boolean toggleOpenframeLogin(boolean enabled) {
+        Optional<SSOConfig> stored = ssoConfigRepository.findByProvider(OPENFRAME_PROVIDER);
+        boolean enabledBefore = stored.map(SSOConfig::isEnabled).orElse(true);
+        SSOConfig config = stored.orElseGet(() -> {
+            SSOConfig created = new SSOConfig();
+            created.setProvider(OPENFRAME_PROVIDER);
+            return created;
+        });
         config.setEnabled(enabled);
         SSOConfig savedConfig = ssoConfigRepository.save(config);
         log.info("Successfully {} OpenFrame login", enabled ? "enabled" : "disabled");
 
         ssoConfigProcessor.postProcessConfigToggled(savedConfig);
+        return enabledBefore != enabled;
     }
 
     private SSOConfigResponse openframeLoginConfig(String requestedProvider) {
@@ -179,7 +187,7 @@ public class SSOConfigService {
      * TODO: once the new mobile app version is released and "openframe" becomes the canonical id
      * (see {@link SSOConfig#OPENFRAME_PROVIDER}), remove this alias handling.
      */
-    private static boolean isOpenframeLogin(String provider) {
+    public static boolean isOpenframeLogin(String provider) {
         return OPENFRAME_PROVIDER.equals(provider) || "openframe".equals(provider);
     }
 

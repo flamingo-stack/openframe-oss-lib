@@ -1,5 +1,7 @@
 package com.openframe.api.service.user;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.invitation.InvitationFilterInput;
 import com.openframe.api.dto.invitation.InvitationFilters;
@@ -45,6 +47,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static com.openframe.api.dto.invitation.InvitationStatus.EXPIRED;
 import static com.openframe.api.dto.invitation.InvitationStatus.PENDING;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,7 +78,8 @@ class UserListingTest {
 
     private InvitationService invitationService() {
         return new InvitationService(invitationRepository, new InvitationMapper(), emailService, userService(),
-                invitationProcessor, emailDomainPolicy);
+                invitationProcessor, emailDomainPolicy, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS),
+                mock(AuditRecorder.class, CALLS_REAL_METHODS));
     }
 
     @Test

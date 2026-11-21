@@ -1,5 +1,7 @@
 package com.openframe.client.service;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.client.event.DeviceUninstalledEvent;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
@@ -14,6 +16,7 @@ import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -46,6 +49,8 @@ class AgentUninstallServiceTest {
     @Mock private InstalledAgentService installedAgentService;
     @Mock private DeletedMachineCleanup deletedMachineCleanup;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditRecorder auditRecorder;
 
     @InjectMocks private AgentUninstallService service;
 

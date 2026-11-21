@@ -21,6 +21,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.User;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -52,7 +53,7 @@ public class OssAuditTargets implements AuditTargetProvider {
     @Override
     public List<AuditTarget<?>> targets() {
         return List.of(
-                AuditTarget.of(TICKET, Ticket.class, Ticket::getTitle)
+                AuditTarget.of(TICKET, Ticket.class, OssAuditTargets::ticketName)
                         .withOrganizationId(Ticket::getOrganizationId)
                         .withDeviceId(Ticket::getDeviceId)
                         .withIgnoredFields(Set.of("lastActivityAt", "awaitingClientSince", "hasPendingApproval")),
@@ -63,7 +64,8 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withIgnoredFields(Set.of("lastSeen", "telemetryStatus", "packageManagers", "securityState",
                                 "complianceState", "securityAlerts", "lastSecurityScan", "lastComplianceScan",
                                 "stuckNotifiedAt", "hostFactsCheckedAt", "computerName", "directorySources",
-                                "directoryUserLink", "directoryUserIds", "directoryUserName")),
+                                "directoryUserLink", "directoryUserIds", "directoryUserName",
+                                "organizationAssignedAt")),
                 AuditTarget.of(USER, User.class, User::nameOrEmail)
                         .withIgnoredFields(Set.of("crmSynced", "lastLogin"))
                         .withMaskedFields(Set.of("passwordHash")),
@@ -73,10 +75,11 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(TENANT, Tenant.class, Tenant::getName)
                         .withTenantId(Tenant::getId),
                 AuditTarget.of(SCRIPT, Script.class, Script::getName)
-                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs", "contentHash")),
+                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "envVars.encrypted", "defaultArgs", "contentHash")),
                 AuditTarget.of(SCRIPT_SCHEDULE, ScheduleScript.class, ScheduleScript::getName)
                         .withIgnoredFields(Set.of("nextRunAt", "lastRunAt"))
-                        .withMaskedFields(Set.of("scriptCustomParams.args", "scriptCustomParams.value")),
+                        .withMaskedFields(Set.of("scriptCustomParams.args", "scriptCustomParams.value",
+                                "scriptCustomParams.encrypted")),
                 AuditTarget.of(SOFTWARE_SCHEDULE, SoftwareSchedule.class, SoftwareSchedule::getName)
                         .withIgnoredFields(Set.of("nextRunAt", "lastRunAt")),
                 AuditTarget.of(EXECUTION, ScriptExecution.class, ScriptExecution::getExecutionId)
@@ -107,5 +110,9 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(SSO_CONFIG, SSOConfig.class, SSOConfig::getProvider)
                         .withIdField("provider")
                         .withMaskedFields(Set.of("clientSecret")));
+    }
+
+    private static String ticketName(Ticket ticket) {
+        return StringUtils.hasText(ticket.getTitle()) ? ticket.getTitle() : String.valueOf(ticket.getTicketNumber());
     }
 }

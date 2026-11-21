@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.core.exception.BadRequestException;
@@ -51,6 +52,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -100,7 +103,8 @@ class SoftwareInventoryServiceFleetPagingTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                softwareAdoptionService, packageManagerAvailability, packageAdoptReach);
+                softwareAdoptionService, packageManagerAvailability, packageAdoptReach,
+                mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -216,9 +220,11 @@ class SoftwareInventoryServiceFleetPagingTest {
             return null;
         }).when(catalogStatus).apply(anyList());
         List<String> machineIds = List.of("m1", "m2");
+        when(autoUpdateService.turnOn("42", chrome, machineIds, WAIT, "admin@x"))
+                .thenReturn(new SoftwareAutoUpdateService.TurnedOn(machineIds, List.of()));
 
         // execution
-        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x");
+        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x").software();
 
         // verifications
         assertThat(result.getName()).isEqualTo("Chrome");

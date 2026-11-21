@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.invitation.InvitationIdInput;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.invitation.InviteUsersInput;
@@ -25,6 +26,7 @@ import com.openframe.security.authentication.ActorType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,6 +36,8 @@ import java.util.List;
 
 import static com.openframe.graphql.relay.NodeType.INVITATION;
 import static com.openframe.graphql.relay.NodeType.USER;
+import static com.openframe.data.document.audit.AuditAction.USER_DELETE;
+import static com.openframe.data.document.audit.AuditAction.USER_OWN_ACCOUNT_DELETE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,9 +56,10 @@ class UserMutationsTest {
 
     @Mock private UserService userService;
     @Mock private InvitationService invitationService;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
 
     private UserDataFetcher users() {
-        return new UserDataFetcher(userService, new GraphQLUserMapper(), CODEC);
+        return new UserDataFetcher(userService, new GraphQLUserMapper(), CODEC, auditedMethodRunner);
     }
 
     private InvitationDataFetcher invitations() {
@@ -94,7 +99,15 @@ class UserMutationsTest {
         UserResponse user = users().deleteUser(new DeleteUserInput(CODEC.encode(USER, "u-2")), ADMIN).getUser();
 
         verify(userService).softDeleteUser("u-2", "me");
+        verify(auditedMethodRunner).run(eq(USER_DELETE), eq("u-2"), any(Runnable.class));
         assertThat(user).isSameAs(deleted);
+    }
+
+    @Test
+    void deleteUser_callerDeletesTheirOwnAccount_recordedAsAnOwnAccountDelete() {
+        users().deleteUser(new DeleteUserInput(CODEC.encode(USER, "me")), ADMIN);
+
+        verify(auditedMethodRunner).run(eq(USER_OWN_ACCOUNT_DELETE), eq("me"), any(Runnable.class));
     }
 
     @Test

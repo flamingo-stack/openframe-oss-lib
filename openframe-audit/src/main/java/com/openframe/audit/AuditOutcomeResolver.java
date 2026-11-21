@@ -16,12 +16,18 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.ErrorResponse;
+import org.springframework.web.client.RestClientResponseException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static com.openframe.data.document.audit.AuditOutcome.FAILURE;
 import static com.openframe.data.document.audit.AuditOutcome.REFUSED;
@@ -33,9 +39,12 @@ public class AuditOutcomeResolver {
 
     private static final Set<String> OAUTH_SERVER_FAULTS = Set.of(OAuth2ErrorCodes.SERVER_ERROR,
             OAuth2ErrorCodes.TEMPORARILY_UNAVAILABLE, "invalid_token_response", "invalid_user_info_response");
+    private static final String MESSAGE_FIELD = "message";
+    private static final String DETAIL_FIELD = "detail";
 
     private final List<AuditFailureStatus> failureStatuses;
     private final ExceptionHandlerStatuses exceptionHandlerStatuses;
+    private final ObjectMapper objectMapper;
 
     public ActionOutcome ofResult(Object result) {
         if (result instanceof HasUserErrors payload) {
@@ -60,14 +69,28 @@ public class AuditOutcomeResolver {
         return new ActionOutcome(outcome, reason);
     }
 
-    private static String refusalReasonOf(Throwable failure) {
+    private String refusalReasonOf(Throwable failure) {
         return switch (failure) {
             case DataAccessException _ -> null;
             case ErrorResponse e -> e.getBody().getDetail();
+            case RestClientResponseException e -> messageOfBody(e);
             case OAuth2AuthenticationException e ->
                     Objects.requireNonNullElse(e.getMessage(), e.getError().getErrorCode());
             default -> failure.getMessage();
         };
+    }
+
+    private String messageOfBody(RestClientResponseException response) {
+        try {
+            JsonNode body = objectMapper.readTree(response.getResponseBodyAsString());
+            return Stream.of(MESSAGE_FIELD, DETAIL_FIELD)
+                    .map(field -> body.path(field).asString())
+                    .filter(StringUtils::hasText)
+                    .findFirst()
+                    .orElseGet(response::getMessage);
+        } catch (JacksonException unreadable) {
+            return response.getMessage();
+        }
     }
 
     private HttpStatusCode statusOf(Throwable failure) {

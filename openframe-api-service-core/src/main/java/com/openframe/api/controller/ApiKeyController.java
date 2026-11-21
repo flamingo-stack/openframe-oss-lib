@@ -5,6 +5,7 @@ import com.openframe.api.dto.CreateApiKeyRequest;
 import com.openframe.api.dto.CreateApiKeyResponse;
 import com.openframe.api.dto.UpdateApiKeyRequest;
 import com.openframe.api.service.ApiKeyService;
+import com.openframe.audit.Audited;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+import static com.openframe.data.document.audit.AuditAction.API_KEY_CREATE;
+import static com.openframe.data.document.audit.AuditAction.API_KEY_DELETE;
+import static com.openframe.data.document.audit.AuditAction.API_KEY_ROTATE;
+import static com.openframe.data.document.audit.AuditAction.API_KEY_UPDATE;
 
 @Slf4j
 @RestController
@@ -31,6 +37,7 @@ public class ApiKeyController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Audited(action = API_KEY_CREATE, targetId = "#result.apiKey.id")
     public CreateApiKeyResponse createApiKey(
             @Valid @RequestBody CreateApiKeyRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {
@@ -47,6 +54,7 @@ public class ApiKeyController {
     }
 
     @PutMapping("/{keyId}")
+    @Audited(action = API_KEY_UPDATE, targetId = "#keyId")
     public ApiKeyResponse updateApiKey(
             @PathVariable String keyId,
             @Valid @RequestBody UpdateApiKeyRequest request,
@@ -57,6 +65,7 @@ public class ApiKeyController {
 
     @DeleteMapping("/{keyId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Audited(action = API_KEY_DELETE, targetId = "#keyId")
     public void deleteApiKey(
             @PathVariable String keyId,
             @AuthenticationPrincipal AuthPrincipal principal) {
@@ -65,6 +74,7 @@ public class ApiKeyController {
     }
 
     @PostMapping("/{keyId}/regenerate")
+    @Audited(action = API_KEY_ROTATE, targetId = "#keyId", details = "newKeyId=#result.apiKey.id")
     public CreateApiKeyResponse regenerateApiKey(
             @PathVariable String keyId,
             @AuthenticationPrincipal AuthPrincipal principal) {

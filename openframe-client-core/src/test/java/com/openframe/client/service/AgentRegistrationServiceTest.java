@@ -1,5 +1,11 @@
 package com.openframe.client.service;
 
+import java.util.Map;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.dto.agent.AgentRegistrationTagInput;
@@ -35,6 +41,12 @@ import java.util.List;
 import java.time.Instant;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_REGISTER_FAIL;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_ORGANIZATION_CHANGE;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_AUTH_FAIL;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -109,6 +121,8 @@ class AgentRegistrationServiceTest {
     private static final String CLIENT_SECRET = "01234567890123456789012345678912";
     private static final String ORGANIZATION_ID = "custom-uuid";
 
+    private final AuditRecorder auditRecorder = mock(AuditRecorder.class, CALLS_REAL_METHODS);
+
     @BeforeEach
     void setUp() {
         agentRegistrationService = new AgentRegistrationService(
@@ -128,6 +142,7 @@ class AgentRegistrationServiceTest {
                 toolConnectionService,
                 agentRegistrationClientFeatureFlagsService,
                 agentRegistrationClientUpdateService,
+                mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), auditRecorder,
                 deletedMachineCleanup
         );
         request = createTestRequest();
@@ -310,6 +325,11 @@ class AgentRegistrationServiceTest {
         Machine savedMachine = writtenOver(existingMachine);
         assertEquals("new-org", savedMachine.getOrganizationId());
         assertNotNull(savedMachine.getOrganizationAssignedAt());
+        assertThat(recorded())
+                .extracting(AuditEntry::getAction, AuditEntry::getTargetId, AuditEntry::getOrganizationId,
+                        AuditEntry::getChanges)
+                .containsExactly(DEVICE_ORGANIZATION_CHANGE, MACHINE_ID, "new-org",
+                        Map.of("organizationId", new AuditChange("old-org", "new-org")));
     }
 
     @Test
@@ -329,6 +349,7 @@ class AgentRegistrationServiceTest {
 
         Machine savedMachine = writtenOver(existingMachine);
         assertEquals(assignedAt, savedMachine.getOrganizationAssignedAt());
+        verify(auditRecorder, never()).record(any());
     }
 
     @Test
@@ -347,6 +368,11 @@ class AgentRegistrationServiceTest {
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(machineWriter);
         verify(oauthClientRepository, never()).save(any());
+        assertThat(recorded())
+                .extracting(AuditEntry::getAction, AuditEntry::getOutcome, AuditEntry::getReason,
+                        AuditEntry::getTargetId, AuditEntry::getDetails)
+                .containsExactly(DEVICE_REGISTER_FAIL, AuditOutcome.REFUSED, "Invalid initial key", MACHINE_ID,
+                        Map.of("claimedHostname", "test-hostname", "claimedOrganizationId", "org-1"));
     }
 
     @Test
@@ -365,6 +391,9 @@ class AgentRegistrationServiceTest {
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(machineWriter);
+        assertThat(recorded())
+                .extracting(AuditEntry::getAction, AuditEntry::getOutcome, AuditEntry::getReason, AuditEntry::getTargetId)
+                .containsExactly(DEVICE_AUTH_FAIL, AuditOutcome.REFUSED, "Unknown machine", MACHINE_ID);
     }
 
     @Test
@@ -699,5 +728,25 @@ class AgentRegistrationServiceTest {
         machine.setOsUuid("old-os-uuid");
         machine.setUserId("old-user");
         return machine;
+    }
+
+    @Test
+    void register_invalidInitialKey_recordsTheRefusalBeforeAnyMachineExists() {
+        doThrow(new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key"))
+                .when(agentRegistrationSecretValidator).validate(INITIAL_KEY);
+
+        assertThatThrownBy(() -> agentRegistrationService.register(INITIAL_KEY, request))
+                .isInstanceOf(AgentRegistrationSecretValidationException.class)
+                .hasMessage("Invalid initial key");
+
+        assertThat(recorded())
+                .extracting(AuditEntry::getAction, AuditEntry::getTargetId)
+                .containsExactly(DEVICE_REGISTER_FAIL, null);
+    }
+
+    private AuditEntry recorded() {
+        ArgumentCaptor<AuditEntry> entry = ArgumentCaptor.forClass(AuditEntry.class);
+        verify(auditRecorder).record(entry.capture());
+        return entry.getValue();
     }
 }

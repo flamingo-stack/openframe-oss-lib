@@ -1,5 +1,6 @@
 package com.openframe.api.service;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.force.request.ForceClientUninstallRequest;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
@@ -15,13 +16,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -40,13 +42,15 @@ class ForceClientUninstallServiceTest {
     @Mock private MachineWriter machineWriter;
     @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
     @Captor private ArgumentCaptor<ClientUninstallDeliverySeed> seedCaptor;
-    @InjectMocks private ForceClientUninstallService service;
+    private ForceClientUninstallService service;
 
     private Machine machine;
     private ForceClientUninstallRequest request;
 
     @BeforeEach
     void setUp() {
+        service = new ForceClientUninstallService(machineRepository, machineWriter, deliveryRouter,
+                mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setStatus(DeviceStatus.ONLINE);

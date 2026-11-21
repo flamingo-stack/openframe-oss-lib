@@ -23,6 +23,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
 
@@ -131,8 +133,8 @@ public class AuditedMethodRunner {
             LoadedTarget after = read(call, rereadCandidates, targetIdBeforeCall);
             Map<String, AuditChange> changes = isVersionConflict(failure)
                     ? null : changesBetween(call, compares, before, after);
-            if (record(call, context, () -> entry(call, targetIdBeforeCall, firstNonNull(after, before), changes,
-                    detailsOf(call, null), null, outcomeResolver.ofFailure(failure)).id(eventId).build())) {
+            if (record(call, context, () -> entry(call, targetIdBeforeCall, firstNonNull(after, before), before,
+                    changes, detailsOf(call, null), null, outcomeResolver.ofFailure(failure)).id(eventId).build())) {
                 RecordedFailures.add(failure);
             }
             throw failure;
@@ -157,18 +159,18 @@ public class AuditedMethodRunner {
         LoadedTarget after = read(call, rereadCandidates, targetId);
         LoadedTarget current = firstNonNull(after, before);
         Map<String, AuditChange> changes = changesBetween(call, compares, before, after);
-        if (changedNothing(changes, outcome) && !hasChildren) {
+        if (!call.recordsUnchanged() && changedNothing(changes, outcome) && !hasChildren) {
             return result;
         }
-        boolean stored = record(call, context, () -> entry(call, targetId, current, changes, details, result, outcome)
-                .id(eventId).build());
+        boolean stored = record(call, context,
+                () -> entry(call, targetId, current, before, changes, details, result, outcome).id(eventId).build());
         if (stored && readKey != null) {
             markSensitiveReadRecorded(readKey);
         }
         List<AuditAction> childActions = tryGet("child events", call,
                 () -> childActionsToRecord(call, compares, before, after, outcome));
         Objects.requireNonNullElse(childActions, List.<AuditAction>of()).forEach(action -> record(call, declared,
-                () -> entry(call.withAction(action), targetId, current, null, details, result, outcome).build()));
+                () -> entry(call.withAction(action), targetId, current, before, null, details, result, outcome).build()));
         return result;
     }
 
@@ -247,18 +249,31 @@ public class AuditedMethodRunner {
     }
 
     private static boolean sameValue(Object before, Object after) {
+        if (isEmpty(before) && isEmpty(after)) {
+            return true;
+        }
         if (before instanceof Decimal128 first && after instanceof Decimal128 second) {
             return first.compareTo(second) == 0;
         }
         if (before instanceof Map<?, ?> first && after instanceof Map<?, ?> second) {
-            return first.keySet().equals(second.keySet())
-                    && first.keySet().stream().allMatch(key -> sameValue(first.get(key), second.get(key)));
+            return Stream.of(first.keySet(), second.keySet()).flatMap(Collection::stream).distinct()
+                    .allMatch(key -> sameValue(first.get(key), second.get(key)));
         }
         if (before instanceof List<?> first && after instanceof List<?> second) {
             return first.size() == second.size()
                     && IntStream.range(0, first.size()).allMatch(index -> sameValue(first.get(index), second.get(index)));
         }
         return Objects.equals(before, after);
+    }
+
+    private static boolean isEmpty(Object value) {
+        return switch (value) {
+            case null -> true;
+            case String text -> text.isEmpty();
+            case Collection<?> items -> items.isEmpty();
+            case Map<?, ?> fields -> fields.isEmpty();
+            default -> false;
+        };
     }
 
     private static boolean changedNothing(Map<String, AuditChange> changes, ActionOutcome outcome) {
@@ -302,8 +317,8 @@ public class AuditedMethodRunner {
         }
     }
 
-    private AuditEntry.AuditEntryBuilder entry(AuditCall call, String targetId,
-                                               LoadedTarget current, Map<String, AuditChange> changes,
+    private AuditEntry.AuditEntryBuilder entry(AuditCall call, String targetId, LoadedTarget current,
+                                               LoadedTarget before, Map<String, AuditChange> changes,
                                                Map<String, Object> details, Object result, ActionOutcome outcome) {
         AuditEntry.AuditEntryBuilder entry = AuditEntry.builder()
                 .action(call.action())
@@ -315,13 +330,25 @@ public class AuditedMethodRunner {
                 .targetTenantId(current == null ? null : current.tenantId())
                 .details(CollectionUtils.isEmpty(details) ? null : details)
                 .changes(CollectionUtils.isEmpty(changes) ? null : changes);
-        return entry.targetName(fromTargetOrResult(current, LoadedTarget::name, "target name", call, call.targetNameOf(), result))
-                .organizationId(fromTargetOrResult(current, LoadedTarget::organizationId, "organization id", call, call.organizationIdOf(), result))
-                .deviceId(fromTargetOrResult(current, LoadedTarget::deviceId, "device id", call, call.deviceIdOf(), result));
+        LoadedTarget loaded = call.ownsOrganizationAndDevice() ? null : current;
+        LoadedTarget loadedBefore = call.ownsOrganizationAndDevice() ? null : before;
+        String organizationId = firstNonNull(fromTarget(loaded, LoadedTarget::organizationId, "organization id", call),
+                fromTarget(loadedBefore, LoadedTarget::organizationId, "organization id", call));
+        String deviceId = firstNonNull(fromTarget(loaded, LoadedTarget::deviceId, "device id", call),
+                fromTarget(loadedBefore, LoadedTarget::deviceId, "device id", call));
+        return entry.targetName(orFromResult(fromTarget(current, LoadedTarget::name, "target name", call),
+                        "target name", call, call.targetNameOf(), result))
+                .organizationId(orFromResult(organizationId, "organization id", call, call.organizationIdOf(), result))
+                .deviceId(orFromResult(deviceId, "device id", call, call.deviceIdOf(), result));
     }
 
-    private static String fromTargetOrResult(LoadedTarget current, Function<LoadedTarget, String> fromTarget, String what, AuditCall call, Function<Object, String> fromResult, Object result) {
-        String loaded = current == null ? null : tryGet(what, call, () -> fromTarget.apply(current));
+    private static String fromTarget(LoadedTarget target, Function<LoadedTarget, String> field, String what,
+                                     AuditCall call) {
+        return target == null ? null : tryGet(what, call, () -> field.apply(target));
+    }
+
+    private static String orFromResult(String loaded, String what, AuditCall call,
+                                       Function<Object, String> fromResult, Object result) {
         return loaded != null ? loaded : tryGet(what, call, () -> fromResult.apply(result));
     }
 

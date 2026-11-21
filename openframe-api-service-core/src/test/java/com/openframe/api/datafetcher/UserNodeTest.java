@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -25,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -75,7 +77,7 @@ class UserNodeTest {
                 .build());
 
         CountedGenericConnection<GenericEdge<UserResponse>> connection = new UserDataFetcher(
-                userService, new GraphQLUserMapper(), CODEC).users(null, "jane", 10, CursorCodec.encode("a@acme.io_u-1"));
+                userService, new GraphQLUserMapper(), CODEC, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS)).users(null, "jane", 10, CursorCodec.encode("a@acme.io_u-1"));
 
         ArgumentCaptor<CursorPaginationCriteria> pagination = ArgumentCaptor.forClass(CursorPaginationCriteria.class);
         verify(userService).queryUsers(isNull(), eq("jane"), pagination.capture());

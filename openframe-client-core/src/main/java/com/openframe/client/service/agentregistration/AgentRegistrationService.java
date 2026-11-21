@@ -1,13 +1,24 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
+import com.openframe.client.dto.agent.AgentRegistrationTagInput;
+import com.openframe.client.exception.AgentRegistrationSecretValidationException;
 import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.ToolConnectionService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.model.audit.AuditActor;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.device.ClientVersionKey;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
@@ -25,15 +36,24 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_AUTH_FAIL;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_ORGANIZATION_CHANGE;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_REGISTER;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_REGISTER_FAIL;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_REINSTALL;
 import static com.openframe.data.service.machine.AgentVersionService.OPENFRAME_CLIENT_AGENT_TYPE;
 import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION;
 import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION_KEY;
@@ -78,12 +98,23 @@ public class AgentRegistrationService {
     private final ToolConnectionService toolConnectionService;
     private final AgentRegistrationClientFeatureFlagsService agentRegistrationClientFeatureFlagsService;
     private final AgentRegistrationClientUpdateService agentRegistrationClientUpdateService;
+    private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
     private final DeletedMachineCleanup deletedMachineCleanup;
 
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
-        secretValidator.validate(initialKey);
-
+        String enrollmentKeyId = validateInitialKey(initialKey, null, request);
         String machineId = machineIdGenerator.generate();
+        Map<String, Object> details = new HashMap<>();
+        details.put("enrollmentKeyId", enrollmentKeyId);
+        details.put("claimedUserId", request.getUserId());
+        if (!CollectionUtils.isEmpty(request.getTags())) {
+            details.put("tags", request.getTags().stream().map(AgentRegistrationTagInput::getKey).toList());
+        }
+        return auditedMethodRunner.run(DEVICE_REGISTER, machineId, details, () -> registerMachine(machineId, request));
+    }
+
+    private AgentRegistrationResponse registerMachine(String machineId, AgentRegistrationRequest request) {
         String clientId = buildClientId(machineId);
         String clientSecret = agentSecretGenerator.generate();
 
@@ -154,11 +185,17 @@ public class AgentRegistrationService {
     }
 
     public AgentRegistrationResponse reinstall(String initialKey, String machineId, String clientSecret, AgentRegistrationRequest request) {
-        secretValidator.validate(initialKey);
-
-        OAuthClient client = loadOAuthClient(machineId);
+        validateInitialKey(initialKey, machineId, request);
+        OAuthClient client = loadOAuthClient(machineId, request);
         clientSecretValidator.validate(client, clientSecret);
+        AuditContext device = auditRecorder.context(AuditActor.fromAgent(machineId, List.of(AGENT_ROLE), null));
+        AuditCall call = AuditCall.of(DEVICE_REINSTALL, machineId).withRecordsUnchanged(true);
+        return auditRecorder.runInContext(device, () -> auditedMethodRunner.run(call,
+                () -> reinstallMachine(machineId, clientSecret, client, request)));
+    }
 
+    private AgentRegistrationResponse reinstallMachine(String machineId, String clientSecret, OAuthClient client,
+                                                       AgentRegistrationRequest request) {
         log.info("Reinstall for existing machine {}", machineId);
 
         Machine machine = updateMachine(machineId, request);
@@ -171,12 +208,35 @@ public class AgentRegistrationService {
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
     }
 
-    private OAuthClient loadOAuthClient(String machineId) {
+    private OAuthClient loadOAuthClient(String machineId, AgentRegistrationRequest request) {
         return oauthClientRepository.findByMachineId(machineId)
                 .orElseThrow(() -> {
                     log.warn("Reinstall requested for unknown machine {}", machineId);
+                    recordRefusal(DEVICE_AUTH_FAIL, machineId, "Unknown machine", request);
                     return new InvalidClientSecretException(CLIENT_SECRET_INVALID, "Invalid client secret");
                 });
+    }
+
+    private String validateInitialKey(String initialKey, String machineId, AgentRegistrationRequest request) {
+        try {
+            return secretValidator.validate(initialKey);
+        } catch (AgentRegistrationSecretValidationException e) {
+            recordRefusal(DEVICE_REGISTER_FAIL, machineId, e.getMessage(), request);
+            throw e;
+        }
+    }
+
+    private void recordRefusal(AuditAction action, String machineId, String reason, AgentRegistrationRequest request) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("claimedHostname", request.getHostname());
+        details.put("claimedOrganizationId", request.getOrganizationId());
+        auditRecorder.record(AuditEntry.builder()
+                .action(action)
+                .outcome(AuditOutcome.REFUSED)
+                .reason(reason)
+                .targetId(machineId)
+                .details(details)
+                .build());
     }
 
     private void postProcessMachine(Machine machine, AgentRegistrationRequest request) {
@@ -205,11 +265,15 @@ public class AgentRegistrationService {
             update.set(ORGANIZATION_ASSIGNED_AT, Instant.now());
         }
 
-        Machine machine = machineWriter.update(machineId, update)
-                .map(MachineWriteResult::after)
+        MachineWriteResult written = machineWriter.update(machineId, update)
                 .orElseThrow(() -> new IllegalStateException("Machine not found for registered client: " + machineId));
+        Machine machine = written.after();
 
         log.info("Updated machine {} on reinstall, organizationId {}", machineId, organizationId);
+        String previousOrganizationId = written.before().getOrganizationId();
+        if (!Objects.equals(previousOrganizationId, organizationId)) {
+            recordOrganizationChange(machine, previousOrganizationId);
+        }
         return machine;
     }
 
@@ -217,6 +281,19 @@ public class AgentRegistrationService {
         return machineRepository.findByMachineId(machineId)
                 .map(machine -> !Objects.equals(machine.getOrganizationId(), organizationId))
                 .orElse(false);
+    }
+
+    private void recordOrganizationChange(Machine machine, String previousOrganizationId) {
+        String organizationId = machine.getOrganizationId();
+        auditRecorder.record(AuditEntry.builder()
+                .action(DEVICE_ORGANIZATION_CHANGE)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(machine.getMachineId())
+                .targetName(machine.deviceName())
+                .organizationId(organizationId)
+                .deviceId(machine.getMachineId())
+                .changes(Map.of("organizationId", new AuditChange(previousOrganizationId, organizationId)))
+                .build());
     }
 
     private MachineUpdate registrationRequestFields(AgentRegistrationRequest request) {

@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.PackageUpdateSettingsInput;
 import com.openframe.api.dto.rmm.software.SoftwareAutoUpdateInput;
@@ -48,6 +50,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -88,14 +95,16 @@ class SoftwareBundleServiceTest {
     @Captor private ArgumentCaptor<SoftwareBundle> softwareBundleCaptor;
     @Captor private ArgumentCaptor<List<SoftwareActionResult>> softwareActionResultsCaptor;
 
+    private AuditedMethodRunner auditedMethodRunner;
     private SoftwareBundleService service;
 
     @BeforeEach
     void setUp() {
+        auditedMethodRunner = mock(AuditedMethodRunner.class, CALLS_REAL_METHODS);
         service = new SoftwareBundleService(bundleRepository, onlineDispatchRepository, softwareScheduleService,
                 softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability,
                 new SoftwarePackageSelectionResolver(softwareInventoryService), softwareInventoryService,
-                packageCatalogVersions);
+                packageCatalogVersions, auditedMethodRunner);
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(1));
         ReflectionTestUtils.setField(service, "scheduleReconnectWindowSeconds", RECONNECT_WINDOW);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -143,6 +152,8 @@ class SoftwareBundleServiceTest {
                 .thenReturn(Optional.empty());
 
         SoftwareBundleResponse res = service.submit(submitInput(brewPkg("slack"), brewPkg("chrome")), USER);
+
+        assertThat(submitCall().action()).isEqualTo(SOFTWARE_INSTALL);
 
         verify(onlineDispatchRepository, times(2)).save(any());
         ArgumentCaptor<SoftwareBundle> saved = ArgumentCaptor.forClass(SoftwareBundle.class);
@@ -262,6 +273,7 @@ class SoftwareBundleServiceTest {
 
         SoftwareBundleResponse res = service.submit(input, USER);
 
+        assertThat(submitCall().action()).isEqualTo(SOFTWARE_UPDATE);
         ArgumentCaptor<SoftwareBundle> saved = ArgumentCaptor.forClass(SoftwareBundle.class);
         verify(bundleRepository).save(saved.capture());
         assertThat(saved.getValue().getUpdateSettings()).satisfies(s -> {
@@ -310,8 +322,12 @@ class SoftwareBundleServiceTest {
         input.setUpdateSettings(settings);
         input.setAutoUpdate(autoUpdate);
 
-        service.submit(input, USER);
+        SoftwareBundleResponse response = service.submit(input, USER);
 
+        assertThat(submitCall())
+                .returns(SOFTWARE_SCHEDULE_CREATE, AuditCall::action)
+                .returns(true, AuditCall::targetIdInResult)
+                .returns("s1", call -> call.targetIdFromResult().apply(response));
         ArgumentCaptor<CreateSoftwareScheduleInput> created = ArgumentCaptor.forClass(CreateSoftwareScheduleInput.class);
         verify(softwareScheduleService).create(created.capture(), eq(USER));
         assertThat(created.getValue().getUpdateSettings()).isSameAs(settings);
@@ -484,7 +500,7 @@ class SoftwareBundleServiceTest {
                 .thenReturn(java.util.Map.of("m1", OsType.WINDOWS, "m2", OsType.WINDOWS));
         SoftwareResponse chrome = SoftwareResponse.builder().id("title-7").name("Chrome").build();
         when(softwareInventoryService.turnOnAutoUpdate("title-7", List.of("m1", "m2"), AUTO_UPDATE_SETTINGS, USER))
-                .thenReturn(chrome);
+                .thenReturn(new SoftwareInventoryService.AutoUpdateTurnedOn(chrome, List.of("m1", "m2"), List.of()));
 
         SoftwareResponse result = service.turnOnAutoUpdate(turnOnInput(), USER);
 
@@ -599,6 +615,12 @@ class SoftwareBundleServiceTest {
         input.setDeadlineSeconds(deadlineSeconds);
         input.setCountdownSeconds(countdownSeconds);
         return input;
+    }
+
+    private AuditCall submitCall() {
+        ArgumentCaptor<AuditCall> call = ArgumentCaptor.forClass(AuditCall.class);
+        verify(auditedMethodRunner).run(call.capture(), any());
+        return call.getValue();
     }
 
     private static SubmitSoftwareBundleInput submitInput(SoftwarePackageInput... packages) {

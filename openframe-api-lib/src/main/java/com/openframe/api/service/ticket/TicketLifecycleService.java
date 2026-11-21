@@ -1,8 +1,6 @@
 package com.openframe.api.service.ticket;
 
 import com.github.pravin.raha.lexorank4j.LexoRank;
-import com.openframe.core.exception.ValidationException;
-import com.openframe.core.exception.ConflictException;
 import com.openframe.api.dto.ticket.ReorderTicketInput;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.TransitionTicketInput;
@@ -10,13 +8,21 @@ import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
 import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.InternalException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.core.exception.ValidationException;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -31,12 +37,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.openframe.api.service.ticket.TicketTransitionPolicyValidator.MANUALLY_CREATABLE_KINDS;
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
+import static com.openframe.data.document.audit.AuditAction.TICKET_ARCHIVE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CHANGE;
 import static com.openframe.data.document.ticket.TicketStatusKind.AI_ASSISTANCE;
 import static com.openframe.data.document.ticket.TicketStatusKind.RESOLVED;
 import static org.springframework.util.StringUtils.hasText;
@@ -63,6 +73,8 @@ public class TicketLifecycleService {
     private final TicketResolverStamp ticketResolverStamp;
     private final TicketStatusHistoryService historyService;
     private final List<TicketEventListener> listeners;
+    private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
 
     @Transactional
     public Ticket transition(AuthPrincipal principal, @Valid TransitionTicketInput input) {
@@ -75,6 +87,15 @@ public class TicketLifecycleService {
      * {@code this} (the proxy would be bypassed and its settings silently ignored).
      */
     private Ticket doTransition(AuthPrincipal principal, TransitionTicketInput input, TransitionSource source) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("toStatusId", input.getToStatusId());
+        details.put("reason", input.getReason());
+        details.put("reopenReason", input.getReopenReason());
+        return auditedMethodRunner.run(TICKET_STATUS_CHANGE, input.getTicketId(), details,
+                () -> transitionTicket(principal, input, source));
+    }
+
+    private Ticket transitionTicket(AuthPrincipal principal, TransitionTicketInput input, TransitionSource source) {
         TransitionContext context = loadContext(input.getTicketId());
         Ticket ticket = context.ticket();
         TicketStatusDefinition target = transitionPolicy.validateAndResolve(ticket, input.getToStatusId());
@@ -214,6 +235,18 @@ public class TicketLifecycleService {
 
     @Transactional
     public List<String> archiveResolvedTickets(AuthPrincipal principal, TicketFilterInput filterInput) {
+        AuditCall call = AuditCall.of(TICKET_ARCHIVE, null)
+                .withCompare(false)
+                .withRecordsResult(archived -> !((List<?>) archived).isEmpty())
+                .withDetailsFromResult(TicketLifecycleService::archiveDetails);
+        return auditedMethodRunner.run(call, () -> archiveResolved(principal, filterInput));
+    }
+
+    private static Map<String, Object> archiveDetails(Object archivedIds) {
+        return archivedIds == null ? Map.of() : Map.of("ticketIds", archivedIds);
+    }
+
+    private List<String> archiveResolved(AuthPrincipal principal, TicketFilterInput filterInput) {
         TicketStatusDefinition resolved = requireByKind(TicketStatusKind.RESOLVED);
         TicketStatusDefinition archived = requireByKind(TicketStatusKind.ARCHIVED);
 
@@ -222,13 +255,32 @@ public class TicketLifecycleService {
         List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filterInput);
 
         Query idsQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
-        List<String> resolvedIds = ticketRepository.findTicketsWithCursor(idsQuery, null, 0, "order", "ASC")
-                .stream().map(Ticket::getId).toList();
+        List<Ticket> resolvedTickets = ticketRepository.findTicketsWithCursor(idsQuery, null, 0, "order", "ASC");
 
         Query updateQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
         ticketRepository.reassignTicketsToStatus(updateQuery, archived.getId(), archived.getKind());
-        log.info("Archived {} resolved tickets (lifecycle)", resolvedIds.size());
-        return resolvedIds;
+        log.info("Archived {} resolved tickets (lifecycle)", resolvedTickets.size());
+        auditRecorder.recordAllWithTargetFields(resolvedTickets.stream()
+                .map(ticket -> archivedEntry(ticket, archived))
+                .toList());
+        return resolvedTickets.stream().map(Ticket::getId).toList();
+    }
+
+    private static AuditEntry archivedEntry(Ticket ticket, TicketStatusDefinition archived) {
+        return AuditEntry.builder()
+                .action(TICKET_ARCHIVE)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(ticket.getId())
+                .targetName(ticket.getTitle())
+                .organizationId(ticket.getOrganizationId())
+                .deviceId(ticket.getDeviceId())
+                .changes(Map.of("statusId", new AuditChange(ticket.getStatusId(), archived.getId()),
+                        "statusKind", new AuditChange(kindName(ticket.getStatusKind()), kindName(archived.getKind()))))
+                .build();
+    }
+
+    private static String kindName(TicketStatusKind kind) {
+        return kind == null ? null : kind.name();
     }
 
     @Transactional

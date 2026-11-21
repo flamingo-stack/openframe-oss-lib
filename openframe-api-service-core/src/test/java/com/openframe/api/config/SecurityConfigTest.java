@@ -1,5 +1,7 @@
 package com.openframe.api.config;
 
+import org.mockito.Answers;
+import com.openframe.audit.AuditedMethodRunner;
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWEAlgorithm;
@@ -64,6 +66,9 @@ class SecurityConfigTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean(answers = Answers.CALLS_REAL_METHODS)
+    private AuditedMethodRunner auditedMethodRunner;
 
     @Autowired
     private MockMvc mockMvc;

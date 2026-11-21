@@ -17,6 +17,8 @@ import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
@@ -93,6 +95,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_AUTO_UPDATE_DISABLE;
 import static org.apache.commons.lang3.StringUtils.containsIgnoreCase;
 import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
@@ -134,6 +137,7 @@ public class SoftwareInventoryService {
     private final SoftwareAdoptionService softwareAdoptionService;
     private final PackageManagerAvailability packageManagerAvailability;
     private final PackageAdoptReach packageAdoptReach;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -255,29 +259,51 @@ public class SoftwareInventoryService {
                 .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
     }
 
-    public SoftwareResponse turnOnAutoUpdate(String softwareId, List<String> machineIds, PackageUpdateSettings settings,
-                                             String actor) {
+    public AutoUpdateTurnedOn turnOnAutoUpdate(String softwareId, List<String> machineIds,
+                                               PackageUpdateSettings settings, String actor) {
         SoftwareResponse software = getManagedSoftware(softwareId);
         PackageCatalogEntry managingPackage = software.getManagingPackage();
-        autoUpdateService.turnOn(softwareId, managingPackage, machineIds, settings, actor);
+        SoftwareAutoUpdateService.TurnedOn devices =
+                autoUpdateService.turnOn(softwareId, managingPackage, machineIds, settings, actor);
         List<SoftwareResponse> rows = List.of(software);
         applyStatuses(rows);
-        return software;
+        return new AutoUpdateTurnedOn(software, devices.added(), devices.removed());
+    }
+
+    public record AutoUpdateTurnedOn(SoftwareResponse software, List<String> added, List<String> removed) {
     }
 
     // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there
     // while a policy already names it: the policy is enough to turn off, and nothing is written for an unknown id.
     public SoftwareResponse turnOffAutoUpdate(String softwareId, String actor) {
+        AuditCall call = AuditCall.of(SOFTWARE_AUTO_UPDATE_DISABLE, softwareId)
+                .withCompare(false)
+                .withTargetNameOf(SoftwareInventoryService::nameOf)
+                .withDetailsFromResult(result -> result instanceof TurnedOff turnedOff
+                        ? Map.of("machineIds", turnedOff.machineIds(), "removed", turnedOff.machineIds()) : Map.of())
+                .withRecordsResult(result -> result instanceof TurnedOff turnedOff
+                        && !turnedOff.machineIds().isEmpty());
+        return auditedMethodRunner.run(call, () -> disableAutoUpdate(softwareId, actor)).software();
+    }
+
+    private record TurnedOff(SoftwareResponse software, List<String> machineIds) {
+    }
+
+    private static String nameOf(Object result) {
+        return result instanceof TurnedOff turnedOff ? turnedOff.software().getName() : null;
+    }
+
+    private TurnedOff disableAutoUpdate(String softwareId, String actor) {
         Optional<SoftwareResponse> title = findById(softwareId);
         boolean inFleet = title.isPresent();
         if (!isKnown(softwareId, inFleet)) {
             throw new NotFoundException("Software not found: " + softwareId);
         }
-        autoUpdateService.turnOff(softwareId, actor);
+        List<String> machineIds = autoUpdateService.turnOff(softwareId, actor);
         SoftwareResponse software = title.orElseGet(() -> autoUpdateService.titleFromPolicies(softwareId));
         List<SoftwareResponse> rows = List.of(software);
         applyStatuses(rows);
-        return software;
+        return new TurnedOff(software, machineIds);
     }
 
     private boolean isKnown(String softwareId, boolean inFleet) {
