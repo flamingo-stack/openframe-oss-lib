@@ -152,7 +152,9 @@ public class SoftwareBundleService {
         }
         Map<String, Object> details = new HashMap<>();
         details.put("bundleIds", List.of(input.getId()));
-        details.put("softwareAction", input.getAction());
+        if (input.getSchedule() != null) {
+            details.put("softwareAction", input.getAction());
+        }
         List<String> machineIds = currentMachineIds(entity);
         details.put("machineIds", machineIds);
         details.put("packages", input.getPackages().stream()
@@ -164,10 +166,19 @@ public class SoftwareBundleService {
                 () -> doSubmit(entity, input, actor, details));
     }
 
-    private static List<SoftwareBundlePackage> withTargetDevice(List<SoftwareBundlePackage> packages,
-                                                                Map<String, OsType> deviceOsTypes) {
+    private List<SoftwareBundlePackage> withTargetDevice(List<SoftwareBundlePackage> packages,
+                                                         Map<String, OsType> deviceOsTypes) {
         return packages.stream()
-                .filter(bundlePackage -> deviceOsTypes.containsValue(osTypeOf(bundlePackage.getPackageManager())))
+                .filter(bundlePackage -> !packageManagerAvailability.supporting(
+                        devicesWithOs(deviceOsTypes, osTypeOf(bundlePackage.getPackageManager())),
+                        bundlePackage.getPackageManager()).isEmpty())
+                .toList();
+    }
+
+    private static List<String> devicesWithOs(Map<String, OsType> deviceOsTypes, OsType osType) {
+        return deviceOsTypes.entrySet().stream()
+                .filter(device -> device.getValue() == osType)
+                .map(Map.Entry::getKey)
                 .toList();
     }
 
