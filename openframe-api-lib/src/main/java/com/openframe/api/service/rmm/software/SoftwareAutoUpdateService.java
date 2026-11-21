@@ -112,14 +112,19 @@ public class SoftwareAutoUpdateService {
     public record TurnedOn(List<String> added, List<String> removed) {
     }
 
-    public long turnOff(String softwareId, String actor) {
+    public List<String> turnOff(String softwareId, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
+        List<String> machineIds = policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, List.of(softwareId)).stream()
+                .filter(PackageAutoUpdatePolicy::isEnabled)
+                .map(PackageAutoUpdatePolicy::getMachineId)
+                .distinct()
+                .toList();
         long turnedOff = policyRepository.disableBySoftwareId(tenantId, softwareId, actor);
         // read after the update: from here on a failed device schedules no retry, so none can slip past this
         policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, List.of(softwareId))
                 .forEach(this::withdrawTurnedOff);
         log.info("Auto-update turned off softwareId={} policies={} actor={}", softwareId, turnedOff, actor);
-        return turnedOff;
+        return machineIds;
     }
 
     public boolean hasPolicy(String softwareId) {

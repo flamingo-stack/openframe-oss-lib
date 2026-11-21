@@ -279,11 +279,13 @@ public class SoftwareInventoryService {
         AuditCall call = AuditCall.of(SOFTWARE_AUTO_UPDATE_DISABLE, softwareId)
                 .withCompare(false)
                 .withTargetNameOf(SoftwareInventoryService::nameOf)
-                .withRecordsResult(result -> ((TurnedOff) result).policies() > 0);
+                .withDetailsFromResult(result -> result instanceof TurnedOff turnedOff
+                        ? Map.of("machineIds", turnedOff.machineIds()) : Map.of())
+                .withRecordsResult(result -> !((TurnedOff) result).machineIds().isEmpty());
         return auditedMethodRunner.run(call, () -> disableAutoUpdate(softwareId, actor)).software();
     }
 
-    private record TurnedOff(SoftwareResponse software, long policies) {
+    private record TurnedOff(SoftwareResponse software, List<String> machineIds) {
     }
 
     private static String nameOf(Object result) {
@@ -296,11 +298,11 @@ public class SoftwareInventoryService {
         if (!isKnown(softwareId, inFleet)) {
             throw new NotFoundException("Software not found: " + softwareId);
         }
-        long policies = autoUpdateService.turnOff(softwareId, actor);
+        List<String> machineIds = autoUpdateService.turnOff(softwareId, actor);
         SoftwareResponse software = title.orElseGet(() -> autoUpdateService.titleFromPolicies(softwareId));
         List<SoftwareResponse> rows = List.of(software);
         applyStatuses(rows);
-        return new TurnedOff(software, policies);
+        return new TurnedOff(software, machineIds);
     }
 
     private boolean isKnown(String softwareId, boolean inFleet) {
