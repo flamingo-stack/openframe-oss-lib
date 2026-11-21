@@ -82,9 +82,13 @@ public class SoftwareScheduleDataFetcher {
     @Audited(action = SOFTWARE_SCHEDULE_CREATE, targetId = "rawId(#result.id)", targetName = "#input.name",
             details = {"machineIds=rawId(#input.machineIds)", "softwareAction=#input.action",
                     "packages=#input.packages.![packageName ?: softwareId]",
-                    "updateMode=#result.updateSettings?.mode", "deadlineSeconds=#result.updateSettings?.deadlineSeconds",
-                    "countdownSeconds=#result.updateSettings?.countdownSeconds",
-                    "autoUpdate=#result.autoUpdate?.enabled == true ? true : null"})
+                    "updateMode=(#result == null ? #input.updateSettings : #result.updateSettings)?.mode",
+                    "deadlineSeconds=(#result == null ? #input.updateSettings : #result.updateSettings)"
+                            + "?.deadlineSeconds",
+                    "countdownSeconds=(#result == null ? #input.updateSettings : #result.updateSettings)"
+                            + "?.countdownSeconds",
+                    "autoUpdate=(#result == null ? #input.autoUpdate : #result.autoUpdate)?.enabled == true"
+                            + " ? true : null"})
     public SoftwareScheduleResponse createSoftwareSchedule(@InputArgument @Valid CreateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         List<String> machineGlobalIds = input.getMachineIds();
@@ -100,7 +104,11 @@ public class SoftwareScheduleDataFetcher {
                     "repeat=#result == null ? #input.repeat : null",
                     "softwareAction=#result == null ? #input.action : null",
                     "packages=#result == null ? #input.packages?.![packageName ?: softwareId] : null",
-                    "machineIds=#result == null ? #input.machineIds : null"})
+                    "machineIds=#result == null ? #input.machineIds : null",
+                    "updateMode=#result == null ? #input.updateSettings?.mode : null",
+                    "deadlineSeconds=#result == null ? #input.updateSettings?.deadlineSeconds : null",
+                    "countdownSeconds=#result == null ? #input.updateSettings?.countdownSeconds : null",
+                    "autoUpdate=#result == null && #input.autoUpdate?.enabled == true ? true : null"})
     public SoftwareScheduleResponse updateSoftwareSchedule(@InputArgument @Valid UpdateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         String scheduleGlobalId = input.getId();
