@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Timeout(10)
+@org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
 class HubspotApiEmailServiceTest {
 
     private static final String TO = "ada@acme.com";
@@ -56,6 +57,15 @@ class HubspotApiEmailServiceTest {
 
         assertThat(requests).containsExactly(new HubspotRequest("POST", "/marketing/v4/email/single-send",
                 "Bearer hs-token", "application/json", downloadLinkPayload()));
+    }
+
+    @Test
+    void send_hubspotAccepts_logsSentWithoutRecipientAddress(org.springframework.boot.test.system.CapturedOutput output) {
+        hubspotAnswers(200, ACCEPTED);
+
+        send(service -> service.sendDownloadLinkEmail(TO, DOWNLOAD_ID));
+
+        assertThat(output).contains("[HubSpot API]", "email sent").doesNotContain(TO);
     }
 
     @Test
