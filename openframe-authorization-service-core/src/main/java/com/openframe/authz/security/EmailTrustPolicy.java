@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.DIRECTORY_ID_CLAIM;
 import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
 
 /**
@@ -28,7 +27,7 @@ public class EmailTrustPolicy {
 
     public boolean emailTrustedForRouting(String provider, Map<String, Object> claims) {
         if (MICROSOFT.equals(provider)) {
-            if (microsoftProps.getPersonalAccountsTenantId().equals(claims.get(DIRECTORY_ID_CLAIM))) {
+            if (microsoftProps.getPersonalAccountsTenantId().equals(claims.get("tid"))) {
                 return true;
             }
             Object edov = claims.get("xms_edov");

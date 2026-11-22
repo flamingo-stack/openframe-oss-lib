@@ -4,7 +4,6 @@ import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
-import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import com.openframe.data.document.user.UserRole;
@@ -23,7 +22,6 @@ import java.util.Optional;
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static com.openframe.authz.support.SsoTestFixtures.authentication;
 import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
-import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -99,28 +97,6 @@ class SsoOidcUserServiceTest {
         provisionDuringLogin("google", newcomer);
 
         verify(userService, never()).registerOrReactivateFromSso(any(), any(), any(), any(), anyList(), any());
-    }
-
-    @Test
-    void provisionsTheFirstCompanyAccountWhenTheProviderAllowsTheDomain() {
-        when(ssoConfigService.getSSOConfig(TENANT, "google"))
-                .thenReturn(Optional.of(tenantApp(true, true, List.of("acme.com"))));
-        when(userService.findActiveByEmailAndTenant("new@acme.com", TENANT)).thenReturn(Optional.empty());
-        when(userService.registerOrReactivateFromSso(TENANT, "New@Acme.com", "New", "Person", List.of(UserRole.ADMIN), "google"))
-                .thenReturn(created);
-
-        assertThat(service.provisionCompanyAccount(TENANT, "google", newcomer)).isSameAs(created);
-        verify(registrationProcessor).postProcessAutoProvision(created, null);
-    }
-
-    @Test
-    void refusesCompanyProvisioningOutsideTheConfiguredDomain() {
-        when(ssoConfigService.getSSOConfig(TENANT, "google"))
-                .thenReturn(Optional.of(tenantApp(true, true, List.of("other.com"))));
-
-        assertThatThrownBy(() -> service.provisionCompanyAccount(TENANT, "google", newcomer))
-                .isInstanceOfSatisfying(AuthFlowException.class, failure -> assertThat(failure.getCode()).isEqualTo(SSO_SESSION_INVALID));
-        verifyNoInteractions(userService, registrationProcessor);
     }
 
     @Test

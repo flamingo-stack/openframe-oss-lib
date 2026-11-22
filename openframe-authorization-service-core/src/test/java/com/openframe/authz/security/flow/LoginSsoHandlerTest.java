@@ -1,17 +1,12 @@
 package com.openframe.authz.security.flow;
 
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
-import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.Visit;
 import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
-import com.openframe.authz.service.sso.CompanySsoLoginService;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SsoIdentityService;
@@ -25,7 +20,6 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.auth.SsoIdentity;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import com.openframe.data.document.tenant.TenantStatus;
-import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,17 +27,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -53,7 +41,6 @@ import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static com.openframe.authz.support.SsoTestFixtures.authentication;
 import static com.openframe.authz.support.SsoTestFixtures.cookieCodec;
 import static com.openframe.authz.support.SsoTestFixtures.inTenMinutes;
-import static com.openframe.authz.support.SsoTestFixtures.objectMapper;
 import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
 import static com.openframe.authz.support.SsoTestFixtures.tenant;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,7 +51,6 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -90,12 +76,6 @@ class LoginSsoHandlerTest {
     private TenantService tenantService;
     @Mock
     private SSOConfigService ssoConfigService;
-    @Mock
-    private RedisTemplate<String, String> redisTemplate;
-    @Mock
-    private ValueOperations<String, String> companySelections;
-    @Mock
-    private OpenframeRedisKeyBuilder keyBuilder;
 
     private final SsoCookieCodec codec = cookieCodec();
     private LoginSsoHandler handler;
@@ -116,7 +96,6 @@ class LoginSsoHandlerTest {
 
     @AfterEach
     void tearDown() {
-        TenantContext.clear();
         unbind();
     }
 
@@ -133,57 +112,6 @@ class LoginSsoHandlerTest {
 
     private MockHttpServletRequest request() {
         return request(null, false);
-    }
-
-    @Test
-    void shouldAuditCompanyLoginAfterBindingTheWorkspaceAccount() throws Exception {
-        MockHttpServletRequest request = companyLoginCallbackRequest();
-        OAuth2AuthenticationToken authentication = authentication("google", trustedGoogle);
-        Logger logger = (Logger) LoggerFactory.getLogger(LoginSsoHandler.class);
-        ListAppender<ILoggingEvent> events = new ListAppender<>();
-        doAnswer(invocation -> {
-            assertThat(events.list).noneMatch(event -> event.getFormattedMessage().startsWith("Login success"));
-            return null;
-        }).when(sessionPrincipalBinder).bind(authentication, existing, request, response);
-
-        events.start();
-        logger.addAppender(events);
-        try {
-            handler.handle(request, response, authentication);
-            assertSuccessfulCompanyLogin(events.list);
-        } finally {
-            logger.detachAppender(events);
-            events.stop();
-        }
-    }
-
-    private MockHttpServletRequest companyLoginCallbackRequest() {
-        String handle = "00000000-0000-0000-0000-000000000001";
-        when(redisTemplate.opsForValue()).thenReturn(companySelections);
-        when(keyBuilder.globalKey("sso:company-login:" + handle)).thenReturn("selection-key");
-        when(companySelections.getAndDelete("selection-key"))
-                .thenReturn("""
-                        {"tenantId":"tenant-1","providers":["google"]}
-                        """);
-        when(ssoConfigService.getSSOConfig(TENANT, "google")).thenReturn(Optional.of(new SSOPerTenantConfig()));
-        when(userService.findActiveByEmailAndTenant("ada@acme.com", TENANT)).thenReturn(Optional.of(existing));
-
-        MockHttpServletRequest request = request();
-        request.setRemoteAddr("192.0.2.5");
-        request.addHeader(HttpHeaders.USER_AGENT, "Browser audit fixture");
-        request.setCookies(new Cookie(SsoFlowCookieNames.OF_SSO_LOGIN, codec.encodeLogin(
-                new SsoLoginCookiePayload("company-state", "google", null, false, 1L, inTenMinutes(), true))));
-        CompanySsoLoginService companyLogin = new CompanySsoLoginService(
-                redisTemplate, keyBuilder, objectMapper(), tenantService, ssoConfigService);
-        companyLogin.start(handle, "google", "company-state", request);
-        TenantContext.setTenantId(TENANT);
-        return request;
-    }
-
-    private void assertSuccessfulCompanyLogin(List<ILoggingEvent> events) {
-        assertThat(response.getRedirectedUrl()).isEqualTo("https://auth.example.com/oauth/continue?tenantId=tenant-1");
-        assertThat(events).extracting(ILoggingEvent::getFormattedMessage)
-                .contains("Login success email=ada@acme.com tenantId=tenant-1 provider=google ip=192.0.2.5 ua=Browser audit fixture");
     }
 
     @Test

@@ -310,7 +310,7 @@ public class UserService {
         if (userId == null || userId.isBlank()) {
             return;
         }
-        userRepository.findPrimaryById(userId).ifPresent(user -> {
+        userRepository.findById(userId).ifPresent(user -> {
             if (user.isEmailVerified()) {
                 return;
             }

@@ -5,7 +5,6 @@ public final class SsoRegistrationConstants {
     }
 
     public static final String ONBOARDING_TENANT_ID = "sso-onboarding";
-    public static final String PROVIDER_AUTHORIZATION_PATH_PREFIX = "/oauth2/authorization/";
 
     /**
      * HTTP-session attribute stamped with the invitation id when an SSO invite is deferred to the
@@ -20,6 +19,6 @@ public final class SsoRegistrationConstants {
 
     /** Spring's OAuth2 authorization-start path for a provider, in the given tenant's context. */
     public static String providerAuthorizationPath(String provider, String tenantId) {
-        return PROVIDER_AUTHORIZATION_PATH_PREFIX + provider + "?tenant=" + tenantId;
+        return "/oauth2/authorization/" + provider + "?tenant=" + tenantId;
     }
 }

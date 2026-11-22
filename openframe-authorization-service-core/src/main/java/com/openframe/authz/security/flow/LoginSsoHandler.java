@@ -2,12 +2,10 @@ package com.openframe.authz.security.flow;
 
 import com.openframe.core.constants.SsoFlowCookieNames;
 
-import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
-import com.openframe.authz.service.sso.CompanySsoLoginService;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SsoIdentityService;
@@ -16,18 +14,15 @@ import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.util.SsoAuthentication;
-import com.openframe.authz.web.ClientIp;
 import com.openframe.authz.web.DownloadCookieReader;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
-import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
@@ -35,8 +30,6 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.Optional;
 
-import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.DIRECTORY_ID_CLAIM;
-import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
@@ -100,16 +93,12 @@ public class LoginSsoHandler implements SsoFlowHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
         Cookie cookie = requireCookie(request);
+        OidcUser user = requireOidcUser(authentication);
+        String email = requireEmail(user);
+
         SsoLoginCookiePayload payload = ssoCookieCodec.decodeLogin(cookie.getValue())
                 .orElseThrow(() -> new AuthFlowException(SSO_SESSION_INVALID, "SSO session is invalid. Please try again."));
 
-        if (Boolean.TRUE.equals(payload.companySso())) {
-            handleCompanyLogin(request, response, authentication, cookie, payload);
-            return;
-        }
-
-        OidcUser user = requireOidcUser(authentication);
-        String email = requireEmail(user);
         String provider = registrationId(authentication, payload);
 
         // Link-first: a previously bound subject outranks the email claim entirely — it cannot be
@@ -156,70 +145,6 @@ public class LoginSsoHandler implements SsoFlowHandler {
         sessionPrincipalBinder.bind(authentication, authUser, request, response);
 
         clearFlowCookieAndRedirect(response, cookie, tenantId, payload.redirectTo(), payload.authMobile());
-    }
-
-    private void handleCompanyLogin(HttpServletRequest request, HttpServletResponse response,
-                                    Authentication authentication, Cookie cookie, SsoLoginCookiePayload payload) throws IOException {
-        try {
-            finishCompanyLogin(request, response, authentication, cookie, payload);
-        } catch (Exception failure) {
-            CompanySsoLoginService.clearSession(request);
-            throw failure;
-        }
-    }
-
-    private void finishCompanyLogin(HttpServletRequest request, HttpServletResponse response,
-                                    Authentication authentication, Cookie cookie, SsoLoginCookiePayload payload) throws IOException {
-        OidcUser user = requireOidcUser(authentication);
-        String email = requireEmail(user);
-        CompanySsoLoginService.Flow flow = CompanySsoLoginService.takeFlow(request);
-        String provider = SsoAuthentication.registrationId(authentication);
-        String tenantId = flow.getTenantId();
-        if (!flow.getState().equals(payload.s()) || !flow.getProvider().equals(provider)
-                || !tenantId.equals(TenantContext.getTenantId())) {
-            throw invalidCompanyLogin();
-        }
-        tenantService.refuseLoginUnlessActive(tenantId);
-        SSOPerTenantConfig config = ssoConfigService.getSSOConfig(tenantId, provider)
-                .orElseThrow(LoginSsoHandler::invalidCompanyLogin);
-        String microsoftDirectory = config.getMsTenantId();
-        boolean directoryBound = MICROSOFT.equals(provider) && hasText(microsoftDirectory);
-        if (directoryBound && !microsoftDirectory.equalsIgnoreCase(user.getClaimAsString(DIRECTORY_ID_CLAIM))) {
-            throw invalidCompanyLogin();
-        }
-
-        AuthUser account = ssoIdentityService.findLink(provider, user.getClaims())
-                .map(link -> userService.findActiveById(link.getUserId())
-                        .filter(linked -> tenantId.equals(linked.getTenantId()))
-                        .orElseThrow(LoginSsoHandler::invalidCompanyLogin))
-                .orElseGet(() -> findOrProvisionCompanyAccount(tenantId, provider, user, email, directoryBound));
-
-        ssoIdentityService.link(provider, user.getClaims(), account);
-        userService.recordSsoLogin(account);
-        if (email.equalsIgnoreCase(account.getEmail()) && OidcUserUtils.emailVerifiedClaimAllows(user)) {
-            userService.markEmailVerified(account.getId());
-        }
-        sessionPrincipalBinder.bind(authentication, account, request, response);
-        log.info("Login success email={} tenantId={} provider={} ip={} ua={}", account.getEmail(), tenantId, provider,
-                ClientIp.of(request), request.getHeader(HttpHeaders.USER_AGENT));
-        clearFlowCookieAndRedirect(response, cookie, tenantId, payload.redirectTo(), payload.authMobile());
-    }
-
-    /**
-     * Trusts the company's Microsoft directory to identify its users.
-     * Other sign-ins require an email address the provider can vouch for.
-     */
-    private AuthUser findOrProvisionCompanyAccount(String tenantId, String provider, OidcUser user, String email,
-                                                    boolean directoryBound) {
-        if (!directoryBound) {
-            requireEmailTrustedForRouting(provider, user);
-        }
-        return userService.findActiveByEmailAndTenant(email, tenantId)
-                .orElseGet(() -> ssoOidcUserService.provisionCompanyAccount(tenantId, provider, user));
-    }
-
-    private static AuthFlowException invalidCompanyLogin() {
-        return new AuthFlowException(SSO_SESSION_INVALID, SSO_SESSION_INVALID.getMessage());
     }
 
     private String registrationId(Authentication authentication, SsoLoginCookiePayload payload) {

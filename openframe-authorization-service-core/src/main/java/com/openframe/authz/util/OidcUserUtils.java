@@ -4,8 +4,6 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import java.util.Map;
 
-import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.DIRECTORY_ID_CLAIM;
-
 public final class OidcUserUtils {
 
     private OidcUserUtils() {
@@ -34,7 +32,7 @@ public final class OidcUserUtils {
     public static String describeEmailTrustSignals(Map<String, Object> claims) {
         Object edov = claims.get("xms_edov");
         Object verified = claims.get("email_verified");
-        return "tid=" + claims.get(DIRECTORY_ID_CLAIM)
+        return "tid=" + claims.get("tid")
                 + " xms_edov=" + (edov == null ? "absent" : edov)
                 + " email_verified=" + (verified == null ? "absent" : verified);
     }

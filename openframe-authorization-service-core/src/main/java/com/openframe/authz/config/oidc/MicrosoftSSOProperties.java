@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 public class MicrosoftSSOProperties extends AbstractOidcProviderProperties {
 
     public static final String MICROSOFT = "microsoft";
-    public static final String DIRECTORY_ID_CLAIM = "tid";
 
     @Override
     public String providerId() {

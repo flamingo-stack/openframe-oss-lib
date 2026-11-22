@@ -18,11 +18,6 @@ public interface RedirectTargetResolver {
      */
     Mono<String> resolve(String tenantId, String userId, String requestedRedirectTo, ServerHttpRequest request);
 
-    default Mono<String> resolveAfterTokenExchange(String tenantId, String userId, String requestedRedirectTo,
-                                                   ServerHttpRequest request, String issuedAccessToken) {
-        return resolve(tenantId, userId, requestedRedirectTo, request);
-    }
-
     /**
      * Whether the URI is on the deployment's exact redirect allow-list (native-app callback URIs).
      * Used by hops that hand a sensitive handle (signup ticket) to a client-supplied target — the
