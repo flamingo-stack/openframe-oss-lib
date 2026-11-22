@@ -181,6 +181,16 @@ class ThrottlingAuthenticationManagerTest {
     }
 
     @Test
+    void tenthWrongPassword_startsTheBlockWindowOnce() {
+        failTimes(EMAIL, 9);
+        assertThat(counters.restarts.get()).isZero();
+
+        fail(EMAIL);
+
+        assertThat(counters.restarts.get()).isEqualTo(1);
+    }
+
+    @Test
     void blocked_attemptsDoNotExtendTheBlock() {
         failTimes(EMAIL, 10);
         int restartsBefore = counters.restarts.get();

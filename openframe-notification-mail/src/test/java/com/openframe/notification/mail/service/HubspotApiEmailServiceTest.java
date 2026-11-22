@@ -6,7 +6,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -22,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Timeout(10)
-@org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+@ExtendWith(OutputCaptureExtension.class)
 class HubspotApiEmailServiceTest {
 
     private static final String TO = "ada@acme.com";
@@ -60,7 +63,7 @@ class HubspotApiEmailServiceTest {
     }
 
     @Test
-    void send_hubspotAccepts_logsSentWithoutRecipientAddress(org.springframework.boot.test.system.CapturedOutput output) {
+    void send_hubspotAccepts_logsSentWithoutRecipientAddress(CapturedOutput output) {
         hubspotAnswers(200, ACCEPTED);
 
         send(service -> service.sendDownloadLinkEmail(TO, DOWNLOAD_ID));
