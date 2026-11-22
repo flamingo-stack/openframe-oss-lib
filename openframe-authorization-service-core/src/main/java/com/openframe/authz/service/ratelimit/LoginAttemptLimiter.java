@@ -55,10 +55,14 @@ public class LoginAttemptLimiter {
     /** Keeps the attempt; the one that reached a limit starts the block. */
     public void onBadPassword(Attempt attempt) {
         if (attempt.accountCount() == maxAccountAttempts) {
-            block(accountKey(attempt.tenantId(), attempt.email()), "account", attempt);
+            rateLimiter.restartWindow(accountKey(attempt.tenantId(), attempt.email()), window);
+            log.warn("event=password_login_blocked scope=account account={} tenantId={} ip={} minutes={}",
+                    emailHash(attempt.email()), attempt.tenantId(), attempt.ip(), window.toMinutes());
         }
         if (attempt.ip() != null && attempt.ipCount() == maxIpAttempts) {
-            block(ipKey(attempt.ip()), "ip", attempt);
+            rateLimiter.restartWindow(ipKey(attempt.ip()), window);
+            log.warn("event=password_login_blocked scope=ip tenantId={} ip={} minutes={}", attempt.tenantId(),
+                    attempt.ip(), window.toMinutes());
         }
     }
 
@@ -81,14 +85,12 @@ public class LoginAttemptLimiter {
         rateLimiter.clear(accountKey(tenantId, email));
     }
 
-    private void block(String key, String scope, Attempt attempt) {
-        rateLimiter.restartWindow(key, window);
-        log.warn("event=password_login_blocked scope={} tenantId={} ip={} minutes={}", scope, attempt.tenantId(),
-                attempt.ip(), window.toMinutes());
+    private static String accountKey(String tenantId, String email) {
+        return "login:account:" + tenantId + ":" + emailHash(email);
     }
 
-    private static String accountKey(String tenantId, String email) {
-        return "login:account:" + tenantId + ":" + hash(email.toLowerCase(Locale.ROOT));
+    private static String emailHash(String email) {
+        return hash(email.toLowerCase(Locale.ROOT));
     }
 
     private static String ipKey(String ip) {

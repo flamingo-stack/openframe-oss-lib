@@ -115,9 +115,8 @@ public class HubspotApiEmailService implements EmailService {
                 "customProperties", customProperties
         );
 
-        if (log.isDebugEnabled()) {
-            log.debug("[HubSpot API] {} Payload: {}", debugContext, payload);
-        }
+        // No payload in logs: it carries the recipient and, for a reset, a working link
+        log.debug("[HubSpot API] {} sending template {}", debugContext, emailTemplateId);
 
         webClient.post()
                 .uri(uriBuilder -> uriBuilder.path("/marketing/v4/email/single-send").build())

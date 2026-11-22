@@ -254,13 +254,13 @@ public class AuthorizationServerConfig {
     public AuthenticationManager authenticationManager(UserDetailsService userDetailsService,
                                                        PasswordEncoder passwordEncoder,
                                                        LoginAttemptLimiter loginAttemptLimiter) {
-        return new ThrottlingAuthenticationManager(authenticationManager(userDetailsService, passwordEncoder),
+        return new ThrottlingAuthenticationManager(passwordAuthenticationManager(userDetailsService, passwordEncoder),
                 loginAttemptLimiter, passwordEncoder);
     }
 
-    // Not a bean: the plain manager without the failure limits, which the bean above wraps.
-    public AuthenticationManager authenticationManager(UserDetailsService userDetailsService,
-                                                       PasswordEncoder passwordEncoder) {
+    /** Not a bean: the plain manager without the failure limits, which the bean above wraps. */
+    AuthenticationManager passwordAuthenticationManager(UserDetailsService userDetailsService,
+                                                        PasswordEncoder passwordEncoder) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return new ProviderManager(provider);

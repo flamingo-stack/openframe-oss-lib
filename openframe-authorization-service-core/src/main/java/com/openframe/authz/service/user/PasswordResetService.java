@@ -69,23 +69,24 @@ public class PasswordResetService {
             return;
         }
         String activeKey = activeKey(email);
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(activeKey))) {
+        Duration ttl = Duration.ofMinutes(ttlMinutes);
+        // Claimed before the send, atomically: parallel requests for one email send one email
+        if (!Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(activeKey, ACTIVE_MARK, ttl))) {
             logRequest("token_active", tenantIds, ip);
             return;
         }
 
         String token = generateResetToken();
-        Duration ttl = Duration.ofMinutes(ttlMinutes);
         redisTemplate.opsForValue().set(tokenKey(token), email, ttl);
         try {
             emailService.sendPasswordResetEmail(email, token);
         } catch (RuntimeException e) {
-            // Still 202: a 500 here would tell the caller the account exists. No active mark, so a retry sends.
+            // Still 202: a 500 here would tell the caller the account exists. The mark goes, so a retry sends.
+            redisTemplate.delete(activeKey);
             log.warn("event=password_reset_request outcome=send_failed tenantIds={} ip={} error={}", tenantIds, ip,
                     e.getClass().getSimpleName());
             return;
         }
-        redisTemplate.opsForValue().set(activeKey, ACTIVE_MARK, ttl);
         logRequest("sent", tenantIds, ip);
     }
 
