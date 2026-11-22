@@ -90,7 +90,6 @@ needs the checklist above before a host asks it for the grid:
 | Table | Still to do |
 |---|---|
 | `KnowledgeBaseTableBody` | `size` / `minSize`, `gridCell` for the name cell (icon, name, status, summary), `open` and the host's `actionsColumn` as action columns |
-| `DeviceSelector` | `size` / `minSize`, `gridCell` for the device and customer cells, its add / remove column as an action column |
 
 `ScriptsTable`, `ScriptSchedulesTable` and `ScriptExecutionsTable` are ready. Their layout is data
 (`features/scripts/scripts-table-columns.ts`: per column a `size`, a `minSize`, a `label`, and `gridKind: 'action'` on
@@ -101,6 +100,15 @@ own columns on that layout (the web app's live Scripts tables) reads the same tw
 `DevicesTableBody` (`features/devices/devices-table-columns.tsx`) is the worked example: every column has a `size`, a
 `minSize` and a `gridCell`, its open column is kept by hand, and it adds `selectionColumn()` itself when the host
 passes `selectable` (off by default: the devices list has no bulk action yet).
+
+`DeviceSelector` is ready. Its device and customer cells are the devices list's (`DeviceNameGridCell` without the
+unread mark, `OrganizationGridCell`); the time a card row prints under the name ("Last Online: 5m ago") sits beside
+the status tag, and the customer's contact line is not drawn. Its add / remove column is an action column kept by
+hand, with a grid form of its own: a bare icon button (a plus, the accent check for a device that is in, the trash on
+the Selected tab), each named for a screen reader ("Add <device>"), and the reason a device cannot be added as the
+control's tooltip, since a 56px cell has no room for the text a card row prints beside the button. The picker keeps
+its own card (the tabs and the search row) around the table; "Add All Devices" or the device count sits above the
+table in `DataTable.Meta`.
 
 `PoliciesTable` and `LogsTableView` are ready too. Both put a card row's two lines on one with
 `GridTextWithDetailCell` (`features/feature-table-grid-cells.tsx`): the subject (a policy's name, a log's time, a

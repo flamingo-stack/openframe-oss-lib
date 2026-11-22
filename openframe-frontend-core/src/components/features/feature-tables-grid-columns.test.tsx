@@ -1,6 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { IdleIntersectionObserver, LOGS_TABLE, POLICIES_TABLE } from './feature-tables.fixtures';
+import { DeviceSelector } from './devices/device-selector/device-selector';
+import type { DeviceSelectorProps, SubTab } from './devices/device-selector/device-selector.types';
+import { EMPTY_NARROWING } from './devices/device-selector/narrowing';
+import type { DeviceRow } from './devices/types';
+import { DEVICE_SELECTOR, IdleIntersectionObserver, LOGS_TABLE, POLICIES_TABLE } from './feature-tables.fixtures';
 import { LogCopyIconButton } from './logs/logs-page-view';
 import { LogsTableView } from './logs/logs-table-view';
 import type { LogsTableDateFilter } from './logs/types';
@@ -198,6 +203,168 @@ describe('feature tables, grid columns', () => {
       // Four data columns, then quick view and open.
       expect([4, 5].map(index => columnWidth(container, index))).toEqual([56, 56]);
       expect(Number.isNaN(columnWidth(container, 6))).toBe(true);
+    });
+  });
+
+  describe('DeviceSelector', () => {
+    /** The picker holding its own selection, as a host's form does (the lists are the browser's). */
+    function ClientPicker(props: Partial<DeviceSelectorProps>) {
+      const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+      return (
+        <DeviceSelector
+          {...DEVICE_SELECTOR.loaded}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          layout="grid"
+          {...props}
+        />
+      );
+    }
+
+    /**
+     * The picker in server mode: the host answers add and remove, and hands back which rows of the page are in. The
+     * Selected tab lists only those.
+     */
+    function ServerPicker({ startTab = 'available' }: { startTab?: SubTab }) {
+      const [assigned, setAssigned] = useState<Set<string>>(() => new Set(['m-2']));
+      const [activeTab, setActiveTab] = useState<SubTab>(startTab);
+      const page = DEVICE_SELECTOR.loaded.devices.filter(
+        device => activeTab === 'available' || assigned.has(device.machineId ?? ''),
+      );
+      const change = (device: DeviceRow, isIn: boolean) =>
+        setAssigned(previous => {
+          const next = new Set(previous);
+          if (isIn) next.add(device.machineId ?? '');
+          else next.delete(device.machineId ?? '');
+          return next;
+        });
+      return (
+        <DeviceSelector
+          {...DEVICE_SELECTOR.loaded}
+          devices={page}
+          selectedIds={assigned}
+          layout="grid"
+          server={{
+            activeTab,
+            onTabChange: setActiveTab,
+            search: '',
+            onSearchChange: noop,
+            narrowing: EMPTY_NARROWING,
+            onNarrowingChange: noop,
+            selectedCount: assigned.size,
+            totalCount: page.length,
+            onAdd: device => change(device, true),
+            onRemove: device => change(device, false),
+            onAddAll: noop,
+            onRemoveAll: noop,
+          }}
+        />
+      );
+    }
+
+    it('lists its data columns, with add / remove as an action column', () => {
+      const { container } = render(<ClientPicker />);
+      expect(dataColumns(container)).toEqual(['device', 'organization', 'os', 'status']);
+      // device 280, customer 280, OS 160, status 220, then the 56px add / remove column.
+      expect([0, 1, 2, 3, 4].map(index => columnWidth(container, index))).toEqual([280, 280, 160, 220, 56]);
+      expect(Number.isNaN(columnWidth(container, 5))).toBe(true);
+    });
+
+    it('puts a card row’s two lines on one: the last online time sits with the status', () => {
+      const { container } = render(<ClientPicker />);
+      expect(cellText(container, 0, 'device')).toBe('reception-01');
+      // The fixture's devices were never seen. A card row says so under the name ("Last Online: ...").
+      expect(cellText(container, 0, 'status')).toMatch(/Never$/);
+      expect(gridParts(container).body).not.toContain('Last Online');
+    });
+
+    it('draws the add control bare in the grid and outlined in a card row', () => {
+      const { unmount } = render(<ClientPicker />);
+      const inGrid = screen.getByRole('button', { name: 'Add reception-01' });
+      expect(inGrid.className).toContain('size-10');
+      expect(inGrid.className).toContain('border-0');
+      unmount();
+
+      const { container } = render(<DeviceSelector {...DEVICE_SELECTOR.loaded} />);
+      // A card row's control carries no name of its own: the grid's does, since it is an icon alone.
+      expect(screen.queryByRole('button', { name: 'Add reception-01' })).toBeNull();
+      expect(container.innerHTML).not.toContain('data-grid-body');
+    });
+
+    it('marks an added device in its row at once, in the lists the browser holds', () => {
+      render(<ClientPicker />);
+      const add = screen.getByRole('button', { name: 'Add reception-01' });
+      expect(add).not.toHaveAttribute('aria-pressed');
+      fireEvent.click(add);
+
+      const added = screen.getByRole('button', { name: 'Remove reception-01' });
+      expect(added).toHaveAttribute('aria-pressed', 'true');
+      // "Added" is the accent check: the card row's fill and border are not drawn in a grid action cell.
+      expect(added.className).toContain('text-ods-accent');
+      expect(added.className).not.toContain('bg-ods-open-yellow-secondary');
+      expect(screen.queryByRole('button', { name: 'Add reception-01' })).toBeNull();
+      // The other row did not change.
+      expect(screen.getByRole('button', { name: 'Add maya-mba' })).not.toHaveAttribute('aria-pressed');
+
+      fireEvent.click(added);
+      expect(screen.getByRole('button', { name: 'Add reception-01' })).not.toHaveAttribute('aria-pressed');
+    });
+
+    it('marks an added device in its row at once, in the lists the server answers', () => {
+      render(<ServerPicker />);
+      // The host says the second device is already in.
+      expect(screen.getByRole('button', { name: 'Remove maya-mba' })).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'Add reception-01' }));
+      expect(screen.getByRole('button', { name: 'Remove reception-01' })).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'Remove maya-mba' }));
+      expect(screen.getByRole('button', { name: 'Add maya-mba' })).not.toHaveAttribute('aria-pressed');
+    });
+
+    it('offers remove on the Selected tab, and the row leaves when it is used', () => {
+      render(<ServerPicker startTab="selected" />);
+      const remove = screen.getByRole('button', { name: 'Remove maya-mba' });
+      expect(remove.className).toContain('text-ods-error');
+      // A removal is not a state of the row: nothing is "pressed" on this tab.
+      expect(remove).not.toHaveAttribute('aria-pressed');
+      expect(screen.queryByRole('button', { name: /reception-01/ })).toBeNull();
+      fireEvent.click(remove);
+      expect(screen.queryByRole('button', { name: 'Remove maya-mba' })).toBeNull();
+    });
+
+    it('keeps a device that cannot be added out, with the reason on the control', () => {
+      const reason = 'Offline devices cannot run a script';
+      const { container } = render(
+        <ClientPicker isDeviceDisabled={device => (device.connectivity === 'OFFLINE' ? reason : undefined)} />,
+      );
+      const blocked = screen.getByRole('button', { name: 'Add maya-mba' });
+      expect(blocked).toBeDisabled();
+      // The reason is the control's tooltip and its name for a screen reader, not text in the 56px cell.
+      expect(screen.getByLabelText(`Add maya-mba: ${reason}`)).toBeTruthy();
+      expect(textOf(gridParts(container).body)).not.toContain(reason);
+      expect(screen.getByRole('button', { name: 'Add reception-01' })).toBeEnabled();
+    });
+
+    it('still leaves out the columns the host hides, the add / remove column among them', () => {
+      const { container } = render(<ClientPicker hideColumns={['organization', 'status', 'actions']} />);
+      expect(dataColumns(container)).toEqual(['device', 'os']);
+      expect([0, 1].map(index => columnWidth(container, index))).toEqual([280, 160]);
+      expect(Number.isNaN(columnWidth(container, 2))).toBe(true);
+      expect(screen.queryByRole('button', { name: 'Add reception-01' })).toBeNull();
+    });
+
+    it('keeps the add / remove column while loading, so the columns do not move when the devices arrive', () => {
+      const { container } = render(<DeviceSelector {...DEVICE_SELECTOR.loading} layout="grid" />);
+      expect(columnWidth(container, 4)).toBe(56);
+    });
+
+    it('does not draw a device’s unread mark: a picker is not where notifications are read', () => {
+      const devices: DeviceRow[] = DEVICE_SELECTOR.loaded.devices.map(device => ({
+        ...device,
+        unreadNotificationCount: 3,
+      }));
+      const { container } = render(<ClientPicker devices={devices} />);
+      expect(cellText(container, 0, 'device')).toBe('reception-01');
+      expect(gridParts(container).body).not.toMatch(/unread/i);
     });
   });
 });
