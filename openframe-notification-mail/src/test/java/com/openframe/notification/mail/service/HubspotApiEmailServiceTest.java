@@ -2,6 +2,7 @@ package com.openframe.notification.mail.service;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import com.openframe.notification.mail.config.HubspotVerificationMailProperties;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -18,6 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -124,16 +126,25 @@ class HubspotApiEmailServiceTest {
                                 "spend_limit_usd", "100"))));
     }
 
+    @Test
+    void usesTheDefaultVerificationTimeoutWhenItIsNotConfigured() {
+        hubspotContext().run(context -> assertThat(context.getBean(HubspotVerificationMailProperties.class)
+                .getVerificationSendTimeout()).isEqualTo(Duration.ofSeconds(20)));
+    }
+
     private void send(Consumer<HubspotApiEmailService> call) {
-        new ApplicationContextRunner()
+        hubspotContext().run(context -> call.accept(context.getBean(HubspotApiEmailService.class)));
+    }
+
+    private ApplicationContextRunner hubspotContext() {
+        return new ApplicationContextRunner()
                 .withPropertyValues(
                         "openframe.mail.provider=hubspot-api",
                         "openframe.mail.from=" + FROM,
                         "openframe.mail.hubspot.access-token=hs-token",
                         "openframe.mail.hubspot.base-url=http://127.0.0.1:" + hubspot.getAddress().getPort(),
                         "openframe.mail.hubspot.download-link-email-id=download-link-template")
-                .withUserConfiguration(HubspotApiEmailService.class)
-                .run(context -> call.accept(context.getBean(HubspotApiEmailService.class)));
+                .withUserConfiguration(HubspotApiEmailService.class);
     }
 
     private void hubspotAnswers(int status, String body) {

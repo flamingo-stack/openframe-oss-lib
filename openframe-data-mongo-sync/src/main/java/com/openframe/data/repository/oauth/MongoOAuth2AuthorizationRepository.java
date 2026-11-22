@@ -2,6 +2,7 @@ package com.openframe.data.repository.oauth;
 
 import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.ReadPreference;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,6 +14,7 @@ public interface MongoOAuth2AuthorizationRepository extends MongoRepository<Mong
 
     Optional<MongoOAuth2Authorization> findByAuthorizationCodeValue(String code);
 
+    @ReadPreference("primary")
     Optional<MongoOAuth2Authorization> findByAccessTokenValue(String accessToken);
 
     Optional<MongoOAuth2Authorization> findByRefreshTokenValue(String refreshToken);

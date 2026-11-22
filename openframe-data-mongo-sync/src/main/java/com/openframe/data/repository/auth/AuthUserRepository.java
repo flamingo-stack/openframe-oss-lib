@@ -3,6 +3,7 @@ package com.openframe.data.repository.auth;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.ReadPreference;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -10,6 +11,9 @@ import java.util.Optional;
 
 @Repository
 public interface AuthUserRepository extends MongoRepository<AuthUser, String>, CustomAuthUserRepository {
+
+    @ReadPreference("primary")
+    Optional<AuthUser> findPrimaryById(String userId);
 
     /**
      * Find single ACTIVE user by email

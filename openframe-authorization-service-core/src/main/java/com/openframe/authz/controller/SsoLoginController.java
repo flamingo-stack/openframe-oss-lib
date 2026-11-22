@@ -23,6 +23,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -53,6 +55,7 @@ import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
+import static org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER;
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -68,6 +71,10 @@ import static org.springframework.util.StringUtils.hasText;
 @RequiredArgsConstructor
 public class SsoLoginController {
 
+    private static final String SSO_LOGIN_PATH = "/login/sso";
+    private static final String LOGIN_HANDLE_PARAMETER = "handle";
+    private static final String REFERRER_POLICY_HEADER = "Referrer-Policy";
+
     private final SsoLoginService ssoLoginService;
     private final SignupTicketService signupTicketService;
     private final SsoIdentityService ssoIdentityService;
@@ -76,7 +83,7 @@ public class SsoLoginController {
     private final TenantRegistrationService registrationService;
     private final AuthErrorResponder authErrorResponder;
 
-    @GetMapping(path = "/login/sso")
+    @GetMapping(path = SSO_LOGIN_PATH, params = "!" + LOGIN_HANDLE_PARAMETER)
     public void startSsoLogin(@Valid @ModelAttribute SsoLoginInitRequest request,
                               HttpServletRequest httpRequest,
                               HttpServletResponse httpResponse) throws IOException {
@@ -92,6 +99,28 @@ public class SsoLoginController {
         } catch (Exception e) {
             authErrorResponder.send(httpResponse, httpRequest, "sso-login-init", e, SSO_LOGIN_FAILED);
         }
+    }
+
+    @GetMapping(path = SSO_LOGIN_PATH, params = LOGIN_HANDLE_PARAMETER)
+    public void startCompanySsoLogin(@Valid @ModelAttribute SsoLoginInitRequest request,
+                                     @RequestParam(LOGIN_HANDLE_PARAMETER) String handle,
+                                     HttpServletRequest httpRequest,
+                                     HttpServletResponse httpResponse) throws IOException {
+        httpResponse.setHeader(REFERRER_POLICY_HEADER, NO_REFERRER.getPolicy());
+        httpResponse.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
+        try {
+            redirectToCompanyProvider(request, handle, httpRequest, httpResponse);
+        } catch (Exception e) {
+            authErrorResponder.send(httpResponse, httpRequest, "sso-company-login-init", e, SSO_LOGIN_FAILED);
+        }
+    }
+
+    private void redirectToCompanyProvider(SsoLoginInitRequest request, String handle, HttpServletRequest httpRequest,
+                                           HttpServletResponse httpResponse) {
+        clearOtherSsoFlowCookies(httpResponse, OF_SSO_LOGIN);
+        SsoAuthorizeData data = ssoLoginService.startCompanyLogin(request, handle, httpRequest);
+        ssoFlowCookies.write(httpResponse, OF_SSO_LOGIN, data.cookieValue(), data.cookieTtlSeconds());
+        seeOther(httpResponse, data.redirectPath());
     }
 
     /**
