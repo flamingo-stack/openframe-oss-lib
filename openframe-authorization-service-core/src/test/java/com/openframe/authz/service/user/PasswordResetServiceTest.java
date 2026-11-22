@@ -399,6 +399,18 @@ class PasswordResetServiceTest {
                 "tenantId=t1", "ip=1.2.3.4").doesNotContain("ada@acme.com");
     }
 
+    @Test
+    void createResetToken_emailSendFails_noActiveMarkSoRetrySends() {
+        when(userService.findActiveTenantIdsByEmail("ada@acme.com")).thenReturn(List.of("t1"));
+        when(ssoConfigService.isOpenframeLoginEnabled("t1")).thenReturn(true);
+        doThrow(new IllegalStateException("HubSpot API error: status=503"))
+                .when(emailService).sendPasswordResetEmail(eq("ada@acme.com"), anyString());
+
+        assertThatThrownBy(() -> service.createResetToken("ada@acme.com")).isInstanceOf(IllegalStateException.class);
+
+        verify(values, never()).set(contains("active:"), anyString(), any(Duration.class));
+    }
+
     private static void fromIp(String ip) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr(ip);

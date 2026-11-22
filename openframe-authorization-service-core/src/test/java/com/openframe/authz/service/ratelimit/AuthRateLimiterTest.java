@@ -108,4 +108,15 @@ class AuthRateLimiterTest {
                 .isEqualTo(sha256("ada@acme.com"))
                 .matches("^[0-9a-f]{64}$");
     }
+
+    @Test
+    void increment_keyIsGlobalUnderAuthLimitPrefix() {
+        when(values.increment(anyString())).thenReturn(1L);
+
+        limiter.increment("reset:ip:1.2.3.4", HOUR);
+
+        String expected = new OpenframeRedisKeyBuilder(new OpenframeRedisProperties()).globalKey("auth-limit:reset:ip:1.2.3.4");
+        verify(values).increment(expected);
+        verify(redisTemplate).expire(expected, HOUR);
+    }
 }
