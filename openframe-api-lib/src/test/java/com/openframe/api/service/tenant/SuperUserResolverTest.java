@@ -11,8 +11,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SuperUserResolverTest {
 
-    private static final String SUPER_TENANT_ID = "1877e27c-b3fa-488f-82b6-449b80c1cc97";
-    private static final String CUSTOMER_TENANT_ID = "6f7639b7-f3a9-45d5-bb16-4b7c3c599a78";
+    private static final String SUPER_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+    private static final String CUSTOMER_TENANT_ID = "00000000-0000-0000-0000-000000000002";
 
     private final SuperUserResolver resolver = new SuperUserResolver(SUPER_TENANT_ID);
 
