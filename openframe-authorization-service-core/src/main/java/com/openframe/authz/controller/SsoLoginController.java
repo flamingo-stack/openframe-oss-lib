@@ -16,6 +16,7 @@ import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.web.Redirects;
+import com.openframe.core.config.AuthHardeningProperties;
 import com.openframe.core.exception.AuthFlowException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -82,6 +83,7 @@ public class SsoLoginController {
     private final SsoCookieCodec ssoCookieCodec;
     private final TenantRegistrationService registrationService;
     private final AuthErrorResponder authErrorResponder;
+    private final AuthHardeningProperties hardening;
 
     @GetMapping(path = SSO_LOGIN_PATH, params = "!" + LOGIN_HANDLE_PARAMETER)
     public void startSsoLogin(@Valid @ModelAttribute SsoLoginInitRequest request,
@@ -108,6 +110,11 @@ public class SsoLoginController {
                                      HttpServletResponse httpResponse) throws IOException {
         httpResponse.setHeader(REFERRER_POLICY_HEADER, NO_REFERRER.getPolicy());
         httpResponse.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
+        if (!hardening.enabled()) {
+            authErrorResponder.send(httpResponse, httpRequest, "sso-company-login-disabled",
+                    new AuthFlowException(SSO_SESSION_EXPIRED, SSO_SESSION_EXPIRED.getMessage()), SSO_SESSION_EXPIRED);
+            return;
+        }
         try {
             redirectToCompanyProvider(request, handle, httpRequest, httpResponse);
         } catch (Exception e) {
