@@ -467,12 +467,26 @@ class DeviceServiceTest {
         m.setMachineId("m-del");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
-        stubStatusWrite(m);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
+        when(deletedMachineCleanup.markDeleted(m)).thenReturn(m);
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
         verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
+        verify(deletedMachineCleanup).markDeleted(m);
+    }
+
+    @Test
+    void deletingAlreadyDeletedDeviceRepeatsScheduleCleanupWithoutPublishingAgain() {
+        Machine machine = new Machine();
+        machine.setTenantId("t-1");
+        machine.setStatus(DeviceStatus.DELETED);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(machine));
+
+        service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
+
+        verify(deletedMachineCleanup).markDeleted(machine);
+        verifyNoInteractions(machineWriter, deviceStatusProcessor);
     }
 
     @Test
@@ -482,7 +496,7 @@ class DeviceServiceTest {
         m.setMachineId("m-del");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
         doThrow(new RuntimeException("mongo hiccup"))
                 .when(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
 
@@ -504,7 +518,7 @@ class DeviceServiceTest {
         m.setMachineId("m-arc");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-arc")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
@@ -519,7 +533,7 @@ class DeviceServiceTest {
         m.setMachineId("m-arc");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-arc")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
@@ -538,7 +552,7 @@ class DeviceServiceTest {
         m.setMachineId("m-pen");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.PENDING);
-        when(machineRepository.findByMachineId("m-pen")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-pen")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         // execution
@@ -556,7 +570,7 @@ class DeviceServiceTest {
         m.setMachineId("m-del");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.DELETED);
-        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         // execution
@@ -577,7 +591,7 @@ class DeviceServiceTest {
                 () -> s.updateStatusByMachineId("m-1", status));
 
         assertThat(ex.getMessage()).contains("only be set to DELETED or ARCHIVED");
-        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).findOnPrimaryByMachineId(any());
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(deletedMachineCleanup, deviceSoftwareConnectivitySync, deviceStatusProcessor);
     }
@@ -589,8 +603,8 @@ class DeviceServiceTest {
         m.setMachineId("m-del");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
-        stubStatusWrite(m);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
+        when(deletedMachineCleanup.markDeleted(m)).thenReturn(m);
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
@@ -605,7 +619,7 @@ class DeviceServiceTest {
         m.setMachineId("m-arc");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-arc")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
@@ -624,7 +638,7 @@ class DeviceServiceTest {
         Machine m = new Machine();
         m.setMachineId("m-arc");
         m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-arc")).thenReturn(Optional.of(m));
         when(machineWriter.update(eq("m-arc"), any(MachineUpdate.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED))

@@ -31,8 +31,15 @@ import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
+import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
+import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +48,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.stubbing.Answer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -177,11 +185,13 @@ class MachineFieldLevelWritesIT {
     // Every read of the machine is followed by the concurrent write, before the service gets to write
     private static MachineRepository interleavingRepository() {
         MachineRepository repository = mock(MachineRepository.class, delegatesTo(storedMachines));
-        doAnswer(invocation -> {
+        Answer<Optional<Machine>> afterMachineRead = invocation -> {
             Optional<Machine> read = storedMachines.findByMachineId(invocation.getArgument(0));
             concurrentDirectoryAndFleetWrite();
             return read;
-        }).when(repository).findByMachineId(anyString());
+        };
+        doAnswer(afterMachineRead).when(repository).findByMachineId(anyString());
+        doAnswer(afterMachineRead).when(repository).findOnPrimaryByMachineId(anyString());
         return repository;
     }
 
@@ -229,9 +239,14 @@ class MachineFieldLevelWritesIT {
         }
 
         private static AgentUninstallService uninstallService(MachineRepository machines) {
-            return new AgentUninstallService(knownClient(false), mock(ClientSecretValidator.class), machines, machineWriter,
+            DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
+                    mock(ScriptScheduleMachineAssignedRepository.class), mock(DeviceOnlineDispatchRepository.class),
+                    mock(SoftwareScheduleMachineAssignedRepository.class), mock(SoftwareScheduleOnlineDispatchRepository.class),
+                    mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), machineWriter,
+                    new ScheduleMutationTransaction(template.getMongoDatabaseFactory()));
+            return new AgentUninstallService(knownClient(false), mock(ClientSecretValidator.class), machines,
                     mock(ToolConnectionService.class), mock(InstalledAgentService.class),
-                    mock(DeletedMachineCleanup.class), mock(ApplicationEventPublisher.class));
+                    cleanup, mock(ApplicationEventPublisher.class));
         }
 
         private static AgentRegistrationService registrationService(MachineRepository machines) {

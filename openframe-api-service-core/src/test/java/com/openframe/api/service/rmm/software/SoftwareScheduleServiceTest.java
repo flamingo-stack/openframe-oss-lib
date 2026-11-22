@@ -10,6 +10,8 @@ import com.openframe.api.service.rmm.software.SoftwareScheduleService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -24,6 +26,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
@@ -33,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -63,6 +67,7 @@ class SoftwareScheduleServiceTest {
     private TenantIdProvider tenantIdProvider;
     private PackageManagerAvailability packageManagerAvailability;
     private SoftwareInventoryService softwareInventoryService;
+    private MachineRepository machineRepository;
     private SoftwareScheduleService service;
 
     private CreateSoftwareScheduleInput createInput;
@@ -75,8 +80,12 @@ class SoftwareScheduleServiceTest {
         tenantIdProvider = mock(TenantIdProvider.class);
         packageManagerAvailability = mock(PackageManagerAvailability.class);
         softwareInventoryService = mock(SoftwareInventoryService.class);
+        machineRepository = mock(MachineRepository.class);
         service = new SoftwareScheduleService(scheduleRepository, assignedRepository, targetResolver, tenantIdProvider,
-                packageManagerAvailability, new SoftwarePackageSelectionResolver(softwareInventoryService));
+                packageManagerAvailability, new SoftwarePackageSelectionResolver(softwareInventoryService), machineRepository);
+
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(invocation ->
+                invocation.<Collection<String>>getArgument(1).stream().map(SoftwareScheduleServiceTest::managedMachine).toList());
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Saves are identity so assertions can read back what the service built.
@@ -102,6 +111,28 @@ class SoftwareScheduleServiceTest {
         p.setPackageName(name);
         p.setBrewPackageType(type);
         return p;
+    }
+
+    @Test
+    void createRejectsUnknownOrDeletedTargetsBeforeWriting() {
+        Machine deleted = managedMachine("m2");
+        deleted.setStatus(DeviceStatus.DELETED);
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenReturn(List.of(deleted));
+
+        assertThatThrownBy(() -> service.create(createInput, ACTOR))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Devices must be managed by this tenant")
+                .hasMessageContaining("m1")
+                .hasMessageContaining("m2");
+        verify(scheduleRepository, never()).save(any());
+        verify(assignedRepository, never()).saveAll(any());
+    }
+
+    private static Machine managedMachine(String machineId) {
+        Machine machine = new Machine();
+        machine.setMachineId(machineId);
+        machine.setStatus(DeviceStatus.MANAGED);
+        return machine;
     }
 
     @Test

@@ -2,7 +2,9 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -21,6 +23,7 @@ import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
+import com.openframe.publishing.transaction.MongoTransactionRunner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,7 +69,13 @@ class ScheduleScriptDeviceServiceTest {
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
         dispatchRepository = mock(DeviceOnlineDispatchRepository.class);
         deliveryRefresher = mock(ScheduleDeliveryRefresher.class);
-        service = new ScheduleScriptDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider, dispatchRepository, deliveryRefresher);
+        ScheduleMutationTransaction transaction = mock(ScheduleMutationTransaction.class);
+        when(transaction.run(any())).thenAnswer(invocation -> {
+            MongoTransactionRunner.Transaction<Long> removal = invocation.getArgument(0);
+            return removal.execute();
+        });
+        service = new ScheduleScriptDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver,
+                tenantIdProvider, dispatchRepository, deliveryRefresher, transaction);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(inv -> {
             Collection<String> ids = inv.getArgument(1);
@@ -123,12 +132,27 @@ class ScheduleScriptDeviceServiceTest {
     @Test
     @DisplayName("removeDevices → disarms (drops the DEVICE_ONLINE sentinels for those machines)")
     void removeDevices_disarmsSentinels() {
-        scheduleExists(ScriptStatus.ACTIVE);
+        when(scheduleRepository.markSpecificAssignmentChange(TENANT_ID, SCHEDULE_ID, ScriptStatus.DELETED, ScheduleDeviceSelectionMode.CRITERIA)).thenReturn(1L);
 
         service.removeDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
 
         verify(dispatchRepository).deleteByTenantIdAndScheduleIdAndMachineIdIn(eq(TENANT_ID), eq(SCHEDULE_ID), any());
         verify(deliveryRefresher).cancelForMachines(eq(SCHEDULE_ID), eq(Set.of("m-1", "m-2")), eq("device removed from the schedule"));
+    }
+
+    @Test
+    void removeDevices_rejectsCriteriaWithoutChangingAssignmentsOrDispatches() {
+        ScheduleScript schedule = ScheduleScript.builder()
+                .id(SCHEDULE_ID)
+                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
+                .trigger(ScheduleScriptTrigger.DEVICE_ONLINE)
+                .build();
+        when(scheduleRepository.findOnPrimaryByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
+
+        assertThatThrownBy(() -> service.removeDevices(SCHEDULE_ID, List.of("m-1"), "user-1"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("selects devices by criteria");
+        verifyNoInteractions(assignedRepository, dispatchRepository, deliveryRefresher);
     }
 
     @Test
@@ -515,12 +539,22 @@ class ScheduleScriptDeviceServiceTest {
     @Test
     @DisplayName("removeDevices: deletes the given pairs by machineId")
     void removeDevices_deletesByIds() {
-        scheduleExists(ScriptStatus.ACTIVE);
+        when(scheduleRepository.markSpecificAssignmentChange(TENANT_ID, SCHEDULE_ID, ScriptStatus.DELETED, ScheduleDeviceSelectionMode.CRITERIA)).thenReturn(1L);
 
         service.removeDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
 
         verify(assignedRepository).deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
                 eq(TENANT_ID), eq(SCHEDULE_ID), any());
+    }
+
+    @Test
+    void removeAssignedDevices_returnsCommittedDeleteCount() {
+        when(scheduleRepository.markSpecificAssignmentChange(TENANT_ID, SCHEDULE_ID, ScriptStatus.DELETED, ScheduleDeviceSelectionMode.CRITERIA)).thenReturn(1L);
+        when(assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
+                TENANT_ID, SCHEDULE_ID, Set.of("m-1", "m-absent"))).thenReturn(1L, 0L);
+
+        assertThat(service.removeAssignedDevices(SCHEDULE_ID, List.of("m-1", "m-1", "m-absent"), "user-1")).isEqualTo(1L);
+        assertThat(service.removeAssignedDevices(SCHEDULE_ID, List.of("m-1", "m-absent"), "user-1")).isZero();
     }
 
     @Test
