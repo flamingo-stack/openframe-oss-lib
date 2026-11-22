@@ -1,6 +1,7 @@
 package com.openframe.authz.service.user;
 
 import com.openframe.authz.service.auth.MongoAuthorizationService;
+import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.web.ClientIp;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
@@ -13,6 +14,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 
 import static com.openframe.authz.util.ResetTokenUtil.generateResetToken;
 
@@ -27,13 +29,21 @@ public class PasswordResetService {
     private final UserService userService;
     private final EmailService emailService;
     private final MongoAuthorizationService authorizationService;
+    private final SSOConfigService ssoConfigService;
 
     @Value("${openframe.password-reset.ttlMinutes:30}")
     private int ttlMinutes;
 
     public void createResetToken(String email) {
-        if (!userService.existsActiveByEmail(email)) {
+        List<String> tenantIds = userService.findActiveTenantIdsByEmail(email);
+        if (tenantIds.isEmpty()) {
             log.warn("Password reset requested for non-existing email: {} ip={}", email, ClientIp.current());
+            return;
+        }
+        // Silent like an unknown email: the response must not reveal that the account exists.
+        if (tenantIds.stream().noneMatch(ssoConfigService::isOpenframeLoginEnabled)) {
+            log.warn("Password reset requested while OpenFrame login is off: tenantIds={} ip={}", tenantIds,
+                    ClientIp.current());
             return;
         }
 
@@ -54,6 +64,9 @@ public class PasswordResetService {
 
         AuthUser user = userService.findActiveByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found for reset token"));
+
+        // The switch may have been turned off after the email was sent.
+        ssoConfigService.refuseUnlessOpenframeLoginEnabled(user.getTenantId());
 
         userService.updatePassword(user.getId(), newPassword);
 

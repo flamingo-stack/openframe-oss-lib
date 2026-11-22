@@ -80,6 +80,13 @@ public class UserService {
         return !userRepository.findAllByEmailAndStatus(email, ACTIVE).isEmpty();
     }
 
+    /** Tolerates the duplicates {@link #findActiveByEmail} throws on, so a caller can stay silent about them. */
+    public List<String> findActiveTenantIdsByEmail(String email) {
+        return userRepository.findAllByEmailAndStatus(email, ACTIVE).stream()
+                .map(AuthUser::getTenantId)
+                .toList();
+    }
+
     public Optional<AuthUser> findActiveByEmailAndTenant(String email, String tenantId) {
         return userRepository.findByEmailAndTenantIdAndStatus(email, tenantId, ACTIVE);
     }
