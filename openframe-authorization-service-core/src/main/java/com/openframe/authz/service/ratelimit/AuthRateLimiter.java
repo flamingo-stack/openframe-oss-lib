@@ -25,7 +25,7 @@ public class AuthRateLimiter {
 
     private static final String KEY_PREFIX = "auth-limit:";
 
-    // One round trip, atomic: the first hit (or a key that lost its TTL) starts the window
+    /** One round trip, atomic: the first hit (or a key that lost its TTL) starts the window. */
     private static final RedisScript<Long> INCREMENT = RedisScript.of("""
             local count = redis.call('INCR', KEYS[1])
             if count == 1 or redis.call('TTL', KEYS[1]) == -1 then
@@ -33,7 +33,7 @@ public class AuthRateLimiter {
             end
             return count""", Long.class);
 
-    // Never recreates an expired key, which would then live without a TTL
+    /** Never recreates an expired key, which would then live without a TTL. */
     private static final RedisScript<Long> DECREMENT = RedisScript.of("""
             if redis.call('EXISTS', KEYS[1]) == 1 then
               return redis.call('DECR', KEYS[1])

@@ -2,6 +2,7 @@ package com.openframe.authz.security;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.ratelimit.LoginAttemptLimiter;
+import com.openframe.authz.service.ratelimit.LoginAttemptLimiter.Attempt;
 import com.openframe.authz.web.ClientIp;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -18,7 +19,7 @@ import java.util.Objects;
  */
 public class ThrottlingAuthenticationManager implements AuthenticationManager {
 
-    // DaoAuthenticationProvider's own wording for a wrong password
+    /** DaoAuthenticationProvider's own wording for a wrong password. */
     private static final String BAD_CREDENTIALS = "Bad credentials";
 
     private final AuthenticationManager delegate;
@@ -39,20 +40,22 @@ public class ThrottlingAuthenticationManager implements AuthenticationManager {
         String tenantId = TenantContext.getTenantId();
         String email = authentication.getName();
         String ip = ClientIp.current();
-        if (!limiter.tryAcquire(tenantId, email, ip)) {
-            passwordEncoder.matches(Objects.toString(authentication.getCredentials(), ""), decoyHash);
-            throw new BadCredentialsException(BAD_CREDENTIALS);
-        }
+        Attempt attempt = limiter.tryAcquire(tenantId, email, ip).orElseThrow(() -> refuse(authentication));
         try {
             Authentication result = delegate.authenticate(authentication);
-            limiter.onSuccess(tenantId, email, ip);
+            limiter.onSuccess(attempt);
             return result;
+        } catch (BadCredentialsException e) {
+            limiter.onBadPassword(attempt);
+            throw e;
         } catch (AuthenticationException e) {
-            // Only a wrong password keeps the attempt; a tenant or login-switch refusal gives it back
-            if (!(e instanceof BadCredentialsException)) {
-                limiter.release(tenantId, email, ip);
-            }
+            limiter.release(attempt);
             throw e;
         }
+    }
+
+    private BadCredentialsException refuse(Authentication authentication) {
+        passwordEncoder.matches(Objects.toString(authentication.getCredentials(), ""), decoyHash);
+        return new BadCredentialsException(BAD_CREDENTIALS);
     }
 }

@@ -6,14 +6,16 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Optional;
 
 import static com.openframe.authz.service.ratelimit.AuthRateLimiter.hash;
 
 /**
  * Password login attempts per account (tenant + email hash) and per client IP. An attempt is reserved
- * before the password is checked, so parallel guesses can't slip past the limit; a success or a refusal
- * that isn't about the password gives it back. Reaching the limit blocks for one window from that
- * attempt; refused attempts don't restart it, so nobody can keep an account locked.
+ * before the password is checked, so parallel guesses can't slip past the limit. Only a wrong password
+ * keeps its reservation; a refusal, a success or a refusal that isn't about the password gives it back.
+ * The wrong password that reaches the limit blocks for one window from that attempt. Refused attempts
+ * don't extend the block, so a locked account opens again after one window.
  */
 @Component
 @Slf4j
@@ -34,25 +36,44 @@ public class LoginAttemptLimiter {
         this.window = window;
     }
 
-    /** Reserves one attempt; false when the account or the IP is blocked. */
-    public boolean tryAcquire(String tenantId, String email, String ip) {
-        boolean accountOpen = reserve(accountKey(tenantId, email), maxAccountAttempts, "account", tenantId, ip);
-        boolean ipOpen = ip == null || reserve(ipKey(ip), maxIpAttempts, "ip", tenantId, ip);
-        return accountOpen && ipOpen;
+    /** A reserved attempt and the counts it reserved at; the ip count is 0 when there is no IP. */
+    public record Attempt(String tenantId, String email, String ip, long accountCount, long ipCount) {
     }
 
-    public void onSuccess(String tenantId, String email, String ip) {
-        clearAccount(tenantId, email);
-        if (ip != null) {
-            rateLimiter.decrement(ipKey(ip));
+    /** Reserves one attempt; empty, with nothing kept, when the account or the IP is blocked. */
+    public Optional<Attempt> tryAcquire(String tenantId, String email, String ip) {
+        long accountCount = rateLimiter.increment(accountKey(tenantId, email), window);
+        long ipCount = ip == null ? 0 : rateLimiter.increment(ipKey(ip), window);
+        Attempt attempt = new Attempt(tenantId, email, ip, accountCount, ipCount);
+        if (accountCount > maxAccountAttempts || ipCount > maxIpAttempts) {
+            release(attempt);
+            return Optional.empty();
+        }
+        return Optional.of(attempt);
+    }
+
+    /** Keeps the attempt; the one that reached a limit starts the block. */
+    public void onBadPassword(Attempt attempt) {
+        if (attempt.accountCount() == maxAccountAttempts) {
+            block(accountKey(attempt.tenantId(), attempt.email()), "account", attempt);
+        }
+        if (attempt.ip() != null && attempt.ipCount() == maxIpAttempts) {
+            block(ipKey(attempt.ip()), "ip", attempt);
         }
     }
 
-    /** Gives back an attempt that ended without a password verdict (tenant inactive, login disabled). */
-    public void release(String tenantId, String email, String ip) {
-        rateLimiter.decrement(accountKey(tenantId, email));
-        if (ip != null) {
-            rateLimiter.decrement(ipKey(ip));
+    public void onSuccess(Attempt attempt) {
+        clearAccount(attempt.tenantId(), attempt.email());
+        if (attempt.ip() != null) {
+            rateLimiter.decrement(ipKey(attempt.ip()));
+        }
+    }
+
+    /** Gives back an attempt that ended without a password verdict (refused, tenant inactive, login disabled). */
+    public void release(Attempt attempt) {
+        rateLimiter.decrement(accountKey(attempt.tenantId(), attempt.email()));
+        if (attempt.ip() != null) {
+            rateLimiter.decrement(ipKey(attempt.ip()));
         }
     }
 
@@ -60,14 +81,10 @@ public class LoginAttemptLimiter {
         rateLimiter.clear(accountKey(tenantId, email));
     }
 
-    private boolean reserve(String key, int max, String scope, String tenantId, String ip) {
-        long attempts = rateLimiter.increment(key, window);
-        if (attempts == max) {
-            rateLimiter.restartWindow(key, window);
-            log.warn("event=password_login_blocked scope={} tenantId={} ip={} minutes={}", scope, tenantId, ip,
-                    window.toMinutes());
-        }
-        return attempts <= max;
+    private void block(String key, String scope, Attempt attempt) {
+        rateLimiter.restartWindow(key, window);
+        log.warn("event=password_login_blocked scope={} tenantId={} ip={} minutes={}", scope, attempt.tenantId(),
+                attempt.ip(), window.toMinutes());
     }
 
     private static String accountKey(String tenantId, String email) {
