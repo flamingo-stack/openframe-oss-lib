@@ -1,6 +1,7 @@
 package com.openframe.authz.service.user;
 
 import com.openframe.authz.service.auth.MongoAuthorizationService;
+import com.openframe.authz.web.ClientIp;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
@@ -32,13 +33,14 @@ public class PasswordResetService {
 
     public void createResetToken(String email) {
         if (!userService.existsActiveByEmail(email)) {
-            log.warn("Password reset requested for non-existing email: {}", email);
+            log.warn("Password reset requested for non-existing email: {} ip={}", email, ClientIp.current());
             return;
         }
 
         String token = generateResetToken();
         String key = keyBuilder.tenantKey(redisProperties.getKeys().getPasswordResetPrefix() + ":" + token);
         redisTemplate.opsForValue().set(key, email, Duration.ofMinutes(ttlMinutes));
+        log.info("Password reset token issued for email: {} ip={}", email, ClientIp.current());
 
         emailService.sendPasswordResetEmail(email, token);
     }
@@ -57,7 +59,8 @@ public class PasswordResetService {
 
         // The old password may be compromised: revoke existing sessions' refresh tokens
         int revoked = authorizationService.revokeAllForPrincipal(user.getEmail());
-        log.info("Revoked {} refresh token(s) after password reset for user {}", revoked, user.getId());
+        log.info("Revoked {} refresh token(s) after password reset for user {} ip={}", revoked, user.getId(),
+                ClientIp.current());
 
         redisTemplate.delete(key);
     }
