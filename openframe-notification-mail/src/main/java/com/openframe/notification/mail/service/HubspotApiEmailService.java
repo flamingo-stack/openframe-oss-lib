@@ -126,7 +126,7 @@ public class HubspotApiEmailService implements EmailService {
                 .bodyValue(payload)
                 .exchangeToMono(response -> {
                     if (response.statusCode().is2xxSuccessful()) {
-                        log.info("[HubSpot API] {} email sent to {}", debugContext, toEmail);
+                        log.info("[HubSpot API] {} email sent", debugContext);
                         return response.releaseBody();
                     }
                     return response.bodyToMono(String.class)
