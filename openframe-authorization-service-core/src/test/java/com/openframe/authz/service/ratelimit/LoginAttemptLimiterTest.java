@@ -34,74 +34,22 @@ class LoginAttemptLimiterTest {
     @BeforeEach
     void setUp() {
         limiter = new LoginAttemptLimiter(rateLimiter, 10, 50, WINDOW);
-        lenient().when(rateLimiter.count(anyString())).thenReturn(0L);
-        lenient().when(rateLimiter.increment(anyString(), eq(WINDOW))).thenReturn(0L);
+        lenient().when(rateLimiter.increment(anyString(), eq(WINDOW))).thenReturn(1L);
     }
 
     @Test
-    void isBlocked_tenFailuresOnTheAccount_blocked() {
-        when(rateLimiter.count(contains("account:t1:" + EMAIL_HASH))).thenReturn(10L);
-
-        assertThat(limiter.isBlocked("t1", "ada@acme.com", "1.2.3.4")).isTrue();
-    }
-
-    @Test
-    void isBlocked_nineFailuresOnTheAccount_notBlocked() {
-        when(rateLimiter.count(contains("account:t1:" + EMAIL_HASH))).thenReturn(9L);
-
-        assertThat(limiter.isBlocked("t1", "ada@acme.com", "1.2.3.4")).isFalse();
-    }
-
-    @Test
-    void isBlocked_fiftyFailuresFromTheIp_blocksAnyAccount() {
-        when(rateLimiter.count(contains("ip:1.2.3.4"))).thenReturn(50L);
-
-        assertThat(limiter.isBlocked("t2", "bob@other.com", "1.2.3.4")).isTrue();
-    }
-
-    @Test
-    void isBlocked_fortyNineFailuresFromTheIp_notBlocked() {
-        when(rateLimiter.count(contains("ip:1.2.3.4"))).thenReturn(49L);
-
-        assertThat(limiter.isBlocked("t2", "bob@other.com", "1.2.3.4")).isFalse();
-    }
-
-    @Test
-    void isBlocked_noIp_onlyTheAccountCounts() {
-        assertThat(limiter.isBlocked("t1", "ada@acme.com", null)).isFalse();
-
-        verify(rateLimiter, never()).count(contains("ip:"));
-    }
-
-    @Test
-    void accountKey_isTenantPlusEmailHash_emailNormalized() {
-        limiter.recordFailure("t1", "Ada@Acme.COM", null);
-
-        verify(rateLimiter).increment(contains("account:t1:" + EMAIL_HASH), eq(WINDOW));
-        verify(rateLimiter, never()).increment(contains("ada@acme.com"), eq(WINDOW));
-    }
-
-    @Test
-    void accountKey_sameEmailInAnotherTenant_countsSeparately() {
-        limiter.recordFailure("t2", "ada@acme.com", null);
-
-        verify(rateLimiter).increment(contains("account:t2:" + EMAIL_HASH), eq(WINDOW));
-        verify(rateLimiter, never()).increment(contains("account:t1:"), eq(WINDOW));
-    }
-
-    @Test
-    void recordFailure_countsAccountAndIp() {
-        limiter.recordFailure("t1", "ada@acme.com", "1.2.3.4");
+    void tryAcquire_reservesTheAttemptOnAccountAndIp() {
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isTrue();
 
         verify(rateLimiter).increment(contains("account:t1:" + EMAIL_HASH), eq(WINDOW));
         verify(rateLimiter).increment(contains("ip:1.2.3.4"), eq(WINDOW));
     }
 
     @Test
-    void recordFailure_tenthFailure_startsTheBlockAndWarnsWithoutEmail(CapturedOutput output) {
+    void tryAcquire_tenthAttempt_allowedAndStartsTheBlock(CapturedOutput output) {
         when(rateLimiter.increment(contains("account:"), eq(WINDOW))).thenReturn(10L);
 
-        limiter.recordFailure("t1", "ada@acme.com", "1.2.3.4");
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isTrue();
 
         verify(rateLimiter).restartWindow(contains("account:t1:" + EMAIL_HASH), eq(WINDOW));
         assertThat(output).contains("event=password_login_blocked", "scope=account", "tenantId=t1", "ip=1.2.3.4")
@@ -109,33 +57,85 @@ class LoginAttemptLimiterTest {
     }
 
     @Test
-    void recordFailure_fiftiethIpFailure_startsTheIpBlock(CapturedOutput output) {
+    void tryAcquire_eleventhAttempt_refusedWithoutExtendingTheBlock() {
+        when(rateLimiter.increment(contains("account:"), eq(WINDOW))).thenReturn(11L);
+
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isFalse();
+
+        verify(rateLimiter, never()).restartWindow(anyString(), eq(WINDOW));
+    }
+
+    @Test
+    void tryAcquire_fiftiethFromIp_allowedAndStartsTheIpBlock(CapturedOutput output) {
         when(rateLimiter.increment(contains("ip:"), eq(WINDOW))).thenReturn(50L);
 
-        limiter.recordFailure("t1", "ada@acme.com", "1.2.3.4");
+        assertThat(limiter.tryAcquire("t2", "bob@other.com", "1.2.3.4")).isTrue();
 
         verify(rateLimiter).restartWindow(contains("ip:1.2.3.4"), eq(WINDOW));
         assertThat(output).contains("event=password_login_blocked", "scope=ip");
     }
 
     @Test
-    void recordFailure_belowTheThreshold_doesNotRestartTheWindow() {
+    void tryAcquire_fiftyFirstFromIp_refusedForAnyAccount() {
+        when(rateLimiter.increment(contains("ip:"), eq(WINDOW))).thenReturn(51L);
+
+        assertThat(limiter.tryAcquire("t2", "bob@other.com", "1.2.3.4")).isFalse();
+    }
+
+    @Test
+    void tryAcquire_belowBothThresholds_noBlockStarted() {
         when(rateLimiter.increment(anyString(), eq(WINDOW))).thenReturn(9L);
 
-        limiter.recordFailure("t1", "ada@acme.com", "1.2.3.4");
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isTrue();
 
         verify(rateLimiter, never()).restartWindow(anyString(), eq(WINDOW));
     }
 
     @Test
-    void recordFailure_whileBlocked_doesNotExtendTheBlock() {
-        when(rateLimiter.count(contains("account:"))).thenReturn(10L);
-        when(rateLimiter.count(contains("ip:"))).thenReturn(50L);
+    void tryAcquire_noIp_onlyTheAccountCounts() {
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", null)).isTrue();
 
-        limiter.recordFailure("t1", "ada@acme.com", "1.2.3.4");
+        verify(rateLimiter, never()).increment(contains("ip:"), eq(WINDOW));
+    }
 
-        verify(rateLimiter, never()).increment(anyString(), eq(WINDOW));
-        verify(rateLimiter, never()).restartWindow(anyString(), eq(WINDOW));
+    @Test
+    void accountKey_isTenantPlusEmailHash_emailNormalized() {
+        limiter.tryAcquire("t1", "Ada@Acme.COM", null);
+
+        verify(rateLimiter).increment(contains("account:t1:" + EMAIL_HASH), eq(WINDOW));
+        verify(rateLimiter, never()).increment(contains("ada@acme.com"), eq(WINDOW));
+    }
+
+    @Test
+    void accountKey_sameEmailInAnotherTenant_countsSeparately() {
+        limiter.tryAcquire("t2", "ada@acme.com", null);
+
+        verify(rateLimiter).increment(contains("account:t2:" + EMAIL_HASH), eq(WINDOW));
+        verify(rateLimiter, never()).increment(contains("account:t1:"), eq(WINDOW));
+    }
+
+    @Test
+    void onSuccess_clearsTheAccountAndGivesTheIpAttemptBack() {
+        limiter.onSuccess("t1", "Ada@acme.com", "1.2.3.4");
+
+        verify(rateLimiter).clear(contains("account:t1:" + EMAIL_HASH));
+        verify(rateLimiter).decrement(contains("ip:1.2.3.4"));
+    }
+
+    @Test
+    void release_givesBothAttemptsBack() {
+        limiter.release("t1", "ada@acme.com", "1.2.3.4");
+
+        verify(rateLimiter).decrement(contains("account:t1:" + EMAIL_HASH));
+        verify(rateLimiter).decrement(contains("ip:1.2.3.4"));
+    }
+
+    @Test
+    void releaseAndSuccess_noIp_touchOnlyTheAccount() {
+        limiter.release("t1", "ada@acme.com", null);
+        limiter.onSuccess("t1", "ada@acme.com", null);
+
+        verify(rateLimiter, never()).decrement(contains("ip:"));
     }
 
     @Test

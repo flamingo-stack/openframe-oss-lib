@@ -11,17 +11,18 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
 import java.time.Duration;
+import java.util.List;
 
 import static com.openframe.authz.support.TestHashes.sha256;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,68 +30,70 @@ import static org.mockito.Mockito.when;
 class AuthRateLimiterTest {
 
     private static final Duration HOUR = Duration.ofHours(1);
+    private static final String KEY = new OpenframeRedisKeyBuilder(new OpenframeRedisProperties())
+            .globalKey("auth-limit:reset:ip:1.2.3.4");
 
     @Mock
     private RedisTemplate<String, String> redisTemplate;
-    @Mock
-    private ValueOperations<String, String> values;
 
     private AuthRateLimiter limiter;
 
     @BeforeEach
     void setUp() {
-        OpenframeRedisProperties props = new OpenframeRedisProperties();
-        limiter = new AuthRateLimiter(redisTemplate, new OpenframeRedisKeyBuilder(props));
-        lenient().when(redisTemplate.opsForValue()).thenReturn(values);
+        limiter = new AuthRateLimiter(redisTemplate, new OpenframeRedisKeyBuilder(new OpenframeRedisProperties()));
     }
 
     @Test
-    void increment_firstHit_startsTheWindow() {
-        when(values.increment(anyString())).thenReturn(1L);
-
-        assertThat(limiter.increment("reset:ip:1.2.3.4", HOUR)).isEqualTo(1L);
-
-        verify(redisTemplate).expire(anyString(), eq(HOUR));
-    }
-
-    @Test
-    void increment_laterHitInsideTheWindow_keepsTheWindow() {
-        when(values.increment(anyString())).thenReturn(2L);
-        when(redisTemplate.getExpire(anyString())).thenReturn(1800L);
+    void increment_runsOneAtomicScriptOnTheGlobalKeyWithTheWindowInSeconds() {
+        when(redisTemplate.execute(any(RedisScript.class), eq(List.of(KEY)), eq("3600"))).thenReturn(2L);
 
         assertThat(limiter.increment("reset:ip:1.2.3.4", HOUR)).isEqualTo(2L);
-
-        verify(redisTemplate, never()).expire(anyString(), eq(HOUR));
     }
 
     @Test
     void increment_redisDown_failsOpenWithWarn(CapturedOutput output) {
-        when(values.increment(anyString())).thenThrow(new RedisConnectionFailureException("down"));
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), anyString()))
+                .thenThrow(new RedisConnectionFailureException("down"));
 
         assertThat(limiter.increment("reset:ip:1.2.3.4", HOUR)).isZero();
         assertThat(output).contains("WARN");
     }
 
     @Test
-    void count_redisDown_failsOpenWithWarn(CapturedOutput output) {
-        when(values.get(anyString())).thenThrow(new RedisConnectionFailureException("down"));
+    void increment_scriptReturnsNothing_isZero() {
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), anyString())).thenReturn(null);
 
-        assertThat(limiter.count("login:ip:1.2.3.4")).isZero();
+        assertThat(limiter.increment("reset:ip:1.2.3.4", HOUR)).isZero();
+    }
+
+    @Test
+    void decrement_runsAScriptOnTheGlobalKey() {
+        limiter.decrement("reset:ip:1.2.3.4");
+
+        verify(redisTemplate).execute(any(RedisScript.class), eq(List.of(KEY)));
+    }
+
+    @Test
+    void decrement_redisDown_doesNotThrow(CapturedOutput output) {
+        when(redisTemplate.execute(any(RedisScript.class), anyList()))
+                .thenThrow(new RedisConnectionFailureException("down"));
+
+        assertThatCode(() -> limiter.decrement("reset:ip:1.2.3.4")).doesNotThrowAnyException();
         assertThat(output).contains("WARN");
     }
 
     @Test
-    void count_missingKey_isZero() {
-        when(values.get(anyString())).thenReturn(null);
+    void restartWindow_setsTheTtlOnTheGlobalKey() {
+        limiter.restartWindow("reset:ip:1.2.3.4", HOUR);
 
-        assertThat(limiter.count("login:ip:1.2.3.4")).isZero();
+        verify(redisTemplate).expire(KEY, HOUR);
     }
 
     @Test
-    void count_existingKey_isItsValue() {
-        when(values.get(anyString())).thenReturn("7");
+    void clear_deletesTheGlobalKey() {
+        limiter.clear("reset:ip:1.2.3.4");
 
-        assertThat(limiter.count("login:ip:1.2.3.4")).isEqualTo(7L);
+        verify(redisTemplate).delete(KEY);
     }
 
     @Test
@@ -107,16 +110,5 @@ class AuthRateLimiterTest {
         assertThat(AuthRateLimiter.hash("ada@acme.com"))
                 .isEqualTo(sha256("ada@acme.com"))
                 .matches("^[0-9a-f]{64}$");
-    }
-
-    @Test
-    void increment_keyIsGlobalUnderAuthLimitPrefix() {
-        when(values.increment(anyString())).thenReturn(1L);
-
-        limiter.increment("reset:ip:1.2.3.4", HOUR);
-
-        String expected = new OpenframeRedisKeyBuilder(new OpenframeRedisProperties()).globalKey("auth-limit:reset:ip:1.2.3.4");
-        verify(values).increment(expected);
-        verify(redisTemplate).expire(expected, HOUR);
     }
 }

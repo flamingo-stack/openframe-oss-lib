@@ -15,7 +15,13 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -79,12 +85,46 @@ class AuthRateLimiterIT {
     }
 
     @Test
-    void loginBlock_tenthFailure_blocksForFifteenMinutesAndKeyHoldsNoEmail() {
+    void increment_concurrentHits_eachGetsADistinctCount() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(16);
+        try {
+            List<Callable<Long>> hits = IntStream.range(0, 40)
+                    .<Callable<Long>>mapToObj(i -> () -> limiter.increment("login:ip:1.2.3.4", WINDOW))
+                    .toList();
+            List<Long> counts = pool.invokeAll(hits).stream().map(AuthRateLimiterIT::get).toList();
+
+            assertThat(counts).doesNotHaveDuplicates().hasSize(40).contains(1L, 40L);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void decrement_missingKey_isNotCreated() {
+        limiter.decrement("login:ip:1.2.3.4");
+
+        assertThat(redis.keys("*")).isEmpty();
+    }
+
+    @Test
+    void decrement_existingKey_keepsItsTtl() {
+        limiter.increment("login:ip:1.2.3.4", WINDOW);
+        limiter.increment("login:ip:1.2.3.4", WINDOW);
+
+        limiter.decrement("login:ip:1.2.3.4");
+
+        String key = onlyKey();
+        assertThat(redis.opsForValue().get(key)).isEqualTo("1");
+        assertThat(redis.getExpire(key)).isPositive();
+    }
+
+    @Test
+    void loginBlock_eleventhAttemptRefused_blockLastsFifteenMinutesAndKeyHoldsNoEmail() {
         for (int i = 0; i < 10; i++) {
-            loginLimiter.recordFailure("t1", "ada@acme.com", null);
+            assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isTrue();
         }
 
-        assertThat(loginLimiter.isBlocked("t1", "ada@acme.com", null)).isTrue();
+        assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isFalse();
         String key = onlyKey();
         assertThat(key).doesNotContain("ada").contains(AuthRateLimiter.hash("ada@acme.com"));
         assertThat(redis.getExpire(key)).isBetween(WINDOW.toSeconds() - 10, WINDOW.toSeconds());
@@ -92,19 +132,27 @@ class AuthRateLimiterIT {
 
     @Test
     void loginBlock_afterTheKeyExpires_isLifted() {
-        for (int i = 0; i < 10; i++) {
-            loginLimiter.recordFailure("t1", "ada@acme.com", null);
+        for (int i = 0; i < 11; i++) {
+            loginLimiter.tryAcquire("t1", "ada@acme.com", null);
         }
         redis.expire(onlyKey(), Duration.ofMillis(1));
         await();
 
-        assertThat(loginLimiter.isBlocked("t1", "ada@acme.com", null)).isFalse();
+        assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isTrue();
     }
 
     private static String onlyKey() {
         Set<String> keys = redis.keys("*");
         assertThat(keys).hasSize(1);
         return keys.iterator().next();
+    }
+
+    private static Long get(Future<Long> future) {
+        try {
+            return future.get();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static void await() {
