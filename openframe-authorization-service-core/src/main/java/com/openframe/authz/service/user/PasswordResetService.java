@@ -77,8 +77,14 @@ public class PasswordResetService {
         String token = generateResetToken();
         Duration ttl = Duration.ofMinutes(ttlMinutes);
         redisTemplate.opsForValue().set(tokenKey(token), email, ttl);
-        emailService.sendPasswordResetEmail(email, token);
-        // Only after the send: a failed email must not hold back the retry
+        try {
+            emailService.sendPasswordResetEmail(email, token);
+        } catch (RuntimeException e) {
+            // Still 202: a 500 here would tell the caller the account exists. No active mark, so a retry sends.
+            log.warn("event=password_reset_request outcome=send_failed tenantIds={} ip={} error={}", tenantIds, ip,
+                    e.getClass().getSimpleName());
+            return;
+        }
         redisTemplate.opsForValue().set(activeKey, ACTIVE_MARK, ttl);
         logRequest("sent", tenantIds, ip);
     }
@@ -92,7 +98,13 @@ public class PasswordResetService {
             throw new IllegalArgumentException("Invalid or expired reset token");
         }
 
-        AuthUser user = userService.findActiveByEmail(email).orElse(null);
+        AuthUser user;
+        try {
+            user = userService.findActiveByEmail(email).orElse(null);
+        } catch (IllegalStateException e) {
+            logConfirm("lookup_failed", null, ip);
+            throw e;
+        }
         if (user == null) {
             logConfirm("user_not_found", null, ip);
             throw new IllegalArgumentException("User not found for reset token");
