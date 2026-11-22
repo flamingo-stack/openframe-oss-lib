@@ -119,3 +119,13 @@ form (`<LogCopyIconButton grid />`).
 
 `TenantsTableView` (`features/cloud-tenants`, both variants) is ready too: its one-line cells are in
 `tenant-grid-cells.tsx`, and its open column is kept by hand because the card table hides it below `md` in one variant.
+
+## Tables whose columns are the data's
+
+`TestRunResults` (`ui/test-run.tsx`) and `QueryReportTable` (`ui/query-report-table/`) take `layout` too. Their
+columns are the keys of the rows they are given, so the grid form has no settings gear and keeps no layout: a column
+per key at the card rows' width (176px for a test run, `columnWidth` for a report), resizable for the session, each
+cell the value on one line with a dash for none. While rows are read they draw the grid's own loading form on unnamed
+columns. Both keep their own empty state outside the grid, and the report keeps its title bar and export above it;
+the report's scrollbar track and edge fades are the card rows' only, since the grid scrolls inside itself. A compact
+report (`variant="compact"`) ignores `layout`.
