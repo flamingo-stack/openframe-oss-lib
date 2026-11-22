@@ -1,6 +1,7 @@
 package com.openframe.authz.service.sso;
 
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import com.openframe.data.repository.tenant.SSOPerTenantConfigRepository;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+
+import static com.openframe.core.exception.AuthErrorCode.PASSWORD_LOGIN_DISABLED;
 
 
 @Slf4j
@@ -102,6 +105,15 @@ public class SSOConfigService {
                 .findFirstByTenantIdAndProvider(tenantId, SSOConfig.OPENFRAME_PROVIDER)
                 .map(SSOConfig::isEnabled)
                 .orElse(true);
+    }
+
+    /**
+     * Called by the paths that sign in with, reset or set an OpenFrame password on invitation.
+     */
+    public void refuseUnlessOpenframeLoginEnabled(String tenantId) {
+        if (!isOpenframeLoginEnabled(tenantId)) {
+            throw new AuthFlowException(PASSWORD_LOGIN_DISABLED, PASSWORD_LOGIN_DISABLED.getMessage());
+        }
     }
 
     public List<String> getDefaultProviders() {

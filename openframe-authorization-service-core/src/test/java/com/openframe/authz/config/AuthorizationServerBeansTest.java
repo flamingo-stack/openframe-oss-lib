@@ -1,6 +1,7 @@
 package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.core.exception.AuthFlowException;
@@ -37,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
+import static com.openframe.core.exception.AuthErrorCode.PASSWORD_LOGIN_DISABLED;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -49,6 +51,7 @@ class AuthorizationServerBeansTest {
     private final AuthorizationServerConfig config = new AuthorizationServerConfig();
     private final UserService userService = mock(UserService.class);
     private final TenantService tenantService = mock(TenantService.class);
+    private final SSOConfigService ssoConfigService = mock(SSOConfigService.class);
     private AuthUser owner;
 
     @BeforeEach
@@ -176,7 +179,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldLoadPasswordUserScopedToRequestTenant() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        UserDetailsService details = config.userDetailsService(userService, tenantService);
+        UserDetailsService details = config.userDetailsService(userService, tenantService, ssoConfigService);
 
         UserDetails loaded = details.loadUserByUsername("OWNER@acme.com");
 
@@ -186,7 +189,7 @@ class AuthorizationServerBeansTest {
 
     @Test
     void shouldRefusePasswordLoginWithoutUserInTenantOrWithoutHash() {
-        UserDetailsService details = config.userDetailsService(userService, tenantService);
+        UserDetailsService details = config.userDetailsService(userService, tenantService, ssoConfigService);
         AuthUser ssoOnly = activeUser("u2", TENANT, "sso@acme.com");
         ssoOnly.setPasswordHash(" ");
         when(userService.findActiveByEmailAndTenant("ghost@acme.com", TENANT)).thenReturn(Optional.empty());
@@ -201,7 +204,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldAuthenticatePasswordsWithBcryptOnly() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
 
         assertThat(config.passwordEncoder()).isInstanceOf(BCryptPasswordEncoder.class);
         assertThat(manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!"))
@@ -214,7 +217,7 @@ class AuthorizationServerBeansTest {
     void shouldGiveSameErrorForUnknownUserAndWrongPassword() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
         when(userService.findActiveByEmailAndTenant("ghost@acme.com", TENANT)).thenReturn(Optional.empty());
-        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
 
         assertThatThrownBy(() -> manager.authenticate(new UsernamePasswordAuthenticationToken("ghost@acme.com", "x")))
                 .isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
@@ -223,7 +226,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldRefusePasswordLoginIntoBlockedTenantBeforeLookingUpTheUser() {
         doThrow(new AuthFlowException(ACCOUNT_BLOCKED, ACCOUNT_BLOCKED.getMessage())).when(tenantService).refuseLoginUnlessActive(TENANT);
-        UserDetailsService details = config.userDetailsService(userService, tenantService);
+        UserDetailsService details = config.userDetailsService(userService, tenantService, ssoConfigService);
 
         assertThatThrownBy(() -> details.loadUserByUsername("owner@acme.com"))
                 .isInstanceOf(AuthFlowException.class)
@@ -236,7 +239,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldFailPasswordAuthenticationForBlockedTenantEvenWithTheRightPassword() {
         doThrow(new AuthFlowException(ACCOUNT_BLOCKED, ACCOUNT_BLOCKED.getMessage())).when(tenantService).refuseLoginUnlessActive(TENANT);
-        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
 
         assertThatThrownBy(() -> manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!")))
                 .isInstanceOf(InternalAuthenticationServiceException.class)
@@ -246,11 +249,23 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldAuthenticatePasswordLoginIntoActiveTenant() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
 
         assertThat(manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!"))
                 .isAuthenticated()).isTrue();
         verify(tenantService).refuseLoginUnlessActive(TENANT);
     }
 
+    @Test
+    void shouldRefusePasswordLoginWhenOpenframeLoginIsOffBeforeLookingUpTheUser() {
+        doThrow(new AuthFlowException(PASSWORD_LOGIN_DISABLED, PASSWORD_LOGIN_DISABLED.getMessage()))
+                .when(ssoConfigService).refuseUnlessOpenframeLoginEnabled(TENANT);
+        UserDetailsService details = config.userDetailsService(userService, tenantService, ssoConfigService);
+
+        assertThatThrownBy(() -> details.loadUserByUsername("owner@acme.com"))
+                .isInstanceOf(AuthFlowException.class)
+                .extracting(e -> ((AuthFlowException) e).getCode())
+                .isEqualTo(PASSWORD_LOGIN_DISABLED);
+        verify(userService, never()).findActiveByEmailAndTenant(anyString(), anyString());
+    }
 }
