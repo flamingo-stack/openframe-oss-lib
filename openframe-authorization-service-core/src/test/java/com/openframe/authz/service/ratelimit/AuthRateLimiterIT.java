@@ -95,7 +95,7 @@ class AuthRateLimiterIT {
         for (int i = 0; i < 10; i++) {
             loginLimiter.recordFailure("t1", "ada@acme.com", null);
         }
-        redis.pexpire(onlyKey(), 1);
+        redis.expire(onlyKey(), Duration.ofMillis(1));
         await();
 
         assertThat(loginLimiter.isBlocked("t1", "ada@acme.com", null)).isFalse();
