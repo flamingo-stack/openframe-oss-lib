@@ -120,11 +120,9 @@ class AuthRateLimiterIT {
 
     @Test
     void loginBlock_eleventhAttemptRefused_blockLastsFifteenMinutesAndKeyHoldsNoEmail() {
-        for (int i = 0; i < 10; i++) {
-            assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isTrue();
-        }
+        failTenTimes();
 
-        assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isFalse();
+        assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isEmpty();
         String key = onlyKey();
         assertThat(key).doesNotContain("ada").contains(AuthRateLimiter.hash("ada@acme.com"));
         assertThat(redis.getExpire(key)).isBetween(WINDOW.toSeconds() - 10, WINDOW.toSeconds());
@@ -132,13 +130,18 @@ class AuthRateLimiterIT {
 
     @Test
     void loginBlock_afterTheKeyExpires_isLifted() {
-        for (int i = 0; i < 11; i++) {
-            loginLimiter.tryAcquire("t1", "ada@acme.com", null);
-        }
+        failTenTimes();
+        loginLimiter.tryAcquire("t1", "ada@acme.com", null);
         redis.expire(onlyKey(), Duration.ofMillis(1));
         await();
 
-        assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isTrue();
+        assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isPresent();
+    }
+
+    private void failTenTimes() {
+        for (int i = 0; i < 10; i++) {
+            loginLimiter.onBadPassword(loginLimiter.tryAcquire("t1", "ada@acme.com", null).orElseThrow());
+        }
     }
 
     private static String onlyKey() {

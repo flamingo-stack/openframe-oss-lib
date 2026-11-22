@@ -39,61 +39,88 @@ class LoginAttemptLimiterTest {
 
     @Test
     void tryAcquire_reservesTheAttemptOnAccountAndIp() {
-        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isTrue();
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isPresent();
 
         verify(rateLimiter).increment(contains("account:t1:" + EMAIL_HASH), eq(WINDOW));
         verify(rateLimiter).increment(contains("ip:1.2.3.4"), eq(WINDOW));
     }
 
     @Test
-    void tryAcquire_tenthAttempt_allowedAndStartsTheBlock(CapturedOutput output) {
+    void tryAcquire_tenthAttempt_allowedWithoutStartingABlock(CapturedOutput output) {
         when(rateLimiter.increment(contains("account:"), eq(WINDOW))).thenReturn(10L);
 
-        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isTrue();
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isPresent();
+
+        verify(rateLimiter, never()).restartWindow(anyString(), eq(WINDOW));
+        assertThat(output).doesNotContain("password_login_blocked");
+    }
+
+    @Test
+    void onBadPassword_tenthAttempt_startsTheAccountBlock(CapturedOutput output) {
+        when(rateLimiter.increment(contains("account:"), eq(WINDOW))).thenReturn(10L);
+
+        limiter.onBadPassword(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4").orElseThrow());
 
         verify(rateLimiter).restartWindow(contains("account:t1:" + EMAIL_HASH), eq(WINDOW));
+        verify(rateLimiter, never()).restartWindow(contains("ip:"), eq(WINDOW));
         assertThat(output).contains("event=password_login_blocked", "scope=account", "tenantId=t1", "ip=1.2.3.4")
                 .doesNotContain("ada@acme.com");
     }
 
     @Test
-    void tryAcquire_eleventhAttempt_refusedWithoutExtendingTheBlock() {
-        when(rateLimiter.increment(contains("account:"), eq(WINDOW))).thenReturn(11L);
-
-        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isFalse();
-
-        verify(rateLimiter, never()).restartWindow(anyString(), eq(WINDOW));
-    }
-
-    @Test
-    void tryAcquire_fiftiethFromIp_allowedAndStartsTheIpBlock(CapturedOutput output) {
+    void onBadPassword_fiftiethFromIp_startsTheIpBlock(CapturedOutput output) {
         when(rateLimiter.increment(contains("ip:"), eq(WINDOW))).thenReturn(50L);
 
-        assertThat(limiter.tryAcquire("t2", "bob@other.com", "1.2.3.4")).isTrue();
+        limiter.onBadPassword(limiter.tryAcquire("t2", "bob@other.com", "1.2.3.4").orElseThrow());
 
         verify(rateLimiter).restartWindow(contains("ip:1.2.3.4"), eq(WINDOW));
+        verify(rateLimiter, never()).restartWindow(contains("account:"), eq(WINDOW));
         assertThat(output).contains("event=password_login_blocked", "scope=ip");
     }
 
     @Test
-    void tryAcquire_fiftyFirstFromIp_refusedForAnyAccount() {
-        when(rateLimiter.increment(contains("ip:"), eq(WINDOW))).thenReturn(51L);
-
-        assertThat(limiter.tryAcquire("t2", "bob@other.com", "1.2.3.4")).isFalse();
-    }
-
-    @Test
-    void tryAcquire_belowBothThresholds_noBlockStarted() {
+    void onBadPassword_belowBothThresholds_noBlockStarted() {
         when(rateLimiter.increment(anyString(), eq(WINDOW))).thenReturn(9L);
 
-        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isTrue();
+        limiter.onBadPassword(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4").orElseThrow());
 
         verify(rateLimiter, never()).restartWindow(anyString(), eq(WINDOW));
     }
 
     @Test
+    void onSuccess_atTheThreshold_startsNoBlock(CapturedOutput output) {
+        when(rateLimiter.increment(anyString(), eq(WINDOW))).thenReturn(10L, 50L);
+
+        limiter.onSuccess(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4").orElseThrow());
+
+        verify(rateLimiter, never()).restartWindow(anyString(), eq(WINDOW));
+        assertThat(output).doesNotContain("password_login_blocked");
+    }
+
+    @Test
+    void tryAcquire_eleventhAttempt_refusedAndGivesBothReservationsBack() {
+        when(rateLimiter.increment(contains("account:"), eq(WINDOW))).thenReturn(11L);
+
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", "1.2.3.4")).isEmpty();
+
+        verify(rateLimiter, never()).restartWindow(anyString(), eq(WINDOW));
+        verify(rateLimiter).decrement(contains("account:t1:" + EMAIL_HASH));
+        verify(rateLimiter).decrement(contains("ip:1.2.3.4"));
+    }
+
+    @Test
+    void tryAcquire_fiftyFirstFromIp_refusedAndGivesBothReservationsBack() {
+        when(rateLimiter.increment(contains("ip:"), eq(WINDOW))).thenReturn(51L);
+
+        assertThat(limiter.tryAcquire("t2", "bob@other.com", "1.2.3.4")).isEmpty();
+
+        verify(rateLimiter).decrement(contains("account:t2:"));
+        verify(rateLimiter).decrement(contains("ip:1.2.3.4"));
+    }
+
+    @Test
     void tryAcquire_noIp_onlyTheAccountCounts() {
-        assertThat(limiter.tryAcquire("t1", "ada@acme.com", null)).isTrue();
+        assertThat(limiter.tryAcquire("t1", "ada@acme.com", null)).isPresent();
 
         verify(rateLimiter, never()).increment(contains("ip:"), eq(WINDOW));
     }
@@ -116,7 +143,7 @@ class LoginAttemptLimiterTest {
 
     @Test
     void onSuccess_clearsTheAccountAndGivesTheIpAttemptBack() {
-        limiter.onSuccess("t1", "Ada@acme.com", "1.2.3.4");
+        limiter.onSuccess(new LoginAttemptLimiter.Attempt("t1", "Ada@acme.com", "1.2.3.4", 1, 1));
 
         verify(rateLimiter).clear(contains("account:t1:" + EMAIL_HASH));
         verify(rateLimiter).decrement(contains("ip:1.2.3.4"));
@@ -124,18 +151,21 @@ class LoginAttemptLimiterTest {
 
     @Test
     void release_givesBothAttemptsBack() {
-        limiter.release("t1", "ada@acme.com", "1.2.3.4");
+        limiter.release(new LoginAttemptLimiter.Attempt("t1", "ada@acme.com", "1.2.3.4", 1, 1));
 
         verify(rateLimiter).decrement(contains("account:t1:" + EMAIL_HASH));
         verify(rateLimiter).decrement(contains("ip:1.2.3.4"));
     }
 
     @Test
-    void releaseAndSuccess_noIp_touchOnlyTheAccount() {
-        limiter.release("t1", "ada@acme.com", null);
-        limiter.onSuccess("t1", "ada@acme.com", null);
+    void releaseSuccessAndBadPassword_noIp_touchOnlyTheAccount() {
+        LoginAttemptLimiter.Attempt attempt = new LoginAttemptLimiter.Attempt("t1", "ada@acme.com", null, 10, 0);
+        limiter.release(attempt);
+        limiter.onSuccess(attempt);
+        limiter.onBadPassword(attempt);
 
         verify(rateLimiter, never()).decrement(contains("ip:"));
+        verify(rateLimiter, never()).restartWindow(contains("ip:"), eq(WINDOW));
     }
 
     @Test

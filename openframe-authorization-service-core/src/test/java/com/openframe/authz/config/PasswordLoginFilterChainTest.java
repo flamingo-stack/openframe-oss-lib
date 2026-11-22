@@ -77,7 +77,8 @@ class PasswordLoginFilterChainTest {
     @BeforeEach
     void setUp() {
         reset(tenantService, userService, ssoConfigService, loginAttemptLimiter);
-        when(loginAttemptLimiter.tryAcquire(any(), anyString(), any())).thenReturn(true);
+        when(loginAttemptLimiter.tryAcquire(any(), anyString(), any()))
+                .thenReturn(Optional.of(new LoginAttemptLimiter.Attempt("tenant-a", EMAIL, null, 1, 0)));
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
@@ -121,7 +122,7 @@ class PasswordLoginFilterChainTest {
         AuthUser user = activeUser("u1", "tenant-a", EMAIL);
         user.setPasswordHash(new BCryptPasswordEncoder().encode("right"));
         when(userService.findActiveByEmailAndTenant(anyString(), any())).thenReturn(Optional.of(user));
-        when(loginAttemptLimiter.tryAcquire(any(), anyString(), any())).thenReturn(false);
+        when(loginAttemptLimiter.tryAcquire(any(), anyString(), any())).thenReturn(Optional.empty());
 
         mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "right"))
                 .andExpect(redirectedUrl("/login?error"));

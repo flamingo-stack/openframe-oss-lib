@@ -191,6 +191,45 @@ class ThrottlingAuthenticationManagerTest {
     }
 
     @Test
+    void blockedIp_rightPasswordsFromIt_doNotLockTheAccountElsewhere() {
+        for (int i = 0; i < 50; i++) {
+            fail("ghost" + i + "@acme.com");
+        }
+        for (int i = 0; i < 20; i++) {
+            assertThatThrownBy(() -> login(EMAIL, PASSWORD)).isInstanceOf(BadCredentialsException.class);
+        }
+        enter("5.6.7.8");
+
+        assertThat(login(EMAIL, PASSWORD).isAuthenticated()).isTrue();
+    }
+
+    @Test
+    void lockedAccount_retries_doNotUseUpTheIpLimit() {
+        failTimes(EMAIL, 10);
+        for (int i = 0; i < 40; i++) {
+            assertThatThrownBy(() -> login(EMAIL, PASSWORD)).isInstanceOf(BadCredentialsException.class);
+        }
+        int lookupsBefore = userLookups.get();
+
+        fail("bob@acme.com");
+
+        assertThat(userLookups.get()).isEqualTo(lookupsBefore + 1);
+    }
+
+    @Test
+    void nearTheIpLimit_successfulLogins_startNoBlock() {
+        for (int i = 0; i < 49; i++) {
+            fail("ghost" + i + "@acme.com");
+        }
+
+        for (int i = 0; i < 20; i++) {
+            assertThat(login(EMAIL, PASSWORD).isAuthenticated()).isTrue();
+        }
+
+        assertThat(counters.restarts.get()).isZero();
+    }
+
+    @Test
     void concurrentWrongPasswords_checkAtMostTheLimit() throws Exception {
         lookupDelayMillis = 30;
         int attempts = 30;
