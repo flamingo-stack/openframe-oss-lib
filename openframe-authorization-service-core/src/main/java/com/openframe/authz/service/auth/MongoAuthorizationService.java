@@ -1,6 +1,7 @@
 package com.openframe.authz.service.auth;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.web.ClientIp;
 import com.openframe.core.util.Sha256;
 import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import com.openframe.data.document.oauth.RetiredRefreshToken;
@@ -51,6 +52,13 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
             entity.setSessionId(loginSessionId());
         }
         MongoOAuth2Authorization stored = repository.findById(entity.getId()).orElse(null);
+        if (stored == null) {
+            // Also fires when an existing login session mints a code with no new login
+            log.info("New authorization {} principal={} client={} grant={} tenantId={} ip={}",
+                    authorization.getId(), authorization.getPrincipalName(), authorization.getRegisteredClientId(),
+                    authorization.getAuthorizationGrantType().getValue(), TenantContext.getTenantId(),
+                    ClientIp.current());
+        }
         entity.setTenantId(owningTenantId(stored));
         entity.setRetiredRefreshTokens(retiredTokensAfterSaving(entity, stored));
         repository.save(entity);
