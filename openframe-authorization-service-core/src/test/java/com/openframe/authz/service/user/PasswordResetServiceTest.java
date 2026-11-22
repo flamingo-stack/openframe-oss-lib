@@ -76,6 +76,7 @@ class PasswordResetServiceTest {
         ReflectionTestUtils.setField(service, "maxRequestsPerEmail", 3);
         ReflectionTestUtils.setField(service, "maxRequestsPerIp", 10);
         lenient().when(redisTemplate.opsForValue()).thenReturn(values);
+        lenient().when(rateLimiter.increment(anyString(), any(Duration.class))).thenReturn(0L);
     }
 
     @AfterEach

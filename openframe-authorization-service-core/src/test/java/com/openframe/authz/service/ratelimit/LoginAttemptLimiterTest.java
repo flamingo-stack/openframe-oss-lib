@@ -35,6 +35,7 @@ class LoginAttemptLimiterTest {
     void setUp() {
         limiter = new LoginAttemptLimiter(rateLimiter, 10, 50, WINDOW);
         lenient().when(rateLimiter.count(anyString())).thenReturn(0L);
+        lenient().when(rateLimiter.increment(anyString(), eq(WINDOW))).thenReturn(0L);
     }
 
     @Test
