@@ -156,8 +156,8 @@ class UserServiceTest {
         AuthUser unverified = activeUser("u", "t", "a@acme.com");
         AuthUser verified = activeUser("v", "t", "b@acme.com");
         verified.setEmailVerified(true);
-        when(repository.findById("u")).thenReturn(Optional.of(unverified));
-        when(repository.findById("v")).thenReturn(Optional.of(verified));
+        when(repository.findPrimaryById("u")).thenReturn(Optional.of(unverified));
+        when(repository.findPrimaryById("v")).thenReturn(Optional.of(verified));
 
         service.markEmailVerified("u");
         service.markEmailVerified("v");

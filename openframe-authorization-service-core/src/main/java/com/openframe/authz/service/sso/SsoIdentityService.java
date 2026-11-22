@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.DIRECTORY_ID_CLAIM;
 import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -40,7 +41,7 @@ public class SsoIdentityService {
      */
     public Optional<String> subjectOf(String provider, Map<String, Object> claims) {
         if (MICROSOFT.equals(provider)) {
-            Object tid = claims.get("tid");
+            Object tid = claims.get(DIRECTORY_ID_CLAIM);
             Object oid = claims.get("oid");
             if (tid instanceof String t && hasText(t) && oid instanceof String o && hasText(o)) {
                 return Optional.of(t + ":" + o);

@@ -108,7 +108,8 @@ public class OAuthBffService {
         if (sessionData == null) return Mono.error(new AuthFlowException(SSO_SESSION_EXPIRED, "Authentication session expired. Please try again."));
         return exchangeCodeForTokens(sessionData, code, request)
                 .flatMap(tokens -> redirectTargetResolver
-                        .resolve(sessionData.tenantId(), extractUserId(tokens), sessionData.redirectTo(), request)
+                        .resolveAfterTokenExchange(sessionData.tenantId(), extractUserId(tokens), sessionData.redirectTo(),
+                                request, tokens.access_token())
                         .map(target -> new OAuthCallbackResult(sessionData.tenantId(), target, tokens, sessionData.authMobile()))
                 );
     }

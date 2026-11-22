@@ -80,7 +80,7 @@ class OAuthBffServiceFlowTest {
         stateEncoder = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(key)));
         jwtService = new JwtService(stateEncoder,
                 NimbusJwtDecoder.withPublicKey(key.toRSAPublicKey()).build());
-        lenient().when(redirectTargetResolver.resolve(anyString(), any(), any(), any()))
+        lenient().when(redirectTargetResolver.resolveAfterTokenExchange(anyString(), any(), any(), any(), any()))
                 .thenAnswer(inv -> Mono.just("https://" + inv.getArgument(0) + ".openframe.ai/"));
     }
 
@@ -182,7 +182,7 @@ class OAuthBffServiceFlowTest {
             assertThat(req.url().toString()).isEqualTo(AUTH_SERVER + "/acme/oauth2/token");
             assertThat(req.headers().getFirst(HttpHeaders.AUTHORIZATION)).startsWith("Basic ");
         });
-        verify(redirectTargetResolver).resolve(eq("acme"), eq("user-7"), eq("/devices"), any());
+        verify(redirectTargetResolver).resolveAfterTokenExchange(eq("acme"), eq("user-7"), eq("/devices"), any(), eq(userToken));
     }
 
     @Test
@@ -235,7 +235,7 @@ class OAuthBffServiceFlowTest {
 
         service.handleCallback("code", data.state(), callbackWith(data, service.buildStateJwt(tampered, 180))).block();
 
-        verify(redirectTargetResolver).resolve(eq("acme"), any(), eq(null), any());
+        verify(redirectTargetResolver).resolveAfterTokenExchange(eq("acme"), any(), eq(null), any(), any());
     }
 
     @Test
@@ -248,7 +248,7 @@ class OAuthBffServiceFlowTest {
         StepVerifier.create(service.handleCallback("used-code", data.state(), callbackWith(data, service.buildStateJwt(data, 180))))
                 .expectErrorMessage("Authentication failed. Please try again.")
                 .verify();
-        verify(redirectTargetResolver, never()).resolve(any(), any(), any(), any());
+        verify(redirectTargetResolver, never()).resolveAfterTokenExchange(any(), any(), any(), any(), any());
     }
 
     @Test

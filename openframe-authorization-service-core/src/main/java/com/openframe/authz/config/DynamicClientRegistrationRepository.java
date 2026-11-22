@@ -2,6 +2,7 @@ package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.auth.DynamicClientRegistrationService;
+import com.openframe.authz.service.sso.CompanySsoLoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import static com.openframe.authz.config.tenant.TenantContextFilter.TENANT_ID;
 
+/** Selects the configured identity provider for a shared or company OAuth sign-in. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -27,6 +29,12 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
         String tenantId = resolveTenantId();
         if (tenantId == null) {
             log.warn("ClientRegistration not resolved: tenantId not in context/session, provider={}. OAuth2 flow will fail.", registrationId);
+            return null;
+        }
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        boolean companySsoFlowMismatch = attributes instanceof ServletRequestAttributes servlet
+                && CompanySsoLoginService.isFlowForDifferentClient(servlet.getRequest(), tenantId, registrationId);
+        if (companySsoFlowMismatch) {
             return null;
         }
         try {
