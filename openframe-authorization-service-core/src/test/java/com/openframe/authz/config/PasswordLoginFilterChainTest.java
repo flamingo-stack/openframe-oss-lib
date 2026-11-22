@@ -4,6 +4,7 @@ import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.service.auth.AuthErrorDetailStore;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
+import com.openframe.authz.service.ratelimit.LoginAttemptLimiter;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
@@ -42,6 +43,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -67,12 +69,16 @@ class PasswordLoginFilterChainTest {
     private SSOConfigService ssoConfigService;
     @Autowired
     private UserService userService;
+    @Autowired
+    private LoginAttemptLimiter loginAttemptLimiter;
 
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        reset(tenantService, userService, ssoConfigService);
+        reset(tenantService, userService, ssoConfigService, loginAttemptLimiter);
+        when(loginAttemptLimiter.tryAcquire(any(), anyString(), any()))
+                .thenReturn(Optional.of(new LoginAttemptLimiter.Attempt("tenant-a", EMAIL, null, 1, 0)));
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
@@ -106,6 +112,19 @@ class PasswordLoginFilterChainTest {
         when(userService.findActiveByEmailAndTenant(anyString(), any())).thenReturn(Optional.of(user));
 
         mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "wrong"))
+                .andExpect(redirectedUrl("/login?error"));
+        verify(loginAttemptLimiter).tryAcquire(any(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("Given the login limit is reached, when the right password is posted, then the login page shows its error")
+    void loginLimitReached_rightPasswordStaysOnTheLoginPage() throws Exception {
+        AuthUser user = activeUser("u1", "tenant-a", EMAIL);
+        user.setPasswordHash(new BCryptPasswordEncoder().encode("right"));
+        when(userService.findActiveByEmailAndTenant(anyString(), any())).thenReturn(Optional.of(user));
+        when(loginAttemptLimiter.tryAcquire(any(), anyString(), any())).thenReturn(Optional.empty());
+
+        mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "right"))
                 .andExpect(redirectedUrl("/login?error"));
     }
 
@@ -143,8 +162,15 @@ class PasswordLoginFilterChainTest {
         }
 
         @Bean
-        AuthenticationManager authenticationManager(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-            return authorizationServerConfig.authenticationManager(userDetailsService, passwordEncoder);
+        LoginAttemptLimiter loginAttemptLimiter() {
+            return mock(LoginAttemptLimiter.class);
+        }
+
+        @Bean
+        AuthenticationManager authenticationManager(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder,
+                                                    LoginAttemptLimiter loginAttemptLimiter) {
+            return authorizationServerConfig.authenticationManager(userDetailsService, passwordEncoder,
+                    loginAttemptLimiter);
         }
 
         @Bean

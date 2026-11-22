@@ -1,5 +1,7 @@
 package com.openframe.notification.mail.service;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import com.openframe.notification.mail.config.HubspotVerificationMailProperties;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -7,7 +9,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -24,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Timeout(10)
+@ExtendWith(OutputCaptureExtension.class)
 class HubspotApiEmailServiceTest {
 
     private static final String TO = "ada@acme.com";
@@ -58,6 +65,30 @@ class HubspotApiEmailServiceTest {
 
         assertThat(requests).containsExactly(new HubspotRequest("POST", "/marketing/v4/email/single-send",
                 "Bearer hs-token", "application/json", downloadLinkPayload()));
+    }
+
+    @Test
+    void send_hubspotAccepts_logsSentWithoutRecipientAddress(CapturedOutput output) {
+        hubspotAnswers(200, ACCEPTED);
+
+        send(service -> service.sendDownloadLinkEmail(TO, DOWNLOAD_ID));
+
+        assertThat(output).contains("[HubSpot API]", "email sent").doesNotContain(TO);
+    }
+
+    @Test
+    void send_debugLogging_neverLogsRecipientOrResetLink(CapturedOutput output) {
+        hubspotAnswers(200, ACCEPTED);
+        Logger logger = (Logger) LoggerFactory.getLogger(HubspotApiEmailService.class);
+        Level before = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        try {
+            send(service -> service.sendPasswordResetEmail(TO, "secret-reset-token"));
+        } finally {
+            logger.setLevel(before);
+        }
+
+        assertThat(output).contains("[HubSpot API]").doesNotContain(TO).doesNotContain("secret-reset-token");
     }
 
     @Test

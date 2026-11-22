@@ -204,7 +204,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldAuthenticatePasswordsWithBcryptOnly() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
+        var manager = config.passwordAuthenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
 
         assertThat(config.passwordEncoder()).isInstanceOf(BCryptPasswordEncoder.class);
         assertThat(manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!"))
@@ -217,7 +217,7 @@ class AuthorizationServerBeansTest {
     void shouldGiveSameErrorForUnknownUserAndWrongPassword() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
         when(userService.findActiveByEmailAndTenant("ghost@acme.com", TENANT)).thenReturn(Optional.empty());
-        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
+        var manager = config.passwordAuthenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
 
         assertThatThrownBy(() -> manager.authenticate(new UsernamePasswordAuthenticationToken("ghost@acme.com", "x")))
                 .isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
@@ -239,7 +239,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldFailPasswordAuthenticationForBlockedTenantEvenWithTheRightPassword() {
         doThrow(new AuthFlowException(ACCOUNT_BLOCKED, ACCOUNT_BLOCKED.getMessage())).when(tenantService).refuseLoginUnlessActive(TENANT);
-        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
+        var manager = config.passwordAuthenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
 
         assertThatThrownBy(() -> manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!")))
                 .isInstanceOf(InternalAuthenticationServiceException.class)
@@ -249,7 +249,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldAuthenticatePasswordLoginIntoActiveTenant() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
+        var manager = config.passwordAuthenticationManager(config.userDetailsService(userService, tenantService, ssoConfigService), config.passwordEncoder());
 
         assertThat(manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!"))
                 .isAuthenticated()).isTrue();
