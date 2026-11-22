@@ -6,6 +6,7 @@ import com.openframe.authz.exception.UserActiveInAnotherTenantException;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.processor.UserDeactivationProcessor;
+import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.validation.InvitationValidator;
 import com.openframe.data.document.auth.AuthInvitation;
@@ -29,6 +30,7 @@ public class InvitationRegistrationService {
     private final UserDeactivationProcessor userDeactivationProcessor;
     private final InvitationValidator invitationValidator;
     private final SsoIdentityService ssoIdentityService;
+    private final SSOConfigService ssoConfigService;
 
     /**
      * Whether accepting this invitation would CREATE a user in the target tenant (vs an existing
@@ -37,6 +39,16 @@ public class InvitationRegistrationService {
     public boolean isNewMemberJoin(String invitationId) {
         AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(invitationId);
         return userService.findActiveByEmailAndTenant(invitation.getEmail(), invitation.getTenantId()).isEmpty();
+    }
+
+    /**
+     * Acceptance with a password chosen by the invitee. The SSO flows call
+     * {@link #registerByInvitation} directly, so they work while OpenFrame login is off.
+     */
+    public AuthUser registerByInvitationWithPassword(InvitationRegistrationRequest request) {
+        AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(request.getInvitationId());
+        ssoConfigService.refuseUnlessOpenframeLoginEnabled(invitation.getTenantId());
+        return registerByInvitation(request);
     }
 
     public AuthUser registerByInvitation(InvitationRegistrationRequest request) {
