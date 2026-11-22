@@ -7,12 +7,10 @@ import com.openframe.authz.service.tenant.TenantDiscoveryService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.core.email.EmailVerdict;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,9 +39,8 @@ public class TenantDiscoveryController {
     @GetMapping(value = "/discover", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
     public TenantDiscoveryResponse discoverTenants(
-            @RequestParam @Email @NotBlank String email, HttpServletResponse response) {
+            @RequestParam @Email @NotBlank String email) {
 
-        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         log.debug("Tenant discovery request for email: {}", email);
         return tenantDiscoveryService.discoverTenantForEmail(email.toLowerCase(Locale.ROOT));
     }

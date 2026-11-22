@@ -2,7 +2,6 @@ package com.openframe.authz.security;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
-import com.openframe.authz.service.sso.CompanySsoLoginService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.web.ClientIp;
 import jakarta.servlet.ServletException;
@@ -43,10 +42,6 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
-        if (authentication instanceof OAuth2AuthenticationToken && CompanySsoLoginService.hasFlow(request)) {
-            ssoFlowSuccessHandler.onAuthenticationSuccess(request, response, authentication);
-            return;
-        }
         try {
             String tenantId = TenantContext.getTenantId();
             String email = extractEmail(authentication);
