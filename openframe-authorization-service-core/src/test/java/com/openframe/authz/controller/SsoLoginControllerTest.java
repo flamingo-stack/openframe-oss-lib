@@ -1,6 +1,7 @@
 package com.openframe.authz.controller;
 
  import com.openframe.authz.dto.Touchpoint;
+import com.openframe.authz.dto.SsoLoginInitRequest;
 import com.openframe.authz.dto.Visit;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -14,6 +15,7 @@ import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.SsoLoginService;
 import com.openframe.authz.service.tenant.TenantRegistrationService;
 import com.openframe.authz.web.AuthErrorResponder;
+import com.openframe.core.config.AuthHardeningProperties;
 import com.openframe.core.constants.SsoFlowCookieNames;
 import com.openframe.data.document.auth.SsoIdentity;
 import com.openframe.data.document.tenant.Tenant;
@@ -46,6 +48,7 @@ import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
 import static com.openframe.authz.support.SsoTestFixtures.tenant;
 import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
@@ -80,8 +83,13 @@ class SsoLoginControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new SsoLoginController(ssoLoginService, signupTicketService, ssoIdentityService,
-                new SsoFlowCookies("Lax"), codec, registrationService, authErrorResponder);
+        controller = controller(false);
+    }
+
+    private SsoLoginController controller(boolean enabled) {
+        return new SsoLoginController(ssoLoginService, signupTicketService, ssoIdentityService,
+                new SsoFlowCookies("Lax"), codec, registrationService, authErrorResponder,
+                new AuthHardeningProperties(enabled));
     }
 
     @AfterEach
@@ -124,6 +132,33 @@ class SsoLoginControllerTest {
         controller.startSsoLogin(new com.openframe.authz.dto.SsoLoginInitRequest(), request, response);
 
         verify(authErrorResponder).send(eq(response), eq(request), eq("sso-login-init"), any(), eq(SSO_LOGIN_FAILED));
+    }
+
+    @Test
+    void disabledHardeningRejectsAStaleCompanySelectionWithoutChangingFlowCookies() throws Exception {
+        MockHttpServletRequest request = bind(new MockHttpServletRequest("GET", "/oauth/login/sso"));
+
+        controller.startCompanySsoLogin(new SsoLoginInitRequest(), "old-handle", request, response);
+
+        verify(authErrorResponder).send(eq(response), eq(request), eq("sso-company-login-disabled"), any(),
+                eq(SSO_SESSION_EXPIRED));
+        verifyNoInteractions(ssoLoginService);
+        assertThat(response.getCookies()).isEmpty();
+    }
+
+    @Test
+    void enabledHardeningStartsTheCompanyProviderFromItsSelection() throws Exception {
+        MockHttpServletRequest request = bind(new MockHttpServletRequest("GET", "/oauth/login/sso"));
+        SsoLoginInitRequest login = new SsoLoginInitRequest("microsoft", null, false);
+        when(ssoLoginService.startCompanyLogin(login, "handle", request)).thenReturn(
+                new SsoAuthorizeData("cookie-value", 600, "microsoft", "state", "/oauth2/authorization/microsoft"));
+
+        controller(true).startCompanySsoLogin(login, "handle", request, response);
+
+        assertThat(response.getStatus()).isEqualTo(303);
+        assertThat(response.getHeader("Location")).endsWith("/oauth2/authorization/microsoft");
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.getHeaders("Set-Cookie")).anyMatch(h -> h.startsWith("of_sso_login=cookie-value"));
     }
 
     @Test

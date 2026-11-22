@@ -1,9 +1,11 @@
 package com.openframe.authz.service.tenant;
 
 import com.openframe.authz.dto.TenantDiscoveryResponse;
+import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
 import com.openframe.authz.service.sso.CompanySsoLoginService;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.config.AuthHardeningProperties;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
@@ -15,10 +17,11 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static java.util.Locale.ROOT;
 
-/** Resolves sign-in choices without publishing tenant metadata for unregistered addresses. */
+/** Resolves sign-in choices under the deployment's workspace discovery policy. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,6 +33,8 @@ public class TenantDiscoveryService {
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
     private final CompanySsoLoginService companySsoLoginService;
+    private final GlobalDomainPolicyLookup globalDomainPolicyLookup;
+    private final AuthHardeningProperties hardening;
 
     public TenantDiscoveryResponse discoverTenantForEmail(String email) {
         log.debug("Discovering tenants for email: {}", email);
@@ -52,12 +57,26 @@ public class TenantDiscoveryService {
 
     private TenantDiscoveryResponse respondByEmailDomain(String email) {
         String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
+        if (!hardening.enabled()) {
+            return findLegacyTenant(domain).map(tenant -> tenantFound(email, tenant)).orElseGet(() -> noAccounts(email));
+        }
 
         return ssoConfigService.findAutoProvisionByDomain(domain)
                 .filter(config -> !OPENFRAME_PROVIDER.equalsIgnoreCase(config.getProvider()))
-                .filter(config -> tenantService.findById(config.getTenantId()).filter(Tenant::isActive).isPresent())
+                .filter(config -> findActiveTenant(config.getTenantId()).isPresent())
                 .map(config -> companySsoForUnknownAccount(email, config))
                 .orElseGet(() -> noAccounts(email));
+    }
+
+    private Optional<Tenant> findLegacyTenant(String domain) {
+        return ssoConfigService.findAutoProvisionByDomain(domain)
+                .flatMap(config -> findActiveTenant(config.getTenantId()))
+                .or(() -> globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                        .flatMap(this::findActiveTenant));
+    }
+
+    private Optional<Tenant> findActiveTenant(String tenantId) {
+        return tenantService.findById(tenantId).filter(Tenant::isActive);
     }
 
     private TenantDiscoveryResponse companySsoForUnknownAccount(String email, SSOPerTenantConfig config) {
@@ -73,15 +92,18 @@ public class TenantDiscoveryService {
     private TenantDiscoveryResponse tenantFound(String email, Tenant tenant) {
         boolean openframeLoginEnabled = ssoConfigService.isOpenframeLoginEnabled(tenant.getId());
         List<String> customProviders = ssoConfigService.getCustomProvidersForTenant(tenant.getId());
+        String handle = hardening.enabled() && !customProviders.isEmpty()
+                ? companySsoLoginService.issue(tenant.getId(), customProviders) : null;
         return TenantDiscoveryResponse.builder()
                 .email(email)
                 .hasExistingAccounts(true)
                 .tenantId(tenant.getId())
+                .tenantName(hardening.enabled() ? null : tenant.getName())
                 .domain(tenant.getDomain())
                 .authProviders(availableAuthProviders(tenant, openframeLoginEnabled))
                 .openframeLoginEnabled(openframeLoginEnabled)
                 .customProviders(customProviders)
-                .ssoLoginHandle(customProviders.isEmpty() ? null : companySsoLoginService.issue(tenant.getId(), customProviders))
+                .ssoLoginHandle(handle)
                 .build();
     }
 
