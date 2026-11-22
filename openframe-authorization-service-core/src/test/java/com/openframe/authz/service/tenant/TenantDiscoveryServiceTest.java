@@ -138,7 +138,7 @@ class TenantDiscoveryServiceTest {
         when(ssoConfigService.findAutoProvisionByDomain("acme.com")).thenReturn(Optional.of(config));
         when(tenantService.findById("sso-tenant")).thenReturn(Optional.of(tenant("sso-tenant", TenantStatus.ACTIVE)));
         MockMvc http = MockMvcBuilders.standaloneSetup(new TenantDiscoveryController(discoveryService(false), userService,
-                mock(EmailDomainPolicy.class))).build();
+                mock(EmailDomainPolicy.class), new AuthHardeningProperties(false))).build();
 
         http.perform(get("/tenant/discover").param("email", "new@acme.com"))
                 .andExpect(status().isOk())

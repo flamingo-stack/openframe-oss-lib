@@ -5,6 +5,7 @@ import com.openframe.authz.dto.EmailDomainAllowedResponse;
 import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.tenant.TenantDiscoveryService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.config.AuthHardeningProperties;
 import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.core.email.EmailVerdict;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,6 +34,7 @@ public class TenantDiscoveryController {
     private final TenantDiscoveryService tenantDiscoveryService;
     private final UserService userService;
     private final EmailDomainPolicy emailDomainPolicy;
+    private final AuthHardeningProperties hardening;
 
     /**
      * Discover tenants and authentication providers for a given email
@@ -48,12 +50,7 @@ public class TenantDiscoveryController {
         return tenantDiscoveryService.discoverTenantForEmail(email.toLowerCase(Locale.ROOT));
     }
 
-    /**
-     * Check whether an email is available for a new registration.
-     * Available means no active user currently owns the address (matching the global uniqueness
-     * check enforced by tenant registration) AND its domain passes the email domain policy —
-     * the same two rules registration itself applies.
-     */
+    /** Keeps the legacy signup check usable without exposing existing accounts when hardening is enabled. */
     @GetMapping(value = "/email-available", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
     public EmailAvailabilityResponse emailAvailable(
@@ -61,9 +58,7 @@ public class TenantDiscoveryController {
 
         String normalizedEmail = email.toLowerCase(Locale.ROOT);
 
-        // Cheap local lookup first, so an already-registered address never triggers the
-        // domain policy's external disposable-domain call.
-        boolean taken = userService.existsActiveByEmail(normalizedEmail);
+        boolean taken = !hardening.enabled() && userService.existsActiveByEmail(normalizedEmail);
         if (taken) {
             return EmailAvailabilityResponse.taken();
         }
