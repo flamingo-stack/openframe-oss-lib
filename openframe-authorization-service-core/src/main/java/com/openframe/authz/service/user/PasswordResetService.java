@@ -1,8 +1,11 @@
 package com.openframe.authz.service.user;
 
 import com.openframe.authz.service.auth.MongoAuthorizationService;
+import com.openframe.authz.service.ratelimit.AuthRateLimiter;
+import com.openframe.authz.service.ratelimit.LoginAttemptLimiter;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.web.ClientIp;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
@@ -16,12 +19,20 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.List;
 
+import static com.openframe.authz.service.ratelimit.AuthRateLimiter.hash;
 import static com.openframe.authz.util.ResetTokenUtil.generateResetToken;
 
+/**
+ * Password reset by email. A request never tells the caller anything: whether the email exists, is over the
+ * limits or already has a live token, the controller answers 202. Logs carry an outcome, never the email.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class PasswordResetService {
+
+    private static final Duration LIMIT_WINDOW = Duration.ofHours(1);
+    private static final String ACTIVE_MARK = "1";
 
     private final RedisTemplate<String, String> redisTemplate;
     private final OpenframeRedisProperties redisProperties;
@@ -30,53 +41,117 @@ public class PasswordResetService {
     private final EmailService emailService;
     private final MongoAuthorizationService authorizationService;
     private final SSOConfigService ssoConfigService;
+    private final AuthRateLimiter rateLimiter;
+    private final LoginAttemptLimiter loginAttemptLimiter;
 
     @Value("${openframe.password-reset.ttlMinutes:30}")
     private int ttlMinutes;
 
+    @Value("${openframe.password-reset.limit.per-email-per-hour:3}")
+    private int maxRequestsPerEmail;
+
+    @Value("${openframe.password-reset.limit.per-ip-per-hour:10}")
+    private int maxRequestsPerIp;
+
     public void createResetToken(String email) {
-        List<String> tenantIds = userService.findActiveTenantIdsByEmail(email);
-        if (tenantIds.isEmpty()) {
-            log.warn("Password reset requested for non-existing email: {} ip={}", email, ClientIp.current());
+        String ip = ClientIp.current();
+        if (overLimit(email, ip)) {
+            logRequest("rate_limited", List.of(), ip);
             return;
         }
-        // Silent like an unknown email: the response must not reveal that the account exists.
+        List<String> tenantIds = userService.findActiveTenantIdsByEmail(email);
+        if (tenantIds.isEmpty()) {
+            logRequest("unknown_email", tenantIds, ip);
+            return;
+        }
         if (tenantIds.stream().noneMatch(ssoConfigService::isOpenframeLoginEnabled)) {
-            log.warn("Password reset requested while OpenFrame login is off: tenantIds={} ip={}", tenantIds,
-                    ClientIp.current());
+            logRequest("login_disabled", tenantIds, ip);
+            return;
+        }
+        String activeKey = activeKey(email);
+        Duration ttl = Duration.ofMinutes(ttlMinutes);
+        // Claimed before the send, atomically: parallel requests for one email send one email
+        if (!Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(activeKey, ACTIVE_MARK, ttl))) {
+            logRequest("token_active", tenantIds, ip);
             return;
         }
 
         String token = generateResetToken();
-        String key = keyBuilder.tenantKey(redisProperties.getKeys().getPasswordResetPrefix() + ":" + token);
-        redisTemplate.opsForValue().set(key, email, Duration.ofMinutes(ttlMinutes));
-        log.info("Password reset token issued for email: {} ip={}", email, ClientIp.current());
-
-        emailService.sendPasswordResetEmail(email, token);
+        redisTemplate.opsForValue().set(tokenKey(token), email, ttl);
+        try {
+            emailService.sendPasswordResetEmail(email, token);
+        } catch (RuntimeException e) {
+            // Still 202: a 500 here would tell the caller the account exists. The mark goes, so a retry sends.
+            redisTemplate.delete(activeKey);
+            log.warn("event=password_reset_request outcome=send_failed tenantIds={} ip={} error={}", tenantIds, ip,
+                    e.getClass().getSimpleName());
+            return;
+        }
+        logRequest("sent", tenantIds, ip);
     }
 
     public void resetPassword(String token, String newPassword) {
-        String key = keyBuilder.tenantKey(redisProperties.getKeys().getPasswordResetPrefix() + ":" + token);
+        String ip = ClientIp.current();
+        String key = tokenKey(token);
         String email = redisTemplate.opsForValue().get(key);
         if (email == null) {
+            logConfirm("invalid_token", null, ip);
             throw new IllegalArgumentException("Invalid or expired reset token");
         }
 
-        AuthUser user = userService.findActiveByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found for reset token"));
+        AuthUser user;
+        try {
+            user = userService.findActiveByEmail(email).orElse(null);
+        } catch (IllegalStateException e) {
+            logConfirm("lookup_failed", null, ip);
+            throw e;
+        }
+        if (user == null) {
+            logConfirm("user_not_found", null, ip);
+            throw new IllegalArgumentException("User not found for reset token");
+        }
 
-        // The switch may have been turned off after the email was sent.
-        ssoConfigService.refuseUnlessOpenframeLoginEnabled(user.getTenantId());
+        try {
+            // The switch may have been turned off after the email was sent.
+            ssoConfigService.refuseUnlessOpenframeLoginEnabled(user.getTenantId());
+        } catch (AuthFlowException e) {
+            logConfirm("login_disabled", user, ip);
+            throw e;
+        }
 
         userService.updatePassword(user.getId(), newPassword);
 
         // The old password may be compromised: revoke existing sessions' refresh tokens
         int revoked = authorizationService.revokeAllForPrincipal(user.getEmail());
-        log.info("Revoked {} refresh token(s) after password reset for user {} ip={}", revoked, user.getId(),
-                ClientIp.current());
+        log.info("Revoked {} refresh token(s) after password reset for user {} ip={}", revoked, user.getId(), ip);
 
         redisTemplate.delete(key);
+        redisTemplate.delete(activeKey(email));
+        loginAttemptLimiter.clearAccount(user.getTenantId(), email);
+        logConfirm("success", user, ip);
+    }
+
+    // Both counters always move, so an unknown email costs the caller the same as a real one.
+    private boolean overLimit(String email, String ip) {
+        boolean emailOver = rateLimiter.increment("reset:email:" + hash(email), LIMIT_WINDOW) > maxRequestsPerEmail;
+        boolean ipOver = ip != null && rateLimiter.increment("reset:ip:" + ip, LIMIT_WINDOW) > maxRequestsPerIp;
+        return emailOver || ipOver;
+    }
+
+    private String tokenKey(String token) {
+        return keyBuilder.tenantKey(redisProperties.getKeys().getPasswordResetPrefix() + ":" + token);
+    }
+
+    private String activeKey(String email) {
+        return keyBuilder.tenantKey(redisProperties.getKeys().getPasswordResetPrefix() + ":active:" + hash(email));
+    }
+
+    private static void logRequest(String outcome, List<String> tenantIds, String ip) {
+        log.info("event=password_reset_request outcome={} tenantIds={} ip={}", outcome, tenantIds, ip);
+    }
+
+    private static void logConfirm(String outcome, AuthUser user, String ip) {
+        log.info("event=password_reset_confirm outcome={} userId={} tenantId={} ip={}", outcome,
+                user == null ? null : user.getId(), user == null ? null : user.getTenantId(), ip);
     }
 }
-
-
