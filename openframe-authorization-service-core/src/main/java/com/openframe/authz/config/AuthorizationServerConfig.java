@@ -20,10 +20,12 @@ import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.config.AuthHardeningProperties;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.model.audit.AuditConstants;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -73,6 +75,7 @@ import static com.openframe.authz.config.tenant.TenantContext.getTenantId;
  */
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(AuthHardeningProperties.class)
 @Slf4j
 public class AuthorizationServerConfig {
 
