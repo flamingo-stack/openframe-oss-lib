@@ -16,15 +16,18 @@ import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.util.SsoAuthentication;
+import com.openframe.authz.web.ClientIp;
 import com.openframe.authz.web.DownloadCookieReader;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
+import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
@@ -32,6 +35,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.Optional;
 
+import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.DIRECTORY_ID_CLAIM;
 import static com.openframe.authz.config.oidc.MicrosoftSSOProperties.MICROSOFT;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
@@ -168,8 +172,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
                                     Authentication authentication, Cookie cookie, SsoLoginCookiePayload payload) throws IOException {
         OidcUser user = requireOidcUser(authentication);
         String email = requireEmail(user);
-        CompanySsoLoginService.Flow flow = CompanySsoLoginService.takeFlow(request)
-                .orElseThrow(LoginSsoHandler::invalidCompanyLogin);
+        CompanySsoLoginService.Flow flow = CompanySsoLoginService.takeFlow(request);
         String provider = SsoAuthentication.registrationId(authentication);
         String tenantId = flow.getTenantId();
         if (!flow.getState().equals(payload.s()) || !flow.getProvider().equals(provider)
@@ -177,11 +180,11 @@ public class LoginSsoHandler implements SsoFlowHandler {
             throw invalidCompanyLogin();
         }
         tenantService.refuseLoginUnlessActive(tenantId);
-        var config = ssoConfigService.getSSOConfig(tenantId, provider)
+        SSOPerTenantConfig config = ssoConfigService.getSSOConfig(tenantId, provider)
                 .orElseThrow(LoginSsoHandler::invalidCompanyLogin);
         String microsoftDirectory = config.getMsTenantId();
         boolean directoryBound = MICROSOFT.equals(provider) && hasText(microsoftDirectory);
-        if (directoryBound && !microsoftDirectory.equalsIgnoreCase(user.getClaimAsString("tid"))) {
+        if (directoryBound && !microsoftDirectory.equalsIgnoreCase(user.getClaimAsString(DIRECTORY_ID_CLAIM))) {
             throw invalidCompanyLogin();
         }
 
@@ -197,6 +200,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
             userService.markEmailVerified(account.getId());
         }
         sessionPrincipalBinder.bind(authentication, account, request, response);
+        log.info("Login success email={} tenantId={} provider={} ip={} ua={}", account.getEmail(), tenantId, provider,
+                ClientIp.of(request), request.getHeader(HttpHeaders.USER_AGENT));
         clearFlowCookieAndRedirect(response, cookie, tenantId, payload.redirectTo(), payload.authMobile());
     }
 
@@ -210,12 +215,11 @@ public class LoginSsoHandler implements SsoFlowHandler {
             requireEmailTrustedForRouting(provider, user);
         }
         return userService.findActiveByEmailAndTenant(email, tenantId)
-                .or(() -> ssoOidcUserService.autoProvisionByCompanyDomain(tenantId, provider, user))
-                .orElseThrow(LoginSsoHandler::invalidCompanyLogin);
+                .orElseGet(() -> ssoOidcUserService.provisionCompanyAccount(tenantId, provider, user));
     }
 
     private static AuthFlowException invalidCompanyLogin() {
-        return new AuthFlowException(SSO_SESSION_INVALID, "SSO session is invalid. Please try again.");
+        return new AuthFlowException(SSO_SESSION_INVALID, SSO_SESSION_INVALID.getMessage());
     }
 
     private String registrationId(Authentication authentication, SsoLoginCookiePayload payload) {

@@ -1,6 +1,7 @@
 package com.openframe.data.config;
 
 import com.openframe.data.document.audit.AuditEvent;
+import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
+import org.springframework.data.mongodb.core.index.IndexOperations;
 import org.springframework.data.mongodb.core.index.PartialIndexFilter;
 import org.springframework.data.mongodb.core.query.Criteria;
 
@@ -32,6 +34,7 @@ public class MongoIndexConfig implements SmartLifecycle {
     private static final String SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX = "script_schedules_tenant_name_notDeleted_unique";
 
     private static final Duration AUDIT_EVENTS_RETENTION = Duration.ofDays(7);
+    private static final String ACCESS_TOKEN_VALUE = "accessTokenValue";
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -77,12 +80,7 @@ public class MongoIndexConfig implements SmartLifecycle {
                                     .unique()
                                     .named("sso_identities_provider_subject_unique"));
 
-        // Every unknown refresh token ends in this lookup. Same name and options as the
-        // @CompoundIndex on MongoOAuth2Authorization, so the two stay idempotent.
-        mongoTemplate.indexOps("oauth2_authorizations")
-            .ensureIndex(new Index().on("retiredRefreshTokens.value", Sort.Direction.ASC)
-                                    .sparse()
-                                    .named("oauth2_authorizations_retired_refresh_token"));
+        initOAuthAuthorizationIndexes();
 
         mongoTemplate.indexOps("application_events")
             .ensureIndex(new Index().on("userId", Sort.Direction.ASC)
@@ -143,6 +141,21 @@ public class MongoIndexConfig implements SmartLifecycle {
                                 .in(ScriptStatus.ACTIVE.name(), ScriptStatus.ARCHIVED.name()))));
 
         initKnowledgeBaseFolderIndexes();
+    }
+
+    /** Keeps access and retired refresh tokens searchable when automatic index creation is disabled. */
+    private void initOAuthAuthorizationIndexes() {
+        IndexOperations indexes = mongoTemplate.indexOps(MongoOAuth2Authorization.class);
+        indexes.createIndex(new Index().on("retiredRefreshTokens.value", Sort.Direction.ASC)
+                .sparse()
+                .named("oauth2_authorizations_retired_refresh_token"));
+
+        boolean hasUnfilteredAccessTokenPrefixIndex = indexes.getIndexInfo().stream()
+                .anyMatch(index -> index.getPartialFilterExpression() == null
+                        && ACCESS_TOKEN_VALUE.equals(index.getIndexFields().getFirst().getKey()));
+        if (!hasUnfilteredAccessTokenPrefixIndex) {
+            indexes.createIndex(new Index().on(ACCESS_TOKEN_VALUE, Sort.Direction.ASC).named(ACCESS_TOKEN_VALUE));
+        }
     }
 
     /**

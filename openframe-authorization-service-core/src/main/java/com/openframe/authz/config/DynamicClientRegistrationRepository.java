@@ -33,9 +33,7 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
         }
         RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
         boolean companySsoFlowMismatch = attributes instanceof ServletRequestAttributes servlet
-                && CompanySsoLoginService.currentFlow(servlet.getRequest())
-                        .filter(flow -> !flow.getTenantId().equals(tenantId) || !flow.getProvider().equals(registrationId))
-                        .isPresent();
+                && CompanySsoLoginService.isFlowForDifferentClient(servlet.getRequest(), tenantId, registrationId);
         if (companySsoFlowMismatch) {
             return null;
         }

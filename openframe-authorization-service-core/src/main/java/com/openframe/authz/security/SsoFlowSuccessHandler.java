@@ -56,7 +56,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 .orElse(null);
 
         if (handler == null && authentication instanceof OAuth2AuthenticationToken
-                && CompanySsoLoginService.currentFlow(request).isPresent()) {
+                && CompanySsoLoginService.hasFlow(request)) {
             CompanySsoLoginService.clearSession(request);
             AuthStateUtils.clearSsoFlowCookies(response);
             authErrorResponder.send(response, request, "sso-company-login-state-mismatch",

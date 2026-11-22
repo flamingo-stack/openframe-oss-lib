@@ -41,7 +41,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
-        if (authentication instanceof OAuth2AuthenticationToken && CompanySsoLoginService.currentFlow(request).isPresent()) {
+        if (authentication instanceof OAuth2AuthenticationToken && CompanySsoLoginService.hasFlow(request)) {
             ssoFlowSuccessHandler.onAuthenticationSuccess(request, response, authentication);
             return;
         }

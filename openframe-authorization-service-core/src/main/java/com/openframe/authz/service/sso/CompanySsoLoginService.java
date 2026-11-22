@@ -68,19 +68,27 @@ public class CompanySsoLoginService {
         session.setAttribute(SESSION_FLOW, new Flow(selection.getTenantId(), provider, state));
     }
 
-    public static Optional<Flow> currentFlow(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        return session != null && session.getAttribute(SESSION_FLOW) instanceof Flow flow
-                ? Optional.of(flow)
-                : Optional.empty();
+    public static boolean hasFlow(HttpServletRequest request) {
+        return currentFlow(request.getSession(false)) != null;
     }
 
-    public static Optional<Flow> takeFlow(HttpServletRequest request) {
-        Optional<Flow> flow = currentFlow(request);
-        if (flow.isPresent()) {
-            request.getSession(false).removeAttribute(SESSION_FLOW);
+    public static boolean isFlowForDifferentClient(HttpServletRequest request, String tenantId, String provider) {
+        Flow flow = currentFlow(request.getSession(false));
+        return flow != null && (!flow.getTenantId().equals(tenantId) || !flow.getProvider().equals(provider));
+    }
+
+    public static Flow takeFlow(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        Flow flow = currentFlow(session);
+        if (flow == null) {
+            throw invalidFlow();
         }
+        session.removeAttribute(SESSION_FLOW);
         return flow;
+    }
+
+    private static Flow currentFlow(HttpSession session) {
+        return session != null && session.getAttribute(SESSION_FLOW) instanceof Flow flow ? flow : null;
     }
 
     public static void clearSession(HttpServletRequest request) {
@@ -98,7 +106,7 @@ public class CompanySsoLoginService {
     }
 
     private static AuthFlowException invalidFlow() {
-        return new AuthFlowException(SSO_SESSION_INVALID, "SSO session is invalid. Please try again.");
+        return new AuthFlowException(SSO_SESSION_INVALID, SSO_SESSION_INVALID.getMessage());
     }
 
     /** Stores the workspace and providers offered by discovery until the selection is used. */

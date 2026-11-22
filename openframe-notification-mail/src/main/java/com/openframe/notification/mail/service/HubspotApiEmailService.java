@@ -85,7 +85,7 @@ public class HubspotApiEmailService implements EmailService {
     public void sendEmailVerificationEmail(String toEmail, String verifyToken) {
         String link = verifyLinkTemplate.replace("{token}", verifyToken);
         sendRequest(verifyEmailId, toEmail, "Verify your email and continue", Map.of(LINK_PROPERTY, link), "Email verification")
-                .block(verificationProperties.verificationSendTimeout());
+                .block(verificationProperties.getVerificationSendTimeout());
     }
 
     @Override
