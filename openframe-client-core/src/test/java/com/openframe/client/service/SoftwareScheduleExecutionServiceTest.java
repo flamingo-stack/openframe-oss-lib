@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.time.Instant;
 import java.util.List;
@@ -162,6 +163,34 @@ class SoftwareScheduleExecutionServiceTest {
     }
 
     @Test
+    void runDue_armsReconnectAfterAnOfflineTargetIsRenamed() {
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE)
+                .nextRunAt(Instant.now().minusSeconds(30))
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
+                .build();
+        dueOfflineTarget(schedule);
+        Machine renamed = machine("m-off", DeviceStatus.OFFLINE);
+        renamed.setVersion(2L);
+        Machine changedAgain = machine("m-off", DeviceStatus.OFFLINE);
+        changedAgain.setVersion(3L);
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineId(TENANT, "m-off"))
+                .thenReturn(Optional.of(renamed), Optional.of(changedAgain));
+        when(targetResolver.isCurrentTarget(schedule, renamed)).thenReturn(true);
+        when(targetResolver.isCurrentTarget(schedule, changedAgain)).thenReturn(true);
+        when(machineRepository.reserveForSoftwareReconnect(TENANT, "m-off", 2L, DeviceStatus.CONNECTED))
+                .thenThrow(new OptimisticLockingFailureException("device changed while arming reconnect"));
+        when(machineRepository.reserveForSoftwareReconnect(TENANT, "m-off", 3L, DeviceStatus.CONNECTED)).thenReturn(1L);
+
+        service.runDueSchedules();
+
+        ArgumentCaptor<SoftwareScheduleOnlineDispatch> pending = ArgumentCaptor.forClass(SoftwareScheduleOnlineDispatch.class);
+        verify(onlineDispatchRepository).insert(pending.capture());
+        assertThat(pending.getValue().getMachineId()).isEqualTo("m-off");
+        assertThat(pending.getValue().getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
+    }
+
+    @Test
     void runDue_doesNotArmFromStaleMachineSnapshot() {
         SoftwareSchedule schedule = SoftwareSchedule.builder()
                 .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE)
@@ -242,6 +271,8 @@ class SoftwareScheduleExecutionServiceTest {
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(machine));
         when(scheduleRepository.findOnPrimaryByTenantIdAndIdAndStatus(TENANT, schedule.getId(), ScriptStatus.ACTIVE))
                 .thenReturn(Optional.of(schedule));
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineId(TENANT, machine.getMachineId()))
+                .thenReturn(Optional.of(machine));
         when(targetResolver.isCurrentTarget(schedule, machine)).thenReturn(true);
         when(scheduleTransaction.run(any())).thenAnswer(invocation -> {
             MongoTransactionRunner.Transaction<Boolean> mutation = invocation.getArgument(0);

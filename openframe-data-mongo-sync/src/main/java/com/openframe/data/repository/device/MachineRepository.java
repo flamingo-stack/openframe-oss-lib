@@ -64,6 +64,10 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     @Update(pipeline = "{ '$set': { 'version': { '$add': [{ '$ifNull': ['$version', 0] }, 1] } } }")
     long reserveForSoftwareReconnect(String tenantId, String machineId, Long version, Collection<DeviceStatus> managedStatuses);
 
+    @Query("{ 'tenantId': ?0, 'machineId': { '$in': ?1 }, 'status': { '$in': ?2 } }")
+    @Update(pipeline = "{ '$set': { 'version': { '$add': [{ '$ifNull': ['$version', 0] }, 1] } } }")
+    long reserveForSoftwareAssignments(String tenantId, Collection<String> machineIds, Collection<DeviceStatus> managedStatuses);
+
     List<Machine> findByMachineIdInAndStatus(Collection<String> machineIds, DeviceStatus status);
 
     List<Machine> findByMachineIdInAndTelemetryStatus(Collection<String> machineIds, TelemetryStatus telemetryStatus);

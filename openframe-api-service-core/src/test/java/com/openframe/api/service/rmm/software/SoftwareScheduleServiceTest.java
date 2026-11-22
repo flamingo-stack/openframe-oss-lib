@@ -28,12 +28,15 @@ import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedReposito
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.publishing.transaction.MongoTransactionRunner.Transaction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -48,6 +51,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -68,6 +72,7 @@ class SoftwareScheduleServiceTest {
     private PackageManagerAvailability packageManagerAvailability;
     private SoftwareInventoryService softwareInventoryService;
     private MachineRepository machineRepository;
+    private ScheduleMutationTransaction transaction;
     private SoftwareScheduleService service;
 
     private CreateSoftwareScheduleInput createInput;
@@ -81,11 +86,17 @@ class SoftwareScheduleServiceTest {
         packageManagerAvailability = mock(PackageManagerAvailability.class);
         softwareInventoryService = mock(SoftwareInventoryService.class);
         machineRepository = mock(MachineRepository.class);
+        transaction = mock(ScheduleMutationTransaction.class);
+        when(transaction.run(any())).thenAnswer(invocation -> invocation.<Transaction<?>>getArgument(0).execute());
         service = new SoftwareScheduleService(scheduleRepository, assignedRepository, targetResolver, tenantIdProvider,
-                packageManagerAvailability, new SoftwarePackageSelectionResolver(softwareInventoryService), machineRepository);
+                packageManagerAvailability, new SoftwarePackageSelectionResolver(softwareInventoryService), machineRepository,
+                transaction);
 
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(invocation ->
                 invocation.<Collection<String>>getArgument(1).stream().map(SoftwareScheduleServiceTest::managedMachine).toList());
+
+        when(machineRepository.reserveForSoftwareAssignments(eq(TENANT_ID), any(), eq(DeviceStatus.CONNECTED)))
+                .thenAnswer(invocation -> (long) invocation.<Collection<String>>getArgument(1).size());
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Saves are identity so assertions can read back what the service built.
@@ -435,6 +446,8 @@ class SoftwareScheduleServiceTest {
 
         service.create(createInput, ACTOR);
 
+        verifyPackageLookupPrecedesAssignmentTransaction();
+
         ArgumentCaptor<SoftwareSchedule> captor = ArgumentCaptor.forClass(SoftwareSchedule.class);
         verify(scheduleRepository).save(captor.capture());
         assertThat(captor.getValue().getPackages())
@@ -458,7 +471,11 @@ class SoftwareScheduleServiceTest {
         input.setPackages(List.of(bySoftware("title-7")));
         input.setStartAt(Instant.parse("2026-09-16T03:30:00Z"));
 
+        input.setMachineIds(List.of("m1"));
+
         service.update(input, ACTOR);
+
+        verifyPackageLookupPrecedesAssignmentTransaction();
 
         assertThat(existing.getPackages())
                 .extracting(SoftwareSchedulePackage::getPackageManager, SoftwareSchedulePackage::getPackageName,
@@ -477,6 +494,12 @@ class SoftwareScheduleServiceTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage("No package manager manages Adobe Acrobat");
         verify(scheduleRepository, never()).save(any(SoftwareSchedule.class));
+    }
+
+    private void verifyPackageLookupPrecedesAssignmentTransaction() {
+        InOrder order = inOrder(softwareInventoryService, transaction);
+        order.verify(softwareInventoryService).getManagingPackage("title-7");
+        order.verify(transaction).run(any());
     }
 
     private static SoftwareSchedulePackageInput bySoftware(String softwareId) {

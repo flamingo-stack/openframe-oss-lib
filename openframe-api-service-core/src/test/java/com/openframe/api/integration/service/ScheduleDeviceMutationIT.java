@@ -7,6 +7,8 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
+import com.openframe.api.service.rmm.software.SoftwareScheduleService;
+import com.openframe.api.service.rmm.software.SoftwarePackageSelectionResolver;
 import com.openframe.data.service.rmm.ScheduleMutationTransaction;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.data.config.ClientVersionThreshold;
@@ -19,6 +21,9 @@ import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
+import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.rmm.CustomScriptScheduleRepositoryImpl;
@@ -27,13 +32,16 @@ import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
@@ -53,8 +61,12 @@ import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -62,7 +74,9 @@ import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
+import static org.mockito.AdditionalAnswers.delegatesTo;
 
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
@@ -83,7 +97,7 @@ class ScheduleDeviceMutationIT {
     static void startMongo() {
         String uri = System.getProperty("mongo.external.uri");
         if (uri == null) {
-            container = new MongoDBContainer(DockerImageName.parse("mongo:7"));
+            container = new MongoDBContainer(DockerImageName.parse("mongo:7")).withReplicaSet();
             container.start();
             uri = container.getConnectionString() + "/test?directConnection=true";
         }
@@ -159,13 +173,19 @@ class ScheduleDeviceMutationIT {
                 repositoryFactory.getRepository(SoftwareScheduleMachineAssignedRepository.class);
         SoftwareScheduleMachineAssigned assignment = assignments.save(SoftwareScheduleMachineAssigned.builder()
                 .tenantId(TENANT).softwareScheduleId("failed-deletion-schedule").machineId(machineId).build());
+        ScriptScheduleMachineAssignedRepository scriptAssignments =
+                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class);
+        ScheduleScriptMachineAssigned scriptAssignment = scriptAssignments.save(ScheduleScriptMachineAssigned.builder()
+                .tenantId(TENANT).scriptScheduleId("rollback-script").machineId(machineId).build());
+        DeviceSoftwareRepository inventory = repositoryFactory.getRepository(DeviceSoftwareRepository.class);
+        DeviceSoftware installed = inventory.save(DeviceSoftware.builder()
+                .tenantId(TENANT).machineId(machineId).softwareTitleId(101L).build());
         MachineRepository machines = mock(MachineRepository.class);
         when(machines.findOnPrimaryByMachineId(machineId)).thenReturn(Optional.of(managed));
         DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
-                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class),
-                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments,
+                scriptAssignments, repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments,
                 repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class),
-                mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), mock(MachineWriter.class),
+                inventory, mock(SoftwareProjectionTrigger.class), mock(MachineWriter.class),
                 new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory()));
         DeviceService service = new DeviceService(machines, cleanup, mock(DeviceSoftwareConnectivitySync.class),
                 mock(MachineWriter.class), mock(TagRepository.class), mock(TagAssignmentRepository.class),
@@ -174,13 +194,15 @@ class ScheduleDeviceMutationIT {
 
         assertThatThrownBy(() -> service.updateStatusByMachineId(machineId, DeviceStatus.DELETED))
                 .hasMessageContaining(machineId);
+        assertThat(scriptAssignments.findById(scriptAssignment.getId())).isPresent();
+        assertThat(inventory.findById(installed.getId())).isPresent();
         assertThat(assignments.findById(assignment.getId())).isPresent();
         assertThat(mongoTemplate.findById(managed.getId(), Machine.class)).extracting(Machine::getStatus)
                 .isEqualTo(DeviceStatus.MANAGED);
     }
 
     @Test
-    void failedScheduleCleanupRollsBackTheDeletedStatusAndMembership() {
+    void failedInventoryProjectionRollsBackDeletionSoItCanBeRetried() {
         Machine machine = new Machine();
         machine.setTenantId(TENANT);
         machine.setMachineId("atomic-cleanup-device");
@@ -190,20 +212,28 @@ class ScheduleDeviceMutationIT {
                 repositoryFactory.getRepository(SoftwareScheduleMachineAssignedRepository.class);
         SoftwareScheduleMachineAssigned assignment = assignments.save(SoftwareScheduleMachineAssigned.builder()
                 .tenantId(TENANT).softwareScheduleId("cleanup-rollback-schedule").machineId(machine.getMachineId()).build());
-        SoftwareScheduleOnlineDispatchRepository reconnects = mock(SoftwareScheduleOnlineDispatchRepository.class);
-        doThrow(new IllegalStateException("simulated reconnect cleanup failure"))
-                .when(reconnects).deleteByTenantIdAndMachineIdAndStatus(TENANT, machine.getMachineId(), DeviceOnlineDispatchStatus.NEW);
+        DeviceSoftwareRepository inventory = repositoryFactory.getRepository(DeviceSoftwareRepository.class);
+        DeviceSoftware installed = inventory.save(DeviceSoftware.builder().tenantId(TENANT)
+                .machineId(machine.getMachineId()).softwareTitleId(102L).build());
+        SoftwareProjectionTrigger projection = mock(SoftwareProjectionTrigger.class);
+        doThrow(new IllegalStateException("simulated inventory projection failure")).doNothing()
+                .when(projection).titlesChanged(TENANT, Set.of(102L));
         DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
                 repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class),
-                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments, reconnects,
-                mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class),
+                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments,
+                repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class), inventory, projection,
                 new MachineWriter(mongoTemplate, absent(), absent()),
                 new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory()));
 
-        assertThatThrownBy(() -> cleanup.markDeleted(machine)).hasMessage("simulated reconnect cleanup failure");
+        assertThatThrownBy(() -> cleanup.markDeleted(machine)).hasMessage("simulated inventory projection failure");
+        assertThat(inventory.findById(installed.getId())).isPresent();
         assertThat(assignments.findById(assignment.getId())).isPresent();
         assertThat(mongoTemplate.findById(machine.getId(), Machine.class)).extracting(Machine::getStatus)
                 .isEqualTo(DeviceStatus.MANAGED);
+
+        assertThat(cleanup.markDeleted(machine).getStatus()).isEqualTo(DeviceStatus.DELETED);
+        assertThat(inventory.findById(installed.getId())).isEmpty();
+        assertThat(assignments.findById(assignment.getId())).isEmpty();
     }
 
     @Test
@@ -240,6 +270,57 @@ class ScheduleDeviceMutationIT {
         assertThat(machines.findOnPrimaryByTenantIdAndMachineId(TENANT, deviceId)).get().extracting(Machine::getStatus)
                 .isEqualTo(DeviceStatus.MANAGED);
         assertThat(assignments.findById(deliberateAssignment.getId())).isPresent();
+    }
+
+    @Test
+    void assignmentStartedBeforeReenrollmentDoesNotAttachToNewEnrollment() {
+        String machineId = "assignment-reenrollment-device";
+        MachineRepository machines = repositoryFactory.getRepository(MachineRepository.class,
+                RepositoryFragments.just(new CustomMachineRepositoryImpl(mongoTemplate, mock(ClientVersionThreshold.class))));
+        Machine machine = new Machine();
+        machine.setTenantId(TENANT);
+        machine.setMachineId(machineId);
+        machine.setStatus(DeviceStatus.MANAGED);
+        Machine enrolled = machines.save(machine);
+        MachineWriter writer = new MachineWriter(mongoTemplate, absent(), absent());
+        ScheduleMutationTransaction transaction = new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory());
+        SoftwareScheduleMachineAssignedRepository assignments =
+                repositoryFactory.getRepository(SoftwareScheduleMachineAssignedRepository.class);
+        DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
+                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class),
+                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments,
+                repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class),
+                mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), writer, transaction);
+        SoftwareScheduleRepository schedules = repositoryFactory.getRepository(SoftwareScheduleRepository.class);
+        SoftwareSchedule schedule = schedules.save(SoftwareSchedule.builder().tenantId(TENANT)
+                .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).status(ScriptStatus.ACTIVE).packages(List.of()).build());
+        List<String> ids = List.of(machineId);
+        MachineRepository interleavingMachines = mock(MachineRepository.class, delegatesTo(machines));
+        doAnswer(invocation -> {
+            Collection<String> targetIds = invocation.getArgument(1);
+            List<Machine> oldEnrollment = machines.findOnPrimaryByTenantIdAndMachineIdIn(TENANT, targetIds);
+            CompletableFuture.runAsync(() -> reenroll(cleanup, writer, machines, enrolled)).get(10, TimeUnit.SECONDS);
+            return oldEnrollment;
+        }).doAnswer(invocation -> machines.findOnPrimaryByTenantIdAndMachineIdIn(TENANT, invocation.getArgument(1)))
+                .when(interleavingMachines).findOnPrimaryByTenantIdAndMachineIdIn(TENANT, Set.copyOf(ids));
+        SoftwareScheduleService service = new SoftwareScheduleService(schedules, assignments,
+                mock(SoftwareScheduleTargetResolver.class), () -> TENANT, mock(PackageManagerAvailability.class),
+                mock(SoftwarePackageSelectionResolver.class), interleavingMachines, transaction);
+
+        assertThatThrownBy(() -> service.addDevices(schedule.getId(), ids, ACTOR)).isInstanceOf(ConflictException.class);
+        assertThat(assignments.findByTenantIdAndSoftwareScheduleId(TENANT, schedule.getId())).isEmpty();
+        assertThat(machines.findOnPrimaryByTenantIdAndMachineId(TENANT, machineId)).get()
+                .extracting(Machine::getStatus).isEqualTo(DeviceStatus.MANAGED);
+        service.addDevices(schedule.getId(), ids, ACTOR);
+        assertThat(assignments.findByTenantIdAndSoftwareScheduleId(TENANT, schedule.getId()))
+                .extracting(SoftwareScheduleMachineAssigned::getMachineId).containsExactly(machineId);
+    }
+
+    private static void reenroll(DeletedMachineCleanup cleanup, MachineWriter writer, MachineRepository machines, Machine enrolled) {
+        cleanup.markDeleted(enrolled);
+        Machine deleted = machines.findOnPrimaryByTenantIdAndMachineId(TENANT, enrolled.getMachineId()).orElseThrow();
+        cleanup.reenrollDeleted(deleted, machineUpdate().set(STATUS, DeviceStatus.PENDING));
+        writer.update(enrolled.getMachineId(), machineUpdate().set(STATUS, DeviceStatus.MANAGED)).orElseThrow();
     }
 
     @SuppressWarnings("unchecked")

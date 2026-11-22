@@ -13,6 +13,7 @@ import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepositor
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.data.service.rmm.ScheduleMutationTransaction;
+import com.openframe.publishing.transaction.MongoTransactionRunner.Transaction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -113,32 +114,53 @@ public class SoftwareScheduleExecutionService {
     }
 
     private boolean armReconnectForDevice(SoftwareSchedule schedule, Machine machine, Instant now, Instant expiresAt) {
+        String machineId = machine.getMachineId();
         try {
-            return scheduleTransaction.run(() -> createPendingReconnect(schedule, machine, now, expiresAt));
-        } catch (DuplicateKeyException | OptimisticLockingFailureException raced) {
-            log.debug("Skipped stale reconnect: scheduleId={} machineId={}", schedule.getId(), machine.getMachineId());
+            return retryOnceOnWriteConflict(() -> createPendingReconnect(schedule, machineId, now, expiresAt));
+        } catch (DuplicateKeyException duplicate) {
+            log.debug("Software schedule reconnect already armed: scheduleId={} machineId={}", schedule.getId(), machineId);
+            return false;
+        } catch (OptimisticLockingFailureException conflict) {
+            log.warn("Software schedule reconnect could not be armed after a retry: scheduleId={} machineId={}",
+                    schedule.getId(), machineId);
             return false;
         }
     }
 
-    private boolean createPendingReconnect(SoftwareSchedule schedule, Machine machine, Instant now, Instant expiresAt) {
+    private boolean retryOnceOnWriteConflict(Transaction<Boolean> change) {
+        try {
+            return scheduleTransaction.run(change);
+        } catch (OptimisticLockingFailureException conflict) {
+            return scheduleTransaction.run(change);
+        }
+    }
+
+    private boolean createPendingReconnect(SoftwareSchedule schedule, String machineId, Instant now, Instant expiresAt) {
         String tenantId = schedule.getTenantId();
-        String machineId = machine.getMachineId();
         String scheduleId = schedule.getId();
         if (onlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(tenantId, machineId, scheduleId).isPresent()) {
             return false;
         }
-        boolean stillTargeted = softwareScheduleRepository.findOnPrimaryByTenantIdAndIdAndStatus(tenantId, scheduleId, ScriptStatus.ACTIVE)
+        return machineRepository.findOnPrimaryByTenantIdAndMachineId(tenantId, machineId)
+                .filter(DeviceDispatchEligibility::isManaged)
+                .filter(machine -> stillTargeted(tenantId, scheduleId, machine))
+                .filter(machine -> machineRepository.reserveForSoftwareReconnect(
+                        tenantId, machineId, machine.getVersion(), DeviceStatus.CONNECTED) == 1)
+                .map(machine -> insertPendingReconnect(tenantId, scheduleId, machine.getMachineId(), now, expiresAt))
+                .isPresent();
+    }
+
+    private boolean stillTargeted(String tenantId, String scheduleId, Machine machine) {
+        return softwareScheduleRepository.findOnPrimaryByTenantIdAndIdAndStatus(tenantId, scheduleId, ScriptStatus.ACTIVE)
                 .filter(current -> targetResolver.isCurrentTarget(current, machine))
                 .isPresent();
-        if (!stillTargeted || machineRepository.reserveForSoftwareReconnect(tenantId, machineId, machine.getVersion(),
-                DeviceStatus.CONNECTED) == 0) {
-            return false;
-        }
-        onlineDispatchRepository.insert(SoftwareScheduleOnlineDispatch.builder()
+    }
+
+    private SoftwareScheduleOnlineDispatch insertPendingReconnect(String tenantId, String scheduleId, String machineId,
+                                                                  Instant now, Instant expiresAt) {
+        return onlineDispatchRepository.insert(SoftwareScheduleOnlineDispatch.builder()
                 .tenantId(tenantId).machineId(machineId).scheduleId(scheduleId)
                 .firstSeenAt(now).expiresAt(expiresAt).status(DeviceOnlineDispatchStatus.NEW).build());
-        return true;
     }
 
     private void advanceAndSave(SoftwareSchedule schedule, Instant now) {

@@ -421,7 +421,6 @@ public class DeviceService {
     private Machine writeDeviceStatus(Machine machine, DeviceStatus status) {
         String machineId = machine.getMachineId();
         if (status == DeviceStatus.DELETED) {
-            deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
             return deletedMachineCleanup.markDeleted(machine);
         }
 

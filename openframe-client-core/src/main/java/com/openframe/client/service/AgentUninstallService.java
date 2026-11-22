@@ -73,7 +73,6 @@ public class AgentUninstallService {
         String machineId = machine.getMachineId();
         toolConnectionService.disconnectAll(machineId);
         installedAgentService.disconnectAll(machineId);
-        deletedMachineCleanup.cleanUpSoftwareInventory(machine.getTenantId(), machineId);
 
         eventPublisher.publishEvent(new DeviceUninstalledEvent(this, machine));
 

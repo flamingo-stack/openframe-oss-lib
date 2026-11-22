@@ -472,7 +472,6 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
-        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(deletedMachineCleanup).markDeleted(m);
     }
 
@@ -490,21 +489,20 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: cleanup runs BEFORE the DELETED save — if cleanup throws, status stays put so the next attempt can retry")
-    void deletingDevice_cleanupFailsBeforeSave_statusStaysUnchanged() {
+    @DisplayName("A failed deletion does not run the device status post-processor")
+    void deletingDevice_failedDeletionDoesNotPostProcess() {
         Machine m = new Machine();
         m.setMachineId("m-del");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
         doThrow(new RuntimeException("mongo hiccup"))
-                .when(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
+                .when(deletedMachineCleanup).markDeleted(m);
 
         assertThatThrownBy(() -> service().updateStatusByMachineId("m-del", DeviceStatus.DELETED))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("mongo hiccup");
 
-        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(machineWriter, never()).update(any(), any(MachineUpdate.class));
         verify(machineRepository, never()).save(any());
         assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
@@ -523,7 +521,7 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
 
-        verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
+        verify(deletedMachineCleanup, never()).markDeleted(any());
     }
 
     @Test
@@ -608,7 +606,6 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
-        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
     }
 

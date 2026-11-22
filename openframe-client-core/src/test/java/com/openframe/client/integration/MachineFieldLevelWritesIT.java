@@ -90,7 +90,7 @@ class MachineFieldLevelWritesIT {
     private static final Instant SEEN = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant LATER = Instant.parse("2026-01-01T00:05:00Z");
 
-    private static final MongoDBContainer MONGO = new MongoDBContainer(DockerImageName.parse("mongo:7"));
+    private static final MongoDBContainer MONGO = new MongoDBContainer(DockerImageName.parse("mongo:7")).withReplicaSet();
 
     private static MongoClient client;
     private static MongoTemplate template;

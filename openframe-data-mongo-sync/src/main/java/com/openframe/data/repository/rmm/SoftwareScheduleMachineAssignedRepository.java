@@ -25,8 +25,6 @@ public interface SoftwareScheduleMachineAssignedRepository
 
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 
-    long deleteByTenantIdAndSoftwareScheduleIdAndIdIn(String tenantId, String softwareScheduleId, Collection<String> ids);
-
     @ReadPreference("primary")
     boolean existsOnPrimaryByTenantIdAndSoftwareScheduleIdAndMachineId(
             String tenantId, String softwareScheduleId, String machineId);

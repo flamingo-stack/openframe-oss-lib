@@ -14,6 +14,7 @@ import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
+import com.openframe.publishing.transaction.MongoTransactionRunner.Transaction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -52,16 +53,22 @@ public class DeletedMachineCleanup {
     }
 
     public Machine markDeleted(Machine expected) {
-        return updateAndClearSchedules(expected, machineUpdate().set(STATUS, DeviceStatus.DELETED));
+        return runLifecycleChange(expected, () -> deleteDevice(expected));
     }
 
     public Machine reenrollDeleted(Machine expected, MachineUpdate update) {
-        return updateAndClearSchedules(expected, update);
+        return runLifecycleChange(expected, () -> writeAndClearSchedules(expected, update));
     }
 
-    private Machine updateAndClearSchedules(Machine expected, MachineUpdate update) {
+    private Machine deleteDevice(Machine expected) {
+        Machine deleted = writeAndClearSchedules(expected, machineUpdate().set(STATUS, DeviceStatus.DELETED));
+        cleanUpSoftwareInventory(deleted.getTenantId(), deleted.getMachineId());
+        return deleted;
+    }
+
+    private Machine runLifecycleChange(Machine expected, Transaction<Machine> change) {
         try {
-            return scheduleTransaction.run(() -> writeAndClearSchedules(expected, update));
+            return scheduleTransaction.run(change);
         } catch (OptimisticLockingFailureException conflict) {
             throw statusChanged(expected);
         }
@@ -113,7 +120,7 @@ public class DeletedMachineCleanup {
         }
     }
 
-    public void cleanUpSoftwareInventory(String tenantId, String machineId) {
+    private void cleanUpSoftwareInventory(String tenantId, String machineId) {
         if (tenantId == null || machineId == null) {
             return;
         }
