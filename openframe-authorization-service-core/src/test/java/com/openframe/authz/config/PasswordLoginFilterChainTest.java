@@ -4,6 +4,7 @@ import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.service.auth.AuthErrorDetailStore;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
+import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.web.AuthErrorResponder;
@@ -35,6 +36,7 @@ import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
+import static com.openframe.core.exception.AuthErrorCode.PASSWORD_LOGIN_DISABLED;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
@@ -62,13 +64,15 @@ class PasswordLoginFilterChainTest {
     @Autowired
     private TenantService tenantService;
     @Autowired
+    private SSOConfigService ssoConfigService;
+    @Autowired
     private UserService userService;
 
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        reset(tenantService, userService);
+        reset(tenantService, userService, ssoConfigService);
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
@@ -79,6 +83,19 @@ class PasswordLoginFilterChainTest {
 
         mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "right"))
                 .andExpect(redirectedUrl("https://app.example/auth/error?ref=ACCOUNT_BLOCKED"));
+    }
+
+    @Test
+    @DisplayName("Given OpenFrame login is off, when the right password is posted, then the error page shows PASSWORD_LOGIN_DISABLED")
+    void openframeLoginOff_redirectsToTheErrorPage() throws Exception {
+        AuthUser user = activeUser("u1", "tenant-a", EMAIL);
+        user.setPasswordHash(new BCryptPasswordEncoder().encode("right"));
+        when(userService.findActiveByEmailAndTenant(anyString(), any())).thenReturn(Optional.of(user));
+        doThrow(new AuthFlowException(PASSWORD_LOGIN_DISABLED, PASSWORD_LOGIN_DISABLED.getMessage()))
+                .when(ssoConfigService).refuseUnlessOpenframeLoginEnabled(any());
+
+        mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "right"))
+                .andExpect(redirectedUrl("https://app.example/auth/error?ref=PASSWORD_LOGIN_DISABLED"));
     }
 
     @Test
@@ -105,6 +122,11 @@ class PasswordLoginFilterChainTest {
         }
 
         @Bean
+        SSOConfigService ssoConfigService() {
+            return mock(SSOConfigService.class);
+        }
+
+        @Bean
         UserService userService() {
             return mock(UserService.class);
         }
@@ -115,8 +137,9 @@ class PasswordLoginFilterChainTest {
         }
 
         @Bean
-        UserDetailsService userDetailsService(UserService userService, TenantService tenantService) {
-            return authorizationServerConfig.userDetailsService(userService, tenantService);
+        UserDetailsService userDetailsService(UserService userService, TenantService tenantService,
+                                              SSOConfigService ssoConfigService) {
+            return authorizationServerConfig.userDetailsService(userService, tenantService, ssoConfigService);
         }
 
         @Bean

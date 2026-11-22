@@ -5,8 +5,10 @@ import com.openframe.authz.exception.OwnerCannotSwitchTenantException;
 import com.openframe.authz.exception.UserActiveInAnotherTenantException;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.processor.UserDeactivationProcessor;
+import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.validation.InvitationValidator;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthInvitation;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.InvitationStatus;
@@ -24,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
+import static com.openframe.core.exception.AuthErrorCode.PASSWORD_LOGIN_DISABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,6 +52,8 @@ class InvitationRegistrationServiceTest {
     private InvitationValidator invitationValidator;
     @Mock
     private SsoIdentityService ssoIdentityService;
+    @Mock
+    private SSOConfigService ssoConfigService;
     @InjectMocks
     private InvitationRegistrationService service;
 
@@ -145,5 +150,35 @@ class InvitationRegistrationServiceTest {
         when(userService.findActiveByEmailAndTenant("invitee@acme.com", "target"))
                 .thenReturn(Optional.of(activeUser("m", "target", "invitee@acme.com")));
         assertThat(service.isNewMemberJoin("inv-1")).isFalse();
+    }
+
+    @Test
+    void shouldRefusePasswordAcceptanceWhenOpenframeLoginIsOff() {
+        doThrow(new AuthFlowException(PASSWORD_LOGIN_DISABLED, PASSWORD_LOGIN_DISABLED.getMessage()))
+                .when(ssoConfigService).refuseUnlessOpenframeLoginEnabled("target");
+
+        assertThatThrownBy(() -> service.registerByInvitationWithPassword(request(null)))
+                .isInstanceOf(AuthFlowException.class);
+        verify(userService, never()).registerUserFromInvitation(any(), any(), any(), any(), any(), any());
+        verify(invitationRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldAcceptWithPasswordWhenOpenframeLoginIsOn() {
+        AuthUser member = activeUser("u1", "target", "invitee@acme.com");
+        when(userService.findActiveByEmail("invitee@acme.com")).thenReturn(Optional.of(member));
+
+        assertThat(service.registerByInvitationWithPassword(request(null))).isSameAs(member);
+        verify(ssoConfigService).refuseUnlessOpenframeLoginEnabled("target");
+    }
+
+    @Test
+    void shouldNotApplyTheSwitchToSsoAcceptance() {
+        AuthUser member = activeUser("u1", "target", "invitee@acme.com");
+        when(userService.findActiveByEmail("invitee@acme.com")).thenReturn(Optional.of(member));
+
+        service.registerByInvitation(request(null));
+
+        verify(ssoConfigService, never()).refuseUnlessOpenframeLoginEnabled(any());
     }
 }

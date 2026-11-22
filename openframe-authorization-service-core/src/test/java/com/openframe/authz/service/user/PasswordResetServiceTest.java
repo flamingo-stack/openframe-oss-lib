@@ -1,6 +1,8 @@
 package com.openframe.authz.service.user;
 
 import com.openframe.authz.service.auth.MongoAuthorizationService;
+import com.openframe.authz.service.sso.SSOConfigService;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
 import com.openframe.notification.mail.service.EmailService;
@@ -15,14 +17,17 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
+import static com.openframe.core.exception.AuthErrorCode.PASSWORD_LOGIN_DISABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,6 +47,8 @@ class PasswordResetServiceTest {
     private EmailService emailService;
     @Mock
     private MongoAuthorizationService authorizationService;
+    @Mock
+    private SSOConfigService ssoConfigService;
 
     private PasswordResetService service;
 
@@ -50,14 +57,15 @@ class PasswordResetServiceTest {
         OpenframeRedisProperties props = new OpenframeRedisProperties();
         props.setTenantId("t1");
         service = new PasswordResetService(redisTemplate, props, new OpenframeRedisKeyBuilder(props),
-                userService, emailService, authorizationService);
+                userService, emailService, authorizationService, ssoConfigService);
         ReflectionTestUtils.setField(service, "ttlMinutes", 30);
         lenient().when(redisTemplate.opsForValue()).thenReturn(values);
     }
 
     @Test
     void shouldStoreRandomTokenWithTtlAndEmailIt() {
-        when(userService.existsActiveByEmail("ada@acme.com")).thenReturn(true);
+        when(userService.findActiveTenantIdsByEmail("ada@acme.com")).thenReturn(List.of("t1"));
+        when(ssoConfigService.isOpenframeLoginEnabled("t1")).thenReturn(true);
 
         service.createResetToken("ada@acme.com");
 
@@ -71,7 +79,7 @@ class PasswordResetServiceTest {
 
     @Test
     void shouldDoNothingVisibleForUnknownEmail() {
-        when(userService.existsActiveByEmail("ghost@acme.com")).thenReturn(false);
+        when(userService.findActiveTenantIdsByEmail("ghost@acme.com")).thenReturn(List.of());
 
         service.createResetToken("ghost@acme.com");
 
@@ -108,6 +116,29 @@ class PasswordResetServiceTest {
 
         assertThatThrownBy(() -> service.resetPassword("token-1", "N3w-password!"))
                 .isInstanceOf(IllegalArgumentException.class);
+        verify(userService, never()).updatePassword(any(), any());
+    }
+
+    @Test
+    void shouldSendNothingWhenOpenframeLoginIsOff() {
+        when(userService.findActiveTenantIdsByEmail("ada@acme.com")).thenReturn(List.of("t1"));
+        when(ssoConfigService.isOpenframeLoginEnabled("t1")).thenReturn(false);
+
+        service.createResetToken("ada@acme.com");
+
+        verifyNoInteractions(emailService);
+        verify(values, never()).set(anyString(), anyString(), any(Duration.class));
+    }
+
+    @Test
+    void shouldRefuseTokenIssuedBeforeOpenframeLoginWasTurnedOff() {
+        when(values.get(anyString())).thenReturn("ada@acme.com");
+        when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.of(activeUser("u1", "t1", "ada@acme.com")));
+        doThrow(new AuthFlowException(PASSWORD_LOGIN_DISABLED, PASSWORD_LOGIN_DISABLED.getMessage()))
+                .when(ssoConfigService).refuseUnlessOpenframeLoginEnabled("t1");
+
+        assertThatThrownBy(() -> service.resetPassword("token-1", "N3w-password!"))
+                .isInstanceOf(AuthFlowException.class);
         verify(userService, never()).updatePassword(any(), any());
     }
 }
