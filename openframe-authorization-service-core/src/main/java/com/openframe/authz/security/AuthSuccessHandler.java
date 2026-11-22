@@ -3,6 +3,7 @@ package com.openframe.authz.security;
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.authz.web.ClientIp;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -43,6 +44,10 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         try {
             String tenantId = TenantContext.getTenantId();
             String email = extractEmail(authentication);
+            log.info("Login success email={} tenantId={} provider={} ip={}", email, tenantId,
+                    authentication instanceof OAuth2AuthenticationToken oauth2
+                            ? oauth2.getAuthorizedClientRegistrationId() : "password",
+                    ClientIp.of(request));
             if (tenantId != null && email != null && !email.isBlank()) {
                 userService.touchLastLogin(email, tenantId);
                 maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);
