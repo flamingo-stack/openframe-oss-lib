@@ -255,7 +255,7 @@ public class AuthorizationServerConfig {
                                                        PasswordEncoder passwordEncoder,
                                                        LoginAttemptLimiter loginAttemptLimiter) {
         return new ThrottlingAuthenticationManager(authenticationManager(userDetailsService, passwordEncoder),
-                loginAttemptLimiter);
+                loginAttemptLimiter, passwordEncoder);
     }
 
     // Not a bean: the plain manager without the failure limits, which the bean above wraps.

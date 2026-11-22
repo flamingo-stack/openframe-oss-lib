@@ -4,6 +4,7 @@ import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -11,6 +12,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.List;
 
 /**
  * Windowed Redis counters for the auth limits. Fails open: a Redis error never blocks a login or a reset,
@@ -22,34 +24,42 @@ import java.util.HexFormat;
 public class AuthRateLimiter {
 
     private static final String KEY_PREFIX = "auth-limit:";
-    private static final long NO_EXPIRY = -1L;
+
+    // One round trip, atomic: the first hit (or a key that lost its TTL) starts the window
+    private static final RedisScript<Long> INCREMENT = RedisScript.of("""
+            local count = redis.call('INCR', KEYS[1])
+            if count == 1 or redis.call('TTL', KEYS[1]) == -1 then
+              redis.call('EXPIRE', KEYS[1], ARGV[1])
+            end
+            return count""", Long.class);
+
+    // Never recreates an expired key, which would then live without a TTL
+    private static final RedisScript<Long> DECREMENT = RedisScript.of("""
+            if redis.call('EXISTS', KEYS[1]) == 1 then
+              return redis.call('DECR', KEYS[1])
+            end
+            return 0""", Long.class);
 
     private final RedisTemplate<String, String> redisTemplate;
     private final OpenframeRedisKeyBuilder keyBuilder;
 
-    /** Counts one hit in the window (started by the first hit) and returns the new count. */
+    /** Counts one hit in the window and returns the new count. */
     public long increment(String relativeKey, Duration window) {
-        String key = key(relativeKey);
         try {
-            Long count = redisTemplate.opsForValue().increment(key);
-            long value = count == null ? 0 : count;
-            if (value == 1 || Long.valueOf(NO_EXPIRY).equals(redisTemplate.getExpire(key))) {
-                redisTemplate.expire(key, window);
-            }
-            return value;
+            Long count = redisTemplate.execute(INCREMENT, List.of(key(relativeKey)), String.valueOf(window.toSeconds()));
+            return count == null ? 0 : count;
         } catch (RuntimeException e) {
             log.warn("Auth rate limit skipped, Redis unavailable: {}", e.getMessage());
             return 0;
         }
     }
 
-    public long count(String relativeKey) {
+    /** Gives back one hit that turned out not to count. */
+    public void decrement(String relativeKey) {
         try {
-            String value = redisTemplate.opsForValue().get(key(relativeKey));
-            return value == null ? 0 : Long.parseLong(value);
+            redisTemplate.execute(DECREMENT, List.of(key(relativeKey)));
         } catch (RuntimeException e) {
-            log.warn("Auth rate limit skipped, Redis unavailable: {}", e.getMessage());
-            return 0;
+            log.warn("Auth rate limit hit not given back, Redis unavailable: {}", e.getMessage());
         }
     }
 
