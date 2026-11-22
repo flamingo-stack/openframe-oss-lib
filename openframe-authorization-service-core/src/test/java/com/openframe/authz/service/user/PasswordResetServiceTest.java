@@ -32,6 +32,7 @@ import static com.openframe.authz.support.TestHashes.sha256;
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static com.openframe.core.exception.AuthErrorCode.PASSWORD_LOGIN_DISABLED;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -400,15 +401,33 @@ class PasswordResetServiceTest {
     }
 
     @Test
-    void createResetToken_emailSendFails_noActiveMarkSoRetrySends() {
+    void createResetToken_emailSendFails_quiet202LogsSendFailedAndSetsNoActiveMark(CapturedOutput output) {
+        fromIp("1.2.3.4");
         when(userService.findActiveTenantIdsByEmail("ada@acme.com")).thenReturn(List.of("t1"));
         when(ssoConfigService.isOpenframeLoginEnabled("t1")).thenReturn(true);
         doThrow(new IllegalStateException("HubSpot API error: status=503"))
                 .when(emailService).sendPasswordResetEmail(eq("ada@acme.com"), anyString());
 
-        assertThatThrownBy(() -> service.createResetToken("ada@acme.com")).isInstanceOf(IllegalStateException.class);
+        assertThatCode(() -> service.createResetToken("ada@acme.com")).doesNotThrowAnyException();
 
         verify(values, never()).set(contains("active:"), anyString(), any(Duration.class));
+        assertThat(output).contains("event=password_reset_request", "outcome=send_failed", "tenantIds=[t1]",
+                "ip=1.2.3.4").doesNotContain("ada@acme.com");
+    }
+
+    @Test
+    void resetPassword_duplicateActiveAccounts_logsLookupFailedAndRethrows(CapturedOutput output) {
+        fromIp("1.2.3.4");
+        when(values.get(anyString())).thenReturn("ada@acme.com");
+        when(userService.findActiveByEmail("ada@acme.com"))
+                .thenThrow(new IllegalStateException("active accounts in more than one organization"));
+
+        assertThatThrownBy(() -> service.resetPassword("token-1", "N3w-password!"))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(output).contains("event=password_reset_confirm", "outcome=lookup_failed", "ip=1.2.3.4")
+                .doesNotContain("ada@acme.com");
+        verify(userService, never()).updatePassword(anyString(), anyString());
     }
 
     private static void fromIp(String ip) {
