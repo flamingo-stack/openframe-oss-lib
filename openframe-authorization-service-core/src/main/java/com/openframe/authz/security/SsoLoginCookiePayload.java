@@ -1,8 +1,9 @@
 package com.openframe.authz.security;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 /**
- * Flow cookie for the email-less SSO login: the user picked a provider on the login page without
- * entering an email, so the tenant is unknown until the provider's callback identifies them.
+ * Binds a shared or company sign-in to its callback without carrying workspace routing data.
  */
 public record SsoLoginCookiePayload(
         String s,
@@ -10,6 +11,11 @@ public record SsoLoginCookiePayload(
         String redirectTo,
         boolean authMobile,
         long iat,
-        long exp
+        long exp,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Boolean companySso
 ) implements SsoCookiePayload {
+
+    public SsoLoginCookiePayload(String s, String provider, String redirectTo, boolean authMobile, long iat, long exp) {
+        this(s, provider, redirectTo, authMobile, iat, exp, null);
+    }
 }

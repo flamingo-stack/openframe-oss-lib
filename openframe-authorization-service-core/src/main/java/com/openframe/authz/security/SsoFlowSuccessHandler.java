@@ -1,6 +1,7 @@
 package com.openframe.authz.security;
 
 import com.openframe.authz.security.flow.SsoFlowHandler;
+import com.openframe.authz.service.sso.CompanySsoLoginService;
 import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.web.AuthErrorResponder;
@@ -12,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
@@ -53,6 +55,15 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 .findFirst()
                 .orElse(null);
 
+        if (handler == null && authentication instanceof OAuth2AuthenticationToken
+                && CompanySsoLoginService.currentFlow(request).isPresent()) {
+            CompanySsoLoginService.clearSession(request);
+            AuthStateUtils.clearSsoFlowCookies(response);
+            authErrorResponder.send(response, request, "sso-company-login-state-mismatch",
+                    new AuthFlowException(SSO_SESSION_EXPIRED, "SSO session expired. Please try again."),
+                    SSO_SESSION_EXPIRED);
+            return;
+        }
         if (handler == null) {
             if (flowHandlers.stream().noneMatch(h -> h.isActivated(request))) {
                 try {

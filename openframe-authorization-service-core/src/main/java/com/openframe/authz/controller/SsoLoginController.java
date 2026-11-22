@@ -76,7 +76,7 @@ public class SsoLoginController {
     private final TenantRegistrationService registrationService;
     private final AuthErrorResponder authErrorResponder;
 
-    @GetMapping(path = "/login/sso")
+    @GetMapping(path = "/login/sso", params = "!handle")
     public void startSsoLogin(@Valid @ModelAttribute SsoLoginInitRequest request,
                               HttpServletRequest httpRequest,
                               HttpServletResponse httpResponse) throws IOException {
@@ -92,6 +92,28 @@ public class SsoLoginController {
         } catch (Exception e) {
             authErrorResponder.send(httpResponse, httpRequest, "sso-login-init", e, SSO_LOGIN_FAILED);
         }
+    }
+
+    @GetMapping(path = "/login/sso", params = "handle")
+    public void startCompanySsoLogin(@Valid @ModelAttribute SsoLoginInitRequest request,
+                                     @RequestParam("handle") String handle,
+                                     HttpServletRequest httpRequest,
+                                     HttpServletResponse httpResponse) throws IOException {
+        httpResponse.setHeader("Referrer-Policy", "no-referrer");
+        httpResponse.setHeader("Cache-Control", "no-store");
+        try {
+            redirectToCompanyProvider(request, handle, httpRequest, httpResponse);
+        } catch (Exception e) {
+            authErrorResponder.send(httpResponse, httpRequest, "sso-company-login-init", e, SSO_LOGIN_FAILED);
+        }
+    }
+
+    private void redirectToCompanyProvider(SsoLoginInitRequest request, String handle, HttpServletRequest httpRequest,
+                                           HttpServletResponse httpResponse) {
+        clearOtherSsoFlowCookies(httpResponse, OF_SSO_LOGIN);
+        SsoAuthorizeData data = ssoLoginService.startCompanyLogin(request, handle, httpRequest);
+        ssoFlowCookies.write(httpResponse, OF_SSO_LOGIN, data.cookieValue(), data.cookieTtlSeconds());
+        seeOther(httpResponse, data.redirectPath());
     }
 
     /**

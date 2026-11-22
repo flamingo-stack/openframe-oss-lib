@@ -119,6 +119,15 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
         }
     }
 
+    public Optional<AuthUser> autoProvisionByCompanyDomain(String tenantId, String provider, OidcUser user) {
+        String email = resolveEmail(user);
+        return ssoConfigService.getSSOConfig(tenantId, provider)
+                .filter(SSOPerTenantConfig::isAutoProvisionUsers)
+                .filter(config -> isEmailAllowedByDomains(config.getAllowedDomains(), email))
+                .map(config -> provisionOrRefresh(tenantId, email, email.toLowerCase(ROOT), user, provider,
+                        resolvePictureUrl(user)));
+    }
+
     private AuthUser provisionOrRefresh(String tenantId,
                                         String email,
                                         String normalizedEmail,

@@ -1,10 +1,12 @@
 package com.openframe.notification.mail.service;
 
+import com.openframe.notification.mail.config.HubspotVerificationMailProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -13,12 +15,17 @@ import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
+/** Sends transactional mail through HubSpot and bounds how long verification delivery can wait. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@EnableConfigurationProperties(HubspotVerificationMailProperties.class)
 @ConditionalOnProperty(prefix = "openframe.mail", name = "provider", havingValue = "hubspot-api")
 public class HubspotApiEmailService implements EmailService {
 
+    private static final String LINK_PROPERTY = "link";
+
+    private final HubspotVerificationMailProperties verificationProperties;
     private WebClient webClient;
 
     @Value("${openframe.mail.from}")
@@ -77,7 +84,8 @@ public class HubspotApiEmailService implements EmailService {
     @Override
     public void sendEmailVerificationEmail(String toEmail, String verifyToken) {
         String link = verifyLinkTemplate.replace("{token}", verifyToken);
-        sendWithTemplate(verifyEmailId, toEmail, "Verify your email and continue", link, "Email verification");
+        sendRequest(verifyEmailId, toEmail, "Verify your email and continue", Map.of(LINK_PROPERTY, link), "Email verification")
+                .block(verificationProperties.verificationSendTimeout());
     }
 
     @Override
@@ -101,10 +109,15 @@ public class HubspotApiEmailService implements EmailService {
     }
 
     private void sendWithTemplate(String emailTemplateId, String toEmail, String subject, String link, String debugContext) {
-        send(emailTemplateId, toEmail, subject, Map.of("link", link), debugContext);
+        send(emailTemplateId, toEmail, subject, Map.of(LINK_PROPERTY, link), debugContext);
     }
 
     private void send(String emailTemplateId, String toEmail, String subject, Map<String, Object> customProperties, String debugContext) {
+        sendRequest(emailTemplateId, toEmail, subject, customProperties, debugContext).block();
+    }
+
+    private Mono<Void> sendRequest(String emailTemplateId, String toEmail, String subject,
+                                   Map<String, Object> customProperties, String debugContext) {
         Map<String, Object> payload = Map.of(
                 "emailId", emailTemplateId,
                 "message", Map.of(
@@ -119,7 +132,7 @@ public class HubspotApiEmailService implements EmailService {
             log.debug("[HubSpot API] {} Payload: {}", debugContext, payload);
         }
 
-        webClient.post()
+        return webClient.post()
                 .uri(uriBuilder -> uriBuilder.path("/marketing/v4/email/single-send").build())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -134,8 +147,7 @@ public class HubspotApiEmailService implements EmailService {
                             .flatMap(body -> Mono.error(new IllegalStateException(
                                     "HubSpot API error: status=" + response.statusCode() + " body=" + body
                             )));
-                })
-                .block();
+                });
     }
 }
 

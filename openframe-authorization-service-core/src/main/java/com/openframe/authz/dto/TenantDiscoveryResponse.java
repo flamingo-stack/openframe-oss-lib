@@ -1,5 +1,6 @@
 package com.openframe.authz.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,13 +24,20 @@ public class TenantDiscoveryResponse {
     @JsonProperty("has_existing_accounts")
     private boolean hasExistingAccounts;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonProperty("tenant_id")
     private String tenantId;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonProperty("tenant_name")
     private String tenantName;
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String domain;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonProperty("sso_login_handle")
+    private String ssoLoginHandle;
 
     /**
      * @deprecated Superseded by {@link #openframeLoginEnabled} and {@link #customProviders}: this
