@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -39,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -78,6 +80,7 @@ class PasswordResetServiceTest {
         ReflectionTestUtils.setField(service, "maxRequestsPerIp", 10);
         lenient().when(redisTemplate.opsForValue()).thenReturn(values);
         lenient().when(rateLimiter.increment(anyString(), any(Duration.class))).thenReturn(0L);
+        lenient().when(values.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
     }
 
     @AfterEach
@@ -259,7 +262,7 @@ class PasswordResetServiceTest {
     void createResetToken_tokenStillValid_sendsNothingNewTokenNotIssued() {
         when(userService.findActiveTenantIdsByEmail("ada@acme.com")).thenReturn(List.of("t1"));
         when(ssoConfigService.isOpenframeLoginEnabled("t1")).thenReturn(true);
-        when(redisTemplate.hasKey(contains("active:" + ADA_HASH))).thenReturn(true);
+        when(values.setIfAbsent(contains("active:" + ADA_HASH), anyString(), any(Duration.class))).thenReturn(false);
 
         service.createResetToken("ada@acme.com");
 
@@ -275,9 +278,20 @@ class PasswordResetServiceTest {
         service.createResetToken("ada@acme.com");
 
         ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
-        verify(values, org.mockito.Mockito.atLeastOnce()).set(key.capture(), anyString(), eq(Duration.ofMinutes(30)));
-        assertThat(key.getAllValues()).anyMatch(k -> k.contains("active:" + ADA_HASH));
-        assertThat(key.getAllValues()).noneMatch(k -> k.contains("ada@acme.com"));
+        verify(values).setIfAbsent(key.capture(), anyString(), eq(Duration.ofMinutes(30)));
+        assertThat(key.getValue()).contains("active:" + ADA_HASH).doesNotContain("ada@acme.com");
+    }
+
+    @Test
+    void createResetToken_claimsTheActiveMarkBeforeSending_soParallelRequestsSendOnce() {
+        when(userService.findActiveTenantIdsByEmail("ada@acme.com")).thenReturn(List.of("t1"));
+        when(ssoConfigService.isOpenframeLoginEnabled("t1")).thenReturn(true);
+
+        service.createResetToken("ada@acme.com");
+
+        InOrder order = inOrder(values, emailService);
+        order.verify(values).setIfAbsent(contains("active:" + ADA_HASH), anyString(), any(Duration.class));
+        order.verify(emailService).sendPasswordResetEmail(eq("ada@acme.com"), anyString());
     }
 
     @Test
@@ -333,7 +347,7 @@ class PasswordResetServiceTest {
         fromIp("1.2.3.4");
         when(userService.findActiveTenantIdsByEmail("ada@acme.com")).thenReturn(List.of("t1"));
         when(ssoConfigService.isOpenframeLoginEnabled("t1")).thenReturn(true);
-        when(redisTemplate.hasKey(contains("active:"))).thenReturn(true);
+        when(values.setIfAbsent(contains("active:"), anyString(), any(Duration.class))).thenReturn(false);
 
         service.createResetToken("ada@acme.com");
 
@@ -410,7 +424,7 @@ class PasswordResetServiceTest {
 
         assertThatCode(() -> service.createResetToken("ada@acme.com")).doesNotThrowAnyException();
 
-        verify(values, never()).set(contains("active:"), anyString(), any(Duration.class));
+        verify(redisTemplate).delete(contains("active:" + ADA_HASH));
         assertThat(output).contains("event=password_reset_request", "outcome=send_failed", "tenantIds=[t1]",
                 "ip=1.2.3.4").doesNotContain("ada@acme.com");
     }

@@ -63,8 +63,8 @@ class LoginAttemptLimiterTest {
 
         verify(rateLimiter).restartWindow(contains("account:t1:" + EMAIL_HASH), eq(WINDOW));
         verify(rateLimiter, never()).restartWindow(contains("ip:"), eq(WINDOW));
-        assertThat(output).contains("event=password_login_blocked", "scope=account", "tenantId=t1", "ip=1.2.3.4")
-                .doesNotContain("ada@acme.com");
+        assertThat(output).contains("event=password_login_blocked", "scope=account", "account=" + EMAIL_HASH,
+                "tenantId=t1", "ip=1.2.3.4").doesNotContain("ada@acme.com");
     }
 
     @Test
@@ -75,7 +75,7 @@ class LoginAttemptLimiterTest {
 
         verify(rateLimiter).restartWindow(contains("ip:1.2.3.4"), eq(WINDOW));
         verify(rateLimiter, never()).restartWindow(contains("account:"), eq(WINDOW));
-        assertThat(output).contains("event=password_login_blocked", "scope=ip");
+        assertThat(output).contains("event=password_login_blocked", "scope=ip").doesNotContain("account=");
     }
 
     @Test
