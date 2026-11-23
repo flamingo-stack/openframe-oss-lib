@@ -448,10 +448,13 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
         <span className="flex size-5 shrink-0 items-center justify-center" aria-hidden>
           {item.checked && <CheckFillIcon size={20} className="text-ods-accent" />}
         </span>
-      ) : item.type === 'submenu' && comparisonSubmenu && item.checked ? (
-        <CheckFillIcon size={20} className="shrink-0 text-ods-accent" aria-hidden />
       ) : (item.type === 'radio' || item.type === 'submenu') && item.checked ? (
-        <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />
+        // The design system's dropdown-item marks a choice with check-fill; the default menu keeps its check.
+        variant === 'overlay' || comparisonSubmenu ? (
+          <CheckFillIcon size={20} className="shrink-0 text-ods-accent" aria-hidden />
+        ) : (
+          <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />
+        )
       ) : null}
 
       {item.type === 'checkbox' && (
