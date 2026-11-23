@@ -59,7 +59,6 @@ public class TenantSoftwareReadModelQuery {
 
     private static final int DEFAULT_PER_PAGE = 20;
     private static final String DEFAULT_SORT_PROPERTY = "nameLower";
-    private static final String ID_PROPERTY = "_id";
     private static final String DEFAULT_VULNERABILITY_SORT_FIELD = "discoveredAt";
     private static final Map<String, String> SORT_FIELD = Map.of(
             "name", "nameLower",
@@ -314,7 +313,7 @@ public class TenantSoftwareReadModelQuery {
         String property = field == null ? DEFAULT_SORT_PROPERTY : SORT_FIELD.getOrDefault(field, DEFAULT_SORT_PROPERTY);
         Sort.Direction direction = sort != null && sort.getDirection() == SortDirection.DESC
                 ? Sort.Direction.DESC : Sort.Direction.ASC;
-        return Sort.by(direction, property, ID_PROPERTY);
+        return Sort.by(direction, property);
     }
 
     // currentVersion is the version on the most devices and olderVersionsCount the other versions in use, as the

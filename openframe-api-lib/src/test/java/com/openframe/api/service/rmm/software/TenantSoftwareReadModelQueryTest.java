@@ -228,7 +228,7 @@ class TenantSoftwareReadModelQueryTest {
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(softwareRepository).findTitles(eq(titles().nameLower("jq").vulnerableOnly(true).build()),
                 pageable.capture());
-        assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "devicesCount", "_id"));
+        assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "devicesCount"));
         assertThat(pageable.getValue().getPageSize()).isEqualTo(1);
         assertThat(result.items()).extracting(SoftwareResponse::getId).containsExactly("1");
         assertThat(result.filteredCount()).isEqualTo(3);
@@ -245,7 +245,7 @@ class TenantSoftwareReadModelQueryTest {
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(softwareRepository).findTitles(eq(titles().build()),
                 pageable.capture());
-        assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.ASC, "nameLower", "_id"));
+        assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.ASC, "nameLower"));
         assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
     }
 
