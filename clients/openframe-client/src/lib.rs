@@ -50,7 +50,6 @@ use crate::listener::command::{
     ToolInstallationHandler, ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
-use crate::listener::identity_split_listener::IdentitySplitListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
 use crate::models::{
@@ -187,7 +186,6 @@ pub struct Client {
     auth_processor: InitialAuthenticationProcessor,
     nats_connection_manager: NatsConnectionManager,
     remote_access_message_listener: RemoteAccessMessageListener,
-    identity_split_listener: IdentitySplitListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
     tool_installation_listener: CommandListener<ToolInstallationHandler>,
     tool_update_listener: CommandListener<ToolUpdateHandler>,
@@ -296,7 +294,7 @@ impl Client {
 
         // Initialize registration processor
         let registration_processor =
-            RegistrationProcessor::new(registration_service.clone(), config_service.clone());
+            RegistrationProcessor::new(registration_service, config_service.clone());
 
         // Initialize authentication client
         let auth_client = AuthClient::new(
@@ -425,7 +423,7 @@ impl Client {
             directory_manager.clone(),
             installed_tools_service.clone(),
             tool_kill_service.clone(),
-            tool_restart_service.clone(),
+            tool_restart_service,
             initial_configuration_service.clone(),
             config_service.clone(),
             tool_ops.clone(),
@@ -544,15 +542,6 @@ impl Client {
             tool_run_manager.client_update_pending(),
             package_upgrades.view(),
             agent_restart.clone(),
-        );
-        let identity_split_listener = IdentitySplitListener::new(
-            nats_connection_manager.clone(),
-            config_service.clone(),
-            registration_service,
-            machine_id_service.clone(),
-            installed_tools_service.clone(),
-            tool_restart_service,
-            restart_gate.clone(),
         );
         let delivery_results = DeliveryResults::new(
             nats_message_publisher.clone(),
@@ -718,7 +707,6 @@ impl Client {
             auth_processor,
             nats_connection_manager,
             remote_access_message_listener,
-            identity_split_listener,
             feature_flags_listener,
             tool_installation_listener,
             tool_update_listener,
@@ -891,7 +879,6 @@ impl Client {
         self.client_uninstall_listener.start().await?;
 
         self.remote_access_message_listener.start().await?;
-        self.identity_split_listener.start().await?;
 
         // Recover interrupted scheduled scripts, then start the outbox flusher,
         // both strictly before any execution listener can accept new batches

@@ -89,24 +89,3 @@ fn a_saved_value_that_is_not_a_machine_id_is_not_restored() {
     assert_ne!(id, "not-a-uuid");
     assert!(Uuid::parse_str(&id).is_ok());
 }
-
-#[test]
-fn regenerating_writes_and_saves_a_new_id_that_later_reads_return() {
-    let dir = tempfile::tempdir().unwrap();
-    let dm = directories(&dir);
-    let saved = Arc::new(FakeSaved::default());
-    let service = MachineIdService::with_saved(&dm, saved.clone());
-    let previous = service.get_or_create().unwrap();
-
-    let regenerated = service.regenerate().unwrap();
-
-    assert_ne!(previous, regenerated);
-    assert_eq!(service.get(), regenerated);
-    assert_eq!(saved.id().as_deref(), Some(regenerated.as_str()));
-    assert_eq!(
-        MachineIdService::with_saved(&dm, Arc::new(FakeSaved::default()))
-            .get_or_create()
-            .unwrap(),
-        regenerated
-    );
-}

@@ -98,15 +98,6 @@ impl MachineIdService {
         Ok(id)
     }
 
-    pub fn regenerate(&self) -> Result<String> {
-        let id = Uuid::new_v4().to_string();
-        self.write(&id)?;
-        info!("Generated new machine ID: {}", id);
-        self.saved.save(&id);
-        *self.cached_id.write().unwrap() = Some(id.clone());
-        Ok(id)
-    }
-
     fn restore_or_generate(&self) -> Result<String> {
         if let Some(id) = self.saved.read().filter(|id| Uuid::parse_str(id).is_ok()) {
             self.write(&id)?;

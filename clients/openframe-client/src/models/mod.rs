@@ -8,7 +8,6 @@ pub mod download_configuration;
 pub mod execution;
 pub mod feature_flags;
 pub mod hostname_report_message;
-pub mod identity_split;
 pub mod initial_configuration;
 pub mod installed_tool;
 pub mod machine_heartbeat_message;
@@ -52,7 +51,6 @@ pub use feature_flags::{
     Feature, FeatureFlag, FeatureFlags, FeatureFlagsMessage, FeatureFlagsState,
 };
 pub use hostname_report_message::HostnameReportMessage;
-pub use identity_split::{identity_split_subject, IdentitySplitMessage, IDENTITY_SPLIT_KIND};
 pub use initial_configuration::InitialConfiguration;
 pub use installed_tool::{
     Installation, InstalledAsset, InstalledTool, ToolRecordState, CHAT_TOOL_AGENT_ID,

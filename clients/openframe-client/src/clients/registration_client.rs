@@ -6,7 +6,7 @@ use reqwest::{
 use serde::Deserialize;
 
 use crate::{
-    models::{AgentRegistrationRequest, AgentRegistrationResponse, IdentitySplitMessage},
+    models::{AgentRegistrationRequest, AgentRegistrationResponse},
     platform::machine_info_persistence::PersistedMachineInfo,
 };
 
@@ -115,55 +115,6 @@ impl RegistrationClient {
             .context("Failed to parse registration response")?;
 
         Ok(registration_response)
-    }
-
-    pub async fn split(
-        &self,
-        machine_info: &PersistedMachineInfo,
-        request: &IdentitySplitMessage,
-    ) -> Result<AgentRegistrationResponse> {
-        let url = format!("{}/clients/api/agents/split", self.base_url);
-
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "X-Machine-Id",
-            machine_info
-                .machine_id
-                .parse()
-                .context("Failed to parse machine id header")?,
-        );
-        headers.insert(
-            "X-Client-Secret",
-            machine_info
-                .client_secret
-                .parse()
-                .context("Failed to parse client secret header")?,
-        );
-        headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-
-        let response = self
-            .http_client
-            .post(&url)
-            .headers(headers)
-            .json(request)
-            .send()
-            .await
-            .context("Failed to send identity split request")?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Identity split failed with status {} and body {}",
-                status,
-                body
-            );
-        }
-
-        response
-            .json()
-            .await
-            .context("Failed to parse identity split response")
     }
 
     /// Reports this machine's uninstall so the platform can run its deletion logic.

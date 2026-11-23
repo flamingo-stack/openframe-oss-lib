@@ -136,24 +136,3 @@ async fn a_missing_file_stays_missing() {
     assert!(!f.path.exists());
     assert_eq!(f.service.get_machine_id().unwrap(), "");
 }
-
-#[tokio::test]
-async fn replacing_the_registration_drops_the_tokens_of_the_previous_machine() {
-    let dir = tempfile::tempdir().unwrap();
-    let agent = crate::test_support::registered_agent(&directories(&dir)).await;
-
-    agent
-        .replace_registration("m-2".into(), "client-2".into(), "secret-2".into())
-        .await
-        .unwrap();
-
-    assert_eq!(
-        agent.get_registration_credentials().unwrap(),
-        ("m-2".to_string(), "secret-2".to_string())
-    );
-    assert_eq!(
-        agent.get_client_credentials().await.unwrap(),
-        ("client-2".to_string(), "secret-2".to_string())
-    );
-    assert!(agent.get_access_token().await.unwrap().is_empty());
-}
