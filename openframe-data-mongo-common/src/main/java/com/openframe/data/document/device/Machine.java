@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 @Data
@@ -58,6 +59,7 @@ public class Machine implements TenantScoped {
     private OsType osType;
     private String osVersion;
     private String osBuild;
+    private Set<String> withheldToolAgents;
     private String timezone;
     private Map<PackageManagerType, PackageManagerState> packageManagers;
     private SecurityState securityState;

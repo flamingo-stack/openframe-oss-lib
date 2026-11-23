@@ -48,9 +48,9 @@ public class AuthErrorResponder {
     public void send(HttpServletResponse response, HttpServletRequest request, String event, Exception e,
                      AuthErrorCode fallbackCode) throws IOException {
         AuthErrorCode code = resolveCode(e, fallbackCode);
-        log.error("Auth failure [{}] event={} code={} tenantId={} uri={} detail={}",
+        log.error("Auth failure [{}] event={} code={} tenantId={} uri={} ip={} detail={}",
                 classify(e), event, code, TenantContext.getTenantId(),
-                request != null ? request.getRequestURI() : null, e.getMessage(), e);
+                request != null ? request.getRequestURI() : null, ClientIp.of(request), e.getMessage(), e);
 
         String reference = reference(code, e);
         String target = authErrorUrl + "?ref=" + reference;

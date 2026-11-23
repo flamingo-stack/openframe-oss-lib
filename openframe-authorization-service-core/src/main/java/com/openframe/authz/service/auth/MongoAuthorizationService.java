@@ -1,6 +1,7 @@
 package com.openframe.authz.service.auth;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.web.ClientIp;
 import com.openframe.core.util.Sha256;
 import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import com.openframe.data.document.oauth.RetiredRefreshToken;
@@ -9,6 +10,7 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
@@ -51,6 +53,13 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
             entity.setSessionId(loginSessionId());
         }
         MongoOAuth2Authorization stored = repository.findById(entity.getId()).orElse(null);
+        if (stored == null) {
+            // Also fires when an existing login session mints a code with no new login
+            log.info("New authorization {} principal={} client={} grant={} tenantId={} ip={} ua={}",
+                    authorization.getId(), authorization.getPrincipalName(), authorization.getRegisteredClientId(),
+                    authorization.getAuthorizationGrantType().getValue(), TenantContext.getTenantId(),
+                    ClientIp.current(), userAgent());
+        }
         entity.setTenantId(owningTenantId(stored));
         entity.setRetiredRefreshTokens(retiredTokensAfterSaving(entity, stored));
         repository.save(entity);
@@ -103,6 +112,12 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
         }
         HttpSession session = attributes.getRequest().getSession(false);
         return session == null ? null : Sha256.hex(session.getId());
+    }
+
+    private static String userAgent() {
+        return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+                ? attributes.getRequest().getHeader(HttpHeaders.USER_AGENT)
+                : null;
     }
 
     private boolean isWithinGrace(RetiredRefreshToken token, Instant now) {

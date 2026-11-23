@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -51,6 +52,7 @@ class DeliveryTrackerTest {
     @Mock private DeliveryCloser closer;
     @Mock private DeliverySpecRegistry deliverySpecRegistry;
     @Mock private DeliverySpec<DeliverySeed, DeliveryPayload> deliverySpec;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @Captor private ArgumentCaptor<Instant> atCaptor;
     @Captor private ArgumentCaptor<Instant> untilCaptor;
@@ -59,7 +61,7 @@ class DeliveryTrackerTest {
 
     @BeforeEach
     void setUp() {
-        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer, deliverySpecRegistry);
+        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer, deliverySpecRegistry, eventPublisher);
     }
 
     @Test
@@ -97,7 +99,7 @@ class DeliveryTrackerTest {
         PolicyOverride configured = new PolicyOverride();
         configured.setResultTimeoutSeconds(CONFIGURED_RESULT_TIMEOUT);
         properties.getTypes().put(DeliveryType.TOOL_INSTALLATION, configured);
-        DeliveryTracker configuredTracker = new DeliveryTracker(repository, properties, closer, deliverySpecRegistry);
+        DeliveryTracker configuredTracker = new DeliveryTracker(repository, properties, closer, deliverySpecRegistry, eventPublisher);
         when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
 
         // execution
@@ -161,6 +163,30 @@ class DeliveryTrackerTest {
     }
 
     @Test
+    void done_ref_rowMarkedDone_deliveryDoneEventPublished() {
+        // setup
+        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class))).thenReturn(true);
+
+        // execution
+        tracker.done(REF, MACHINE_ID);
+
+        // verifications
+        verify(eventPublisher).publishEvent(new DeliveryDoneEvent(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID));
+    }
+
+    @Test
+    void done_ref_noRowForTheDispatch_noEventPublished() {
+        // setup
+        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class))).thenReturn(false);
+
+        // execution
+        tracker.done(REF, MACHINE_ID);
+
+        // verifications
+        verifyNoInteractions(eventPublisher, closer);
+    }
+
+    @Test
     void done_byKey_currentDispatchOfTheRowMarkedDone() {
         // setup
         when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(row()));
@@ -171,6 +197,32 @@ class DeliveryTrackerTest {
 
         // verifications
         verify(repository).markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class));
+    }
+
+    @Test
+    void done_byKey_rowMarkedDone_deliveryDoneEventPublished() {
+        // setup
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(row()));
+        when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class))).thenReturn(true);
+
+        // execution
+        tracker.done(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+
+        // verifications
+        verify(eventPublisher).publishEvent(new DeliveryDoneEvent(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID));
+    }
+
+    @Test
+    void done_byKey_noRow_nothingMarkedOrPublished() {
+        // setup
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.empty());
+
+        // execution
+        tracker.done(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
+
+        // verifications
+        verify(repository, never()).markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class));
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
