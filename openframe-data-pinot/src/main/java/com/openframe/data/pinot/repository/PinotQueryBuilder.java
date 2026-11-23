@@ -59,14 +59,9 @@ public class PinotQueryBuilder {
     private static final int MAX_LIMIT = 10000;
     private static final int MIN_LIMIT = 1;
 
-    private static final String CURSOR_SEPARATOR = "_";
-    private static final String SORT_ASC = "ASC";
     private static final String CURSOR_DESC_OPERATOR = "<";
     private static final String CURSOR_ASC_OPERATOR = ">";
-    // args: field, comparison operator, timestamp
-    private static final String CURSOR_TIMESTAMP_CMP_CONDITION = "(%s %s %d)";
-    // args: field, timestamp, comparison operator, quote, toolEventId, quote
-    private static final String CURSOR_TIMESTAMP_EQUAL_CONDITION = "(%s = %d AND toolEventId %s %s%s%s)";
+    private static final String KEYSET_CONDITION = "((%1$s %2$s %3$s) OR (%1$s = %3$s AND %4$s %2$s %5$s))";
 
     private static final LocalTime END_OF_DAY = LocalTime.MAX;
 
@@ -447,50 +442,31 @@ public class PinotQueryBuilder {
         return this;
     }
 
-    /**
-     * Keyset-pagination predicate. The comparison operator must match the active
-     * sort direction, otherwise paging walks the dataset the wrong way: for
-     * {@code DESC} (newest first) we page toward older rows ({@code <}); for
-     * {@code ASC} (oldest first) we page toward newer rows ({@code >}). The
-     * tie-breaker on {@code toolEventId} uses the same operator so it stays
-     * consistent with {@link #orderBySortInput}.
-     */
-    public PinotQueryBuilder whereCursor(String cursor, String sortDirection) {
-        if (cursor != null && !cursor.trim().isEmpty()) {
-            String[] cursorParts = cursor.split(CURSOR_SEPARATOR, 2);
-            if (cursorParts.length == 2) {
-                try {
-                    long timestamp = Long.parseLong(cursorParts[0]);
-                    String toolEventId = cursorParts[1];
-
-                    String operator = SORT_ASC.equalsIgnoreCase(sortDirection)
-                            ? CURSOR_ASC_OPERATOR : CURSOR_DESC_OPERATOR;
-
-                    String timestampCmpCondition = String.format(CURSOR_TIMESTAMP_CMP_CONDITION,
-                            EVENT_TIMESTAMP_FIELD, operator, timestamp);
-                    String timestampEqualCondition = String.format(CURSOR_TIMESTAMP_EQUAL_CONDITION,
-                            EVENT_TIMESTAMP_FIELD, timestamp, operator, SINGLE_QUOTE, escapeSqlValue(toolEventId), SINGLE_QUOTE);
-
-                    String cursorCondition = timestampCmpCondition + SQL_OR + timestampEqualCondition;
-                    whereConditions.add(cursorCondition);
-                } catch (NumberFormatException e) {
-                    throw new PinotQueryException("Invalid cursor format: timestamp must be a valid number", e);
-                }
-            } else {
-                throw new PinotQueryException("Invalid cursor format: expected 'timestamp_toolEventId'");
-            }
-        }
-        return this;
-    }
-
     public PinotQueryBuilder whereKeysetAfter(String sortField, long sortValue, String keyField, String keyValue,
                                               String sortDirection) {
-        return this;
+        String sortLiteral = Long.toString(sortValue);
+        return whereKeysetAfterLiteral(sortField, sortLiteral, keyField, keyValue, sortDirection);
     }
 
     public PinotQueryBuilder whereKeysetAfter(String sortField, String sortValue, String keyField, String keyValue,
                                               String sortDirection) {
+        String sortLiteral = quoted(sortValue);
+        return whereKeysetAfterLiteral(sortField, sortLiteral, keyField, keyValue, sortDirection);
+    }
+
+    private PinotQueryBuilder whereKeysetAfterLiteral(String sortField, String sortLiteral, String keyField,
+                                                      String keyValue, String sortDirection) {
+        validateFieldName(sortField);
+        validateFieldName(keyField);
+        String operator = SORT_DESC.equalsIgnoreCase(sortDirection) ? CURSOR_DESC_OPERATOR : CURSOR_ASC_OPERATOR;
+        String keyLiteral = quoted(keyValue);
+        String keyset = KEYSET_CONDITION.formatted(sortField, operator, sortLiteral, keyField, keyLiteral);
+        whereConditions.add(keyset);
         return this;
+    }
+
+    private String quoted(String value) {
+        return SINGLE_QUOTE + escapeSqlValue(value) + SINGLE_QUOTE;
     }
 
     private void validateTableName(String tableName) {

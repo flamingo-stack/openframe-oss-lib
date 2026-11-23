@@ -3,6 +3,7 @@ package com.openframe.data.pinot.repository;
 import com.openframe.data.pinot.model.LogProjection;
 import com.openframe.data.pinot.model.LogSortPosition;
 import com.openframe.data.pinot.model.OrganizationOption;
+import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ResultSet;
@@ -15,6 +16,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.springframework.util.StringUtils.hasText;
@@ -23,18 +25,22 @@ import static org.springframework.util.StringUtils.hasText;
 @Repository
 public class PinotClientLogRepository extends AbstractPinotRepository implements PinotLogRepository {
 
-    private static final List<String> SORTABLE_COLUMNS = List.of(
-            "eventTimestamp",
-            "severity",
-            "eventType",
-            "toolType",
-            "organizationId",
-            "deviceId",
-            "ingestDay"
+    private static final String TIMESTAMP_COLUMN = "eventTimestamp";
+
+    private static final Map<String, Function<LogProjection, String>> TEXT_SORT_VALUES = Map.of(
+            "severity", row -> row.severity,
+            "eventType", row -> row.eventType,
+            "toolType", row -> row.toolType,
+            "organizationId", row -> row.organizationId,
+            "deviceId", row -> row.deviceId,
+            "ingestDay", row -> row.ingestDay
     );
 
-    private static final String DEFAULT_SORT_COLUMN = "eventTimestamp";
+    private static final String DEFAULT_SORT_COLUMN = TIMESTAMP_COLUMN;
     private static final String PRIMARY_KEY_FIELD = "toolEventId";
+    private static final String SORT_ASC = "ASC";
+    private static final String SORT_DESC = "DESC";
+    private static final String NOT_SORTABLE_MESSAGE = "Logs cannot be sorted by the requested field";
 
     /**
      * Explicit upper bound for the filter-option queries. Pinot applies its own default of 10 to any query that
@@ -64,11 +70,10 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .whereEquals("deviceId", deviceId)
-                .orderBySortInput(sortField, sortDirection, PRIMARY_KEY_FIELD)
-                .limit(limit);
+                .whereEquals("deviceId", deviceId);
 
-        return executeLogQuery(queryBuilder.build());
+        String query = pageQuery(queryBuilder, position, limit, sortField, sortDirection, backward);
+        return executeLogQuery(query);
     }
 
     @Override
@@ -85,11 +90,10 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
                 .whereEquals("deviceId", deviceId)
-                .whereRelevanceLogSearch(searchTerm)
-                .orderBySortInput(sortField, sortDirection, PRIMARY_KEY_FIELD)
-                .limit(limit);
+                .whereRelevanceLogSearch(searchTerm);
 
-        return executeLogQuery(queryBuilder.build());
+        String query = pageQuery(queryBuilder, position, limit, sortField, sortDirection, backward);
+        return executeLogQuery(query);
     }
 
     @Override
@@ -182,7 +186,13 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
 
     @Override
     public LogSortPosition sortPositionOf(LogProjection row, String sortField) {
-        return null;
+        requireSortable(sortField);
+        if (TIMESTAMP_COLUMN.equals(sortField)) {
+            long timestampMillis = row.eventTimestamp.toEpochMilli();
+            return LogSortPosition.ofTimestamp(timestampMillis, row.toolEventId);
+        }
+        String textValue = TEXT_SORT_VALUES.get(sortField).apply(row);
+        return LogSortPosition.ofText(textValue, row.toolEventId);
     }
 
     @Override
@@ -190,12 +200,53 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
         if (field == null || field.trim().isEmpty()) {
             return false;
         }
-        return SORTABLE_COLUMNS.contains(field.trim());
+        return isSortableColumn(field.trim());
     }
 
     @Override
     public String getDefaultSortField() {
         return DEFAULT_SORT_COLUMN;
+    }
+
+    private String pageQuery(PinotQueryBuilder filteredQuery, LogSortPosition position, int limit,
+                             String sortField, String sortDirection, boolean backward) {
+        requireSortable(sortField);
+        String fetchDirection = fetchDirection(sortDirection, backward);
+        seekPast(filteredQuery, position, sortField, fetchDirection);
+        return filteredQuery
+                .orderBySortInput(sortField, fetchDirection, PRIMARY_KEY_FIELD)
+                .limit(limit)
+                .build();
+    }
+
+    private void seekPast(PinotQueryBuilder filteredQuery, LogSortPosition position, String sortField,
+                          String fetchDirection) {
+        if (position == null) {
+            return;
+        }
+        String toolEventId = position.getToolEventId();
+        if (position.isTimestamp()) {
+            long timestampMillis = position.getTimestampMillis();
+            filteredQuery.whereKeysetAfter(sortField, timestampMillis, PRIMARY_KEY_FIELD, toolEventId, fetchDirection);
+            return;
+        }
+        String textValue = position.getTextValue();
+        filteredQuery.whereKeysetAfter(sortField, textValue, PRIMARY_KEY_FIELD, toolEventId, fetchDirection);
+    }
+
+    private String fetchDirection(String sortDirection, boolean backward) {
+        boolean descending = SORT_DESC.equalsIgnoreCase(sortDirection);
+        return descending == backward ? SORT_ASC : SORT_DESC;
+    }
+
+    private void requireSortable(String sortField) {
+        if (!isSortableColumn(sortField)) {
+            throw new PinotQueryException(NOT_SORTABLE_MESSAGE);
+        }
+    }
+
+    private boolean isSortableColumn(String column) {
+        return TIMESTAMP_COLUMN.equals(column) || (column != null && TEXT_SORT_VALUES.containsKey(column));
     }
 
     // Optional columns store the schema default (empty string) when absent, and the API contract is an
