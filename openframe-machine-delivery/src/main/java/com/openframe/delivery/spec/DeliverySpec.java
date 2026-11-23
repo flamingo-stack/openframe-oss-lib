@@ -2,6 +2,7 @@ package com.openframe.delivery.spec;
 
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
 
 import java.util.EnumSet;
 import java.util.Set;
@@ -35,5 +36,9 @@ public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload>
     // built for one machine never reaches every machine by a stray wildcard
     default boolean canDeliverToEveryMachine() {
         return false;
+    }
+
+    default boolean admits(Machine machine, P payload) {
+        return true;
     }
 }

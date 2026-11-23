@@ -45,8 +45,10 @@ import static com.openframe.data.service.machine.MachineFields.MANUFACTURER;
 import static com.openframe.data.service.machine.MachineFields.MODEL;
 import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ASSIGNED_AT;
 import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ID;
+import static com.openframe.data.service.machine.MachineFields.OS_BUILD;
 import static com.openframe.data.service.machine.MachineFields.OS_TYPE;
 import static com.openframe.data.service.machine.MachineFields.OS_UUID;
+import static com.openframe.data.service.machine.MachineFields.OS_VERSION;
 import static com.openframe.data.service.machine.MachineFields.SERIAL_NUMBER;
 import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineFields.TIMEZONE;
@@ -241,6 +243,8 @@ public class AgentRegistrationService {
                 .set(LAST_SEEN, Instant.now());
         // Optional; keep the existing value on reinstall when the agent doesn't send it
         setIfNotBlank(update, USER_ID, request.getUserId());
+        setIfNotBlank(update, OS_VERSION, request.getOsVersion());
+        setIfNotBlank(update, OS_BUILD, request.getOsBuild());
         if (isNotBlank(request.getTimezone()) && isValidZone(request.getTimezone())) {
             update.set(TIMEZONE, request.getTimezone());
         }

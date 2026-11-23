@@ -1,6 +1,7 @@
 package com.openframe.management.initializer;
 
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.toolagent.IntegratedToolAgentConfiguration;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.service.IntegratedToolAgentService;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Component
@@ -63,6 +65,7 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
             String configurationId = configuration.getId();
 
             applyVersionFromProperties(configuration);
+            applyMinOsVersionsFromProperties(configuration);
 
             integratedToolAgentService.updateConfigurationFields(configuration);
             log.info("Applied agent configuration: {} from {}", configurationId, agentConfigurationFilePath);
@@ -80,6 +83,17 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
     private void applyVersionFromProperties(IntegratedToolAgentConfiguration configuration) {
         AgentVersionOverride.forAgentId(configuration.getId())
                 .ifPresent(override -> override.apply(configuration, clientVersionsProperties));
+    }
+
+    private void applyMinOsVersionsFromProperties(IntegratedToolAgentConfiguration configuration) {
+        Map<String, String> minOsVersions = agentConfigurationProperties.getAgentMinOsVersions().get(configuration.getId());
+        List<DownloadConfiguration> downloadConfigurations = configuration.getDownloadConfigurations();
+        if (minOsVersions == null || downloadConfigurations == null) {
+            return;
+        }
+        minOsVersions.forEach((os, minOsVersion) -> downloadConfigurations.stream()
+                .filter(downloadConfiguration -> os.equalsIgnoreCase(downloadConfiguration.getOs()))
+                .forEach(downloadConfiguration -> downloadConfiguration.setMinOsVersion(minOsVersion)));
     }
 
     private static void applyAssetVersion(IntegratedToolAgentConfiguration configuration, String assetId, String version) {
