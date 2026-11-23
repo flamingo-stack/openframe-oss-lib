@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.util.context.Context;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,7 +34,7 @@ class NatsClientContextFactoryTest {
 
     @BeforeEach
     void setUp() {
-        NatsSubjectPolicyFactory policyFactory = new NatsSubjectPolicyFactory(new NatsSubjectFilterProperties());
+        NatsSubjectPolicyFactory policyFactory = new NatsSubjectPolicyFactory(new NatsSubjectFilterProperties(), List.of());
         factory = new NatsClientContextFactory(requestJwtClaimsReader, policyFactory);
     }
 

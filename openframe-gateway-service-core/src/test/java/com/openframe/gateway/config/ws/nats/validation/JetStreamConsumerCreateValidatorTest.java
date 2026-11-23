@@ -134,6 +134,21 @@ class JetStreamConsumerCreateValidatorTest {
     }
 
     @Test
+    void check_durableConsumer_refusedBeforeAnyAuthorizer() {
+        // setup
+        NatsClientContext context = NatsTestContexts.user();
+        String body = "{\"config\":{\"durable_name\":\"d1\",\"filter_subject\":\"chat.d-1.message\"}}";
+        NatsClientCommand command = NatsTestCommands.publish(CREATE_SUBJECT, body);
+
+        // execution
+        NatsValidationResult result = validator.validate(command, context).block();
+
+        // verifications
+        assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.PUB, CREATE_SUBJECT));
+        verifyNoInteractions(chatAuthorizer);
+    }
+
+    @Test
     void check_ambiguousFilter_refusedBeforeAnyAuthorizer() {
         // setup
         NatsClientContext context = NatsTestContexts.user();

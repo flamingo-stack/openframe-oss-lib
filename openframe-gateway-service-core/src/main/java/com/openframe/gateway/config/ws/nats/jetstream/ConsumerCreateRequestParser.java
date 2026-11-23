@@ -31,6 +31,7 @@ public class ConsumerCreateRequestParser {
     private static final String FILTER_SUBJECT_FIELD = "filter_subject";
     private static final String FILTER_SUBJECTS_FIELD = "filter_subjects";
     private static final String DELIVER_SUBJECT_FIELD = "deliver_subject";
+    private static final String DURABLE_NAME_FIELD = "durable_name";
 
     private final ObjectMapper objectMapper;
 
@@ -48,6 +49,8 @@ public class ConsumerCreateRequestParser {
                 .filterSubjects(filterSubjects);
         textOf(config, DELIVER_SUBJECT_FIELD).ifPresent(consumerCreateRequest::deliverSubject);
         ambiguityOf(singleFilter, listedFilters, bodyFilters, apiSubject).ifPresent(consumerCreateRequest::ambiguity);
+        boolean durable = textOf(config, DURABLE_NAME_FIELD).isPresent();
+        consumerCreateRequest.durable(durable);
         return consumerCreateRequest.build();
     }
 

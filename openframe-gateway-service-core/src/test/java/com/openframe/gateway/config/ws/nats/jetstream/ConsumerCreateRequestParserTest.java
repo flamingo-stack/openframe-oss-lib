@@ -101,6 +101,30 @@ class ConsumerCreateRequestParserTest {
     }
 
     @Test
+    void parse_durableName_durable() {
+        // setup
+        byte[] body = json("{\"config\":{\"durable_name\":\"d1\",\"filter_subject\":\"chat.d-1.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.isDurable()).isTrue();
+    }
+
+    @Test
+    void parse_ephemeralConsumerWithAName_notDurable() {
+        // setup
+        byte[] body = json("{\"config\":{\"name\":\"c1\",\"filter_subject\":\"chat.d-1.message\",\"inactive_threshold\":30000000000}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.isDurable()).isFalse();
+    }
+
+    @Test
     void parse_bothFilterFieldsInTheBody_ambiguous() {
         // setup
         byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-1.message\",\"filter_subjects\":[\"chat.d-2.message\"]}}");

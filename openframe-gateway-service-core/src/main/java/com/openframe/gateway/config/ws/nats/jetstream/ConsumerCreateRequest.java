@@ -21,6 +21,8 @@ public class ConsumerCreateRequest {
     List<String> filterSubjects;
     String deliverSubject;
     String ambiguity;
+    /** A durable consumer outlives the client and its state stays on the stream until someone deletes it. */
+    boolean durable;
 
     public Optional<String> getDeliverSubject() {
         return Optional.ofNullable(deliverSubject);

@@ -20,9 +20,12 @@ import java.util.List;
  * <p>
  * Pattern tokens: a literal matches itself; {@code *} matches exactly one literal token, never a
  * wildcard sent by the client; {@code >} matches the rest of the subject, wildcards included;
- * {@code {id}} is the caller's id. The defaults mirror the subjects the NATS device user is allowed
- * today, scoped to the caller. A list set in config replaces its default wholesale (Spring binds a
- * list, it does not merge one), so a config that touches a list has to carry every pattern of it.
+ * {@code {id}} is the caller's id. The defaults are the OSS subjects only: a device's own machine
+ * subjects, a user's own notifications, and the inboxes every client needs for request/reply and
+ * JetStream deliveries. A product built on the gateway adds its own streams in code, through
+ * {@code NatsSubjectPatternContributor} beans (the saas gateway contributes the chat stream); those
+ * are always added. A list set in config replaces its default wholesale (Spring binds a list, it
+ * does not merge one), so a config that touches a list has to carry every pattern of it.
  * <p>
  * Roll out in two steps: {@code enabled=true, enforce=false} logs what would be refused
  * ("NATS client ... not allowed" in the gateway log, {@code openframe.tenant.gateway.nats.command.refused}
@@ -52,39 +55,20 @@ public class NatsSubjectFilterProperties {
     private List<String> deviceSubscribe = List.of(
             "_INBOX.*",
             "_INBOX.*.>",
-            "machine.{id}.>",
-            "deliver.web.{id}.>"
+            "machine.{id}.>"
     );
 
     private List<String> devicePublish = List.of(
-            "machine.{id}.>",
-            "user.*.installed-agent",
-            "$JS.API.CONSUMER.CREATE.MACHINE_TIMEZONE_REQUEST.*.machine.{id}.timezone.request",
-            "$JS.API.CONSUMER.DELETE.MACHINE_TIMEZONE_REQUEST.>",
-            "$JS.ACK.MACHINE_TIMEZONE_REQUEST.>",
-            "$JS.API.STREAM.INFO.CHAT_CHUNKS",
-            "$JS.API.CONSUMER.CREATE.CHAT_CHUNKS.>",
-            "$JS.API.CONSUMER.INFO.CHAT_CHUNKS.>",
-            "$JS.API.CONSUMER.DELETE.CHAT_CHUNKS.>",
-            "$JS.API.CONSUMER.MSG.NEXT.CHAT_CHUNKS.>"
+            "machine.{id}.>"
     );
 
     private List<String> userSubscribe = List.of(
             "_INBOX.*",
             "_INBOX.*.>",
-            "deliver.web.{id}.>",
-            "user.{id}.notification",
-            "chat.*.message",
-            "chat.*.admin-message"
+            "user.{id}.notification"
     );
 
-    private List<String> userPublish = List.of(
-            "$JS.API.STREAM.INFO.CHAT_CHUNKS",
-            "$JS.API.CONSUMER.CREATE.CHAT_CHUNKS.>",
-            "$JS.API.CONSUMER.INFO.CHAT_CHUNKS.>",
-            "$JS.API.CONSUMER.DELETE.CHAT_CHUNKS.>",
-            "$JS.API.CONSUMER.MSG.NEXT.CHAT_CHUNKS.>"
-    );
+    private List<String> userPublish = List.of();
 
     public List<String> publishPatternsFor(NatsClientKind kind) {
         return switch (kind) {
