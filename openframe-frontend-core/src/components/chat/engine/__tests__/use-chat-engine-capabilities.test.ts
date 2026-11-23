@@ -182,6 +182,53 @@ describe('useChatEngine: a dialog this chat creates', () => {
     expect(history.fetchDialogMessages).not.toHaveBeenCalled();
   });
 
+  it("a new intent dialog the server does not serve yet is read again, and its greeting shows: it isn't left", async () => {
+    const greeting: HistoricalMessage[] = [
+      {
+        id: 'g1',
+        createdAt: '2026-11-23T12:00:00Z',
+        owner: { type: 'ASSISTANT' },
+        parts: [{ type: 'TEXT', text: 'What should this script do?' }],
+      },
+    ];
+    const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'intent2' }));
+    const fetchDialogMessages = vi
+      .fn((): Promise<FetchDialogMessagesResult> => Promise.resolve({ messages: greeting, nextCursor: null }))
+      .mockResolvedValueOnce({ messages: [], nextCursor: null, missing: true });
+    const { result } = setup({ history: { createDialog, fetchDialogMessages } });
+    await act(async () => {
+      await result.current.startNewDialog({ intent: 'CREATE_SCRIPT' });
+    });
+    await waitFor(() => expect(fetchDialogMessages).toHaveBeenCalledTimes(2), { timeout: 3000 });
+    await waitFor(() => expect(texts(result.current.messages)).toEqual([['assistant', 'What should this script do?']]));
+    expect(result.current.activeDialogId).toBe('intent2');
+  });
+
+  it('a new intent dialog still missing on the second read stays open', async () => {
+    const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'intent3' }));
+    const fetchDialogMessages = vi.fn((): Promise<FetchDialogMessagesResult> =>
+      Promise.resolve({ messages: [], nextCursor: null, missing: true }),
+    );
+    const { result } = setup({ history: { createDialog, fetchDialogMessages } });
+    await act(async () => {
+      await result.current.startNewDialog({ intent: 'CREATE_POLICY' });
+    });
+    await waitFor(() => expect(fetchDialogMessages).toHaveBeenCalledTimes(2), { timeout: 3000 });
+    await waitFor(() => expect(result.current.isMessagesLoading).toBe(false));
+    expect(result.current.activeDialogId).toBe('intent3');
+  });
+
+  it('an intent dialog started with a prompt keeps its send: no history read clears it', async () => {
+    const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'intent4' }));
+    const { result, transport, history } = setup({ history: { createDialog } });
+    await act(async () => {
+      await result.current.startNewDialog({ intent: 'CREATE_POLICY', prompt: 'disk above 90%' });
+    });
+    expect(transport.publish).toHaveBeenCalledWith('disk above 90%', expect.objectContaining({ dialogId: 'intent4' }));
+    await waitFor(() => expect(texts(result.current.messages)).toEqual([['user', 'disk above 90%']]));
+    expect(history.fetchDialogMessages).not.toHaveBeenCalled();
+  });
+
   it('startNewDialog with nothing to start opens the draft', async () => {
     const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'x' }));
     const { result } = setup({ history: { createDialog } });
