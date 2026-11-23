@@ -113,6 +113,7 @@ public class GatewaySecurityConfig {
                                 CLIENTS_PREFIX + "/api/agents/register",
                                 CLIENTS_PREFIX + "/api/agents/reinstall",
                                 CLIENTS_PREFIX + "/api/agents/uninstall",
+                                CLIENTS_PREFIX + "/api/agents/split",
                                 CLIENTS_PREFIX + "/api/release-version",
                                 CLIENTS_PREFIX + "/oauth/token"
                         ).permitAll()

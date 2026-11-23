@@ -82,7 +82,27 @@ public class AgentRegistrationService {
 
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
+        return registerMachine(request);
+    }
 
+    public AgentRegistrationResponse registerSplit(Machine shared) {
+        AgentRegistrationResponse response = registerMachine(splitRequest(shared));
+        registrationTagAssignmentService.copyTags(shared.getMachineId(), response.getMachineId());
+        return response;
+    }
+
+    private static AgentRegistrationRequest splitRequest(Machine shared) {
+        AgentRegistrationRequest request = new AgentRegistrationRequest();
+        request.setHostname(shared.getHostname());
+        request.setOrganizationId(shared.getOrganizationId());
+        request.setUserId(shared.getUserId());
+        request.setAgentVersion(shared.getAgentVersion());
+        request.setOsType(shared.getOsType() == null ? null : shared.getOsType().name());
+        request.setTimezone(shared.getTimezone());
+        return request;
+    }
+
+    private AgentRegistrationResponse registerMachine(AgentRegistrationRequest request) {
         String machineId = machineIdGenerator.generate();
         String clientId = buildClientId(machineId);
         String clientSecret = agentSecretGenerator.generate();

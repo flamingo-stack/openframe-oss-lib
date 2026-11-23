@@ -3,11 +3,14 @@ package com.openframe.client.listener;
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.MachineStatusService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
+import com.openframe.client.service.identitysplit.MachineIdentityConflictService;
+import com.openframe.data.nats.model.MachineHeartbeatMessage;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -16,6 +19,8 @@ import jakarta.annotation.PreDestroy;
 
 import java.time.Duration;
 import java.time.Instant;
+
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +31,7 @@ public class MachineHeartbeatListener {
     private final ObjectMapper objectMapper;
     private final MachineStatusService machineStatusService;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
+    private final ObjectProvider<MachineIdentityConflictService> identityConflicts;
 
     private static final String SUBJECT = "machine.*.heartbeat";
 
@@ -48,7 +54,7 @@ public class MachineHeartbeatListener {
         }
     }
 
-    private void handleMessage(Message message) {
+    void handleMessage(Message message) {
         String subject = message.getSubject();
 
         String machineId = null;
@@ -62,10 +68,29 @@ public class MachineHeartbeatListener {
 
             // Process the heartbeat
             machineStatusService.processHeartbeat(machineId, eventTimestamp);
+            trackSession(machineId, message.getData());
 
             log.debug("Machine heartbeat processed successfully");
         } catch (Exception e) {
             log.error("Unexpected error processing heartbeat for machine {}", machineId, e);
+        }
+    }
+
+    private void trackSession(String machineId, byte[] payload) {
+        identityConflicts.ifAvailable(conflicts -> {
+            String sessionId = sessionIdOf(machineId, payload);
+            if (isNotBlank(sessionId)) {
+                conflicts.onHeartbeat(machineId, sessionId);
+            }
+        });
+    }
+
+    private String sessionIdOf(String machineId, byte[] payload) {
+        try {
+            return objectMapper.readValue(payload, MachineHeartbeatMessage.class).getSessionId();
+        } catch (RuntimeException e) {
+            log.debug("Heartbeat of machine {} carries no readable session", machineId);
+            return null;
         }
     }
 

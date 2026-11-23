@@ -71,6 +71,28 @@ public class RegistrationTagAssignmentService {
         }
     }
 
+    public void copyTags(String sourceMachineId, String targetMachineId) {
+        List<TagAssignment> assignments = tagAssignmentRepository.findByEntityIdAndEntityType(sourceMachineId, TagEntityType.DEVICE);
+        Instant now = Instant.now();
+        for (TagAssignment source : assignments) {
+            try {
+                TagAssignment copy = TagAssignment.builder()
+                        .entityId(targetMachineId)
+                        .tagId(source.getTagId())
+                        .entityType(TagEntityType.DEVICE)
+                        .values(source.getValues() != null ? source.getValues() : List.of())
+                        .taggedAt(now)
+                        .taggedBy(source.getTaggedBy())
+                        .build();
+                tagAssignmentRepository.save(copy);
+            } catch (Exception e) {
+                log.error("Failed to copy tag {} from machine {} to machine {}: {}",
+                        source.getTagId(), sourceMachineId, targetMachineId, e.getMessage(), e);
+            }
+        }
+        log.info("Copied {} tag(s) from machine {} to machine {}", assignments.size(), sourceMachineId, targetMachineId);
+    }
+
     /**
      * Finds an existing tag by key and DEVICE entity type, or creates a new one.
      * If the tag already exists and new values are provided, appends any new values

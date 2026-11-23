@@ -98,7 +98,7 @@ class GatewayRouteAuthorizationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"/clients/api/agents/register", "/clients/api/agents/reinstall", "/clients/api/agents/uninstall",
+    @CsvSource({"/clients/api/agents/register", "/clients/api/agents/reinstall", "/clients/api/agents/uninstall", "/clients/api/agents/split",
             "/clients/api/release-version", "/clients/oauth/token", "/clients/metrics/x", "/public/x"})
     void shouldKeepPublicPathsOpen(String path) {
         assertThat(call(path, null)).isEqualTo(200);
