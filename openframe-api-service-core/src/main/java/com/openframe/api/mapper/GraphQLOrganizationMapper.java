@@ -12,6 +12,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.organization.Organization;
 import org.springframework.stereotype.Component;
 
@@ -60,7 +61,7 @@ public class GraphQLOrganizationMapper {
     private static void requireDecodable(String opaqueCursor) {
         boolean provided = opaqueCursor != null && !opaqueCursor.isBlank();
         if (provided && CursorCodec.decode(opaqueCursor) == null) {
-            throw new IllegalArgumentException("Invalid cursor");
+            throw new InvalidCursorException();
         }
     }
 

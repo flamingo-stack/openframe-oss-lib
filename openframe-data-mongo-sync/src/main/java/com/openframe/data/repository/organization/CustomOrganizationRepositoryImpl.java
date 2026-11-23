@@ -1,5 +1,6 @@
 package com.openframe.data.repository.organization;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import lombok.RequiredArgsConstructor;
@@ -172,9 +173,10 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
         if (!idOnlyUnderValueSort) {
             return OrganizationKeysetCursor.parse(cursor, sortField);
         }
-        Organization anchor = mongoTemplate.findById(cursor, Organization.class);
+        Query byId = new Query(Criteria.where(ID_FIELD).is(cursor));
+        Organization anchor = mongoTemplate.findOne(byId, Organization.class);
         if (anchor == null) {
-            throw new IllegalArgumentException(OrganizationKeysetCursor.INVALID_CURSOR_MESSAGE);
+            throw new InvalidCursorException();
         }
         String compoundCursor = OrganizationKeysetCursor.encode(anchor, sortField);
         return OrganizationKeysetCursor.parse(compoundCursor, sortField);

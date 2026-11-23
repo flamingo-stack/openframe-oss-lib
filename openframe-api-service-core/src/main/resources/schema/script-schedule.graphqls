@@ -15,7 +15,9 @@ extend type Query {
     When sorting by startAt, DEVICE_ONLINE schedules are always ordered last
     (they are event-driven and have no startAt).
     Ties are broken by _id so the order is stable. Search is a
-    case-insensitive substring match on name."""
+    case-insensitive substring match on name.
+    When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor
+    are valid paging cursors."""
     scriptSchedules(
         filter: ScriptScheduleFilterInput,
         search: String,
