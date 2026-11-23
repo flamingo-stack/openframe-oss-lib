@@ -98,6 +98,7 @@ class DeliveryRolloutServiceTest {
         doReturn(spec).when(registry).require(DeliveryType.CLIENT_UPDATE);
         doReturn(DELIVERABLE).when(spec).getDeliverableStatuses();
         lenient().doReturn(TestPayload.class).when(spec).getPayloadClass();
+        lenient().doReturn(true).when(spec).admits(any(), any());
         lenient().when(floors.of(DeliveryType.CLIENT_UPDATE)).thenReturn(AgentVersionFloor.EVERY_VERSION);
     }
 
@@ -224,6 +225,83 @@ class DeliveryRolloutServiceTest {
         // verifications
         verify(sink).accept(any());
         verifyNoInteractions(agentVersions);
+    }
+
+    @Test
+    void advance_specDoesNotAdmitAMachine_walkedPastCountedAndTheOthersDispatched() {
+        // setup
+        Machine refused = machine("m-1");
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(refused, machine("m-2")));
+        doReturn(false).when(spec).admits(eq(refused), any(TestPayload.class));
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(sink).accept(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getMachineId()).isEqualTo("m-2");
+        verify(metrics).recordRolloutNotAdmitted(DeliveryType.CLIENT_UPDATE, 1);
+        verify(metrics).recordRolloutMachines(DeliveryType.CLIENT_UPDATE, 1);
+    }
+
+    @Test
+    void advance_specDoesNotAdmitAMachine_cursorStillMovesPastIt() {
+        // setup
+        Machine refused = machine("m-2");
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(machine("m-1"), refused));
+        doReturn(false).when(spec).admits(eq(refused), any(TestPayload.class));
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(repository).advance(ROLLOUT_ID, SEQUENCE, "id-m-2", 1);
+    }
+
+    @Test
+    void advance_everyMachineAdmitted_notAdmittedNeverCounted() {
+        // setup
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(machine("m-1"), machine("m-2")));
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(metrics, never()).recordRolloutNotAdmitted(any(), anyInt());
+    }
+
+    @Test
+    void advance_unreadablePayload_everyMachineAdmittedWithoutAskingTheSpec() {
+        // setup
+        rollout.setPayloadJson("not-json");
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(machine("m-1"), machine("m-2")));
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(spec, never()).admits(any(), any());
+        verify(metrics, never()).recordRolloutNotAdmitted(any(), anyInt());
+        verify(metrics).recordRolloutMachines(DeliveryType.CLIENT_UPDATE, 2);
+        verify(repository).advance(ROLLOUT_ID, SEQUENCE, "id-m-2", 2);
+    }
+
+    @Test
+    void advance_noMachines_specNeverAsked() {
+        // setup
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of());
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(spec, never()).admits(any(), any());
+        verify(repository).finish(ROLLOUT_ID, SEQUENCE, 0);
     }
 
     private static Machine machine(String machineId) {

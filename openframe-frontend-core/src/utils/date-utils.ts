@@ -164,36 +164,49 @@ export function formatDateTime(timestamp: string | Date, options: Intl.DateTimeF
   });
 }
 
+/** `1 day ago`, `3 days ago`: the unit singular for one. */
+function unitsAgo(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? '' : 's'} ago`;
+}
+
 /**
- * Get time difference in human readable format (detailed)
+ * Get time difference in human readable format (detailed): "just now", then whole minutes, hours, days, months
+ * (30 days) and years, singular for one ("1 day ago", "3 days ago"). A time in the future reads "just now".
  *
  * @param timestamp - ISO timestamp string or Date object
  * @returns Detailed time difference string
  */
 export function getDetailedTimeDifference(timestamp: string | Date): string {
-  const now = new Date();
+  return getDetailedTimeDifferenceFrom(timestamp, new Date());
+}
+
+/**
+ * {@link getDetailedTimeDifference} against a given "now": for a view that takes its clock at a moment of its own
+ * (a tooltip when it opens, a test).
+ */
+export function getDetailedTimeDifferenceFrom(timestamp: string | Date, now: Date | number): string {
   const targetTime = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
 
   if (isNaN(targetTime.getTime())) {
     return 'Invalid date';
   }
 
-  const diffInMs = now.getTime() - targetTime.getTime();
-  const diffInSeconds = Math.floor(diffInMs / 1000);
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  const nowMs = typeof now === 'number' ? now : now.getTime();
+  const diffInMinutes = Math.floor((nowMs - targetTime.getTime()) / (1000 * 60));
+  if (diffInMinutes < 1) return 'just now';
+  if (diffInMinutes < 60) return unitsAgo(diffInMinutes, 'minute');
+
   const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return unitsAgo(diffInHours, 'hour');
+
   const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 30) return unitsAgo(diffInDays, 'day');
 
-  if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
-  if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
-  if (diffInHours < 24) return `${diffInHours} hours ago`;
-  if (diffInDays < 30) return `${diffInDays} days ago`;
-
-  const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) return `${diffInMonths} months ago`;
-
+  // Years by 365 days, months by 30: below one whole year it stays in months, so 360-364 days read "12 months
+  // ago", never "0 years ago".
   const diffInYears = Math.floor(diffInDays / 365);
-  return `${diffInYears} years ago`;
+  if (diffInYears < 1) return unitsAgo(Math.floor(diffInDays / 30), 'month');
+  return unitsAgo(diffInYears, 'year');
 }
 
 /**

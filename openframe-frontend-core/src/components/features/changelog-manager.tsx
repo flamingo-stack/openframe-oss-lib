@@ -180,7 +180,6 @@ export function ChangelogManager({
               {tagOptions && tagLabelOf(entry.tag) && (
                 <StatusBadge
                   variant="button"
-                  singleLine
                   text={tagLabelOf(entry.tag) as string}
                   className="shrink-0 whitespace-nowrap"
                 />

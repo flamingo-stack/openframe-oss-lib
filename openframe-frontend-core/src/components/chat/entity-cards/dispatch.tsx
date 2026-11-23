@@ -1428,6 +1428,10 @@ const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   openframe_tenant: { label: 'OpenFrame tenant' },
   // One feature customers asked for (the GTM and product shared base): a glyph card, opening its drawer.
   product_feature: { label: 'Feature' },
+  // What a customer said in one record, backing a feature: a glyph card, opening the proof's drawer.
+  market_proof: { label: 'Proof' },
+  // A HubSpot company (an account): a glyph card, opening the company in HubSpot.
+  hubspot_company: { label: 'HubSpot company' },
   recorded_call: { label: 'Call', media: true },
   // One story of the AI daily digest: a glyph card (a story has no cover), opening the digest screen.
   ai_digest_story: { label: 'AI digest story' },
@@ -2282,6 +2286,30 @@ export function useRecordDestination(chatRef: ChatRef) {
   return { entry, fetchEntry, item, isLoading, isError, isFetched, notFound, finalChatRef, hostRoute, isNewTab, path };
 }
 
+/**
+ * A record card's loading form: its type's skeleton inside the same chrome the loaded card has (the footer row, its
+ * actions in their loading form), so the card does not change height when it loads. The loader draws it while it
+ * fetches; `renderChatInlineEntityCard(ref, { loading: true })` draws it for a card whose row is not known yet (a
+ * page of cards still being read), with no request.
+ */
+function ChatCardLoading({ chatRef, action }: { chatRef: ChatRef; action?: CardDiscussAction }) {
+  const entry = CHAT_CARD_REGISTRY[chatRef.type];
+  if (!entry) return null;
+  const node = entry.skeleton?.() ?? null;
+  // loading-standard-ok(OPTIONAL_MARK): `entry.disclosure` is the card registry's, not a read field, and the loaded card draws the same button
+  const footerAction = entry.disclosure ? <ChatCardDisclosureButton kind={entry.disclosure} loading /> : undefined;
+  return entry.bareInline ? (
+    <>
+      {node}
+      {footerAction ? <span className="mt-1 flex items-center pl-0.5">{footerAction}</span> : null}
+    </>
+  ) : (
+    <ChatCardWithDiscuss chatRef={chatRef} action={action} footerAction={footerAction} loading>
+      {node}
+    </ChatCardWithDiscuss>
+  );
+}
+
 export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: ChatCardLoaderProps) {
   const entry = CHAT_CARD_REGISTRY[chatRef.type];
   const { fetchEntry, item, isLoading, isError, isFetched, notFound, finalChatRef, hostRoute, isNewTab, path } =
@@ -2319,22 +2347,15 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: 
   // wrapper; everything else gets the ChatCardWithDiscuss chrome. Kept
   // here (not per-branch) so the two paths can never drift on the
   // discuss-menu wiring.
-  // `loading` draws the same chrome around the card's skeleton (the footer row and its actions in their loading
-  // form), so the card does not grow by a row when it loads.
-  const finish = (node: React.ReactNode, footerAction?: React.ReactNode, loading?: boolean) =>
+  const finish = (node: React.ReactNode, footerAction?: React.ReactNode) =>
     entry.bareInline ? (
       <>
-        {loading ? node : navWrap(node)}
+        {navWrap(node)}
         {footerAction ? <span className="mt-1 flex items-center pl-0.5">{footerAction}</span> : null}
       </>
     ) : (
-      <ChatCardWithDiscuss
-        chatRef={finalChatRef}
-        action={actions.discuss}
-        footerAction={footerAction}
-        loading={loading}
-      >
-        {loading ? node : navWrap(node)}
+      <ChatCardWithDiscuss chatRef={finalChatRef} action={actions.discuss} footerAction={footerAction}>
+        {navWrap(node)}
       </ChatCardWithDiscuss>
     );
   if (!fetchEntry) {
@@ -2342,14 +2363,7 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: 
     // to fetch): render straight from the record's descriptor.
     return finish(entry.render(undefined, finalChatRef, renderOpts));
   }
-  if (isLoading) {
-    return finish(
-      fetchEntry.skeleton?.() ?? null,
-      // loading-standard-ok(OPTIONAL_MARK): `entry.disclosure` is the card registry's, not a read field, and the loaded card draws the same button
-      entry.disclosure ? <ChatCardDisclosureButton kind={entry.disclosure} loading /> : undefined,
-      true,
-    );
-  }
+  if (isLoading) return <ChatCardLoading chatRef={finalChatRef} action={actions.discuss} />;
   if (!item) {
     // A 404 with the message's own source part: this host cannot read the record (a conversation read on another platform,
     // whose card route knows no such type), and the message says what it is and where it lives. That one answer makes the
@@ -2431,9 +2445,14 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: 
  */
 export function renderChatInlineEntityCard(
   chatRef: ChatRef,
-  options: RecordActionHandlers & { extras?: ChatCardDispatchExtras } = {},
+  options: RecordActionHandlers & {
+    extras?: ChatCardDispatchExtras;
+    /** The card's row is still being read by its host: draw the card's loading form, with no request. */
+    loading?: boolean;
+  } = {},
 ): React.ReactNode {
   const { onDiscuss, onDisplay, held, extras } = options;
+  if (options.loading) return <ChatCardLoading chatRef={chatRef} />;
 
   const loader = (
     <ChatCardLoader chatRef={chatRef} onDiscuss={onDiscuss} onDisplay={onDisplay} held={held} extras={extras} />

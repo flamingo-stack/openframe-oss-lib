@@ -258,30 +258,36 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       </>
     );
 
+    // With the Usage panel the counter waits for a figure too: while the budget and the usage are both unknown (no
+    // chat open, a new chat before its first figures) it would read "— / — context budget", so it is not drawn, and
+    // the panel it opens is out of reach until then.
+    const panelBudget = usagePanel ? (contextWindow ?? usagePanel.context.limit) : null;
+    const panelHasFigure = usedTokens != null || (panelBudget != null && panelBudget > 0);
+
     const inline = (
       <div ref={ref} className={cn(MODEL_DISPLAY_ROW_CLASS, 'text-ods-text-secondary', className)} {...props}>
         {labelWithTooltip}
-        {usagePanel ? (
-          <UsagePanelTrigger
-            usagePanel={usagePanel}
-            usedTokens={usedTokens}
-            budget={contextWindow ?? usagePanel.context.limit}
-            text={tailText(contextWindow ?? usagePanel.context.limit)}
-          />
-        ) : (
-          contextWindow != null && (
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="ml-auto opacity-70 text-h6">{tailText(contextWindow)}</span>
-                </TooltipTrigger>
-                <TooltipContent side="top" align="end">
-                  {CONTEXT_BUDGET_HINT}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )
-        )}
+        {usagePanel
+          ? panelHasFigure && (
+              <UsagePanelTrigger
+                usagePanel={usagePanel}
+                usedTokens={usedTokens}
+                budget={panelBudget}
+                text={tailText(panelBudget)}
+              />
+            )
+          : contextWindow != null && (
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="ml-auto opacity-70 text-h6">{tailText(contextWindow)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="end">
+                    {CONTEXT_BUDGET_HINT}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
       </div>
     );
 

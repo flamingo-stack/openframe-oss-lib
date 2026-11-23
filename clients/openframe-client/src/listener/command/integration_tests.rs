@@ -1613,7 +1613,8 @@ async fn an_update_whose_old_binary_is_still_running_fails_and_keeps_the_recorde
     archive
         .start_file(
             "agent.exe",
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored),
         )
         .unwrap();
     archive.write_all(&new_agent).unwrap();
@@ -1679,7 +1680,7 @@ async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empt
 
     let helper = vec![9u8; 150 * 1024];
     let stored =
-        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     for (name, bytes) in [("agent", vec![7u8; 150 * 1024]), ("helper", helper.clone())] {
         archive.start_file(name, stored).unwrap();

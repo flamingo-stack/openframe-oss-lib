@@ -12,6 +12,7 @@ import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -26,6 +27,7 @@ public class DeliveryTracker {
     private final DeliveryProperties properties;
     private final DeliveryCloser closer;
     private final DeliverySpecRegistry deliverySpecRegistry;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ref = the delivery block the agent copied back from the command; the row is looked up by that exact dispatch
     public void acknowledge(DeliveryRef ref, String machineId) {
@@ -60,6 +62,7 @@ public class DeliveryTracker {
         boolean done = repository.markDone(id, dispatchId, DeliveryStatus.COMPLETABLE, now, expiresAt);
         if (done) {
             log.info("Delivery DONE: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
+            eventPublisher.publishEvent(new DeliveryDoneEvent(type, targetId, machineId));
         } else {
             log.debug("Delivery completion ignored, no row for this dispatch: id={} dispatchId={}", id, dispatchId);
         }

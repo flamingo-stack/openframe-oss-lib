@@ -39,7 +39,7 @@ public class InvitationRegistrationController {
     @PostMapping(path = "/accept", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
     public AuthUser register(@Valid @RequestBody InvitationRegistrationRequest request) {
-        return invitationRegistrationService.registerByInvitation(request);
+        return invitationRegistrationService.registerByInvitationWithPassword(request);
     }
 
     @GetMapping(path = "/accept/sso")

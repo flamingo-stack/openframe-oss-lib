@@ -72,6 +72,17 @@
   --font-size-badge: 0.625rem; /* 10px */
   --font-line-space-badge: 0.75rem; /* 12px */
 
+  /* QUICK-ACTION CHIP SCALE — COMPONENT tokens, like the badge: the caption a
+   * quick-action chip's label renders at and its gap, FIXED across breakpoints
+   * and content areas. The chip's own caption (`text-h5`) follows the content area, so the
+   * same row drew 12px beside a narrow chat column and 14px under a full page;
+   * one row of chips reads the same size everywhere it is drawn. */
+  --font-size-chip: 0.75rem; /* 12px */
+  --font-line-space-chip: 1rem; /* 16px */
+  /* The gap inside a chip (icon to label) and between chips, as the row draws
+   * them beside a narrow chat column: fixed, so the chips keep one width. */
+  --spacing-chip-gap: 0.25rem; /* 4px */
+
   /* CHIP WALL PITCH — THE gap between quick-action chips, wherever a wall of
    * them is drawn: the in-app QuickActionWall (its `copyGap` default, which
    * also sets the clone seam and the row stack) and the marketing decks' own
