@@ -76,12 +76,13 @@ public class PasswordResetService {
             return;
         }
 
-        String token = generateResetToken();
-        redisTemplate.opsForValue().set(tokenKey(token), email, ttl);
         try {
+            String token = generateResetToken();
+            redisTemplate.opsForValue().set(tokenKey(token), email, ttl);
             emailService.sendPasswordResetEmail(email, token);
         } catch (RuntimeException e) {
-            // Still 202: a 500 here would tell the caller the account exists. The mark goes, so a retry sends.
+            // Token write or send failed. Still 202: a 500 here would tell the caller the account exists.
+            // The mark goes, so a retry sends.
             redisTemplate.delete(activeKey);
             log.warn("event=password_reset_request outcome=send_failed tenantIds={} ip={} error={}", tenantIds, ip,
                     e.getClass().getSimpleName());
