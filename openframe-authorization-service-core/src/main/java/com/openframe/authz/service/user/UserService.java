@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -78,6 +79,13 @@ public class UserService {
 
     public boolean existsActiveByEmail(String email) {
         return !userRepository.findAllByEmailAndStatus(email, ACTIVE).isEmpty();
+    }
+
+    /** Tolerates the duplicates {@link #findActiveByEmail} throws on, so a caller can stay silent about them. */
+    public List<String> findActiveTenantIdsByEmail(String email) {
+        return userRepository.findAllByEmailAndStatus(email, ACTIVE).stream()
+                .map(AuthUser::getTenantId)
+                .toList();
     }
 
     public Optional<AuthUser> findActiveByEmailAndTenant(String email, String tenantId) {
@@ -174,9 +182,14 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    /**
+     * Sets a new password and revokes every access token issued before it: whoever changes a
+     * password expects the old sessions to stop now, not when their tokens expire.
+     */
     public void updatePassword(String userId, String rawPassword) {
         userRepository.findById(userId).ifPresentOrElse(user -> {
             user.setPasswordHash(passwordEncoder.encode(rawPassword));
+            user.setTokensRevokedAt(Instant.now().truncatedTo(ChronoUnit.SECONDS));
             userRepository.save(user);
         }, () -> {
             throw new IllegalArgumentException("User not found: " + userId);

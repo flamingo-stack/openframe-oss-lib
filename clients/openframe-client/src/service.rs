@@ -463,7 +463,8 @@ impl Service {
     }
 
     async fn kill_processes_running_from(target: &std::path::Path) {
-        use sysinfo::{ProcessRefreshKind, Signal, System, UpdateKind};
+        use crate::platform::process_kill;
+        use sysinfo::{ProcessRefreshKind, System, UpdateKind};
 
         let target = target.to_string_lossy().to_lowercase();
         let own_pid = std::process::id();
@@ -488,13 +489,9 @@ impl Service {
                     "Killing leftover process {} running from target binary",
                     pid
                 );
-                if process
-                    .kill_with(Signal::Kill)
-                    .unwrap_or_else(|| process.kill())
-                {
-                    killed += 1;
-                } else {
-                    warn!("Failed to kill leftover process {}", pid);
+                match process_kill::terminate(pid.as_u32()) {
+                    Ok(()) => killed += 1,
+                    Err(e) => warn!("Failed to kill leftover process {}: {}", pid, e),
                 }
             }
             killed

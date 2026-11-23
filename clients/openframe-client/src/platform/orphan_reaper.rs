@@ -6,6 +6,8 @@ use std::path::Path;
 use sysinfo::{ProcessRefreshKind, System, UpdateKind};
 use tracing::{info, warn};
 
+use super::process_kill::terminate;
+
 #[derive(Debug, Clone)]
 pub(crate) struct ProcSnapshot {
     pub pid: u32,
@@ -123,38 +125,20 @@ pub(crate) fn reap_orphans(target_exe: &Path) -> usize {
             continue;
         }
         let age_secs = process.run_time();
-        if force_kill(*pid) {
-            killed += 1;
-            info!(pid, ?reason, age_secs, exe = %target, "Killed orphaned tool process");
-        } else {
-            warn!(pid, ?reason, age_secs, exe = %target, "Failed to kill orphaned tool process");
+        match terminate(*pid) {
+            Ok(()) => {
+                killed += 1;
+                info!(pid, ?reason, age_secs, exe = %target, "Killed orphaned tool process");
+            }
+            Err(e) => {
+                warn!(pid, ?reason, age_secs, exe = %target, error = %e, "Failed to kill orphaned tool process")
+            }
         }
     }
     if !orphans.is_empty() {
         info!(found = orphans.len(), killed, exe = %target, "Orphaned tool process sweep finished");
     }
     killed
-}
-
-// Direct kill: sysinfo's Windows kill() spawns taskkill.exe, which can hang on a WMI-starved host.
-fn force_kill(pid: u32) -> bool {
-    #[cfg(windows)]
-    unsafe {
-        use windows::Win32::Foundation::CloseHandle;
-        use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
-        match OpenProcess(PROCESS_TERMINATE, false, pid) {
-            Ok(handle) => {
-                let killed = TerminateProcess(handle, 1).is_ok();
-                let _ = CloseHandle(handle);
-                killed
-            }
-            Err(_) => false,
-        }
-    }
-    #[cfg(unix)]
-    unsafe {
-        libc::kill(pid as i32, libc::SIGKILL) == 0
-    }
 }
 
 #[cfg(test)]
