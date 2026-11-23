@@ -1,0 +1,168 @@
+package com.openframe.authz.service.ratelimit;
+
+import com.openframe.data.redis.OpenframeRedisKeyBuilder;
+import com.openframe.data.redis.OpenframeRedisProperties;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.utility.DockerImageName;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.IntStream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** Counting windows and blocks against a real Redis: the TTLs are what make every limit temporary. */
+@Tag("integration")
+@EnabledIfSystemProperty(named = "integration.tests", matches = "true")
+class AuthRateLimiterIT {
+
+    private static final Duration WINDOW = Duration.ofMinutes(15);
+
+    private static final GenericContainer<?> REDIS =
+            new GenericContainer<>(DockerImageName.parse("redis:7")).withExposedPorts(6379);
+
+    private static LettuceConnectionFactory connectionFactory;
+    private static StringRedisTemplate redis;
+
+    private AuthRateLimiter limiter;
+    private LoginAttemptLimiter loginLimiter;
+
+    @BeforeAll
+    static void startRedis() {
+        REDIS.start();
+        connectionFactory = new LettuceConnectionFactory(
+                new RedisStandaloneConfiguration(REDIS.getHost(), REDIS.getMappedPort(6379)));
+        connectionFactory.afterPropertiesSet();
+        redis = new StringRedisTemplate(connectionFactory);
+        redis.afterPropertiesSet();
+    }
+
+    @AfterAll
+    static void stopRedis() {
+        connectionFactory.destroy();
+        REDIS.stop();
+    }
+
+    @BeforeEach
+    void setUp() {
+        redis.getConnectionFactory().getConnection().serverCommands().flushAll();
+        limiter = new AuthRateLimiter(redis, new OpenframeRedisKeyBuilder(new OpenframeRedisProperties()));
+        loginLimiter = new LoginAttemptLimiter(limiter, 10, 50, WINDOW);
+    }
+
+    @Test
+    void increment_firstHit_keyExpiresWithTheWindow() {
+        limiter.increment("reset:ip:1.2.3.4", Duration.ofHours(1));
+
+        String key = onlyKey();
+        assertThat(redis.getExpire(key)).isBetween(3590L, 3600L);
+    }
+
+    @Test
+    void increment_keyLeftWithoutTtl_getsTheWindowBack() {
+        limiter.increment("reset:ip:1.2.3.4", Duration.ofHours(1));
+        String key = onlyKey();
+        redis.persist(key);
+
+        limiter.increment("reset:ip:1.2.3.4", Duration.ofHours(1));
+
+        assertThat(redis.opsForValue().get(key)).isEqualTo("2");
+        assertThat(redis.getExpire(key)).isPositive();
+    }
+
+    @Test
+    void increment_concurrentHits_eachGetsADistinctCount() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(16);
+        try {
+            List<Callable<Long>> hits = IntStream.range(0, 40)
+                    .<Callable<Long>>mapToObj(i -> () -> limiter.increment("login:ip:1.2.3.4", WINDOW))
+                    .toList();
+            List<Long> counts = pool.invokeAll(hits).stream().map(AuthRateLimiterIT::get).toList();
+
+            assertThat(counts).doesNotHaveDuplicates().hasSize(40).contains(1L, 40L);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void decrement_missingKey_isNotCreated() {
+        limiter.decrement("login:ip:1.2.3.4");
+
+        assertThat(redis.keys("*")).isEmpty();
+    }
+
+    @Test
+    void decrement_existingKey_keepsItsTtl() {
+        limiter.increment("login:ip:1.2.3.4", WINDOW);
+        limiter.increment("login:ip:1.2.3.4", WINDOW);
+
+        limiter.decrement("login:ip:1.2.3.4");
+
+        String key = onlyKey();
+        assertThat(redis.opsForValue().get(key)).isEqualTo("1");
+        assertThat(redis.getExpire(key)).isPositive();
+    }
+
+    @Test
+    void loginBlock_eleventhAttemptRefused_blockLastsFifteenMinutesAndKeyHoldsNoEmail() {
+        failTenTimes();
+
+        assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isEmpty();
+        String key = onlyKey();
+        assertThat(key).doesNotContain("ada").contains(AuthRateLimiter.hash("ada@acme.com"));
+        assertThat(redis.getExpire(key)).isBetween(WINDOW.toSeconds() - 10, WINDOW.toSeconds());
+    }
+
+    @Test
+    void loginBlock_afterTheKeyExpires_isLifted() {
+        failTenTimes();
+        loginLimiter.tryAcquire("t1", "ada@acme.com", null);
+        redis.expire(onlyKey(), Duration.ofMillis(1));
+        await();
+
+        assertThat(loginLimiter.tryAcquire("t1", "ada@acme.com", null)).isPresent();
+    }
+
+    private void failTenTimes() {
+        for (int i = 0; i < 10; i++) {
+            loginLimiter.onBadPassword(loginLimiter.tryAcquire("t1", "ada@acme.com", null).orElseThrow());
+        }
+    }
+
+    private static String onlyKey() {
+        Set<String> keys = redis.keys("*");
+        assertThat(keys).hasSize(1);
+        return keys.iterator().next();
+    }
+
+    private static Long get(Future<Long> future) {
+        try {
+            return future.get();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void await() {
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}

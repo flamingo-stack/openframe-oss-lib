@@ -19,5 +19,6 @@ public class DownloadConfiguration {
     private InstallationType installationType = InstallationType.STANDARD;
     private String bundleId;
     private String serviceName;
+    private String minOsVersion;
 
 }

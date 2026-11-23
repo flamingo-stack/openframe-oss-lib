@@ -86,7 +86,7 @@ public class DeliveryRolloutService {
         int batchSize = properties.getSweep().getBatchSize();
         String cursor = rollout.getCursor();
         List<Machine> machines = machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(statuses, cursor, Limit.of(batchSize));
-        List<Machine> admitted = admittedByTheFloor(machines, type);
+        List<Machine> admitted = admittedBySpec(admittedByTheFloor(machines, type), rollout, spec);
         admitted.forEach(machine -> dispatchTo(machine, rollout, spec));
         String id = rollout.getId();
         int sequence = rollout.getSequence();
@@ -119,6 +119,30 @@ public class DeliveryRolloutService {
         if (left > 0) {
             metrics.recordRolloutBelowFloor(type, left);
             log.info("Delivery rollout walked past {} machine(s) below the floor: type={} floor={}", left, type, floor);
+        }
+        return admitted;
+    }
+
+    private List<Machine> admittedBySpec(List<Machine> machines, MachineDeliveryRollout rollout,
+                                         DeliverySpec<DeliverySeed, DeliveryPayload> spec) {
+        if (machines.isEmpty()) {
+            return machines;
+        }
+        DeliveryPayload payload;
+        try {
+            payload = payloadJson.read(rollout.getPayloadJson(), spec.getPayloadClass());
+        } catch (RuntimeException unreadable) {
+            log.warn("Delivery rollout payload unreadable, every machine admitted: id={}", rollout.getId(), unreadable);
+            return machines;
+        }
+        List<Machine> admitted = machines.stream()
+                .filter(machine -> spec.admits(machine, payload))
+                .toList();
+        int left = machines.size() - admitted.size();
+        if (left > 0) {
+            DeliveryType type = rollout.getType();
+            metrics.recordRolloutNotAdmitted(type, left);
+            log.info("Delivery rollout walked past {} machine(s) the type does not admit: type={}", left, type);
         }
         return admitted;
     }
