@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -61,7 +62,7 @@ class TicketServiceDeviceFilterTest {
                 ticketStalenessResolver, machineRepository, organizationRepository, userRepository, assignmentService,
                 ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of());
         when(ticketRepository.buildTicketQuery(any(), any(), any(), any())).thenReturn(query);
-        when(ticketRepository.findTicketsWithCursor(eq(query), any(), anyInt(), any(), any())).thenReturn(List.of());
+        when(ticketRepository.findTicketsWithCursor(eq(query), any(), anyBoolean(), anyInt(), any(), any())).thenReturn(List.of());
     }
 
     @Test

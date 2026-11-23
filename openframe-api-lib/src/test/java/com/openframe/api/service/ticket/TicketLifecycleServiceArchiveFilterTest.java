@@ -6,6 +6,7 @@ import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -65,7 +66,8 @@ class TicketLifecycleServiceArchiveFilterTest {
         when(statusRepository.findByKind(TicketStatusKind.RESOLVED)).thenReturn(Optional.of(resolved));
         when(statusRepository.findByKind(TicketStatusKind.ARCHIVED)).thenReturn(Optional.of(archived));
         when(ticketRepository.buildTicketQuery(any(), isNull(), any(), isNull())).thenReturn(query);
-        when(ticketRepository.findTicketsWithCursor(eq(query), isNull(), anyInt(), any(), any())).thenReturn(List.of());
+        when(ticketRepository.findTicketsWithCursor(eq(query), eq(new CursorPosition.None()), eq(false), anyInt(), any(), any()))
+                .thenReturn(List.of());
     }
 
     @Test

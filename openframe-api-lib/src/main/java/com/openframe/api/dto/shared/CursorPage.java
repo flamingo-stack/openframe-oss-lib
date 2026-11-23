@@ -16,4 +16,8 @@ public record CursorPage<T>(List<T> items, boolean hasNextPage, boolean hasPrevi
         boolean hasPreviousPage = backward ? hasMore : hasCursor;
         return new CursorPage<>(items, hasNextPage, hasPreviousPage);
     }
+
+    public static <T> CursorPage<T> assemble(List<T> fetched, PositionPaginationCriteria criteria) {
+        return new CursorPage<>(fetched, false, false);
+    }
 }

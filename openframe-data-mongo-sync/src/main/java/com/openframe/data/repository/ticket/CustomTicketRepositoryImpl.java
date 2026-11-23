@@ -8,6 +8,8 @@ import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
 import com.openframe.publishing.api.OutboxPublisher;
 import lombok.extern.slf4j.Slf4j;
@@ -282,8 +284,9 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     @Override
-    public List<Ticket> findTicketsWithCursor(Query query, String cursor, int limit,
-                                               String sortField, String sortDirection) {
+    public List<Ticket> findTicketsWithCursor(Query query, CursorPosition position, boolean backward, int limit,
+                                              String sortField, String sortDirection) {
+        String cursor = position instanceof CursorPosition.RowId rowId ? rowId.id() : null;
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
         Sort.Direction mongoSortDirection = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
 
@@ -375,6 +378,12 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             case FIELD_ORDER -> ticket.getOrder();
             default -> null;
         };
+    }
+
+    @Override
+    public KeysetCursor keysetCursor(Ticket ticket, String sortField, String sortDirection) {
+        Sort.Direction direction = SORT_DESC.equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        return new KeysetCursor(sortField, direction, "", ticket.getId());
     }
 
     @Override

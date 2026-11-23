@@ -3,6 +3,7 @@ package com.openframe.api.service.ticket;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.PositionPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.ticket.CreateTicketInput;
@@ -30,6 +31,7 @@ import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.document.user.User;
 import com.openframe.data.model.ClientOwnerScope;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -107,8 +109,11 @@ public class TicketService {
                 ? sort.getDirection().name()
                 : SortDirection.DESC.name();
         int limit = paging.getLimit();
+        CursorPosition position = paging.hasCursor()
+                ? new CursorPosition.RowId(paging.getCursor())
+                : new CursorPosition.None();
         List<Ticket> raw = ticketRepository.findTicketsWithCursor(
-                query, paging.getCursor(), limit + 1, sortField, sortDirection);
+                query, position, false, limit + 1, sortField, sortDirection);
         boolean hasNextPage = raw.size() > limit;
         List<Ticket> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 
@@ -117,6 +122,16 @@ public class TicketService {
                 .pageInfo(buildPageInfo(pageItems, hasNextPage, paging.hasCursor()))
                 .filteredCount((int) filteredCount)
                 .build();
+    }
+
+    public CountedGenericQueryResult<Ticket> getTicketsByPosition(AuthPrincipal principal,
+                                                                  TicketFilterInput filter,
+                                                                  PositionPaginationCriteria pagination,
+                                                                  String search,
+                                                                  SortInput sort) {
+        Integer limit = pagination != null ? pagination.getLimit() : null;
+        CursorPaginationCriteria forwardFromTheStart = CursorPaginationCriteria.builder().limit(limit).build();
+        return getTickets(principal, filter, forwardFromTheStart, search, sort);
     }
 
     public Optional<Ticket> getTicket(AuthPrincipal principal, @NotBlank String ticketId) {

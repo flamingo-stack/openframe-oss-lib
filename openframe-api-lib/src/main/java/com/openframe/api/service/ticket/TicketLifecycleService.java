@@ -17,6 +17,7 @@ import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -222,7 +223,8 @@ public class TicketLifecycleService {
         List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filterInput);
 
         Query idsQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
-        List<String> resolvedIds = ticketRepository.findTicketsWithCursor(idsQuery, null, 0, "order", "ASC")
+        CursorPosition fromTheStart = new CursorPosition.None();
+        List<String> resolvedIds = ticketRepository.findTicketsWithCursor(idsQuery, fromTheStart, false, 0, "order", "ASC")
                 .stream().map(Ticket::getId).toList();
 
         Query updateQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);

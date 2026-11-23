@@ -1,5 +1,6 @@
 package com.openframe.api.dto.shared;
 
+import com.openframe.data.repository.cursor.CursorPosition;
 import org.junit.jupiter.api.Test;
 
 import java.util.Comparator;
@@ -11,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CursorPageTest {
 
     private static final String CURSOR = "cursor-text";
+    private static final CursorPosition POSITION = new CursorPosition.RowId("65f1a2b3c4d5e6f708192a3b");
     private static final List<Integer> ALL_ROWS = IntStream.rangeClosed(1, 7).boxed().toList();
 
     @Test
@@ -221,6 +223,129 @@ class CursorPageTest {
         assertThat(pageBack.items()).containsExactly(2, 3, 4);
         assertThat(pageBack.hasNextPage()).isTrue();
         assertThat(pageBack.hasPreviousPage()).isTrue();
+    }
+
+    @Test
+    void assemble_positionCriteriaForwardFromTheStartWithOneRowMore_trimmedWithANextPageOnly() {
+        // setup
+        PositionPaginationCriteria criteria = PositionPaginationCriteria.builder().limit(3).build();
+        List<Integer> fetched = List.of(1, 2, 3, 4);
+
+        // execution
+        CursorPage<Integer> page = CursorPage.assemble(fetched, criteria);
+
+        // verifications
+        assertThat(page.items()).containsExactly(1, 2, 3);
+        assertThat(page.hasNextPage()).isTrue();
+        assertThat(page.hasPreviousPage()).isFalse();
+    }
+
+    @Test
+    void assemble_positionCriteriaForwardAfterAPositionWithNoRowMore_allRowsWithAPreviousPageOnly() {
+        // setup
+        PositionPaginationCriteria criteria = PositionPaginationCriteria.builder().position(POSITION).limit(3).build();
+        List<Integer> fetched = List.of(5, 6, 7);
+
+        // execution
+        CursorPage<Integer> page = CursorPage.assemble(fetched, criteria);
+
+        // verifications
+        assertThat(page.items()).containsExactly(5, 6, 7);
+        assertThat(page.hasNextPage()).isFalse();
+        assertThat(page.hasPreviousPage()).isTrue();
+    }
+
+    @Test
+    void assemble_positionCriteriaBackwardBeforeAPositionWithOneRowMore_trimmedAndReadBackWithBothPages() {
+        // setup
+        PositionPaginationCriteria criteria = PositionPaginationCriteria.builder()
+                .position(POSITION).limit(3).backward(true).build();
+        List<Integer> fetched = List.of(6, 5, 4, 3);
+
+        // execution
+        CursorPage<Integer> page = CursorPage.assemble(fetched, criteria);
+
+        // verifications
+        assertThat(page.items()).containsExactly(4, 5, 6);
+        assertThat(page.hasNextPage()).isTrue();
+        assertThat(page.hasPreviousPage()).isTrue();
+    }
+
+    @Test
+    void assemble_positionCriteriaBackwardBeforeAPositionWithNoRowMore_noPreviousPage() {
+        // setup
+        PositionPaginationCriteria criteria = PositionPaginationCriteria.builder()
+                .position(POSITION).limit(3).backward(true).build();
+        List<Integer> fetched = List.of(2, 1);
+
+        // execution
+        CursorPage<Integer> page = CursorPage.assemble(fetched, criteria);
+
+        // verifications
+        assertThat(page.items()).containsExactly(1, 2);
+        assertThat(page.hasNextPage()).isTrue();
+        assertThat(page.hasPreviousPage()).isFalse();
+    }
+
+    @Test
+    void assemble_positionCriteriaBackwardWithoutAPosition_lastRowsWithNoNextPage() {
+        // setup
+        PositionPaginationCriteria criteria = PositionPaginationCriteria.builder().limit(3).backward(true).build();
+        List<Integer> fetched = List.of(7, 6, 5, 4);
+
+        // execution
+        CursorPage<Integer> page = CursorPage.assemble(fetched, criteria);
+
+        // verifications
+        assertThat(page.items()).containsExactly(5, 6, 7);
+        assertThat(page.hasNextPage()).isFalse();
+        assertThat(page.hasPreviousPage()).isTrue();
+    }
+
+    @Test
+    void assemble_positionCriteriaAtTheStartOfTheList_readAsNoPosition() {
+        // setup
+        CursorPosition startOfTheList = new CursorPosition.None();
+        PositionPaginationCriteria criteria = PositionPaginationCriteria.builder()
+                .position(startOfTheList).limit(3).build();
+        List<Integer> fetched = List.of(1, 2, 3);
+
+        // execution
+        CursorPage<Integer> page = CursorPage.assemble(fetched, criteria);
+
+        // verifications
+        assertThat(page.items()).containsExactly(1, 2, 3);
+        assertThat(page.hasNextPage()).isFalse();
+        assertThat(page.hasPreviousPage()).isFalse();
+    }
+
+    @Test
+    void assemble_positionCriteriaWithoutLimit_defaultPageSizeApplied() {
+        // setup
+        PositionPaginationCriteria criteria = PositionPaginationCriteria.builder().build();
+        List<Integer> fetched = IntStream.rangeClosed(1, 21).boxed().toList();
+        List<Integer> firstTwenty = IntStream.rangeClosed(1, 20).boxed().toList();
+
+        // execution
+        CursorPage<Integer> page = CursorPage.assemble(fetched, criteria);
+
+        // verifications
+        assertThat(page.items()).isEqualTo(firstTwenty);
+        assertThat(page.hasNextPage()).isTrue();
+    }
+
+    @Test
+    void assemble_positionCriteriaWithALimitAboveTheMaximum_maximumPageSizeApplied() {
+        // setup
+        PositionPaginationCriteria criteria = PositionPaginationCriteria.builder().limit(5000).build();
+        List<Integer> fetched = IntStream.rangeClosed(1, 101).boxed().toList();
+
+        // execution
+        CursorPage<Integer> page = CursorPage.assemble(fetched, criteria);
+
+        // verifications
+        assertThat(page.items()).hasSize(100);
+        assertThat(page.hasNextPage()).isTrue();
     }
 
     private static List<Integer> fetchAfter(Integer cursorRow, int limit) {
