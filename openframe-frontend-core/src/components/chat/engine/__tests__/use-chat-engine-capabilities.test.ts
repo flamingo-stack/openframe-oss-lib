@@ -146,6 +146,42 @@ describe('useChatEngine: a dialog this chat creates', () => {
     expect(createDialog).toHaveBeenLastCalledWith(expect.objectContaining({ intent: 'CREATE_SCRIPT' }));
   });
 
+  it("an intent dialog is read from history when it opens: the server's greeting shows in it", async () => {
+    const greeting: HistoricalMessage[] = [
+      {
+        id: 'g1',
+        createdAt: '2026-11-23T12:00:00Z',
+        owner: { type: 'ASSISTANT' },
+        parts: [{ type: 'TEXT', text: 'What do you want to monitor?' }],
+      },
+    ];
+    const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'intent1' }));
+    const fetchDialogMessages = vi.fn(() => Promise.resolve({ messages: greeting, nextCursor: null }));
+    const { result } = setup({ history: { createDialog, fetchDialogMessages } });
+    await act(async () => {
+      await result.current.startNewDialog({ intent: 'CREATE_POLICY' });
+    });
+    expect(result.current.activeDialogId).toBe('intent1');
+    await waitFor(() =>
+      expect(texts(result.current.messages)).toEqual([['assistant', 'What do you want to monitor?']]),
+    );
+    expect(fetchDialogMessages).toHaveBeenCalledWith(expect.objectContaining({ dialogId: 'intent1' }));
+  });
+
+  it('a dialog started with a prompt keeps its thread: no history read, the send shown once', async () => {
+    const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'prompted' }));
+    const { result, transport, history } = setup({ history: { createDialog } });
+    await act(async () => {
+      await result.current.startNewDialog({ prompt: 'check disk space' });
+    });
+    expect(transport.publish).toHaveBeenCalledWith(
+      'check disk space',
+      expect.objectContaining({ dialogId: 'prompted' }),
+    );
+    await waitFor(() => expect(texts(result.current.messages)).toEqual([['user', 'check disk space']]));
+    expect(history.fetchDialogMessages).not.toHaveBeenCalled();
+  });
+
   it('startNewDialog with nothing to start opens the draft', async () => {
     const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'x' }));
     const { result } = setup({ history: { createDialog } });

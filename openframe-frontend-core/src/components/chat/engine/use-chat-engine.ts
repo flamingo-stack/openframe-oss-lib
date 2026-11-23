@@ -1089,7 +1089,9 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         });
         // The list shows the new conversation at once, under its name; the next refresh replaces it with the real entry.
         upsertDialogTop({ id: newId, title: create.title || NEW_DIALOG_TITLE, timestamp: new Date() });
-        createdDialogsRef.current.add(newId);
+        // An intent dialog's greeting is the server's, written as the dialog is created: it is read from history like
+        // any opened dialog. Only a dialog this chat created with nothing in it but its own send skips that read.
+        if (!create.intent) createdDialogsRef.current.add(newId);
         openDialog(newId);
         currentDialogIdRef.current = newId;
         if (create.prompt && newDialogGreeting) {
