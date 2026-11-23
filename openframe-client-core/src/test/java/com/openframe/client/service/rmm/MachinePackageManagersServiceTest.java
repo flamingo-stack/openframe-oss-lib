@@ -43,10 +43,12 @@ import static com.openframe.data.document.packagesearch.PackageManagerType.BREW;
 import static com.openframe.data.document.packagesearch.PackageManagerType.CHOCO;
 import static com.openframe.data.document.packagesearch.PackageManagerType.WINGET;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -754,6 +756,25 @@ class MachinePackageManagersServiceTest {
 
         // verifications
         verify(bootstrapService, never()).resendChocolateyUpgrade(MACHINE_ID);
+    }
+
+    @Test
+    void apply_bootstrapDispatchFails_chocolateyAlreadyStored() {
+        // setup
+        machine.setPackageManagers(Map.of(CHOCO, PRESENT, WINGET, MISSING));
+        machine.setChocolatey(stored(ChocolateyStatus.MANAGED, null));
+        stubMachine();
+        doThrow(new IllegalStateException("publish failed")).when(bootstrapService).dispatchInstall(MACHINE_ID, WINGET);
+
+        // execution
+        assertThatThrownBy(() -> service.apply(MACHINE_ID, chocolateyReport(
+                Map.of("CHOCO", PRESENT, "WINGET", MISSING), chocolatey("ACTION_REQUIRED", "PINNED"))))
+                .isInstanceOf(IllegalStateException.class);
+
+        // verifications
+        verify(machineWriter).update(eq(MACHINE_ID), updateCaptor.capture());
+        assertThat(updateCaptor.getValue().paths()).containsExactly(CHOCOLATEY_PATH);
+        assertThat(afterWrites().getChocolatey().getStatus()).isEqualTo(ChocolateyStatus.ACTION_REQUIRED);
     }
 
     private void stubMachine() {

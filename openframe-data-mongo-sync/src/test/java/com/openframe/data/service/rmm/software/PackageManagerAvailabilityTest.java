@@ -649,6 +649,42 @@ class PackageManagerAvailabilityTest {
     }
 
     @Test
+    void isSupportedOn_chocoAbsentFromANonEmptyReport_false() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT));
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isSupportedOn_wingetAbsentFromANonEmptyReport_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of(CHOCO, UNSUPPORTED));
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, WINGET);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isSupportedOn_chocoOnAnEmptyReport_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of());
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
     void isSupportedOn_chocoUnsupported_false() {
         // setup
         Machine machine = machine("m-server", Map.of(WINGET, PRESENT, CHOCO, UNSUPPORTED));
