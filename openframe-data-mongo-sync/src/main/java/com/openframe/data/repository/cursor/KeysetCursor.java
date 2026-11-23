@@ -50,17 +50,14 @@ public record KeysetCursor(String sortField, Sort.Direction direction, String ra
             return new CursorPosition.RowId(rawInput);
         }
         String decoded = CursorBase64.decode(rawInput);
-        if (decoded.startsWith(PAYLOAD_PREFIX)) {
-            return parsePayload(decoded);
-        }
-        if (ObjectId.isValid(decoded)) {
-            return new CursorPosition.RowId(decoded);
-        }
-        return new CursorPosition.Unrecognised(decoded);
+        return positionOf(decoded);
     }
 
     public static CursorPosition parseDecoded(String decoded) {
-        throw new UnsupportedOperationException();
+        if (isBlank(decoded)) {
+            return new CursorPosition.None();
+        }
+        return positionOf(decoded);
     }
 
     public String encode() {
@@ -103,6 +100,16 @@ public record KeysetCursor(String sortField, Sort.Direction direction, String ra
         } catch (IllegalArgumentException e) {
             throw new InvalidCursorException(e);
         }
+    }
+
+    private static CursorPosition positionOf(String decoded) {
+        if (decoded.startsWith(PAYLOAD_PREFIX)) {
+            return parsePayload(decoded);
+        }
+        if (ObjectId.isValid(decoded)) {
+            return new CursorPosition.RowId(decoded);
+        }
+        return new CursorPosition.Unrecognised(decoded);
     }
 
     private static KeysetCursor parsePayload(String payload) {

@@ -111,7 +111,9 @@ type ScriptSchedule implements Node {
     is a Script global id (matches `scripts[].id`)."""
     scriptCustomParams: [ScheduledScriptCustomParams!]!
     """Machines assigned to this schedule — a Relay connection with the same filter/search/sort/pagination
-    as the top-level `devices` query, scoped to this schedule's assignments."""
+    as the top-level `devices` query, scoped to this schedule's assignments. Sortable fields and default order
+    as on `devices`. When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor
+    are valid paging cursors."""
     assignedDevices(
         filter: DeviceFilterInput,
         first: Int,
@@ -123,9 +125,12 @@ type ScriptSchedule implements Node {
     ): DeviceConnection!
     """Devices selectable for this schedule — the "Available Devices" picker. Scoped to this
     schedule's supportedPlatforms so platform-mismatched devices are never shown (a Windows device
-    is not offered for a macOS schedule). Same filter/search/sort/pagination as the top-level
+    is not offered for a macOS schedule). Same filter/search/pagination as the top-level
     `devices` query. Each edge carries `assigned` = whether that device is already assigned to this
-    schedule, so the picker can pre-check it. No scheduleId argument — it is taken from the parent."""
+    schedule, so the picker can pre-check it. No scheduleId argument — it is taken from the parent.
+    The order is fixed: assigned devices first, then online before offline; `sort` is ignored.
+    When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor are valid
+    paging cursors."""
     availableDevices(
         filter: DeviceFilterInput,
         first: Int,

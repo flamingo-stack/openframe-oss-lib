@@ -1,5 +1,6 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DirectorySource;
@@ -16,7 +17,6 @@ import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.cursor.KeysetCursor;
-import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
@@ -51,7 +51,6 @@ import static java.util.stream.Collectors.toMap;
 import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
-@Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     private static final String SORT_DESC = "DESC";
@@ -73,6 +72,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String DIRECTORY_USER_LINK_FIELD = "directoryUserLink";
     private static final String COUNT_FIELD = "count";
     private static final String BUCKET_FIELD = "_availableBucket";
+    private static final String BUCKET_SORT_FIELD = "bucket";
+    private static final int UNASSIGNED_BUCKET_OFFSET = 2;
+    private static final int NOT_ONLINE_BUCKET_OFFSET = 1;
+    private static final String NO_SORT_VALUE = "";
     private static final String ONLINE_STATUS = "ONLINE";
     private static final String CURSOR_SEPARATOR = "|";
     private static final String HOSTNAME_FLAG_PREFIX = "h";
@@ -103,6 +106,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String CLIENT_OUTDATED_RANK_FIELD = "_clientOutdatedRank";
     private static final int OUTDATED_RANK = 1;
     private static final int NOT_OUTDATED_RANK = 0;
+    private static final Map<String, String> RANK_FIELDS = Map.of(
+            STATUS_FIELD, STATUS_RANK_FIELD,
+            CONNECTIVITY_SORT_FIELD, CONNECTIVITY_RANK_FIELD,
+            CLIENT_OUTDATED_SORT_FIELD, CLIENT_OUTDATED_RANK_FIELD);
     private static final String OUTDATED_FACET_VALUE = "true";
     private static final String NOT_OUTDATED_FACET_VALUE = "false";
 
@@ -244,58 +251,107 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return query.addCriteria(Criteria.where(TENANT_ID_FIELD).is(tenantId));
     }
 
-    private List<Machine> findMachinesWithCursor(Query query, String cursor, int limit,
-                                                 String sortField, String sortDirection) {
-        boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
-        if (STATUS_FIELD.equals(sortField)) {
-            AggregationOperation rankStage = statusRankAddFieldsStage();
-            return findMachinesByRank(query, cursor, limit, isDesc, STATUS_RANK_FIELD, rankStage, CustomMachineRepositoryImpl::statusRankOf);
-        }
-        if (CONNECTIVITY_SORT_FIELD.equals(sortField)) {
-            AggregationOperation rankStage = connectivityRankAddFieldsStage();
-            return findMachinesByRank(query, cursor, limit, isDesc, CONNECTIVITY_RANK_FIELD, rankStage, CustomMachineRepositoryImpl::connectivityRankOf);
-        }
-        if (CLIENT_OUTDATED_SORT_FIELD.equals(sortField)) {
-            AggregationOperation rankStage = clientOutdatedRankAddFieldsStage();
-            return findMachinesByRank(query, cursor, limit, isDesc, CLIENT_OUTDATED_RANK_FIELD, rankStage, this::clientOutdatedRankOf);
-        }
-        Sort.Direction mongoSortDirection = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
-
-        if (cursor != null && !cursor.trim().isEmpty()) {
-            try {
-                ObjectId cursorId = new ObjectId(cursor);
-                applyCursorCriteria(query, cursorId, sortField, isDesc);
-            } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
+    private Optional<KeysetCursor> keysetAnchor(String tenantId, CursorPosition position,
+                                                String sortField, Sort.Direction direction) {
+        return switch (position) {
+            case CursorPosition.None _ -> Optional.empty();
+            case KeysetCursor keyset -> {
+                keyset.requireSort(sortField, direction);
+                yield Optional.of(keyset);
             }
+            case CursorPosition.RowId rowId -> {
+                KeysetCursor anchor = rowAnchor(tenantId, rowId.id(), sortField, direction);
+                yield Optional.of(anchor);
+            }
+            case CursorPosition.Unrecognised _ -> throw new InvalidCursorException();
+        };
+    }
+
+    private KeysetCursor rowAnchor(String tenantId, String rowId, String sortField, Sort.Direction direction) {
+        if (ID_FIELD.equals(sortField)) {
+            return new KeysetCursor(ID_FIELD, direction, NO_SORT_VALUE, rowId);
         }
+        Machine row = cursorRow(tenantId, rowId);
+        return keysetCursor(row, sortField, direction);
+    }
+
+    private Machine cursorRow(String tenantId, String rowId) {
+        ObjectId id = cursorObjectId(rowId);
+        Criteria byId = Criteria.where(ID_FIELD).is(id);
+        Query query = withTenant(tenantId, new Query(byId));
+        Machine row = mongoTemplate.findOne(query, Machine.class);
+        return Optional.ofNullable(row).orElseThrow(InvalidCursorException::new);
+    }
+
+    private KeysetCursor keysetCursor(Machine machine, String sortField, Sort.Direction direction) {
+        String id = machine.getId();
+        return switch (sortField) {
+            case "hostname" -> KeysetCursor.ofString(sortField, direction, machine.getHostname(), id);
+            case "displayName" -> KeysetCursor.ofString(sortField, direction, machine.getDisplayName(), id);
+            case "nickname" -> KeysetCursor.ofString(sortField, direction, machine.getNickname(), id);
+            case LAST_SEEN_FIELD -> KeysetCursor.ofInstant(sortField, direction, machine.getLastSeen(), id);
+            case STATUS_FIELD -> rankCursor(machine, sortField, direction, CustomMachineRepositoryImpl::statusRankOf);
+            case CONNECTIVITY_SORT_FIELD ->
+                    rankCursor(machine, sortField, direction, CustomMachineRepositoryImpl::connectivityRankOf);
+            case CLIENT_OUTDATED_SORT_FIELD -> rankCursor(machine, sortField, direction, this::clientOutdatedRankOf);
+            default -> new KeysetCursor(sortField, direction, NO_SORT_VALUE, id);
+        };
+    }
+
+    private static KeysetCursor rankCursor(Machine machine, String sortField, Sort.Direction direction,
+                                           ToIntFunction<Machine> rankOf) {
+        int rank = rankOf.applyAsInt(machine);
+        String rawValue = Integer.toString(rank);
+        return new KeysetCursor(sortField, direction, rawValue, machine.getId());
+    }
+
+    private static Sort.Direction directionOf(String sortDirection) {
+        return SORT_DESC.equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
+    }
+
+    private static int cursorInt(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new InvalidCursorException(e);
+        }
+    }
+
+    private static ObjectId cursorObjectId(String value) {
+        if (!ObjectId.isValid(value)) {
+            throw new InvalidCursorException();
+        }
+        return new ObjectId(value);
+    }
+
+    private List<Machine> findMachinesByField(Query query, int limit, String sortField, boolean fetchDescending) {
+        Sort.Direction fetchDirection = fetchDescending ? Sort.Direction.DESC : Sort.Direction.ASC;
         query.limit(limit);
 
         if (ID_FIELD.equals(sortField)) {
-            query.with(Sort.by(mongoSortDirection, ID_FIELD));
+            query.with(Sort.by(fetchDirection, ID_FIELD));
         } else {
             query.with(Sort.by(
-                Sort.Order.by(sortField).with(mongoSortDirection),
-                Sort.Order.by(ID_FIELD).with(mongoSortDirection)
+                Sort.Order.by(sortField).with(fetchDirection),
+                Sort.Order.by(ID_FIELD).with(fetchDirection)
             ));
         }
 
         return mongoTemplate.find(query, Machine.class);
     }
 
-    private List<Machine> findMachinesByRank(Query query, String cursor, int limit, boolean isDesc,
-                                             String rankField, AggregationOperation rankStage,
-                                             ToIntFunction<Machine> cursorRank) {
-        int direction = isDesc ? -1 : 1;
+    private List<Machine> findMachinesByRank(Query query, List<AggregationOperation> cursorStages, int limit,
+                                             String sortField, boolean fetchDescending) {
+        String rankField = RANK_FIELDS.get(sortField);
+        int direction = fetchDescending ? -1 : 1;
         Document predicate = query.getQueryObject();
         Document sort = new Document(rankField, direction).append(ID_FIELD, direction);
 
         List<AggregationOperation> ops = new ArrayList<>();
         // tenantId is already inside the predicate (withTenant) — aggregate() bypasses the template's auto-scope.
         ops.add(ctx -> new Document("$match", predicate));
-        ops.add(rankStage);
-        Optional<AggregationOperation> cursorStage = rankCursorStage(cursor, isDesc, rankField, cursorRank);
-        cursorStage.ifPresent(ops::add);
+        ops.add(rankAddFieldsStage(sortField));
+        ops.addAll(cursorStages);
         ops.add(ctx -> new Document("$sort", sort));
         ops.add(Aggregation.limit(limit));
 
@@ -305,6 +361,14 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return rows.stream()
                 .map(this::readMachine)
                 .toList();
+    }
+
+    private AggregationOperation rankAddFieldsStage(String sortField) {
+        return switch (sortField) {
+            case STATUS_FIELD -> statusRankAddFieldsStage();
+            case CONNECTIVITY_SORT_FIELD -> connectivityRankAddFieldsStage();
+            default -> clientOutdatedRankAddFieldsStage();
+        };
     }
 
     private Machine readMachine(Document row) {
@@ -340,33 +404,16 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return ctx -> addFields;
     }
 
-    private Optional<AggregationOperation> rankCursorStage(String cursor, boolean isDesc,
-                                                           String rankField, ToIntFunction<Machine> cursorRank) {
-        if (cursor == null || cursor.isBlank()) {
-            return Optional.empty();
-        }
-        ObjectId cursorId;
-        try {
-            cursorId = new ObjectId(cursor.trim());
-        } catch (IllegalArgumentException ex) {
-            log.warn("Invalid ObjectId cursor format: {}", cursor);
-            return Optional.empty();
-        }
-        String pastOperator = isDesc ? "$lt" : "$gt";
+    private static AggregationOperation rankCursorStage(KeysetCursor cursor, String sortField, boolean fetchDescending) {
+        String rankField = RANK_FIELDS.get(sortField);
+        int rank = cursorInt(cursor.rawValue());
+        ObjectId cursorId = cursorObjectId(cursor.id());
+        String pastOperator = fetchDescending ? "$lt" : "$gt";
         Document pastId = new Document(pastOperator, cursorId);
-
-        Machine cursorDoc = mongoTemplate.findById(cursorId, Machine.class);
-        if (cursorDoc == null) {
-            log.warn("Cursor document not found for id: {}", cursorId);
-            Document match = new Document("$match", new Document(ID_FIELD, pastId));
-            return Optional.of(ctx -> match);
-        }
-
-        int rank = cursorRank.applyAsInt(cursorDoc);
         Document pastRank = new Document(rankField, new Document(pastOperator, rank));
         Document sameRankPastId = new Document(rankField, rank).append(ID_FIELD, pastId);
         Document match = new Document("$match", new Document("$or", List.of(pastRank, sameRankPastId)));
-        return Optional.of(ctx -> match);
+        return ctx -> match;
     }
 
     private static int statusRankOf(Machine machine) {
@@ -395,8 +442,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     private List<Machine> findAvailableForScheduleWithCursor(Query baseQuery, Collection<String> assignedMachineIds,
-                                                            String cursor, int limit) {
+                                                            CursorPosition position, boolean backward, int limit) {
         List<String> assigned = assignedMachineIds == null ? List.of() : new ArrayList<>(assignedMachineIds);
+        Optional<AggregationOperation> cursorStage = bucketCursorStage(position, backward);
+        int direction = backward ? -1 : 1;
 
         List<AggregationOperation> ops = new ArrayList<>();
         // $match: the tenant + platform/filter/search predicate already assembled in the Query
@@ -406,8 +455,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         // $addFields: bucket 0..3 = (assigned ? 0 : 2) + (telemetryStatus ONLINE ? 0 : 1).
         ops.add(bucketAddFieldsStage(assigned));
         // Keyset cursor over (bucket, _id), then the matching sort.
-        appendBucketCursor(ops, cursor);
-        ops.add(ctx -> new Document("$sort", new Document(BUCKET_FIELD, 1).append(ID_FIELD, 1)));
+        cursorStage.ifPresent(ops::add);
+        ops.add(ctx -> new Document("$sort", new Document(BUCKET_FIELD, direction).append(ID_FIELD, direction)));
         ops.add(Aggregation.limit(limit));
 
         AggregationResults<Document> results =
@@ -419,64 +468,62 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     private static AggregationOperation bucketAddFieldsStage(List<String> assignedMachineIds) {
         Document assignedRank = new Document("$cond", List.of(
-                new Document("$in", List.of("$" + MACHINE_ID_FIELD, assignedMachineIds)), 0, 2));
+                new Document("$in", List.of("$" + MACHINE_ID_FIELD, assignedMachineIds)), 0, UNASSIGNED_BUCKET_OFFSET));
         Document connectivityRank = new Document("$cond", List.of(
-                new Document("$eq", List.of("$" + TELEMETRY_STATUS_FIELD, ONLINE_STATUS)), 0, 1));
+                new Document("$eq", List.of("$" + TELEMETRY_STATUS_FIELD, ONLINE_STATUS)), 0, NOT_ONLINE_BUCKET_OFFSET));
         Document bucket = new Document("$add", List.of(assignedRank, connectivityRank));
         Document addFields = new Document("$addFields", new Document(BUCKET_FIELD, bucket));
         return ctx -> addFields;
     }
 
-    /** Compound keyset on ascending (bucket, _id): rows strictly after the cursor. Format "bucket|objectIdHex". */
-    private static void appendBucketCursor(List<AggregationOperation> ops, String cursor) {
-        if (cursor == null || cursor.isBlank()) {
-            return;
-        }
-        int separator = cursor.lastIndexOf(CURSOR_SEPARATOR);
-        if (separator < 0) {
-            log.warn("Invalid availableDevices cursor (no separator): '{}' — falling back to first page", cursor);
-            return;
-        }
-        ObjectId cursorId;
-        try {
-            cursorId = new ObjectId(cursor.substring(separator + 1));
-        } catch (IllegalArgumentException ex) {
-            log.warn("Invalid availableDevices cursor id: '{}' — falling back to first page", cursor);
-            return;
-        }
-        int bucket;
-        try {
-            bucket = Integer.parseInt(cursor.substring(0, separator));
-        } catch (NumberFormatException ex) {
-            log.warn("Unparseable availableDevices bucket in cursor '{}' — falling back to first page", cursor);
-            return;
-        }
-        Document orExpr = new Document("$or", List.of(
-                new Document(BUCKET_FIELD, new Document("$gt", bucket)),
-                new Document(BUCKET_FIELD, bucket).append(ID_FIELD, new Document("$gt", cursorId))));
-        ops.add(ctx -> new Document("$match", orExpr));
+    private static Optional<AggregationOperation> bucketCursorStage(CursorPosition position, boolean backward) {
+        return switch (position) {
+            case CursorPosition.None _ -> Optional.empty();
+            case KeysetCursor keyset -> {
+                keyset.requireSort(BUCKET_SORT_FIELD, Sort.Direction.ASC);
+                AggregationOperation stage = bucketCursorStage(keyset.rawValue(), keyset.id(), backward);
+                yield Optional.of(stage);
+            }
+            case CursorPosition.Unrecognised olderFormat -> {
+                AggregationOperation stage = olderBucketCursorStage(olderFormat.decoded(), backward);
+                yield Optional.of(stage);
+            }
+            case CursorPosition.RowId _ -> throw new InvalidCursorException();
+        };
     }
 
-    private void applyCursorCriteria(Query query, ObjectId cursorId, String sortField, boolean isDesc) {
+    private static AggregationOperation olderBucketCursorStage(String cursor, boolean backward) {
+        int separator = cursor.lastIndexOf(CURSOR_SEPARATOR);
+        if (separator < 0) {
+            throw new InvalidCursorException();
+        }
+        String bucketValue = cursor.substring(0, separator);
+        String idValue = cursor.substring(separator + 1);
+        return bucketCursorStage(bucketValue, idValue, backward);
+    }
+
+    private static AggregationOperation bucketCursorStage(String bucketValue, String idValue, boolean backward) {
+        int bucket = cursorInt(bucketValue);
+        ObjectId cursorId = cursorObjectId(idValue);
+        String pastOperator = backward ? "$lt" : "$gt";
+        Document orExpr = new Document("$or", List.of(
+                new Document(BUCKET_FIELD, new Document(pastOperator, bucket)),
+                new Document(BUCKET_FIELD, bucket).append(ID_FIELD, new Document(pastOperator, cursorId))));
+        return ctx -> new Document("$match", orExpr);
+    }
+
+    private static void applyCursorCriteria(Query query, KeysetCursor cursor, String sortField, boolean fetchDescending) {
+        ObjectId cursorId = cursorObjectId(cursor.id());
         if (ID_FIELD.equals(sortField)) {
-            query.addCriteria(isDesc ?
+            query.addCriteria(fetchDescending ?
                 Criteria.where(ID_FIELD).lt(cursorId) :
                 Criteria.where(ID_FIELD).gt(cursorId));
             return;
         }
 
-        Machine cursorDoc = mongoTemplate.findById(cursorId, Machine.class);
-        if (cursorDoc == null) {
-            log.warn("Cursor document not found for id: {}", cursorId);
-            query.addCriteria(isDesc ?
-                Criteria.where(ID_FIELD).lt(cursorId) :
-                Criteria.where(ID_FIELD).gt(cursorId));
-            return;
-        }
-
-        Object cursorSortValue = getSortFieldValue(cursorDoc, sortField);
+        Object cursorSortValue = LAST_SEEN_FIELD.equals(sortField) ? cursor.instantValue() : cursor.stringValue();
         if (cursorSortValue == null) {
-            if (isDesc) {
+            if (fetchDescending) {
                 // Trailing null group: only the remaining null rows, ordered by _id descending.
                 query.addCriteria(Criteria.where(sortField).is(null).and(ID_FIELD).lt(cursorId));
             } else {
@@ -489,15 +536,15 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             return;
         }
 
-        Criteria pastSortValue = isDesc ?
+        Criteria pastSortValue = fetchDescending ?
             Criteria.where(sortField).lt(cursorSortValue) :
             Criteria.where(sortField).gt(cursorSortValue);
 
-        Criteria sameSortValuePastId = isDesc ?
+        Criteria sameSortValuePastId = fetchDescending ?
             Criteria.where(sortField).is(cursorSortValue).and(ID_FIELD).lt(cursorId) :
             Criteria.where(sortField).is(cursorSortValue).and(ID_FIELD).gt(cursorId);
 
-        if (isDesc) {
+        if (fetchDescending) {
             // Descending: null-valued rows sort AFTER every non-null value, so they belong on the
             // pages that follow a non-null cursor — include them or the trailing nulls are dropped.
             addOrCriteria(query,
@@ -526,16 +573,6 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         query.addCriteria(Criteria.where("$or").is(branches));
     }
 
-    private Object getSortFieldValue(Machine machine, String sortField) {
-        return switch (sortField) {
-            case "hostname" -> machine.getHostname();
-            case "displayName" -> machine.getDisplayName();
-            case "nickname" -> machine.getNickname();
-            case "lastSeen" -> machine.getLastSeen();
-            default -> null;
-        };
-    }
-
     @Override
     public long countMachines(String tenantId, MachineQueryFilter filter, String search) {
         Query query = buildTenantQuery(tenantId, filter, search);
@@ -552,9 +589,18 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     public List<Machine> findMachinesWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                 CursorPosition position, boolean backward, int limit,
                                                 String sortField, String sortDirection) {
+        Sort.Direction direction = directionOf(sortDirection);
+        Optional<KeysetCursor> anchor = keysetAnchor(tenantId, position, sortField, direction);
+        boolean fetchDescending = direction.isDescending() != backward;
         Query query = buildTenantQuery(tenantId, filter, search);
-        String cursor = position instanceof CursorPosition.RowId rowId ? rowId.id() : null;
-        return findMachinesWithCursor(query, cursor, limit, sortField, sortDirection);
+        if (RANK_FIELDS.containsKey(sortField)) {
+            List<AggregationOperation> cursorStages = anchor.stream()
+                    .map(cursor -> rankCursorStage(cursor, sortField, fetchDescending))
+                    .toList();
+            return findMachinesByRank(query, cursorStages, limit, sortField, fetchDescending);
+        }
+        anchor.ifPresent(cursor -> applyCursorCriteria(query, cursor, sortField, fetchDescending));
+        return findMachinesByField(query, limit, sortField, fetchDescending);
     }
 
     @Override
@@ -562,18 +608,22 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                                                             Collection<String> assignedMachineIds,
                                                             CursorPosition position, boolean backward, int limit) {
         Query query = buildTenantQuery(tenantId, filter, search);
-        String cursor = position instanceof CursorPosition.Unrecognised legacy ? legacy.decoded() : null;
-        return findAvailableForScheduleWithCursor(query, assignedMachineIds, cursor, limit);
+        return findAvailableForScheduleWithCursor(query, assignedMachineIds, position, backward, limit);
     }
 
     @Override
     public KeysetCursor keysetCursor(Machine machine, String sortField, String sortDirection) {
-        throw new UnsupportedOperationException();
+        Sort.Direction direction = directionOf(sortDirection);
+        return keysetCursor(machine, sortField, direction);
     }
 
     @Override
     public KeysetCursor availableForScheduleKeysetCursor(Machine machine, Collection<String> assignedMachineIds) {
-        throw new UnsupportedOperationException();
+        boolean assigned = assignedMachineIds != null && assignedMachineIds.contains(machine.getMachineId());
+        boolean online = machine.getTelemetryStatus() == TelemetryStatus.ONLINE;
+        int bucket = (assigned ? 0 : UNASSIGNED_BUCKET_OFFSET) + (online ? 0 : NOT_ONLINE_BUCKET_OFFSET);
+        String rawValue = Integer.toString(bucket);
+        return new KeysetCursor(BUCKET_SORT_FIELD, Sort.Direction.ASC, rawValue, machine.getId());
     }
 
     @Override
