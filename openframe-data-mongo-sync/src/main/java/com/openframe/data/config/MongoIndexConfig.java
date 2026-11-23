@@ -77,6 +77,14 @@ public class MongoIndexConfig implements SmartLifecycle {
                                     .unique()
                                     .named("sso_identities_provider_subject_unique"));
 
+        // Load-bearing: the ordering guard of CustomDeviceOsStateRepositoryImpl.replaceUnlessNewerStored is the
+        // DuplicateKeyException of this index. Same name, keys and options as the @CompoundIndex on DeviceOsState.
+        mongoTemplate.indexOps("device_os_states")
+            .ensureIndex(new Index().on("tenantId", Sort.Direction.ASC)
+                                    .on("machineId", Sort.Direction.ASC)
+                                    .unique()
+                                    .named("tenant_machine"));
+
         // Every unknown refresh token ends in this lookup. Same name and options as the
         // @CompoundIndex on MongoOAuth2Authorization, so the two stay idempotent.
         mongoTemplate.indexOps("oauth2_authorizations")

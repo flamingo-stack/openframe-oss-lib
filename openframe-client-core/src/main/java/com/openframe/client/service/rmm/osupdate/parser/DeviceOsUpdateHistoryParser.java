@@ -1,0 +1,77 @@
+package com.openframe.client.service.rmm.osupdate.parser;
+
+import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
+import com.openframe.data.document.rmm.osupdate.OsUpdateInstallResult;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
+import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
+@Component
+@RequiredArgsConstructor
+public class DeviceOsUpdateHistoryParser {
+
+    private static final long HRESULT_SUCCESS = 0;
+    private static final long UNSIGNED_32_BITS = 0xFFFFFFFFL;
+
+    private final ReportedEnumParser reportedEnumParser;
+
+    // Only Windows reports a history. A Mac's block has none.
+    public List<DeviceOsUpdateHistoryEntry> parse(ReportingDevice reportingDevice,
+                                                  MachineOsUpdatesMessage.WindowsDetails windows) {
+        if (windows == null || windows.getHistory() == null) {
+            return List.of();
+        }
+        return windows.getHistory().stream()
+                .filter(DeviceOsUpdateHistoryParser::isIdentified)
+                .map(reportedEntry -> parse(reportingDevice, reportedEntry))
+                .toList();
+    }
+
+    private static boolean isIdentified(MachineOsUpdatesMessage.WindowsHistoryEntry reportedEntry) {
+        return reportedEntry != null
+                && isNotBlank(reportedEntry.getUpdateId())
+                && reportedEntry.getInstalledAt() != null;
+    }
+
+    private DeviceOsUpdateHistoryEntry parse(ReportingDevice reportingDevice,
+                                             MachineOsUpdatesMessage.WindowsHistoryEntry reportedEntry) {
+        String identifier = parseIdentifier(reportedEntry);
+        OsUpdateOperation operation = reportedEnumParser.parse(OsUpdateOperation.class, reportedEntry.getOperation());
+        return DeviceOsUpdateHistoryEntry.builder()
+                .tenantId(reportingDevice.getTenantId())
+                .machineId(reportingDevice.getMachineId())
+                .entryKey(parseEntryKey(identifier, reportedEntry))
+                .identifier(identifier)
+                .title(reportedEntry.getTitle())
+                .installedAt(reportedEntry.getInstalledAt())
+                .operation(operation)
+                .result(reportedEnumParser.parse(OsUpdateInstallResult.class, reportedEntry.getResultCode()))
+                .errorCode(parseErrorCode(reportedEntry.getHresult()))
+                .build();
+    }
+
+    // Same form as the identifier of a pending Windows update: UpdateID:RevisionNumber.
+    private static String parseIdentifier(MachineOsUpdatesMessage.WindowsHistoryEntry reportedEntry) {
+        if (reportedEntry.getRevision() == null) {
+            return reportedEntry.getUpdateId();
+        }
+        return reportedEntry.getUpdateId() + ":" + reportedEntry.getRevision();
+    }
+
+    private static String parseEntryKey(String identifier, MachineOsUpdatesMessage.WindowsHistoryEntry reportedEntry) {
+        long installedAtMillis = reportedEntry.getInstalledAt().toEpochMilli();
+        return identifier + "|" + installedAtMillis + "|" + reportedEntry.getOperation();
+    }
+
+    private static String parseErrorCode(Long hresult) {
+        if (hresult == null || hresult == HRESULT_SUCCESS) {
+            return null;
+        }
+        return String.format("0x%08X", hresult & UNSIGNED_32_BITS);
+    }
+}
