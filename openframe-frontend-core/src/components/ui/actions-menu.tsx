@@ -403,9 +403,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
   const wrapperClasses = cn(skin.wrapper, mobileDrillDown && 'min-h-10', customContent && 'min-h-14');
   const subTriggerClasses = cn(itemClasses, skin.rowOpen, comparisonSubmenu && 'data-[state=open]:bg-ods-bg-surface');
   const labelClasses = cn(
-    mobileDrillDown
-      ? 'min-w-0 flex-1 font-body text-[length:var(--font-size-menu-label)] font-medium leading-[var(--font-line-space-menu-label)]'
-      : skin.label,
+    mobileDrillDown ? 'min-w-0 flex-1 text-shell-body' : skin.label,
     item.disabled
       ? mobileDrillDown
         ? 'text-ods-text-panel-secondary'
@@ -1111,9 +1109,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
                     onClick={back}
                   >
                     <Chevron02LeftIcon aria-hidden size={24} />
-                    <span className="truncate font-body text-[length:var(--font-size-menu-heading)] font-medium leading-[var(--font-line-space-menu-heading)]">
-                      {page.label}
-                    </span>
+                    <span className="truncate text-h4">{page.label}</span>
                   </Button>
                 ) : (
                   header

@@ -205,8 +205,8 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
             type="button"
             aria-label={name ? `Chat model: ${name}` : 'Chat model'}
             aria-disabled={modelMenu.disabled || undefined}
-            // Figma mingo/model-trigger: 6 / 4 / 2 around a 20px mark; backgrounds/openframe-background hover / action.
-            className="group flex min-w-0 items-center gap-[var(--spacing-model-trigger-inline)] rounded py-[var(--spacing-model-trigger-block)] pl-[var(--spacing-model-trigger-inline)] pr-[var(--spacing-system-xxs)] text-ods-text-secondary transition-colors hover:bg-ods-bg-base-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ods-text-secondary data-[state=open]:bg-ods-bg-base-active data-[state=open]:text-ods-text-primary"
+            // Figma mingo/model-trigger: a 20px mark, 24px high.
+            className="group flex h-6 min-w-0 items-center gap-[var(--spacing-system-xxs)] rounded px-[var(--spacing-system-xxs)] text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ods-text-secondary data-[state=open]:bg-ods-bg-active data-[state=open]:text-ods-text-primary"
           >
             {icon && <span className={cn(PROVIDER_ICON_BOX_CLASS, '[&_svg]:size-5')}>{icon}</span>}
             <span className="truncate font-body">{name}</span>
