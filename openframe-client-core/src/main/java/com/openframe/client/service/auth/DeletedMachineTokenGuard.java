@@ -1,5 +1,6 @@
 package com.openframe.client.service.auth;
 
+import com.openframe.client.exception.MachineDeletedException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -13,8 +14,9 @@ import org.springframework.stereotype.Component;
  * a fresh one from the token endpoint and be rejected again, round after round. DELETED is final: a
  * reinstalled agent registers under a new machine id, so no device ever needs a token for a deleted
  * one. A machine pending deletion still gets tokens, since it has yet to receive its uninstall.
- * The refusal is an {@link IllegalArgumentException}, which the token endpoint answers as 401 with
- * the same body as any other refused credential.
+ * The refusal is a {@link MachineDeletedException}, which the token endpoint answers with
+ * {@code 410 Gone}: the agent counts consecutive 410s, stops its tools, backs off and uninstalls
+ * itself, where a 401 would keep it retrying every minute.
  */
 @Slf4j
 @Component
@@ -44,7 +46,7 @@ public class DeletedMachineTokenGuard {
                 .orElse(false);
         if (deleted) {
             log.info("Refused a token to deleted machine {}", machineId);
-            throw new IllegalArgumentException(MACHINE_DELETED);
+            throw new MachineDeletedException(MACHINE_DELETED);
         }
     }
 }

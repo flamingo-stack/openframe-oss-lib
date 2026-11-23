@@ -1,5 +1,6 @@
 package com.openframe.client.service.auth;
 
+import com.openframe.client.exception.MachineDeletedException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
@@ -38,13 +39,13 @@ class DeletedMachineTokenGuardTest {
     }
 
     @Test
-    void requireNotDeleted_deletedMachine_throwsIllegalArgument() {
+    void requireNotDeleted_deletedMachine_throwsMachineDeleted() {
         // setup
         machine.setStatus(DeviceStatus.DELETED);
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
 
         // execution
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        MachineDeletedException ex = assertThrows(MachineDeletedException.class,
                 () -> guard.requireNotDeleted(MACHINE_ID));
 
         // verifications
