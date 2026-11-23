@@ -63,7 +63,7 @@ public class SoftwareDataFetcher {
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
-        int page = PageCursors.decodePage(after != null ? after : before);
+        int page = PageCursors.resolvePage(first, after, last, before);
         int perPage = PageCursors.pageSize(first, last);
         Boolean vulnerable = SoftwareInventoryService.vulnerableOnly(filter);
         PageResult<SoftwareResponse> softwarePage = softwareInventoryService.listSoftware(
@@ -84,7 +84,7 @@ public class SoftwareDataFetcher {
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
-        int page = PageCursors.decodePage(after != null ? after : before);
+        int page = PageCursors.resolvePage(first, after, last, before);
         int perPage = PageCursors.pageSize(first, last);
         return PageCursors.toConnection(
                 softwareInventoryService.listSoftwareForDevice(machineId, filter, search, page, perPage, sort));
@@ -96,7 +96,7 @@ public class SoftwareDataFetcher {
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
-        int page = PageCursors.decodePage(after != null ? after : before);
+        int page = PageCursors.resolvePage(first, after, last, before);
         int perPage = PageCursors.pageSize(first, last);
         return PageCursors.toConnection(
                 softwareInventoryService.listDevicesForSoftware(softwareId, filter, search, page, perPage, sort));
@@ -108,7 +108,7 @@ public class SoftwareDataFetcher {
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
-        int page = PageCursors.decodePage(after != null ? after : before);
+        int page = PageCursors.resolvePage(first, after, last, before);
         int perPage = PageCursors.pageSize(first, last);
         String sortField = sort == null ? null : sort.getField();
         boolean asc = sort != null && sort.getDirection() == SortDirection.ASC;

@@ -2,11 +2,13 @@ package com.openframe.core.exception;
 
 public class InvalidCursorException extends BadRequestException {
 
+    private static final String MESSAGE = "Invalid cursor";
+
     public InvalidCursorException() {
-        super("Not implemented");
+        super(ErrorCode.INVALID_CURSOR, MESSAGE);
     }
 
     public InvalidCursorException(Throwable cause) {
-        super("Not implemented");
+        super(ErrorCode.INVALID_CURSOR, MESSAGE, cause);
     }
 }
