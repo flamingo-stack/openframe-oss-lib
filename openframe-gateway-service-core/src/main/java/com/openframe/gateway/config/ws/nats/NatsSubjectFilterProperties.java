@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws;
+package com.openframe.gateway.config.ws.nats;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -10,14 +10,15 @@ import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_API_WS
 import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_WS_ENDPOINT_PATH;
 
 /**
- * Per-client subject allow-list for the NATS websocket routes ({@code /ws/nats}, {@code /ws/nats-api}).
+ * Per-client allow-list for the NATS websocket routes ({@code /ws/nats}, {@code /ws/nats-api}).
  * <p>
  * Every device and every dashboard logs in to NATS as the one shared device user, so the NATS
  * permissions of that user hold a {@code *} where a machine or user id belongs and cannot tell one
  * client from another: a device may subscribe {@code machine.*.command-execution} and read every
  * machine of the tenant. The gateway does know who the client is, from the JWT it accepted on the
  * upgrade, so it vets each {@code SUB}/{@code PUB} against the patterns below with {@code {id}}
- * replaced by the caller's machine id (device token) or user id (user token).
+ * replaced by the caller's machine id (device token) or user id (user token), and each JetStream
+ * consumer it creates against the stream's {@code StreamConsumerAuthorizer}.
  * <p>
  * Pattern tokens: a literal matches itself; {@code *} matches exactly one literal token, never a
  * wildcard sent by the client; {@code >} matches the rest of the subject, wildcards included;
@@ -34,11 +35,17 @@ import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_WS_END
 @ConfigurationProperties(prefix = "openframe.gateway.websocket.nats-subject-filter")
 public class NatsSubjectFilterProperties {
 
+    private static final long NATS_DEFAULT_MAX_PAYLOAD_BYTES = 5L * 1024 * 1024;
+
     /** Off by default: a pod that has not been configured relays exactly as before. */
     private boolean enabled = false;
 
     /** false = log what would be refused and relay it anyway; true = refuse it. */
     private boolean enforce = false;
+
+    /** Largest {@code PUB}/{@code HPUB} payload held back for inspection; the tenant NATS refuses
+     *  anything above its own {@code max_payload} (5MB in the configmap), so this only has to match it. */
+    private long maxPayloadBytes = NATS_DEFAULT_MAX_PAYLOAD_BYTES;
 
     private List<String> deviceSubscribe = List.of(
             "_INBOX.*",

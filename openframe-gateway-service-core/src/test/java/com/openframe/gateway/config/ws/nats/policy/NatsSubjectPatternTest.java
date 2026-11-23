@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws;
+package com.openframe.gateway.config.ws.nats.policy;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;

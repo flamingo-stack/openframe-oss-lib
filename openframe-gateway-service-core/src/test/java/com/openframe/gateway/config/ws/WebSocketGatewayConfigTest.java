@@ -1,5 +1,7 @@
 package com.openframe.gateway.config.ws;
 
+import com.openframe.gateway.config.ws.nats.session.NatsSubjectFilter;
+import com.openframe.gateway.config.ws.nats.session.NatsSubjectFilteringWebSocketSessionDecorator;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

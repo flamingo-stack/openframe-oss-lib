@@ -1,5 +1,10 @@
-package com.openframe.gateway.config.ws;
+package com.openframe.gateway.config.ws.nats.session;
 
+import com.openframe.gateway.config.ws.nats.NatsClientContextFactory;
+import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
+import com.openframe.gateway.config.ws.nats.NatsTestContexts;
+import com.openframe.gateway.config.ws.nats.check.NatsCommandVetter;
+import com.openframe.gateway.config.ws.nats.protocol.NatsControlLineParser;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,24 +15,21 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
-import tools.jackson.databind.ObjectMapper;
-
-import java.util.Optional;
+import reactor.util.context.Context;
+import reactor.util.context.ContextView;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NatsSubjectFilterTest {
 
-    private static final String MACHINE_ID = "m-1";
-    private static final String USER_ID = "u-1";
     private static final String NATS_PATH = "/ws/nats";
     private static final String TENANT = "tenant-1";
+    private static final ContextView CONTEXT = Context.empty();
 
-    @Mock private RequestJwtClaimsReader requestJwtClaimsReader;
+    @Mock private NatsClientContextFactory natsClientContextFactory;
+    @Mock private NatsCommandVetter natsCommandVetter;
     @Mock private GatewayTrafficMetrics gatewayTrafficMetrics;
     @Mock private ServerWebExchange exchange;
     @Mock private WebSocketSession session;
@@ -39,8 +41,8 @@ class NatsSubjectFilterTest {
     void setUp() {
         properties = new NatsSubjectFilterProperties();
         properties.setEnabled(true);
-        natsSubjectFilter = new NatsSubjectFilter(properties, requestJwtClaimsReader, new ObjectMapper(),
-                gatewayTrafficMetrics);
+        natsSubjectFilter = new NatsSubjectFilter(properties, natsClientContextFactory, new NatsControlLineParser(),
+                natsCommandVetter, gatewayTrafficMetrics);
     }
 
     @ParameterizedTest
@@ -64,19 +66,6 @@ class NatsSubjectFilterTest {
     }
 
     @Test
-    void decorate_tokenWithoutIdentity_sessionRelayedUnfiltered() {
-        // setup
-        when(requestJwtClaimsReader.getMachineId(exchange)).thenReturn(Optional.empty());
-        when(requestJwtClaimsReader.getUserId(exchange)).thenThrow(new IllegalStateException("no sub"));
-
-        // execution
-        WebSocketSession decorated = natsSubjectFilter.decorate(exchange, session, NATS_PATH, TENANT);
-
-        // verifications
-        assertThat(decorated).isSameAs(session);
-    }
-
-    @Test
     void isEnabledFor_natsPathWhileDisabled_false() {
         // setup
         properties.setEnabled(false);
@@ -89,29 +78,27 @@ class NatsSubjectFilterTest {
     }
 
     @Test
-    void decorate_deviceToken_filteringDecoratorForTheMachine() {
+    void decorate_identityKnown_filteringDecorator() {
         // setup
-        when(requestJwtClaimsReader.getMachineId(exchange)).thenReturn(Optional.of(MACHINE_ID));
+        when(natsClientContextFactory.create(exchange, NATS_PATH, TENANT, CONTEXT)).thenReturn(NatsTestContexts.device());
 
         // execution
-        WebSocketSession decorated = natsSubjectFilter.decorate(exchange, session, NATS_PATH, TENANT);
+        WebSocketSession decorated = natsSubjectFilter.decorate(exchange, session, NATS_PATH, TENANT, CONTEXT);
 
         // verifications
         assertThat(decorated).isInstanceOf(NatsSubjectFilteringWebSocketSessionDecorator.class);
-        verify(requestJwtClaimsReader, never()).getUserId(exchange);
     }
 
     @Test
-    void decorate_userToken_filteringDecoratorForTheUser() {
+    void decorate_tokenWithoutIdentity_sessionRelayedUnfiltered() {
         // setup
-        when(requestJwtClaimsReader.getMachineId(exchange)).thenReturn(Optional.empty());
-        when(requestJwtClaimsReader.getUserId(exchange)).thenReturn(USER_ID);
+        when(natsClientContextFactory.create(exchange, NATS_PATH, TENANT, CONTEXT))
+                .thenThrow(new IllegalStateException("no sub"));
 
         // execution
-        WebSocketSession decorated = natsSubjectFilter.decorate(exchange, session, NATS_PATH, TENANT);
+        WebSocketSession decorated = natsSubjectFilter.decorate(exchange, session, NATS_PATH, TENANT, CONTEXT);
 
         // verifications
-        assertThat(decorated).isInstanceOf(NatsSubjectFilteringWebSocketSessionDecorator.class);
-        verify(requestJwtClaimsReader).getUserId(exchange);
+        assertThat(decorated).isSameAs(session);
     }
 }

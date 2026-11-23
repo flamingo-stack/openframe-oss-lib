@@ -1,6 +1,7 @@
 package com.openframe.gateway.config.ws;
 
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.gateway.config.ws.nats.session.NatsSubjectFilter;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import com.openframe.gateway.metrics.WebSocketKind;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
@@ -87,7 +88,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                         sessionToHandle, path, tenantId(exchange), meshControlProperties, objectMapper);
             }
             if (natsSubjectFilter.isEnabledFor(path)) {
-                sessionToHandle = natsSubjectFilter.decorate(exchange, sessionToHandle, path, tenantId(exchange));
+                sessionToHandle = natsSubjectFilter.decorate(exchange, sessionToHandle, path, tenantId(exchange), context);
             }
             if (loggingProperties.isFramePath(path)) {
                 sessionToHandle = new LoggingWebSocketSessionDecorator(

@@ -1,14 +1,25 @@
-package com.openframe.gateway.config.ws;
+package com.openframe.gateway.config.ws.nats.policy;
 
+import com.openframe.gateway.config.ws.nats.NatsClientIdentity;
+import com.openframe.gateway.config.ws.nats.NatsClientKind;
+import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class NatsSubjectPolicyTest {
+class NatsSubjectPolicyFactoryTest {
 
     private static final String MACHINE_ID = "m-1";
     private static final String USER_ID = "u-1";
+
+    private NatsSubjectPolicyFactory factory;
+
+    @BeforeEach
+    void setUp() {
+        factory = new NatsSubjectPolicyFactory(new NatsSubjectFilterProperties());
+    }
 
     @ParameterizedTest
     @CsvSource({
@@ -35,15 +46,15 @@ class NatsSubjectPolicyTest {
             "USER,   _INBOX.abc.*,                   true",
             "USER,   _INBOX.>,                       false"
     })
-    void allowsSubscribe_defaultPatterns_scopedToTheCaller(NatsClientKind kind, String subject, boolean expected) {
+    void policyFor_defaultSubscribePatterns_scopedToTheCaller(NatsClientKind kind, String subject, boolean expected) {
         // setup
-        NatsSubjectPolicy policy = policyFor(kind);
+        NatsClientIdentity identity = identityOf(kind);
 
         // execution
-        boolean allowed = policy.allowsSubscribe(subject);
+        NatsSubjectPolicy policy = factory.policyFor(identity);
 
         // verifications
-        assertThat(allowed).isEqualTo(expected);
+        assertThat(policy.allowsSubscribe(subject)).isEqualTo(expected);
     }
 
     @ParameterizedTest
@@ -65,22 +76,20 @@ class NatsSubjectPolicyTest {
             "USER,   chat.d-1.message,                                                                false",
             "USER,   user.u-1.installed-agent,                                                        false"
     })
-    void allowsPublish_defaultPatterns_scopedToTheCaller(NatsClientKind kind, String subject, boolean expected) {
+    void policyFor_defaultPublishPatterns_scopedToTheCaller(NatsClientKind kind, String subject, boolean expected) {
         // setup
-        NatsSubjectPolicy policy = policyFor(kind);
+        NatsClientIdentity identity = identityOf(kind);
 
         // execution
-        boolean allowed = policy.allowsPublish(subject);
+        NatsSubjectPolicy policy = factory.policyFor(identity);
 
         // verifications
-        assertThat(allowed).isEqualTo(expected);
+        assertThat(policy.allowsPublish(subject)).isEqualTo(expected);
     }
 
-    private static NatsSubjectPolicy policyFor(NatsClientKind kind) {
-        NatsSubjectFilterProperties properties = new NatsSubjectFilterProperties();
-        NatsClientIdentity identity = kind == NatsClientKind.DEVICE
+    private static NatsClientIdentity identityOf(NatsClientKind kind) {
+        return kind == NatsClientKind.DEVICE
                 ? NatsClientIdentity.device(MACHINE_ID)
                 : NatsClientIdentity.user(USER_ID);
-        return NatsSubjectPolicy.of(properties, identity);
     }
 }

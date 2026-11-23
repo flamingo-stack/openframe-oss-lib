@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.gateway.config.ws.nats.session.NatsSubjectFilter;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import com.openframe.gateway.tenant.NamespaceRewriteGatewayFilter;
 import lombok.RequiredArgsConstructor;

@@ -1,5 +1,7 @@
 package com.openframe.gateway.config.ws;
 
+import com.openframe.gateway.config.ws.nats.session.NatsSubjectFilter;
+import com.openframe.gateway.config.ws.nats.session.NatsSubjectFilteringWebSocketSessionDecorator;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -107,7 +109,7 @@ class WebSocketServiceSecurityDecoratorTest {
         NatsSubjectFilter natsSubjectFilter = mock(NatsSubjectFilter.class);
         WebSocketSession filtered = mock(WebSocketSession.class);
         when(natsSubjectFilter.isEnabledFor(NATS_REQUEST_PATH)).thenReturn(true);
-        when(natsSubjectFilter.decorate(any(ServerWebExchange.class), any(WebSocketSession.class), eq(NATS_REQUEST_PATH), any()))
+        when(natsSubjectFilter.decorate(any(ServerWebExchange.class), any(WebSocketSession.class), eq(NATS_REQUEST_PATH), any(), any()))
                 .thenReturn(filtered);
 
         WebSocketSession proxied = handleAndCaptureProxiedSession(noFrameLogging(), new MeshControlCommandProperties(),

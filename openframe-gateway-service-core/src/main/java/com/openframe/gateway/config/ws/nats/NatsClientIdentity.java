@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws;
+package com.openframe.gateway.config.ws.nats;
 
 /**
  * Who a NATS websocket client is, taken from the JWT the gateway accepted on the upgrade: the

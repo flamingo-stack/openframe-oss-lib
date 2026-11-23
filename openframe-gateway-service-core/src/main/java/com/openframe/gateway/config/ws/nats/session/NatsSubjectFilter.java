@@ -1,5 +1,11 @@
-package com.openframe.gateway.config.ws;
+package com.openframe.gateway.config.ws.nats.session;
 
+import com.openframe.gateway.config.ws.nats.NatsClientContext;
+import com.openframe.gateway.config.ws.nats.NatsClientContextFactory;
+import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
+import com.openframe.gateway.config.ws.nats.check.NatsCommandVetter;
+import com.openframe.gateway.config.ws.nats.protocol.NatsClientStreamAssembler;
+import com.openframe.gateway.config.ws.nats.protocol.NatsControlLineParser;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -7,9 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
-import tools.jackson.databind.ObjectMapper;
-
-import java.util.Optional;
+import reactor.util.context.ContextView;
 
 /**
  * Wraps a NATS websocket session with {@link NatsSubjectFilteringWebSocketSessionDecorator} for the
@@ -21,8 +25,9 @@ import java.util.Optional;
 public class NatsSubjectFilter {
 
     private final NatsSubjectFilterProperties natsSubjectFilterProperties;
-    private final RequestJwtClaimsReader requestJwtClaimsReader;
-    private final ObjectMapper objectMapper;
+    private final NatsClientContextFactory natsClientContextFactory;
+    private final NatsControlLineParser natsControlLineParser;
+    private final NatsCommandVetter natsCommandVetter;
     private final GatewayTrafficMetrics gatewayTrafficMetrics;
 
     @PostConstruct
@@ -40,27 +45,19 @@ public class NatsSubjectFilter {
      * leaves the session unfiltered rather than closed: the gateway already accepted that token, and
      * the observation phase must never cut a client.
      */
-    public WebSocketSession decorate(ServerWebExchange exchange, WebSocketSession session, String path, String tenant) {
-        NatsClientIdentity identity;
+    public WebSocketSession decorate(ServerWebExchange exchange, WebSocketSession session, String path, String tenant,
+                                     ContextView reactorContext) {
+        NatsClientContext context;
         try {
-            identity = identityOf(exchange);
+            context = natsClientContextFactory.create(exchange, path, tenant, reactorContext);
         } catch (IllegalStateException e) {
             log.warn("NATS client identity unknown, relaying unfiltered: {} path={} tenant={}", e.getMessage(), path, tenant);
             return session;
         }
-        return new NatsSubjectFilteringWebSocketSessionDecorator(session, path, tenant, identity,
-                natsSubjectFilterProperties, objectMapper, gatewayTrafficMetrics);
-    }
-
-    private NatsClientIdentity identityOf(ServerWebExchange exchange) {
-        Optional<String> machineId = requestJwtClaimsReader.getMachineId(exchange);
-        return machineId
-                .map(NatsClientIdentity::device)
-                .orElseGet(() -> userIdentityOf(exchange));
-    }
-
-    private NatsClientIdentity userIdentityOf(ServerWebExchange exchange) {
-        String userId = requestJwtClaimsReader.getUserId(exchange);
-        return NatsClientIdentity.user(userId);
+        long maxPayloadBytes = natsSubjectFilterProperties.getMaxPayloadBytes();
+        NatsClientStreamAssembler assembler = new NatsClientStreamAssembler(natsControlLineParser, maxPayloadBytes);
+        NatsRefusalReporter reporter = new NatsRefusalReporter(gatewayTrafficMetrics, context);
+        return new NatsSubjectFilteringWebSocketSessionDecorator(session, context, natsSubjectFilterProperties,
+                assembler, natsCommandVetter, reporter);
     }
 }
