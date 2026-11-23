@@ -1,13 +1,20 @@
 package com.openframe.data.nats.delivery;
 
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.toolagent.ToolOsSupport;
 import com.openframe.data.nats.mapper.ToolAgentUpdateMessageMapper;
+import com.openframe.data.nats.model.DownloadConfiguration;
 import com.openframe.data.nats.model.ToolAgentUpdateMessage;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySpec;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 import static java.lang.String.format;
 
@@ -53,5 +60,22 @@ public class ToolUpdateDeliverySpec implements DeliverySpec<ToolUpdateDeliverySe
     @Override
     public boolean canDeliverToEveryMachine() {
         return true;
+    }
+
+    @Override
+    public boolean admits(Machine machine, ToolAgentUpdateMessage payload) {
+        List<DownloadConfiguration> configurations = payload.getDownloadConfigurations();
+        if (configurations == null) {
+            return true;
+        }
+        Optional<String> minOsVersion = ToolOsSupport.downloadOs(machine.getOsType())
+                .flatMap(os -> configurations.stream()
+                        .filter(configuration -> os.equalsIgnoreCase(configuration.getOs()))
+                        .map(DownloadConfiguration::getMinOsVersion)
+                        .filter(Objects::nonNull)
+                        .findFirst());
+        return minOsVersion
+                .map(minimum -> !ToolOsSupport.isBelow(machine.getOsVersion(), minimum))
+                .orElse(true);
     }
 }
