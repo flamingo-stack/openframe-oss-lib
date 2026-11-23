@@ -181,7 +181,11 @@ fn updates_run_only_on_a_managed_choco() {
     };
     assert_eq!(
         assess(&weak).refusal().as_deref(),
-        Some("Chocolatey on this device needs action: WeakAcl")
+        Some("Chocolatey on this device needs action: WEAK_ACL")
+    );
+    assert_eq!(
+        assess(&customer("1.4.0")).refusal().as_deref(),
+        Some("Chocolatey on this device needs action: VERSION_1")
     );
 }
 

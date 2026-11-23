@@ -121,6 +121,8 @@ pub(super) struct ChocoReport {
     reason: Option<Reason>,
     packages: Vec<String>,
     existing_packages: Vec<String>,
+    #[serde(skip)]
+    verdict: Verdict,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -155,12 +157,18 @@ enum Reason {
 impl ChocoReport {
     #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     pub(super) fn refusal(&self) -> Option<String> {
-        match (self.status, self.reason) {
-            (Status::Managed, _) => None,
-            (_, Some(reason)) => Some(format!(
-                "Chocolatey on this device needs action: {reason:?}"
+        match self.verdict {
+            Verdict::Managed => None,
+            Verdict::UpgradeRequired => {
+                Some("Chocolatey on this device must be upgraded first".to_string())
+            }
+            Verdict::ActionRequired(reason) => Some(format!(
+                "Chocolatey on this device needs action: {}",
+                serde_json::to_value(reason)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .expect("a unit variant serializes to a string")
             )),
-            (_, None) => Some("Chocolatey on this device must be upgraded first".to_string()),
         }
     }
 }
@@ -271,6 +279,7 @@ fn assess(facts: &Facts) -> ChocoReport {
         reason,
         packages,
         existing_packages,
+        verdict,
     }
 }
 

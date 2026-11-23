@@ -5,7 +5,11 @@ use super::decide::is_under;
 use super::windows_app::{identity, Package, Shortcut, SCRIPT_HELPERS, SCRIPT_OUTPUT};
 use super::{AppIdentity, Undetermined, RESOLVE_TIMEOUT_SECS};
 use crate::executor::{execute_script, Privilege, ScriptParams};
-use crate::services::package_manager::choco::{root, SCRIPT_PRELUDE};
+use crate::services::package_manager::choco::root;
+
+const PRELUDE: &str = r#"$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+"#;
 
 const BODY: &str = r#"$chocoRoot = $args[0]
 $lib = Join-Path $chocoRoot 'lib'
@@ -83,7 +87,7 @@ struct Found {
 
 pub(super) async fn resolve(id: &str) -> Result<AppIdentity, Undetermined> {
     let result = execute_script(ScriptParams {
-        code: &format!("{SCRIPT_PRELUDE}{SCRIPT_HELPERS}{BODY}{SCRIPT_OUTPUT}"),
+        code: &format!("{PRELUDE}{SCRIPT_HELPERS}{BODY}{SCRIPT_OUTPUT}"),
         shell: "powershell",
         args: &[root(), id.to_string()],
         timeout_secs: RESOLVE_TIMEOUT_SECS,
