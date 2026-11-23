@@ -2,7 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.assignment.AssignmentTarget;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
@@ -14,6 +14,7 @@ import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.repository.assignment.ItemAssignmentRepository;
 import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -59,36 +60,39 @@ public class AssignmentService {
                 ? sort.getDirection() : SortDirection.DESC;
 
         int limit = normalizedPagination.getLimit();
+        CursorPosition position = KeysetCursor.parseDecoded(normalizedPagination.getCursor());
         long totalFilteredCount = repository.countAssignments(itemId, targetType, search);
 
-        CursorPosition position = normalizedPagination.hasCursor()
-                ? new CursorPosition.RowId(normalizedPagination.getCursor())
-                : new CursorPosition.None();
-        List<ItemAssignment> raw = repository.findAssignmentsWithCursor(
+        List<ItemAssignment> fetched = repository.findAssignmentsWithCursor(
                 itemId, targetType, search, sortField, sortDirection.name(),
-                position, false, limit + 1);
-        boolean hasNextPage = raw.size() > limit;
-        List<ItemAssignment> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
+                position, normalizedPagination.isBackward(), limit + 1);
+        CursorPage<ItemAssignment> page = CursorPage.assemble(fetched, normalizedPagination);
 
-        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
+        PageInfo pageInfo = buildPageInfo(page, sortField, sortDirection.name());
 
         return CountedGenericQueryResult.<ItemAssignment>builder()
-                .items(pageItems)
+                .items(page.items())
                 .pageInfo(pageInfo)
                 .filteredCount((int) totalFilteredCount)
                 .build();
     }
 
-    private PageInfo buildPageInfo(List<ItemAssignment> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getFirst().getId());
-        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getLast().getId());
+    private PageInfo buildPageInfo(CursorPage<ItemAssignment> page, String sortField, String sortDirection) {
+        List<ItemAssignment> pageItems = page.items();
+        String startCursor = pageItems.isEmpty() ? null : pageCursor(pageItems.getFirst(), sortField, sortDirection);
+        String endCursor = pageItems.isEmpty() ? null : pageCursor(pageItems.getLast(), sortField, sortDirection);
 
         return PageInfo.builder()
-                .hasNextPage(hasNextPage)
-                .hasPreviousPage(hasPreviousPage)
+                .hasNextPage(page.hasNextPage())
+                .hasPreviousPage(page.hasPreviousPage())
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
+    }
+
+    private String pageCursor(ItemAssignment assignment, String sortField, String sortDirection) {
+        KeysetCursor cursor = repository.keysetCursor(assignment, sortField, sortDirection);
+        return cursor.encode();
     }
 
     private String validateSortField(String field) {

@@ -33,10 +33,15 @@ public class CustomInvitationRepositoryImpl implements CustomInvitationRepositor
     @Override
     public List<Invitation> findOpenInvitationsPage(InvitationListFilter filter, Instant now, String cursor,
                                                     boolean backward, int limit) {
+        boolean fetchDescending = !backward;
         List<Criteria> criteria = listCriteria(filter, now);
-        InvitationPageCursor.parse(cursor).map(CustomInvitationRepositoryImpl::after).ifPresent(criteria::add);
+        InvitationPageCursor.parse(cursor)
+                .map(position -> pastPosition(position, fetchDescending))
+                .ifPresent(criteria::add);
+        Sort.Direction fetchDirection = fetchDescending ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort sort = Sort.by(fetchDirection, FIELD_CREATED_AT, FIELD_ID);
         Query query = new Query(new Criteria().andOperator(criteria))
-                .with(Sort.by(Sort.Order.desc(FIELD_CREATED_AT), Sort.Order.desc(FIELD_ID)))
+                .with(sort)
                 .limit(limit);
         log.debug("Executing MongoDB invitation page query: {}", query);
         return mongoTemplate.find(query, Invitation.class);
@@ -66,17 +71,30 @@ public class CustomInvitationRepositoryImpl implements CustomInvitationRepositor
         return criteria;
     }
 
-    // Descending: a missing createdAt sorts after every value, so it is reachable from any position.
-    private static Criteria after(InvitationPageCursor cursor) {
-        Criteria sameCreatedAtPastId = new Criteria().andOperator(
-                Criteria.where(FIELD_CREATED_AT).is(cursor.createdAt()),
-                Criteria.where(FIELD_ID).lt(cursor.id()));
+    // A missing createdAt sorts after every value when descending and before every value when ascending.
+    private static Criteria pastPosition(InvitationPageCursor cursor, boolean fetchDescending) {
+        Criteria id = Criteria.where(FIELD_ID);
+        Criteria pastId = fetchDescending ? id.lt(cursor.id()) : id.gt(cursor.id());
+        Criteria sameCreatedAt = Criteria.where(FIELD_CREATED_AT).is(cursor.createdAt());
+        Criteria sameCreatedAtPastId = new Criteria().andOperator(sameCreatedAt, pastId);
         if (cursor.createdAt() == null) {
-            return sameCreatedAtPastId;
+            return restOfUndatedGroup(sameCreatedAtPastId, fetchDescending);
         }
-        return new Criteria().orOperator(
-                Criteria.where(FIELD_CREATED_AT).lt(cursor.createdAt()),
-                sameCreatedAtPastId,
-                Criteria.where(FIELD_CREATED_AT).is(null));
+        Criteria createdAt = Criteria.where(FIELD_CREATED_AT);
+        if (fetchDescending) {
+            Criteria older = createdAt.lt(cursor.createdAt());
+            Criteria undatedGroup = Criteria.where(FIELD_CREATED_AT).is(null);
+            return new Criteria().orOperator(older, sameCreatedAtPastId, undatedGroup);
+        }
+        Criteria newer = createdAt.gt(cursor.createdAt());
+        return new Criteria().orOperator(newer, sameCreatedAtPastId);
+    }
+
+    private static Criteria restOfUndatedGroup(Criteria undatedPastId, boolean fetchDescending) {
+        if (fetchDescending) {
+            return undatedPastId;
+        }
+        Criteria everyDatedRow = Criteria.where(FIELD_CREATED_AT).ne(null);
+        return new Criteria().orOperator(undatedPastId, everyDatedRow);
     }
 }

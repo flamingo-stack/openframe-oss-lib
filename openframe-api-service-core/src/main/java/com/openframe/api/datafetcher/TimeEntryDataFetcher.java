@@ -94,7 +94,8 @@ public class TimeEntryDataFetcher {
                 .startedFrom(period != null ? period.getStartDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null)
                 .startedTo(period != null ? period.getEndDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null)
                 .build();
-        return queryEntries(filter, search, sort, first, after);
+        ConnectionArgs page = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        return queryEntries(filter, search, sort, page);
     }
 
     @DgsQuery
@@ -107,7 +108,8 @@ public class TimeEntryDataFetcher {
             @InputArgument Integer last,
             @InputArgument String before) {
         decodeFilterIds(filter);
-        return queryEntries(filter, search, sort, first, after);
+        ConnectionArgs page = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
+        return queryEntries(filter, search, sort, page);
     }
 
     @DgsQuery
@@ -220,9 +222,8 @@ public class TimeEntryDataFetcher {
     }
 
     private CountedGenericConnection<GenericEdge<TimeEntry>> queryEntries(
-            TimeEntryFilterInput filter, String search, SortInput sort, Integer first, String after) {
-        CursorPaginationCriteria pagination = CursorPaginationCriteria.fromConnectionArgs(
-                ConnectionArgs.builder().first(first).after(after).build());
+            TimeEntryFilterInput filter, String search, SortInput sort, ConnectionArgs page) {
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.fromConnectionArgs(page);
         CountedGenericQueryResult<TimeEntry> result =
                 timeEntryService.queryEntries(filter, search, pagination, sort);
         return toConnection(result);

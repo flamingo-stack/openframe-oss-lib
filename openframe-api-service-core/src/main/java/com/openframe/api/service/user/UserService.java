@@ -1,6 +1,7 @@
 package com.openframe.api.service.user;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorCodec;
@@ -90,14 +91,15 @@ public class UserService {
         CursorPaginationCriteria page = pagination.normalize();
         UserListFilter listFilter = toListFilter(filter, search);
         long filteredCount = userRepository.countUsers(listFilter);
-        List<User> raw = userRepository.findUsersPage(listFilter, page.getCursor(), false, page.getLimit() + 1);
-        boolean hasNextPage = raw.size() > page.getLimit();
-        List<UserResponse> items = toResponses(hasNextPage ? raw.subList(0, page.getLimit()) : raw);
+        List<User> fetched = userRepository.findUsersPage(
+                listFilter, page.getCursor(), page.isBackward(), page.getLimit() + 1);
+        CursorPage<User> cursorPage = CursorPage.assemble(fetched, page);
+        List<UserResponse> items = toResponses(cursorPage.items());
         return CountedGenericQueryResult.<UserResponse>builder()
                 .items(items)
                 .pageInfo(PageInfo.builder()
-                        .hasNextPage(hasNextPage)
-                        .hasPreviousPage(page.hasCursor())
+                        .hasNextPage(cursorPage.hasNextPage())
+                        .hasPreviousPage(cursorPage.hasPreviousPage())
                         .startCursor(items.isEmpty() ? null : cursorOf(items.getFirst()))
                         .endCursor(items.isEmpty() ? null : cursorOf(items.getLast()))
                         .build())

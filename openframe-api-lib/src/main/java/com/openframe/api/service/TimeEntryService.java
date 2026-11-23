@@ -1,7 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
@@ -10,7 +10,6 @@ import com.openframe.api.dto.timetracking.CreateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.EmployeeTimeStats;
 import com.openframe.api.dto.timetracking.StartTimerCommand;
 import com.openframe.api.dto.timetracking.StopTimerCommand;
-import com.openframe.api.dto.timetracking.TimeEntryCursors;
 import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.exception.TimeEntryNotFoundException;
@@ -25,6 +24,7 @@ import com.openframe.data.document.timetracking.TimeEntrySource;
 import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
 import com.openframe.data.document.timetracking.filter.TimeEntryStateFilter;
 import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.repository.timetracking.TimeEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -274,22 +274,19 @@ public class TimeEntryService {
 
         TimeEntryQueryFilter filter = buildQueryFilter(input, search);
         validatePeriod(filter.getStartedFrom(), filter.getStartedTo());
+        CursorPosition position = KeysetCursor.parseDecoded(normalized.getCursor());
 
         Query query = timeEntryRepository.buildTimeEntryQuery(filter);
         long total = timeEntryRepository.countTimeEntries(query);
 
         int limit = normalized.getLimit();
-        CursorPosition position = normalized.hasCursor()
-                ? new CursorPosition.Unrecognised(normalized.getCursor())
-                : new CursorPosition.None();
-        List<TimeEntry> raw = timeEntryRepository.findTimeEntriesWithCursor(
-                query, position, false, limit + 1, sortField, direction.name());
-        boolean hasNext = raw.size() > limit;
-        List<TimeEntry> page = hasNext ? raw.subList(0, limit) : raw;
+        List<TimeEntry> fetched = timeEntryRepository.findTimeEntriesWithCursor(
+                query, position, normalized.isBackward(), limit + 1, sortField, direction.name());
+        CursorPage<TimeEntry> page = CursorPage.assemble(fetched, normalized);
 
         return CountedGenericQueryResult.<TimeEntry>builder()
-                .items(page)
-                .pageInfo(buildPageInfo(page, hasNext, normalized.hasCursor(), sortField))
+                .items(page.items())
+                .pageInfo(buildPageInfo(page, sortField, direction.name()))
                 .filteredCount((int) total)
                 .build();
     }
@@ -435,21 +432,20 @@ public class TimeEntryService {
         return trimmed;
     }
 
-    private PageInfo buildPageInfo(List<TimeEntry> items, boolean hasNext, boolean hasPrevious, String sortField) {
-        String startCursor = items.isEmpty() ? null : CursorCodec.encode(rawCursor(items.getFirst(), sortField));
-        String endCursor = items.isEmpty() ? null : CursorCodec.encode(rawCursor(items.getLast(), sortField));
+    private PageInfo buildPageInfo(CursorPage<TimeEntry> page, String sortField, String sortDirection) {
+        List<TimeEntry> items = page.items();
+        String startCursor = items.isEmpty() ? null : pageCursor(items.getFirst(), sortField, sortDirection);
+        String endCursor = items.isEmpty() ? null : pageCursor(items.getLast(), sortField, sortDirection);
         return PageInfo.builder()
-                .hasNextPage(hasNext)
-                .hasPreviousPage(hasPrevious)
+                .hasNextPage(page.hasNextPage())
+                .hasPreviousPage(page.hasPreviousPage())
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
     }
 
-    private String rawCursor(TimeEntry entry, String sortField) {
-        if (TimeEntryCursors.DATE_FIELD.equals(sortField)) {
-            return TimeEntryCursors.date(entry);
-        }
-        return entry.getId();
+    private String pageCursor(TimeEntry entry, String sortField, String sortDirection) {
+        KeysetCursor cursor = timeEntryRepository.keysetCursor(entry, sortField, sortDirection);
+        return cursor.encode();
     }
 }
