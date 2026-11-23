@@ -23,6 +23,7 @@ public enum AuthErrorCode {
     ACCOUNT_BLOCKED("This OpenFrame account is blocked. Contact support."),
     ACCOUNT_ALREADY_LINKED("This account is already connected to an organization. Please sign in instead."),
     ORGANIZATION_SSO_REQUIRED("Your organization uses its own sign-in for this provider. Enter your email on the login page to be redirected to it."),
+    PASSWORD_LOGIN_DISABLED("OpenFrame SSO is turned off for your organization. Please sign in with another provider."),
     INVITATION_FAILED("Invitation acceptance failed. Please try again."),
     INVITATION_USED("Invitation already used or revoked"),
     INVITATION_EXPIRED("Invitation expired"),

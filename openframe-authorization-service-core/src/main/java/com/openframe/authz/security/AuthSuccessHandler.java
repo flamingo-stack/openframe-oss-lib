@@ -3,11 +3,13 @@ package com.openframe.authz.security;
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.authz.web.ClientIp;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -43,6 +45,10 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         try {
             String tenantId = TenantContext.getTenantId();
             String email = extractEmail(authentication);
+            log.info("Login success email={} tenantId={} provider={} ip={} ua={}", email, tenantId,
+                    authentication instanceof OAuth2AuthenticationToken oauth2
+                            ? oauth2.getAuthorizedClientRegistrationId() : "password",
+                    ClientIp.of(request), request.getHeader(HttpHeaders.USER_AGENT));
             if (tenantId != null && email != null && !email.isBlank()) {
                 userService.touchLastLogin(email, tenantId);
                 maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);

@@ -12,7 +12,6 @@
  * surface attaches them through `applyProxyAuth`. The preview shows the exact
  * headers the next request carries, from the form as typed.
  */
-
 import { type ReactNode, useMemo, useState } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import {
@@ -207,7 +206,7 @@ function ProxyCredentialsForm({ description, saved }: ProxyCredentialsPanelProps
           </div>
           {activeEmail && (
             <div className="self-start">
-              <StatusBadge singleLine colorScheme="success" text={`Active: ${activeEmail}`} />
+              <StatusBadge colorScheme="success" text={`Active: ${activeEmail}`} />
             </div>
           )}
         </header>

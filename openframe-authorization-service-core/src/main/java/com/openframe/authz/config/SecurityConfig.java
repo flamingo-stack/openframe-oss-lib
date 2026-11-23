@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -34,6 +35,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import java.io.IOException;
@@ -70,7 +72,8 @@ public class SecurityConfig {
                                                           AuthenticationFailureHandler oauth2LoginFailureHandler,
                                                           AuthErrorResponder authErrorResponder,
                                                           JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory,
-                                                          SsoProviderRegistry ssoProviderRegistry) throws Exception {
+                                                          SsoProviderRegistry ssoProviderRegistry,
+                                                          AuthenticationManager authenticationManager) throws Exception {
         return http
                 // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
                 // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
@@ -103,6 +106,15 @@ public class SecurityConfig {
                         .loginPage("/login")
                         .successHandler(authSuccessHandler)
                         .failureHandler(passwordLoginFailureHandler(authErrorResponder))
+                        // The form otherwise gets Spring's global manager, built from the UserDetailsService
+                        // alone, which bypasses the attempt limits of the AuthenticationManager bean.
+                        .withObjectPostProcessor(new ObjectPostProcessor<UsernamePasswordAuthenticationFilter>() {
+                            @Override
+                            public <O extends UsernamePasswordAuthenticationFilter> O postProcess(O filter) {
+                                filter.setAuthenticationManager(authenticationManager);
+                                return filter;
+                            }
+                        })
                         .permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
