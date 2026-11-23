@@ -32,6 +32,14 @@ class FleetProxyGuardTest {
             "GET /api/{v}/fleet/hosts/identifier/{identifier}",
             "GET /api/{v}/fleet/hosts/{id:[0-9]+}/software"
     );
+    private static final List<String> READS_AND_WRITES = List.of(
+            "GET /api/{v}/fleet/policies",
+            "POST /api/{v}/fleet/policies",
+            "PATCH /api/{v}/fleet/policies/{id:[0-9]+}",
+            "PUT /api/{v}/fleet/policies/{id:[0-9]+}/hosts",
+            "DELETE /api/{v}/fleet/labels/id/{id:[0-9]+}",
+            "POST /api/{v}/fleet/queries/run"
+    );
 
     @Mock
     private TenantIdProvider tenantIdProvider;
@@ -164,6 +172,37 @@ class FleetProxyGuardTest {
 
         // verifications
         assertEndpointNotAllowed(thrown);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "POST, /api/v1/fleet/policies",
+            "PATCH, /api/v1/fleet/policies/7",
+            "PUT, /api/v1/fleet/policies/7/hosts",
+            "DELETE, /api/v1/fleet/labels/id/7",
+            "POST, /api/v1/fleet/queries/run"
+    })
+    void requireAllowed_listedNonGetEndpoint_throwsEndpointNotAllowed(String method, String toolPath) {
+        // setup
+        FleetProxyGuard guard = guard(true, READS_AND_WRITES);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> guard.requireAllowed(method, toolPath));
+
+        // verifications
+        assertEndpointNotAllowed(thrown);
+    }
+
+    @Test
+    void requireAllowed_listedGetBesideWrites_passes() {
+        // setup
+        FleetProxyGuard guard = guard(true, READS_AND_WRITES);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> guard.requireAllowed("GET", "/api/v1/fleet/policies"));
+
+        // verifications
+        assertThat(thrown).isNull();
     }
 
     @Test

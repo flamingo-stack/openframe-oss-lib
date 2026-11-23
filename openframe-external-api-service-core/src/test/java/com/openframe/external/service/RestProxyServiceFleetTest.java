@@ -124,6 +124,28 @@ class RestProxyServiceFleetTest {
     }
 
     @Test
+    void proxy_listedWriteEndpoint_throws403WithoutToolLookup() {
+        // setup
+        FleetProxyProperties properties = new FleetProxyProperties();
+        properties.setEnabled(true);
+        properties.setAllowedEndpoints(List.of("GET /api/{v}/fleet/policies", "POST /api/{v}/fleet/policies"));
+        FleetProxyGuard guard = new FleetProxyGuard(properties, tenantIdProvider);
+        CloseableHttpClient httpClient = new ToolProxyHttpClientConfig().toolProxyHttpClient();
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("test");
+        ProxyUrlResolver resolver = new ProxyUrlResolver(environment);
+        RestProxyService service = new RestProxyService(toolRepository, resolver, new ToolUrlService(), guard, httpClient);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> service.proxyApiRequest(FLEET,
+                request("POST", "/tools/fleetmdm-server/api/v1/fleet/policies"), null));
+
+        // verifications
+        assertEndpointNotAllowed(thrown);
+        verifyNoInteractions(toolRepository, tenantIdProvider);
+    }
+
+    @Test
     void proxy_dotSegmentPath_throws403WithoutToolLookup() {
         // setup
         RestProxyService service = service(true);
