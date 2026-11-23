@@ -23,6 +23,7 @@ public class FleetProxyGuard {
 
     private static final Set<String> DOT_SEGMENTS = Set.of(".", "..");
     private static final Set<String> SEPARATORS = Set.of("/", "\\");
+    private static final HttpMethod READ_METHOD = HttpMethod.GET;
 
     private final boolean multiTenancyEnabled;
     private final FleetEndpointMatcher allowedEndpoints;
@@ -56,11 +57,18 @@ public class FleetProxyGuard {
     }
 
     private boolean isAllowed(String method, String toolPath) {
+        HttpMethod httpMethod = HttpMethod.valueOf(method);
+        if (!isRead(httpMethod)) {
+            return false;
+        }
         if (!hasPlainSegmentsOnly(toolPath)) {
             return false;
         }
-        HttpMethod httpMethod = HttpMethod.valueOf(method);
         return allowedEndpoints.matches(httpMethod, toolPath);
+    }
+
+    private static boolean isRead(HttpMethod method) {
+        return READ_METHOD.equals(method);
     }
 
     private static boolean isFleet(String toolId) {
