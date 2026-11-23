@@ -21,7 +21,18 @@ import { extendTailwindMerge } from 'tailwind-merge';
 const twMerge = extendTailwindMerge<'ods-typography'>({
   extend: {
     classGroups: {
-      'ods-typography': ['text-h1', 'text-h2', 'text-h3', 'text-h4', 'text-h5', 'text-h6', 'text-code', 'text-badge'],
+      'ods-typography': [
+        'text-h1',
+        'text-h2',
+        'text-h3',
+        'text-h4',
+        'text-h5',
+        'text-h6',
+        'text-code',
+        'text-badge',
+        'text-shell-body',
+        'text-wordmark',
+      ],
     },
   },
 });
