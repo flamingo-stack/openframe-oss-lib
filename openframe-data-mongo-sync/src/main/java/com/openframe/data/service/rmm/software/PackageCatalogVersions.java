@@ -21,7 +21,7 @@ public class PackageCatalogVersions {
 
     private final PackageCatalogRepository catalogRepository;
 
-    // false for a package the catalog does not carry (Chocolatey is not in it)
+    // false for a package the catalog does not carry
     public boolean hasLatest(PackageManagerType manager, String packageId, BrewPackageType brewType) {
         return versions(manager, packageId, brewType).findAny().isPresent();
     }

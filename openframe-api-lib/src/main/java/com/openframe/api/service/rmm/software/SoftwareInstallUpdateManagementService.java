@@ -100,14 +100,11 @@ public class SoftwareInstallUpdateManagementService {
 
         String executionId = UUID.randomUUID().toString();
         BrewPackageType brewPackageType = adoptionPackage.getBrewPackageType();
-        boolean brew = packageManager == PackageManagerType.BREW;
-        String adoptScriptId = brew ? SoftwareScriptCode.BREW_ADOPT_SCRIPT_ID : SoftwareScriptCode.CHOCO_ADOPT_SCRIPT_ID;
-        PrivilegeLevel adoptPrivilegeLevel = brew ? PrivilegeLevel.USER : PrivilegeLevel.ADMIN;
         String requestId = packageUpdateDispatchService.dispatchAdopt(RunningExecutionRows.builder()
                 .executionId(executionId)
-                .scriptId(adoptScriptId)
+                .scriptId(SoftwareScriptCode.BREW_ADOPT_SCRIPT_ID)
                 .machineIds(targets)
-                .privilegeLevel(adoptPrivilegeLevel)
+                .privilegeLevel(PrivilegeLevel.USER)
                 .initiatedBy(initiatedBy)
                 .source(ExecutionSource.PACKAGE_INSTALLATION)
                 .packageManager(packageManager)

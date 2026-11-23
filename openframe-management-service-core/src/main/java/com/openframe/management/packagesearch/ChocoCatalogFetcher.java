@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,9 +55,11 @@ public class ChocoCatalogFetcher {
         Map<String, ChocoFeedSearch.Hit> hitsById = search.getData().stream()
                 .filter(hit -> hit.getId() != null)
                 .collect(toMap(hit -> lowerCase(hit.getId()), identity(), (first, second) -> first));
+        Map<String, PackageCatalogEntry> wingetEntriesByLowerCaseId = wingetEntriesById.entrySet().stream()
+                .collect(toMap(entry -> lowerCase(entry.getKey()), Map.Entry::getValue, (first, second) -> first));
         return catalog.getPackages().stream()
                 .filter(ChocoCatalogFetcher::isCuratedApp)
-                .map(pkg -> toEntry(pkg, hitsById, wingetEntriesById))
+                .map(pkg -> toEntry(pkg, hitsById, wingetEntriesByLowerCaseId))
                 .toList();
     }
 
@@ -72,8 +75,13 @@ public class ChocoCatalogFetcher {
                 .filter(StringUtils::hasText)
                 .distinct()
                 .toList();
-        return catalogRepository.findByManagerAndPackageIdIn(PackageManagerType.WINGET, wingetIds).stream()
-                .collect(toMap(PackageCatalogEntry::getPackageId, identity(), (first, second) -> first));
+        Map<String, PackageCatalogEntry> entriesById = new HashMap<>();
+        for (String wingetId : wingetIds) {
+            List<PackageCatalogEntry> found =
+                    catalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.WINGET, wingetId);
+            found.stream().findFirst().ifPresent(entry -> entriesById.put(wingetId, entry));
+        }
+        return entriesById;
     }
 
     private static <T> T fetch(RestClient feed, String path, Class<T> type) {
@@ -92,12 +100,12 @@ public class ChocoCatalogFetcher {
     }
 
     private static PackageCatalogEntry toEntry(ChocoFeedCatalog.Package pkg, Map<String, ChocoFeedSearch.Hit> hitsById,
-                                               Map<String, PackageCatalogEntry> wingetEntriesById) {
+                                               Map<String, PackageCatalogEntry> wingetEntriesByLowerCaseId) {
         String id = pkg.getId();
         String wingetId = pkg.getWingetId();
         ChocoFeedSearch.Hit hit = hitsById.getOrDefault(lowerCase(id), NO_HIT);
         PackageCatalogEntry winget = hasText(wingetId)
-                ? wingetEntriesById.getOrDefault(wingetId, NO_MATCHING_KEYS)
+                ? wingetEntriesByLowerCaseId.getOrDefault(lowerCase(wingetId), NO_MATCHING_KEYS)
                 : NO_MATCHING_KEYS;
         String title = hit.getTitle();
         String name = hasText(title) ? title : id;

@@ -73,11 +73,20 @@ public class PackageCatalogSyncScheduler {
     private void runSync(PackageManagerType manager, Supplier<List<PackageCatalogEntry>> fetcher) {
         try {
             List<PackageCatalogEntry> entries = fetcher.get();
+            if (isEmptyChocoCatalog(manager, entries)) {
+                log.warn("{} catalog fetch returned no entries, keeping the previous snapshot", manager);
+                syncMetrics.recordFailure(manager);
+                return;
+            }
             packageCatalogWriter.replaceManagerEntries(manager, entries);
             syncMetrics.recordSuccess(manager);
         } catch (Exception e) {
             log.error("{} catalog sync failed, keeping the previous snapshot", manager, e);
             syncMetrics.recordFailure(manager);
         }
+    }
+
+    private static boolean isEmptyChocoCatalog(PackageManagerType manager, List<PackageCatalogEntry> entries) {
+        return manager == PackageManagerType.CHOCO && entries.isEmpty();
     }
 }

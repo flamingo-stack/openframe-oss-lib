@@ -5,6 +5,7 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.function.Function;
 import static java.util.stream.Collectors.toMap;
 
 @Component
+@ConditionalOnProperty(name = "openframe.package-managers.choco-enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class ChocoInstalledPackageMatcher implements PackageMatcher {
 

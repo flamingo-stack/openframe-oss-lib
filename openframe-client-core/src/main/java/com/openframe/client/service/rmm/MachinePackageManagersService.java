@@ -108,10 +108,18 @@ public class MachinePackageManagersService {
             return;
         }
         if (decision.isUpgradeRetryPending() && UPGRADE_BLOCKED.equals(decision.getReason()) && isChocoEnabled()) {
-            bootstrapService.resendChocolateyUpgrade(machineId);
-            decision.setUpgradeRetryPending(false);
-            machineWriter.update(machineId, machineUpdate().set(CHOCOLATEY_DECISION, decision));
+            resendUpgrade(machineId, decision);
         }
+    }
+
+    private void resendUpgrade(String machineId, ChocolateyDecision decision) {
+        boolean dispatched = bootstrapService.resendChocolateyUpgrade(machineId);
+        if (!dispatched) {
+            log.debug("Chocolatey upgrade retry for machineId={} was not dispatched, it stays pending", machineId);
+            return;
+        }
+        decision.setUpgradeRetryPending(false);
+        machineWriter.update(machineId, machineUpdate().set(CHOCOLATEY_DECISION, decision));
     }
 
     private boolean isChocoEnabled() {

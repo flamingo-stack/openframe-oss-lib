@@ -63,22 +63,22 @@ public class PackageManagerBootstrapService {
         dispatchScript(machineId, PackageManagerType.CHOCO, SystemScriptCode.UPGRADE_CHOCOLATEY, cooldownSeconds);
     }
 
-    public void resendChocolateyUpgrade(String machineId) {
-        dispatchScript(machineId, PackageManagerType.CHOCO, SystemScriptCode.UPGRADE_CHOCOLATEY, NO_COOLDOWN);
+    public boolean resendChocolateyUpgrade(String machineId) {
+        return dispatchScript(machineId, PackageManagerType.CHOCO, SystemScriptCode.UPGRADE_CHOCOLATEY, NO_COOLDOWN);
     }
 
-    private void dispatchScript(String machineId, PackageManagerType packageManager, SystemScriptCode bootstrapScript,
-                                long cooldown) {
+    private boolean dispatchScript(String machineId, PackageManagerType packageManager,
+                                   SystemScriptCode bootstrapScript, long cooldown) {
         Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
         if (foundMachine.isEmpty()) {
             log.warn("Package-manager report for unknown machine {}, ignoring", machineId);
-            return;
+            return false;
         }
         Machine machine = foundMachine.get();
         DeviceStatus status = machine.getStatus();
         if (!DeviceStatus.CONNECTED.contains(status)) {
             log.debug("Ignoring package-manager report for machineId={} in status {}", machineId, status);
-            return;
+            return false;
         }
 
         String tenantId = machine.getTenantId();
@@ -87,16 +87,17 @@ public class PackageManagerBootstrapService {
         if (foundScript.isEmpty()) {
             log.warn("Bootstrap script {} not seeded for tenant {}, ignoring report from machineId={}",
                     bootstrapScript, tenantId, machineId);
-            return;
+            return false;
         }
         Script script = foundScript.get();
 
         if (isSuppressed(tenantId, machineId, script.getId(), cooldown)) {
-            return;
+            return false;
         }
 
         List<String> args = scriptArgs(bootstrapScript, script);
         dispatch(tenantId, machineId, packageManager, script, args);
+        return true;
     }
 
     private List<String> scriptArgs(SystemScriptCode bootstrapScript, Script script) {

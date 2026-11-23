@@ -512,7 +512,8 @@ extend type Mutation {
     Returns the devices (Machine global ids) the order was sent to. Left out: devices of another OS, devices without
     the package manager reported PRESENT, devices whose copy is only in ~/Applications, and devices the order cannot
     reach (the order is switched off or the agent is too old for it). NOT_FOUND for an unknown title. BAD_REQUEST
-    when the title has no adoption package, when no device is left, and when a device is not managed."""
+    when the title has no adoption package, when no device is left, and when a device is not managed.
+    Adoption into Chocolatey is not available yet: BAD_REQUEST for a Chocolatey adoption package."""
     adoptSoftware(input: AdoptSoftwareInput!): [ID!]!
 
     """Save the Auto-update form: on with these settings for the bundle's devices, off for the title's other
@@ -533,7 +534,7 @@ extend type Mutation {
 
 input AdoptSoftwareInput {
     """The software title (Software.id). It is adopted into its Software.adoptionPackage: a Homebrew cask on
-    macOS, a Chocolatey package on Windows."""
+    macOS. Adoption into Chocolatey on Windows is not available yet."""
     softwareId: ID!
     "The devices (Machine global ids), 1..100."
     machineIds: [ID!]!
