@@ -20,6 +20,7 @@ public class ClientCredentialsHandler {
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenGenerator accessTokenGenerator;
     private final RefreshTokenGenerator refreshTokenGenerator;
+    private final DeletedMachineTokenGuard deletedMachineTokenGuard;
 
     public AgentTokenResponse handle(String clientId, String clientSecret) {
         OAuthClient client = clientRepository.findByClientId(clientId)
@@ -29,6 +30,7 @@ public class ClientCredentialsHandler {
                 });
 
         validateClientSecret(client, clientSecret);
+        deletedMachineTokenGuard.requireNotDeleted(client.getMachineId());
 
         String accessToken = accessTokenGenerator.generate(client, CLIENT_CREDENTIALS_GRANT_TYPE);
         String refreshToken = refreshTokenGenerator.generate(client.getClientId());

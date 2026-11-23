@@ -40,6 +40,7 @@ public class DownloadConfigurationMapper {
         natsDownloadConfig.setInstallationType(mapInstallationType(downloadConfiguration.getInstallationType()));
         natsDownloadConfig.setBundleId(downloadConfiguration.getBundleId());
         natsDownloadConfig.setServiceName(downloadConfiguration.getServiceName());
+        natsDownloadConfig.setMinOsVersion(downloadConfiguration.getMinOsVersion());
 
         return natsDownloadConfig;
     }

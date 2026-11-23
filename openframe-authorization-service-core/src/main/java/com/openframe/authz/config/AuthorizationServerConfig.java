@@ -17,6 +17,7 @@ import com.openframe.authz.service.sso.apple.AppleAuthorizationCodeClient;
 import com.openframe.authz.service.sso.apple.AppleTokenService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
+import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
@@ -62,6 +63,8 @@ import java.util.Locale;
 import java.util.Objects;
 
 import com.openframe.authz.util.AuthUserPrincipals;
+import com.openframe.authz.security.ThrottlingAuthenticationManager;
+import com.openframe.authz.service.ratelimit.LoginAttemptLimiter;
 
 import static com.openframe.authz.config.tenant.TenantContext.getTenantId;
 
@@ -215,11 +218,13 @@ public class AuthorizationServerConfig {
      * UserDetailsService for Spring Security authentication
      */
     @Bean
-    public UserDetailsService userDetailsService(UserService userService, TenantService tenantService) {
+    public UserDetailsService userDetailsService(UserService userService, TenantService tenantService,
+                                                 SSOConfigService ssoConfigService) {
         return username -> {
             String tenantId = getTenantId();
-            // Before the user lookup, so the refusal is the same for every email and reveals no account.
+            // Both before the user lookup, so the refusal is the same for every email and reveals no account.
             tenantService.refuseLoginUnlessActive(tenantId);
+            ssoConfigService.refuseUnlessOpenframeLoginEnabled(tenantId);
             AuthUser user = userService.findActiveByEmailAndTenant(username.toLowerCase(Locale.ROOT), tenantId)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
@@ -242,12 +247,20 @@ public class AuthorizationServerConfig {
     }
 
     /**
-     * AuthenticationManager for programmatic authentication (e.g., in RegistrationController).
+     * AuthenticationManager for form login and programmatic authentication, behind the failed-login limits.
      * Uses our UserDetailsService and PasswordEncoder.
      */
     @Bean
     public AuthenticationManager authenticationManager(UserDetailsService userDetailsService,
-                                                       PasswordEncoder passwordEncoder) {
+                                                       PasswordEncoder passwordEncoder,
+                                                       LoginAttemptLimiter loginAttemptLimiter) {
+        return new ThrottlingAuthenticationManager(passwordAuthenticationManager(userDetailsService, passwordEncoder),
+                loginAttemptLimiter, passwordEncoder);
+    }
+
+    /** Not a bean: the plain manager without the failure limits, which the bean above wraps. */
+    AuthenticationManager passwordAuthenticationManager(UserDetailsService userDetailsService,
+                                                        PasswordEncoder passwordEncoder) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return new ProviderManager(provider);

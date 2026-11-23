@@ -23,4 +23,10 @@ public interface ReactiveUserRepository extends ReactiveMongoRepository<User, St
      * shared/SaaS side bypasses the tenant aspect and must scope by tenant explicitly.
      */
     Mono<Boolean> existsByTenantIdAndId(String tenantId, String id);
+
+    /**
+     * The user with the given id in the given tenant. Tenant-first for the same reason as
+     * {@link #existsByTenantIdAndId}.
+     */
+    Mono<User> findByTenantIdAndId(String tenantId, String id);
 } 
