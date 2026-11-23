@@ -91,7 +91,8 @@ public class PackageManagerAvailability {
     public static boolean isSupportedOn(Machine machine, PackageManagerType manager) {
         Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
         return reported == null
-                || (reported.get(manager) != PackageManagerState.UNSUPPORTED && !isBlockedChoco(machine, manager));
+                || (reported.get(manager) != PackageManagerState.UNSUPPORTED
+                && !isBlockedChoco(machine, manager) && !isUnreportedChoco(reported, manager));
     }
 
     // in the order of machineIds; a machine that is not found is left out
@@ -156,6 +157,11 @@ public class PackageManagerAvailability {
         return manager == PackageManagerType.CHOCO
                 && reported != null && reported.get(manager) == PackageManagerState.PRESENT
                 && !hasManagedChocolatey(machine);
+    }
+
+    private static boolean isUnreportedChoco(Map<PackageManagerType, PackageManagerState> reported,
+                                             PackageManagerType manager) {
+        return manager == PackageManagerType.CHOCO && !reported.isEmpty() && reported.get(manager) == null;
     }
 
     private List<Machine> machines(Collection<String> machineIds) {

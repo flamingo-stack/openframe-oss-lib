@@ -59,11 +59,11 @@ public class MachinePackageManagersService {
             machineWriter.update(machineId, machineUpdate().set(PACKAGE_MANAGERS, states));
             log.info("Updated package managers for machineId={}: {}", machineId, states);
         }
-        states.forEach((manager, state) -> bootstrapIfMissing(machineId, manager, state));
-        report.getDependencies().forEach(dependency -> bootstrapIfMissing(machineId, dependency));
-
         MachineChocolatey chocolatey = reportedChocolatey(states, report.getChocolatey());
         applyChocolatey(machineId, machine, chocolatey);
+
+        states.forEach((manager, state) -> bootstrapIfMissing(machineId, manager, state));
+        report.getDependencies().forEach(dependency -> bootstrapIfMissing(machineId, dependency));
     }
 
     private void bootstrapIfMissing(String machineId, PackageManagerType manager, PackageManagerState state) {
