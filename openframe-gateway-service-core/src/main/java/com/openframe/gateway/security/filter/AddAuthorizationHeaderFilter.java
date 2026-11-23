@@ -63,7 +63,6 @@ public class AddAuthorizationHeaderFilter implements WebFilter {
                         || path.equals(CLIENTS_PREFIX + "/api/agents/register")
                         || path.equals(CLIENTS_PREFIX + "/api/agents/reinstall")
                         || path.equals(CLIENTS_PREFIX + "/api/agents/uninstall")
-                        || path.equals(CLIENTS_PREFIX + "/api/agents/split")
                         || path.equals(CLIENTS_PREFIX + "/api/release-version")
                         || path.equals(CLIENTS_PREFIX + "/oauth/token")
         );

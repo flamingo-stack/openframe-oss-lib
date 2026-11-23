@@ -1,4 +1,4 @@
-package com.openframe.client.service.identitysplit;
+package com.openframe.client.service.identityconflict;
 
 import org.junit.jupiter.api.Test;
 

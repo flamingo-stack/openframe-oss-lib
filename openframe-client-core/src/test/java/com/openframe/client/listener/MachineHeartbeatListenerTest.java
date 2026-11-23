@@ -2,7 +2,7 @@ package com.openframe.client.listener;
 
 import com.openframe.client.service.MachineStatusService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.client.service.identitysplit.MachineIdentityConflictService;
+import com.openframe.client.service.identityconflict.MachineIdentityConflictService;
 import io.nats.client.Connection;
 import io.nats.client.Message;
 import org.junit.jupiter.api.BeforeEach;

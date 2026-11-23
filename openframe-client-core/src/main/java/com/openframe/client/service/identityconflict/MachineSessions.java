@@ -1,4 +1,4 @@
-package com.openframe.client.service.identitysplit;
+package com.openframe.client.service.identityconflict;
 
 import java.time.Duration;
 import java.time.Instant;

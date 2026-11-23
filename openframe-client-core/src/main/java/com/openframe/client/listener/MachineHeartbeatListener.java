@@ -3,7 +3,7 @@ package com.openframe.client.listener;
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.MachineStatusService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.client.service.identitysplit.MachineIdentityConflictService;
+import com.openframe.client.service.identityconflict.MachineIdentityConflictService;
 import com.openframe.data.nats.model.MachineHeartbeatMessage;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;

@@ -638,40 +638,6 @@ class AgentRegistrationServiceTest {
         assertSame(failure, thrown);
     }
 
-    @Test
-    void registerSplit_RegistersANewMachineLikeTheSharedOneWithoutAnInitialKey() {
-        // setup
-        stubNewMachineRegistration();
-        Machine shared = new Machine();
-        shared.setMachineId("shared-machine");
-        shared.setHostname("shared-host");
-        shared.setOrganizationId("org-1");
-        shared.setUserId("user-1");
-        shared.setAgentVersion("1.6.2");
-        shared.setOsType(OsType.WINDOWS);
-        shared.setTimezone("Europe/Kyiv");
-
-        // execution
-        AgentRegistrationResponse response = agentRegistrationService.registerSplit(shared);
-
-        // verifications
-        assertThat(response.getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(response.getClientSecret()).isEqualTo(CLIENT_SECRET);
-        verifyNoInteractions(agentRegistrationSecretValidator);
-        verify(organizationIdResolver).resolve("org-1");
-        verify(machineRepository).save(machineCaptor.capture());
-        Machine saved = machineCaptor.getValue();
-        assertThat(saved.getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(saved.getHostname()).isEqualTo("shared-host");
-        assertThat(saved.getUserId()).isEqualTo("user-1");
-        assertThat(saved.getAgentVersion()).isEqualTo("1.6.2");
-        assertThat(saved.getOsType()).isEqualTo(OsType.WINDOWS);
-        assertThat(saved.getTimezone()).isEqualTo("Europe/Kyiv");
-        assertThat(saved.getStatus()).isEqualTo(DeviceStatus.PENDING);
-        verify(registrationTagAssignmentService).copyTags("shared-machine", MACHINE_ID);
-        verify(agentRegistrationToolInstallationService).process(MACHINE_ID);
-    }
-
     private void stubNewMachineRegistration() {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
