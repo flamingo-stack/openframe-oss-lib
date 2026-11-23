@@ -23,6 +23,11 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.UnsupportedTool;
+import com.openframe.data.service.ToolOsSupportService;
+import com.openframe.data.service.ToolOsSupportService.AgentWithToolType;
+import graphql.GraphQLContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +63,7 @@ class DeviceDataFetcherTest {
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     @Mock private NotificationRecipientResolver recipientResolver;
+    @Mock private ToolOsSupportService toolOsSupportService;
     @Mock private DgsDataFetchingEnvironment dfe;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
     @Spy private ClientVersionThreshold clientVersionThreshold = new ClientVersionThreshold("1.6.0");
@@ -136,6 +143,67 @@ class DeviceDataFetcherTest {
 
         // verifications
         assertThat(result).isEqualTo(expected);
+    }
+
+    @Test
+    void unsupportedTools_machineBelowMinimum_serviceListReturned() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        List<AgentWithToolType> agents = List.of(new AgentWithToolType(new IntegratedToolAgent(), ToolType.FLEET_MDM));
+        List<UnsupportedTool> unsupported = List.of(new UnsupportedTool("fleetmdm-agent", ToolType.FLEET_MDM, "13.0", "11.7.10"));
+        when(dfe.getSource()).thenReturn(machine);
+        when(dfe.getGraphQlContext()).thenReturn(GraphQLContext.newContext().build());
+        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.unsupportedTools(machine, agents)).thenReturn(unsupported);
+
+        // execution
+        List<UnsupportedTool> result = fetcher.unsupportedTools(dfe);
+
+        // verifications
+        assertThat(result).isSameAs(unsupported);
+    }
+
+    @Test
+    void unsupportedTools_severalMachinesInOneRequest_agentsLoadedOnce() {
+        // setup
+        Machine first = new Machine();
+        first.setMachineId("m1");
+        Machine second = new Machine();
+        second.setMachineId("m2");
+        List<AgentWithToolType> agents = List.of(new AgentWithToolType(new IntegratedToolAgent(), ToolType.FLEET_MDM));
+        when(dfe.getSource()).thenReturn(first, second);
+        when(dfe.getGraphQlContext()).thenReturn(GraphQLContext.newContext().build());
+        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.unsupportedTools(first, agents)).thenReturn(List.of());
+        when(toolOsSupportService.unsupportedTools(second, agents)).thenReturn(List.of());
+
+        // execution
+        fetcher.unsupportedTools(dfe);
+        fetcher.unsupportedTools(dfe);
+
+        // verifications
+        verify(toolOsSupportService).agentsWithMinOsVersion();
+        verify(toolOsSupportService).unsupportedTools(second, agents);
+    }
+
+    @Test
+    void unsupportedTools_separateRequests_agentsLoadedPerRequest() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        List<AgentWithToolType> agents = List.of();
+        when(dfe.getSource()).thenReturn(machine);
+        when(dfe.getGraphQlContext()).thenReturn(GraphQLContext.newContext().build(), GraphQLContext.newContext().build());
+        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.unsupportedTools(machine, agents)).thenReturn(List.of());
+
+        // execution
+        fetcher.unsupportedTools(dfe);
+        fetcher.unsupportedTools(dfe);
+
+        // verifications
+        verify(toolOsSupportService, times(2)).agentsWithMinOsVersion();
     }
 
     private static Stream<Arguments> clientOutdatedCases() {
