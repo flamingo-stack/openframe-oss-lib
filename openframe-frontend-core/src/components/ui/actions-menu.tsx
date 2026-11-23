@@ -396,7 +396,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick, depth = 0, subme
     item.disabled
       ? cn('pointer-events-none cursor-not-allowed text-ods-text-secondary', !mobileDrillDown && 'opacity-60')
       : skin.rowIdle,
-    mobileDrillDown && 'min-h-0',
+    mobileDrillDown && 'min-h-0 pr-[var(--spacing-system-xsf)]',
     customContent && 'gap-[var(--spacing-system-sf)] py-[var(--spacing-system-xxs)]',
   );
 
@@ -1104,7 +1104,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
                     type="button"
                     role="menuitem"
                     aria-label={`Back to providers from ${page.label}`}
-                    className="min-h-12 gap-[var(--spacing-system-xs)] rounded-none bg-ods-bg-base px-[var(--spacing-system-xsf)] text-ods-text-panel-secondary"
+                    className="min-h-12 gap-[var(--spacing-system-xsf)] rounded-none bg-ods-bg-base px-[var(--spacing-system-xsf)] text-ods-text-panel-secondary"
                     onClick={back}
                   >
                     <Chevron02LeftIcon aria-hidden size={24} />
