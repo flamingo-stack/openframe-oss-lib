@@ -402,6 +402,9 @@
    * `--color-bg-overlay` is the dimmed BACKDROP behind a dialog, not this. */
   --color-bg-menu: var(--ods-backgrounds-overlay);
   --color-bg-menu-hover: var(--ods-backgrounds-overlay-hover);
+  /* A control on the deepest ground, hovered and pressed (backgrounds/openframe-background hover / action). */
+  --color-bg-base-hover: var(--ods-backgrounds-openframe-background-hover);
+  --color-bg-base-active: var(--ods-backgrounds-openframe-background-action);
   --color-text-panel-secondary: var(--ods-shell-system-greys-grey);
   --color-accent-tint: var(--ods-shell-open-yellow-sec);
   --color-accent-tint-hover: var(--ods-shell-open-yellow-sec-hover);
