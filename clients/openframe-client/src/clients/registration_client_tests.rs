@@ -62,6 +62,7 @@ fn current_machine() -> PersistedMachineInfo {
         machine_id: "m-1".into(),
         client_secret: "secret-1".into(),
         user_id: None,
+        local_machine_id: None,
     }
 }
 

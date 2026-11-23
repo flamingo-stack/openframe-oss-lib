@@ -5,10 +5,51 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
+use crate::platform::machine_info_persistence;
 use crate::platform::DirectoryManager;
 use crate::utils::fs::atomic_write;
 
 pub const MACHINE_ID_HEADER: &str = "x-machine-id";
+
+pub(crate) trait SavedMachineId: Send + Sync {
+    fn read(&self) -> Option<String>;
+    fn save(&self, id: &str);
+}
+
+struct PersistedMachineInfoStore;
+
+impl SavedMachineId for PersistedMachineInfoStore {
+    fn read(&self) -> Option<String> {
+        match machine_info_persistence::read() {
+            Ok(info) => info.and_then(|info| info.local_machine_id),
+            Err(e) => {
+                debug!("Cannot read the saved machine ID: {:#}", e);
+                None
+            }
+        }
+    }
+
+    fn save(&self, id: &str) {
+        let mut info = match machine_info_persistence::read() {
+            Ok(Some(info)) => info,
+            Ok(None) => return,
+            Err(e) => {
+                debug!("Cannot read machine info to save the machine ID: {:#}", e);
+                return;
+            }
+        };
+        if info.local_machine_id.as_deref() == Some(id) {
+            return;
+        }
+        info.local_machine_id = Some(id.to_string());
+        if let Err(e) = machine_info_persistence::write(&info) {
+            warn!(
+                "Failed to save the machine ID with the machine info: {:#}",
+                e
+            );
+        }
+    }
+}
 
 // Locally generated machine identity, distinct from the server-assigned machine_id in agent config.
 // Persisted in the shared app-support dir so integrated tool agents (mesh, fleet) can read it.
@@ -16,13 +57,22 @@ pub const MACHINE_ID_HEADER: &str = "x-machine-id";
 pub struct MachineIdService {
     file_path: PathBuf,
     cached_id: Arc<std::sync::RwLock<Option<String>>>,
+    saved: Arc<dyn SavedMachineId>,
 }
 
 impl MachineIdService {
     pub fn new(directory_manager: &DirectoryManager) -> Self {
+        Self::with_saved(directory_manager, Arc::new(PersistedMachineInfoStore))
+    }
+
+    pub(crate) fn with_saved(
+        directory_manager: &DirectoryManager,
+        saved: Arc<dyn SavedMachineId>,
+    ) -> Self {
         Self {
             file_path: directory_manager.app_support_dir().join("machine_id"),
             cached_id: Arc::new(std::sync::RwLock::new(None)),
+            saved,
         }
     }
 
@@ -31,21 +81,19 @@ impl MachineIdService {
             return Ok(id);
         }
 
-        match self.read() {
+        let id = match self.read() {
             Ok(id) => {
                 debug!("Using existing machine ID: {}", id);
-                *self.cached_id.write().unwrap() = Some(id.clone());
-                return Ok(id);
+                id
             }
-            Err(e) if self.file_path.exists() => {
-                warn!("{:#}; generating a new machine ID", e);
+            Err(e) => {
+                if self.file_path.exists() {
+                    warn!("{:#}; restoring or generating a machine ID", e);
+                }
+                self.restore_or_generate()?
             }
-            Err(_) => {}
-        }
-
-        let id = Uuid::new_v4().to_string();
-        self.write(&id)?;
-        info!("Generated new machine ID: {}", id);
+        };
+        self.saved.save(&id);
         *self.cached_id.write().unwrap() = Some(id.clone());
         Ok(id)
     }
@@ -54,7 +102,20 @@ impl MachineIdService {
         let id = Uuid::new_v4().to_string();
         self.write(&id)?;
         info!("Generated new machine ID: {}", id);
+        self.saved.save(&id);
         *self.cached_id.write().unwrap() = Some(id.clone());
+        Ok(id)
+    }
+
+    fn restore_or_generate(&self) -> Result<String> {
+        if let Some(id) = self.saved.read().filter(|id| Uuid::parse_str(id).is_ok()) {
+            self.write(&id)?;
+            info!("Restored machine ID saved with the machine info: {}", id);
+            return Ok(id);
+        }
+        let id = Uuid::new_v4().to_string();
+        self.write(&id)?;
+        info!("Generated new machine ID: {}", id);
         Ok(id)
     }
 
