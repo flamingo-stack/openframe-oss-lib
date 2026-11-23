@@ -42,7 +42,10 @@ import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.document.toolagent.UnsupportedTool;
 import com.openframe.data.document.notification.NotificationEntityType;
+import com.openframe.data.service.ToolOsSupportService;
+import com.openframe.data.service.ToolOsSupportService.AgentWithToolType;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.validation.Valid;
@@ -66,6 +69,8 @@ import static com.openframe.graphql.relay.NodeType.MACHINE;
 @RequiredArgsConstructor
 public class DeviceDataFetcher {
 
+    private static final String AGENTS_WITH_MIN_OS_VERSION = DeviceDataFetcher.class.getName() + ".agentsWithMinOsVersion";
+
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
     private final TagService tagService;
@@ -75,6 +80,7 @@ public class DeviceDataFetcher {
     private final RelayIdCodec relayIdCodec;
     private final NotificationRecipientResolver recipientResolver;
     private final ClientVersionThreshold clientVersionThreshold;
+    private final ToolOsSupportService toolOsSupportService;
 
     @DgsQuery
     public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument @Valid DeviceFilterInput filter,
@@ -232,6 +238,14 @@ public class DeviceDataFetcher {
     public boolean softwareManagementSupported(DgsDataFetchingEnvironment dfe) {
         Machine machine = dfe.getSource();
         return packageManagerAvailability.isSoftwareManageable(machine);
+    }
+
+    @DgsData(parentType = "Machine")
+    public List<UnsupportedTool> unsupportedTools(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        List<AgentWithToolType> agents = dfe.getGraphQlContext()
+                .computeIfAbsent(AGENTS_WITH_MIN_OS_VERSION, key -> toolOsSupportService.agentsWithMinOsVersion());
+        return toolOsSupportService.unsupportedTools(machine, agents);
     }
 
     @DgsData(parentType = "Machine")

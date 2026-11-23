@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.gateway.config.ws.ToolWebSocketProxyUrlFilter.ORIGINAL_AUTHORIZATION_ATTR;
@@ -20,6 +22,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 public class RequestJwtClaimsReader {
 
     private static final String MACHINE_ID_CLAIM = "machine_id";
+    private static final String USER_ID_CLAIM = "userId";
+    private static final String ROLES_CLAIM = "roles";
 
     public Instant getExpiration(ServerWebExchange exchange) {
         Claims jwtClaims = getClaims(exchange);
@@ -40,6 +44,36 @@ public class RequestJwtClaimsReader {
         Claims claims = getClaims(exchange);
         Object machineId = claims.get(MACHINE_ID_CLAIM);
         return machineId == null ? Optional.empty() : Optional.of(String.valueOf(machineId));
+    }
+
+    /** The {@code userId} claim of a user token, or its {@code sub} when the claim is absent. */
+    public String getUserId(ServerWebExchange exchange) {
+        Claims claims = getClaims(exchange);
+        Object userId = claims.get(USER_ID_CLAIM);
+        if (userId != null) {
+            return String.valueOf(userId);
+        }
+        return requireSubject(claims);
+    }
+
+    /** The {@code roles} claim as strings; empty when the token has none. */
+    public List<String> getRoles(ServerWebExchange exchange) {
+        Claims claims = getClaims(exchange);
+        Object roles = claims.get(ROLES_CLAIM);
+        if (!(roles instanceof Collection<?> values)) {
+            return List.of();
+        }
+        return values.stream()
+                .map(String::valueOf)
+                .toList();
+    }
+
+    private static String requireSubject(Claims claims) {
+        String subject = claims.getSubject();
+        if (isBlank(subject)) {
+            throw new IllegalStateException("Token carries neither a userId nor a sub claim");
+        }
+        return subject;
     }
 
     private Claims getClaims(ServerWebExchange exchange) {
