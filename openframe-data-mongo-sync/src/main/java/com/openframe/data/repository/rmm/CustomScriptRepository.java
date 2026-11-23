@@ -2,6 +2,8 @@ package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -46,9 +48,11 @@ public interface CustomScriptRepository {
                                    String search,
                                    String sortField,
                                    Sort.Direction sortDirection,
-                                   String cursor,
+                                   CursorPosition position,
                                    boolean backward,
                                    int limit);
+
+    KeysetCursor keysetCursor(Script script, String sortField, Sort.Direction sortDirection);
 
     /**
      * Count all scripts matching the tenant + filter + search, ignoring

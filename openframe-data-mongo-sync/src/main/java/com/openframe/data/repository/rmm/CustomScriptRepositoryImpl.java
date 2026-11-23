@@ -6,6 +6,8 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
@@ -77,9 +79,10 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
                                           String search,
                                           String sortField,
                                           Sort.Direction sortDirection,
-                                          String cursor,
+                                          CursorPosition position,
                                           boolean backward,
                                           int limit) {
+        String cursor = position instanceof CursorPosition.RowId rowId ? rowId.id() : null;
         Criteria criteria = buildBaseCriteria(tenantId, filter, search);
         applyCursor(criteria, cursor, backward, sortDirection);
 
@@ -89,6 +92,11 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
                 .limit(limit);
 
         return mongoTemplate.find(query, Script.class);
+    }
+
+    @Override
+    public KeysetCursor keysetCursor(Script script, String sortField, Sort.Direction sortDirection) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

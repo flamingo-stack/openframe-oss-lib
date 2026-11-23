@@ -49,6 +49,10 @@ class OrganizationDataFetcherDgsTest {
             { organizations(filter: { status: "%s" }) { edges { node { organizationId } } filteredCount } }
             """;
 
+    private static final String ORGANIZATIONS_AT_CURSOR = """
+            { organizations(%s: "%%%%not-base64%%%%") { edges { node { organizationId } } } }
+            """;
+
     @Autowired
     private DgsQueryExecutor queryExecutor;
 
@@ -93,6 +97,28 @@ class OrganizationDataFetcherDgsTest {
                 .containsEntry("code", "VALIDATION_ERROR")
                 .containsEntry("httpStatus", 400);
         assertThat(refusal.getMessage()).contains("status must be ACTIVE or ARCHIVED");
+        assertThat(result.<Object>getData()).isNull();
+        verifyNoInteractions(organizationQueryService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"after", "before"})
+    void organizations_cursorThatIsNotBase64_refusedAsInvalidCursorWithoutEdges(String cursorArgument) {
+        // setup
+        String query = ORGANIZATIONS_AT_CURSOR.formatted(cursorArgument);
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(query);
+
+        // verifications
+        assertThat(result.getErrors())
+                .extracting(GraphQLError::getMessage)
+                .containsExactly("Invalid cursor");
+        assertThat(result.getErrors())
+                .extracting(GraphQLError::getExtensions)
+                .allSatisfy(extensions -> assertThat(extensions)
+                        .containsEntry("code", "INVALID_CURSOR")
+                        .containsEntry("httpStatus", 400));
         assertThat(result.<Object>getData()).isNull();
         verifyNoInteractions(organizationQueryService);
     }

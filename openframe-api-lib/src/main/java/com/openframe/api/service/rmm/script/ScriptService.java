@@ -23,6 +23,7 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -132,9 +133,11 @@ public class ScriptService {
         // lets the UI show the count up front while items load page by page.
         long filteredCount = scriptRepository.countForTenant(tenantId, queryFilter, search);
 
+        CursorPosition position = normalized.hasCursor()
+                ? new CursorPosition.RowId(normalized.getCursor()) : new CursorPosition.None();
         List<Script> page = scriptRepository.findPageForTenant(
                 tenantId, queryFilter, search, sortField, sortDirection,
-                normalized.getCursor(), normalized.isBackward(), limit + 1);
+                position, normalized.isBackward(), limit + 1);
 
         boolean hasMore = page.size() > limit;
         List<Script> items = hasMore ? page.subList(0, limit) : page;

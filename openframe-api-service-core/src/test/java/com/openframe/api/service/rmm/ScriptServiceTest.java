@@ -8,7 +8,10 @@ import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
@@ -20,6 +23,7 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.ForbiddenException;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -28,27 +32,44 @@ import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
+import com.openframe.data.repository.cursor.CursorBase64;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
+import com.openframe.data.repository.rmm.CustomScriptRepository;
+import com.openframe.data.repository.rmm.CustomScriptRepositoryImpl;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -59,6 +80,22 @@ class ScriptServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String SCRIPT_ID = "65f4a8000000000000000001";
+    private static final String ROW_1 = "65f4a8000000000000000010";
+    private static final String ROW_2 = "65f4a8000000000000000020";
+    private static final String ROW_3 = "65f4a8000000000000000030";
+    private static final String ROW_4 = "65f4a8000000000000000040";
+    private static final String ROW_5 = "65f4a8000000000000000050";
+    private static final String GONE_ROW = "65f4a8000000000000000035";
+    private static final String ID = "_id";
+    private static final String NAME = "name";
+    private static final String CREATED_AT = "createdAt";
+    private static final String UPDATED_AT = "updatedAt";
+    private static final String KEYSET_PREFIX = "k1|";
+    private static final String INVALID_CURSOR = "Invalid cursor";
+    private static final Instant EARLY = Instant.ofEpochMilli(1_700_000_000_000L);
+    private static final Instant MIDDLE = EARLY.plusSeconds(60);
+    private static final Instant LATE = EARLY.plusSeconds(120);
+    private static final CursorPosition NO_POSITION = new CursorPosition.None();
     /**
      * Mirror of the ScriptService constant — DELETED is intentionally OUT so
      * the mock asserts we ONLY collide against visible (ACTIVE/ARCHIVED) rows.
@@ -86,6 +123,8 @@ class ScriptServiceTest {
 
     @InjectMocks
     private ScriptService scriptService;
+
+    private final CustomScriptRepository cursorIssuer = new CustomScriptRepositoryImpl(mock(MongoTemplate.class));
 
     private CreateScriptInput createInput;
     private UpdateScriptInput updateInput;
@@ -343,6 +382,7 @@ class ScriptServiceTest {
     @DisplayName("list: forward pagination — fetches limit+1 rows, drops the extra, marks hasNextPage=true and hasPreviousPage=false on the first page")
     void list_forwardFirstPage_dropsSentinelAndReportsHasNext() {
         stubSortAllowlistDefault();
+        stubIdCursors();
         Script s1 = new Script();
         s1.setId("id-1");
         Script s2 = new Script();
@@ -353,7 +393,7 @@ class ScriptServiceTest {
                 .limit(2).cursor(null).backward(false).build();
 
         when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false), eq(3)))
+                eq("_id"), eq(Sort.Direction.DESC), eq(NO_POSITION), eq(false), eq(3)))
                 .thenReturn(List.of(s1, s2, s3));
         when(scriptMapper.toResponse(s1)).thenReturn(ScriptResponse.builder().id("id-1").build());
         when(scriptMapper.toResponse(s2)).thenReturn(ScriptResponse.builder().id("id-2").build());
@@ -372,13 +412,14 @@ class ScriptServiceTest {
     @DisplayName("list: forward pagination — last page (no sentinel returned) → hasNextPage=false, hasPreviousPage reflects the supplied cursor")
     void list_forwardLastPage_hasNoNext() {
         stubSortAllowlistDefault();
+        stubIdCursors();
         Script s1 = new Script();
         s1.setId("id-1");
         CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
-                .limit(10).cursor("decoded-cursor").backward(false).build();
+                .limit(10).cursor(SCRIPT_ID).backward(false).build();
 
         when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq("decoded-cursor"), eq(false), eq(11)))
+                eq("_id"), eq(Sort.Direction.DESC), eq(new CursorPosition.RowId(SCRIPT_ID)), eq(false), eq(11)))
                 .thenReturn(List.of(s1));
         when(scriptMapper.toResponse(s1)).thenReturn(ScriptResponse.builder().id("id-1").build());
 
@@ -393,6 +434,7 @@ class ScriptServiceTest {
     @DisplayName("list: backward pagination — items are reversed so the page is still displayed newest-first, and hasMore maps to hasPreviousPage")
     void list_backwardPagination_reversesItemsAndFlipsHasMore() {
         stubSortAllowlistDefault();
+        stubIdCursors();
         Script s1 = new Script();
         s1.setId("id-1");
         Script s2 = new Script();
@@ -400,10 +442,10 @@ class ScriptServiceTest {
         Script s3 = new Script();
         s3.setId("id-3");
         CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
-                .limit(2).cursor("decoded-cursor").backward(true).build();
+                .limit(2).cursor(SCRIPT_ID).backward(true).build();
 
         when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq("decoded-cursor"), eq(true), eq(3)))
+                eq("_id"), eq(Sort.Direction.DESC), eq(new CursorPosition.RowId(SCRIPT_ID)), eq(true), eq(3)))
                 .thenReturn(List.of(s1, s2, s3));
         when(scriptMapper.toResponse(any(Script.class)))
                 .thenAnswer(inv -> ScriptResponse.builder().id(((Script) inv.getArgument(0)).getId()).build());
@@ -423,7 +465,7 @@ class ScriptServiceTest {
         CursorPaginationCriteria criteria = CursorPaginationCriteria.builder()
                 .limit(20).cursor(null).backward(false).build();
         when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false), eq(21)))
+                eq("_id"), eq(Sort.Direction.DESC), eq(NO_POSITION), eq(false), eq(21)))
                 .thenReturn(List.of());
 
         GenericQueryResult<ScriptResponse> result = scriptService.list(null, null, null, criteria);
@@ -442,13 +484,13 @@ class ScriptServiceTest {
         CursorPaginationCriteria raw = CursorPaginationCriteria.builder()
                 .limit(null).cursor(null).backward(false).build();
         when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false),
+                eq("_id"), eq(Sort.Direction.DESC), eq(NO_POSITION), eq(false),
                 eq(CursorPaginationCriteria.DEFAULT_PAGE_SIZE + 1))).thenReturn(List.of());
 
         scriptService.list(null, null, null, raw);
 
         verify(scriptRepository).findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false),
+                eq("_id"), eq(Sort.Direction.DESC), eq(NO_POSITION), eq(false),
                 eq(CursorPaginationCriteria.DEFAULT_PAGE_SIZE + 1));
     }
 
@@ -467,7 +509,7 @@ class ScriptServiceTest {
                 .limit(20).cursor(null).backward(false).build();
 
         when(scriptRepository.findPageForTenant(eq(TENANT_ID), any(ScriptQueryFilter.class), eq("backup"),
-                eq("name"), eq(Sort.Direction.ASC), eq(null), eq(false), eq(21)))
+                eq("name"), eq(Sort.Direction.ASC), eq(NO_POSITION), eq(false), eq(21)))
                 .thenReturn(List.of());
 
         scriptService.list(filter, "backup", sort, criteria);
@@ -475,7 +517,7 @@ class ScriptServiceTest {
         org.mockito.ArgumentCaptor<ScriptQueryFilter> filterCaptor =
                 org.mockito.ArgumentCaptor.forClass(ScriptQueryFilter.class);
         verify(scriptRepository).findPageForTenant(eq(TENANT_ID), filterCaptor.capture(), eq("backup"),
-                eq("name"), eq(Sort.Direction.ASC), eq(null), eq(false), eq(21));
+                eq("name"), eq(Sort.Direction.ASC), eq(NO_POSITION), eq(false), eq(21));
         assertThat(filterCaptor.getValue().getTagIds()).containsExactly("tag-1");
         assertThat(filterCaptor.getValue().getCreatedByIds()).containsExactly("user-7");
 
@@ -492,7 +534,7 @@ class ScriptServiceTest {
 
         when(scriptRepository.countForTenant(TENANT_ID, null, null)).thenReturn(146L);
         when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false), eq(21)))
+                eq("_id"), eq(Sort.Direction.DESC), eq(NO_POSITION), eq(false), eq(21)))
                 .thenReturn(List.of());
 
         CountedGenericQueryResult<ScriptResponse> result = scriptService.list(null, null, null, criteria);
@@ -513,13 +555,171 @@ class ScriptServiceTest {
                 .limit(10).cursor(null).backward(false).build();
 
         when(scriptRepository.findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false), eq(11)))
+                eq("_id"), eq(Sort.Direction.DESC), eq(NO_POSITION), eq(false), eq(11)))
                 .thenReturn(List.of());
 
         scriptService.list(null, null, sort, criteria);
 
         verify(scriptRepository).findPageForTenant(eq(TENANT_ID), eq(null), eq(null),
-                eq("_id"), eq(Sort.Direction.DESC), eq(null), eq(false), eq(11));
+                eq("_id"), eq(Sort.Direction.DESC), eq(NO_POSITION), eq(false), eq(11));
+    }
+
+    @ParameterizedTest
+    @MethodSource("sortsOverRowsWithEqualValues")
+    void list_pageOneThenPageTwoThenBeforePageTwo_returnsPageOneAgain(
+            SortInput sort, List<String> pageOneRows, List<String> pageTwoRows) {
+        // setup
+        stubScriptPages(sort);
+
+        // execution
+        CountedGenericQueryResult<ScriptResponse> pageOne = scriptService.list(null, null, sort, forward(2, null));
+        CountedGenericQueryResult<ScriptResponse> pageTwo =
+                scriptService.list(null, null, sort, forward(2, pageOne.getPageInfo().getEndCursor()));
+        CountedGenericQueryResult<ScriptResponse> backToPageOne =
+                scriptService.list(null, null, sort, backward(2, pageTwo.getPageInfo().getStartCursor()));
+
+        // verifications
+        assertThat(pageOne.getItems()).extracting(ScriptResponse::getId).containsExactlyElementsOf(pageOneRows);
+        assertThat(pageTwo.getItems()).extracting(ScriptResponse::getId).containsExactlyElementsOf(pageTwoRows);
+        assertThat(backToPageOne.getItems()).extracting(ScriptResponse::getId).containsExactlyElementsOf(pageOneRows);
+        assertThat(backToPageOne.getPageInfo())
+                .returns(pageOne.getPageInfo().getStartCursor(), PageInfo::getStartCursor)
+                .returns(pageOne.getPageInfo().getEndCursor(), PageInfo::getEndCursor);
+    }
+
+    @ParameterizedTest
+    @MethodSource("pagesOfFiveRows")
+    void list_eachPageInEachDirection_rowsInDisplayOrderWithBothFlags(
+            boolean backward, int anchorRow, List<String> expectedRows, boolean hasPreviousPage, boolean hasNextPage) {
+        // setup
+        SortInput sort = SortInput.builder().field(NAME).direction(SortDirection.ASC).build();
+        stubScriptPages(sort);
+        String cursor = nameCursorOfRow(anchorRow);
+        CursorPaginationCriteria pagination = connectionPage(backward, 2, cursor);
+
+        // execution
+        CountedGenericQueryResult<ScriptResponse> result = scriptService.list(null, null, sort, pagination);
+
+        // verifications
+        assertThat(result.getItems()).extracting(ScriptResponse::getId).containsExactlyElementsOf(expectedRows);
+        assertThat(result.getPageInfo())
+                .returns(hasPreviousPage, PageInfo::isHasPreviousPage)
+                .returns(hasNextPage, PageInfo::isHasNextPage);
+    }
+
+    @Test
+    void list_lastWithoutBefore_lastRowsInDisplayOrderAndNoNextPage() {
+        // setup
+        SortInput sort = SortInput.builder().field(NAME).direction(SortDirection.ASC).build();
+        stubScriptPages(sort);
+
+        // execution
+        CountedGenericQueryResult<ScriptResponse> result = scriptService.list(null, null, sort, backward(2, null));
+
+        // verifications
+        assertThat(result.getItems()).extracting(ScriptResponse::getId).containsExactly(ROW_4, ROW_5);
+        assertThat(result.getPageInfo())
+                .returns(false, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+        verify(scriptRepository).findPageForTenant(eq(TENANT_ID), isNull(), isNull(),
+                eq(NAME), eq(Sort.Direction.ASC), eq(NO_POSITION), eq(true), eq(3));
+    }
+
+    @ParameterizedTest
+    @MethodSource("keysetsOfTheFirstTwoRows")
+    void list_pageInfoCursors_keysetCursorsOfTheFirstAndLastShownRows(
+            SortInput sort, KeysetCursor expectedStart, KeysetCursor expectedEnd) {
+        // setup
+        stubScriptPages(sort);
+
+        // execution
+        PageInfo pageInfo = scriptService.list(null, null, sort, forward(2, null)).getPageInfo();
+
+        // verifications
+        assertThat(KeysetCursor.parse(pageInfo.getStartCursor())).isEqualTo(expectedStart);
+        assertThat(KeysetCursor.parse(pageInfo.getEndCursor())).isEqualTo(expectedEnd);
+        assertThat(CursorBase64.decode(pageInfo.getStartCursor())).startsWith(KEYSET_PREFIX);
+        assertThat(CursorBase64.decode(pageInfo.getEndCursor())).startsWith(KEYSET_PREFIX);
+    }
+
+    @Test
+    void list_plainRowIdWhoseRowIsGoneUnderTheDefaultSort_pagesOnFromThatPosition() {
+        // setup
+        stubScriptPages(null);
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(2).cursor(GONE_ROW).build();
+
+        // execution
+        CountedGenericQueryResult<ScriptResponse> result = scriptService.list(null, null, null, pagination);
+
+        // verifications
+        assertThat(result.getItems()).extracting(ScriptResponse::getId).containsExactly(ROW_3, ROW_2);
+        assertThat(result.getPageInfo())
+                .returns(true, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+        verify(scriptRepository).findPageForTenant(eq(TENANT_ID), isNull(), isNull(),
+                eq(ID), eq(Sort.Direction.DESC), eq(new CursorPosition.RowId(GONE_ROW)), eq(false), eq(3));
+    }
+
+    @Test
+    void list_base64RowIdOfAnOlderPageCursor_stillPagesPastThatRow() {
+        // setup
+        stubScriptPages(null);
+        CursorPaginationCriteria pagination = forward(2, CursorCodec.encode(ROW_4));
+
+        // execution
+        CountedGenericQueryResult<ScriptResponse> result = scriptService.list(null, null, null, pagination);
+
+        // verifications
+        assertThat(result.getItems()).extracting(ScriptResponse::getId).containsExactly(ROW_3, ROW_2);
+        verify(scriptRepository).findPageForTenant(eq(TENANT_ID), isNull(), isNull(),
+                eq(ID), eq(Sort.Direction.DESC), eq(new CursorPosition.RowId(ROW_4)), eq(false), eq(3));
+    }
+
+    @Test
+    void list_decodedKeysetCursorBackward_repositoryGetsTheKeysetPositionAndTheDirection() {
+        // setup
+        SortInput sort = SortInput.builder().field(NAME).direction(SortDirection.ASC).build();
+        when(scriptRepository.isSortableField(NAME)).thenReturn(true);
+        KeysetCursor cursor = KeysetCursor.ofString(NAME, Sort.Direction.ASC, "beta", ROW_3);
+        CursorPaginationCriteria pagination = backward(2, cursor.encode());
+
+        // execution
+        scriptService.list(null, null, sort, pagination);
+
+        // verifications
+        verify(scriptRepository).findPageForTenant(eq(TENANT_ID), isNull(), isNull(),
+                eq(NAME), eq(Sort.Direction.ASC), eq(cursor), eq(true), eq(3));
+    }
+
+    @Test
+    void list_cursorInAnotherFormat_leftToTheRepositoryToReject() {
+        // setup
+        stubSortAllowlistDefault();
+        CursorPosition unrecognised = new CursorPosition.Unrecognised("not-a-script-cursor");
+        when(scriptRepository.findPageForTenant(eq(TENANT_ID), isNull(), isNull(),
+                eq(ID), eq(Sort.Direction.DESC), eq(unrecognised), eq(false), eq(3)))
+                .thenThrow(new InvalidCursorException());
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(2).cursor("not-a-script-cursor").build();
+
+        // execution
+        Throwable thrown = catchThrowable(() -> scriptService.list(null, null, null, pagination));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
+    }
+
+    @Test
+    void list_malformedKeysetPayload_throwsInvalidCursorBeforeAnyPageIsRead() {
+        // setup
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(2).cursor("k1|name|ASC").build();
+
+        // execution
+        Throwable thrown = catchThrowable(() -> scriptService.list(null, null, null, pagination));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
+        verify(scriptRepository, never()).findPageForTenant(any(), any(), any(), any(), any(),
+                any(CursorPosition.class), anyBoolean(), anyInt());
     }
 
     @Test
@@ -858,5 +1058,155 @@ class ScriptServiceTest {
                 .hasMessageContaining("Managed scripts");
 
         verify(scriptRepository, never()).save(any());
+    }
+
+    private static Stream<Arguments> sortsOverRowsWithEqualValues() {
+        return Stream.of(
+                arguments(null, List.of(ROW_5, ROW_4), List.of(ROW_3, ROW_2)),
+                arguments(sortBy(ID, SortDirection.ASC), List.of(ROW_1, ROW_2), List.of(ROW_3, ROW_4)),
+                arguments(sortBy(NAME, SortDirection.ASC), List.of(ROW_1, ROW_2), List.of(ROW_3, ROW_4)),
+                arguments(sortBy(NAME, SortDirection.DESC), List.of(ROW_5, ROW_4), List.of(ROW_3, ROW_2)),
+                arguments(sortBy(CREATED_AT, SortDirection.ASC), List.of(ROW_1, ROW_2), List.of(ROW_3, ROW_4)),
+                arguments(sortBy(CREATED_AT, SortDirection.DESC), List.of(ROW_5, ROW_4), List.of(ROW_3, ROW_2)),
+                arguments(sortBy(UPDATED_AT, SortDirection.ASC), List.of(ROW_5, ROW_2), List.of(ROW_3, ROW_4)),
+                arguments(sortBy(UPDATED_AT, SortDirection.DESC), List.of(ROW_1, ROW_4), List.of(ROW_3, ROW_2)));
+    }
+
+    private static Stream<Arguments> pagesOfFiveRows() {
+        return Stream.of(
+                arguments(false, 0, List.of(ROW_1, ROW_2), false, true),
+                arguments(false, 2, List.of(ROW_3, ROW_4), true, true),
+                arguments(false, 4, List.of(ROW_5), true, false),
+                arguments(false, 5, List.of(), true, false),
+                arguments(true, 0, List.of(ROW_4, ROW_5), true, false),
+                arguments(true, 4, List.of(ROW_2, ROW_3), true, true),
+                arguments(true, 3, List.of(ROW_1, ROW_2), false, true),
+                arguments(true, 2, List.of(ROW_1), false, true),
+                arguments(true, 1, List.of(), false, true));
+    }
+
+    private static Stream<Arguments> keysetsOfTheFirstTwoRows() {
+        return Stream.of(
+                arguments(null,
+                        new KeysetCursor(ID, Sort.Direction.DESC, "", ROW_5),
+                        new KeysetCursor(ID, Sort.Direction.DESC, "", ROW_4)),
+                arguments(sortBy(NAME, SortDirection.ASC),
+                        KeysetCursor.ofString(NAME, Sort.Direction.ASC, "alpha", ROW_1),
+                        KeysetCursor.ofString(NAME, Sort.Direction.ASC, "beta", ROW_2)),
+                arguments(sortBy(CREATED_AT, SortDirection.DESC),
+                        KeysetCursor.ofInstant(CREATED_AT, Sort.Direction.DESC, LATE, ROW_5),
+                        KeysetCursor.ofInstant(CREATED_AT, Sort.Direction.DESC, MIDDLE, ROW_4)),
+                arguments(sortBy(UPDATED_AT, SortDirection.ASC),
+                        KeysetCursor.ofInstant(UPDATED_AT, Sort.Direction.ASC, EARLY, ROW_5),
+                        KeysetCursor.ofInstant(UPDATED_AT, Sort.Direction.ASC, MIDDLE, ROW_2)));
+    }
+
+    private static SortInput sortBy(String field, SortDirection direction) {
+        return SortInput.builder().field(field).direction(direction).build();
+    }
+
+    private static CursorPaginationCriteria forward(int first, String after) {
+        ConnectionArgs args = ConnectionArgs.builder().first(first).after(after).build();
+        return CursorPaginationCriteria.fromConnectionArgs(args);
+    }
+
+    private static CursorPaginationCriteria backward(int last, String before) {
+        ConnectionArgs args = ConnectionArgs.builder().last(last).before(before).build();
+        return CursorPaginationCriteria.fromConnectionArgs(args);
+    }
+
+    private static CursorPaginationCriteria connectionPage(boolean backward, int limit, String cursor) {
+        return backward ? backward(limit, cursor) : forward(limit, cursor);
+    }
+
+    private static List<Script> scripts() {
+        return List.of(
+                script(ROW_1, "alpha", EARLY, LATE),
+                script(ROW_2, "beta", MIDDLE, MIDDLE),
+                script(ROW_3, "beta", MIDDLE, MIDDLE),
+                script(ROW_4, "beta", MIDDLE, MIDDLE),
+                script(ROW_5, "gamma", LATE, EARLY));
+    }
+
+    private static Script script(String id, String name, Instant createdAt, Instant updatedAt) {
+        return Script.builder().id(id).name(name).createdAt(createdAt).updatedAt(updatedAt).build();
+    }
+
+    private static ScriptResponse response(Script script) {
+        return ScriptResponse.builder().id(script.getId()).name(script.getName()).build();
+    }
+
+    private static List<Script> rowsPast(String sortField, Sort.Direction direction, CursorPosition position,
+                                         boolean backward, int limit) {
+        Comparator<Script> displayOrder = displayOrder(sortField, direction);
+        Comparator<Script> fetchOrder = backward ? displayOrder.reversed() : displayOrder;
+        Optional<Script> anchor = anchorOf(position, sortField);
+        return scripts().stream()
+                .sorted(fetchOrder)
+                .filter(row -> anchor.map(past -> fetchOrder.compare(row, past) > 0).orElse(true))
+                .limit(limit)
+                .toList();
+    }
+
+    private static Comparator<Script> displayOrder(String sortField, Sort.Direction direction) {
+        Comparator<Script> ascending = switch (sortField) {
+            case NAME -> Comparator.comparing(Script::getName).thenComparing(Script::getId);
+            case CREATED_AT -> Comparator.comparing(Script::getCreatedAt).thenComparing(Script::getId);
+            case UPDATED_AT -> Comparator.comparing(Script::getUpdatedAt).thenComparing(Script::getId);
+            default -> Comparator.comparing(Script::getId);
+        };
+        return direction.isAscending() ? ascending : ascending.reversed();
+    }
+
+    private static Optional<Script> anchorOf(CursorPosition position, String sortField) {
+        return switch (position) {
+            case KeysetCursor keyset -> Optional.of(anchorRow(keyset, sortField));
+            case CursorPosition.RowId rowId when ID.equals(sortField) -> Optional.of(script(rowId.id(), null, null, null));
+            case CursorPosition.RowId rowId ->
+                    throw new IllegalStateException("A row id under the " + sortField + " sort carries no sort value");
+            case CursorPosition.Unrecognised unrecognised -> throw new InvalidCursorException();
+            case CursorPosition.None none -> Optional.empty();
+        };
+    }
+
+    private static Script anchorRow(KeysetCursor keyset, String sortField) {
+        return switch (sortField) {
+            case NAME -> script(keyset.id(), keyset.stringValue(), null, null);
+            case CREATED_AT -> script(keyset.id(), null, keyset.instantValue(), null);
+            case UPDATED_AT -> script(keyset.id(), null, null, keyset.instantValue());
+            default -> script(keyset.id(), null, null, null);
+        };
+    }
+
+    private String nameCursorOfRow(int row) {
+        return row == 0 ? null : cursorIssuer.keysetCursor(scripts().get(row - 1), NAME, Sort.Direction.ASC).encode();
+    }
+
+    private void stubIdCursors() {
+        lenient().when(scriptRepository.keysetCursor(any(Script.class), eq(ID), eq(Sort.Direction.DESC)))
+                .thenAnswer(call -> new KeysetCursor(ID, Sort.Direction.DESC, "", call.<Script>getArgument(0).getId()));
+    }
+
+    private void stubSortResolution(SortInput sort) {
+        if (sort == null) {
+            when(scriptRepository.getDefaultSortField()).thenReturn(ID);
+        } else {
+            when(scriptRepository.isSortableField(sort.getField())).thenReturn(true);
+        }
+    }
+
+    private void stubScriptPages(SortInput sort) {
+        String sortField = sort == null ? ID : sort.getField();
+        Sort.Direction direction = sort != null && sort.getDirection() == SortDirection.ASC
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        stubSortResolution(sort);
+        when(scriptRepository.findPageForTenant(eq(TENANT_ID), isNull(), isNull(), eq(sortField), eq(direction),
+                any(CursorPosition.class), anyBoolean(), anyInt()))
+                .thenAnswer(call -> rowsPast(sortField, direction,
+                        call.getArgument(5), call.getArgument(6), call.getArgument(7)));
+        lenient().when(scriptRepository.keysetCursor(any(Script.class), eq(sortField), eq(direction)))
+                .thenAnswer(call -> cursorIssuer.keysetCursor(call.getArgument(0), sortField, direction));
+        lenient().when(scriptMapper.toResponse(any(Script.class)))
+                .thenAnswer(call -> response(call.getArgument(0)));
     }
 }

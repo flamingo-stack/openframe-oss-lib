@@ -13,6 +13,8 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.organization.Organization;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -85,29 +87,31 @@ class GraphQLOrganizationMapperTest {
     }
 
     @Test
-    void toCursorPaginationCriteria_undecodableAfter_throwsIllegalArgument() {
+    void toCursorPaginationCriteria_undecodableAfter_throwsInvalidCursor() {
         // setup
         ConnectionArgs args = ConnectionArgs.builder().first(2).after("not-a-cursor").build();
 
         // execution
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        InvalidCursorException ex = assertThrows(InvalidCursorException.class,
                 () -> mapper.toCursorPaginationCriteria(args));
 
         // verifications
-        assertThat(ex.getMessage()).contains("Invalid cursor");
+        assertThat(ex.getMessage()).isEqualTo("Invalid cursor");
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR);
     }
 
     @Test
-    void toCursorPaginationCriteria_undecodableBefore_throwsIllegalArgument() {
+    void toCursorPaginationCriteria_undecodableBefore_throwsInvalidCursor() {
         // setup
         ConnectionArgs args = ConnectionArgs.builder().last(2).before("not-a-cursor").build();
 
         // execution
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        InvalidCursorException ex = assertThrows(InvalidCursorException.class,
                 () -> mapper.toCursorPaginationCriteria(args));
 
         // verifications
-        assertThat(ex.getMessage()).contains("Invalid cursor");
+        assertThat(ex.getMessage()).isEqualTo("Invalid cursor");
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_CURSOR);
     }
 
     @Test
