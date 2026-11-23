@@ -430,6 +430,22 @@ class PasswordResetServiceTest {
     }
 
     @Test
+    void createResetToken_tokenWriteFails_quiet202DropsActiveMarkSendsNothing(CapturedOutput output) {
+        fromIp("1.2.3.4");
+        when(userService.findActiveTenantIdsByEmail("ada@acme.com")).thenReturn(List.of("t1"));
+        when(ssoConfigService.isOpenframeLoginEnabled("t1")).thenReturn(true);
+        doThrow(new IllegalStateException("Redis down"))
+                .when(values).set(anyString(), eq("ada@acme.com"), any(Duration.class));
+
+        assertThatCode(() -> service.createResetToken("ada@acme.com")).doesNotThrowAnyException();
+
+        verify(redisTemplate).delete(contains("active:" + ADA_HASH));
+        verifyNoInteractions(emailService);
+        assertThat(output).contains("event=password_reset_request", "outcome=send_failed", "ip=1.2.3.4")
+                .doesNotContain("ada@acme.com");
+    }
+
+    @Test
     void resetPassword_duplicateActiveAccounts_logsLookupFailedAndRethrows(CapturedOutput output) {
         fromIp("1.2.3.4");
         when(values.get(anyString())).thenReturn("ada@acme.com");
