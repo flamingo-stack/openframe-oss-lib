@@ -4,11 +4,13 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.openframe.core.dto.ErrorResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,6 +63,22 @@ class BaseGlobalExceptionHandlerLoggingTest {
         handler.handleIllegalArgument(new IllegalArgumentException("Invalid UUID string: x"));
 
         assertOnlyEvent(Level.WARN, "Invalid request: Invalid UUID string: x", true);
+    }
+
+    @Test
+    void handleBaseException_invalidCursor_badRequestWithItsOwnCodeLoggedAsAWarning() {
+        // setup
+        InvalidCursorException exception = new InvalidCursorException();
+
+        // execution
+        ResponseEntity<ErrorResponse> response = handler.handleBaseException(exception);
+
+        // verifications
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody())
+                .returns("INVALID_CURSOR", ErrorResponse::getCode)
+                .returns("Invalid cursor", ErrorResponse::getMessage);
+        assertOnlyEvent(Level.WARN, "INVALID_CURSOR: Invalid cursor", false);
     }
 
     private void assertOnlyEvent(Level level, String message, boolean withStackTrace) {

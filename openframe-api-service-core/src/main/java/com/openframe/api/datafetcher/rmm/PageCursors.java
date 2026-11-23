@@ -27,6 +27,10 @@ final class PageCursors {
         return Math.min(requested, MAX_PAGE_SIZE);
     }
 
+    static int resolvePage(Integer first, String after, Integer last, String before) {
+        throw new UnsupportedOperationException();
+    }
+
     static int decodePage(String cursor) {
         if (cursor == null || cursor.isBlank()) {
             return 0;
