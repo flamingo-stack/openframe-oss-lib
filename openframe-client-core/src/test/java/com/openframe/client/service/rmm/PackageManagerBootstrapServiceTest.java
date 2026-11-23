@@ -463,9 +463,10 @@ class PackageManagerBootstrapServiceTest {
         givenLastExecution(status, Instant.now().minusSeconds(60));
 
         // execution
-        service.resendChocolateyUpgrade(MACHINE_ID);
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
 
         // verifications
+        assertThat(dispatched).isTrue();
         verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), messageCaptor.capture());
         assertThat(messageCaptor.getValue())
                 .returns("__system__upgrade-chocolatey body", ScriptMessage::getCode)
@@ -480,9 +481,10 @@ class PackageManagerBootstrapServiceTest {
         givenLastExecution(ExecutionStatus.FAILED, Instant.now().minusSeconds(60));
 
         // execution
-        service.resendChocolateyUpgrade(MACHINE_ID);
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
 
         // verifications
+        assertThat(dispatched).isTrue();
         verify(scriptExecutionRepository).save(executionCaptor.capture());
         assertThat(executionCaptor.getValue())
                 .returns(SCRIPT_ID, ScriptExecution::getScriptId)
@@ -499,9 +501,10 @@ class PackageManagerBootstrapServiceTest {
         givenNoLastExecution();
 
         // execution
-        service.resendChocolateyUpgrade(MACHINE_ID);
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
 
         // verifications
+        assertThat(dispatched).isTrue();
         verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
     }
 
@@ -514,9 +517,10 @@ class PackageManagerBootstrapServiceTest {
         givenLastExecution(status, Instant.now().minusSeconds(60));
 
         // execution
-        service.resendChocolateyUpgrade(MACHINE_ID);
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
 
         // verifications
+        assertThat(dispatched).isFalse();
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
         verify(scriptExecutionRepository, never()).save(any(ScriptExecution.class));
     }
@@ -530,9 +534,36 @@ class PackageManagerBootstrapServiceTest {
                 .thenReturn(Optional.empty());
 
         // execution
-        service.resendChocolateyUpgrade(MACHINE_ID);
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
 
         // verifications
+        assertThat(dispatched).isFalse();
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @Test
+    void resendChocolateyUpgrade_machineNotConnected_ignored() {
+        // setup
+        givenMachine(DeviceStatus.ARCHIVED);
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isFalse();
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @Test
+    void resendChocolateyUpgrade_unknownMachine_ignored() {
+        // setup
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isFalse();
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
     }
 }

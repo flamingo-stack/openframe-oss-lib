@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.List;
 
@@ -56,6 +57,18 @@ class ChocoInstalledPackageMatcherTest {
     }
 
     @Test
+    void conditionalOnProperty_chocoEnabledSwitch_beanOnlyWhenTrue() {
+        // execution
+        ConditionalOnProperty condition = ChocoInstalledPackageMatcher.class.getAnnotation(ConditionalOnProperty.class);
+
+        // verifications
+        assertThat(condition).isNotNull();
+        assertThat(condition.name()).containsExactly("openframe.package-managers.choco-enabled");
+        assertThat(condition.havingValue()).isEqualTo("true");
+        assertThat(condition.matchIfMissing()).isFalse();
+    }
+
+    @Test
     void match_nameEqualsTheCatalogId_matched() {
         // setup
         when(catalogRepository.findByManager(PackageManagerType.CHOCO)).thenReturn(List.of(sevenZip, chrome));
@@ -83,6 +96,21 @@ class ChocoInstalledPackageMatcherTest {
         assertThat(matches)
                 .extracting(PackageMatch::getEntry)
                 .containsExactly(chrome, sevenZip);
+    }
+
+    @Test
+    void match_catalogIdsDifferOnlyByLetterCase_firstEntryMatched() {
+        // setup
+        PackageCatalogEntry lowerCaseChrome = entry("googlechrome");
+        when(catalogRepository.findByManager(PackageManagerType.CHOCO)).thenReturn(List.of(chrome, lowerCaseChrome));
+        List<InstalledProgram> programs = List.of(program("GOOGLECHROME"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(programs);
+
+        // verifications
+        assertThat(matches).hasSize(1);
+        assertThat(matches.get(0).getEntry()).isSameAs(chrome);
     }
 
     @Test

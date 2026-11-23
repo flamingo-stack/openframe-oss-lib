@@ -141,6 +141,25 @@ class ChocoCatalogFetcherTest {
     }
 
     @Test
+    void toEntries_twoSearchHitsForTheSameIdInDifferentLetterCase_firstHitSuppliesTheTitle() {
+        // setup
+        ChocoFeedCatalog catalog = catalog(pkg("GoogleChrome", "159.0.8154.13", CURATED, null));
+        ChocoFeedSearch search = search(
+                hit("GoogleChrome", "Google Chrome", "Chrome is a fast browser", "https://www.google.com/chrome/browser/"),
+                hit("googlechrome", "Chrome (duplicate)", "A second hit", "https://example.test/second"));
+
+        // execution
+        List<PackageCatalogEntry> entries = ChocoCatalogFetcher.toEntries(catalog, search, Map.of());
+
+        // verifications
+        assertThat(entries)
+                .extracting(PackageCatalogEntry::getPackageId, PackageCatalogEntry::getName,
+                        PackageCatalogEntry::getDescription, PackageCatalogEntry::getHomepage)
+                .containsExactly(tuple("GoogleChrome", "Google Chrome", "Chrome is a fast browser",
+                        "https://www.google.com/chrome/browser/"));
+    }
+
+    @Test
     void toEntries_noSearchHit_idAsNameWithoutDescriptionAndHomepage() {
         // setup
         ChocoFeedCatalog catalog = catalog(pkg("7zip", "26.6.0", CURATED, null));
@@ -195,6 +214,39 @@ class ChocoCatalogFetcherTest {
                         List.of("7zip.7zip_8wekyb3d8bbwe"),
                         List.of("7-zip", "7-zip(x64)"),
                         List.of("igorpavlov")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7Zip.7Zip", "7ZIP.7ZIP"})
+    void toEntries_wingetIdInAnotherLetterCaseThanTheWingetEntry_matchingKeysCopied(String wingetId) {
+        // setup
+        ChocoFeedCatalog catalog = catalog(pkg("7zip", "26.6.0", CURATED, wingetId));
+        Map<String, PackageCatalogEntry> wingetEntriesById = Map.of(WINGET_ID, wingetEntry());
+
+        // execution
+        List<PackageCatalogEntry> entries = ChocoCatalogFetcher.toEntries(catalog, search(), wingetEntriesById);
+
+        // verifications
+        assertThat(entries)
+                .extracting(PackageCatalogEntry::getPackageId, PackageCatalogEntry::getProductCodes,
+                        PackageCatalogEntry::getNormalizedNames)
+                .containsExactly(tuple("7zip", List.of("{23170f69-40c1-2702-2600-000001000000}"),
+                        List.of("7-zip", "7-zip(x64)")));
+    }
+
+    @Test
+    void toEntries_wingetEntriesKeyedInAnotherLetterCaseThanTheCatalog_matchingKeysCopied() {
+        // setup
+        ChocoFeedCatalog catalog = catalog(pkg("7zip", "26.6.0", CURATED, WINGET_ID));
+        Map<String, PackageCatalogEntry> wingetEntriesById = Map.of("7Zip.7Zip", wingetEntry());
+
+        // execution
+        List<PackageCatalogEntry> entries = ChocoCatalogFetcher.toEntries(catalog, search(), wingetEntriesById);
+
+        // verifications
+        assertThat(entries)
+                .extracting(PackageCatalogEntry::getUpgradeCodes)
+                .containsExactly(List.of("{23170f69-40c1-2702-0000-000004000000}"));
     }
 
     @Test

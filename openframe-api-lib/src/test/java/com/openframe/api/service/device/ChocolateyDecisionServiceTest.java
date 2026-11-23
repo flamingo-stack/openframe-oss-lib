@@ -88,6 +88,21 @@ class ChocolateyDecisionServiceTest {
     }
 
     @Test
+    void set_writeMatchesNoMachineAfterTheRead_notFoundAsForAnUnknownMachine() {
+        // setup
+        machine.setChocolatey(chocolatey(ChocolateyStatus.ACTION_REQUIRED, PINNED));
+        stubMachine();
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        // execution
+        NotFoundException notFound = assertThrows(NotFoundException.class,
+                () -> service.set(MACHINE_ID, ChocolateyAdminOption.DONT_TOUCH, DECIDED_BY));
+
+        // verifications
+        assertThat(notFound.getMessage()).isEqualTo("Device not found: " + MACHINE_ID);
+    }
+
+    @Test
     void set_machineOfTheTenant_lookedUpWithTheTenantIdOfTheProvider() {
         // setup
         machine.setChocolatey(chocolatey(ChocolateyStatus.ACTION_REQUIRED, PINNED));

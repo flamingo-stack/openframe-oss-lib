@@ -541,6 +541,7 @@ class SoftwareCatalogStatusTest {
                 .extracting(SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage,
                         SoftwareResponse::getAutoUpdate, SoftwareResponse::getLatestVersion)
                 .containsExactly(null, null, SoftwareAutoUpdateStatus.NO_PACKAGE, "24.09");
+        assertThat(sevenZip.getSource()).isEqualTo(SoftwareSource.CHOCOLATEY);
     }
 
     @Test

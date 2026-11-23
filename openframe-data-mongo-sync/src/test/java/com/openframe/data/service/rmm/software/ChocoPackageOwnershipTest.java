@@ -204,6 +204,24 @@ class ChocoPackageOwnershipTest {
     }
 
     @Test
+    void owners_idOnlyInExistingPackagesAndSettingOff_excluded() {
+        // setup
+        Machine existing = machine("m-1", ChocolateyStatus.MANAGED, List.of(), List.of(CHROME_ID));
+        Machine installed = machine("m-2", ChocolateyStatus.MANAGED, List.of(CHROME_ID), List.of());
+        List<String> machineIds = List.of("m-1", "m-2");
+        when(softwareSettingsService.updatesExistingChocolateyPackages()).thenReturn(false);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), sameIds("m-1", "m-2")))
+                .thenReturn(List.of(existing, installed));
+
+        // execution
+        List<String> result = ownership.owners(machineIds, CHROME_ID);
+
+        // verifications
+        assertThat(result).containsExactly("m-2");
+    }
+
+    @Test
     void owners_noMachineFound_empty() {
         // setup
         List<String> machineIds = List.of("m-gone");

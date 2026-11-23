@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.stream.Stream;
 
@@ -39,6 +40,40 @@ class PackageManagerPropertiesTest {
 
         // verifications
         assertThat(ex.getMessage()).containsIgnoringCase("choco");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "http://feed/choco/index.json", "https://feed/choco/", "https://feed/choco/v3.json"})
+    void validate_chocoEnabledFeedUrlNotAnHttpsIndexJson_throwsIllegalState(String feedUrl) {
+        // setup
+        properties.setChocoEnabled(true);
+        properties.getChoco().setFeedUrl(feedUrl);
+        properties.getChoco().setVersion(VERSION);
+        properties.getChoco().setSha256(SHA256);
+
+        // execution
+        IllegalStateException ex = assertThrows(IllegalStateException.class, properties::validate);
+
+        // verifications
+        assertThat(ex.getMessage()).containsIgnoringCase("choco").contains("feed-url");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "http://feed/choco/index.json", "https://feed/choco/", "https://feed/choco/v3.json"})
+    void validate_chocoDisabledFeedUrlNotAnHttpsIndexJson_passes(String feedUrl) {
+        // setup
+        properties.setChocoEnabled(false);
+        properties.getChoco().setFeedUrl(feedUrl);
+        properties.getChoco().setVersion(VERSION);
+        properties.getChoco().setSha256(SHA256);
+
+        // execution
+        Throwable thrown = catchThrowable(properties::validate);
+
+        // verifications
+        assertThat(thrown).isNull();
     }
 
     @Test

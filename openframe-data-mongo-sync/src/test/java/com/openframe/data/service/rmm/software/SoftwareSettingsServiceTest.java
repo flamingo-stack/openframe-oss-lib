@@ -13,12 +13,15 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -166,5 +169,45 @@ class SoftwareSettingsServiceTest {
                 .extracting(SoftwareSettings::getId, SoftwareSettings::getTenantId,
                         SoftwareSettings::isUpdateExistingChocolateyPackages)
                 .containsExactly(SETTINGS_ID, TENANT_ID, updateExisting);
+    }
+
+    @Test
+    void update_firstSaveOfTheTenantHitsADuplicateKey_rereadDocumentUpdatedAndSaved() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(softwareSettingsRepository.findByTenantId(TENANT_ID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(stored));
+        when(softwareSettingsRepository.save(any(SoftwareSettings.class)))
+                .thenThrow(new DuplicateKeyException("tenantId"))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // execution
+        SoftwareSettings result = service.update(false);
+
+        // verifications
+        verify(softwareSettingsRepository, times(2)).save(settingsCaptor.capture());
+        assertThat(settingsCaptor.getAllValues().get(0).getId()).isNull();
+        assertThat(settingsCaptor.getAllValues().get(1)).isSameAs(stored);
+        assertThat(result)
+                .extracting(SoftwareSettings::getId, SoftwareSettings::getTenantId,
+                        SoftwareSettings::isUpdateExistingChocolateyPackages)
+                .containsExactly(SETTINGS_ID, TENANT_ID, false);
+    }
+
+    @Test
+    void update_secondSaveHitsADuplicateKeyToo_exceptionPropagatesAfterOneRetry() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(softwareSettingsRepository.findByTenantId(TENANT_ID)).thenReturn(Optional.empty());
+        when(softwareSettingsRepository.save(any(SoftwareSettings.class)))
+                .thenThrow(new DuplicateKeyException("tenantId"));
+
+        // execution
+        Throwable thrown = catchThrowable(() -> service.update(true));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(DuplicateKeyException.class);
+        verify(softwareSettingsRepository, times(2)).save(any(SoftwareSettings.class));
     }
 }

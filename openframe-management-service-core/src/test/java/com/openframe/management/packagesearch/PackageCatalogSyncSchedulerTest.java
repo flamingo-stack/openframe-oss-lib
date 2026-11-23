@@ -104,6 +104,107 @@ class PackageCatalogSyncSchedulerTest {
     }
 
     @Test
+    void syncChocoCatalog_fetchReturnsNoEntries_failureRecordedAndPreviousSnapshotKept() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        when(chocoCatalogFetcher.fetchAll()).thenReturn(List.of());
+
+        // execution
+        scheduler.syncChocoCatalog();
+
+        // verifications
+        verify(syncMetrics).recordFailure(PackageManagerType.CHOCO);
+        verify(syncMetrics, never()).recordSuccess(PackageManagerType.CHOCO);
+        verify(packageCatalogWriter, never()).replaceManagerEntries(eq(PackageManagerType.CHOCO), anyList());
+    }
+
+    @Test
+    void syncBrewCatalog_enabled_replacesBrewEntries() {
+        // setup
+        List<PackageCatalogEntry> entries = List.of(entry(PackageManagerType.BREW, "wget"));
+        when(brewCatalogFetcher.fetchAll()).thenReturn(entries);
+
+        // execution
+        scheduler.syncBrewCatalog();
+
+        // verifications
+        verify(packageCatalogWriter).replaceManagerEntries(PackageManagerType.BREW, entries);
+        verify(syncMetrics).recordSuccess(PackageManagerType.BREW);
+        verify(syncMetrics, never()).recordFailure(PackageManagerType.BREW);
+    }
+
+    @Test
+    void syncBrewCatalog_fetchReturnsNoEntries_brewEntriesStillReplaced() {
+        // setup
+        List<PackageCatalogEntry> noEntries = List.of();
+        when(brewCatalogFetcher.fetchAll()).thenReturn(noEntries);
+
+        // execution
+        scheduler.syncBrewCatalog();
+
+        // verifications
+        verify(packageCatalogWriter).replaceManagerEntries(PackageManagerType.BREW, noEntries);
+        verify(syncMetrics).recordSuccess(PackageManagerType.BREW);
+    }
+
+    @Test
+    void syncBrewCatalog_fetchFails_failureRecordedAndPreviousSnapshotKept() {
+        // setup
+        when(brewCatalogFetcher.fetchAll()).thenThrow(new IllegalStateException("formulae index is down"));
+
+        // execution
+        scheduler.syncBrewCatalog();
+
+        // verifications
+        verify(syncMetrics).recordFailure(PackageManagerType.BREW);
+        verify(syncMetrics, never()).recordSuccess(PackageManagerType.BREW);
+        verify(packageCatalogWriter, never()).replaceManagerEntries(eq(PackageManagerType.BREW), anyList());
+    }
+
+    @Test
+    void syncWingetCatalog_enabled_replacesWingetEntries() {
+        // setup
+        List<PackageCatalogEntry> entries = List.of(entry(PackageManagerType.WINGET, "7zip.7zip"));
+        when(wingetCatalogFetcher.fetchAll()).thenReturn(entries);
+
+        // execution
+        scheduler.syncWingetCatalog();
+
+        // verifications
+        verify(packageCatalogWriter).replaceManagerEntries(PackageManagerType.WINGET, entries);
+        verify(syncMetrics).recordSuccess(PackageManagerType.WINGET);
+        verify(syncMetrics, never()).recordFailure(PackageManagerType.WINGET);
+    }
+
+    @Test
+    void syncWingetCatalog_fetchReturnsNoEntries_wingetEntriesStillReplaced() {
+        // setup
+        List<PackageCatalogEntry> noEntries = List.of();
+        when(wingetCatalogFetcher.fetchAll()).thenReturn(noEntries);
+
+        // execution
+        scheduler.syncWingetCatalog();
+
+        // verifications
+        verify(packageCatalogWriter).replaceManagerEntries(PackageManagerType.WINGET, noEntries);
+        verify(syncMetrics).recordSuccess(PackageManagerType.WINGET);
+    }
+
+    @Test
+    void syncWingetCatalog_fetchFails_failureRecordedAndPreviousSnapshotKept() {
+        // setup
+        when(wingetCatalogFetcher.fetchAll()).thenThrow(new IllegalStateException("source index is down"));
+
+        // execution
+        scheduler.syncWingetCatalog();
+
+        // verifications
+        verify(syncMetrics).recordFailure(PackageManagerType.WINGET);
+        verify(syncMetrics, never()).recordSuccess(PackageManagerType.WINGET);
+        verify(packageCatalogWriter, never()).replaceManagerEntries(eq(PackageManagerType.WINGET), anyList());
+    }
+
+    @Test
     void syncChocoCatalog_enabled_lockedUnderTheChocoSyncNameForTheChocoInterval() {
         // setup
         packageManagerProperties.setChocoEnabled(true);
@@ -122,8 +223,12 @@ class PackageCatalogSyncSchedulerTest {
     }
 
     private static PackageCatalogEntry chocoEntry(String packageId) {
+        return entry(PackageManagerType.CHOCO, packageId);
+    }
+
+    private static PackageCatalogEntry entry(PackageManagerType manager, String packageId) {
         return PackageCatalogEntry.builder()
-                .manager(PackageManagerType.CHOCO)
+                .manager(manager)
                 .packageId(packageId)
                 .name(packageId)
                 .version("1.0.0")

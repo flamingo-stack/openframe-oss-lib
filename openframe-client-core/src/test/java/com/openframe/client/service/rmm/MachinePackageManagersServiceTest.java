@@ -647,6 +647,7 @@ class MachinePackageManagersServiceTest {
         machine.setChocolatey(stored(ChocolateyStatus.ACTION_REQUIRED, UPGRADE_BLOCKED));
         machine.setChocolateyDecision(decision(UPGRADE_BLOCKED, true));
         stubMachine();
+        when(bootstrapService.resendChocolateyUpgrade(MACHINE_ID)).thenReturn(true);
 
         // execution
         service.apply(MACHINE_ID, chocolateyReport(Map.of("CHOCO", PRESENT), chocolatey("ACTION_REQUIRED", UPGRADE_BLOCKED)));
@@ -664,6 +665,7 @@ class MachinePackageManagersServiceTest {
         machine.setChocolatey(stored(ChocolateyStatus.ACTION_REQUIRED, UPGRADE_BLOCKED));
         machine.setChocolateyDecision(decision(UPGRADE_BLOCKED, true));
         stubMachine();
+        when(bootstrapService.resendChocolateyUpgrade(MACHINE_ID)).thenReturn(true);
 
         // execution
         service.apply(MACHINE_ID, chocolateyReport(Map.of("CHOCO", PRESENT), chocolatey("ACTION_REQUIRED", UPGRADE_BLOCKED)));
@@ -674,6 +676,25 @@ class MachinePackageManagersServiceTest {
         updateCaptor.getValue().applyTo(applied);
         assertThat(applied.getChocolateyDecision()).isEqualTo(decision(UPGRADE_BLOCKED, false));
         assertThat(updateCaptor.getValue().paths()).containsExactly(CHOCOLATEY_DECISION_PATH);
+    }
+
+    @Test
+    void apply_upgradeBlockedRetryPendingResendSuppressed_retryStaysPending() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        machine.setPackageManagers(Map.of(CHOCO, PRESENT));
+        machine.setChocolatey(stored(ChocolateyStatus.ACTION_REQUIRED, UPGRADE_BLOCKED));
+        machine.setChocolateyDecision(decision(UPGRADE_BLOCKED, true));
+        stubMachine();
+        when(bootstrapService.resendChocolateyUpgrade(MACHINE_ID)).thenReturn(false);
+
+        // execution
+        service.apply(MACHINE_ID, chocolateyReport(Map.of("CHOCO", PRESENT), chocolatey("ACTION_REQUIRED", UPGRADE_BLOCKED)));
+
+        // verifications
+        verify(bootstrapService).resendChocolateyUpgrade(MACHINE_ID);
+        verify(machineWriter, never()).update(eq(MACHINE_ID), any(MachineUpdate.class));
+        assertThat(machine.getChocolateyDecision().isUpgradeRetryPending()).isTrue();
     }
 
     @Test

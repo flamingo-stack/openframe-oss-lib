@@ -120,7 +120,8 @@ class ChocoPackageManagerHandlerTest {
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = {"", "  ", "-x", "--source=evil", "a b", "a;b", "a/b", ".hidden"})
+    @ValueSource(strings = {"", "  ", "-x", "--source=evil", "a b", "a;b", "a/b", ".hidden",
+            "pkg.nupkg", "pkg.NUSPEC", "packages.config"})
     void buildArgs_idMissingOrOutsideTheAllowedPattern_badRequest(String packageId) {
         // setup
         BrewPackageType noBrewType = null;
