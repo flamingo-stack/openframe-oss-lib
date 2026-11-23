@@ -66,6 +66,7 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
 
             applyVersionFromProperties(configuration);
             applyMinOsVersionsFromProperties(configuration);
+            applyExtraRunArgsFromProperties(configuration);
 
             integratedToolAgentService.updateConfigurationFields(configuration);
             log.info("Applied agent configuration: {} from {}", configurationId, agentConfigurationFilePath);
@@ -94,6 +95,14 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
         minOsVersions.forEach((os, minOsVersion) -> downloadConfigurations.stream()
                 .filter(downloadConfiguration -> os.equalsIgnoreCase(downloadConfiguration.getOs()))
                 .forEach(downloadConfiguration -> downloadConfiguration.setMinOsVersion(minOsVersion)));
+    }
+
+    private void applyExtraRunArgsFromProperties(IntegratedToolAgentConfiguration configuration) {
+        List<String> extraRunArgs = agentConfigurationProperties.getAgentExtraRunArgs().get(configuration.getId());
+        if (extraRunArgs == null) {
+            return;
+        }
+        configuration.getRunCommandArgs().addAll(extraRunArgs);
     }
 
     private static void applyAssetVersion(IntegratedToolAgentConfiguration configuration, String assetId, String version) {

@@ -31,6 +31,7 @@ class IntegratedToolAgentInitializerTest {
 
     private static final String FLEET_AGENT = "fleetmdm-agent";
     private static final String FLEET_CONFIGURATION = "agent-configurations/fleetmdm-agent.json";
+    private static final String CA_PATH = "/etc/openframe/local-ca.pem";
 
     @Mock private IntegratedToolAgentService integratedToolAgentService;
 
@@ -120,6 +121,50 @@ class IntegratedToolAgentInitializerTest {
         // verifications
         verify(integratedToolAgentService).updateConfigurationFields(configurationCaptor.capture());
         assertThat(configurationCaptor.getValue().getVersion()).isEqualTo("4.70.0");
+    }
+
+    @Test
+    void run_fleetConfiguration_runArgsKeepTlsVerification() {
+        // setup
+
+        // execution
+        initializer.run(null);
+
+        // verifications
+        verify(integratedToolAgentService).updateConfigurationFields(configurationCaptor.capture());
+        assertThat(configurationCaptor.getValue().getRunCommandArgs())
+                .contains("--fleet-url", "--openframe-mode")
+                .doesNotContain("--insecure");
+    }
+
+    @Test
+    void run_extraRunArgsForFleet_appendedAfterTheJsonArgs() {
+        // setup
+        agentConfigurationProperties.setAgentExtraRunArgs(Map.of(FLEET_AGENT, List.of("--fleet-certificate", CA_PATH)));
+
+        // execution
+        initializer.run(null);
+
+        // verifications
+        verify(integratedToolAgentService).updateConfigurationFields(configurationCaptor.capture());
+        assertThat(configurationCaptor.getValue().getRunCommandArgs())
+                .startsWith("--fleet-url")
+                .endsWith("--fleet-certificate", CA_PATH);
+    }
+
+    @Test
+    void run_extraRunArgsForAnotherAgent_fleetRunArgsUnchanged() {
+        // setup
+        agentConfigurationProperties.setAgentExtraRunArgs(Map.of("meshcentral-agent", List.of("--insecure")));
+
+        // execution
+        initializer.run(null);
+
+        // verifications
+        verify(integratedToolAgentService).updateConfigurationFields(configurationCaptor.capture());
+        assertThat(configurationCaptor.getValue().getRunCommandArgs())
+                .endsWith("--openframe-token-path", "${client.openframeTokenPath}")
+                .doesNotContain("--insecure");
     }
 
     @Test
