@@ -1,6 +1,7 @@
 package com.openframe.data.pinot.repository;
 
 import com.openframe.data.pinot.model.LogProjection;
+import com.openframe.data.pinot.model.LogSortPosition;
 import com.openframe.data.pinot.model.OrganizationOption;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pinot.client.Connection;
@@ -53,8 +54,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
     @Override
     public List<LogProjection> findLogs(String tenantId, LocalDate startDate, LocalDate endDate, Instant timestampFrom, Instant timestampTo,
                                         List<String> toolTypes, List<String> eventTypes,
-                                        List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
-                                        String sortField, String sortDirection) {
+                                        List<String> severities, List<String> organizationIds, String deviceId, LogSortPosition position, int limit,
+                                        String sortField, String sortDirection, boolean backward) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "executionSource", "scriptCreationSource", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
@@ -64,7 +65,6 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
                 .whereEquals("deviceId", deviceId)
-                .whereCursor(cursor, sortDirection)
                 .orderBySortInput(sortField, sortDirection, PRIMARY_KEY_FIELD)
                 .limit(limit);
 
@@ -74,8 +74,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
     @Override
     public List<LogProjection> searchLogs(String tenantId, LocalDate startDate, LocalDate endDate, Instant timestampFrom, Instant timestampTo,
                                           List<String> toolTypes, List<String> eventTypes,
-                                          List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
-                                          String sortField, String sortDirection) {
+                                          List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, LogSortPosition position, int limit,
+                                          String sortField, String sortDirection, boolean backward) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
                 .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "executionSource", "scriptCreationSource", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
@@ -86,7 +86,6 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("organizationId", organizationIds)
                 .whereEquals("deviceId", deviceId)
                 .whereRelevanceLogSearch(searchTerm)
-                .whereCursor(cursor, sortDirection)
                 .orderBySortInput(sortField, sortDirection, PRIMARY_KEY_FIELD)
                 .limit(limit);
 
@@ -179,6 +178,11 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
         }).stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public LogSortPosition sortPositionOf(LogProjection row, String sortField) {
+        return null;
     }
 
     @Override

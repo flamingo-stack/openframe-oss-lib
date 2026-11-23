@@ -64,8 +64,8 @@ public class LogService {
                     timestampFrom, timestampTo,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
-                    search, cursor, limit + 1,
-                    sortField, sortDirection);
+                    search, null, limit + 1,
+                    sortField, sortDirection, false);
         } else {
             log.debug("Using exact field filtering");
             logs = pinotLogRepository.findLogs(
@@ -74,8 +74,8 @@ public class LogService {
                     timestampFrom, timestampTo,
                     toolTypes, eventTypes, severities,
                     organizationIds, deviceId,
-                    cursor, limit + 1,
-                    sortField, sortDirection);
+                    null, limit + 1,
+                    sortField, sortDirection, false);
         }
 
         log.debug("Retrieved {} logs from Pinot", logs != null ? logs.size() : 0);

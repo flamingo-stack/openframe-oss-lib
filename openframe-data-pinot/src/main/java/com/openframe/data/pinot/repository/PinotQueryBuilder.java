@@ -483,6 +483,16 @@ public class PinotQueryBuilder {
         return this;
     }
 
+    public PinotQueryBuilder whereKeysetAfter(String sortField, long sortValue, String keyField, String keyValue,
+                                              String sortDirection) {
+        return this;
+    }
+
+    public PinotQueryBuilder whereKeysetAfter(String sortField, String sortValue, String keyField, String keyValue,
+                                              String sortDirection) {
+        return this;
+    }
+
     private void validateTableName(String tableName) {
         if (tableName == null || tableName.trim().isEmpty()) {
             throw new PinotQueryException("Table name must not be null or empty");
