@@ -28,7 +28,7 @@ if ($run.output.Count -gt 0) { $version = ([string]$run.output[-1]).Trim() }
 $pinned = $false
 if ($versionExit -eq 0) {
     $run = Invoke-Choco pin list --limit-output
-    if ($run.exit -ne 0) { exit 3 }
+    if ($run.exit -notin 0, 2) { exit 3 }
     $pinned = @($run.output | Where-Object { ([string]$_ -split '\|')[0] -eq 'chocolatey' }).Count -gt 0
 }
 
