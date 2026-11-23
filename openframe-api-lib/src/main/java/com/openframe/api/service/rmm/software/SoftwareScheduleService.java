@@ -203,15 +203,20 @@ public class SoftwareScheduleService {
     }
 
     public void addDevices(String scheduleId, List<String> machineIds, String actor) {
-        withDeviceAssignments(machineIds, () -> appendAssignedDevices(scheduleId, machineIds, actor));
+        if (isEmpty(machineIds)) {
+            loadVisibleOrThrow(tenantIdProvider.getTenantId(), scheduleId);
+            return;
+        }
+        try {
+            scheduleTransaction.runWithoutResult(() -> appendAssignedDevices(scheduleId, machineIds, actor));
+        } catch (OptimisticLockingFailureException conflict) {
+            throw assignmentConflict();
+        }
     }
 
-    private Void appendAssignedDevices(String scheduleId, List<String> machineIds, String actor) {
+    private void appendAssignedDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
-        if (machineIds == null || machineIds.isEmpty()) {
-            return null;
-        }
         List<PackageManagerType> managers = managersOf(entity.getPackages());
         requireAssignableDevices(tenantId, machineIds, managers);
         ensureSpecificMode(entity);
@@ -222,7 +227,6 @@ public class SoftwareScheduleService {
                         .tenantId(tenantId).softwareScheduleId(scheduleId).machineId(machineId).createdBy(actor).build())
                 .toList();
         saveAssignments(rows);
-        return null;
     }
 
     public void removeDevices(String scheduleId, List<String> machineIds, String actor) {

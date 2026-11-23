@@ -82,7 +82,6 @@ public class SoftwareScheduleExecutionService {
                 .findOnPrimaryByTenantIdAndMachineIdIn(schedule.getTenantId(), new HashSet<>(targets)).stream()
                 .collect(Collectors.toMap(Machine::getMachineId, Function.identity(), (a, b) -> a));
 
-        // A device can be reenrolled between the membership and lifecycle reads.
         Set<String> currentTargets = schedule.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA
                 ? Set.copyOf(targets) : Set.copyOf(targetResolver.resolveMachineIds(schedule));
         Map<Boolean, List<Machine>> connectedDevices = targets.stream().filter(currentTargets::contains).map(machinesById::get)

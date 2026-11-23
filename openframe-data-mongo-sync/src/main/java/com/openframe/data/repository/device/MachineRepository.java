@@ -59,7 +59,6 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     @ReadPreference("primary")
     Optional<Machine> findOnPrimaryByTenantIdAndMachineId(String tenantId, String machineId);
 
-    // The pending reconnect and a concurrent deletion must write the same device document.
     @Query("{ 'tenantId': ?0, 'machineId': ?1, 'version': ?2, 'status': { '$in': ?3 } }")
     @Update(pipeline = "{ '$set': { 'version': { '$add': [{ '$ifNull': ['$version', 0] }, 1] } } }")
     long reserveForSoftwareReconnect(String tenantId, String machineId, Long version, Collection<DeviceStatus> managedStatuses);

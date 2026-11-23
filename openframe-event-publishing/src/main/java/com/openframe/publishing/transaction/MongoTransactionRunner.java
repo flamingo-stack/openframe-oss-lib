@@ -52,10 +52,23 @@ public class MongoTransactionRunner {
             log.debug("Outbox transaction committed");
             return result;
         } catch (RuntimeException e) {
-            Throwable failure = unwrapUndeclaredThrowable(e);
-            log.debug("Outbox transaction rolled back: {}", failure.getClass().getName());
-            throw rethrow(failure);
+            throw translateRollback(e);
         }
+    }
+
+    public void runWithoutResult(Runnable action) {
+        try {
+            transactionOperations.executeWithoutResult(status -> action.run());
+            log.debug("Outbox transaction committed");
+        } catch (RuntimeException e) {
+            throw translateRollback(e);
+        }
+    }
+
+    private static RuntimeException translateRollback(RuntimeException error) {
+        Throwable failure = unwrapUndeclaredThrowable(error);
+        log.debug("Outbox transaction rolled back: {}", failure.getClass().getName());
+        return rethrow(failure);
     }
 
     private static boolean isWriteConflict(Throwable failure) {

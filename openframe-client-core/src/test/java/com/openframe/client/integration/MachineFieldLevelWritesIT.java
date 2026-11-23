@@ -252,7 +252,6 @@ class MachineFieldLevelWritesIT {
         private static AgentRegistrationService registrationService(MachineRepository machines) {
             OrganizationIdResolver organizations = mock(OrganizationIdResolver.class);
             when(organizations.resolve("org-2")).thenReturn("org-2");
-            // a reinstall no longer reads the machine, so the concurrent write lands after its first read, the client
             return new AgentRegistrationService(knownClient(true), machines, machineWriter, organizations,
                     mock(AgentRegistrationSecretValidator.class), mock(ClientSecretValidator.class),
                     mock(AgentSecretGenerator.class), mock(PasswordEncoder.class), mock(MachineIdGenerator.class),

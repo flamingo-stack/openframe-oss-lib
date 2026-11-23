@@ -17,4 +17,8 @@ public class ScheduleMutationTransaction {
     public <T> T run(MongoTransactionRunner.Transaction<T> mutation) {
         return transactions.run(mutation);
     }
+
+    public void runWithoutResult(Runnable mutation) {
+        transactions.runWithoutResult(mutation);
+    }
 }

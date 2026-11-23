@@ -135,7 +135,7 @@ public class ScheduleScriptDeviceService {
         log.info("Added {} device(s) to script schedule id={} tenantId={}", rows.size(), scheduleId, tenantId);
     }
 
-    /** Incrementally unassign devices from a schedule (missing ids are simply no-ops). */
+    /** Removes selected devices from a script schedule that uses an explicit device list. */
     public void removeDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         removeAssignedDevices(scheduleId, machineIds, actorUserId);
     }
