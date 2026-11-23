@@ -91,7 +91,7 @@ public class KnowledgeBaseService {
             folderCount = repository.countFolders(parent, search, restrictToItemIds);
             if (!pastFolders) {
                 List<KnowledgeBaseItem> raw = repository.findFolders(
-                        parent, search, restrictToItemIds, cursor, limit + 1);
+                        parent, search, restrictToItemIds, cursor, false, limit + 1);
                 hasNextPage = raw.size() > limit;
                 folders = hasNextPage ? raw.subList(0, limit) : raw;
             }
@@ -505,7 +505,7 @@ public class KnowledgeBaseService {
                                              List<KnowledgeBaseArticleStatus> statuses,
                                              KnowledgeBaseItemCursor cursor, int limit) {
         List<KnowledgeBaseItem> raw = repository.findArticles(
-                parent, search, itemIds, statuses, cursor, limit + 1);
+                parent, search, itemIds, statuses, cursor, false, limit + 1);
         boolean hasNextPage = raw.size() > limit;
         List<KnowledgeBaseItem> page = hasNextPage ? raw.subList(0, limit) : raw;
         return new PagedArticles(page, hasNextPage);
@@ -516,7 +516,7 @@ public class KnowledgeBaseService {
                                                       CursorPaginationCriteria normalized) {
         int limit = normalized.getLimit();
         List<KnowledgeBaseItem> raw = repository.findArchivedArticles(
-                search, itemIds, resolveCursor(normalized.getCursor()), limit + 1);
+                search, itemIds, resolveCursor(normalized.getCursor()), false, limit + 1);
         boolean hasNextPage = raw.size() > limit;
         List<KnowledgeBaseItem> page = hasNextPage ? raw.subList(0, limit) : raw;
         return new PagedArticles(page, hasNextPage);

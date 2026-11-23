@@ -4,6 +4,8 @@ extend type Query {
         search: String
         first: Int
         after: String
+        last: Int
+        before: String
     ): KnowledgeBaseItemConnection!
     knowledgeBaseItem(id: ID!): KnowledgeBaseItem
     knowledgeBaseTags(folderId: ID, archived: Boolean, assignedTo: AssignmentTargetInput): [Tag!]!
@@ -14,6 +16,8 @@ extend type Query {
         tagIds: [ID]
         first: Int
         after: String
+        last: Int
+        before: String
     ): KnowledgeBaseItemConnection!
     knowledgeBaseAttachmentDownloadUrl(attachmentId: ID!): String!
 }

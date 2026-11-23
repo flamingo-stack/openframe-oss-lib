@@ -14,6 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -44,7 +45,7 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
 
     @Override
     public List<KnowledgeBaseItem> findFolders(KnowledgeBaseParentFilter parent, String search, List<String> itemIds,
-                                               KnowledgeBaseItemCursor cursor, int limit) {
+                                               KnowledgeBaseItemCursor cursor, boolean backward, int limit) {
         Query query = buildFolderQuery(parent, search, itemIds);
         addComposites(query, folderPosition(cursor));
         query.with(Sort.by(
@@ -64,7 +65,7 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     @Override
     public List<KnowledgeBaseItem> findArticles(KnowledgeBaseParentFilter parent, String search, List<String> itemIds,
                                                  List<KnowledgeBaseArticleStatus> statuses,
-                                                 KnowledgeBaseItemCursor cursor, int limit) {
+                                                 KnowledgeBaseItemCursor cursor, boolean backward, int limit) {
         Query query = buildArticleQuery(parent, itemIds, statuses);
         addComposites(query, articleSearch(search), articlePosition(cursor));
         return executeWithArticleSort(query, limit);
@@ -87,7 +88,7 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
 
     @Override
     public List<KnowledgeBaseItem> findArchivedArticles(String search, List<String> itemIds,
-                                                         KnowledgeBaseItemCursor cursor, int limit) {
+                                                         KnowledgeBaseItemCursor cursor, boolean backward, int limit) {
         Query query = buildArchivedArticlesQuery(itemIds);
         addComposites(query, articleSearch(search), articlePosition(cursor));
         return executeWithArticleSort(query, limit);
@@ -107,6 +108,11 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
         query.with(Sort.by(Sort.Order.asc(FIELD_NAME), Sort.Order.desc(ID_FIELD)));
         return mongoTemplate.find(query, KnowledgeBaseItem.class);
+    }
+
+    @Override
+    public Optional<KnowledgeBaseItem> findCursorItem(String id) {
+        return Optional.empty();
     }
 
     private Query buildFolderQuery(KnowledgeBaseParentFilter parent, String search, List<String> itemIds) {

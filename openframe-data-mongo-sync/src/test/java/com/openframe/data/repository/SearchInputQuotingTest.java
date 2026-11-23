@@ -155,7 +155,7 @@ class SearchInputQuotingTest {
         MongoTemplate template = mock(MongoTemplate.class);
         CustomKnowledgeBaseItemRepositoryImpl repo = new CustomKnowledgeBaseItemRepositoryImpl(template);
 
-        repo.findFolders(KnowledgeBaseParentFilter.root(), HOSTILE, null, null, 10);
+        repo.findFolders(KnowledgeBaseParentFilter.root(), HOSTILE, null, null, false, 10);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).find(captor.capture(), eq(KnowledgeBaseItem.class));

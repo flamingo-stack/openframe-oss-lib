@@ -68,7 +68,9 @@ public class KnowledgeBaseDataFetcher {
             @InputArgument @Valid KnowledgeBaseFilterInput filter,
             @InputArgument String search,
             @InputArgument Integer first,
-            @InputArgument String after) {
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
         log.debug("Fetching KB items: filter={}, search={}, first={}, after={}",
                 filter, search, first, after);
 
@@ -120,7 +122,9 @@ public class KnowledgeBaseDataFetcher {
             @InputArgument String search,
             @InputArgument List<String> tagIds,
             @InputArgument Integer first,
-            @InputArgument String after) {
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
         log.debug("Fetching archived KB articles: search={}, tagIds={}", search, tagIds);
 
         List<String> rawTagIds = relayIdCodec.decodeAll(tagIds, TAG);
