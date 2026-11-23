@@ -4,6 +4,8 @@ import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.service.auth.AuthErrorDetailStore;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
+import com.openframe.authz.service.ratelimit.LoginAttemptLimiter;
+import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.web.AuthErrorResponder;
@@ -35,11 +37,13 @@ import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
+import static com.openframe.core.exception.AuthErrorCode.PASSWORD_LOGIN_DISABLED;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -62,13 +66,19 @@ class PasswordLoginFilterChainTest {
     @Autowired
     private TenantService tenantService;
     @Autowired
+    private SSOConfigService ssoConfigService;
+    @Autowired
     private UserService userService;
+    @Autowired
+    private LoginAttemptLimiter loginAttemptLimiter;
 
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        reset(tenantService, userService);
+        reset(tenantService, userService, ssoConfigService, loginAttemptLimiter);
+        when(loginAttemptLimiter.tryAcquire(any(), anyString(), any()))
+                .thenReturn(Optional.of(new LoginAttemptLimiter.Attempt("tenant-a", EMAIL, null, 1, 0)));
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
@@ -82,6 +92,19 @@ class PasswordLoginFilterChainTest {
     }
 
     @Test
+    @DisplayName("Given OpenFrame login is off, when the right password is posted, then the error page shows PASSWORD_LOGIN_DISABLED")
+    void openframeLoginOff_redirectsToTheErrorPage() throws Exception {
+        AuthUser user = activeUser("u1", "tenant-a", EMAIL);
+        user.setPasswordHash(new BCryptPasswordEncoder().encode("right"));
+        when(userService.findActiveByEmailAndTenant(anyString(), any())).thenReturn(Optional.of(user));
+        doThrow(new AuthFlowException(PASSWORD_LOGIN_DISABLED, PASSWORD_LOGIN_DISABLED.getMessage()))
+                .when(ssoConfigService).refuseUnlessOpenframeLoginEnabled(any());
+
+        mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "right"))
+                .andExpect(redirectedUrl("https://app.example/auth/error?ref=PASSWORD_LOGIN_DISABLED"));
+    }
+
+    @Test
     @DisplayName("Given an active tenant, when the password is wrong, then the login page shows its error")
     void wrongPassword_staysOnTheLoginPage() throws Exception {
         AuthUser user = activeUser("u1", "tenant-a", EMAIL);
@@ -89,6 +112,19 @@ class PasswordLoginFilterChainTest {
         when(userService.findActiveByEmailAndTenant(anyString(), any())).thenReturn(Optional.of(user));
 
         mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "wrong"))
+                .andExpect(redirectedUrl("/login?error"));
+        verify(loginAttemptLimiter).tryAcquire(any(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("Given the login limit is reached, when the right password is posted, then the login page shows its error")
+    void loginLimitReached_rightPasswordStaysOnTheLoginPage() throws Exception {
+        AuthUser user = activeUser("u1", "tenant-a", EMAIL);
+        user.setPasswordHash(new BCryptPasswordEncoder().encode("right"));
+        when(userService.findActiveByEmailAndTenant(anyString(), any())).thenReturn(Optional.of(user));
+        when(loginAttemptLimiter.tryAcquire(any(), anyString(), any())).thenReturn(Optional.empty());
+
+        mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "right"))
                 .andExpect(redirectedUrl("/login?error"));
     }
 
@@ -105,6 +141,11 @@ class PasswordLoginFilterChainTest {
         }
 
         @Bean
+        SSOConfigService ssoConfigService() {
+            return mock(SSOConfigService.class);
+        }
+
+        @Bean
         UserService userService() {
             return mock(UserService.class);
         }
@@ -115,13 +156,21 @@ class PasswordLoginFilterChainTest {
         }
 
         @Bean
-        UserDetailsService userDetailsService(UserService userService, TenantService tenantService) {
-            return authorizationServerConfig.userDetailsService(userService, tenantService);
+        UserDetailsService userDetailsService(UserService userService, TenantService tenantService,
+                                              SSOConfigService ssoConfigService) {
+            return authorizationServerConfig.userDetailsService(userService, tenantService, ssoConfigService);
         }
 
         @Bean
-        AuthenticationManager authenticationManager(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-            return authorizationServerConfig.authenticationManager(userDetailsService, passwordEncoder);
+        LoginAttemptLimiter loginAttemptLimiter() {
+            return mock(LoginAttemptLimiter.class);
+        }
+
+        @Bean
+        AuthenticationManager authenticationManager(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder,
+                                                    LoginAttemptLimiter loginAttemptLimiter) {
+            return authorizationServerConfig.authenticationManager(userDetailsService, passwordEncoder,
+                    loginAttemptLimiter);
         }
 
         @Bean
