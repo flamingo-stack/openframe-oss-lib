@@ -77,6 +77,11 @@
   --font-line-space-tag-stamp: 1rem;
   --spacing-tag-stamp-inline: 0.375rem;
 
+  /* The model trigger under the Mingo composer (Figma mingo/model-trigger): 6px before its mark and between its
+   * parts, 2px above and below; the 4px after the chevron is --spacing-system-xxs. */
+  --spacing-model-trigger-inline: 0.375rem; /* 6px */
+  --spacing-model-trigger-block: 0.125rem; /* 2px */
+
   /* Menu text keeps the same size when the popup becomes a drill-down panel. */
   --font-size-menu-label: 1rem;
   --font-line-space-menu-label: 1.25rem;
