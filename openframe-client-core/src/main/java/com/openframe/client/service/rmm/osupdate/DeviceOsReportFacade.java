@@ -3,6 +3,7 @@ package com.openframe.client.service.rmm.osupdate;
 import com.openframe.client.service.rmm.osupdate.parser.DeviceOsReportParser;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.repository.device.MachineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -24,6 +26,7 @@ public class DeviceOsReportFacade {
     private final OsUpdateService osUpdateService;
     private final DeviceOsPendingUpdateService deviceOsPendingUpdateService;
     private final DeviceOsUpdateHistoryService deviceOsUpdateHistoryService;
+    private final DeviceOsUpdateHistoryLogService deviceOsUpdateHistoryLogService;
 
     public void applyReport(String machineId, byte[] payload, Instant receivedAt) {
         Optional<Machine> reportingMachine = findReportingMachine(machineId);
@@ -42,7 +45,9 @@ public class DeviceOsReportFacade {
             osUpdateService.saveMissing(deviceOsReport.getOsUpdates());
             deviceOsPendingUpdateService.replacePendingUpdates(machine, deviceOsReport.getPendingUpdates());
         }
-        deviceOsUpdateHistoryService.saveMissing(machine, deviceOsReport.getHistoryEntries());
+        List<DeviceOsUpdateHistoryEntry> newHistoryEntries =
+                deviceOsUpdateHistoryService.saveMissing(machine, deviceOsReport.getHistoryEntries());
+        deviceOsUpdateHistoryLogService.logNewEntries(newHistoryEntries);
     }
 
     private Optional<Machine> findReportingMachine(String machineId) {

@@ -59,6 +59,10 @@ public class EventTypeMapper {
         registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.CMD_RUN_FINISHED, UnifiedEventType.COMMAND_RUN_FINISHED);
         registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED, UnifiedEventType.SCRIPT_EXECUTED);
         registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.SCRIPT_RUN_FAILED, UnifiedEventType.SCRIPT_FAILED);
+        registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.OS_UPDATE_INSTALLED, UnifiedEventType.OS_UPDATE_INSTALLED);
+        registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.OS_UPDATE_INSTALL_FAILED, UnifiedEventType.OS_UPDATE_INSTALL_FAILED);
+        registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.OS_UPDATE_UNINSTALLED, UnifiedEventType.OS_UPDATE_UNINSTALLED);
+        registerMapping(IntegratedToolType.RMM, SourceEventTypes.Rmm.OS_UPDATE_UNINSTALL_FAILED, UnifiedEventType.OS_UPDATE_UNINSTALL_FAILED);
 
         // Core MeshCentral mappings
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.SERVER_STARTED, UnifiedEventType.SYSTEM_START);

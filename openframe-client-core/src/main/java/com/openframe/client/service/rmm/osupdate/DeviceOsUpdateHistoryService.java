@@ -19,16 +19,18 @@ public class DeviceOsUpdateHistoryService {
 
     // Every report repeats the device's past installs, and each is stored once. Installs older than the retention
     // are not stored: the collection has already dropped them, and the report would bring them back.
-    public void saveMissing(Machine machine, List<DeviceOsUpdateHistoryEntry> reportedHistoryEntries) {
+    // Returns the entries stored now, for the first time.
+    public List<DeviceOsUpdateHistoryEntry> saveMissing(Machine machine,
+                                                        List<DeviceOsUpdateHistoryEntry> reportedHistoryEntries) {
         List<DeviceOsUpdateHistoryEntry> retainedEntries = findWithinRetention(reportedHistoryEntries);
         if (retainedEntries.isEmpty()) {
-            return;
+            return List.of();
         }
         Set<String> storedEntryKeys = findStoredEntryKeys(machine, retainedEntries);
         List<DeviceOsUpdateHistoryEntry> missingEntries = retainedEntries.stream()
                 .filter(retainedEntry -> !storedEntryKeys.contains(retainedEntry.getEntryKey()))
                 .toList();
-        deviceOsUpdateHistoryRepository.saveAll(missingEntries);
+        return deviceOsUpdateHistoryRepository.saveAll(missingEntries);
     }
 
     private static List<DeviceOsUpdateHistoryEntry> findWithinRetention(
