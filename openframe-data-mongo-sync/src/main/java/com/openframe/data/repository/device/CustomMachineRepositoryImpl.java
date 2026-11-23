@@ -14,6 +14,8 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -548,18 +550,30 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     @Override
     public List<Machine> findMachinesWithCursor(String tenantId, MachineQueryFilter filter, String search,
-                                                String cursor, int limit,
+                                                CursorPosition position, boolean backward, int limit,
                                                 String sortField, String sortDirection) {
         Query query = buildTenantQuery(tenantId, filter, search);
+        String cursor = position instanceof CursorPosition.RowId rowId ? rowId.id() : null;
         return findMachinesWithCursor(query, cursor, limit, sortField, sortDirection);
     }
 
     @Override
     public List<Machine> findAvailableForScheduleWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                             Collection<String> assignedMachineIds,
-                                                            String cursor, int limit) {
+                                                            CursorPosition position, boolean backward, int limit) {
         Query query = buildTenantQuery(tenantId, filter, search);
+        String cursor = position instanceof CursorPosition.Unrecognised legacy ? legacy.decoded() : null;
         return findAvailableForScheduleWithCursor(query, assignedMachineIds, cursor, limit);
+    }
+
+    @Override
+    public KeysetCursor keysetCursor(Machine machine, String sortField, String sortDirection) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public KeysetCursor availableForScheduleKeysetCursor(Machine machine, Collection<String> assignedMachineIds) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

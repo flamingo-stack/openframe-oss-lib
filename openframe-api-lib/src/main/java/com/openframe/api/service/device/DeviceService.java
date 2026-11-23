@@ -21,6 +21,7 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.device.MachineNameMatches;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
@@ -182,8 +183,10 @@ public class DeviceService {
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
+        CursorPosition position = normalized.hasCursor()
+                ? new CursorPosition.Unrecognised(normalized.getCursor()) : new CursorPosition.None();
         List<Machine> page = machineRepository.findAvailableForScheduleWithCursor(
-                tenantId, filter, search, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
+                tenantId, filter, search, assignedMachineIds, position, false, normalized.getLimit() + 1);
         boolean hasNextPage = page.size() > normalized.getLimit();
         if (hasNextPage) {
             page = page.subList(0, normalized.getLimit());
@@ -274,8 +277,10 @@ public class DeviceService {
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
 
         int limit = normalizedPagination.getLimit();
+        CursorPosition position = normalizedPagination.hasCursor()
+                ? new CursorPosition.RowId(normalizedPagination.getCursor()) : new CursorPosition.None();
         List<Machine> raw = machineRepository.findMachinesWithCursor(tenantId, filter, search,
-                normalizedPagination.getCursor(), limit + 1, sortField, sortDirection.name());
+                position, false, limit + 1, sortField, sortDirection.name());
         boolean hasNextPage = raw.size() > limit;
         List<Machine> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 

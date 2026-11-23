@@ -293,6 +293,96 @@ class KeysetCursorTest {
                 .hasMessage(INVALID_CURSOR);
     }
 
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    void parseDecoded_nullOrBlank_noPosition(String decoded) {
+        // execution
+        CursorPosition position = KeysetCursor.parseDecoded(decoded);
+
+        // verifications
+        assertThat(position).isEqualTo(new CursorPosition.None());
+    }
+
+    @Test
+    void parseDecoded_keysetPayload_keysetPosition() {
+        // setup
+        String decoded = "k1|createdAt|DESC|1700000000123|" + ROW_ID;
+        KeysetCursor expected = new KeysetCursor(CREATED_AT, Sort.Direction.DESC, "1700000000123", ROW_ID);
+
+        // execution
+        CursorPosition position = KeysetCursor.parseDecoded(decoded);
+
+        // verifications
+        assertThat(position).isEqualTo(expected);
+    }
+
+    @Test
+    void parseDecoded_objectId_rowId() {
+        // execution
+        CursorPosition position = KeysetCursor.parseDecoded(ROW_ID);
+
+        // verifications
+        assertThat(position).isEqualTo(new CursorPosition.RowId(ROW_ID));
+    }
+
+    @Test
+    void parseDecoded_anotherFormat_unrecognisedWithTheSameText() {
+        // setup
+        String decoded = "2|" + ROW_ID;
+
+        // execution
+        CursorPosition position = KeysetCursor.parseDecoded(decoded);
+
+        // verifications
+        assertThat(position).isEqualTo(new CursorPosition.Unrecognised(decoded));
+    }
+
+    @Test
+    void parseDecoded_stillEncodedCursor_unrecognisedBecauseItIsNotDecodedAgain() {
+        // setup
+        String encoded = KeysetCursor.ofInstant(CREATED_AT, Sort.Direction.DESC, CREATED_AT_VALUE, ROW_ID).encode();
+
+        // execution
+        CursorPosition position = KeysetCursor.parseDecoded(encoded);
+
+        // verifications
+        assertThat(position).isEqualTo(new CursorPosition.Unrecognised(encoded));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "k1|",
+            "k1|name|ASC|5",
+            "k1|name|UP|5|65f1a2b3c4d5e6f708192a3b",
+            "k1|name|ASC|5|"
+    })
+    void parseDecoded_malformedKeysetPayload_throwsInvalidCursor(String decoded) {
+        // execution
+        Throwable thrown = catchThrowable(() -> KeysetCursor.parseDecoded(decoded));
+
+        // verifications
+        assertThat(thrown)
+                .isInstanceOf(InvalidCursorException.class)
+                .hasMessage(INVALID_CURSOR);
+    }
+
+    @Test
+    void parseDecoded_payloadOfAnEncodedCursor_samePositionAsParseOfTheEncodedCursor() {
+        // setup
+        KeysetCursor cursor = KeysetCursor.ofString(NAME, Sort.Direction.ASC, NAME_WITH_SEPARATOR, ROW_ID);
+        String encoded = cursor.encode();
+        String decoded = CursorBase64.decode(encoded);
+
+        // execution
+        CursorPosition position = KeysetCursor.parseDecoded(decoded);
+
+        // verifications
+        assertThat(position)
+                .isEqualTo(cursor)
+                .isEqualTo(KeysetCursor.parse(encoded));
+    }
+
     @Test
     void requireSort_sameFieldAndDirection_passes() {
         // setup

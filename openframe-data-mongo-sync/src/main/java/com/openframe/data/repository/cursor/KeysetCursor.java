@@ -59,6 +59,10 @@ public record KeysetCursor(String sortField, Sort.Direction direction, String ra
         return new CursorPosition.Unrecognised(decoded);
     }
 
+    public static CursorPosition parseDecoded(String decoded) {
+        throw new UnsupportedOperationException();
+    }
+
     public String encode() {
         String payload = String.join(SEPARATOR, VERSION, sortField, direction.name(), rawValue, id);
         return Base64.getEncoder().encodeToString(payload.getBytes(StandardCharsets.UTF_8));

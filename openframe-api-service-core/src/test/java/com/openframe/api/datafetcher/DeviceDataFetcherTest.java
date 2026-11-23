@@ -1,7 +1,12 @@
 package com.openframe.api.datafetcher;
 
 import com.openframe.graphql.relay.RelayIdCodec;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
@@ -12,6 +17,10 @@ import com.openframe.api.dataloader.MachineTagDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationKey;
 import com.openframe.api.dto.notification.NotificationRecipient;
+import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.NotificationRecipientResolver;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
@@ -23,6 +32,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +43,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 
 import org.dataloader.DataLoader;
 
@@ -89,6 +100,36 @@ class DeviceDataFetcherTest {
 
         assertThat(result.getNickname()).isNull();
         verify(deviceService).updateNickname("m1", null);
+    }
+
+    @Test
+    void devices_lastAndBefore_serviceGetsTheBackwardPageOfTheConnectionArguments() {
+        // setup
+        KeysetCursor cursor = KeysetCursor.ofString("hostname", Sort.Direction.ASC, "host-c", "65f1a2b3c4d5e6f708192a3b");
+        String before = cursor.encode();
+        ConnectionArgs lastBefore = ConnectionArgs.builder().last(5).before(before).build();
+        CursorPaginationCriteria backwardPage = CursorPaginationCriteria.fromConnectionArgs(lastBefore);
+        DeviceFilterInput noFilter = null;
+        DeviceFilterCriteria everyDevice = DeviceFilterCriteria.builder().build();
+        SortInput byHostname = SortInput.builder().field("hostname").direction(SortDirection.ASC).build();
+        CountedGenericQueryResult<Machine> page = CountedGenericQueryResult.<Machine>builder().items(List.of()).build();
+        CountedGenericConnection<GenericEdge<Machine>> connection =
+                CountedGenericConnection.<GenericEdge<Machine>>builder().edges(List.of()).build();
+        when(mapper.toDeviceFilterCriteria(noFilter)).thenReturn(everyDevice);
+        when(mapper.toCursorPaginationCriteria(lastBefore)).thenReturn(backwardPage);
+        when(deviceService.queryDevices(everyDevice, backwardPage, "mac", byHostname)).thenReturn(page);
+        when(mapper.toDeviceConnection(page)).thenReturn(connection);
+
+        // execution
+        CountedGenericConnection<GenericEdge<Machine>> result =
+                fetcher.devices(noFilter, null, null, 5, before, "mac", byHostname);
+
+        // verifications
+        assertThat(result).isSameAs(connection);
+        assertThat(backwardPage)
+                .returns(true, CursorPaginationCriteria::isBackward)
+                .returns(5, CursorPaginationCriteria::getLimit);
+        assertThat(KeysetCursor.parseDecoded(backwardPage.getCursor())).isEqualTo(cursor);
     }
 
     @Test
