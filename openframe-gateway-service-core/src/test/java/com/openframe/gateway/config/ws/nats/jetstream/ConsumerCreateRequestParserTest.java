@@ -1,0 +1,194 @@
+package com.openframe.gateway.config.ws.nats.jetstream;
+
+import com.openframe.gateway.config.ws.nats.protocol.NatsProtocolException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
+
+import java.util.Optional;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+class ConsumerCreateRequestParserTest {
+
+    private static final JetStreamApiSubject BARE_CREATE =
+            JetStreamApiSubject.builder().stream("CHAT_CHUNKS").build();
+    private static final JetStreamApiSubject FILTERED_CREATE =
+            JetStreamApiSubject.builder().stream("CHAT_CHUNKS").consumerName("c1").filterSubject("chat.d-1.message").build();
+
+    private ConsumerCreateRequestParser parser;
+
+    @BeforeEach
+    void setUp() {
+        parser = new ConsumerCreateRequestParser(new ObjectMapper());
+    }
+
+    @Test
+    void parse_filterSubjectInTheBody_singleFilter() {
+        // setup
+        byte[] body = json("{\"stream_name\":\"CHAT_CHUNKS\",\"config\":{\"filter_subject\":\"chat.d-1.message\",\"deliver_policy\":\"new\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.getStream()).isEqualTo("CHAT_CHUNKS");
+        assertThat(request.getFilterSubjects()).containsExactly("chat.d-1.message");
+        assertThat(request.getDeliverSubject()).isEmpty();
+        assertThat(request.isUnfiltered()).isFalse();
+    }
+
+    @Test
+    void parse_filterSubjectsArrayInTheBody_allFilters() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subjects\":[\"chat.d-1.message\",\"chat.d-2.message\"]}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.getFilterSubjects()).containsExactly("chat.d-1.message", "chat.d-2.message");
+    }
+
+    @Test
+    void parse_filterOnlyInTheApiSubject_takenFromThere() {
+        // setup
+        byte[] body = json("{\"config\":{\"deliver_policy\":\"new\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(FILTERED_CREATE, body);
+
+        // verifications
+        assertThat(request.getFilterSubjects()).containsExactly("chat.d-1.message");
+    }
+
+    @Test
+    void parse_noFilterAnywhere_unfiltered() {
+        // setup
+        byte[] body = json("{\"config\":{\"deliver_policy\":\"all\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.isUnfiltered()).isTrue();
+    }
+
+    @Test
+    void parse_streamNameMissingInTheBody_takenFromTheApiSubject() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-1.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.getStream()).isEqualTo("CHAT_CHUNKS");
+    }
+
+    @Test
+    void parse_pushConsumer_deliverSubjectRead() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-1.message\",\"deliver_subject\":\"_INBOX.abc\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.getDeliverSubject()).contains("_INBOX.abc");
+    }
+
+    @Test
+    void parse_bodyStreamDiffersFromTheApiSubject_ambiguousAndStreamFromTheSubject() {
+        // setup
+        byte[] body = json("{\"stream_name\":\"OTHER_STREAM\",\"config\":{\"filter_subject\":\"chat.d-1.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.getStream()).isEqualTo("CHAT_CHUNKS");
+        assertThat(request.getAmbiguity()).contains(ConsumerCreateRequestParser.AMBIGUITY_STREAM_DIFFERS);
+    }
+
+    @Test
+    void parse_durableName_durable() {
+        // setup
+        byte[] body = json("{\"config\":{\"durable_name\":\"d1\",\"filter_subject\":\"chat.d-1.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.isDurable()).isTrue();
+    }
+
+    @Test
+    void parse_ephemeralConsumerWithAName_notDurable() {
+        // setup
+        byte[] body = json("{\"config\":{\"name\":\"c1\",\"filter_subject\":\"chat.d-1.message\",\"inactive_threshold\":30000000000}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.isDurable()).isFalse();
+    }
+
+    @Test
+    void parse_bothFilterFieldsInTheBody_ambiguous() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-1.message\",\"filter_subjects\":[\"chat.d-2.message\"]}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.isAmbiguous()).isTrue();
+        assertThat(request.getAmbiguity()).contains(ConsumerCreateRequestParser.AMBIGUITY_BOTH_FILTER_FIELDS);
+    }
+
+    @Test
+    void parse_bodyFilterDiffersFromTheApiSubjectFilter_ambiguous() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-2.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(FILTERED_CREATE, body);
+
+        // verifications
+        assertThat(request.isAmbiguous()).isTrue();
+        assertThat(request.getAmbiguity()).contains(ConsumerCreateRequestParser.AMBIGUITY_SUBJECT_DIFFERS);
+    }
+
+    @Test
+    void parse_bodyFilterEqualsTheApiSubjectFilter_notAmbiguous() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-1.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(FILTERED_CREATE, body);
+
+        // verifications
+        assertThat(request.isAmbiguous()).isFalse();
+        assertThat(request.getFilterSubjects()).containsExactly("chat.d-1.message");
+    }
+
+    @Test
+    void parse_bodyNotJson_throwsProtocolException() {
+        // setup
+        byte[] body = "not-json".getBytes(UTF_8);
+
+        // execution
+        NatsProtocolException exception = assertThrows(NatsProtocolException.class, () -> parser.parse(BARE_CREATE, body));
+
+        // verifications
+        assertThat(exception.getMessage()).contains("JSON");
+    }
+
+    private static byte[] json(String text) {
+        return text.getBytes(UTF_8);
+    }
+}
