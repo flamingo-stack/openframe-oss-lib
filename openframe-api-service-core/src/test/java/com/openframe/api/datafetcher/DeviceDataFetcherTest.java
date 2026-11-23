@@ -2,8 +2,10 @@ package com.openframe.api.datafetcher;
 
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
+import com.openframe.api.dto.device.MachinePackageManagersResponse;
 import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
+import com.openframe.api.service.device.ChocolateyDecisionService;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
@@ -21,6 +23,8 @@ import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.device.chocolatey.ChocolateyAdminOption;
+import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
@@ -28,16 +32,22 @@ import com.openframe.data.document.toolagent.UnsupportedTool;
 import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.service.ToolOsSupportService.AgentWithToolType;
 import graphql.GraphQLContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import org.dataloader.DataLoader;
 
@@ -57,6 +67,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DeviceDataFetcherTest {
 
+    private static final String USER_ID = "user-1";
+
     @Mock private DeviceService deviceService;
     @Mock private DeviceFilterService deviceFilterService;
     @Mock private TagService tagService;
@@ -64,11 +76,61 @@ class DeviceDataFetcherTest {
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     @Mock private NotificationRecipientResolver recipientResolver;
     @Mock private ToolOsSupportService toolOsSupportService;
+    @Mock private ChocolateyDecisionService chocolateyDecisionService;
     @Mock private DgsDataFetchingEnvironment dfe;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
     @Spy private ClientVersionThreshold clientVersionThreshold = new ClientVersionThreshold("1.6.0");
 
     @InjectMocks private DeviceDataFetcher fetcher;
+
+    @BeforeEach
+    void setUp() {
+        Jwt jwt = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .claim("userId", USER_ID)
+                .build();
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(jwt);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @ParameterizedTest
+    @EnumSource(ChocolateyAdminOption.class)
+    void setChocolateyDecision_option_storedForTheCurrentUserAndTheUpdatedMachineReturned(ChocolateyAdminOption option) {
+        // setup
+        Machine updated = new Machine();
+        updated.setMachineId("m1");
+        when(chocolateyDecisionService.set("m1", option, USER_ID)).thenReturn(updated);
+
+        // execution
+        Machine result = fetcher.setChocolateyDecision("m1", option);
+
+        // verifications
+        assertThat(result).isSameAs(updated);
+        verify(chocolateyDecisionService).set("m1", option, USER_ID);
+    }
+
+    @Test
+    void packageManagers_machine_mappedFromTheWholeMachineSoChocolateyIsIncluded() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        MachinePackageManagersResponse mapped = MachinePackageManagersResponse.builder()
+                .choco(PackageManagerState.PRESENT)
+                .build();
+        when(dfe.getSource()).thenReturn(machine);
+        when(mapper.toPackageManagers(machine)).thenReturn(mapped);
+
+        // execution
+        MachinePackageManagersResponse result = fetcher.packageManagers(dfe);
+
+        // verifications
+        assertThat(result).isSameAs(mapped);
+    }
 
     @Test
     @DisplayName("updateDeviceNickname: delegates to DeviceService.updateNickname and returns the updated device")

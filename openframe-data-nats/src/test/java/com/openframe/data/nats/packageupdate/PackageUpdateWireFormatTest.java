@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PackageUpdateWireFormatTest {
 
+    private static final String CHOCO_FEED = "https://feed.openframe.build/choco/index.json";
+
     private final JsonMapper mapper = new JsonMapper();
 
     @Test
@@ -259,5 +261,121 @@ class PackageUpdateWireFormatTest {
         assertThat(msg.getState()).isNull();                          // unknown top-level state tolerated
         assertThat(msg.getWaiting().getReason()).isNull();            // unknown reason tolerated
         assertThat(msg.getWaiting().getPhase()).isEqualTo(PackageUpdateStatusMessage.Waiting.Phase.PROMPT);
+    }
+
+    @Test
+    void reference_choco_idAndFeed() {
+        // setup
+        PackageReference expected = PackageReference.builder()
+                .manager(PackageManagerType.CHOCO)
+                .id("googlechrome")
+                .feed(CHOCO_FEED)
+                .build();
+
+        // execution
+        PackageReference reference = PackageUpdateWire.reference(PackageManagerType.CHOCO, "googlechrome", null,
+                CHOCO_FEED);
+
+        // verifications
+        assertThat(reference).isEqualTo(expected);
+    }
+
+    @Test
+    void reference_winget_idOnlyWithoutTheFeed() {
+        // setup
+        PackageReference expected = PackageReference.builder()
+                .manager(PackageManagerType.WINGET)
+                .id("Google.Chrome")
+                .build();
+
+        // execution
+        PackageReference reference = PackageUpdateWire.reference(PackageManagerType.WINGET, "Google.Chrome", null,
+                CHOCO_FEED);
+
+        // verifications
+        assertThat(reference).isEqualTo(expected);
+    }
+
+    @Test
+    void reference_brew_kindAndNameWithoutTheFeed() {
+        // setup
+        PackageReference expected = PackageReference.builder()
+                .manager(PackageManagerType.BREW)
+                .kind(BrewPackageType.CASK)
+                .name("postman")
+                .build();
+
+        // execution
+        PackageReference reference = PackageUpdateWire.reference(PackageManagerType.BREW, "postman",
+                BrewPackageType.CASK, CHOCO_FEED);
+
+        // verifications
+        assertThat(reference).isEqualTo(expected);
+    }
+
+    @Test
+    void order_choco_carriesFeed() {
+        // setup
+        PackageUpdateRequest request = PackageUpdateRequest.builder()
+                .requestId("req-1")
+                .source(PackageUpdateSource.ADMIN)
+                .packageManager(PackageManagerType.CHOCO)
+                .packageName("googlechrome")
+                .feed(CHOCO_FEED)
+                .mode(PackageUpdateMode.WAIT)
+                .build();
+        PackageUpdateMessage order = new PackageUpdateDeliverySpec()
+                .request(PackageUpdateWire.seed("m1", request))
+                .getPayload();
+        JsonNode expected = mapper.readTree("""
+                {"manager": "CHOCO", "id": "googlechrome", "feed": "https://feed.openframe.build/choco/index.json"}""");
+
+        // execution
+        JsonNode json = mapper.readTree(mapper.writeValueAsString(order));
+
+        // verifications
+        assertThat(json.get("package")).isEqualTo(expected);
+    }
+
+    @Test
+    void deadlineForce_chocoRequest_referenceKeepsTheFeed() {
+        // setup
+        PackageUpdateRequest request = PackageUpdateRequest.builder()
+                .requestId("req-1")
+                .source(PackageUpdateSource.AUTO)
+                .packageManager(PackageManagerType.CHOCO)
+                .packageName("googlechrome")
+                .feed(CHOCO_FEED)
+                .mode(PackageUpdateMode.WAIT)
+                .forceCountdownSeconds(300)
+                .deadlineSeconds(604800L)
+                .build();
+        PackageReference expected = PackageReference.builder()
+                .manager(PackageManagerType.CHOCO)
+                .id("googlechrome")
+                .feed(CHOCO_FEED)
+                .build();
+
+        // execution
+        PackageUpdateDeliverySeed force = PackageUpdateWire.deadlineForce("m1", request);
+
+        // verifications
+        assertThat(force.getPackageRef()).isEqualTo(expected);
+    }
+
+    @Test
+    void order_winget_noFeed() {
+        // setup
+        PackageUpdateMessage order = new PackageUpdateMessage();
+        order.setRequestId("req-1");
+        order.setPackageRef(PackageUpdateWire.reference(PackageManagerType.WINGET, "Google.Chrome", null, CHOCO_FEED));
+        JsonNode expected = mapper.readTree("""
+                {"manager": "WINGET", "id": "Google.Chrome"}""");
+
+        // execution
+        JsonNode json = mapper.readTree(mapper.writeValueAsString(order));
+
+        // verifications
+        assertThat(json.get("package")).isEqualTo(expected);
     }
 }

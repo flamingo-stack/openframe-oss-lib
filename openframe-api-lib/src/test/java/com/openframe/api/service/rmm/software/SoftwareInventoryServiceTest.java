@@ -38,6 +38,7 @@ import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
@@ -121,6 +122,7 @@ class SoftwareInventoryServiceTest {
     @Mock private SoftwareAdoptionService softwareAdoptionService;
     @Mock private PackageManagerAvailability packageManagerAvailability;
     @Mock private PackageAdoptReach packageAdoptReach;
+    @Mock private ChocoPackageOwnership chocoPackageOwnership;
 
     @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
     @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
@@ -134,7 +136,7 @@ class SoftwareInventoryServiceTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                softwareAdoptionService, packageManagerAvailability, packageAdoptReach);
+                softwareAdoptionService, packageManagerAvailability, packageAdoptReach, chocoPackageOwnership);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -1324,6 +1326,79 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
+    void listDevicesForSoftware_chocolateyTitle_installedByChocolateyOnlyOnDevicesOwningItsManagingPackage() {
+        // setup
+        Machine owner = device("m-1", "24.08");
+        Machine notOwner = device("m-2", "24.09");
+        stubDevices("chocolatey_packages", owner, notOwner);
+        catalogManagesWith(chocoPackage("7zip"));
+        when(chocoPackageOwnership.owns(owner, "7zip")).thenReturn(true);
+        when(chocoPackageOwnership.owns(notOwner, "7zip")).thenReturn(false);
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows)
+                .extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getInstalledBy,
+                        SoftwareOnDeviceResponse::getAutoUpdate)
+                .containsExactly(tuple("m-1", SoftwareSource.CHOCOLATEY, SoftwareAutoUpdateStatus.OFF),
+                        tuple("m-2", null, null));
+    }
+
+    @Test
+    void listDevicesForSoftware_installedByChocolateyFilter_onlyDevicesOwningTheManagingPackage() {
+        // setup
+        Machine owner = device("m-1", "24.08");
+        Machine notOwner = device("m-2", "24.09");
+        stubDevices("chocolatey_packages", owner, notOwner);
+        catalogManagesWith(chocoPackage("7zip"));
+        when(chocoPackageOwnership.owns(owner, "7zip")).thenReturn(true);
+        when(chocoPackageOwnership.owns(notOwner, "7zip")).thenReturn(false);
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setInstalledBy(List.of(SoftwareSource.CHOCOLATEY));
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", filter, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-1");
+    }
+
+    @Test
+    void listDevicesForSoftware_manageableOfAChocolateyTitle_splitsTheDevicesByOwnership() {
+        // setup
+        Machine owner = device("m-1", "24.08");
+        Machine notOwner = device("m-2", "24.09");
+        stubDevices("chocolatey_packages", owner, notOwner);
+        catalogManagesWith(chocoPackage("7zip"));
+        when(chocoPackageOwnership.owns(owner, "7zip")).thenReturn(true);
+        when(chocoPackageOwnership.owns(notOwner, "7zip")).thenReturn(false);
+        SoftwareOnDeviceFilterInput rest = new SoftwareOnDeviceFilterInput();
+        rest.setManageable(false);
+
+        // execution
+        List<SoftwareOnDeviceResponse> notManageable = service.listDevicesForSoftware("42", rest, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(notManageable).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-2");
+    }
+
+    @Test
+    void listDevicesForSoftware_programWingetMatches_chocoOwnershipNeverConsulted() {
+        // setup
+        stubDevices("programs", withWinget(device("m-1", "1.0"), PackageManagerState.PRESENT));
+        catalogMatchesWinget(null);
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getInstalledBy).containsExactly(SoftwareSource.WINGET);
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    @Test
     void listDevicesForSoftware_programWingetDoesNotMatch_installedByUnknown() {
         // setup
         stubDevices("programs", withWinget(device("m-1", "1.0"), PackageManagerState.PRESENT));
@@ -1762,6 +1837,10 @@ class SoftwareInventoryServiceTest {
                 .thenAnswer(call -> List.of(hostByVersion.get(call.<HostSearchRequest>getArgument(0).getSoftwareVersionId())));
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(machineByHost);
+    }
+
+    private static PackageCatalogEntry chocoPackage(String id) {
+        return PackageCatalogEntry.builder().manager(PackageManagerType.CHOCO).packageId(id).version("24.09").build();
     }
 
     private static Machine withWinget(Machine machine, PackageManagerState state) {

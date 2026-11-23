@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -15,6 +16,7 @@ import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
+import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.packageupdate.PackageAutoUpdateWithdrawal;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
@@ -22,6 +24,8 @@ import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+import com.openframe.data.service.rmm.software.ChocoPackageManagerHandler;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.nats.packageupdate.PackageUpdateEligibilityService;
@@ -34,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -43,6 +48,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -60,6 +66,10 @@ class PackageAutoUpdateTriggerTest {
             .mode(PackageUpdateMode.WAIT).deadlineSeconds(604_800L).countdownSeconds(300).build();
     private static final PackageUpdateSettings FORCE = PackageUpdateSettings.builder()
             .mode(PackageUpdateMode.FORCE).countdownSeconds(60).build();
+    private static final String CHOCO_PACKAGE = "googlechrome";
+    private static final String CHOCO_LATEST = "159.0.8154.13";
+    private static final String CHOCO_JOB =
+            SoftwareExecutionId.forAutoUpdate(TENANT, PackageManagerType.CHOCO, CHOCO_PACKAGE, CHOCO_LATEST);
 
     private final PackageAutoUpdatePolicyRepository policyRepository = mock(PackageAutoUpdatePolicyRepository.class);
     private final PackageCatalogVersions catalogVersions = mock(PackageCatalogVersions.class);
@@ -70,12 +80,20 @@ class PackageAutoUpdateTriggerTest {
     private final DeliveryTracker deliveryTracker = mock(DeliveryTracker.class);
     private final TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
     private final MachinePlatformResolver machinePlatformResolver = mock(MachinePlatformResolver.class);
+    private final ChocoPackageOwnership chocoPackageOwnership = mock(ChocoPackageOwnership.class);
+    private final PackageManagerProperties packageManagerProperties = chocoEnabledProperties();
+
+    private final ArgumentCaptor<RunningExecutionRows> rowsCaptor = ArgumentCaptor.forClass(RunningExecutionRows.class);
+    private final ArgumentCaptor<SoftwareActionResult> jobCaptor = ArgumentCaptor.forClass(SoftwareActionResult.class);
 
     private final PackageAutoUpdateTrigger trigger = new PackageAutoUpdateTrigger(policyRepository, catalogVersions,
             eligibility,
-            new PackageManagerRegistry(List.of(new BrewPackageManagerHandler(), new WingetPackageManagerHandler())),
+            new PackageManagerRegistry(
+                    List.of(new BrewPackageManagerHandler(), new WingetPackageManagerHandler(),
+                            new ChocoPackageManagerHandler(packageManagerProperties)),
+                    packageManagerProperties),
             scriptRepository, actionResultRepository, dispatchService, new PackageAutoUpdateWithdrawal(deliveryTracker), tenantIdProvider,
-            machinePlatformResolver);
+            machinePlatformResolver, chocoPackageOwnership);
 
     @BeforeEach
     void setUp() {
@@ -250,6 +268,119 @@ class PackageAutoUpdateTriggerTest {
         verify(dispatchService).dispatchAutoUpdate(any(), any(), eq(FORCE));
         verify(policyRepository).markOrdered(eq(List.of("p2")), eq(LATEST), any());
         verify(policyRepository).markOrdered(eq(List.of("p3")), eq(LATEST), any());
+    }
+
+    @Test
+    void run_chocoOutdatedPolicies_onlyOwningDevicesOrdered() {
+        // setup
+        stubChocoCatalogAndScript();
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(
+                choco("p1", "m1", "158.0.8100.2"),
+                choco("p2", "m2", "158.0.8100.2")));
+        stubEveryMachineEligible();
+        when(chocoPackageOwnership.owners(anyCollection(), eq(CHOCO_PACKAGE))).thenReturn(List.of("m2"));
+        when(dispatchService.dispatchAutoUpdate(any(RunningExecutionRows.class), isNull(), eq(WAIT))).thenReturn("req-choco");
+
+        // execution
+        trigger.run();
+
+        // verifications
+        verify(dispatchService).dispatchAutoUpdate(rowsCaptor.capture(), isNull(), eq(WAIT));
+        assertThat(rowsCaptor.getValue())
+                .returns(List.of("m2"), RunningExecutionRows::getMachineIds)
+                .returns(PackageManagerType.CHOCO, RunningExecutionRows::getPackageManager)
+                .returns(CHOCO_PACKAGE, RunningExecutionRows::getPackageName)
+                .returns("choco-update-id", RunningExecutionRows::getScriptId)
+                .returns(CHOCO_JOB, RunningExecutionRows::getExecutionId);
+        verify(policyRepository).markOrdered(List.of("p2"), CHOCO_LATEST, "req-choco");
+    }
+
+    @Test
+    void run_chocoOutdatedPolicies_jobListsOnlyOwningDevices() {
+        // setup
+        stubChocoCatalogAndScript();
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(
+                choco("p1", "m1", "158.0.8100.2"),
+                choco("p2", "m2", "158.0.8100.2")));
+        stubEveryMachineEligible();
+        when(chocoPackageOwnership.owners(anyCollection(), eq(CHOCO_PACKAGE))).thenReturn(List.of("m2"));
+
+        // execution
+        trigger.run();
+
+        // verifications
+        verify(actionResultRepository).save(jobCaptor.capture());
+        assertThat(jobCaptor.getValue())
+                .returns(CHOCO_JOB, SoftwareActionResult::getId)
+                .returns(List.of("m2"), SoftwareActionResult::getMachineIds)
+                .returns(1, SoftwareActionResult::getTotalMachineCount);
+    }
+
+    @Test
+    void run_chocoOutdatedPoliciesNoOwningDevice_nothingDispatched() {
+        // setup
+        stubChocoCatalogAndScript();
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(
+                choco("p1", "m1", "158.0.8100.2"),
+                choco("p2", "m2", "158.0.8100.2")));
+        stubEveryMachineEligible();
+        when(chocoPackageOwnership.owners(anyCollection(), eq(CHOCO_PACKAGE))).thenReturn(List.of());
+
+        // execution
+        trigger.run();
+
+        // verifications
+        verifyNoInteractions(dispatchService, actionResultRepository, deliveryTracker);
+        verify(policyRepository, never()).markOrdered(anyCollection(), eq(CHOCO_LATEST), any(String.class));
+    }
+
+    @Test
+    void run_brewOutdatedPolicies_chocoOwnershipNotConsulted() {
+        // setup
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(
+                chrome("p1", "m1", "151.0.7922.98", WAIT),
+                chrome("p2", "m2", "151.0.7922.98", WAIT)));
+        stubEveryMachineEligible();
+
+        // execution
+        trigger.run();
+
+        // verifications
+        verify(dispatchService).dispatchAutoUpdate(rowsCaptor.capture(), eq(BrewPackageType.CASK), eq(WAIT));
+        assertThat(rowsCaptor.getValue().getMachineIds()).containsExactly("m1", "m2");
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    private void stubChocoCatalogAndScript() {
+        when(catalogVersions.hasLatest(PackageManagerType.CHOCO, CHOCO_PACKAGE, null)).thenReturn(true);
+        when(catalogVersions.latest(PackageManagerType.CHOCO, CHOCO_PACKAGE, null)).thenReturn(CHOCO_LATEST);
+        when(scriptRepository.findByTenantIdAndNameAndType(
+                TENANT, SoftwareScriptCode.CHOCO_UPDATE.canonicalName(), ScriptType.SOFTWARE))
+                .thenReturn(Optional.of(Script.builder().id("choco-update-id").privilegeLevel(PrivilegeLevel.ADMIN)
+                        .defaultTimeoutSeconds(540).build()));
+        when(actionResultRepository.findByTenantIdAndExecutionId(TENANT, CHOCO_JOB)).thenReturn(Optional.empty());
+    }
+
+    private void stubEveryMachineEligible() {
+        when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection()))
+                .thenAnswer(invocation -> Set.copyOf(invocation.<Collection<String>>getArgument(1)));
+    }
+
+    private static PackageManagerProperties chocoEnabledProperties() {
+        PackageManagerProperties properties = new PackageManagerProperties();
+        properties.setChocoEnabled(true);
+        properties.getChoco().setFeedUrl("https://feed.openframe.test/choco/index.json");
+        properties.getChoco().setVersion("2.7.5");
+        properties.getChoco().setSha256("f86f99a1");
+        return properties;
+    }
+
+    private static PackageAutoUpdatePolicy choco(String id, String machineId, String lastVersion) {
+        return PackageAutoUpdatePolicy.builder()
+                .id(id).tenantId(TENANT).machineId(machineId)
+                .packageManager(PackageManagerType.CHOCO).packageName(CHOCO_PACKAGE)
+                .enabled(true).settings(WAIT).lastVersion(lastVersion)
+                .build();
     }
 
     private static PackageAutoUpdatePolicy chrome(String id, String machineId, String lastVersion,

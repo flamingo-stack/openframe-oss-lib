@@ -3,6 +3,8 @@ package com.openframe.api.schema;
 import com.apollographql.federation.graphqljava.Federation;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
+import com.openframe.data.document.device.chocolatey.ChocolateyAdminOption;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketStatus;
@@ -331,6 +333,113 @@ class ApiSubgraphSchemaTest {
         assertThat(tagType).isEqualTo("Tag!");
     }
 
+    @Test
+    void machinePackageManagers_chocolatey_nullableMachineChocolatey() {
+        // setup
+        GraphQLFieldDefinition definition = schema.getObjectType("MachinePackageManagers").getFieldDefinition("chocolatey");
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo("MachineChocolatey");
+    }
+
+    @ParameterizedTest
+    @MethodSource("machineChocolateyFields")
+    void machineChocolateyField_typedLikeTheContract(String field, String type) {
+        // setup
+        GraphQLFieldDefinition definition = schema.getObjectType("MachineChocolatey").getFieldDefinition(field);
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo(type);
+    }
+
+    @ParameterizedTest
+    @MethodSource("chocolateyEnums")
+    void chocolateyEnum_valuesEqualJavaEnum(String type, Class<? extends Enum<?>> javaEnum) {
+        // setup
+        List<String> javaNames = javaEnumNames(javaEnum);
+
+        // execution
+        List<String> sdlNames = sdlEnumNames(type);
+
+        // verifications
+        assertThat(sdlNames).containsExactlyInAnyOrderElementsOf(javaNames);
+    }
+
+    @Test
+    void setChocolateyDecision_mutation_takesTheMachineAndTheOptionAndReturnsTheMachine() {
+        // setup
+        GraphQLFieldDefinition mutation = schema.getMutationType().getFieldDefinition("setChocolateyDecision");
+
+        // execution
+        String type = GraphQLTypeUtil.simplePrint(mutation.getType());
+        String machineId = GraphQLTypeUtil.simplePrint(mutation.getArgument("machineId").getType());
+        String option = GraphQLTypeUtil.simplePrint(mutation.getArgument("option").getType());
+
+        // verifications
+        assertThat(type).isEqualTo("Machine!");
+        assertThat(machineId).isEqualTo("String!");
+        assertThat(option).isEqualTo("ChocolateyAdminOption!");
+    }
+
+    @Test
+    void softwareSettings_query_nonNullSoftwareSettings() {
+        // setup
+        GraphQLFieldDefinition query = schema.getQueryType().getFieldDefinition("softwareSettings");
+
+        // execution
+        String type = GraphQLTypeUtil.simplePrint(query.getType());
+
+        // verifications
+        assertThat(type).isEqualTo("SoftwareSettings!");
+        assertThat(query.getArguments()).isEmpty();
+    }
+
+    @Test
+    void softwareSettings_updateExistingChocolateyPackages_nonNullBoolean() {
+        // setup
+        GraphQLFieldDefinition definition =
+                schema.getObjectType("SoftwareSettings").getFieldDefinition("updateExistingChocolateyPackages");
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo("Boolean!");
+    }
+
+    @Test
+    void softwareSettingsInput_updateExistingChocolateyPackages_requiredBoolean() {
+        // setup
+        GraphQLInputObjectType input = schema.getTypeAs("SoftwareSettingsInput");
+        GraphQLInputObjectField definition = input.getFieldDefinition("updateExistingChocolateyPackages");
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo("Boolean!");
+    }
+
+    @Test
+    void updateSoftwareSettings_mutation_takesTheInputAndReturnsTheSettings() {
+        // setup
+        GraphQLFieldDefinition mutation = schema.getMutationType().getFieldDefinition("updateSoftwareSettings");
+
+        // execution
+        String type = GraphQLTypeUtil.simplePrint(mutation.getType());
+        String input = GraphQLTypeUtil.simplePrint(mutation.getArgument("input").getType());
+
+        // verifications
+        assertThat(type).isEqualTo("SoftwareSettings!");
+        assertThat(input).isEqualTo("SoftwareSettingsInput!");
+    }
+
     private static Stream<Arguments> entityKeys() {
         return Stream.of(
                 Arguments.of("User", "id"),
@@ -370,6 +479,23 @@ class ApiSubgraphSchemaTest {
         return Stream.of(
                 Arguments.of("DirectorySource", DirectorySource.class),
                 Arguments.of("DirectoryUserLink", DirectoryUserLink.class));
+    }
+
+    private static Stream<Arguments> machineChocolateyFields() {
+        return Stream.of(
+                Arguments.of("version", "String"),
+                Arguments.of("edition", "String"),
+                Arguments.of("ours", "Boolean!"),
+                Arguments.of("status", "ChocolateyStatus!"),
+                Arguments.of("reason", "String"),
+                Arguments.of("options", "[ChocolateyAdminOption!]!"),
+                Arguments.of("decision", "ChocolateyAdminOption"));
+    }
+
+    private static Stream<Arguments> chocolateyEnums() {
+        return Stream.of(
+                Arguments.of("ChocolateyStatus", ChocolateyStatus.class),
+                Arguments.of("ChocolateyAdminOption", ChocolateyAdminOption.class));
     }
 
     private static List<String> sdlEnumNames(String type) {

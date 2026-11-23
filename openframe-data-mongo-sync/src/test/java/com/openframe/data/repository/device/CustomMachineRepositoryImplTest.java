@@ -14,7 +14,10 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -218,11 +221,124 @@ class CustomMachineRepositoryImplTest {
     }
 
     @Test
+    void softwareManageable_choco_presentNeedsManagedStatus() {
+        // setup
+        MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setManageableByPackageManagers(List.of(PackageManagerType.CHOCO));
+
+        // execution
+        Document query = repo.buildDeviceQuery(filter, null).getQueryObject();
+
+        // verifications
+        assertThat(conjunctionWith(query, "packageManagers.CHOCO", "PRESENT"))
+                .containsEntry("chocolatey.status", "MANAGED");
+    }
+
+    @Test
+    void softwareManageable_choco_missingOrUnknownAcceptedWithoutPresent() {
+        // setup
+        MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setManageableByPackageManagers(List.of(PackageManagerType.CHOCO));
+
+        // execution
+        Document query = repo.buildDeviceQuery(filter, null).getQueryObject();
+
+        // verifications
+        assertThat(inValues(query, "packageManagers.CHOCO")).containsExactlyInAnyOrder("MISSING", "UNKNOWN");
+    }
+
+    @Test
+    void softwareManageable_chocoWithWinget_wingetStatesUnchanged() {
+        // setup
+        MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setManageableByPackageManagers(List.of(PackageManagerType.CHOCO, PackageManagerType.WINGET));
+
+        // execution
+        Document query = repo.buildDeviceQuery(filter, null).getQueryObject();
+
+        // verifications
+        assertThat(inValues(query, "packageManagers.WINGET"))
+                .containsExactlyInAnyOrder("PRESENT", "MISSING", "UNKNOWN");
+    }
+
+    @Test
+    void softwareManageable_withoutChoco_noChocolateyStatusClause() {
+        // setup
+        MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setManageableByPackageManagers(List.of(PackageManagerType.BREW, PackageManagerType.WINGET));
+
+        // execution
+        Document query = repo.buildDeviceQuery(filter, null).getQueryObject();
+
+        // verifications
+        assertThat(mentionsField(query, "chocolatey.status")).isFalse();
+    }
+
+    @Test
     @DisplayName("buildDeviceQuery: without manageableByPackageManagers the query never touches packageManagers (scripts, devices page)")
     void noManageableFilter_noPackageManagersClause() {
         Document q = repo.buildDeviceQuery(allDimensionsFilter(), "x").getQueryObject();
 
         assertThat(mentionsField(q, "packageManagers")).isFalse();
+    }
+
+    private static List<String> inValues(Object node, String field) {
+        if (node instanceof Document doc) {
+            if (doc.get(field) instanceof Document operators && operators.get("$in") instanceof Collection<?> values) {
+                return values.stream().map(String::valueOf).toList();
+            }
+            return doc.values().stream()
+                    .map(v -> inValues(v, field))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (node instanceof List<?> list) {
+            return list.stream()
+                    .map(v -> inValues(v, field))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private static Map<String, String> conjunctionWith(Object node, String field, String value) {
+        if (node instanceof Document doc) {
+            Map<String, String> equalities = equalities(doc);
+            if (value.equals(equalities.get(field))) {
+                return equalities;
+            }
+            return doc.values().stream()
+                    .map(v -> conjunctionWith(v, field, value))
+                    .filter(found -> !found.isEmpty())
+                    .findFirst()
+                    .orElse(Map.of());
+        }
+        if (node instanceof List<?> list) {
+            return list.stream()
+                    .map(v -> conjunctionWith(v, field, value))
+                    .filter(found -> !found.isEmpty())
+                    .findFirst()
+                    .orElse(Map.of());
+        }
+        return Map.of();
+    }
+
+    private static Map<String, String> equalities(Document doc) {
+        Map<String, String> equalities = new HashMap<>();
+        doc.forEach((key, value) -> {
+            if (!key.startsWith("$") && !(value instanceof Document) && !(value instanceof Collection<?>)) {
+                equalities.put(key, String.valueOf(value));
+            }
+        });
+        if (doc.get("$and") instanceof List<?> parts) {
+            parts.stream()
+                    .filter(Document.class::isInstance)
+                    .map(Document.class::cast)
+                    .forEach(part -> equalities.putAll(equalities(part)));
+        }
+        return equalities;
     }
 
     private static Pattern fieldPattern(Object node, String field) {

@@ -1,6 +1,9 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -17,11 +20,15 @@ import com.openframe.data.document.rmm.software.SoftwareAutoUpdate;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
+import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
+import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+import com.openframe.data.service.rmm.software.ChocoPackageManagerHandler;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
@@ -30,6 +37,8 @@ import com.openframe.data.service.rmm.software.WingetPackageManagerHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
@@ -39,6 +48,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -48,10 +58,15 @@ import static org.mockito.Mockito.when;
 class SoftwareBundleOnlineDispatcherTest {
 
     private static final String TENANT = "t-1";
+    private static final String CHOCO_FEED_URL = "https://feed.openframe.test/choco/index.json";
+    private static final String CHOCO_PACKAGE = "googlechrome";
 
     private final ScriptRepository scriptRepository = mock(ScriptRepository.class);
-    private final PackageManagerRegistry registry =
-            new PackageManagerRegistry(List.of(new BrewPackageManagerHandler(), new WingetPackageManagerHandler()));
+    private final PackageManagerProperties packageManagerProperties = chocoEnabledProperties();
+    private final PackageManagerRegistry registry = new PackageManagerRegistry(
+            List.of(new BrewPackageManagerHandler(), new WingetPackageManagerHandler(),
+                    new ChocoPackageManagerHandler(packageManagerProperties)),
+            packageManagerProperties);
     private final ScriptExecutionRepository scriptExecutionRepository = mock(ScriptExecutionRepository.class);
     private final SoftwareNatsPublisher softwareNatsPublisher = mock(SoftwareNatsPublisher.class);
     private final ScriptDeliveryRetryStore retryStore = mock(ScriptDeliveryRetryStore.class);
@@ -60,12 +75,18 @@ class SoftwareBundleOnlineDispatcherTest {
     private final PackageUpdateDispatchService packageUpdateDispatchService = mock(PackageUpdateDispatchService.class);
 
     private final PackageAutoUpdatePolicyService autoUpdatePolicyService = mock(PackageAutoUpdatePolicyService.class);
+    private final ChocoPackageOwnership chocoPackageOwnership = mock(ChocoPackageOwnership.class);
+
+    private final ArgumentCaptor<RunningExecutionRows> rowsCaptor = ArgumentCaptor.forClass(RunningExecutionRows.class);
+    private final ArgumentCaptor<ScriptMessage> messageCaptor = ArgumentCaptor.forClass(ScriptMessage.class);
 
     private final SoftwareBundleOnlineDispatcher dispatcher = new SoftwareBundleOnlineDispatcher(
             scriptRepository, registry, scriptExecutionRepository, softwareNatsPublisher, retryStore,
-            packageManagerAvailability, packageUpdateEligibility, packageUpdateDispatchService, autoUpdatePolicyService);
+            packageManagerAvailability, packageUpdateEligibility, packageUpdateDispatchService, autoUpdatePolicyService,
+            chocoPackageOwnership);
 
     private final Machine mac = machine("m-1", OsType.MAC_OS);
+    private final Machine win = chocoManagedMachine("m-win");
 
     @BeforeEach
     void setUp() {
@@ -167,6 +188,156 @@ class SoftwareBundleOnlineDispatcherTest {
         dispatcher.dispatch(bundle, server);
 
         verifyNoInteractions(packageUpdateDispatchService, scriptExecutionRepository, softwareNatsPublisher);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void dispatch_chocoUpdateOnDeviceThatDoesNotOwnThePackage_packageSkipped(boolean viaOrder) {
+        // setup
+        stubChocoScript(SoftwareScriptCode.CHOCO_UPDATE, "choco-update-id");
+        when(packageManagerAvailability.isSoftwareManageable(win)).thenReturn(true);
+        when(packageUpdateEligibility.isEligible(SoftwareAction.UPDATE, win)).thenReturn(viaOrder);
+        when(chocoPackageOwnership.owns(win, CHOCO_PACKAGE)).thenReturn(false);
+
+        // execution
+        dispatcher.dispatch(chocoBundle(SoftwareAction.UPDATE), win);
+
+        // verifications
+        verifyNoInteractions(packageUpdateDispatchService, autoUpdatePolicyService, scriptExecutionRepository,
+                softwareNatsPublisher, retryStore);
+    }
+
+    @Test
+    void dispatch_chocoUpdateOnOwningEligibleDevice_orderSent() {
+        // setup
+        stubChocoScript(SoftwareScriptCode.CHOCO_UPDATE, "choco-update-id");
+        when(packageManagerAvailability.isSoftwareManageable(win)).thenReturn(true);
+        when(packageUpdateEligibility.isEligible(SoftwareAction.UPDATE, win)).thenReturn(true);
+        when(chocoPackageOwnership.owns(win, CHOCO_PACKAGE)).thenReturn(true);
+
+        // execution
+        dispatcher.dispatch(chocoBundle(SoftwareAction.UPDATE), win);
+
+        // verifications
+        verify(packageUpdateDispatchService).dispatchAdminUpdate(rowsCaptor.capture(), isNull(), isNull());
+        assertThat(rowsCaptor.getValue())
+                .returns(List.of("m-win"), RunningExecutionRows::getMachineIds)
+                .returns(PackageManagerType.CHOCO, RunningExecutionRows::getPackageManager)
+                .returns(CHOCO_PACKAGE, RunningExecutionRows::getPackageName)
+                .returns("choco-update-id", RunningExecutionRows::getScriptId);
+    }
+
+    @Test
+    void dispatch_chocoUpdateOnOwningDeviceWithoutOrderFeature_scriptSentWithIdAndFeed() {
+        // setup
+        stubChocoScript(SoftwareScriptCode.CHOCO_UPDATE, "choco-update-id");
+        when(packageManagerAvailability.isSoftwareManageable(win)).thenReturn(true);
+        when(packageUpdateEligibility.isEligible(SoftwareAction.UPDATE, win)).thenReturn(false);
+        when(chocoPackageOwnership.owns(win, CHOCO_PACKAGE)).thenReturn(true);
+
+        // execution
+        dispatcher.dispatch(chocoBundle(SoftwareAction.UPDATE), win);
+
+        // verifications
+        verify(softwareNatsPublisher).publishSoftware(eq("m-win"), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getArgs()).containsExactly(CHOCO_PACKAGE, CHOCO_FEED_URL);
+    }
+
+    @Test
+    void dispatch_chocoUpdateNotOwnedNextToAnotherPackage_otherPackageStillSent() {
+        // setup
+        stubChocoScript(SoftwareScriptCode.CHOCO_UPDATE, "choco-update-id");
+        when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__winget-update", ScriptType.SOFTWARE))
+                .thenReturn(Optional.of(windowsScript("winget-update-id")));
+        when(packageManagerAvailability.isSoftwareManageable(win)).thenReturn(true);
+        when(packageUpdateEligibility.isEligible(SoftwareAction.UPDATE, win)).thenReturn(false);
+        when(chocoPackageOwnership.owns(win, CHOCO_PACKAGE)).thenReturn(false);
+        SoftwareBundle bundle = chocoBundle(SoftwareAction.UPDATE);
+        bundle.setPackages(List.of(
+                SoftwareBundlePackage.builder().packageManager(PackageManagerType.CHOCO).packageName(CHOCO_PACKAGE).build(),
+                SoftwareBundlePackage.builder().packageManager(PackageManagerType.WINGET).packageName("Google.Chrome").build()));
+
+        // execution
+        dispatcher.dispatch(bundle, win);
+
+        // verifications
+        verify(scriptExecutionRepository).saveQueued(rowsCaptor.capture());
+        assertThat(rowsCaptor.getValue())
+                .returns(PackageManagerType.WINGET, RunningExecutionRows::getPackageManager)
+                .returns("Google.Chrome", RunningExecutionRows::getPackageName);
+    }
+
+    @Test
+    void dispatch_chocoInstall_sentWithoutConsultingOwnership() {
+        // setup
+        stubChocoScript(SoftwareScriptCode.CHOCO_INSTALL, "choco-install-id");
+        when(packageManagerAvailability.isSoftwareManageable(win)).thenReturn(true);
+
+        // execution
+        dispatcher.dispatch(chocoBundle(SoftwareAction.INSTALL), win);
+
+        // verifications
+        verify(softwareNatsPublisher).publishSoftware(eq("m-win"), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getArgs()).containsExactly(CHOCO_PACKAGE, CHOCO_FEED_URL);
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    @Test
+    void dispatch_wingetUpdate_sentWithoutConsultingOwnership() {
+        // setup
+        when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__winget-update", ScriptType.SOFTWARE))
+                .thenReturn(Optional.of(windowsScript("winget-update-id")));
+        when(packageManagerAvailability.isSoftwareManageable(win)).thenReturn(true);
+        when(packageUpdateEligibility.isEligible(SoftwareAction.UPDATE, win)).thenReturn(false);
+        SoftwareBundle bundle = chocoBundle(SoftwareAction.UPDATE);
+        bundle.setPackages(List.of(SoftwareBundlePackage.builder()
+                .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome").build()));
+
+        // execution
+        dispatcher.dispatch(bundle, win);
+
+        // verifications
+        verify(softwareNatsPublisher).publishSoftware(eq("m-win"), any(ScriptMessage.class));
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    private void stubChocoScript(SoftwareScriptCode code, String scriptId) {
+        when(scriptRepository.findByTenantIdAndNameAndType(TENANT, code.canonicalName(), ScriptType.SOFTWARE))
+                .thenReturn(Optional.of(windowsScript(scriptId)));
+    }
+
+    private static PackageManagerProperties chocoEnabledProperties() {
+        PackageManagerProperties properties = new PackageManagerProperties();
+        properties.setChocoEnabled(true);
+        properties.getChoco().setFeedUrl(CHOCO_FEED_URL);
+        properties.getChoco().setVersion("2.7.5");
+        properties.getChoco().setSha256("f86f99a1");
+        return properties;
+    }
+
+    private static SoftwareBundle chocoBundle(SoftwareAction action) {
+        return SoftwareBundle.builder()
+                .id("b-1").tenantId(TENANT).createdBy("user-1").action(action)
+                .packages(List.of(SoftwareBundlePackage.builder()
+                        .packageManager(PackageManagerType.CHOCO).packageName(CHOCO_PACKAGE).build()))
+                .build();
+    }
+
+    private static Script windowsScript(String id) {
+        return Script.builder()
+                .id(id).type(ScriptType.SOFTWARE)
+                .scriptBody("run $args").shell(ScriptShell.POWERSHELL)
+                .privilegeLevel(PrivilegeLevel.ADMIN).defaultTimeoutSeconds(540)
+                .supportedPlatforms(List.of(OsType.WINDOWS))
+                .build();
+    }
+
+    private static Machine chocoManagedMachine(String machineId) {
+        Machine machine = machine(machineId, OsType.WINDOWS);
+        machine.setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.PRESENT,
+                PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        machine.setChocolatey(MachineChocolatey.builder().status(ChocolateyStatus.MANAGED).build());
+        return machine;
     }
 
     private static SoftwareBundle bundle(SoftwareAction action) {

@@ -6,6 +6,7 @@ import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
+import com.openframe.api.service.device.ChocolateyDecisionService;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
@@ -89,6 +90,7 @@ class DeviceFiltersSelectionSetTest {
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     @Mock private PackageManagerAvailability packageManagerAvailability;
     @Mock private ToolOsSupportService toolOsSupportService;
+    @Mock private ChocolateyDecisionService chocolateyDecisionService;
 
     @Captor private ArgumentCaptor<Set<DeviceFilterFacet>> facetsCaptor;
 
@@ -99,7 +101,7 @@ class DeviceFiltersSelectionSetTest {
         DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, tagService,
                 fleetVulnerabilityStatusService, mapper, packageManagerAvailability, new RelayIdCodec(),
                 new NotificationRecipientResolver(), new ClientVersionThreshold("1.6.0"),
-                toolOsSupportService);
+                toolOsSupportService, chocolateyDecisionService);
 
         TypeDefinitionRegistry registry = new SchemaParser().parse(SDL);
         RuntimeWiring wiring = RuntimeWiring.newRuntimeWiring()

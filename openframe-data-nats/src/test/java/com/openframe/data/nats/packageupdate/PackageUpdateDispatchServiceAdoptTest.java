@@ -1,5 +1,6 @@
 package com.openframe.data.nats.packageupdate;
 
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -22,7 +23,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -48,6 +48,7 @@ class PackageUpdateDispatchServiceAdoptTest {
     private static final String BUNDLE_ID = "com.postmanlabs.mac";
     private static final String MAC = "mac-1";
     private static final String OTHER_MAC = "mac-2";
+    private static final String CHOCO_FEED = "https://feed.openframe.build/choco/index.json";
 
     @Mock private DeliveryRouter deliveryRouter;
     @Mock private PackageUpdateRequestRepository requestRepository;
@@ -60,12 +61,16 @@ class PackageUpdateDispatchServiceAdoptTest {
     @Captor private ArgumentCaptor<RunningExecutionRows> rowsCaptor;
     @Captor private ArgumentCaptor<PackageAdoptDeliverySeed> seedCaptor;
 
-    @InjectMocks private PackageUpdateDispatchService service;
-
+    private PackageManagerProperties packageManagerProperties;
+    private PackageUpdateDispatchService service;
     private RunningExecutionRows rows;
 
     @BeforeEach
     void setUp() {
+        packageManagerProperties = new PackageManagerProperties();
+        packageManagerProperties.getChoco().setFeedUrl(CHOCO_FEED);
+        service = new PackageUpdateDispatchService(deliveryRouter, requestRepository, deviceStateRepository,
+                scriptExecutionRepository, tenantIdProvider, packageManagerProperties);
         rows = RunningExecutionRows.builder()
                 .executionId(EXECUTION_ID)
                 .scriptId("brew-install")
@@ -169,7 +174,7 @@ class PackageUpdateDispatchServiceAdoptTest {
     }
 
     @Test
-    void dispatchAdopt_chocoPackage_orderCarriesThePackageId() {
+    void dispatchAdopt_chocoPackage_orderCarriesThePackageIdAndTheFeed() {
         // setup
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
         RunningExecutionRows chocoRows = rows.toBuilder()
@@ -180,6 +185,7 @@ class PackageUpdateDispatchServiceAdoptTest {
         PackageReference chocoRef = PackageReference.builder()
                 .manager(PackageManagerType.CHOCO)
                 .id("googlechrome")
+                .feed(CHOCO_FEED)
                 .build();
 
         // execution
@@ -188,6 +194,37 @@ class PackageUpdateDispatchServiceAdoptTest {
         // verifications
         verify(deliveryRouter).dispatch(seedCaptor.capture());
         assertThat(seedCaptor.getValue().getPackageRef()).isEqualTo(chocoRef);
+    }
+
+    @Test
+    void dispatchAdopt_chocoPackage_requestStoresTheFeedFromProperties() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+        RunningExecutionRows chocoRows = rows.toBuilder()
+                .machineIds(List.of("win-1"))
+                .packageManager(PackageManagerType.CHOCO)
+                .packageName("googlechrome")
+                .build();
+
+        // execution
+        service.dispatchAdopt(chocoRows, null, SOFTWARE_ID, null);
+
+        // verifications
+        verify(requestRepository).save(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getFeed()).isEqualTo(CHOCO_FEED);
+    }
+
+    @Test
+    void dispatchAdopt_casks_requestHasNoFeed() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+
+        // execution
+        service.dispatchAdopt(rows, BrewPackageType.CASK, SOFTWARE_ID, BUNDLE_ID);
+
+        // verifications
+        verify(requestRepository).save(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getFeed()).isNull();
     }
 
     @Test

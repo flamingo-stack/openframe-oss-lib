@@ -7,7 +7,10 @@ import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import com.openframe.data.document.rmm.software.FleetSource;
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerState;
@@ -18,6 +21,7 @@ import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,8 +56,6 @@ class SoftwareCatalogStatusTest {
 
     private static final String TENANT_ID = "t1";
     private static final String MACHINE_ID = "m1";
-    private static final SoftwareBundlePackage ADOPTION_INTO_CHOCO_7ZIP = SoftwareBundlePackage.builder()
-            .packageManager(PackageManagerType.CHOCO).packageName("7zip").version("24.09").build();
 
     @Mock private PackageCatalogRepository catalogRepository;
     @Mock private SoftwarePackageMatcher packageMatcher;
@@ -61,10 +63,20 @@ class SoftwareCatalogStatusTest {
     @Mock private PackageAdoptReach packageAdoptReach;
     @Mock private MachineRepository machineRepository;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private ChocoPackageOwnership chocoPackageOwnership;
 
     private SoftwareCatalogStatus status() {
         return new SoftwareCatalogStatus(catalogRepository, packageMatcher, packageManagerAvailability,
-                packageAdoptReach, machineRepository, tenantIdProvider);
+                packageAdoptReach, machineRepository, tenantIdProvider, chocoPackageOwnership);
+    }
+
+    private SoftwareCatalogStatus statusWithChocoEnabled() {
+        PackageManagerProperties chocoEnabled = new PackageManagerProperties();
+        chocoEnabled.setChocoEnabled(true);
+        PackageManagerAvailability realAvailability =
+                new PackageManagerAvailability(chocoEnabled, machineRepository, tenantIdProvider);
+        return new SoftwareCatalogStatus(catalogRepository, packageMatcher, realAvailability,
+                packageAdoptReach, machineRepository, tenantIdProvider, chocoPackageOwnership);
     }
 
     @Test
@@ -410,33 +422,29 @@ class SoftwareCatalogStatusTest {
     }
 
     @Test
-    void apply_programWithOnlyAPackageToAdoptInto_needsAdoptionWithItsLatestAndNoManagingPackage() {
-        // setup
-        SoftwareResponse sevenZip = program("7-Zip", "24.08");
-        PackageCatalogEntry choco7zip = chocoPackage("7zip", "24.09");
-        stubMatch(sevenZip, PackageMatch.noPackage());
-        stubAdoptionMatch(sevenZip, PackageMatch.of(choco7zip));
-        when(packageManagerAvailability.isEnabled(PackageManagerType.CHOCO)).thenReturn(true);
-
-        // execution
-        status().apply(List.of(sevenZip));
-
-        // verifications
-        assertThat(sevenZip)
-                .extracting(SoftwareResponse::getSource, SoftwareResponse::getLatestVersion,
-                        SoftwareResponse::getVersionStatus, SoftwareResponse::getAutoUpdate,
-                        SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
-                .containsExactly(SoftwareSource.UNMANAGED, "24.09", SoftwareVersionStatus.OUTDATED,
-                        SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, ADOPTION_INTO_CHOCO_7ZIP);
-    }
-
-    @Test
-    void apply_packageToAdoptIntoOfADisabledManager_noPackageFound() {
+    void apply_programWithOnlyAChocoPackageToAdoptInto_notOfferedEvenWithChocoEnabled() {
         // setup
         SoftwareResponse sevenZip = program("7-Zip", "24.08");
         stubMatch(sevenZip, PackageMatch.noPackage());
         stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
-        when(packageManagerAvailability.isEnabled(PackageManagerType.CHOCO)).thenReturn(false);
+
+        // execution
+        statusWithChocoEnabled().apply(List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NO_PACKAGE, null, null);
+    }
+
+    @Test
+    void apply_packageToAdoptIntoOfAManagerNoAdoptionIsOfferedFor_noPackageFound() {
+        // setup
+        SoftwareResponse sevenZip = program("7-Zip", "24.08");
+        stubMatch(sevenZip, PackageMatch.noPackage());
+        stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+        when(packageManagerAvailability.isAdoptionOffered(PackageManagerType.CHOCO)).thenReturn(false);
 
         // execution
         status().apply(List.of(sevenZip));
@@ -445,6 +453,174 @@ class SoftwareCatalogStatusTest {
         assertThat(sevenZip.getAutoUpdate()).isEqualTo(SoftwareAutoUpdateStatus.NO_PACKAGE);
         assertThat(sevenZip.getAdoptionPackage()).isNull();
         assertThat(sevenZip.getLatestVersion()).isNull();
+    }
+
+    @Test
+    void apply_chocolateyTitleMatchedToAChocoCatalogEntry_managedByItAsChocolateyWithItsLatestAndAutoUpdateOff() {
+        // setup
+        SoftwareResponse sevenZip = chocolateyTitle("7zip", "24.08");
+        PackageCatalogEntry choco7zip = chocoPackage("7zip", "24.09");
+        stubMatch(sevenZip, PackageMatch.of(choco7zip));
+
+        // execution
+        status().apply(List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip.getManagingPackage()).isSameAs(choco7zip);
+        assertThat(sevenZip)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getLatestVersion,
+                        SoftwareResponse::getVersionStatus, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareSource.CHOCOLATEY, "24.09", SoftwareVersionStatus.OUTDATED,
+                        SoftwareAutoUpdateStatus.OFF, null);
+    }
+
+    @Test
+    void apply_chocolateyTitleMatchedToAChocoCatalogEntry_ownershipIsADeviceMatterAndIsNotAskedForTheTenant() {
+        // setup
+        SoftwareResponse sevenZip = chocolateyTitle("7zip", "24.08");
+        PackageCatalogEntry choco7zip = chocoPackage("7zip", "24.09");
+        stubMatch(sevenZip, PackageMatch.of(choco7zip));
+
+        // execution
+        status().apply(List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip.getManagingPackage()).isSameAs(choco7zip);
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    @Test
+    void apply_chocolateyTitleWithAnAutoUpdatePolicy_policyStays() {
+        // setup
+        SoftwareResponse sevenZip = chocolateyTitle("7zip", "24.08");
+        sevenZip.setAutoUpdate(SoftwareAutoUpdateStatus.ON);
+        stubMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+
+        // execution
+        status().apply(List.of(sevenZip));
+
+        // verifications
+        assertThat(sevenZip.getAutoUpdate()).isEqualTo(SoftwareAutoUpdateStatus.ON);
+    }
+
+    @Test
+    void applyOnDevice_chocoPackageOwnedByTheDevice_managingPackageKeptAsChocolatey() {
+        // setup
+        SoftwareResponse sevenZip = chocolateyTitle("7zip", "24.08");
+        PackageCatalogEntry choco7zip = chocoPackage("7zip", "24.09");
+        Machine device = stubManagedChocoDevice();
+        stubMatch(sevenZip, PackageMatch.of(choco7zip));
+        when(chocoPackageOwnership.owns(device, "7zip")).thenReturn(true);
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
+
+        // verifications
+        assertThat(sevenZip.getManagingPackage()).isSameAs(choco7zip);
+        assertThat(sevenZip)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getLatestVersion,
+                        SoftwareResponse::getVersionStatus, SoftwareResponse::getAutoUpdate)
+                .containsExactly(SoftwareSource.CHOCOLATEY, "24.09", SoftwareVersionStatus.OUTDATED,
+                        SoftwareAutoUpdateStatus.OFF);
+    }
+
+    @Test
+    void applyOnDevice_chocoPackageNotOwnedByTheDeviceWhereChocoIsPresent_noManagingPackage() {
+        // setup
+        SoftwareResponse sevenZip = chocolateyTitle("7zip", "24.08");
+        Machine device = stubManagedChocoDevice();
+        stubMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+        when(chocoPackageOwnership.owns(device, "7zip")).thenReturn(false);
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
+
+        // verifications
+        assertThat(sevenZip)
+                .extracting(SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage,
+                        SoftwareResponse::getAutoUpdate, SoftwareResponse::getLatestVersion)
+                .containsExactly(null, null, SoftwareAutoUpdateStatus.NO_PACKAGE, "24.09");
+    }
+
+    @Test
+    void applyOnDevice_chocoPackageOnADeviceThatNeverReportedItsManagers_ownershipStillDecides() {
+        // setup
+        SoftwareResponse sevenZip = chocolateyTitle("7zip", "24.08");
+        Machine device = stubDevice(null);
+        stubMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+        when(chocoPackageOwnership.owns(device, "7zip")).thenReturn(false);
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
+
+        // verifications
+        assertThat(sevenZip.getManagingPackage()).isNull();
+    }
+
+    @Test
+    void applyOnDevice_wingetPackage_presenceDecidesAndChocoOwnershipIsNotConsulted() {
+        // setup
+        SoftwareResponse chrome = program("Google Chrome", "141.0");
+        PackageCatalogEntry wingetChrome = wingetPackage("Google.Chrome", "142.0");
+        stubDevice(Map.of(PackageManagerType.WINGET, PackageManagerState.PRESENT));
+        stubMatch(chrome, PackageMatch.of(wingetChrome));
+
+        // execution
+        status().applyOnDevice(MACHINE_ID, List.of(chrome), Set.of());
+
+        // verifications
+        assertThat(chrome.getManagingPackage()).isSameAs(wingetChrome);
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    @Test
+    void applyOnDevice_programWithOnlyAChocoPackageToAdoptInto_notOfferedEvenWhereChocoIsManaged() {
+        // setup
+        SoftwareResponse sevenZip = program("7-Zip", "24.08");
+        stubManagedChocoDevice();
+        stubMatch(sevenZip, PackageMatch.noPackage());
+        stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
+
+        // execution
+        statusWithChocoEnabled().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
+
+        // verifications
+        assertThat(sevenZip)
+                .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
+                        SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NO_PACKAGE, null, null);
+    }
+
+    @Test
+    void apply_macAppWithACaskToAdoptIntoAndChocoEnabled_theBrewAdoptionIsStillOffered() {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "4.40");
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
+
+        // execution
+        statusWithChocoEnabled().apply(List.of(slack));
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, adoptionIntoCask("slack", "4.41"));
+    }
+
+    @Test
+    void applyOnDevice_macAppWithACaskToAdoptIntoAndChocoEnabled_theBrewAdoptionIsStillOffered() {
+        // setup
+        SoftwareResponse slack = macApp("Slack", "4.40");
+        stubDevice(Map.of(PackageManagerType.BREW, PackageManagerState.PRESENT));
+        stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
+
+        // execution
+        statusWithChocoEnabled().applyOnDevice(MACHINE_ID, List.of(slack), Set.of());
+
+        // verifications
+        assertThat(slack)
+                .extracting(SoftwareResponse::getAutoUpdate, SoftwareResponse::getAdoptionPackage)
+                .containsExactly(SoftwareAutoUpdateStatus.NEEDS_ADOPTION, adoptionIntoCask("slack", "4.41"));
     }
 
     @Test
@@ -484,25 +660,24 @@ class SoftwareCatalogStatusTest {
     }
 
     @Test
-    void applyOnDevice_wingetDoesNotRunOnTheDevice_thePackageToAdoptIntoInstead() {
+    void applyOnDevice_wingetDoesNotRunAndOnlyChocoToAdoptInto_noOfferEvenWhereChocoIsManaged() {
         // setup
         SoftwareResponse sevenZip = program("7-Zip", "24.08");
-        PackageCatalogEntry choco7zip = chocoPackage("7zip", "24.09");
         Machine server = stubDevice(Map.of(PackageManagerType.WINGET, PackageManagerState.UNSUPPORTED,
                 PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        server.setChocolatey(MachineChocolatey.builder().status(ChocolateyStatus.MANAGED).ours(true).build());
         stubMatch(sevenZip, PackageMatch.of(wingetPackage("7zip.7zip", "24.09")));
-        stubAdoptionMatch(sevenZip, PackageMatch.of(choco7zip));
-        when(packageManagerAvailability.isAdoptableOn(server, PackageManagerType.CHOCO)).thenReturn(true);
+        stubAdoptionMatch(sevenZip, PackageMatch.of(chocoPackage("7zip", "24.09")));
 
         // execution
-        status().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
+        statusWithChocoEnabled().applyOnDevice(MACHINE_ID, List.of(sevenZip), Set.of());
 
         // verifications
         assertThat(sevenZip)
                 .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
-                        SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
-                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null,
-                        ADOPTION_INTO_CHOCO_7ZIP);
+                        SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage,
+                        SoftwareResponse::getLatestVersion)
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NO_PACKAGE, null, null, "24.09");
     }
 
     @Test
@@ -585,6 +760,24 @@ class SoftwareCatalogStatusTest {
         return device;
     }
 
+    private Machine stubManagedChocoDevice() {
+        Machine device = stubDevice(Map.of(PackageManagerType.WINGET, PackageManagerState.PRESENT,
+                PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        device.setChocolatey(MachineChocolatey.builder()
+                .status(ChocolateyStatus.MANAGED)
+                .ours(true)
+                .packages(List.of("7zip"))
+                .existingPackages(List.of())
+                .build());
+        return device;
+    }
+
+    private static SoftwareResponse chocolateyTitle(String name, String currentVersion) {
+        SoftwareResponse title = row(name, SoftwareSource.CHOCOLATEY, currentVersion, 0);
+        title.setFleetSource(FleetSource.CHOCOLATEY_PACKAGES);
+        return title;
+    }
+
     private void stubAdoptionMatch(SoftwareResponse row, PackageMatch match) {
         when(packageMatcher.matchForAdoption(anyList())).thenAnswer(invocation -> {
             List<InstalledProgram> programs = invocation.getArgument(0);
@@ -655,7 +848,7 @@ class SoftwareCatalogStatusTest {
         // setup
         SoftwareResponse slack = macApp("Slack", "4.40");
         stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", "4.41")));
-        when(packageManagerAvailability.isEnabled(PackageManagerType.BREW)).thenReturn(true);
+        when(packageManagerAvailability.isAdoptionOffered(PackageManagerType.BREW)).thenReturn(true);
 
         // execution
         status().apply(List.of(slack));
@@ -679,7 +872,7 @@ class SoftwareCatalogStatusTest {
         // setup
         SoftwareResponse slack = macApp("Slack", "3.3.2");
         stubAdoptionMatch(slack, PackageMatch.of(brewCask("slack", caskVersion)));
-        when(packageManagerAvailability.isEnabled(PackageManagerType.BREW)).thenReturn(true);
+        when(packageManagerAvailability.isAdoptionOffered(PackageManagerType.BREW)).thenReturn(true);
 
         // execution
         status().apply(List.of(slack));
@@ -822,7 +1015,7 @@ class SoftwareCatalogStatusTest {
         // setup
         SoftwareResponse hiddenBar = macApp("Hidden Bar", "1.9");
         stubAdoptionMatch(hiddenBar, PackageMatch.of(brewCask("hiddenbar", "1.9")));
-        when(packageManagerAvailability.isEnabled(PackageManagerType.BREW)).thenReturn(true);
+        when(packageManagerAvailability.isAdoptionOffered(PackageManagerType.BREW)).thenReturn(true);
 
         // execution
         status().apply(List.of(hiddenBar));

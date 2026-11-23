@@ -21,6 +21,7 @@ import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,7 +62,6 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     private static final String CHOCO_PACKAGE = "googlechrome";
     private static final List<String> MACS = List.of(MAC, OTHER_MAC);
     private static final Set<OsType> MAC_OS = Set.of(OsType.MAC_OS);
-    private static final Set<OsType> WINDOWS_OS = Set.of(OsType.WINDOWS);
     private static final Map<String, OsType> MAC_OS_TYPES = Map.of(MAC, OsType.MAC_OS, OTHER_MAC, OsType.MAC_OS);
 
     @Mock private SoftwareInventoryService softwareInventoryService;
@@ -72,6 +72,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     @Mock private PackageUpdateDispatchService packageUpdateDispatchService;
     @Mock private SoftwareActionResultRepository softwareActionResultRepository;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private ChocoPackageOwnership chocoPackageOwnership;
 
     @Captor private ArgumentCaptor<RunningExecutionRows> rowsCaptor;
     @Captor private ArgumentCaptor<SoftwareActionResult> actionResultCaptor;
@@ -156,38 +157,6 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
                 .containsExactly(TENANT, rowsCaptor.getValue().getExecutionId(), SoftwareAction.ADOPT,
                         SoftwareActionKind.ADOPT, PackageManagerType.BREW, CASK, SoftwareActionStatus.IN_PROGRESS,
                         MACS, 2, USER);
-    }
-
-    @Test
-    void adopt_titleWithAChocoPackage_chocoRequestWithTheChocoAdoptIdForHistory() {
-        // setup
-        List<String> machineIds = List.of(WINDOWS);
-        Map<String, OsType> osTypes = Map.of(WINDOWS, OsType.WINDOWS);
-        SoftwareBundlePackage chocoPackage = SoftwareBundlePackage.builder()
-                .packageManager(PackageManagerType.CHOCO)
-                .packageName(CHOCO_PACKAGE)
-                .build();
-        AdoptSoftwareInput input = input(machineIds);
-        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(title(chocoPackage, null));
-        when(machinePlatformResolver.osTypesByMachineId(machineIds)).thenReturn(osTypes);
-        when(machinePlatformResolver.compatible(machineIds, osTypes, WINDOWS_OS)).thenReturn(machineIds);
-        when(packageManagerAvailability.adoptableOn(machineIds, PackageManagerType.CHOCO)).thenReturn(machineIds);
-        when(softwareInventoryService.withoutCopiesNotToAdopt(SOFTWARE_ID, chocoPackage, machineIds)).thenReturn(machineIds);
-        when(packageAdoptReach.filterReachable(machineIds)).thenReturn(List.of(WINDOWS));
-        stubAdoptDispatch(null, null);
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
-
-        // execution
-        List<String> ordered = service.adopt(input, USER);
-
-        // verifications
-        verify(packageUpdateDispatchService).dispatchAdopt(rowsCaptor.capture(), eq(null), eq(SOFTWARE_ID), eq(null));
-        assertThat(rowsCaptor.getValue())
-                .extracting(RunningExecutionRows::getPackageManager, RunningExecutionRows::getPackageName,
-                        RunningExecutionRows::getScriptId, RunningExecutionRows::getPrivilegeLevel)
-                .containsExactly(PackageManagerType.CHOCO, CHOCO_PACKAGE, SoftwareScriptCode.CHOCO_ADOPT_SCRIPT_ID,
-                        PrivilegeLevel.ADMIN);
-        assertThat(ordered).containsExactly(WINDOWS);
     }
 
     @Test
@@ -320,6 +289,25 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
         assertThat(refused.getMessage())
                 .isEqualTo("A program is not adopted into WINGET: winget updates it as it is installed");
         verifyNoInteractions(machinePlatformResolver, packageAdoptReach, deviceService, packageUpdateDispatchService);
+    }
+
+    @Test
+    void adopt_choco_badRequest() {
+        // setup
+        SoftwareBundlePackage chocoPackage = SoftwareBundlePackage.builder()
+                .packageManager(PackageManagerType.CHOCO)
+                .packageName(CHOCO_PACKAGE)
+                .build();
+        AdoptSoftwareInput input = input(List.of(WINDOWS));
+        when(softwareInventoryService.getAdoptableSoftware(SOFTWARE_ID)).thenReturn(title(chocoPackage, null));
+
+        // execution
+        BadRequestException refused = assertThrows(BadRequestException.class, () -> service.adopt(input, USER));
+
+        // verifications
+        assertThat(refused.getMessage()).contains("CHOCO");
+        verifyNoInteractions(machinePlatformResolver, packageManagerAvailability, packageAdoptReach, deviceService,
+                packageUpdateDispatchService, softwareActionResultRepository, chocoPackageOwnership);
     }
 
     @Test

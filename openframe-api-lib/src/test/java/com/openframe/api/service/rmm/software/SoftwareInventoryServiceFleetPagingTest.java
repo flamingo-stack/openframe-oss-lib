@@ -27,6 +27,7 @@ import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
@@ -55,6 +56,7 @@ import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -91,6 +93,7 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private SoftwareAdoptionService softwareAdoptionService;
     @Mock private PackageManagerAvailability packageManagerAvailability;
     @Mock private PackageAdoptReach packageAdoptReach;
+    @Mock private ChocoPackageOwnership chocoPackageOwnership;
 
     private SoftwareInventoryService service;
 
@@ -100,7 +103,7 @@ class SoftwareInventoryServiceFleetPagingTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                softwareAdoptionService, packageManagerAvailability, packageAdoptReach);
+                softwareAdoptionService, packageManagerAvailability, packageAdoptReach, chocoPackageOwnership);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -225,6 +228,62 @@ class SoftwareInventoryServiceFleetPagingTest {
         InOrder order = inOrder(autoUpdateService);
         order.verify(autoUpdateService).turnOn("42", chrome, machineIds, WAIT, "admin@x");
         order.verify(autoUpdateService).applyToSoftware(List.of(result));
+    }
+
+    @Test
+    void turnOnAutoUpdate_wingetTitle_machineIdsPassedUnchangedWithoutAskingChocoOwnership() {
+        // setup
+        PackageCatalogEntry chrome = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.WINGET).packageId("Google.Chrome").build();
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("Chrome", 42L, 7));
+        catalogManagesWith(chrome);
+        List<String> machineIds = List.of("m1", "m2", "m3");
+
+        // execution
+        service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x");
+
+        // verifications
+        verify(autoUpdateService).turnOn("42", chrome, machineIds, WAIT, "admin@x");
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    @Test
+    void turnOnAutoUpdate_chocoTitle_policyOnlyForTheDevicesOwningThePackage() {
+        // setup
+        PackageCatalogEntry sevenZip = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.CHOCO).packageId("7zip").build();
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("7zip", 42L, 3));
+        catalogManagesWith(sevenZip);
+        List<String> machineIds = List.of("m1", "m2", "m3");
+        List<String> owners = List.of("m1", "m3");
+        when(chocoPackageOwnership.owners(machineIds, "7zip")).thenReturn(owners);
+
+        // execution
+        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x");
+
+        // verifications
+        assertThat(result.getName()).isEqualTo("7zip");
+        verify(autoUpdateService).turnOn("42", sevenZip, owners, WAIT, "admin@x");
+        verify(autoUpdateService, never()).turnOn("42", sevenZip, machineIds, WAIT, "admin@x");
+    }
+
+    @Test
+    void turnOnAutoUpdate_chocoTitleNoneOfTheGivenDevicesOwns_badRequestNothingTurnedOn() {
+        // setup
+        PackageCatalogEntry sevenZip = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.CHOCO).packageId("7zip").build();
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("7zip", 42L, 3));
+        catalogManagesWith(sevenZip);
+        List<String> machineIds = List.of("m1", "m2");
+        when(chocoPackageOwnership.owners(machineIds, "7zip")).thenReturn(List.of());
+
+        // execution
+        BadRequestException refused = assertThrows(BadRequestException.class,
+                () -> service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x"));
+
+        // verifications
+        assertThat(refused.getMessage()).isNotBlank();
+        verify(autoUpdateService, never()).turnOn(anyString(), any(), anyList(), any(), anyString());
     }
 
     @Test
@@ -419,6 +478,14 @@ class SoftwareInventoryServiceFleetPagingTest {
         // verifications
         assertThat(result.items()).isEmpty();
         verify(fleet, never()).getSoftwareTitle(anyLong());
+    }
+
+    private void catalogManagesWith(PackageCatalogEntry managingPackage) {
+        doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setManagingPackage(managingPackage));
+            return null;
+        }).when(catalogStatus).apply(anyList());
     }
 
     private static SortInput sort(String field, SortDirection direction) {

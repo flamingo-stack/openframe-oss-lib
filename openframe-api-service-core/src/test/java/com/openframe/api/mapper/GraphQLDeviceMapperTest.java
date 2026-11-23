@@ -6,12 +6,20 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.api.dto.device.MachineChocolateyResponse;
+import com.openframe.api.dto.device.MachinePackageManagersResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.device.chocolatey.ChocolateyAdminOption;
+import com.openframe.data.document.device.chocolatey.ChocolateyDecision;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
@@ -19,9 +27,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -235,5 +246,171 @@ class GraphQLDeviceMapperTest {
 
         assertThat(criteria.getDirectorySources()).containsExactly(DirectorySource.MICROSOFT_365);
         assertThat(criteria.getUserLinks()).containsExactly(DirectoryUserLink.PRIMARY, DirectoryUserLink.NONE);
+    }
+
+    @Test
+    void toPackageManagers_neitherStatesNorChocolatey_null() {
+        // setup
+        Machine neverReported = machine(null);
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(neverReported);
+
+        // verifications
+        assertThat(response).isNull();
+    }
+
+    @Test
+    void toPackageManagers_statesWithoutChocolatey_statesMappedAndChocolateyNull() {
+        // setup
+        Machine machine = machine(null);
+        machine.setPackageManagers(Map.of(
+                PackageManagerType.BREW, PackageManagerState.UNSUPPORTED,
+                PackageManagerType.WINGET, PackageManagerState.PRESENT,
+                PackageManagerType.CHOCO, PackageManagerState.MISSING));
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(machine);
+
+        // verifications
+        assertThat(response)
+                .extracting(MachinePackageManagersResponse::getBrew, MachinePackageManagersResponse::getWinget,
+                        MachinePackageManagersResponse::getChoco, MachinePackageManagersResponse::getChocolatey)
+                .containsExactly(PackageManagerState.UNSUPPORTED, PackageManagerState.PRESENT,
+                        PackageManagerState.MISSING, null);
+    }
+
+    @Test
+    void toPackageManagers_chocolateyReported_fieldsMappedNextToTheStates() {
+        // setup
+        Machine machine = machine(null);
+        machine.setPackageManagers(Map.of(PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        machine.setChocolatey(MachineChocolatey.builder()
+                .version("1.4.0")
+                .edition("OPEN_SOURCE")
+                .ours(true)
+                .status(ChocolateyStatus.ACTION_REQUIRED)
+                .reason("VERSION_1")
+                .packages(List.of("7zip"))
+                .existingPackages(List.of("GoogleChrome"))
+                .build());
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(machine);
+
+        // verifications
+        assertThat(response.getChoco()).isEqualTo(PackageManagerState.PRESENT);
+        assertThat(response.getChocolatey())
+                .extracting(MachineChocolateyResponse::getVersion, MachineChocolateyResponse::getEdition,
+                        MachineChocolateyResponse::isOurs, MachineChocolateyResponse::getStatus,
+                        MachineChocolateyResponse::getReason)
+                .containsExactly("1.4.0", "OPEN_SOURCE", true, ChocolateyStatus.ACTION_REQUIRED, "VERSION_1");
+    }
+
+    @Test
+    void toPackageManagers_chocolateyNotOurs_oursFalseAndAbsentVersionKeptNull() {
+        // setup
+        Machine machine = machine(null);
+        machine.setPackageManagers(Map.of(PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        machine.setChocolatey(chocolatey(ChocolateyStatus.ACTION_REQUIRED, "BROKEN"));
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(machine);
+
+        // verifications
+        assertThat(response.getChocolatey())
+                .extracting(MachineChocolateyResponse::getVersion, MachineChocolateyResponse::isOurs)
+                .containsExactly(null, false);
+    }
+
+    @Test
+    void toPackageManagers_chocolateyWithoutStates_chocolateyMappedAndStatesNull() {
+        // setup
+        Machine machine = machine(null);
+        machine.setChocolatey(chocolatey(ChocolateyStatus.MANAGED, null));
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(machine);
+
+        // verifications
+        assertThat(response)
+                .extracting(MachinePackageManagersResponse::getBrew, MachinePackageManagersResponse::getWinget,
+                        MachinePackageManagersResponse::getChoco)
+                .containsExactly(null, null, null);
+        assertThat(response.getChocolatey().getStatus()).isEqualTo(ChocolateyStatus.MANAGED);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"VERSION_1", "UPGRADE_BLOCKED", "PINNED", "LICENSED", "BROKEN", "UNSIGNED", "WEAK_ACL",
+            "SEVERAL_INSTALLS", "A_REASON_OF_A_NEWER_AGENT"})
+    void toPackageManagers_actionRequiredWhateverTheReason_dontTouchThenAdminFixesOffered(String reason) {
+        // setup
+        Machine machine = machine(null);
+        machine.setChocolatey(chocolatey(ChocolateyStatus.ACTION_REQUIRED, reason));
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(machine);
+
+        // verifications
+        assertThat(response.getChocolatey().getOptions())
+                .containsExactly(ChocolateyAdminOption.DONT_TOUCH, ChocolateyAdminOption.ADMIN_FIXES);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @EnumSource(value = ChocolateyStatus.class, names = {"ACTION_REQUIRED"}, mode = EnumSource.Mode.EXCLUDE)
+    void toPackageManagers_statusOtherThanActionRequired_emptyOptions(ChocolateyStatus status) {
+        // setup
+        Machine machine = machine(null);
+        machine.setChocolatey(chocolatey(status, null));
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(machine);
+
+        // verifications
+        assertThat(response.getChocolatey().getOptions()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(ChocolateyAdminOption.class)
+    void toPackageManagers_decisionStored_decisionIsItsOption(ChocolateyAdminOption option) {
+        // setup
+        Machine machine = machine(null);
+        machine.setChocolatey(chocolatey(ChocolateyStatus.ACTION_REQUIRED, "PINNED"));
+        machine.setChocolateyDecision(ChocolateyDecision.builder()
+                .option(option)
+                .reason("PINNED")
+                .decidedAt(REGISTERED)
+                .decidedBy("user-1")
+                .build());
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(machine);
+
+        // verifications
+        assertThat(response.getChocolatey().getDecision()).isEqualTo(option);
+    }
+
+    @Test
+    void toPackageManagers_noDecision_decisionNull() {
+        // setup
+        Machine machine = machine(null);
+        machine.setChocolatey(chocolatey(ChocolateyStatus.ACTION_REQUIRED, "PINNED"));
+
+        // execution
+        MachinePackageManagersResponse response = mapper.toPackageManagers(machine);
+
+        // verifications
+        assertThat(response.getChocolatey().getDecision()).isNull();
+    }
+
+    private static MachineChocolatey chocolatey(ChocolateyStatus status, String reason) {
+        return MachineChocolatey.builder()
+                .status(status)
+                .reason(reason)
+                .packages(List.of())
+                .existingPackages(List.of())
+                .build();
     }
 }
