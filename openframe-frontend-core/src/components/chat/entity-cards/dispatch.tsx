@@ -2296,7 +2296,6 @@ function ChatCardLoading({ chatRef, action }: { chatRef: ChatRef; action?: CardD
   const entry = CHAT_CARD_REGISTRY[chatRef.type];
   if (!entry) return null;
   const node = entry.skeleton?.() ?? null;
-  // loading-standard-ok(OPTIONAL_MARK): `entry.disclosure` is the card registry's, not a read field, and the loaded card draws the same button
   const footerAction = entry.disclosure ? <ChatCardDisclosureButton kind={entry.disclosure} loading /> : undefined;
   return entry.bareInline ? (
     <>

@@ -107,6 +107,9 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     """False when no enabled package manager can ever work on this device. Software Management then hides it
     from device pickers and skips it at dispatch; inventory and vulnerabilities still show it."""
     softwareManagementSupported: Boolean!
+    """Integrated agents this device's OS version is below the minimum of: they are not installed, updated or kept on
+    it. Empty when the OS version is unknown or every agent supports it."""
+    unsupportedTools: [UnsupportedTool!]!
     enrollment: DeviceEnrollment
     """SOURCES column: the directories that know this machine besides the agent; [] when none, and always in OSS."""
     directorySources: [DirectorySource!]!
@@ -234,4 +237,11 @@ type InstalledAgent implements Node {
 extend type Mutation {
 
     updateDeviceNickname(machineId: String!, nickname: String): Machine!
+}
+
+"""An integrated agent that does not run on the device's OS version."""
+type UnsupportedTool {
+    toolType: ToolType!
+    minOsVersion: String!
+    osVersion: String!
 }
