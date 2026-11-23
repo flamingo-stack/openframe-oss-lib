@@ -24,4 +24,6 @@ public class PackageReference {
     private BrewPackageType kind;
 
     private String name;
+
+    private String feed;
 }

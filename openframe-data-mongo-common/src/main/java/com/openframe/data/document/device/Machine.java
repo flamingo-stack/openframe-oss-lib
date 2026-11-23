@@ -1,5 +1,7 @@
 package com.openframe.data.document.device;
 import com.openframe.data.document.TenantScoped;
+import com.openframe.data.document.device.chocolatey.ChocolateyDecision;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
@@ -62,6 +64,8 @@ public class Machine implements TenantScoped {
     private Set<String> withheldToolAgents;
     private String timezone;
     private Map<PackageManagerType, PackageManagerState> packageManagers;
+    private MachineChocolatey chocolatey;
+    private ChocolateyDecision chocolateyDecision;
     private SecurityState securityState;
     private ComplianceState complianceState;
     private List<SecurityAlert> securityAlerts;

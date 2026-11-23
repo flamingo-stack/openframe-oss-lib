@@ -19,10 +19,14 @@ public class PackageUpdateWire {
         };
     }
 
-    public PackageReference reference(PackageManagerType manager, String packageName, BrewPackageType brewPackageType) {
+    public PackageReference reference(PackageManagerType manager, String packageName, BrewPackageType brewPackageType,
+                                      String feed) {
         PackageReference.PackageReferenceBuilder ref = PackageReference.builder().manager(manager);
         if (manager == PackageManagerType.BREW) {
             return ref.kind(brewPackageType).name(packageName).build();
+        }
+        if (manager == PackageManagerType.CHOCO) {
+            return ref.id(packageName).feed(feed).build();
         }
         return ref.id(packageName).build();
     }
@@ -30,8 +34,8 @@ public class PackageUpdateWire {
     public PackageUpdateDeliverySeed seed(String machineId, PackageUpdateRequest request) {
         PackageUpdateMode mode = request.getMode();
         UpdateSource source = source(request.getSource());
-        PackageReference packageRef =
-                reference(request.getPackageManager(), request.getPackageName(), request.getBrewPackageType());
+        PackageReference packageRef = reference(request.getPackageManager(), request.getPackageName(),
+                request.getBrewPackageType(), request.getFeed());
         return PackageUpdateDeliverySeed.builder()
                 .machineId(machineId)
                 .requestId(request.getRequestId())

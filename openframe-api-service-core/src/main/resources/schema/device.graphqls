@@ -141,6 +141,47 @@ type MachinePackageManagers {
     brew: PackageManagerState
     winget: PackageManagerState
     choco: PackageManagerState
+    """The Chocolatey found on the device and whether OpenFrame may use it. Null unless choco is PRESENT and the
+    agent reported it."""
+    chocolatey: MachineChocolatey
+}
+
+"""Chocolatey as last reported by the device agent."""
+type MachineChocolatey {
+    """Installed Chocolatey version. Null when it could not be read (reason BROKEN)."""
+    version: String
+    """Chocolatey edition as the agent names it, e.g. OPEN_SOURCE."""
+    edition: String
+    """True when OpenFrame installed this Chocolatey; false for one that was already on the device."""
+    ours: Boolean!
+    status: ChocolateyStatus!
+    """Why action is required, e.g. VERSION_1, UPGRADE_BLOCKED, PINNED, LICENSED, BROKEN, UNSIGNED, WEAK_ACL,
+    SEVERAL_INSTALLS. Set only with ACTION_REQUIRED; a newer agent may send other values."""
+    reason: String
+    """What the admin can choose for this device with setChocolateyDecision. Empty unless the status is
+    ACTION_REQUIRED."""
+    options: [ChocolateyAdminOption!]!
+    """The admin's choice for the current reason. Null until one is made; cleared when the reason changes or action
+    is no longer required."""
+    decision: ChocolateyAdminOption
+}
+
+enum ChocolateyStatus {
+    """OpenFrame installs and updates packages through this Chocolatey."""
+    MANAGED
+    """OpenFrame is upgrading this Chocolatey by itself; packages wait until it is MANAGED."""
+    UPGRADE_REQUIRED
+    """OpenFrame does not touch this Chocolatey until an admin acts; see reason and options."""
+    ACTION_REQUIRED
+    """A status this backend does not know; treated as not MANAGED."""
+    UNKNOWN
+}
+
+enum ChocolateyAdminOption {
+    """Leave this Chocolatey as it is: OpenFrame keeps managing no Chocolatey packages on the device."""
+    DONT_TOUCH
+    """The admin fixes the cause on the device. With reason UPGRADE_BLOCKED OpenFrame tries the upgrade again."""
+    ADMIN_FIXES
 }
 
 
@@ -232,6 +273,11 @@ type InstalledAgent implements Node {
 extend type Mutation {
 
     updateDeviceNickname(machineId: String!, nickname: String): Machine!
+
+    """Store the admin's choice for a device whose Chocolatey requires action (MachineChocolatey.options).
+    Valid only while packageManagers.chocolatey.status is ACTION_REQUIRED, otherwise BAD_REQUEST. NOT_FOUND for an
+    unknown device. machineId is the plain Machine.machineId."""
+    setChocolateyDecision(machineId: String!, option: ChocolateyAdminOption!): Machine!
 }
 
 """An integrated agent that does not run on the device's OS version."""

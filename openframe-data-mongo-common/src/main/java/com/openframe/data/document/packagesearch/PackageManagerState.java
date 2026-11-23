@@ -10,4 +10,5 @@ public enum PackageManagerState {
     UNKNOWN;
 
     public static final Set<PackageManagerState> MANAGEABLE = EnumSet.of(PRESENT, MISSING, UNKNOWN);
+    public static final Set<PackageManagerState> NOT_YET_USABLE = EnumSet.of(MISSING, UNKNOWN);
 }

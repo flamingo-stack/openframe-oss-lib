@@ -292,7 +292,7 @@ public class TenantSoftwareReadModelQuery {
         List<String> softwareIds = packageAutoUpdatePolicyRepository.findSoftwareIds(tenantId);
         Set<Long> enabledPolicyTitleIds = titleIds(enabledSoftwareIds);
         Set<Long> policyTitleIds = titleIds(softwareIds);
-        List<PackageManagerType> adoptionManagers = packageManagerAvailability.enabledManagers();
+        List<PackageManagerType> adoptionManagers = packageManagerAvailability.adoptionManagers();
         titles.autoUpdateStatuses(autoUpdateStatuses)
                 .enabledPolicyTitleIds(enabledPolicyTitleIds)
                 .policyTitleIds(policyTitleIds)

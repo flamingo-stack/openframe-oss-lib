@@ -1,12 +1,14 @@
 package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
@@ -16,6 +18,7 @@ import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
@@ -44,6 +47,7 @@ public class SoftwareBundleOnlineDispatcher {
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
     private final PackageAutoUpdatePolicyService autoUpdatePolicyService;
+    private final ChocoPackageOwnership chocoPackageOwnership;
 
     public void dispatch(SoftwareBundle bundle, Machine machine) {
         if (bundle.getPackages() == null || bundle.getPackages().isEmpty()) {
@@ -87,6 +91,11 @@ public class SoftwareBundleOnlineDispatcher {
                     code.canonicalName(), script.getSupportedPlatforms());
             return;
         }
+        if (isChocoUpdate(bundle, pkg) && !chocoPackageOwnership.owns(machine, pkg.getPackageName())) {
+            log.debug("Skipping package {}/{} for machine {} — the device does not own the package",
+                    pkg.getPackageManager(), pkg.getPackageName(), machineId);
+            return;
+        }
 
         String executionId = SoftwareExecutionId.forBundle(bundle.getId(), pkg.getPackageManager(), pkg.getPackageName());
         RunningExecutionRows rows = RunningExecutionRows.builder()
@@ -128,5 +137,9 @@ public class SoftwareBundleOnlineDispatcher {
 
         log.info("Dispatched software bundle fire bundleId={} executionId={} package={} manager={} action={} machine={}",
                 bundle.getId(), executionId, pkg.getPackageName(), pkg.getPackageManager(), bundle.getAction(), machineId);
+    }
+
+    private static boolean isChocoUpdate(SoftwareBundle bundle, SoftwareBundlePackage pkg) {
+        return pkg.getPackageManager() == PackageManagerType.CHOCO && bundle.getAction() == SoftwareAction.UPDATE;
     }
 }

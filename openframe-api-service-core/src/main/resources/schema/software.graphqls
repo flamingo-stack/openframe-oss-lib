@@ -143,6 +143,9 @@ extend type Query {
     """Faceted severity counts for one device's CVEs — same scope as deviceVulnerabilities(machineId, search);
     mirrors vulnerabilityFilters. Unknown machineId → NOT_FOUND; a device with no CVEs → empty facets."""
     deviceVulnerabilityFilters(machineId: String!, filter: VulnerabilityFilterInput, search: String): VulnerabilityFilters!
+
+    """The tenant's Software Management settings. The defaults until they are saved for the first time."""
+    softwareSettings: SoftwareSettings!
 }
 
 # ────────── Software (aggregate row) ──────────
@@ -521,6 +524,9 @@ extend type Mutation {
     Software (autoUpdate).
     Idempotent: a title that has no auto-update is returned as it is. Unknown softwareId → NOT_FOUND."""
     turnOffSoftwareAutoUpdate(softwareId: ID!): Software!
+
+    """Save the tenant's Software Management settings. Returns the settings as stored."""
+    updateSoftwareSettings(input: SoftwareSettingsInput!): SoftwareSettings!
 }
 
 # ────────── Adopt ──────────
@@ -617,4 +623,16 @@ input TurnOnSoftwareAutoUpdateInput {
     "A PENDING SoftwareBundle with the devices to keep updated, at least one."
     bundleId: ID!
     settings: PackageUpdateSettingsInput!
+}
+
+"""Software Management settings of the tenant."""
+type SoftwareSettings {
+    """Update existing Chocolatey packages: when true, OpenFrame also updates the Chocolatey packages that were on
+    a device before OpenFrame managed its Chocolatey, not only the ones it installed. Off by default."""
+    updateExistingChocolateyPackages: Boolean!
+}
+
+input SoftwareSettingsInput {
+    "True to also update the Chocolatey packages OpenFrame did not install."
+    updateExistingChocolateyPackages: Boolean!
 }

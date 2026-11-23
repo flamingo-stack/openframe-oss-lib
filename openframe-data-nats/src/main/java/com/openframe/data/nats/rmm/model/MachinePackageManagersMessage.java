@@ -16,6 +16,7 @@ public class MachinePackageManagersMessage {
 
     private Map<String, PackageManagerState> packageManagers;
     private List<Dependency> dependencies = List.of();
+    private Chocolatey chocolatey;
 
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -23,5 +24,18 @@ public class MachinePackageManagersMessage {
 
         private String name;
         private PackageManagerState state;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Chocolatey {
+
+        private String version;
+        private String edition;
+        private boolean ours;
+        private String status;
+        private String reason;
+        private List<String> packages = List.of();
+        private List<String> existingPackages = List.of();
     }
 }

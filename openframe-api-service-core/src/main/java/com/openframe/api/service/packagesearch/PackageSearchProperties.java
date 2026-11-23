@@ -13,16 +13,7 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "openframe.package-search")
 public class PackageSearchProperties {
 
-    private Choco choco = new Choco();
     private Winget winget = new Winget();
-
-    @Getter
-    @Setter
-    public static class Choco {
-        private String baseUrl = "https://community.chocolatey.org/api/v2";
-        private Duration timeout = Duration.ofSeconds(15);
-        private Duration cacheTtl = Duration.ofMinutes(30);
-    }
 
     @Getter
     @Setter

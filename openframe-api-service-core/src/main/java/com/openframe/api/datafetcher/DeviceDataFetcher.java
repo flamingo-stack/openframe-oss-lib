@@ -26,6 +26,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.graphql.relay.RelayIdCodec;
+import com.openframe.api.service.device.ChocolateyDecisionService;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
@@ -36,6 +37,7 @@ import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.device.chocolatey.ChocolateyAdminOption;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
@@ -47,12 +49,16 @@ import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.service.ToolOsSupportService.AgentWithToolType;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.security.authentication.AuthPrincipal;
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dataloader.DataLoader;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -81,6 +87,7 @@ public class DeviceDataFetcher {
     private final NotificationRecipientResolver recipientResolver;
     private final ClientVersionThreshold clientVersionThreshold;
     private final ToolOsSupportService toolOsSupportService;
+    private final ChocolateyDecisionService chocolateyDecisionService;
 
     @DgsQuery
     public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument @Valid DeviceFilterInput filter,
@@ -154,6 +161,14 @@ public class DeviceDataFetcher {
                                         @InputArgument String nickname) {
         log.debug("Updating nickname for machineId: {}", machineId);
         return deviceService.updateNickname(machineId, nickname);
+    }
+
+    @DgsMutation
+    public Machine setChocolateyDecision(@InputArgument @NotBlank String machineId,
+                                         @InputArgument ChocolateyAdminOption option) {
+        log.debug("Setting Chocolatey decision {} for machineId: {}", option, machineId);
+        String decidedBy = getCurrentUserId();
+        return chocolateyDecisionService.set(machineId, option, decidedBy);
     }
 
     @DgsData(parentType = "ToolConnection", field = "vulnerabilitiesUpdatedAt")
@@ -231,7 +246,7 @@ public class DeviceDataFetcher {
     @DgsData(parentType = "Machine")
     public MachinePackageManagersResponse packageManagers(DgsDataFetchingEnvironment dfe) {
         Machine machine = dfe.getSource();
-        return mapper.toPackageManagers(machine.getPackageManagers());
+        return mapper.toPackageManagers(machine);
     }
 
     @DgsData(parentType = "Machine")
@@ -276,6 +291,11 @@ public class DeviceDataFetcher {
                 recipient.id(), recipient.type(), NotificationEntityType.DEVICE, machine.getMachineId());
         DataLoader<UnreadNotificationKey, Integer> loader = dfe.getDataLoader(UnreadNotificationDataLoader.NAME);
         return loader.load(key);
+    }
+
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 
 }

@@ -27,6 +27,7 @@ import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
@@ -63,6 +64,7 @@ public class SoftwareInstallUpdateManagementService {
     private final PackageAdoptReach packageAdoptReach;
     private final SoftwareInventoryService softwareInventoryService;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final ChocoPackageOwnership chocoPackageOwnership;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -80,6 +82,9 @@ public class SoftwareInstallUpdateManagementService {
         String packageName = adoptionPackage.getPackageName();
         if (packageManager == PackageManagerType.WINGET) {
             throw new BadRequestException("A program is not adopted into WINGET: winget updates it as it is installed");
+        }
+        if (packageManager == PackageManagerType.CHOCO) {
+            throw new BadRequestException("A program is not adopted into CHOCO: the device agent cannot do it yet");
         }
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
         List<String> adoptable = adoptableMachines(softwareId, adoptionPackage, machineIds);
@@ -146,7 +151,7 @@ public class SoftwareInstallUpdateManagementService {
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
 
             List<String> compatible = machinePlatformResolver.compatible(machineIds, osTypes, script.getSupportedPlatforms());
-            List<String> targets = machinePlatformResolver.supporting(compatible, pkg.getPackageManager());
+            List<String> targets = targetsOf(action, pkg, compatible);
             if (targets.isEmpty()) {
                 log.warn("Software {} skipped package {}/{}: no compatible device among {} target(s) (supports {})",
                         action, pkg.getPackageManager(), pkg.getPackageName(), machineIds.size(),
@@ -194,6 +199,13 @@ public class SoftwareInstallUpdateManagementService {
         log.info("Software {} dispatched: packages={}/{} machines={} initiatedBy={} source={}",
                 action, results.size(), packages.size(), machineIds.size(), initiatedBy, source);
         return results;
+    }
+
+    private List<String> targetsOf(SoftwareAction action, SoftwarePackageInput pkg, List<String> compatible) {
+        PackageManagerType packageManager = pkg.getPackageManager();
+        List<String> supporting = machinePlatformResolver.supporting(compatible, packageManager);
+        boolean chocoUpdate = packageManager == PackageManagerType.CHOCO && action == SoftwareAction.UPDATE;
+        return chocoUpdate ? chocoPackageOwnership.owners(supporting, pkg.getPackageName()) : supporting;
     }
 
     // the Software Actions list reads its rows from here: no row, no line on the screen

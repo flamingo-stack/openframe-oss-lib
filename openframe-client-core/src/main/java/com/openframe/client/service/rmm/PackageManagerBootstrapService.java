@@ -3,6 +3,7 @@ package com.openframe.client.service.rmm;
 import java.util.List;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -34,11 +36,16 @@ import java.util.UUID;
 @Slf4j
 public class PackageManagerBootstrapService {
 
+    private static final Set<SystemScriptCode> CHOCOLATEY_SCRIPTS =
+            Set.of(SystemScriptCode.INSTALL_CHOCOLATEY, SystemScriptCode.UPGRADE_CHOCOLATEY);
+    private static final long NO_COOLDOWN = 0;
+
     private final MachineRepository machineRepository;
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
     private final EncryptionService encryptionService;
+    private final PackageManagerProperties packageManagerProperties;
 
     @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds}")
     private long cooldownSeconds;
@@ -49,6 +56,19 @@ public class PackageManagerBootstrapService {
     }
 
     public void dispatchInstall(String machineId, PackageManagerType packageManager, SystemScriptCode bootstrapScript) {
+        dispatchScript(machineId, packageManager, bootstrapScript, cooldownSeconds);
+    }
+
+    public void dispatchChocolateyUpgrade(String machineId) {
+        dispatchScript(machineId, PackageManagerType.CHOCO, SystemScriptCode.UPGRADE_CHOCOLATEY, cooldownSeconds);
+    }
+
+    public void resendChocolateyUpgrade(String machineId) {
+        dispatchScript(machineId, PackageManagerType.CHOCO, SystemScriptCode.UPGRADE_CHOCOLATEY, NO_COOLDOWN);
+    }
+
+    private void dispatchScript(String machineId, PackageManagerType packageManager, SystemScriptCode bootstrapScript,
+                                long cooldown) {
         Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
         if (foundMachine.isEmpty()) {
             log.warn("Package-manager report for unknown machine {}, ignoring", machineId);
@@ -71,14 +91,23 @@ public class PackageManagerBootstrapService {
         }
         Script script = foundScript.get();
 
-        if (isSuppressed(tenantId, machineId, script.getId())) {
+        if (isSuppressed(tenantId, machineId, script.getId(), cooldown)) {
             return;
         }
 
-        dispatch(tenantId, machineId, packageManager, script);
+        List<String> args = scriptArgs(bootstrapScript, script);
+        dispatch(tenantId, machineId, packageManager, script, args);
     }
 
-    private boolean isSuppressed(String tenantId, String machineId, String scriptId) {
+    private List<String> scriptArgs(SystemScriptCode bootstrapScript, Script script) {
+        if (CHOCOLATEY_SCRIPTS.contains(bootstrapScript)) {
+            PackageManagerProperties.Choco choco = packageManagerProperties.getChoco();
+            return List.of(choco.getFeedUrl(), choco.getVersion(), choco.getSha256());
+        }
+        return ScriptArgsTokenizer.tokenize(script.getDefaultArgs());
+    }
+
+    private boolean isSuppressed(String tenantId, String machineId, String scriptId, long cooldown) {
         Optional<ScriptExecution> last = scriptExecutionRepository
                 .findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
                         tenantId, machineId, scriptId, ExecutionSource.SYSTEM_BOOTSTRAP);
@@ -92,7 +121,7 @@ public class PackageManagerBootstrapService {
             return true;
         }
         Instant dispatchedAt = execution.getDispatchedAt();
-        if (dispatchedAt != null && dispatchedAt.isAfter(Instant.now().minusSeconds(cooldownSeconds))) {
+        if (dispatchedAt != null && dispatchedAt.isAfter(Instant.now().minusSeconds(cooldown))) {
             log.debug("Bootstrap for machineId={} scriptId={} dispatched at {} is within the cooldown — skipping",
                     machineId, scriptId, dispatchedAt);
             return true;
@@ -100,7 +129,8 @@ public class PackageManagerBootstrapService {
         return false;
     }
 
-    private void dispatch(String tenantId, String machineId, PackageManagerType packageManager, Script script) {
+    private void dispatch(String tenantId, String machineId, PackageManagerType packageManager, Script script,
+                          List<String> args) {
         String executionId = UUID.randomUUID().toString();
         Instant now = Instant.now();
 
@@ -128,7 +158,7 @@ public class PackageManagerBootstrapService {
                 .code(script.getScriptBody())
                 .shell(script.getShell())
                 .privilegeLevel(script.getPrivilegeLevel())
-                .args(ScriptArgsTokenizer.tokenize(script.getDefaultArgs()))
+                .args(args)
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
                 .envVars(envVars)
                 .build());

@@ -3,6 +3,9 @@ package com.openframe.client.service.rmm;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.chocolatey.ChocolateyDecision;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.PackageManagerDependency;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -18,8 +21,11 @@ import org.springframework.stereotype.Service;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
+import static com.openframe.data.service.machine.MachineFields.CHOCOLATEY;
+import static com.openframe.data.service.machine.MachineFields.CHOCOLATEY_DECISION;
 import static com.openframe.data.service.machine.MachineFields.PACKAGE_MANAGERS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
@@ -28,6 +34,8 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 @RequiredArgsConstructor
 @Slf4j
 public class MachinePackageManagersService {
+
+    private static final String UPGRADE_BLOCKED = "UPGRADE_BLOCKED";
 
     private final MachineRepository machineRepository;
     private final MachineWriter machineWriter;
@@ -53,6 +61,9 @@ public class MachinePackageManagersService {
         }
         states.forEach((manager, state) -> bootstrapIfMissing(machineId, manager, state));
         report.getDependencies().forEach(dependency -> bootstrapIfMissing(machineId, dependency));
+
+        MachineChocolatey chocolatey = reportedChocolatey(states, report.getChocolatey());
+        applyChocolatey(machineId, machine, chocolatey);
     }
 
     private void bootstrapIfMissing(String machineId, PackageManagerType manager, PackageManagerState state) {
@@ -76,6 +87,37 @@ public class MachinePackageManagersService {
         }
     }
 
+    private void applyChocolatey(String machineId, Machine machine, MachineChocolatey reported) {
+        if (!ChocolateyReport.isSame(reported, machine.getChocolatey())) {
+            machineWriter.update(machineId, machineUpdate().set(CHOCOLATEY, reported));
+            log.info("Updated chocolatey for machineId={}: {}", machineId, reported);
+        }
+        ChocolateyDecision decision = machine.getChocolateyDecision();
+        if (decision != null) {
+            applyDecision(machineId, decision, reported);
+        }
+        if (hasStatus(reported, ChocolateyStatus.UPGRADE_REQUIRED) && isChocoEnabled()) {
+            bootstrapService.dispatchChocolateyUpgrade(machineId);
+        }
+    }
+
+    private void applyDecision(String machineId, ChocolateyDecision decision, MachineChocolatey reported) {
+        if (!isAnswerTo(decision, reported)) {
+            machineWriter.update(machineId, machineUpdate().set(CHOCOLATEY_DECISION, null));
+            log.info("Reset chocolatey decision for machineId={}", machineId);
+            return;
+        }
+        if (decision.isUpgradeRetryPending() && UPGRADE_BLOCKED.equals(decision.getReason()) && isChocoEnabled()) {
+            bootstrapService.resendChocolateyUpgrade(machineId);
+            decision.setUpgradeRetryPending(false);
+            machineWriter.update(machineId, machineUpdate().set(CHOCOLATEY_DECISION, decision));
+        }
+    }
+
+    private boolean isChocoEnabled() {
+        return !packageManagerProperties.isDisabled(PackageManagerType.CHOCO);
+    }
+
     private static boolean isFrozen(Machine machine) {
         return DeviceStatus.FROZEN.contains(machine.getStatus());
     }
@@ -95,6 +137,21 @@ public class MachinePackageManagersService {
             return;
         }
         manager.ifPresent(known -> states.put(known, state));
+    }
+
+    private static MachineChocolatey reportedChocolatey(Map<PackageManagerType, PackageManagerState> states,
+                                                        MachinePackageManagersMessage.Chocolatey reported) {
+        boolean chocoPresent = states.get(PackageManagerType.CHOCO) == PackageManagerState.PRESENT;
+        return chocoPresent && reported != null ? ChocolateyReport.toDocument(reported) : null;
+    }
+
+    private static boolean isAnswerTo(ChocolateyDecision decision, MachineChocolatey reported) {
+        return hasStatus(reported, ChocolateyStatus.ACTION_REQUIRED)
+                && Objects.equals(reported.getReason(), decision.getReason());
+    }
+
+    private static boolean hasStatus(MachineChocolatey chocolatey, ChocolateyStatus status) {
+        return chocolatey != null && chocolatey.getStatus() == status;
     }
 
     private static Optional<PackageManagerType> managerNamed(String name) {

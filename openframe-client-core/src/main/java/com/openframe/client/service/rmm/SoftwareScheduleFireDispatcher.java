@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
@@ -8,6 +9,7 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
@@ -16,6 +18,7 @@ import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
@@ -46,6 +49,7 @@ public class SoftwareScheduleFireDispatcher {
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
     private final PackageAutoUpdatePolicyService autoUpdatePolicyService;
+    private final ChocoPackageOwnership chocoPackageOwnership;
 
     public void dispatch(SoftwareSchedule schedule, List<String> machineIds, Instant now) {
         if (schedule.getPackages() == null || schedule.getPackages().isEmpty()
@@ -76,7 +80,10 @@ public class SoftwareScheduleFireDispatcher {
         Script script = found.get();
 
         List<String> compatible = machinePlatformResolver.compatible(machineIds, osTypes, script.getSupportedPlatforms());
-        List<String> targets = machinePlatformResolver.supporting(compatible, pkg.getPackageManager());
+        List<String> supporting = machinePlatformResolver.supporting(compatible, pkg.getPackageManager());
+        List<String> targets = isChocoUpdate(schedule, pkg)
+                ? chocoPackageOwnership.owners(supporting, pkg.getPackageName())
+                : supporting;
         if (targets.isEmpty()) {
             log.warn("Software schedule scheduleId={} package {}/{}: no compatible device among {} target(s) (supports {}) — skipped",
                     schedule.getId(), pkg.getPackageManager(), pkg.getPackageName(), machineIds.size(),
@@ -133,5 +140,9 @@ public class SoftwareScheduleFireDispatcher {
         log.info("Dispatched software schedule fire scheduleId={} executionId={} package={} manager={} action={} machines={}",
                 schedule.getId(), executionId, pkg.getPackageName(), pkg.getPackageManager(), schedule.getAction(),
                 scriptTargets.size());
+    }
+
+    private static boolean isChocoUpdate(SoftwareSchedule schedule, SoftwareSchedulePackage pkg) {
+        return pkg.getPackageManager() == PackageManagerType.CHOCO && schedule.getAction() == SoftwareAction.UPDATE;
     }
 }

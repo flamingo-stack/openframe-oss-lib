@@ -6,6 +6,7 @@ import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.packagesearch.PackageManagerState;
@@ -67,6 +68,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
     private static final String PACKAGE_MANAGERS_FIELD = "packageManagers";
+    private static final String CHOCOLATEY_STATUS_FIELD = "chocolatey.status";
     private static final String DIRECTORY_SOURCES_FIELD = "directorySources";
     private static final String DIRECTORY_USER_LINK_FIELD = "directoryUserLink";
     private static final String COUNT_FIELD = "count";
@@ -908,9 +910,19 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static Criteria softwareManageableCriteria(Collection<PackageManagerType> manageableBy) {
         List<Criteria> anyManageable = new ArrayList<>();
         anyManageable.add(Criteria.where(PACKAGE_MANAGERS_FIELD).exists(false));
-        manageableBy.forEach(manager -> anyManageable.add(
-                Criteria.where(PACKAGE_MANAGERS_FIELD + "." + manager.name()).in(PackageManagerState.MANAGEABLE)));
+        manageableBy.forEach(manager -> anyManageable.addAll(manageableCriteria(manager)));
         return new Criteria().orOperator(anyManageable.toArray(new Criteria[0]));
+    }
+
+    private static List<Criteria> manageableCriteria(PackageManagerType manager) {
+        String stateField = PACKAGE_MANAGERS_FIELD + "." + manager.name();
+        if (manager != PackageManagerType.CHOCO) {
+            return List.of(Criteria.where(stateField).in(PackageManagerState.MANAGEABLE));
+        }
+        return List.of(
+                Criteria.where(stateField).in(PackageManagerState.NOT_YET_USABLE),
+                Criteria.where(stateField).is(PackageManagerState.PRESENT)
+                        .and(CHOCOLATEY_STATUS_FIELD).is(ChocolateyStatus.MANAGED));
     }
 
 }
