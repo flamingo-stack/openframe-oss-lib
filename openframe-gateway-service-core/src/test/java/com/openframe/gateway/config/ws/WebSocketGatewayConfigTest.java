@@ -1,5 +1,7 @@
 package com.openframe.gateway.config.ws;
 
+import com.openframe.gateway.config.ws.nats.session.NatsSubjectFilter;
+import com.openframe.gateway.config.ws.nats.session.NatsSubjectFilteringWebSocketSessionDecorator;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,7 @@ class WebSocketGatewayConfigTest {
     @Mock private WebSocketService defaultWebSocketService;
     @Mock private GatewayTrafficMetrics gatewayTrafficMetrics;
     @Mock private RelayAccessWatcher relayAccessWatcher;
+    @Mock private NatsSubjectFilter natsSubjectFilter;
 
     private WebSocketGatewayConfig config;
 
@@ -37,7 +40,7 @@ class WebSocketGatewayConfigTest {
         // execution
         WebSocketService service = config.webSocketServiceDecorator(requestJwtClaimsReader, defaultWebSocketService,
                 gatewayTrafficMetrics, loggingProperties, meshControlProperties, objectMapper, relayAccessWatcher,
-                sessionCap);
+                sessionCap, natsSubjectFilter);
 
         // verifications
         assertThat(service).isInstanceOf(WebSocketServiceSecurityDecorator.class);
