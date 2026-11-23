@@ -2,6 +2,7 @@ package com.openframe.client.controller;
 
 import com.openframe.client.dto.AgentTokenResponse;
 import com.openframe.client.exception.MachineDeletedException;
+import com.openframe.client.exception.TenantBlockedException;
 import com.openframe.client.service.AgentAuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,11 @@ public class AgentAuthController {
             return ResponseEntity.ok(response);
         } catch (MachineDeletedException e) {
             return ResponseEntity.status(HttpStatus.GONE)
+                    .body(Map.of(
+                            "message", e.getMessage()
+                    ));
+        } catch (TenantBlockedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of(
                             "message", e.getMessage()
                     ));

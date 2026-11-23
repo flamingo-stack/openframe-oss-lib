@@ -41,6 +41,11 @@ public class Machine implements TenantScoped {
     private TelemetryStatus telemetryStatus;
     private Instant lastSeen;
     private Instant firstConnectedAt;
+    /**
+     * Device access tokens issued before this instant are rejected by the gateway; set when the
+     * tenant is blocked, so its tokens stay dead after an unblock. Whole seconds, as JWT iat is.
+     */
+    private Instant tokensRevokedAt;
     @Indexed
     private String organizationId;
     private Instant organizationAssignedAt;
