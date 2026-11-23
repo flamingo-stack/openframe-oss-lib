@@ -7,7 +7,9 @@ import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -20,16 +22,19 @@ public class DeviceOsUpdateHistoryParser {
 
     private final ReportedEnumParser reportedEnumParser;
 
-    // Only Windows reports a history. A Mac's block has none.
+    // Only Windows reports a history. A Mac's block has none. One entry per entry key: an install the report
+    // names twice is one entry.
     public List<DeviceOsUpdateHistoryEntry> parse(ReportingDevice reportingDevice,
                                                   MachineOsUpdatesMessage.WindowsDetails windows) {
         if (windows == null || windows.getHistory() == null) {
             return List.of();
         }
-        return windows.getHistory().stream()
+        Map<String, DeviceOsUpdateHistoryEntry> entriesByEntryKey = new LinkedHashMap<>();
+        windows.getHistory().stream()
                 .filter(DeviceOsUpdateHistoryParser::isIdentified)
                 .map(reportedEntry -> parse(reportingDevice, reportedEntry))
-                .toList();
+                .forEach(historyEntry -> entriesByEntryKey.putIfAbsent(historyEntry.getEntryKey(), historyEntry));
+        return List.copyOf(entriesByEntryKey.values());
     }
 
     private static boolean isIdentified(MachineOsUpdatesMessage.WindowsHistoryEntry reportedEntry) {

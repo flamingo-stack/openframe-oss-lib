@@ -5,11 +5,9 @@ import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -24,24 +22,11 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_MACHINE_ID = "machineId";
-    private static final String FIELD_ENTRY_KEY = "entryKey";
     private static final String FIELD_INSTALLED_AT = "installedAt";
     private static final String CURSOR_SEPARATOR = "|";
     private static final Sort NEWEST_INSTALLED_FIRST = Sort.by(Sort.Direction.DESC, FIELD_INSTALLED_AT, FIELD_ID);
 
     private final MongoTemplate mongoTemplate;
-
-    @Override
-    public void insertMissing(List<DeviceOsUpdateHistoryEntry> historyEntries) {
-        if (historyEntries.isEmpty()) {
-            return;
-        }
-        BulkOperations bulkOperations =
-                mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, DeviceOsUpdateHistoryEntry.class);
-        historyEntries.forEach(historyEntry ->
-                bulkOperations.upsert(sameEntry(historyEntry), insertIfAbsent(historyEntry)));
-        bulkOperations.execute();
-    }
 
     @Override
     public List<DeviceOsUpdateHistoryEntry> findPage(String tenantId, String machineId, String cursor, int limit) {
@@ -53,16 +38,6 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
     @Override
     public String encodeCursor(DeviceOsUpdateHistoryEntry historyEntry) {
         return historyEntry.getInstalledAt().toEpochMilli() + CURSOR_SEPARATOR + historyEntry.getId();
-    }
-
-    private static Query sameEntry(DeviceOsUpdateHistoryEntry historyEntry) {
-        Criteria sameEntry = ofMachine(historyEntry.getTenantId(), historyEntry.getMachineId())
-                .and(FIELD_ENTRY_KEY).is(historyEntry.getEntryKey());
-        return Query.query(sameEntry);
-    }
-
-    private Update insertIfAbsent(DeviceOsUpdateHistoryEntry historyEntry) {
-        return InsertIfAbsentUpdate.of(mongoTemplate.getConverter(), historyEntry);
     }
 
     private static Criteria ofMachine(String tenantId, String machineId) {

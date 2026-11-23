@@ -5,7 +5,9 @@ import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -26,12 +28,15 @@ public class ReportedPendingUpdatesParser {
         return confidence == OsUpdateListConfidence.CONFIRMED;
     }
 
+    // One item per identifier: an update the report names twice is one pending update.
     public List<MachineOsUpdatesMessage.UpdateItem> parse(MachineOsUpdatesMessage.UpdateSet updates) {
         if (!isReadable(updates)) {
             return List.of();
         }
-        return updates.getItems().stream()
+        Map<String, MachineOsUpdatesMessage.UpdateItem> itemsByIdentifier = new LinkedHashMap<>();
+        updates.getItems().stream()
                 .filter(item -> item != null && isNotBlank(item.getIdentifier()))
-                .toList();
+                .forEach(item -> itemsByIdentifier.putIfAbsent(item.getIdentifier(), item));
+        return List.copyOf(itemsByIdentifier.values());
     }
 }

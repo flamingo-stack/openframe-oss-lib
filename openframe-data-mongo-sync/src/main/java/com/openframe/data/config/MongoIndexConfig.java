@@ -1,6 +1,7 @@
 package com.openframe.data.config;
 
 import com.openframe.data.document.audit.AuditEvent;
+import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -77,14 +78,6 @@ public class MongoIndexConfig implements SmartLifecycle {
                                     .unique()
                                     .named("sso_identities_provider_subject_unique"));
 
-        // Load-bearing: the ordering guard of CustomDeviceOsStateRepositoryImpl.replaceUnlessNewerStored is the
-        // DuplicateKeyException of this index. Same name, keys and options as the @CompoundIndex on DeviceOsState.
-        mongoTemplate.indexOps("device_os_states")
-            .ensureIndex(new Index().on("tenantId", Sort.Direction.ASC)
-                                    .on("machineId", Sort.Direction.ASC)
-                                    .unique()
-                                    .named("tenant_machine"));
-
         // Every unknown refresh token ends in this lookup. Same name and options as the
         // @CompoundIndex on MongoOAuth2Authorization, so the two stay idempotent.
         mongoTemplate.indexOps("oauth2_authorizations")
@@ -104,6 +97,11 @@ public class MongoIndexConfig implements SmartLifecycle {
             .createIndex(new Index().on("occurredAt", Sort.Direction.ASC)
                                     .expire(AUDIT_EVENTS_RETENTION)
                                     .named("audit_events_ttl"));
+
+        mongoTemplate.indexOps(DeviceOsUpdateHistoryEntry.class)
+            .createIndex(new Index().on("installedAt", Sort.Direction.ASC)
+                                    .expire(DeviceOsUpdateHistoryEntry.RETENTION)
+                                    .named("device_os_update_history_ttl"));
 
         // Drop stale 'name' unique index from tags collection (legacy schema)
         dropStaleIndex("tags", "name");

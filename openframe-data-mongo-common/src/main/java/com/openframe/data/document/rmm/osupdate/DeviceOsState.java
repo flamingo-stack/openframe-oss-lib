@@ -6,11 +6,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
-import java.util.Map;
 
 @Data
 @Builder
@@ -25,6 +25,9 @@ public class DeviceOsState implements TenantScoped {
 
     @Id
     private String id;
+
+    @Version
+    private Long version;
 
     private String tenantId;
 
@@ -57,7 +60,6 @@ public class DeviceOsState implements TenantScoped {
 
     private LastOsInstall lastOsInstall;
 
-    private Map<String, Object> platformDetails;
 
     private Instant reportedAt;
 

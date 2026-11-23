@@ -42,7 +42,7 @@ public class DeviceOsReportFacade {
             osUpdateService.saveMissing(deviceOsReport.getOsUpdates());
             deviceOsPendingUpdateService.replacePendingUpdates(machine, deviceOsReport.getPendingUpdates());
         }
-        deviceOsUpdateHistoryService.saveMissing(deviceOsReport.getHistoryEntries());
+        deviceOsUpdateHistoryService.saveMissing(machine, deviceOsReport.getHistoryEntries());
     }
 
     private Optional<Machine> findReportingMachine(String machineId) {

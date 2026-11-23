@@ -9,7 +9,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Repository
-public interface OsUpdateRepository extends MongoRepository<OsUpdate, String>, CustomOsUpdateRepository {
+public interface OsUpdateRepository extends MongoRepository<OsUpdate, String> {
 
     List<OsUpdate> findByTenantIdAndPlatformAndIdentifierIn(
             String tenantId, OsPlatform platform, Collection<String> identifiers);

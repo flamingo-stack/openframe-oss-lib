@@ -17,20 +17,45 @@ public class DeviceOsStateService {
 
     // false = a newer report of this device is already stored, so nothing of this one may be applied.
     public boolean saveIfNotOlder(DeviceOsState reportedState) {
-        Instant rebootPendingSince = resolveRebootPendingSince(reportedState);
-        reportedState.setRebootPendingSince(rebootPendingSince);
-        return deviceOsStateRepository.replaceUnlessNewerStored(reportedState);
+        Optional<DeviceOsState> foundState = deviceOsStateRepository.findByTenantIdAndMachineId(
+                reportedState.getTenantId(), reportedState.getMachineId());
+        if (foundState.isEmpty()) {
+            saveFirstState(reportedState);
+            return true;
+        }
+        DeviceOsState storedState = foundState.get();
+        if (isOlder(reportedState, storedState)) {
+            return false;
+        }
+        replaceStoredState(storedState, reportedState);
+        return true;
     }
 
-    // The moment the reboot became pending is kept from the stored state while the device keeps reporting it.
-    private Instant resolveRebootPendingSince(DeviceOsState reportedState) {
+    private void saveFirstState(DeviceOsState reportedState) {
+        Instant rebootPendingSince = resolveRebootPendingSince(reportedState, reportedState.getReceivedAt());
+        reportedState.setRebootPendingSince(rebootPendingSince);
+        deviceOsStateRepository.save(reportedState);
+    }
+
+    // The version is the stored one: when another report replaced the state meanwhile, the save fails and the
+    // report is delivered again instead of overwriting it.
+    private void replaceStoredState(DeviceOsState storedState, DeviceOsState reportedState) {
+        Instant rebootPendingSince = resolveRebootPendingSince(reportedState, storedState.getRebootPendingSince());
+        reportedState.setId(storedState.getId());
+        reportedState.setVersion(storedState.getVersion());
+        reportedState.setRebootPendingSince(rebootPendingSince);
+        deviceOsStateRepository.save(reportedState);
+    }
+
+    private static boolean isOlder(DeviceOsState reportedState, DeviceOsState storedState) {
+        return reportedState.getReceivedAt().isBefore(storedState.getReceivedAt());
+    }
+
+    // The moment the reboot became pending is kept while the device keeps reporting it.
+    private static Instant resolveRebootPendingSince(DeviceOsState reportedState, Instant pendingSince) {
         if (reportedState.getRebootPending() != OsRebootPending.YES) {
             return null;
         }
-        Optional<DeviceOsState> storedState = deviceOsStateRepository.findByTenantIdAndMachineId(
-                reportedState.getTenantId(), reportedState.getMachineId());
-        return storedState
-                .map(DeviceOsState::getRebootPendingSince)
-                .orElse(reportedState.getReceivedAt());
+        return pendingSince != null ? pendingSince : reportedState.getReceivedAt();
     }
 }

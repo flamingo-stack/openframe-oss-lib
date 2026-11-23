@@ -1,13 +1,10 @@
 package com.openframe.data.nats.rmm.model;
 
-import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 // The agent's report as it is on the wire. Enum-like values stay strings here: the agent adds values before the
 // backend learns them, and a report must not fail on one.
@@ -36,7 +33,6 @@ public class MachineOsUpdatesMessage {
     private UpdateSet updates;
     private LastOsInstall lastOsInstall;
 
-    private Map<String, Object> macos;
     private WindowsDetails windows;
 
     @Data
@@ -108,13 +104,10 @@ public class MachineOsUpdatesMessage {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class WindowsDetails {
 
         private List<WindowsHistoryEntry> history;
-
-        // Everything else in the block: evidence of Windows' own update mechanism, stored as it came.
-        @JsonAnySetter
-        private Map<String, Object> details = new LinkedHashMap<>();
     }
 
     @Data
