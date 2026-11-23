@@ -35,32 +35,32 @@ public class JetStreamConsumerCreateValidator implements NatsCommandValidator {
 
     @Override
     public boolean appliesTo(NatsClientCommand command) {
-        if (!command.operation().isPublish()) {
+        if (!command.getOperation().isPublish()) {
             return false;
         }
-        String subject = command.subject().orElseThrow();
+        String subject = command.getSubject().orElseThrow();
         return jetStreamApiSubjectParser.consumerCreateOf(subject).isPresent();
     }
 
     @Override
     public Mono<NatsValidationResult> validate(NatsClientCommand command, NatsClientContext context) {
-        String subject = command.subject().orElseThrow();
+        String subject = command.getSubject().orElseThrow();
         JetStreamApiSubject apiSubject = jetStreamApiSubjectParser.consumerCreateOf(subject).orElseThrow();
-        ConsumerCreateRequest request = consumerCreateRequestParser.parse(apiSubject, command.payload());
-        NatsOperation operation = command.operation();
+        ConsumerCreateRequest request = consumerCreateRequestParser.parse(apiSubject, command.getPayload());
+        NatsOperation operation = command.getOperation();
         NatsValidationResult refused = new NatsValidationResult.Refused(operation, subject);
         if (!isDeliverSubjectOwn(request, context)) {
             return Mono.just(refused);
         }
-        return authorizerFor(request.stream())
+        return authorizerFor(request.getStream())
                 .mayConsume(context, request)
                 .map(allowed -> allowed ? NatsValidationResult.ALLOWED : refused);
     }
 
     private static boolean isDeliverSubjectOwn(ConsumerCreateRequest request, NatsClientContext context) {
-        Optional<String> deliverSubject = request.deliverSubject();
+        Optional<String> deliverSubject = request.getDeliverSubject();
         return deliverSubject
-                .map(subject -> context.policy().allowsSubscribe(subject))
+                .map(subject -> context.getPolicy().allowsSubscribe(subject))
                 .orElse(true);
     }
 

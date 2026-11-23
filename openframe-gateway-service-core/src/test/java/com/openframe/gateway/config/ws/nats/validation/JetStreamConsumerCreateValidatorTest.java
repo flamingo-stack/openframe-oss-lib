@@ -86,7 +86,7 @@ class JetStreamConsumerCreateValidatorTest {
 
         // verifications
         assertThat(result).isEqualTo(NatsValidationResult.ALLOWED);
-        assertThat(requestCaptor.getValue().filterSubjects()).containsExactly(DIALOG_SUBJECT);
+        assertThat(requestCaptor.getValue().getFilterSubjects()).containsExactly(DIALOG_SUBJECT);
     }
 
     @Test

@@ -15,8 +15,8 @@ public class NatsSubjectPolicyFactory {
     private final NatsSubjectFilterProperties natsSubjectFilterProperties;
 
     public NatsSubjectPolicy policyFor(NatsClientIdentity identity) {
-        NatsClientKind kind = identity.kind();
-        String id = identity.id();
+        NatsClientKind kind = identity.getKind();
+        String id = identity.getId();
         List<String> publishPatterns = natsSubjectFilterProperties.publishPatternsFor(kind);
         List<String> subscribePatterns = natsSubjectFilterProperties.subscribePatternsFor(kind);
         List<NatsSubjectPattern> publish = compile(publishPatterns, id);

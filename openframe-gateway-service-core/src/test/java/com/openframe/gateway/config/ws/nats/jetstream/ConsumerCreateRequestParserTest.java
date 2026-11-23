@@ -14,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class ConsumerCreateRequestParserTest {
 
     private static final JetStreamApiSubject BARE_CREATE =
-            new JetStreamApiSubject("CHAT_CHUNKS", Optional.empty(), Optional.empty());
+            JetStreamApiSubject.builder().stream("CHAT_CHUNKS").build();
     private static final JetStreamApiSubject FILTERED_CREATE =
-            new JetStreamApiSubject("CHAT_CHUNKS", Optional.of("c1"), Optional.of("chat.d-1.message"));
+            JetStreamApiSubject.builder().stream("CHAT_CHUNKS").consumerName("c1").filterSubject("chat.d-1.message").build();
 
     private ConsumerCreateRequestParser parser;
 
@@ -34,9 +34,9 @@ class ConsumerCreateRequestParserTest {
         ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
 
         // verifications
-        assertThat(request.stream()).isEqualTo("CHAT_CHUNKS");
-        assertThat(request.filterSubjects()).containsExactly("chat.d-1.message");
-        assertThat(request.deliverSubject()).isEmpty();
+        assertThat(request.getStream()).isEqualTo("CHAT_CHUNKS");
+        assertThat(request.getFilterSubjects()).containsExactly("chat.d-1.message");
+        assertThat(request.getDeliverSubject()).isEmpty();
         assertThat(request.isUnfiltered()).isFalse();
     }
 
@@ -49,7 +49,7 @@ class ConsumerCreateRequestParserTest {
         ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
 
         // verifications
-        assertThat(request.filterSubjects()).containsExactly("chat.d-1.message", "chat.d-2.message");
+        assertThat(request.getFilterSubjects()).containsExactly("chat.d-1.message", "chat.d-2.message");
     }
 
     @Test
@@ -61,7 +61,7 @@ class ConsumerCreateRequestParserTest {
         ConsumerCreateRequest request = parser.parse(FILTERED_CREATE, body);
 
         // verifications
-        assertThat(request.filterSubjects()).containsExactly("chat.d-1.message");
+        assertThat(request.getFilterSubjects()).containsExactly("chat.d-1.message");
     }
 
     @Test
@@ -85,7 +85,7 @@ class ConsumerCreateRequestParserTest {
         ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
 
         // verifications
-        assertThat(request.stream()).isEqualTo("CHAT_CHUNKS");
+        assertThat(request.getStream()).isEqualTo("CHAT_CHUNKS");
     }
 
     @Test
@@ -97,7 +97,7 @@ class ConsumerCreateRequestParserTest {
         ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
 
         // verifications
-        assertThat(request.deliverSubject()).contains("_INBOX.abc");
+        assertThat(request.getDeliverSubject()).contains("_INBOX.abc");
     }
 
     @Test

@@ -31,12 +31,12 @@ public class NatsControlLineParser {
         String line = new String(raw, UTF_8);
         List<String> tokens = tokensOf(line);
         if (tokens.isEmpty()) {
-            return new NatsControlLine(NatsOperation.OTHER, tokens, NO_PAYLOAD, raw);
+            return NatsControlLine.builder().operation(NatsOperation.OTHER).tokens(tokens).payloadSize(NO_PAYLOAD).raw(raw).build();
         }
         NatsOperation operation = NatsOperation.of(tokens.get(0));
         requireArguments(operation, tokens);
         long payloadSize = payloadSizeOf(operation, tokens);
-        return new NatsControlLine(operation, tokens, payloadSize, raw);
+        return NatsControlLine.builder().operation(operation).tokens(tokens).payloadSize(payloadSize).raw(raw).build();
     }
 
     private static void requireArguments(NatsOperation operation, List<String> tokens) {

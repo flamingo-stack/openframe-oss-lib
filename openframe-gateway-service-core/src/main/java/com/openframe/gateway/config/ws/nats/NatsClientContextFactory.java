@@ -23,7 +23,13 @@ public class NatsClientContextFactory {
     public NatsClientContext create(ServerWebExchange exchange, String path, String tenantId, ContextView reactorContext) {
         NatsClientIdentity identity = identityOf(exchange);
         NatsSubjectPolicy policy = natsSubjectPolicyFactory.policyFor(identity);
-        return new NatsClientContext(identity, tenantId, path, policy, reactorContext);
+        return NatsClientContext.builder()
+                .identity(identity)
+                .tenantId(tenantId)
+                .path(path)
+                .policy(policy)
+                .reactorContext(reactorContext)
+                .build();
     }
 
     private NatsClientIdentity identityOf(ServerWebExchange exchange) {

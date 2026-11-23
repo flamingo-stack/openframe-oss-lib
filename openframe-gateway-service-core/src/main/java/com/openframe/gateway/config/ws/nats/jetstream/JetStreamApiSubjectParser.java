@@ -2,6 +2,7 @@ package com.openframe.gateway.config.ws.nats.jetstream;
 
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Optional;
 
 @Component
@@ -29,25 +30,23 @@ public class JetStreamApiSubjectParser {
 
     private static JetStreamApiSubject parse(String remainder) {
         String[] tokens = remainder.split("\\.", -1);
-        String stream = tokens[STREAM_INDEX];
-        Optional<String> consumerName = tokenAt(tokens, CONSUMER_INDEX);
-        Optional<String> filterSubject = filterFrom(tokens);
-        return new JetStreamApiSubject(stream, consumerName, filterSubject);
+        JetStreamApiSubject.JetStreamApiSubjectBuilder call = JetStreamApiSubject.builder().stream(tokens[STREAM_INDEX]);
+        if (hasToken(tokens, CONSUMER_INDEX)) {
+            call.consumerName(tokens[CONSUMER_INDEX]);
+        }
+        if (hasToken(tokens, FILTER_START_INDEX)) {
+            call.filterSubject(filterFrom(tokens));
+        }
+        return call.build();
     }
 
-    private static Optional<String> tokenAt(String[] tokens, int index) {
-        if (index >= tokens.length) {
-            return Optional.empty();
-        }
-        return Optional.of(tokens[index]);
+    private static boolean hasToken(String[] tokens, int index) {
+        return index < tokens.length;
     }
 
     /** The filter subject keeps its own dots, so it is everything after the consumer name. */
-    private static Optional<String> filterFrom(String[] tokens) {
-        if (tokens.length <= FILTER_START_INDEX) {
-            return Optional.empty();
-        }
-        String filter = String.join(TOKEN_SEPARATOR, java.util.Arrays.copyOfRange(tokens, FILTER_START_INDEX, tokens.length));
-        return Optional.of(filter);
+    private static String filterFrom(String[] tokens) {
+        String[] filterTokens = Arrays.copyOfRange(tokens, FILTER_START_INDEX, tokens.length);
+        return String.join(TOKEN_SEPARATOR, filterTokens);
     }
 }

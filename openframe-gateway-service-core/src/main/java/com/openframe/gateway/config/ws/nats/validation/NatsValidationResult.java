@@ -1,29 +1,38 @@
 package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.protocol.NatsOperation;
+import lombok.Value;
 
-/** What the checks decided about one client command. */
+/** What the validators decided about one client command. */
 public sealed interface NatsValidationResult {
 
     NatsValidationResult ALLOWED = new Allowed();
 
+    default boolean isAllowed() {
+        return this instanceof Allowed;
+    }
+
     /** Relay the command as it is. */
-    record Allowed() implements NatsValidationResult {
+    @Value
+    class Allowed implements NatsValidationResult {
     }
 
     /** Drop the command; the client gets the permissions error NATS would have sent. */
-    record Refused(NatsOperation operation, String subject) implements NatsValidationResult {
+    @Value
+    class Refused implements NatsValidationResult {
+        NatsOperation operation;
+        String subject;
     }
 
     /** End the session: what the client sent must not reach NATS at all. */
-    record CloseSession(String reason) implements NatsValidationResult {
+    @Value
+    class CloseSession implements NatsValidationResult {
+        String reason;
     }
 
     /** NATS could not parse this either; the session decides whether to end or to stop parsing. */
-    record ProtocolViolation(String reason) implements NatsValidationResult {
-    }
-
-    default boolean isAllowed() {
-        return this instanceof Allowed;
+    @Value
+    class ProtocolViolation implements NatsValidationResult {
+        String reason;
     }
 }

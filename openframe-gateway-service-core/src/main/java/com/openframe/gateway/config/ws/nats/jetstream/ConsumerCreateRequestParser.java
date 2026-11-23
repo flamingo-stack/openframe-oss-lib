@@ -35,8 +35,11 @@ public class ConsumerCreateRequestParser {
         JsonNode config = request.path(CONFIG_FIELD);
         String stream = streamOf(request, apiSubject);
         List<String> filterSubjects = filterSubjectsOf(config, apiSubject);
-        Optional<String> deliverSubject = textOf(config, DELIVER_SUBJECT_FIELD);
-        return new ConsumerCreateRequest(stream, filterSubjects, deliverSubject);
+        ConsumerCreateRequest.ConsumerCreateRequestBuilder consumerCreateRequest = ConsumerCreateRequest.builder()
+                .stream(stream)
+                .filterSubjects(filterSubjects);
+        textOf(config, DELIVER_SUBJECT_FIELD).ifPresent(consumerCreateRequest::deliverSubject);
+        return consumerCreateRequest.build();
     }
 
     private JsonNode requestOf(byte[] body) {
@@ -48,7 +51,7 @@ public class ConsumerCreateRequestParser {
     }
 
     private static String streamOf(JsonNode request, JetStreamApiSubject apiSubject) {
-        return textOf(request, STREAM_FIELD).orElse(apiSubject.stream());
+        return textOf(request, STREAM_FIELD).orElse(apiSubject.getStream());
     }
 
     private static List<String> filterSubjectsOf(JsonNode config, JetStreamApiSubject apiSubject) {
@@ -58,7 +61,7 @@ public class ConsumerCreateRequestParser {
             addText(filters, filter);
         }
         if (filters.isEmpty()) {
-            apiSubject.filterSubject().ifPresent(filters::add);
+            apiSubject.getFilterSubject().ifPresent(filters::add);
         }
         return List.copyOf(filters);
     }

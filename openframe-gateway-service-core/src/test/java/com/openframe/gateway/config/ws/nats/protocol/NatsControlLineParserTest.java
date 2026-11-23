@@ -27,10 +27,10 @@ class NatsControlLineParserTest {
         NatsControlLine line = parser.parse(raw);
 
         // verifications
-        assertThat(line.operation()).isEqualTo(NatsOperation.SUB);
-        assertThat(line.subject()).contains("machine.m-1.command-execution");
+        assertThat(line.getOperation()).isEqualTo(NatsOperation.SUB);
+        assertThat(line.getSubject()).contains("machine.m-1.command-execution");
         assertThat(line.hasPayload()).isFalse();
-        assertThat(line.raw()).isEqualTo(raw);
+        assertThat(line.getRaw()).isEqualTo(raw);
     }
 
     @Test
@@ -42,7 +42,7 @@ class NatsControlLineParserTest {
         NatsControlLine line = parser.parse(raw);
 
         // verifications
-        assertThat(line.subject()).contains("machine.m-1.command-execution");
+        assertThat(line.getSubject()).contains("machine.m-1.command-execution");
     }
 
     @Test
@@ -54,9 +54,9 @@ class NatsControlLineParserTest {
         NatsControlLine line = parser.parse(raw);
 
         // verifications
-        assertThat(line.operation()).isEqualTo(NatsOperation.PUB);
-        assertThat(line.subject()).contains("machine.m-1.hostname");
-        assertThat(line.payloadSize()).isEqualTo(12);
+        assertThat(line.getOperation()).isEqualTo(NatsOperation.PUB);
+        assertThat(line.getSubject()).contains("machine.m-1.hostname");
+        assertThat(line.getPayloadSize()).isEqualTo(12);
     }
 
     @Test
@@ -68,8 +68,8 @@ class NatsControlLineParserTest {
         NatsControlLine line = parser.parse(raw);
 
         // verifications
-        assertThat(line.operation()).isEqualTo(NatsOperation.HPUB);
-        assertThat(line.payloadSize()).isEqualTo(17);
+        assertThat(line.getOperation()).isEqualTo(NatsOperation.HPUB);
+        assertThat(line.getPayloadSize()).isEqualTo(17);
     }
 
     @Test
@@ -81,9 +81,9 @@ class NatsControlLineParserTest {
         NatsControlLine line = parser.parse(raw);
 
         // verifications
-        assertThat(line.operation()).isEqualTo(NatsOperation.CONNECT);
-        assertThat(line.arguments()).isEqualTo("{\"user\":\"machine\",\"pass\":\"\"}");
-        assertThat(line.subject()).isEmpty();
+        assertThat(line.getOperation()).isEqualTo(NatsOperation.CONNECT);
+        assertThat(line.getArguments()).isEqualTo("{\"user\":\"machine\",\"pass\":\"\"}");
+        assertThat(line.getSubject()).isEmpty();
     }
 
     @ParameterizedTest
@@ -103,7 +103,7 @@ class NatsControlLineParserTest {
         NatsControlLine parsed = parser.parse(raw);
 
         // verifications
-        assertThat(parsed.operation()).isEqualTo(expected);
+        assertThat(parsed.getOperation()).isEqualTo(expected);
     }
 
     @Test
@@ -115,7 +115,7 @@ class NatsControlLineParserTest {
         NatsControlLine line = parser.parse(raw);
 
         // verifications
-        assertThat(line.subject()).contains("machine.m-1.x");
+        assertThat(line.getSubject()).contains("machine.m-1.x");
     }
 
     @Test
@@ -127,7 +127,7 @@ class NatsControlLineParserTest {
         NatsControlLine line = parser.parse(raw);
 
         // verifications
-        assertThat(line.operation()).isEqualTo(NatsOperation.OTHER);
+        assertThat(line.getOperation()).isEqualTo(NatsOperation.OTHER);
     }
 
     @Test

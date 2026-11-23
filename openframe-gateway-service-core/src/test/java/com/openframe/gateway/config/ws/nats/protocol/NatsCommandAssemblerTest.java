@@ -31,7 +31,7 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(commands)
-                .extracting(NatsClientCommand::operation, command -> text(command.raw()))
+                .extracting(NatsClientCommand::getOperation, command -> text(command.getRaw()))
                 .containsExactly(tuple(NatsOperation.PING, PING), tuple(NatsOperation.SUB, SUBSCRIBE));
     }
 
@@ -44,7 +44,7 @@ class NatsCommandAssemblerTest {
         // verifications
         assertThat(head).isEmpty();
         assertThat(tail)
-                .extracting(command -> text(command.raw()))
+                .extracting(command -> text(command.getRaw()))
                 .containsExactly(SUBSCRIBE, PING);
     }
 
@@ -58,7 +58,7 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(commands)
-                .extracting(NatsClientCommand::operation, command -> text(command.raw()), command -> text(command.payload()))
+                .extracting(NatsClientCommand::getOperation, command -> text(command.getRaw()), command -> text(command.getPayload()))
                 .containsExactly(tuple(NatsOperation.PUB, publish, "hi"), tuple(NatsOperation.PING, PING, ""));
     }
 
@@ -73,7 +73,7 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(commands)
-                .extracting(NatsClientCommand::operation, command -> text(command.payload()))
+                .extracting(NatsClientCommand::getOperation, command -> text(command.getPayload()))
                 .containsExactly(tuple(NatsOperation.PUB, SUBSCRIBE));
     }
 
@@ -86,7 +86,7 @@ class NatsCommandAssemblerTest {
         // verifications
         assertThat(head).isEmpty();
         assertThat(tail)
-                .extracting(NatsClientCommand::operation, command -> text(command.payload()))
+                .extracting(NatsClientCommand::getOperation, command -> text(command.getPayload()))
                 .containsExactly(tuple(NatsOperation.PUB, "abcde"), tuple(NatsOperation.PING, ""));
     }
 
@@ -100,7 +100,7 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(commands)
-                .extracting(command -> text(command.raw()))
+                .extracting(command -> text(command.getRaw()))
                 .containsExactly(publish, PING);
     }
 
@@ -117,7 +117,7 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(commands)
-                .extracting(NatsClientCommand::operation, command -> text(command.payload()))
+                .extracting(NatsClientCommand::getOperation, command -> text(command.getPayload()))
                 .containsExactly(tuple(NatsOperation.HPUB, headers + body), tuple(NatsOperation.PING, ""));
     }
 
@@ -131,7 +131,7 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(commands)
-                .extracting(NatsClientCommand::isMalformed, NatsClientCommand::trouble, command -> text(command.raw()))
+                .extracting(NatsClientCommand::isMalformed, NatsClientCommand::getTrouble, command -> text(command.getRaw()))
                 .containsExactly(tuple(true, "PUB payload size is not a number", line));
     }
 
@@ -145,7 +145,7 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(commands)
-                .extracting(NatsClientCommand::trouble)
+                .extracting(NatsClientCommand::getTrouble)
                 .containsExactly("payload larger than " + MAX_PAYLOAD_BYTES + " bytes");
     }
 
@@ -161,10 +161,10 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(first)
-                .extracting(NatsClientCommand::trouble, command -> command.raw().length)
+                .extracting(NatsClientCommand::getTrouble, command -> command.getRaw().length)
                 .containsExactly(tuple("control line longer than 4096 bytes", OVERLONG_LINE_BYTES));
         assertThat(next)
-                .extracting(NatsClientCommand::operation, command -> text(command.raw()))
+                .extracting(NatsClientCommand::getOperation, command -> text(command.getRaw()))
                 .containsExactly(tuple(NatsOperation.OTHER, SUBSCRIBE));
     }
 
@@ -178,7 +178,7 @@ class NatsCommandAssemblerTest {
 
         // verifications
         assertThat(commands)
-                .extracting(NatsClientCommand::operation, command -> text(command.raw()))
+                .extracting(NatsClientCommand::getOperation, command -> text(command.getRaw()))
                 .containsExactly(tuple(NatsOperation.OTHER, PING + SUBSCRIBE));
     }
 

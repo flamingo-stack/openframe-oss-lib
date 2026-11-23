@@ -1,6 +1,8 @@
 package com.openframe.gateway.config.ws.nats;
 
 import com.openframe.gateway.config.ws.nats.policy.NatsSubjectPolicy;
+import lombok.Builder;
+import lombok.Value;
 import reactor.util.context.ContextView;
 
 /**
@@ -8,23 +10,25 @@ import reactor.util.context.ContextView;
  * tenant it belongs to, what it may publish and subscribe to, and the Reactor context of the
  * upgrade request, so a validator that reads the database runs under the same tenant routing.
  */
-public record NatsClientContext(
-        NatsClientIdentity identity,
-        String tenantId,
-        String path,
-        NatsSubjectPolicy policy,
-        ContextView reactorContext
-) {
+@Value
+@Builder
+public class NatsClientContext {
 
-    public NatsClientKind kind() {
-        return identity.kind();
+    NatsClientIdentity identity;
+    String tenantId;
+    String path;
+    NatsSubjectPolicy policy;
+    ContextView reactorContext;
+
+    public NatsClientKind getKind() {
+        return identity.getKind();
     }
 
-    public String clientId() {
-        return identity.id();
+    public String getClientId() {
+        return identity.getId();
     }
 
     public boolean isDevice() {
-        return identity.kind() == NatsClientKind.DEVICE;
+        return identity.getKind() == NatsClientKind.DEVICE;
     }
 }

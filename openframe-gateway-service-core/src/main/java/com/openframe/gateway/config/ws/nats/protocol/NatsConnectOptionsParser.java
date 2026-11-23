@@ -35,7 +35,7 @@ public class NatsConnectOptionsParser {
     }
 
     private JsonNode optionsOf(NatsControlLine connect) {
-        String json = connect.arguments();
+        String json = connect.getArguments();
         try {
             return objectMapper.readTree(json);
         } catch (Exception e) {

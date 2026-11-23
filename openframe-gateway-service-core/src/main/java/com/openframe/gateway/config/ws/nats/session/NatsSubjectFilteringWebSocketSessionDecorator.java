@@ -6,6 +6,7 @@ import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidationServ
 import com.openframe.gateway.config.ws.nats.validation.NatsValidationResult;
 import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
 import com.openframe.gateway.config.ws.nats.protocol.NatsCommandAssembler;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -89,16 +90,16 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
             return Mono.empty();
         }
         if (!isInspected(frame)) {
-            return Mono.just(messageOf(frame.type(), frame.bytes()));
+            return Mono.just(messageOf(frame.getType(), frame.getBytes()));
         }
-        currentFrameType = frame.type();
-        List<NatsClientCommand> commands = assembler.feed(frame.bytes());
+        currentFrameType = frame.getType();
+        List<NatsClientCommand> commands = assembler.feed(frame.getBytes());
         return Flux.fromIterable(commands)
                 .concatMap(this::forwardable)
                 .collect(ByteArrayOutputStream::new, ByteArrayOutputStream::writeBytes)
                 .map(ByteArrayOutputStream::toByteArray)
                 .filter(bytes -> bytes.length > 0)
-                .map(bytes -> messageOf(frame.type(), bytes));
+                .map(bytes -> messageOf(frame.getType(), bytes));
     }
 
     private boolean isInspected(CapturedFrame frame) {
@@ -109,7 +110,7 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
             relayUnfiltered = true;
             return false;
         }
-        return frame.type() == Type.TEXT || frame.type() == Type.BINARY;
+        return frame.getType() == Type.TEXT || frame.getType() == Type.BINARY;
     }
 
     private Mono<byte[]> forwardable(NatsClientCommand command) {
@@ -123,7 +124,7 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
     private byte[] apply(NatsValidationResult result, NatsClientCommand command) {
         boolean enforce = properties.isEnforce();
         return switch (result) {
-            case NatsValidationResult.Allowed allowed -> command.raw();
+            case NatsValidationResult.Allowed allowed -> command.getRaw();
             case NatsValidationResult.Refused refused -> applyRefusal(refused, command, enforce);
             case NatsValidationResult.CloseSession closeSession -> applyCloseSession(closeSession, command, enforce);
             case NatsValidationResult.ProtocolViolation violation -> applyProtocolViolation(violation, command, enforce);
@@ -133,7 +134,7 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
     private byte[] applyRefusal(NatsValidationResult.Refused refused, NatsClientCommand command, boolean enforce) {
         reporter.refused(refused, enforce);
         if (!enforce) {
-            return command.raw();
+            return command.getRaw();
         }
         byte[] error = NatsPermissionError.of(refused);
         WebSocketMessage message = messageOf(currentFrameType, error);
@@ -144,26 +145,26 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
     private byte[] applyCloseSession(NatsValidationResult.CloseSession closeSession, NatsClientCommand command, boolean enforce) {
         reporter.closeSession(closeSession, enforce);
         if (!enforce) {
-            return command.raw();
+            return command.getRaw();
         }
-        reject(closeSession.reason());
+        reject(closeSession.getReason());
         return NOTHING;
     }
 
     private byte[] applyProtocolViolation(NatsValidationResult.ProtocolViolation violation, NatsClientCommand command, boolean enforce) {
         reporter.protocolViolation(violation, enforce);
         if (enforce) {
-            reject(violation.reason());
+            reject(violation.getReason());
             return NOTHING;
         }
         assembler.relayUnparsed();
-        return command.raw();
+        return command.getRaw();
     }
 
     private void reject(String reason) {
         rejected = true;
         log.warn("NATS client session closed: {} kind={} id={} path={} tenant={}",
-                reason, context.kind(), context.clientId(), context.path(), context.tenantId());
+                reason, context.getKind(), context.getClientId(), context.getPath(), context.getTenantId());
         webSocketSession.close(CloseStatus.POLICY_VIOLATION).subscribe();
     }
 
@@ -172,7 +173,11 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
         return new WebSocketMessage(type, payload);
     }
 
-    private record CapturedFrame(Type type, byte[] bytes) {
+    @Value
+    private static class CapturedFrame {
+
+        Type type;
+        byte[] bytes;
 
         static CapturedFrame of(WebSocketMessage message) {
             DataBuffer payload = message.getPayload();

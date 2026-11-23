@@ -27,6 +27,6 @@ public final class NatsTestContexts {
         NatsSubjectFilterProperties properties = new NatsSubjectFilterProperties();
         NatsSubjectPolicyFactory policyFactory = new NatsSubjectPolicyFactory(properties);
         NatsSubjectPolicy policy = policyFactory.policyFor(identity);
-        return new NatsClientContext(identity, TENANT_ID, PATH, policy, Context.empty());
+        return NatsClientContext.builder().identity(identity).tenantId(TENANT_ID).path(PATH).policy(policy).reactorContext(Context.empty()).build();
     }
 }

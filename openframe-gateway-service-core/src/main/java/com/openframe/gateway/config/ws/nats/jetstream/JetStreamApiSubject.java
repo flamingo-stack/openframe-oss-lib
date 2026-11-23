@@ -1,5 +1,8 @@
 package com.openframe.gateway.config.ws.nats.jetstream;
 
+import lombok.Builder;
+import lombok.Value;
+
 import java.util.Optional;
 
 /**
@@ -7,5 +10,19 @@ import java.util.Optional;
  * {@code …CREATE.<stream>.<consumer>} or the filtered {@code …CREATE.<stream>.<consumer>.<filter>},
  * plus the legacy {@code $JS.API.CONSUMER.DURABLE.CREATE.<stream>.<durable>}.
  */
-public record JetStreamApiSubject(String stream, Optional<String> consumerName, Optional<String> filterSubject) {
+@Value
+@Builder
+public class JetStreamApiSubject {
+
+    String stream;
+    String consumerName;
+    String filterSubject;
+
+    public Optional<String> getConsumerName() {
+        return Optional.ofNullable(consumerName);
+    }
+
+    public Optional<String> getFilterSubject() {
+        return Optional.ofNullable(filterSubject);
+    }
 }

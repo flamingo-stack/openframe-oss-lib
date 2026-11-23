@@ -23,12 +23,12 @@ public class ConnectCredentialsValidator implements NatsCommandValidator {
 
     @Override
     public boolean appliesTo(NatsClientCommand command) {
-        return command.operation() == NatsOperation.CONNECT;
+        return command.getOperation() == NatsOperation.CONNECT;
     }
 
     @Override
     public Mono<NatsValidationResult> validate(NatsClientCommand command, NatsClientContext context) {
-        Optional<String> credentialField = natsConnectOptionsParser.credentialFieldOf(command.controlLine());
+        Optional<String> credentialField = natsConnectOptionsParser.credentialFieldOf(command.getControlLine());
         NatsValidationResult result = credentialField
                 .<NatsValidationResult>map(field -> new NatsValidationResult.CloseSession("CONNECT carries " + field))
                 .orElse(NatsValidationResult.ALLOWED);

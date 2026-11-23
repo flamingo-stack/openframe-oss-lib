@@ -46,10 +46,10 @@ class NatsClientContextFactoryTest {
         NatsClientContext context = factory.create(exchange, PATH, TENANT_ID, Context.empty());
 
         // verifications
-        assertThat(context.identity()).isEqualTo(NatsClientIdentity.device(MACHINE_ID));
-        assertThat(context.tenantId()).isEqualTo(TENANT_ID);
-        assertThat(context.path()).isEqualTo(PATH);
-        assertThat(context.policy().allowsSubscribe("machine.m-1.command-execution")).isTrue();
+        assertThat(context.getIdentity()).isEqualTo(NatsClientIdentity.device(MACHINE_ID));
+        assertThat(context.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(context.getPath()).isEqualTo(PATH);
+        assertThat(context.getPolicy().allowsSubscribe("machine.m-1.command-execution")).isTrue();
         verify(requestJwtClaimsReader, never()).getUserId(exchange);
     }
 
@@ -63,9 +63,9 @@ class NatsClientContextFactoryTest {
         NatsClientContext context = factory.create(exchange, PATH, TENANT_ID, Context.empty());
 
         // verifications
-        assertThat(context.identity()).isEqualTo(NatsClientIdentity.user(USER_ID));
+        assertThat(context.getIdentity()).isEqualTo(NatsClientIdentity.user(USER_ID));
         assertThat(context.isDevice()).isFalse();
-        assertThat(context.policy().allowsSubscribe("user.u-1.notification")).isTrue();
+        assertThat(context.getPolicy().allowsSubscribe("user.u-1.notification")).isTrue();
     }
 
     @Test

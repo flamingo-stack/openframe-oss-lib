@@ -87,8 +87,7 @@ class SubjectPolicyConsumerAuthorizerTest {
     void mayConsume_oneFilterOutsideThePolicy_false() {
         // setup
         NatsClientContext context = NatsTestContexts.user();
-        ConsumerCreateRequest request = new ConsumerCreateRequest(CHAT_STREAM,
-                List.of("chat.d-1.message", "machine.m-1.heartbeat"), Optional.empty());
+        ConsumerCreateRequest request = ConsumerCreateRequest.builder().stream(CHAT_STREAM).filterSubjects(List.of("chat.d-1.message", "machine.m-1.heartbeat")).build();
 
         // execution
         Boolean allowed = authorizer.mayConsume(context, request).block();
@@ -101,7 +100,7 @@ class SubjectPolicyConsumerAuthorizerTest {
     void mayConsume_unfilteredConsumer_false() {
         // setup
         NatsClientContext context = NatsTestContexts.user();
-        ConsumerCreateRequest request = new ConsumerCreateRequest(CHAT_STREAM, List.of(), Optional.empty());
+        ConsumerCreateRequest request = ConsumerCreateRequest.builder().stream(CHAT_STREAM).filterSubjects(List.of()).build();
 
         // execution
         Boolean allowed = authorizer.mayConsume(context, request).block();
@@ -111,6 +110,6 @@ class SubjectPolicyConsumerAuthorizerTest {
     }
 
     private static ConsumerCreateRequest request(String stream, String filterSubject) {
-        return new ConsumerCreateRequest(stream, List.of(filterSubject), Optional.empty());
+        return ConsumerCreateRequest.builder().stream(stream).filterSubjects(List.of(filterSubject)).build();
     }
 }

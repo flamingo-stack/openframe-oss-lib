@@ -1,5 +1,8 @@
 package com.openframe.gateway.config.ws.nats.jetstream;
 
+import lombok.Builder;
+import lombok.Value;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -8,7 +11,17 @@ import java.util.Optional;
  * will deliver ({@code filter_subject} / {@code filter_subjects}; empty means the whole stream) and,
  * for a push consumer, where it delivers them.
  */
-public record ConsumerCreateRequest(String stream, List<String> filterSubjects, Optional<String> deliverSubject) {
+@Value
+@Builder
+public class ConsumerCreateRequest {
+
+    String stream;
+    List<String> filterSubjects;
+    String deliverSubject;
+
+    public Optional<String> getDeliverSubject() {
+        return Optional.ofNullable(deliverSubject);
+    }
 
     public boolean isUnfiltered() {
         return filterSubjects.isEmpty();

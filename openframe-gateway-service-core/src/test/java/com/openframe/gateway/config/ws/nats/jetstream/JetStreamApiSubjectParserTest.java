@@ -24,7 +24,7 @@ class JetStreamApiSubjectParserTest {
         Optional<JetStreamApiSubject> call = parser.consumerCreateOf("$JS.API.CONSUMER.CREATE.CHAT_CHUNKS.c1.chat.d-1.message");
 
         // verifications
-        assertThat(call).contains(new JetStreamApiSubject("CHAT_CHUNKS", Optional.of("c1"), Optional.of("chat.d-1.message")));
+        assertThat(call).contains(JetStreamApiSubject.builder().stream("CHAT_CHUNKS").consumerName("c1").filterSubject("chat.d-1.message").build());
     }
 
     @Test
@@ -33,7 +33,7 @@ class JetStreamApiSubjectParserTest {
         Optional<JetStreamApiSubject> call = parser.consumerCreateOf("$JS.API.CONSUMER.CREATE.CHAT_CHUNKS.c1");
 
         // verifications
-        assertThat(call).contains(new JetStreamApiSubject("CHAT_CHUNKS", Optional.of("c1"), Optional.empty()));
+        assertThat(call).contains(JetStreamApiSubject.builder().stream("CHAT_CHUNKS").consumerName("c1").build());
     }
 
     @Test
@@ -42,7 +42,7 @@ class JetStreamApiSubjectParserTest {
         Optional<JetStreamApiSubject> call = parser.consumerCreateOf("$JS.API.CONSUMER.CREATE.CHAT_CHUNKS");
 
         // verifications
-        assertThat(call).contains(new JetStreamApiSubject("CHAT_CHUNKS", Optional.empty(), Optional.empty()));
+        assertThat(call).contains(JetStreamApiSubject.builder().stream("CHAT_CHUNKS").build());
     }
 
     @Test
@@ -51,7 +51,7 @@ class JetStreamApiSubjectParserTest {
         Optional<JetStreamApiSubject> call = parser.consumerCreateOf("$JS.API.CONSUMER.DURABLE.CREATE.CHAT_CHUNKS.d1");
 
         // verifications
-        assertThat(call).contains(new JetStreamApiSubject("CHAT_CHUNKS", Optional.of("d1"), Optional.empty()));
+        assertThat(call).contains(JetStreamApiSubject.builder().stream("CHAT_CHUNKS").consumerName("d1").build());
     }
 
     @ParameterizedTest

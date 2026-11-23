@@ -26,33 +26,33 @@ final class NatsRefusalReporter {
     NatsRefusalReporter(GatewayTrafficMetrics gatewayTrafficMetrics, NatsClientContext context) {
         this.gatewayTrafficMetrics = gatewayTrafficMetrics;
         this.context = context;
-        this.tenant = context.tenantId() == null ? "-" : context.tenantId();
+        this.tenant = context.getTenantId() == null ? "-" : context.getTenantId();
     }
 
     void refused(NatsValidationResult.Refused refused, boolean enforce) {
-        String operation = refused.operation().name();
+        String operation = refused.getOperation().name();
         String outcome = enforce ? "dropped and answered with -ERR" : "relayed (enforce=false)";
-        report(operation, outcome, refused.subject(), enforce);
+        report(operation, outcome, refused.getSubject(), enforce);
     }
 
     void closeSession(NatsValidationResult.CloseSession closeSession, boolean enforce) {
         String outcome = enforce ? "closing" : "relayed (enforce=false)";
-        report(OPERATION_CONNECT, outcome, closeSession.reason(), enforce);
+        report(OPERATION_CONNECT, outcome, closeSession.getReason(), enforce);
     }
 
     void protocolViolation(NatsValidationResult.ProtocolViolation violation, boolean enforce) {
         String outcome = enforce ? "closing" : "relaying the rest of the session unparsed";
-        report(OPERATION_PROTOCOL, outcome, violation.reason(), enforce);
+        report(OPERATION_PROTOCOL, outcome, violation.getReason(), enforce);
     }
 
     private void report(String operation, String outcome, String detail, boolean enforce) {
-        String kind = context.kind().name();
+        String kind = context.getKind().name();
         gatewayTrafficMetrics.recordNatsCommandRefused(operation, kind, enforce);
         if (logged >= LOGGED_REFUSALS_PER_SESSION) {
             return;
         }
         logged++;
         log.warn("NATS client {} not allowed, {}: {} kind={} id={} path={} tenant={}",
-                operation, outcome, detail, kind, context.clientId(), context.path(), tenant);
+                operation, outcome, detail, kind, context.getClientId(), context.getPath(), tenant);
     }
 }

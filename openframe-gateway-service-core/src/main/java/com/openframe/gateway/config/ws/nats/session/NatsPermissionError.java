@@ -19,8 +19,8 @@ final class NatsPermissionError {
     }
 
     static byte[] of(NatsValidationResult.Refused refused) {
-        String template = refused.operation() == NatsOperation.SUB ? SUBSCRIBE_ERROR : PUBLISH_ERROR;
-        String error = String.format(template, refused.subject());
+        String template = refused.getOperation() == NatsOperation.SUB ? SUBSCRIBE_ERROR : PUBLISH_ERROR;
+        String error = String.format(template, refused.getSubject());
         return error.getBytes(UTF_8);
     }
 }

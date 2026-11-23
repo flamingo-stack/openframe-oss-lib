@@ -23,7 +23,7 @@ public class NatsCommandValidationService {
 
     public Mono<NatsValidationResult> validate(NatsClientCommand command, NatsClientContext context) {
         if (command.isMalformed()) {
-            return Mono.just(new NatsValidationResult.ProtocolViolation(command.trouble()));
+            return Mono.just(new NatsValidationResult.ProtocolViolation(command.getTrouble()));
         }
         return Flux.fromIterable(natsCommandValidators)
                 .filter(validator -> validator.appliesTo(command))

@@ -26,8 +26,8 @@ public class SubjectPolicyConsumerAuthorizer implements StreamConsumerAuthorizer
         if (request.isUnfiltered()) {
             return Mono.just(false);
         }
-        NatsSubjectPolicy policy = context.policy();
-        boolean allowed = request.filterSubjects().stream().allMatch(policy::allowsSubscribe);
+        NatsSubjectPolicy policy = context.getPolicy();
+        boolean allowed = request.getFilterSubjects().stream().allMatch(policy::allowsSubscribe);
         return Mono.just(allowed);
     }
 }

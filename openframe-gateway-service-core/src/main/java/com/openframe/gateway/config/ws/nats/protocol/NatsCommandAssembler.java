@@ -77,7 +77,7 @@ public final class NatsCommandAssembler {
         pendingPayload.reset();
         NatsControlLine controlLine = pendingControlLine;
         pendingControlLine = null;
-        byte[] raw = concat(controlLine.raw(), payloadWithTrailer);
+        byte[] raw = concat(controlLine.getRaw(), payloadWithTrailer);
         byte[] payload = withoutTrailer(payloadWithTrailer);
         return NatsClientCommand.parsed(controlLine, payload, raw);
     }
@@ -104,13 +104,13 @@ public final class NatsCommandAssembler {
             commands.add(NatsClientCommand.malformed(line, e.getMessage()));
             return;
         }
-        if (controlLine.payloadSize() > maxPayloadBytes) {
+        if (controlLine.getPayloadSize() > maxPayloadBytes) {
             commands.add(NatsClientCommand.malformed(line, "payload larger than " + maxPayloadBytes + " bytes"));
             return;
         }
-        if (controlLine.operation().isPublish()) {
+        if (controlLine.getOperation().isPublish()) {
             pendingControlLine = controlLine;
-            payloadRemaining = controlLine.payloadSize() + PAYLOAD_TRAILER_BYTES;
+            payloadRemaining = controlLine.getPayloadSize() + PAYLOAD_TRAILER_BYTES;
             return;
         }
         commands.add(NatsClientCommand.parsed(controlLine, new byte[0], line));
