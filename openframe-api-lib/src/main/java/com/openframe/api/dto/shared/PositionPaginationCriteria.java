@@ -13,10 +13,19 @@ public class PositionPaginationCriteria {
     boolean backward;
 
     public PositionPaginationCriteria normalize() {
-        return this;
+        int requestedLimit = limit != null ? limit : CursorPaginationCriteria.DEFAULT_PAGE_SIZE;
+        int atLeastMinimum = Math.max(CursorPaginationCriteria.MIN_PAGE_SIZE, requestedLimit);
+        int normalizedLimit = Math.min(atLeastMinimum, CursorPaginationCriteria.MAX_PAGE_SIZE);
+        CursorPosition normalizedPosition = position != null ? position : new CursorPosition.None();
+
+        return PositionPaginationCriteria.builder()
+                .position(normalizedPosition)
+                .limit(normalizedLimit)
+                .backward(backward)
+                .build();
     }
 
     public boolean hasPosition() {
-        return false;
+        return position != null && !(position instanceof CursorPosition.None);
     }
 }

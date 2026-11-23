@@ -1,5 +1,6 @@
 package com.openframe.data.repository.ticket;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
@@ -35,6 +36,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -49,6 +51,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String ID_FIELD = "_id";
     private static final String DEFAULT_SORT_FIELD = "_id";
     private static final String AND_OPERATOR = "$and";
+    private static final String NO_SORT_VALUE = "";
 
     private static final String FIELD_STATUS_ID = "statusId";
     private static final String FIELD_STATUS_KIND = "statusKind";
@@ -286,32 +289,36 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     @Override
     public List<Ticket> findTicketsWithCursor(Query query, CursorPosition position, boolean backward, int limit,
                                               String sortField, String sortDirection) {
-        String cursor = position instanceof CursorPosition.RowId rowId ? rowId.id() : null;
-        boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
-        Sort.Direction mongoSortDirection = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
-
-        Query pageQuery = query;
-        if (cursor != null && !cursor.trim().isEmpty()) {
-            try {
-                ObjectId cursorId = new ObjectId(cursor);
-                Criteria cursorCriteria = buildCursorCriteria(cursorId, sortField, isDesc);
-                pageQuery = withCursorBound(query, cursorCriteria);
-            } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
-            }
-        }
+        Sort.Direction direction = directionOf(sortDirection);
+        boolean fetchDescending = direction.isDescending() != backward;
+        Query pageQuery = keysetAnchor(position, sortField, direction)
+                .map(anchor -> keysetCriteria(anchor, sortField, fetchDescending))
+                .map(pastAnchor -> withCursorBound(query, pastAnchor))
+                .orElse(query);
+        Sort sort = sortWithIdTieBreak(sortField, fetchDescending);
         pageQuery.limit(limit);
-
-        if (ID_FIELD.equals(sortField)) {
-            pageQuery.with(Sort.by(mongoSortDirection, ID_FIELD));
-        } else {
-            pageQuery.with(Sort.by(
-                    Sort.Order.by(sortField).with(mongoSortDirection),
-                    Sort.Order.by(ID_FIELD).with(mongoSortDirection)
-            ));
-        }
+        pageQuery.with(sort);
 
         return mongoTemplate.find(pageQuery, Ticket.class);
+    }
+
+    @Override
+    public KeysetCursor keysetCursor(Ticket ticket, String sortField, String sortDirection) {
+        Sort.Direction direction = directionOf(sortDirection);
+        return keysetOf(ticket, sortField, direction);
+    }
+
+    private static Sort.Direction directionOf(String sortDirection) {
+        return SORT_DESC.equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
+    }
+
+    private static Sort sortWithIdTieBreak(String sortField, boolean fetchDescending) {
+        Sort.Direction fetchDirection = fetchDescending ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort byId = Sort.by(fetchDirection, ID_FIELD);
+        if (ID_FIELD.equals(sortField)) {
+            return byId;
+        }
+        return Sort.by(fetchDirection, sortField).and(byId);
     }
 
     // Not addCriteria: a second criterion per key ('_id' from tags, '$or' from search) throws.
@@ -330,60 +337,126 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         return new BasicQuery(merged, fields);
     }
 
-    private Criteria buildCursorCriteria(ObjectId cursorId, String sortField, boolean isDesc) {
-        if (ID_FIELD.equals(sortField)) {
-            return buildIdCriteria(cursorId, isDesc);
-        }
-
-        Ticket cursorDoc = mongoTemplate.findById(cursorId, Ticket.class);
-        if (cursorDoc == null) {
-            log.warn("Cursor document not found for id: {}", cursorId);
-            return buildIdCriteria(cursorId, isDesc);
-        }
-
-        Object cursorSortValue = getSortFieldValue(cursorDoc, sortField);
-        if (cursorSortValue == null) {
-            return buildIdCriteria(cursorId, isDesc);
-        }
-
-        Criteria pastSortValue = isDesc
-                ? Criteria.where(sortField).lt(cursorSortValue)
-                : Criteria.where(sortField).gt(cursorSortValue);
-
-        Criteria sameSortValuePastId = new Criteria().andOperator(
-                Criteria.where(sortField).is(cursorSortValue),
-                buildIdCriteria(cursorId, isDesc)
-        );
-
-        return new Criteria().orOperator(pastSortValue, sameSortValuePastId);
-    }
-
-    private Criteria buildIdCriteria(ObjectId cursorId, boolean isDesc) {
-        return isDesc
-                ? Criteria.where(ID_FIELD).lt(cursorId)
-                : Criteria.where(ID_FIELD).gt(cursorId);
-    }
-
-    private Object getSortFieldValue(Ticket ticket, String sortField) {
-        return switch (sortField) {
-            case FIELD_TICKET_NUMBER -> ticket.getTicketNumber();
-            case FIELD_STATUS_KIND -> ticket.getStatusKind() != null ? ticket.getStatusKind().name() : null;
-            case FIELD_ORGANIZATION_NAME -> ticket.getOrganizationName();
-            case FIELD_ASSIGNED_NAME -> ticket.getAssignedName();
-            case FIELD_DEVICE_HOSTNAME -> ticket.getDeviceHostname();
-            case FIELD_CREATED_AT -> ticket.getCreatedAt();
-            case FIELD_UPDATED_AT -> ticket.getUpdatedAt();
-            case FIELD_RESOLVED_AT -> ticket.getResolvedAt();
-            case FIELD_LAST_ACTIVITY_AT -> ticket.getLastActivityAt();
-            case FIELD_ORDER -> ticket.getOrder();
-            default -> null;
+    private Optional<KeysetCursor> keysetAnchor(CursorPosition position, String sortField, Sort.Direction direction) {
+        return switch (position) {
+            case CursorPosition.None _ -> Optional.empty();
+            case KeysetCursor keyset -> {
+                keyset.requireSort(sortField, direction);
+                yield Optional.of(keyset);
+            }
+            case CursorPosition.RowId rowId -> {
+                KeysetCursor anchor = rowAnchor(rowId.id(), sortField, direction);
+                yield Optional.of(anchor);
+            }
+            case CursorPosition.Unrecognised _ -> throw new InvalidCursorException();
         };
     }
 
-    @Override
-    public KeysetCursor keysetCursor(Ticket ticket, String sortField, String sortDirection) {
-        Sort.Direction direction = SORT_DESC.equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
-        return new KeysetCursor(sortField, direction, "", ticket.getId());
+    private KeysetCursor rowAnchor(String rowId, String sortField, Sort.Direction direction) {
+        if (ID_FIELD.equals(sortField)) {
+            return new KeysetCursor(ID_FIELD, direction, NO_SORT_VALUE, rowId);
+        }
+        Ticket row = cursorRow(rowId);
+        return keysetOf(row, sortField, direction);
+    }
+
+    private Ticket cursorRow(String rowId) {
+        ObjectId id = cursorObjectId(rowId);
+        Criteria byId = Criteria.where(ID_FIELD).is(id);
+        Query query = new Query(byId);
+        Ticket row = mongoTemplate.findOne(query, Ticket.class);
+        if (row == null) {
+            throw new InvalidCursorException();
+        }
+        return row;
+    }
+
+    private static KeysetCursor keysetOf(Ticket ticket, String sortField, Sort.Direction direction) {
+        String id = ticket.getId();
+        return switch (sortField) {
+            case FIELD_TICKET_NUMBER -> {
+                String ticketNumber = Objects.toString(ticket.getTicketNumber(), NO_SORT_VALUE);
+                yield new KeysetCursor(sortField, direction, ticketNumber, id);
+            }
+            case FIELD_STATUS_KIND -> {
+                String statusKind = ticket.getStatusKind() != null ? ticket.getStatusKind().name() : null;
+                yield KeysetCursor.ofString(sortField, direction, statusKind, id);
+            }
+            case FIELD_ORGANIZATION_NAME -> KeysetCursor.ofString(sortField, direction, ticket.getOrganizationName(), id);
+            case FIELD_ASSIGNED_NAME -> KeysetCursor.ofString(sortField, direction, ticket.getAssignedName(), id);
+            case FIELD_DEVICE_HOSTNAME -> KeysetCursor.ofString(sortField, direction, ticket.getDeviceHostname(), id);
+            case FIELD_ORDER -> KeysetCursor.ofString(sortField, direction, ticket.getOrder(), id);
+            case FIELD_CREATED_AT -> KeysetCursor.ofInstant(sortField, direction, ticket.getCreatedAt(), id);
+            case FIELD_UPDATED_AT -> KeysetCursor.ofInstant(sortField, direction, ticket.getUpdatedAt(), id);
+            case FIELD_RESOLVED_AT -> KeysetCursor.ofInstant(sortField, direction, ticket.getResolvedAt(), id);
+            case FIELD_LAST_ACTIVITY_AT -> KeysetCursor.ofInstant(sortField, direction, ticket.getLastActivityAt(), id);
+            default -> new KeysetCursor(sortField, direction, NO_SORT_VALUE, id);
+        };
+    }
+
+    private static Criteria keysetCriteria(KeysetCursor cursor, String sortField, boolean fetchDescending) {
+        ObjectId cursorId = cursorObjectId(cursor.id());
+        if (ID_FIELD.equals(sortField)) {
+            Criteria id = Criteria.where(ID_FIELD);
+            return pastId(id, cursorId, fetchDescending);
+        }
+        Object sortValue = sortValue(cursor, sortField);
+        if (sortValue == null) {
+            return nullGroupKeyset(sortField, cursorId, fetchDescending);
+        }
+        return valueKeyset(sortField, sortValue, cursorId, fetchDescending);
+    }
+
+    private static Object sortValue(KeysetCursor cursor, String sortField) {
+        return switch (sortField) {
+            case FIELD_TICKET_NUMBER -> ticketNumberValue(cursor);
+            case FIELD_CREATED_AT, FIELD_UPDATED_AT, FIELD_RESOLVED_AT, FIELD_LAST_ACTIVITY_AT -> cursor.instantValue();
+            default -> cursor.stringValue();
+        };
+    }
+
+    private static Integer ticketNumberValue(KeysetCursor cursor) {
+        if (cursor.hasNullValue()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(cursor.rawValue());
+        } catch (NumberFormatException e) {
+            throw new InvalidCursorException(e);
+        }
+    }
+
+    private static Criteria nullGroupKeyset(String sortField, ObjectId cursorId, boolean fetchDescending) {
+        Criteria idInsideNullGroup = Criteria.where(sortField).is(null).and(ID_FIELD);
+        Criteria restOfNullGroup = pastId(idInsideNullGroup, cursorId, fetchDescending);
+        if (fetchDescending) {
+            return restOfNullGroup;
+        }
+        Criteria everyValue = Criteria.where(sortField).ne(null);
+        return new Criteria().orOperator(restOfNullGroup, everyValue);
+    }
+
+    private static Criteria valueKeyset(String sortField, Object sortValue, ObjectId cursorId, boolean fetchDescending) {
+        Criteria value = Criteria.where(sortField);
+        Criteria pastValue = fetchDescending ? value.lt(sortValue) : value.gt(sortValue);
+        Criteria idInsideSameValue = Criteria.where(sortField).is(sortValue).and(ID_FIELD);
+        Criteria sameValuePastId = pastId(idInsideSameValue, cursorId, fetchDescending);
+        if (fetchDescending) {
+            Criteria nullGroup = Criteria.where(sortField).is(null);
+            return new Criteria().orOperator(pastValue, sameValuePastId, nullGroup);
+        }
+        return new Criteria().orOperator(pastValue, sameValuePastId);
+    }
+
+    private static Criteria pastId(Criteria id, ObjectId cursorId, boolean fetchDescending) {
+        return fetchDescending ? id.lt(cursorId) : id.gt(cursorId);
+    }
+
+    private static ObjectId cursorObjectId(String value) {
+        if (!ObjectId.isValid(value)) {
+            throw new InvalidCursorException();
+        }
+        return new ObjectId(value);
     }
 
     @Override
