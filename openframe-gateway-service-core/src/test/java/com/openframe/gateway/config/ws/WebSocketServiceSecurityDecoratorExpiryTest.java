@@ -68,6 +68,7 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
     @Mock private RequestPath requestPath;
     @Mock private WebSocketSession clientSession;
     @Mock private WebSocketHandler proxyHandler;
+    @Mock private NatsSubjectFilter natsSubjectFilter;
 
     @Captor private ArgumentCaptor<RelayDevice> deviceCaptor;
     @Captor private ArgumentCaptor<ContextView> contextCaptor;
@@ -86,7 +87,7 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
         sessionCap.setMaxDurationSeconds(SESSION_CAP.getSeconds());
         decorator = new WebSocketServiceSecurityDecorator(defaultWebSocketService, requestJwtReader,
                 gatewayTrafficMetrics, new WebSocketLoggingProperties(), new MeshControlCommandProperties(),
-                new ObjectMapper(), relayAccessWatcher, sessionCap);
+                new ObjectMapper(), relayAccessWatcher, sessionCap, natsSubjectFilter);
     }
 
     @AfterEach

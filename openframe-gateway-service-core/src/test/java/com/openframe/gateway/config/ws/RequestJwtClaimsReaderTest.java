@@ -16,6 +16,7 @@ import java.util.Optional;
 
 import static com.openframe.gateway.config.ws.ToolWebSocketProxyUrlFilter.ORIGINAL_AUTHORIZATION_ATTR;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RequestJwtClaimsReaderTest {
 
@@ -23,6 +24,8 @@ class RequestJwtClaimsReaderTest {
     private static final String SUBJECT = "agent_8daa5e90-707c-4fab-8cda-d11550b0d26b";
     private static final String MACHINE_ID_CLAIM = "machine_id";
     private static final long NUMERIC_MACHINE_ID = 42L;
+    private static final String USER_ID = "usr_abc123";
+    private static final String USER_SUBJECT = "technician@example.com";
 
     private RequestJwtClaimsReader reader;
 
@@ -82,6 +85,48 @@ class RequestJwtClaimsReaderTest {
 
         // verifications
         assertThat(machineId).contains("42");
+    }
+
+    @Test
+    void getUserId_userIdClaimPresent_returnsIt() {
+        // setup
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("sub", USER_SUBJECT);
+        claims.put("userId", USER_ID);
+        MockServerWebExchange exchange = exchangeWithAuthorizationHeader(claims);
+
+        // execution
+        String userId = reader.getUserId(exchange);
+
+        // verifications
+        assertThat(userId).isEqualTo(USER_ID);
+    }
+
+    @Test
+    void getUserId_noUserIdClaim_fallsBackToSubject() {
+        // setup
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("sub", USER_SUBJECT);
+        MockServerWebExchange exchange = exchangeWithAuthorizationHeader(claims);
+
+        // execution
+        String userId = reader.getUserId(exchange);
+
+        // verifications
+        assertThat(userId).isEqualTo(USER_SUBJECT);
+    }
+
+    @Test
+    void getUserId_neitherUserIdNorSubject_throwsIllegalState() {
+        // setup
+        Map<String, Object> claims = new HashMap<>();
+        MockServerWebExchange exchange = exchangeWithAuthorizationHeader(claims);
+
+        // execution
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> reader.getUserId(exchange));
+
+        // verifications
+        assertThat(exception.getMessage()).contains("userId");
     }
 
     private static Map<String, Object> deviceClaims(Object machineId) {

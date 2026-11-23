@@ -32,6 +32,7 @@ class WebSocketServiceSecurityDecoratorTest {
     private static final String MESH_REQUEST_PATH = "/ws/tools/agent/meshcentral-server/agent.ashx";
     private static final String CONTROL_REQUEST_PATH = "/ws/tools/meshcentral-server/control.ashx";
     private static final String RELAY_REQUEST_PATH = "/ws/tools/meshcentral-server/meshrelay.ashx";
+    private static final String NATS_REQUEST_PATH = "/ws/nats";
 
     @Test
     void wrapsClientSessionForFrameLogging_whenRequestPathMatchesFramePrefix() {
@@ -101,6 +102,26 @@ class WebSocketServiceSecurityDecoratorTest {
         assertThat(proxied).isInstanceOf(LoggingWebSocketSessionDecorator.class);
     }
 
+    @Test
+    void wrapsNatsSessionsWithTheSubjectFilter_whenItIsOn() {
+        NatsSubjectFilter natsSubjectFilter = mock(NatsSubjectFilter.class);
+        WebSocketSession filtered = mock(WebSocketSession.class);
+        when(natsSubjectFilter.isEnabledFor(NATS_REQUEST_PATH)).thenReturn(true);
+        when(natsSubjectFilter.decorate(any(ServerWebExchange.class), any(WebSocketSession.class), eq(NATS_REQUEST_PATH), any()))
+                .thenReturn(filtered);
+
+        WebSocketSession proxied = handleAndCaptureProxiedSession(noFrameLogging(), new MeshControlCommandProperties(),
+                natsSubjectFilter, NATS_REQUEST_PATH);
+
+        assertThat(proxied).isSameAs(filtered);
+    }
+
+    @Test
+    void doesNotWrapNatsSessions_whenTheSubjectFilterIsOff() {
+        assertThat(handleAndCaptureProxiedSession(noFrameLogging(), NATS_REQUEST_PATH))
+                .isNotInstanceOf(NatsSubjectFilteringWebSocketSessionDecorator.class);
+    }
+
     private static WebSocketLoggingProperties noFrameLogging() {
         return new WebSocketLoggingProperties();
     }
@@ -117,6 +138,13 @@ class WebSocketServiceSecurityDecoratorTest {
 
     private WebSocketSession handleAndCaptureProxiedSession(WebSocketLoggingProperties props,
                                                             MeshControlCommandProperties meshProps, String requestPath) {
+        // NATS subject filtering off: a bare mock answers false to isEnabledFor.
+        return handleAndCaptureProxiedSession(props, meshProps, mock(NatsSubjectFilter.class), requestPath);
+    }
+
+    private WebSocketSession handleAndCaptureProxiedSession(WebSocketLoggingProperties props,
+                                                            MeshControlCommandProperties meshProps,
+                                                            NatsSubjectFilter natsSubjectFilter, String requestPath) {
         WebSocketService defaultService = mock(WebSocketService.class);
         RequestJwtClaimsReader jwtReader = mock(RequestJwtClaimsReader.class);
         GatewayTrafficMetrics metrics = mock(GatewayTrafficMetrics.class);
@@ -125,7 +153,7 @@ class WebSocketServiceSecurityDecoratorTest {
         WebSocketServiceSecurityDecorator decorator =
                 new WebSocketServiceSecurityDecorator(defaultService, jwtReader, metrics, props,
                         meshProps, new tools.jackson.databind.ObjectMapper(), mock(RelayAccessWatcher.class),
-                        new RemoteSessionCapProperties());
+                        new RemoteSessionCapProperties(), natsSubjectFilter);
 
         ServerWebExchange exchange = exchangeWithPath(requestPath);
         when(jwtReader.getSubject(exchange)).thenReturn(Optional.of("agent_x"));

@@ -18,6 +18,7 @@ class WebSocketGatewayConfigTest {
     @Mock private WebSocketService defaultWebSocketService;
     @Mock private GatewayTrafficMetrics gatewayTrafficMetrics;
     @Mock private RelayAccessWatcher relayAccessWatcher;
+    @Mock private NatsSubjectFilter natsSubjectFilter;
 
     private WebSocketGatewayConfig config;
 
@@ -37,7 +38,7 @@ class WebSocketGatewayConfigTest {
         // execution
         WebSocketService service = config.webSocketServiceDecorator(requestJwtClaimsReader, defaultWebSocketService,
                 gatewayTrafficMetrics, loggingProperties, meshControlProperties, objectMapper, relayAccessWatcher,
-                sessionCap);
+                sessionCap, natsSubjectFilter);
 
         // verifications
         assertThat(service).isInstanceOf(WebSocketServiceSecurityDecorator.class);

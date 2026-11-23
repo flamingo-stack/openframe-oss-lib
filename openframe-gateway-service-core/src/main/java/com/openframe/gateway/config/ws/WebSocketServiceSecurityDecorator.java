@@ -43,6 +43,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
     private final ObjectMapper objectMapper;
     private final RelayAccessWatcher relayAccessWatcher;
     private final RemoteSessionCapProperties remoteSessionCapProperties;
+    private final NatsSubjectFilter natsSubjectFilter;
 
     private final ConcurrentMap<String, SessionInfo> sessionRegistry = new ConcurrentHashMap<>();
     private record SessionInfo(Instant createdAt, String path, String sub) {}
@@ -84,6 +85,9 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
             if (meshControlProperties.isEnabled() && meshControlProperties.isControlPath(path)) {
                 sessionToHandle = new MeshControlFilteringWebSocketSessionDecorator(
                         sessionToHandle, path, tenantId(exchange), meshControlProperties, objectMapper);
+            }
+            if (natsSubjectFilter.isEnabledFor(path)) {
+                sessionToHandle = natsSubjectFilter.decorate(exchange, sessionToHandle, path, tenantId(exchange));
             }
             if (loggingProperties.isFramePath(path)) {
                 sessionToHandle = new LoggingWebSocketSessionDecorator(
