@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws.nats.check;
+package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.NatsTestCommands;
@@ -10,15 +10,15 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SubscribeSubjectCheckTest {
+class SubscribeSubjectValidatorTest {
 
     private NatsClientContext context;
-    private SubscribeSubjectCheck check;
+    private SubscribeSubjectValidator validator;
 
     @BeforeEach
     void setUp() {
         context = NatsTestContexts.device();
-        check = new SubscribeSubjectCheck();
+        validator = new SubscribeSubjectValidator();
     }
 
     @Test
@@ -27,7 +27,7 @@ class SubscribeSubjectCheckTest {
         NatsClientCommand command = NatsTestCommands.command("SUB machine.m-1.x 1\r\n");
 
         // execution
-        boolean applies = check.appliesTo(command);
+        boolean applies = validator.appliesTo(command);
 
         // verifications
         assertThat(applies).isTrue();
@@ -39,7 +39,7 @@ class SubscribeSubjectCheckTest {
         NatsClientCommand command = NatsTestCommands.publish("machine.m-1.heartbeat", "hi");
 
         // execution
-        boolean applies = check.appliesTo(command);
+        boolean applies = validator.appliesTo(command);
 
         // verifications
         assertThat(applies).isFalse();
@@ -51,10 +51,10 @@ class SubscribeSubjectCheckTest {
         NatsClientCommand command = NatsTestCommands.command("SUB machine.m-1.command-execution 1\r\n");
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(NatsVerdict.ALLOWED);
+        assertThat(result).isEqualTo(NatsValidationResult.ALLOWED);
     }
 
     @Test
@@ -63,9 +63,9 @@ class SubscribeSubjectCheckTest {
         NatsClientCommand command = NatsTestCommands.command("SUB machine.m-2.command-execution 1\r\n");
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(new NatsVerdict.Refused(NatsOperation.SUB, "machine.m-2.command-execution"));
+        assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.SUB, "machine.m-2.command-execution"));
     }
 }

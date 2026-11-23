@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws.nats.check;
+package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.jetstream.ConsumerCreateRequest;
@@ -23,9 +23,9 @@ import java.util.Optional;
  * may subscribe to, or it would be a way to publish into someone else's subject.
  */
 @Component
-@Order(JetStreamConsumerCreateCheck.ORDER)
+@Order(JetStreamConsumerCreateValidator.ORDER)
 @RequiredArgsConstructor
-public class JetStreamConsumerCreateCheck implements NatsCommandCheck {
+public class JetStreamConsumerCreateValidator implements NatsCommandValidator {
 
     static final int ORDER = 400;
 
@@ -43,18 +43,18 @@ public class JetStreamConsumerCreateCheck implements NatsCommandCheck {
     }
 
     @Override
-    public Mono<NatsVerdict> check(NatsClientCommand command, NatsClientContext context) {
+    public Mono<NatsValidationResult> validate(NatsClientCommand command, NatsClientContext context) {
         String subject = command.subject().orElseThrow();
         JetStreamApiSubject apiSubject = jetStreamApiSubjectParser.consumerCreateOf(subject).orElseThrow();
         ConsumerCreateRequest request = consumerCreateRequestParser.parse(apiSubject, command.payload());
         NatsOperation operation = command.operation();
-        NatsVerdict refused = new NatsVerdict.Refused(operation, subject);
+        NatsValidationResult refused = new NatsValidationResult.Refused(operation, subject);
         if (!isDeliverSubjectOwn(request, context)) {
             return Mono.just(refused);
         }
         return authorizerFor(request.stream())
                 .mayConsume(context, request)
-                .map(allowed -> allowed ? NatsVerdict.ALLOWED : refused);
+                .map(allowed -> allowed ? NatsValidationResult.ALLOWED : refused);
     }
 
     private static boolean isDeliverSubjectOwn(ConsumerCreateRequest request, NatsClientContext context) {

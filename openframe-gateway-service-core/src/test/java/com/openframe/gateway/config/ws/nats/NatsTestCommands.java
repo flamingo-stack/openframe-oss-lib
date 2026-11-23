@@ -1,14 +1,14 @@
 package com.openframe.gateway.config.ws.nats;
 
 import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
-import com.openframe.gateway.config.ws.nats.protocol.NatsClientStreamAssembler;
+import com.openframe.gateway.config.ws.nats.protocol.NatsCommandAssembler;
 import com.openframe.gateway.config.ws.nats.protocol.NatsControlLineParser;
 
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-/** Complete client commands built from protocol text, for the tests of the checks. */
+/** Complete client commands built from protocol text, for the tests of the validators. */
 public final class NatsTestCommands {
 
     private static final long MAX_PAYLOAD_BYTES = 1024 * 1024;
@@ -17,7 +17,7 @@ public final class NatsTestCommands {
     }
 
     public static NatsClientCommand command(String protocolText) {
-        NatsClientStreamAssembler assembler = new NatsClientStreamAssembler(new NatsControlLineParser(), MAX_PAYLOAD_BYTES);
+        NatsCommandAssembler assembler = new NatsCommandAssembler(new NatsControlLineParser(), MAX_PAYLOAD_BYTES);
         byte[] bytes = protocolText.getBytes(UTF_8);
         List<NatsClientCommand> commands = assembler.feed(bytes);
         if (commands.size() != 1) {

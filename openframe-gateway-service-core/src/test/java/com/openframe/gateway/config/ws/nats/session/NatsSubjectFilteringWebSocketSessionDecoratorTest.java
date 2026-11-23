@@ -3,16 +3,16 @@ package com.openframe.gateway.config.ws.nats.session;
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
 import com.openframe.gateway.config.ws.nats.NatsTestContexts;
-import com.openframe.gateway.config.ws.nats.check.ConnectCredentialsCheck;
-import com.openframe.gateway.config.ws.nats.check.JetStreamConsumerCreateCheck;
-import com.openframe.gateway.config.ws.nats.check.NatsCommandCheck;
-import com.openframe.gateway.config.ws.nats.check.NatsCommandVetter;
-import com.openframe.gateway.config.ws.nats.check.PublishSubjectCheck;
-import com.openframe.gateway.config.ws.nats.check.SubscribeSubjectCheck;
+import com.openframe.gateway.config.ws.nats.validation.ConnectCredentialsValidator;
+import com.openframe.gateway.config.ws.nats.validation.JetStreamConsumerCreateValidator;
+import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidator;
+import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidationService;
+import com.openframe.gateway.config.ws.nats.validation.PublishSubjectValidator;
+import com.openframe.gateway.config.ws.nats.validation.SubscribeSubjectValidator;
 import com.openframe.gateway.config.ws.nats.jetstream.ConsumerCreateRequestParser;
 import com.openframe.gateway.config.ws.nats.jetstream.JetStreamApiSubjectParser;
 import com.openframe.gateway.config.ws.nats.jetstream.SubjectPolicyConsumerAuthorizer;
-import com.openframe.gateway.config.ws.nats.protocol.NatsClientStreamAssembler;
+import com.openframe.gateway.config.ws.nats.protocol.NatsCommandAssembler;
 import com.openframe.gateway.config.ws.nats.protocol.NatsConnectOptionsParser;
 import com.openframe.gateway.config.ws.nats.protocol.NatsControlLineParser;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
@@ -74,7 +74,7 @@ class NatsSubjectFilteringWebSocketSessionDecoratorTest {
     @Captor private ArgumentCaptor<Publisher<WebSocketMessage>> sentCaptor;
 
     private NatsSubjectFilterProperties properties;
-    private NatsCommandVetter vetter;
+    private NatsCommandValidationService validationService;
 
     @BeforeEach
     void setUp() {
@@ -82,13 +82,13 @@ class NatsSubjectFilteringWebSocketSessionDecoratorTest {
         properties.setEnabled(true);
         properties.setEnforce(true);
         ObjectMapper objectMapper = new ObjectMapper();
-        List<NatsCommandCheck> checks = List.of(
-                new ConnectCredentialsCheck(new NatsConnectOptionsParser(objectMapper)),
-                new SubscribeSubjectCheck(),
-                new PublishSubjectCheck(),
-                new JetStreamConsumerCreateCheck(new JetStreamApiSubjectParser(),
+        List<NatsCommandValidator> checks = List.of(
+                new ConnectCredentialsValidator(new NatsConnectOptionsParser(objectMapper)),
+                new SubscribeSubjectValidator(),
+                new PublishSubjectValidator(),
+                new JetStreamConsumerCreateValidator(new JetStreamApiSubjectParser(),
                         new ConsumerCreateRequestParser(objectMapper), List.of(new SubjectPolicyConsumerAuthorizer())));
-        vetter = new NatsCommandVetter(checks);
+        validationService = new NatsCommandValidationService(checks);
     }
 
     @Test
@@ -340,9 +340,9 @@ class NatsSubjectFilteringWebSocketSessionDecoratorTest {
     }
 
     private NatsSubjectFilteringWebSocketSessionDecorator decoratorFor(NatsClientContext context) {
-        NatsClientStreamAssembler assembler = new NatsClientStreamAssembler(new NatsControlLineParser(), MAX_PAYLOAD_BYTES);
+        NatsCommandAssembler assembler = new NatsCommandAssembler(new NatsControlLineParser(), MAX_PAYLOAD_BYTES);
         NatsRefusalReporter reporter = new NatsRefusalReporter(gatewayTrafficMetrics, context);
-        return new NatsSubjectFilteringWebSocketSessionDecorator(delegate, context, properties, assembler, vetter, reporter);
+        return new NatsSubjectFilteringWebSocketSessionDecorator(delegate, context, properties, assembler, validationService, reporter);
     }
 
     private static List<WebSocketMessage> receiveAll(NatsSubjectFilteringWebSocketSessionDecorator decorator) {

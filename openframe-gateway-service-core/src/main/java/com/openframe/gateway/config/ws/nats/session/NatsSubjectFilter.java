@@ -3,8 +3,8 @@ package com.openframe.gateway.config.ws.nats.session;
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.NatsClientContextFactory;
 import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
-import com.openframe.gateway.config.ws.nats.check.NatsCommandVetter;
-import com.openframe.gateway.config.ws.nats.protocol.NatsClientStreamAssembler;
+import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidationService;
+import com.openframe.gateway.config.ws.nats.protocol.NatsCommandAssembler;
 import com.openframe.gateway.config.ws.nats.protocol.NatsControlLineParser;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import jakarta.annotation.PostConstruct;
@@ -27,7 +27,7 @@ public class NatsSubjectFilter {
     private final NatsSubjectFilterProperties natsSubjectFilterProperties;
     private final NatsClientContextFactory natsClientContextFactory;
     private final NatsControlLineParser natsControlLineParser;
-    private final NatsCommandVetter natsCommandVetter;
+    private final NatsCommandValidationService natsCommandValidationService;
     private final GatewayTrafficMetrics gatewayTrafficMetrics;
 
     @PostConstruct
@@ -55,9 +55,9 @@ public class NatsSubjectFilter {
             return session;
         }
         long maxPayloadBytes = natsSubjectFilterProperties.getMaxPayloadBytes();
-        NatsClientStreamAssembler assembler = new NatsClientStreamAssembler(natsControlLineParser, maxPayloadBytes);
+        NatsCommandAssembler assembler = new NatsCommandAssembler(natsControlLineParser, maxPayloadBytes);
         NatsRefusalReporter reporter = new NatsRefusalReporter(gatewayTrafficMetrics, context);
         return new NatsSubjectFilteringWebSocketSessionDecorator(session, context, natsSubjectFilterProperties,
-                assembler, natsCommandVetter, reporter);
+                assembler, natsCommandValidationService, reporter);
     }
 }

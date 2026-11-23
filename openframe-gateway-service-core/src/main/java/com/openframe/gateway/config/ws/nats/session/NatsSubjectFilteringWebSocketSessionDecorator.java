@@ -2,10 +2,10 @@ package com.openframe.gateway.config.ws.nats.session;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
-import com.openframe.gateway.config.ws.nats.check.NatsCommandVetter;
-import com.openframe.gateway.config.ws.nats.check.NatsVerdict;
+import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidationService;
+import com.openframe.gateway.config.ws.nats.validation.NatsValidationResult;
 import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
-import com.openframe.gateway.config.ws.nats.protocol.NatsClientStreamAssembler;
+import com.openframe.gateway.config.ws.nats.protocol.NatsCommandAssembler;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -31,8 +31,8 @@ import java.util.function.Function;
  * Applied to the client-side session, so {@link #receive()} is the client &rarr; NATS direction —
  * the only one a client controls. NATS &rarr; client ({@link #send}) is relayed untouched, except
  * that the {@code -ERR} for a refused command is merged into it. The frames are assembled into
- * commands by {@link NatsClientStreamAssembler}, judged by {@link NatsCommandVetter}, and relayed
- * in order: a command whose check reads the database holds the ones behind it until it is decided.
+ * commands by {@link NatsCommandAssembler}, validated by {@link NatsCommandValidationService}, and relayed
+ * in order: a command whose validator reads the database holds the ones behind it until it is decided.
  * <p>
  * Every inbound frame is copied out as soon as it arrives: Reactor Netty releases a received frame
  * once {@code onNext} returns, and the decision about it may come later, so nothing here keeps or
@@ -49,8 +49,8 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
     private final WebSocketSession webSocketSession;
     private final NatsClientContext context;
     private final NatsSubjectFilterProperties properties;
-    private final NatsClientStreamAssembler assembler;
-    private final NatsCommandVetter vetter;
+    private final NatsCommandAssembler assembler;
+    private final NatsCommandValidationService validationService;
     private final NatsRefusalReporter reporter;
     private final Sinks.Many<WebSocketMessage> errorsToClient = Sinks.many().unicast().onBackpressureBuffer();
 
@@ -60,13 +60,13 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
 
     public NatsSubjectFilteringWebSocketSessionDecorator(WebSocketSession webSocketSession, NatsClientContext context,
                                                          NatsSubjectFilterProperties properties,
-                                                         NatsClientStreamAssembler assembler, NatsCommandVetter vetter,
+                                                         NatsCommandAssembler assembler, NatsCommandValidationService validationService,
                                                          NatsRefusalReporter reporter) {
         this.webSocketSession = webSocketSession;
         this.context = context;
         this.properties = properties;
         this.assembler = assembler;
-        this.vetter = vetter;
+        this.validationService = validationService;
         this.reporter = reporter;
     }
 
@@ -116,21 +116,21 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
         if (rejected) {
             return Mono.just(NOTHING);
         }
-        return vetter.vet(command, context)
-                .map(verdict -> apply(verdict, command));
+        return validationService.validate(command, context)
+                .map(result -> apply(result, command));
     }
 
-    private byte[] apply(NatsVerdict verdict, NatsClientCommand command) {
+    private byte[] apply(NatsValidationResult result, NatsClientCommand command) {
         boolean enforce = properties.isEnforce();
-        return switch (verdict) {
-            case NatsVerdict.Allowed allowed -> command.raw();
-            case NatsVerdict.Refused refused -> applyRefusal(refused, command, enforce);
-            case NatsVerdict.Closed closed -> applyClose(closed, command, enforce);
-            case NatsVerdict.ProtocolTrouble trouble -> applyProtocolTrouble(trouble, command, enforce);
+        return switch (result) {
+            case NatsValidationResult.Allowed allowed -> command.raw();
+            case NatsValidationResult.Refused refused -> applyRefusal(refused, command, enforce);
+            case NatsValidationResult.CloseSession closeSession -> applyCloseSession(closeSession, command, enforce);
+            case NatsValidationResult.ProtocolViolation violation -> applyProtocolViolation(violation, command, enforce);
         };
     }
 
-    private byte[] applyRefusal(NatsVerdict.Refused refused, NatsClientCommand command, boolean enforce) {
+    private byte[] applyRefusal(NatsValidationResult.Refused refused, NatsClientCommand command, boolean enforce) {
         reporter.refused(refused, enforce);
         if (!enforce) {
             return command.raw();
@@ -141,19 +141,19 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
         return NOTHING;
     }
 
-    private byte[] applyClose(NatsVerdict.Closed closed, NatsClientCommand command, boolean enforce) {
-        reporter.closed(closed, enforce);
+    private byte[] applyCloseSession(NatsValidationResult.CloseSession closeSession, NatsClientCommand command, boolean enforce) {
+        reporter.closeSession(closeSession, enforce);
         if (!enforce) {
             return command.raw();
         }
-        reject(closed.reason());
+        reject(closeSession.reason());
         return NOTHING;
     }
 
-    private byte[] applyProtocolTrouble(NatsVerdict.ProtocolTrouble trouble, NatsClientCommand command, boolean enforce) {
-        reporter.protocolTrouble(trouble, enforce);
+    private byte[] applyProtocolViolation(NatsValidationResult.ProtocolViolation violation, NatsClientCommand command, boolean enforce) {
+        reporter.protocolViolation(violation, enforce);
         if (enforce) {
-            reject(trouble.reason());
+            reject(violation.reason());
             return NOTHING;
         }
         assembler.relayUnparsed();

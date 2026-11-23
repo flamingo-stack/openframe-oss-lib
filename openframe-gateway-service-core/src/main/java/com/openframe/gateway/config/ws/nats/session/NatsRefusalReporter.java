@@ -1,12 +1,12 @@
 package com.openframe.gateway.config.ws.nats.session;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
-import com.openframe.gateway.config.ws.nats.check.NatsVerdict;
+import com.openframe.gateway.config.ws.nats.validation.NatsValidationResult;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Logs and counts what the checks refused for one session. The counter sees every refusal; the
+ * Logs and counts what the validators refused for one session. The counter sees every refusal; the
  * log sees the first few, so a client stuck re-subscribing in a loop cannot flood it.
  */
 @Slf4j
@@ -29,20 +29,20 @@ final class NatsRefusalReporter {
         this.tenant = context.tenantId() == null ? "-" : context.tenantId();
     }
 
-    void refused(NatsVerdict.Refused refused, boolean enforce) {
+    void refused(NatsValidationResult.Refused refused, boolean enforce) {
         String operation = refused.operation().name();
         String outcome = enforce ? "dropped and answered with -ERR" : "relayed (enforce=false)";
         report(operation, outcome, refused.subject(), enforce);
     }
 
-    void closed(NatsVerdict.Closed closed, boolean enforce) {
+    void closeSession(NatsValidationResult.CloseSession closeSession, boolean enforce) {
         String outcome = enforce ? "closing" : "relayed (enforce=false)";
-        report(OPERATION_CONNECT, outcome, closed.reason(), enforce);
+        report(OPERATION_CONNECT, outcome, closeSession.reason(), enforce);
     }
 
-    void protocolTrouble(NatsVerdict.ProtocolTrouble trouble, boolean enforce) {
+    void protocolViolation(NatsValidationResult.ProtocolViolation violation, boolean enforce) {
         String outcome = enforce ? "closing" : "relaying the rest of the session unparsed";
-        report(OPERATION_PROTOCOL, outcome, trouble.reason(), enforce);
+        report(OPERATION_PROTOCOL, outcome, violation.reason(), enforce);
     }
 
     private void report(String operation, String outcome, String detail, boolean enforce) {

@@ -2,7 +2,7 @@ package com.openframe.gateway.config.ws.nats.session;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.NatsTestContexts;
-import com.openframe.gateway.config.ws.nats.check.NatsVerdict;
+import com.openframe.gateway.config.ws.nats.validation.NatsValidationResult;
 import com.openframe.gateway.config.ws.nats.protocol.NatsOperation;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.verify;
 class NatsRefusalReporterTest {
 
     private static final String DEVICE = "DEVICE";
-    private static final NatsVerdict.Refused REFUSED = new NatsVerdict.Refused(NatsOperation.SUB, "machine.m-2.x");
+    private static final NatsValidationResult.Refused REFUSED = new NatsValidationResult.Refused(NatsOperation.SUB, "machine.m-2.x");
     private static final int REFUSALS_BEYOND_THE_LOG_CAP = NatsRefusalReporter.LOGGED_REFUSALS_PER_SESSION + 5;
 
     @Mock private GatewayTrafficMetrics gatewayTrafficMetrics;
@@ -41,18 +41,18 @@ class NatsRefusalReporterTest {
     }
 
     @Test
-    void closed_observing_countedAsConnectNotEnforced() {
+    void closeSession_observing_countedAsConnectNotEnforced() {
         // execution
-        reporter.closed(new NatsVerdict.Closed("CONNECT carries pass"), false);
+        reporter.closeSession(new NatsValidationResult.CloseSession("CONNECT carries pass"), false);
 
         // verifications
         verify(gatewayTrafficMetrics).recordNatsCommandRefused("CONNECT", DEVICE, false);
     }
 
     @Test
-    void protocolTrouble_enforcing_countedAsProtocol() {
+    void protocolViolation_enforcing_countedAsProtocol() {
         // execution
-        reporter.protocolTrouble(new NatsVerdict.ProtocolTrouble("control line too long"), true);
+        reporter.protocolViolation(new NatsValidationResult.ProtocolViolation("control line too long"), true);
 
         // verifications
         verify(gatewayTrafficMetrics).recordNatsCommandRefused("PROTOCOL", DEVICE, true);

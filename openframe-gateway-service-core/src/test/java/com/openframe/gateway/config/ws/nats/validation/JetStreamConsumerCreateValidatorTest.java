@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws.nats.check;
+package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.NatsTestCommands;
@@ -29,7 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class JetStreamConsumerCreateCheckTest {
+class JetStreamConsumerCreateValidatorTest {
 
     private static final String CHAT_STREAM = "CHAT_CHUNKS";
     private static final String TIMEZONE_STREAM = "MACHINE_TIMEZONE_REQUEST";
@@ -40,12 +40,12 @@ class JetStreamConsumerCreateCheckTest {
 
     @Captor private ArgumentCaptor<ConsumerCreateRequest> requestCaptor;
 
-    private JetStreamConsumerCreateCheck check;
+    private JetStreamConsumerCreateValidator validator;
 
     @BeforeEach
     void setUp() {
         List<StreamConsumerAuthorizer> authorizers = List.of(chatAuthorizer, new SubjectPolicyConsumerAuthorizer());
-        check = new JetStreamConsumerCreateCheck(new JetStreamApiSubjectParser(),
+        validator = new JetStreamConsumerCreateValidator(new JetStreamApiSubjectParser(),
                 new ConsumerCreateRequestParser(new ObjectMapper()), authorizers);
     }
 
@@ -55,7 +55,7 @@ class JetStreamConsumerCreateCheckTest {
         NatsClientCommand command = NatsTestCommands.consumerCreate(CHAT_STREAM, DIALOG_SUBJECT);
 
         // execution
-        boolean applies = check.appliesTo(command);
+        boolean applies = validator.appliesTo(command);
 
         // verifications
         assertThat(applies).isTrue();
@@ -67,7 +67,7 @@ class JetStreamConsumerCreateCheckTest {
         NatsClientCommand command = NatsTestCommands.publish("machine.m-1.heartbeat", "hi");
 
         // execution
-        boolean applies = check.appliesTo(command);
+        boolean applies = validator.appliesTo(command);
 
         // verifications
         assertThat(applies).isFalse();
@@ -82,10 +82,10 @@ class JetStreamConsumerCreateCheckTest {
         when(chatAuthorizer.mayConsume(eq(context), requestCaptor.capture())).thenReturn(Mono.just(true));
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(NatsVerdict.ALLOWED);
+        assertThat(result).isEqualTo(NatsValidationResult.ALLOWED);
         assertThat(requestCaptor.getValue().filterSubjects()).containsExactly(DIALOG_SUBJECT);
     }
 
@@ -98,10 +98,10 @@ class JetStreamConsumerCreateCheckTest {
         when(chatAuthorizer.mayConsume(eq(context), requestCaptor.capture())).thenReturn(Mono.just(false));
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(new NatsVerdict.Refused(NatsOperation.PUB, CREATE_SUBJECT));
+        assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.PUB, CREATE_SUBJECT));
     }
 
     @Test
@@ -112,10 +112,10 @@ class JetStreamConsumerCreateCheckTest {
         when(chatAuthorizer.supports(TIMEZONE_STREAM)).thenReturn(false);
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(NatsVerdict.ALLOWED);
+        assertThat(result).isEqualTo(NatsValidationResult.ALLOWED);
     }
 
     @Test
@@ -126,10 +126,10 @@ class JetStreamConsumerCreateCheckTest {
         NatsClientCommand command = NatsTestCommands.publish(CREATE_SUBJECT, body);
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(new NatsVerdict.Refused(NatsOperation.PUB, CREATE_SUBJECT));
+        assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.PUB, CREATE_SUBJECT));
     }
 
     @Test
@@ -139,7 +139,7 @@ class JetStreamConsumerCreateCheckTest {
         NatsClientCommand command = NatsTestCommands.publish(CREATE_SUBJECT, "not-json");
 
         // execution
-        NatsProtocolException exception = assertThrows(NatsProtocolException.class, () -> check.check(command, context));
+        NatsProtocolException exception = assertThrows(NatsProtocolException.class, () -> validator.validate(command, context));
 
         // verifications
         assertThat(exception.getMessage()).contains("JSON");

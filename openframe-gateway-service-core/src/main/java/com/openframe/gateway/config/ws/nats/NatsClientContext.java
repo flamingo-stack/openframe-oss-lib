@@ -4,9 +4,9 @@ import com.openframe.gateway.config.ws.nats.policy.NatsSubjectPolicy;
 import reactor.util.context.ContextView;
 
 /**
- * Everything a check needs to know about one NATS websocket session: who the client is, which
+ * Everything a validator needs to know about one NATS websocket session: who the client is, which
  * tenant it belongs to, what it may publish and subscribe to, and the Reactor context of the
- * upgrade request, so a check that reads the database runs under the same tenant routing.
+ * upgrade request, so a validator that reads the database runs under the same tenant routing.
  */
 public record NatsClientContext(
         NatsClientIdentity identity,

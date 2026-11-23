@@ -3,7 +3,7 @@ package com.openframe.gateway.config.ws.nats.session;
 import com.openframe.gateway.config.ws.nats.NatsClientContextFactory;
 import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
 import com.openframe.gateway.config.ws.nats.NatsTestContexts;
-import com.openframe.gateway.config.ws.nats.check.NatsCommandVetter;
+import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidationService;
 import com.openframe.gateway.config.ws.nats.protocol.NatsControlLineParser;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +29,7 @@ class NatsSubjectFilterTest {
     private static final ContextView CONTEXT = Context.empty();
 
     @Mock private NatsClientContextFactory natsClientContextFactory;
-    @Mock private NatsCommandVetter natsCommandVetter;
+    @Mock private NatsCommandValidationService natsCommandValidationService;
     @Mock private GatewayTrafficMetrics gatewayTrafficMetrics;
     @Mock private ServerWebExchange exchange;
     @Mock private WebSocketSession session;
@@ -42,7 +42,7 @@ class NatsSubjectFilterTest {
         properties = new NatsSubjectFilterProperties();
         properties.setEnabled(true);
         natsSubjectFilter = new NatsSubjectFilter(properties, natsClientContextFactory, new NatsControlLineParser(),
-                natsCommandVetter, gatewayTrafficMetrics);
+                natsCommandValidationService, gatewayTrafficMetrics);
     }
 
     @ParameterizedTest

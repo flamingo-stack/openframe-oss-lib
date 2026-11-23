@@ -10,18 +10,18 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
-class NatsClientStreamAssemblerTest {
+class NatsCommandAssemblerTest {
 
     private static final long MAX_PAYLOAD_BYTES = 1024;
     private static final String SUBSCRIBE = "SUB machine.m-1.command-execution 1\r\n";
     private static final String PING = "PING\r\n";
-    private static final int OVERLONG_LINE_BYTES = NatsClientStreamAssembler.MAX_CONTROL_LINE_BYTES + 1;
+    private static final int OVERLONG_LINE_BYTES = NatsCommandAssembler.MAX_CONTROL_LINE_BYTES + 1;
 
-    private NatsClientStreamAssembler assembler;
+    private NatsCommandAssembler assembler;
 
     @BeforeEach
     void setUp() {
-        assembler = new NatsClientStreamAssembler(new NatsControlLineParser(), MAX_PAYLOAD_BYTES);
+        assembler = new NatsCommandAssembler(new NatsControlLineParser(), MAX_PAYLOAD_BYTES);
     }
 
     @Test

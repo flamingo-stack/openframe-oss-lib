@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws.nats.check;
+package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 @Component
-@Order(PublishSubjectCheck.ORDER)
-public class PublishSubjectCheck implements NatsCommandCheck {
+@Order(PublishSubjectValidator.ORDER)
+public class PublishSubjectValidator implements NatsCommandValidator {
 
     static final int ORDER = 300;
 
@@ -19,12 +19,12 @@ public class PublishSubjectCheck implements NatsCommandCheck {
     }
 
     @Override
-    public Mono<NatsVerdict> check(NatsClientCommand command, NatsClientContext context) {
+    public Mono<NatsValidationResult> validate(NatsClientCommand command, NatsClientContext context) {
         String subject = command.subject().orElseThrow();
         if (context.policy().allowsPublish(subject)) {
-            return Mono.just(NatsVerdict.ALLOWED);
+            return Mono.just(NatsValidationResult.ALLOWED);
         }
         NatsOperation operation = command.operation();
-        return Mono.just(new NatsVerdict.Refused(operation, subject));
+        return Mono.just(new NatsValidationResult.Refused(operation, subject));
     }
 }

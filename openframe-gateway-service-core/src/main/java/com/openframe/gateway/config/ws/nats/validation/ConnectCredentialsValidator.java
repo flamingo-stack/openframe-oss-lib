@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws.nats.check;
+package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
@@ -13,9 +13,9 @@ import java.util.Optional;
 
 /** A {@code CONNECT} with a credential ends the session: nothing through the gateway needs one. */
 @Component
-@Order(ConnectCredentialsCheck.ORDER)
+@Order(ConnectCredentialsValidator.ORDER)
 @RequiredArgsConstructor
-public class ConnectCredentialsCheck implements NatsCommandCheck {
+public class ConnectCredentialsValidator implements NatsCommandValidator {
 
     static final int ORDER = 100;
 
@@ -27,11 +27,11 @@ public class ConnectCredentialsCheck implements NatsCommandCheck {
     }
 
     @Override
-    public Mono<NatsVerdict> check(NatsClientCommand command, NatsClientContext context) {
+    public Mono<NatsValidationResult> validate(NatsClientCommand command, NatsClientContext context) {
         Optional<String> credentialField = natsConnectOptionsParser.credentialFieldOf(command.controlLine());
-        NatsVerdict verdict = credentialField
-                .<NatsVerdict>map(field -> new NatsVerdict.Closed("CONNECT carries " + field))
-                .orElse(NatsVerdict.ALLOWED);
-        return Mono.just(verdict);
+        NatsValidationResult result = credentialField
+                .<NatsValidationResult>map(field -> new NatsValidationResult.CloseSession("CONNECT carries " + field))
+                .orElse(NatsValidationResult.ALLOWED);
+        return Mono.just(result);
     }
 }

@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws.nats.check;
+package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.NatsTestCommands;
@@ -10,15 +10,15 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class PublishSubjectCheckTest {
+class PublishSubjectValidatorTest {
 
     private NatsClientContext context;
-    private PublishSubjectCheck check;
+    private PublishSubjectValidator validator;
 
     @BeforeEach
     void setUp() {
         context = NatsTestContexts.device();
-        check = new PublishSubjectCheck();
+        validator = new PublishSubjectValidator();
     }
 
     @Test
@@ -28,8 +28,8 @@ class PublishSubjectCheckTest {
         NatsClientCommand headerPublish = NatsTestCommands.command("HPUB machine.m-1.hostname 12 17\r\nNATS/1.0\r\n\r\nhello\r\n");
 
         // execution
-        boolean appliesToPublish = check.appliesTo(publish);
-        boolean appliesToHeaderPublish = check.appliesTo(headerPublish);
+        boolean appliesToPublish = validator.appliesTo(publish);
+        boolean appliesToHeaderPublish = validator.appliesTo(headerPublish);
 
         // verifications
         assertThat(appliesToPublish).isTrue();
@@ -42,7 +42,7 @@ class PublishSubjectCheckTest {
         NatsClientCommand command = NatsTestCommands.command("SUB machine.m-1.x 1\r\n");
 
         // execution
-        boolean applies = check.appliesTo(command);
+        boolean applies = validator.appliesTo(command);
 
         // verifications
         assertThat(applies).isFalse();
@@ -54,10 +54,10 @@ class PublishSubjectCheckTest {
         NatsClientCommand command = NatsTestCommands.publish("machine.m-1.heartbeat", "hi");
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(NatsVerdict.ALLOWED);
+        assertThat(result).isEqualTo(NatsValidationResult.ALLOWED);
     }
 
     @Test
@@ -66,9 +66,9 @@ class PublishSubjectCheckTest {
         NatsClientCommand command = NatsTestCommands.command("HPUB machine.m-2.cmd 12 17\r\nNATS/1.0\r\n\r\nhello\r\n");
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(new NatsVerdict.Refused(NatsOperation.HPUB, "machine.m-2.cmd"));
+        assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.HPUB, "machine.m-2.cmd"));
     }
 }

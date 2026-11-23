@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws.nats.check;
+package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 @Component
-@Order(SubscribeSubjectCheck.ORDER)
-public class SubscribeSubjectCheck implements NatsCommandCheck {
+@Order(SubscribeSubjectValidator.ORDER)
+public class SubscribeSubjectValidator implements NatsCommandValidator {
 
     static final int ORDER = 200;
 
@@ -19,11 +19,11 @@ public class SubscribeSubjectCheck implements NatsCommandCheck {
     }
 
     @Override
-    public Mono<NatsVerdict> check(NatsClientCommand command, NatsClientContext context) {
+    public Mono<NatsValidationResult> validate(NatsClientCommand command, NatsClientContext context) {
         String subject = command.subject().orElseThrow();
         if (context.policy().allowsSubscribe(subject)) {
-            return Mono.just(NatsVerdict.ALLOWED);
+            return Mono.just(NatsValidationResult.ALLOWED);
         }
-        return Mono.just(new NatsVerdict.Refused(NatsOperation.SUB, subject));
+        return Mono.just(new NatsValidationResult.Refused(NatsOperation.SUB, subject));
     }
 }

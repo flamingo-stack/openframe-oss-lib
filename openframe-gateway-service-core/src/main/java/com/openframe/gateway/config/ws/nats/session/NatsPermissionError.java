@@ -1,6 +1,6 @@
 package com.openframe.gateway.config.ws.nats.session;
 
-import com.openframe.gateway.config.ws.nats.check.NatsVerdict;
+import com.openframe.gateway.config.ws.nats.validation.NatsValidationResult;
 import com.openframe.gateway.config.ws.nats.protocol.NatsOperation;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -18,7 +18,7 @@ final class NatsPermissionError {
     private NatsPermissionError() {
     }
 
-    static byte[] of(NatsVerdict.Refused refused) {
+    static byte[] of(NatsValidationResult.Refused refused) {
         String template = refused.operation() == NatsOperation.SUB ? SUBSCRIBE_ERROR : PUBLISH_ERROR;
         String error = String.format(template, refused.subject());
         return error.getBytes(UTF_8);

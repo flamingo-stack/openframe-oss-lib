@@ -1,4 +1,4 @@
-package com.openframe.gateway.config.ws.nats.check;
+package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
 import com.openframe.gateway.config.ws.nats.NatsTestCommands;
@@ -11,18 +11,18 @@ import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ConnectCredentialsCheckTest {
+class ConnectCredentialsValidatorTest {
 
     private static final String CONNECT_DEVICE_USER = "CONNECT {\"user\":\"machine\",\"pass\":\"\"}\r\n";
     private static final String CONNECT_WITH_PASSWORD = "CONNECT {\"user\":\"service\",\"pass\":\"secret\"}\r\n";
 
     private NatsClientContext context;
-    private ConnectCredentialsCheck check;
+    private ConnectCredentialsValidator validator;
 
     @BeforeEach
     void setUp() {
         context = NatsTestContexts.device();
-        check = new ConnectCredentialsCheck(new NatsConnectOptionsParser(new ObjectMapper()));
+        validator = new ConnectCredentialsValidator(new NatsConnectOptionsParser(new ObjectMapper()));
     }
 
     @Test
@@ -31,7 +31,7 @@ class ConnectCredentialsCheckTest {
         NatsClientCommand command = NatsTestCommands.command(CONNECT_DEVICE_USER);
 
         // execution
-        boolean applies = check.appliesTo(command);
+        boolean applies = validator.appliesTo(command);
 
         // verifications
         assertThat(applies).isTrue();
@@ -43,7 +43,7 @@ class ConnectCredentialsCheckTest {
         NatsClientCommand command = NatsTestCommands.command("SUB machine.m-1.x 1\r\n");
 
         // execution
-        boolean applies = check.appliesTo(command);
+        boolean applies = validator.appliesTo(command);
 
         // verifications
         assertThat(applies).isFalse();
@@ -55,10 +55,10 @@ class ConnectCredentialsCheckTest {
         NatsClientCommand command = NatsTestCommands.command(CONNECT_DEVICE_USER);
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(NatsVerdict.ALLOWED);
+        assertThat(result).isEqualTo(NatsValidationResult.ALLOWED);
     }
 
     @Test
@@ -67,9 +67,9 @@ class ConnectCredentialsCheckTest {
         NatsClientCommand command = NatsTestCommands.command(CONNECT_WITH_PASSWORD);
 
         // execution
-        NatsVerdict verdict = check.check(command, context).block();
+        NatsValidationResult result = validator.validate(command, context).block();
 
         // verifications
-        assertThat(verdict).isEqualTo(new NatsVerdict.Closed("CONNECT carries pass"));
+        assertThat(result).isEqualTo(new NatsValidationResult.CloseSession("CONNECT carries pass"));
     }
 }

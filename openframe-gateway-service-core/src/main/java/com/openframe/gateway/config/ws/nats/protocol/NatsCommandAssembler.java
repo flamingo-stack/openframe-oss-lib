@@ -14,7 +14,7 @@ import java.util.List;
  * could not parse comes out {@link NatsClientCommand#malformed malformed}, never as an exception,
  * so the session decides whether to end or to {@link #relayUnparsed() stop parsing}.
  */
-public final class NatsClientStreamAssembler {
+public final class NatsCommandAssembler {
 
     /** NATS's default {@code max_control_line}; the tenant configmap does not raise it. */
     static final int MAX_CONTROL_LINE_BYTES = 4096;
@@ -31,7 +31,7 @@ public final class NatsClientStreamAssembler {
     private long payloadRemaining;
     private boolean unparsed;
 
-    public NatsClientStreamAssembler(NatsControlLineParser controlLineParser, long maxPayloadBytes) {
+    public NatsCommandAssembler(NatsControlLineParser controlLineParser, long maxPayloadBytes) {
         this.controlLineParser = controlLineParser;
         this.maxPayloadBytes = maxPayloadBytes;
     }
