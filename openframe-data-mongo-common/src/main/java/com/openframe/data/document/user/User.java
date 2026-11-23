@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +53,12 @@ public class User implements TenantScoped {
      * changes. New users start as null so they are picked up automatically.
      */
     private Boolean crmSynced;
+    /**
+     * Access tokens issued before this instant are rejected by the gateways, so a token that leaked
+     * stops working before it expires. Set when the password changes. Whole seconds, because a
+     * token's {@code iat} has no finer precision.
+     */
+    private Instant tokensRevokedAt;
     @CreatedDate
     private LocalDateTime createdAt;
     @LastModifiedDate
