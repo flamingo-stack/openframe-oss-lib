@@ -3,7 +3,9 @@ package com.openframe.gateway.config.ws;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.reactive.repository.tool.ReactiveIntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.gateway.logging.UriLogFormat;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
+import com.openframe.gateway.upstream.meshcentral.MeshControlUpstreamAuth;
 import com.openframe.gateway.upstream.ToolUpstreamResolverRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,10 +55,11 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
 
         return getTool(toolId, request)
                 .flatMap(tool -> {
-                    URI proxyUri = upstreamRegistry.resolve(toolId)
+                    URI resolvedUri = upstreamRegistry.resolve(toolId)
                             .resolveWs(tool, request, getEndpointPrefix());
+                    URI proxyUri = adjustProxyUri(resolvedUri, path);
 
-                    log.debug("Proxy web socket request: {}", proxyUri);
+                    log.debug("Proxy web socket request: {}", UriLogFormat.withoutQuery(proxyUri));
 
                     exchange.getAttributes()
                             .put(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR, proxyUri);
@@ -66,13 +69,24 @@ public abstract class ToolWebSocketProxyUrlFilter implements GatewayFilter, Orde
                         exchange.getAttributes().put(ORIGINAL_AUTHORIZATION_ATTR, originalAuthorization);
                     }
 
-                    ServerWebExchange mutatedExchange = mutateExchange(exchange, tool);
+                    ServerWebExchange sanitizedExchange = withoutClientMeshAuth(exchange);
+                    ServerWebExchange mutatedExchange = mutateExchange(sanitizedExchange, tool);
                     return chain.filter(mutatedExchange);
                 });
     }
 
+    protected URI adjustProxyUri(URI proxyUri, String path) {
+        return proxyUri;
+    }
+
     protected ServerWebExchange mutateExchange(ServerWebExchange exchange, IntegratedTool tool) {
         return exchange;
+    }
+
+    private ServerWebExchange withoutClientMeshAuth(ServerWebExchange exchange) {
+        return exchange.mutate()
+                .request(r -> r.headers(h -> h.remove(MeshControlUpstreamAuth.MESH_AUTH_HEADER)))
+                .build();
     }
 
     /**
