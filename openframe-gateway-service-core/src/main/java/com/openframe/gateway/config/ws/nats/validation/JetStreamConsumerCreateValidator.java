@@ -19,8 +19,10 @@ import java.util.Optional;
 /**
  * A consumer-create is a publish whose body decides what the client will read, so after the
  * publish subject itself passed, the request is parsed and the stream's
- * {@link StreamConsumerAuthorizer} asked. A push consumer must deliver into a subject the client
- * may subscribe to, or it would be a way to publish into someone else's subject.
+ * {@link StreamConsumerAuthorizer} asked. A request whose filter is ambiguous is refused outright:
+ * the gateway authorizes only a config it reads the same way NATS will. A push consumer must
+ * deliver into a subject the client may subscribe to, or it would be a way to publish into someone
+ * else's subject.
  */
 @Component
 @Order(JetStreamConsumerCreateValidator.ORDER)
@@ -49,6 +51,9 @@ public class JetStreamConsumerCreateValidator implements NatsCommandValidator {
         ConsumerCreateRequest request = consumerCreateRequestParser.parse(apiSubject, command.getPayload());
         NatsOperation operation = command.getOperation();
         NatsValidationResult refused = new NatsValidationResult.Refused(operation, subject);
+        if (request.isAmbiguous()) {
+            return Mono.just(refused);
+        }
         if (!isDeliverSubjectOwn(request, context)) {
             return Mono.just(refused);
         }

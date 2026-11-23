@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 import org.springframework.web.reactive.socket.server.WebSocketService;
 
+import java.util.Set;
+
 @Configuration
 @RequiredArgsConstructor
 @Slf4j
@@ -26,6 +28,10 @@ public class WebSocketGatewayConfig {
     public static final String TOOLS_API_WS_ENDPOINT_PREFIX = "/ws/tools";
     public static final String NATS_WS_ENDPOINT_PATH = "/ws/nats";
     public static final String NATS_API_WS_ENDPOINT_PATH = "/ws/nats-api";
+    public static final String NATS_WS_ROUTE_ID = "nats_websocket_route";
+    public static final String NATS_API_WS_ROUTE_ID = "nats_api_websocket_route";
+    /** The routes that reach NATS; the NATS subject filter keys off the route Spring matched, not the path. */
+    public static final Set<String> NATS_ROUTE_IDS = Set.of(NATS_WS_ROUTE_ID, NATS_API_WS_ROUTE_ID);
 
     @Bean
     public RouteLocator customRouteLocator(
@@ -46,11 +52,11 @@ public class WebSocketGatewayConfig {
                         .uri("no://op"))
                 // nats-ws-url carries a namespace placeholder on a shared multi-tenant pod; the filter
                 // rewrites it to the calling tenant's namespace per request (no-op on single-tenant pods).
-                .route("nats_websocket_route", r -> r
+                .route(NATS_WS_ROUTE_ID, r -> r
                         .path(NATS_WS_ENDPOINT_PATH)
                         .filters(f -> f.filter(namespaceRewriteFilter))
                         .uri(natsWsUrl))
-                .route("nats_api_websocket_route", r -> r
+                .route(NATS_API_WS_ROUTE_ID, r -> r
                         .path(NATS_API_WS_ENDPOINT_PATH)
                         .filters(f -> f.filter(namespaceRewriteFilter))
                         .uri(natsWsUrl))

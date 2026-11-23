@@ -87,7 +87,7 @@ public class WebSocketServiceSecurityDecorator implements WebSocketService {
                 sessionToHandle = new MeshControlFilteringWebSocketSessionDecorator(
                         sessionToHandle, path, tenantId(exchange), meshControlProperties, objectMapper);
             }
-            if (natsSubjectFilter.isEnabledFor(path)) {
+            if (natsSubjectFilter.isEnabledFor(exchange)) {
                 sessionToHandle = natsSubjectFilter.decorate(exchange, sessionToHandle, path, tenantId(exchange), context);
             }
             if (loggingProperties.isFramePath(path)) {

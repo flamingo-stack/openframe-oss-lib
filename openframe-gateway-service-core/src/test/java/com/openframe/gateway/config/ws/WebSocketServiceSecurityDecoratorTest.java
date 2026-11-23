@@ -108,7 +108,7 @@ class WebSocketServiceSecurityDecoratorTest {
     void wrapsNatsSessionsWithTheSubjectFilter_whenItIsOn() {
         NatsSubjectFilter natsSubjectFilter = mock(NatsSubjectFilter.class);
         WebSocketSession filtered = mock(WebSocketSession.class);
-        when(natsSubjectFilter.isEnabledFor(NATS_REQUEST_PATH)).thenReturn(true);
+        when(natsSubjectFilter.isEnabledFor(any(ServerWebExchange.class))).thenReturn(true);
         when(natsSubjectFilter.decorate(any(ServerWebExchange.class), any(WebSocketSession.class), eq(NATS_REQUEST_PATH), any(), any()))
                 .thenReturn(filtered);
 

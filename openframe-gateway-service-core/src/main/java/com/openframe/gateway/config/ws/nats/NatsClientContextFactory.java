@@ -10,6 +10,12 @@ import reactor.util.context.ContextView;
 
 import java.util.Optional;
 
+/**
+ * Builds the {@link NatsClientContext} of a session once, at the upgrade. Every client logs in to
+ * NATS as the same shared user, so the only thing that tells one client from another is the JWT
+ * the gateway accepted; the policy that scopes its subjects can only be compiled once that identity
+ * is known, and it is compiled here so no validator parses a token again.
+ */
 @Component
 @RequiredArgsConstructor
 public class NatsClientContextFactory {

@@ -6,6 +6,7 @@ import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidationServ
 import com.openframe.gateway.config.ws.nats.validation.NatsValidationResult;
 import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
 import com.openframe.gateway.config.ws.nats.protocol.NatsCommandAssembler;
+import com.openframe.gateway.config.ws.nats.protocol.NatsOperation;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
@@ -128,7 +129,23 @@ public class NatsSubjectFilteringWebSocketSessionDecorator implements WebSocketS
             case NatsValidationResult.Refused refused -> applyRefusal(refused, command, enforce);
             case NatsValidationResult.CloseSession closeSession -> applyCloseSession(closeSession, command, enforce);
             case NatsValidationResult.ProtocolViolation violation -> applyProtocolViolation(violation, command, enforce);
+            case NatsValidationResult.Undecided undecided -> applyUndecided(undecided, command, enforce);
         };
+    }
+
+    /** No decision is a refusal only when enforcing; while observing, a failed or slow lookup must not touch the client. */
+    private byte[] applyUndecided(NatsValidationResult.Undecided undecided, NatsClientCommand command, boolean enforce) {
+        reporter.undecided(undecided, command, enforce);
+        if (!enforce) {
+            return command.getRaw();
+        }
+        NatsOperation operation = command.getOperation();
+        String subject = command.getSubject().orElse("");
+        NatsValidationResult.Refused refused = new NatsValidationResult.Refused(operation, subject);
+        byte[] error = NatsPermissionError.of(refused);
+        WebSocketMessage message = messageOf(currentFrameType, error);
+        errorsToClient.tryEmitNext(message);
+        return NOTHING;
     }
 
     private byte[] applyRefusal(NatsValidationResult.Refused refused, NatsClientCommand command, boolean enforce) {

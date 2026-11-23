@@ -3,8 +3,8 @@ package com.openframe.gateway.config.ws.nats.session;
 import com.openframe.gateway.config.ws.nats.NatsClientContextFactory;
 import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
 import com.openframe.gateway.config.ws.nats.NatsTestContexts;
-import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidationService;
 import com.openframe.gateway.config.ws.nats.protocol.NatsControlLineParser;
+import com.openframe.gateway.config.ws.nats.validation.NatsCommandValidationService;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,13 +13,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cloud.gateway.route.Route;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
+import java.net.URI;
+
+import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_ROUTE_IDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 
 @ExtendWith(MockitoExtension.class)
 class NatsSubjectFilterTest {
@@ -27,11 +34,11 @@ class NatsSubjectFilterTest {
     private static final String NATS_PATH = "/ws/nats";
     private static final String TENANT = "tenant-1";
     private static final ContextView CONTEXT = Context.empty();
+    private static final URI NATS_URI = URI.create("ws://nats.tenant-ns.svc.cluster.local:8080");
 
     @Mock private NatsClientContextFactory natsClientContextFactory;
     @Mock private NatsCommandValidationService natsCommandValidationService;
     @Mock private GatewayTrafficMetrics gatewayTrafficMetrics;
-    @Mock private ServerWebExchange exchange;
     @Mock private WebSocketSession session;
 
     private NatsSubjectFilterProperties properties;
@@ -46,32 +53,61 @@ class NatsSubjectFilterTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/ws/nats", "/ws/nats-api"})
-    void isEnabledFor_natsPathWhileEnabled_true(String path) {
+    @ValueSource(strings = {"nats_websocket_route", "nats_api_websocket_route"})
+    void isEnabledFor_requestRoutedToNats_true(String routeId) {
+        // setup
+        ServerWebExchange exchange = exchangeRoutedBy(routeId);
+
         // execution
-        boolean enabled = natsSubjectFilter.isEnabledFor(path);
+        boolean enabled = natsSubjectFilter.isEnabledFor(exchange);
 
         // verifications
         assertThat(enabled).isTrue();
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"/ws/tools/meshcentral-server/control.ashx", "/ws/nats-logs", "/ws/nats/"})
-    void isEnabledFor_otherPath_false(String path) {
+    @Test
+    void isEnabledFor_everyNatsRouteId_true() {
         // execution
-        boolean enabled = natsSubjectFilter.isEnabledFor(path);
+        boolean allEnabled = NATS_ROUTE_IDS.stream()
+                .map(NatsSubjectFilterTest::exchangeRoutedBy)
+                .allMatch(natsSubjectFilter::isEnabledFor);
+
+        // verifications
+        assertThat(allEnabled).isTrue();
+    }
+
+    @Test
+    void isEnabledFor_requestRoutedElsewhere_false() {
+        // setup
+        ServerWebExchange exchange = exchangeRoutedBy("api_gateway_websocket_route");
+
+        // execution
+        boolean enabled = natsSubjectFilter.isEnabledFor(exchange);
 
         // verifications
         assertThat(enabled).isFalse();
     }
 
     @Test
-    void isEnabledFor_natsPathWhileDisabled_false() {
+    void isEnabledFor_requestWithoutAMatchedRoute_false() {
         // setup
-        properties.setEnabled(false);
+        ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get(NATS_PATH).build());
 
         // execution
-        boolean enabled = natsSubjectFilter.isEnabledFor(NATS_PATH);
+        boolean enabled = natsSubjectFilter.isEnabledFor(exchange);
+
+        // verifications
+        assertThat(enabled).isFalse();
+    }
+
+    @Test
+    void isEnabledFor_natsRouteWhileDisabled_false() {
+        // setup
+        properties.setEnabled(false);
+        ServerWebExchange exchange = exchangeRoutedBy("nats_websocket_route");
+
+        // execution
+        boolean enabled = natsSubjectFilter.isEnabledFor(exchange);
 
         // verifications
         assertThat(enabled).isFalse();
@@ -80,6 +116,7 @@ class NatsSubjectFilterTest {
     @Test
     void decorate_identityKnown_filteringDecorator() {
         // setup
+        ServerWebExchange exchange = exchangeRoutedBy("nats_websocket_route");
         when(natsClientContextFactory.create(exchange, NATS_PATH, TENANT, CONTEXT)).thenReturn(NatsTestContexts.device());
 
         // execution
@@ -92,6 +129,7 @@ class NatsSubjectFilterTest {
     @Test
     void decorate_tokenWithoutIdentity_sessionRelayedUnfiltered() {
         // setup
+        ServerWebExchange exchange = exchangeRoutedBy("nats_websocket_route");
         when(natsClientContextFactory.create(exchange, NATS_PATH, TENANT, CONTEXT))
                 .thenThrow(new IllegalStateException("no sub"));
 
@@ -100,5 +138,12 @@ class NatsSubjectFilterTest {
 
         // verifications
         assertThat(decorated).isSameAs(session);
+    }
+
+    private static ServerWebExchange exchangeRoutedBy(String routeId) {
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get(NATS_PATH).build());
+        Route route = Route.async().id(routeId).uri(NATS_URI).predicate(request -> true).build();
+        exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, route);
+        return exchange;
     }
 }

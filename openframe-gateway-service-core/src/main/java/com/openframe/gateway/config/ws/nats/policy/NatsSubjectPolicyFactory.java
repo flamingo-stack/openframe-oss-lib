@@ -8,6 +8,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Compiles the configured subject patterns of a client's kind into its {@link NatsSubjectPolicy},
+ * with {@code {id}} replaced by its own id, so the per-command checks compare subjects against
+ * ready patterns instead of touching the configuration.
+ */
 @Component
 @RequiredArgsConstructor
 public class NatsSubjectPolicyFactory {

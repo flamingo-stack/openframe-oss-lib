@@ -5,6 +5,11 @@ import org.springframework.stereotype.Component;
 import java.util.Arrays;
 import java.util.Optional;
 
+/**
+ * Recognises a consumer-create among the subjects a client publishes to and reads the stream,
+ * consumer name and filter the API subject itself carries, so the validator knows which requests
+ * need their body inspected and which stream rule to ask.
+ */
 @Component
 public class JetStreamApiSubjectParser {
 

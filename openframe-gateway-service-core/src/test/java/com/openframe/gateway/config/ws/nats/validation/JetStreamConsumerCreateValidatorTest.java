@@ -26,6 +26,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -130,6 +131,21 @@ class JetStreamConsumerCreateValidatorTest {
 
         // verifications
         assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.PUB, CREATE_SUBJECT));
+    }
+
+    @Test
+    void check_ambiguousFilter_refusedBeforeAnyAuthorizer() {
+        // setup
+        NatsClientContext context = NatsTestContexts.user();
+        String body = "{\"config\":{\"filter_subject\":\"chat.d-1.message\",\"filter_subjects\":[\"chat.d-2.message\"]}}";
+        NatsClientCommand command = NatsTestCommands.publish(CREATE_SUBJECT, body);
+
+        // execution
+        NatsValidationResult result = validator.validate(command, context).block();
+
+        // verifications
+        assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.PUB, CREATE_SUBJECT));
+        verifyNoInteractions(chatAuthorizer);
     }
 
     @Test

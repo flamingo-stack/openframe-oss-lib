@@ -48,13 +48,17 @@ public final class NatsCommandAssembler {
         List<NatsClientCommand> commands = new ArrayList<>();
         int position = 0;
         while (position < frame.length) {
-            if (isInsidePayload()) {
-                position = consumePayload(frame, position, commands);
-            } else {
-                position = consumeControlLine(frame, position, commands);
-            }
+            position = consume(frame, position, commands);
         }
         return commands;
+    }
+
+    /** @return the position the next read starts from. */
+    private int consume(byte[] frame, int position, List<NatsClientCommand> commands) {
+        if (isInsidePayload()) {
+            return consumePayload(frame, position, commands);
+        }
+        return consumeControlLine(frame, position, commands);
     }
 
     private boolean isInsidePayload() {

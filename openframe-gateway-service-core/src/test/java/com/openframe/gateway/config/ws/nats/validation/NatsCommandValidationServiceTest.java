@@ -1,6 +1,7 @@
 package com.openframe.gateway.config.ws.nats.validation;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
+import com.openframe.gateway.config.ws.nats.NatsSubjectFilterProperties;
 import com.openframe.gateway.config.ws.nats.NatsTestCommands;
 import com.openframe.gateway.config.ws.nats.NatsTestContexts;
 import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -26,6 +28,7 @@ class NatsCommandValidationServiceTest {
 
     private static final String SUBSCRIBE = "SUB machine.m-1.command-execution 1\r\n";
     private static final NatsValidationResult REFUSED = new NatsValidationResult.Refused(NatsOperation.SUB, "machine.m-1.command-execution");
+    private static final Duration SHORT_TIMEOUT = Duration.ofMillis(200);
 
     @Mock private NatsCommandValidator firstValidator;
     @Mock private NatsCommandValidator secondValidator;
@@ -38,7 +41,9 @@ class NatsCommandValidationServiceTest {
     void setUp() {
         context = NatsTestContexts.device();
         command = NatsTestCommands.command(SUBSCRIBE);
-        validationService = new NatsCommandValidationService(List.of(firstValidator, secondValidator));
+        NatsSubjectFilterProperties properties = new NatsSubjectFilterProperties();
+        properties.setValidationTimeout(SHORT_TIMEOUT);
+        validationService = new NatsCommandValidationService(List.of(firstValidator, secondValidator), properties);
     }
 
     @Test
@@ -108,5 +113,32 @@ class NatsCommandValidationServiceTest {
 
         // verifications
         assertThat(result).isEqualTo(new NatsValidationResult.ProtocolViolation("CONNECT options are not JSON"));
+    }
+
+    @Test
+    void validate_validatorFails_undecidedNamingTheFailure() {
+        // setup
+        when(firstValidator.appliesTo(command)).thenReturn(true);
+        when(firstValidator.validate(command, context)).thenReturn(Mono.error(new IllegalStateException("mongo down")));
+
+        // execution
+        NatsValidationResult result = validationService.validate(command, context).block();
+
+        // verifications
+        assertThat(result).isInstanceOf(NatsValidationResult.Undecided.class);
+        assertThat(((NatsValidationResult.Undecided) result).getReason()).contains("mongo down");
+    }
+
+    @Test
+    void validate_validatorOutlivesTheTimeout_undecidedAsTimedOut() {
+        // setup
+        when(firstValidator.appliesTo(command)).thenReturn(true);
+        when(firstValidator.validate(command, context)).thenReturn(Mono.never());
+
+        // execution
+        NatsValidationResult result = validationService.validate(command, context).block();
+
+        // verifications
+        assertThat(result).isEqualTo(new NatsValidationResult.Undecided("validation timed out"));
     }
 }

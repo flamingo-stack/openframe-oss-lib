@@ -1,6 +1,7 @@
 package com.openframe.gateway.config.ws.nats.session;
 
 import com.openframe.gateway.config.ws.nats.NatsClientContext;
+import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
 import com.openframe.gateway.config.ws.nats.validation.NatsValidationResult;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,13 @@ final class NatsRefusalReporter {
     void protocolViolation(NatsValidationResult.ProtocolViolation violation, boolean enforce) {
         String outcome = enforce ? "closing" : "relaying the rest of the session unparsed";
         report(OPERATION_PROTOCOL, outcome, violation.getReason(), enforce);
+    }
+
+    void undecided(NatsValidationResult.Undecided undecided, NatsClientCommand command, boolean enforce) {
+        String operation = command.getOperation().name();
+        String outcome = enforce ? "undecided, dropped and answered with -ERR" : "undecided, relayed (enforce=false)";
+        String detail = undecided.getReason() + " for " + command.getSubject().orElse("-");
+        report(operation, outcome, detail, enforce);
     }
 
     private void report(String operation, String outcome, String detail, boolean enforce) {

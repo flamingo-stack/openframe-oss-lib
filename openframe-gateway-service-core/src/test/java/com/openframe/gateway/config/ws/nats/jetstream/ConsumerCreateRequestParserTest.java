@@ -101,6 +101,45 @@ class ConsumerCreateRequestParserTest {
     }
 
     @Test
+    void parse_bothFilterFieldsInTheBody_ambiguous() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-1.message\",\"filter_subjects\":[\"chat.d-2.message\"]}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.isAmbiguous()).isTrue();
+        assertThat(request.getAmbiguity()).contains(ConsumerCreateRequestParser.AMBIGUITY_BOTH_FILTER_FIELDS);
+    }
+
+    @Test
+    void parse_bodyFilterDiffersFromTheApiSubjectFilter_ambiguous() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-2.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(FILTERED_CREATE, body);
+
+        // verifications
+        assertThat(request.isAmbiguous()).isTrue();
+        assertThat(request.getAmbiguity()).contains(ConsumerCreateRequestParser.AMBIGUITY_SUBJECT_DIFFERS);
+    }
+
+    @Test
+    void parse_bodyFilterEqualsTheApiSubjectFilter_notAmbiguous() {
+        // setup
+        byte[] body = json("{\"config\":{\"filter_subject\":\"chat.d-1.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(FILTERED_CREATE, body);
+
+        // verifications
+        assertThat(request.isAmbiguous()).isFalse();
+        assertThat(request.getFilterSubjects()).containsExactly("chat.d-1.message");
+    }
+
+    @Test
     void parse_bodyNotJson_throwsProtocolException() {
         // setup
         byte[] body = "not-json".getBytes(UTF_8);

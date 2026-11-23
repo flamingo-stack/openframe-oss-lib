@@ -12,7 +12,9 @@ import com.openframe.gateway.config.ws.nats.validation.SubscribeSubjectValidator
 import com.openframe.gateway.config.ws.nats.jetstream.ConsumerCreateRequestParser;
 import com.openframe.gateway.config.ws.nats.jetstream.JetStreamApiSubjectParser;
 import com.openframe.gateway.config.ws.nats.jetstream.SubjectPolicyConsumerAuthorizer;
+import com.openframe.gateway.config.ws.nats.protocol.NatsClientCommand;
 import com.openframe.gateway.config.ws.nats.protocol.NatsCommandAssembler;
+import com.openframe.gateway.config.ws.nats.validation.NatsValidationResult;
 import com.openframe.gateway.config.ws.nats.protocol.NatsConnectOptionsParser;
 import com.openframe.gateway.config.ws.nats.protocol.NatsControlLineParser;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
@@ -67,6 +69,10 @@ class NatsSubjectFilteringWebSocketSessionDecoratorTest {
             "-ERR 'Permissions Violation for Publish to \"" + CHAT_CONSUMER_CREATE_SUBJECT + "\"'\r\n";
     private static final String PING = "PING\r\n";
     private static final String CONNECT_WITH_PASSWORD = "CONNECT {\"user\":\"service\",\"pass\":\"secret\"}\r\n";
+    private static final String FAILING_LOOKUP_SUBJECT = "machine.m-1.lookup-fails";
+    private static final String FAILING_LOOKUP_SUBSCRIBE = "SUB " + FAILING_LOOKUP_SUBJECT + " 9\r\n";
+    private static final String FAILING_LOOKUP_ERROR =
+            "-ERR 'Permissions Violation for Subscription to \"" + FAILING_LOOKUP_SUBJECT + "\"'\r\n";
 
     @Mock private WebSocketSession delegate;
     @Mock private GatewayTrafficMetrics gatewayTrafficMetrics;
@@ -82,13 +88,65 @@ class NatsSubjectFilteringWebSocketSessionDecoratorTest {
         properties.setEnabled(true);
         properties.setEnforce(true);
         ObjectMapper objectMapper = new ObjectMapper();
-        List<NatsCommandValidator> checks = List.of(
+        List<NatsCommandValidator> validators = List.of(
+                new FailingLookupValidator(),
                 new ConnectCredentialsValidator(new NatsConnectOptionsParser(objectMapper)),
                 new SubscribeSubjectValidator(),
                 new PublishSubjectValidator(),
                 new JetStreamConsumerCreateValidator(new JetStreamApiSubjectParser(),
                         new ConsumerCreateRequestParser(objectMapper), List.of(new SubjectPolicyConsumerAuthorizer())));
-        validationService = new NatsCommandValidationService(checks);
+        validationService = new NatsCommandValidationService(validators, properties);
+    }
+
+    @Test
+    void receive_lookupFailsObserving_relayedAndCounted() {
+        // setup
+        properties.setEnforce(false);
+        NatsSubjectFilteringWebSocketSessionDecorator decorator = decoratorFor(NatsTestContexts.device());
+        when(delegate.receive()).thenReturn(Flux.just(message(Type.BINARY, FAILING_LOOKUP_SUBSCRIBE)));
+        when(delegate.bufferFactory()).thenReturn(BUFFERS);
+
+        // execution
+        List<WebSocketMessage> relayed = receiveAll(decorator);
+
+        // verifications
+        assertThat(relayed)
+                .extracting(WebSocketMessage::getPayloadAsText)
+                .containsExactly(FAILING_LOOKUP_SUBSCRIBE);
+        verify(gatewayTrafficMetrics).recordNatsCommandRefused("SUB", DEVICE, false);
+    }
+
+    @Test
+    void receive_lookupFailsEnforcing_droppedAndClientGetsThePermissionsError() {
+        // setup
+        NatsSubjectFilteringWebSocketSessionDecorator decorator = decoratorFor(NatsTestContexts.device());
+        when(delegate.receive()).thenReturn(Flux.just(message(Type.BINARY, FAILING_LOOKUP_SUBSCRIBE)));
+        when(delegate.bufferFactory()).thenReturn(BUFFERS);
+        when(delegate.send(sentCaptor.capture())).thenReturn(Mono.empty());
+
+        // execution
+        List<WebSocketMessage> relayed = receiveAll(decorator);
+        decorator.send(Flux.empty());
+        WebSocketMessage toClient = firstSent();
+
+        // verifications
+        assertThat(relayed).isEmpty();
+        assertThat(toClient.getPayloadAsText()).isEqualTo(FAILING_LOOKUP_ERROR);
+        verify(gatewayTrafficMetrics).recordNatsCommandRefused("SUB", DEVICE, true);
+    }
+
+    /** Stands in for a validator whose database lookup fails, for the one subject it applies to. */
+    private static final class FailingLookupValidator implements NatsCommandValidator {
+
+        @Override
+        public boolean appliesTo(NatsClientCommand command) {
+            return command.getSubject().filter(FAILING_LOOKUP_SUBJECT::equals).isPresent();
+        }
+
+        @Override
+        public Mono<NatsValidationResult> validate(NatsClientCommand command, NatsClientContext context) {
+            return Mono.error(new IllegalStateException("mongo down"));
+        }
     }
 
     @Test

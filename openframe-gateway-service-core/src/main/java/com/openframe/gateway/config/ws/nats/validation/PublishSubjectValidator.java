@@ -7,6 +7,10 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+/**
+ * A {@code PUB}/{@code HPUB} may only name a subject the client's policy lets it write: its own
+ * machine's results and the JetStream API calls it is allowed, never another machine's subjects.
+ */
 @Component
 @Order(PublishSubjectValidator.ORDER)
 public class PublishSubjectValidator implements NatsCommandValidator {

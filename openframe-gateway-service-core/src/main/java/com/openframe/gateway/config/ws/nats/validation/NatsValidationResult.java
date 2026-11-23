@@ -35,4 +35,13 @@ public sealed interface NatsValidationResult {
     class ProtocolViolation implements NatsValidationResult {
         String reason;
     }
+
+    /**
+     * A validator could not decide — its lookup failed or timed out. Relayed while observing, so a
+     * database hiccup never interrupts a client the filter is only watching; refused while enforcing.
+     */
+    @Value
+    class Undecided implements NatsValidationResult {
+        String reason;
+    }
 }

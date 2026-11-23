@@ -4,10 +4,8 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.List;
-
-import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_API_WS_ENDPOINT_PATH;
-import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_WS_ENDPOINT_PATH;
 
 /**
  * Per-client allow-list for the NATS websocket routes ({@code /ws/nats}, {@code /ws/nats-api}).
@@ -46,6 +44,10 @@ public class NatsSubjectFilterProperties {
     /** Largest {@code PUB}/{@code HPUB} payload held back for inspection; the tenant NATS refuses
      *  anything above its own {@code max_payload} (5MB in the configmap), so this only has to match it. */
     private long maxPayloadBytes = NATS_DEFAULT_MAX_PAYLOAD_BYTES;
+
+    /** How long one command may wait for its validators (a consumer-create reads the database);
+     *  past it the command is undecided: relayed while observing, refused while enforcing. */
+    private Duration validationTimeout = Duration.ofSeconds(3);
 
     private List<String> deviceSubscribe = List.of(
             "_INBOX.*",
@@ -96,9 +98,5 @@ public class NatsSubjectFilterProperties {
             case DEVICE -> deviceSubscribe;
             case USER -> userSubscribe;
         };
-    }
-
-    public boolean isNatsPath(String path) {
-        return NATS_WS_ENDPOINT_PATH.equals(path) || NATS_API_WS_ENDPOINT_PATH.equals(path);
     }
 }

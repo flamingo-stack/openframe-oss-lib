@@ -7,6 +7,10 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+/**
+ * A {@code SUB} may only name a subject the client's policy lets it read: its own machine's or
+ * user's subjects and its inboxes, never another id and never a wildcard over them.
+ */
 @Component
 @Order(SubscribeSubjectValidator.ORDER)
 public class SubscribeSubjectValidator implements NatsCommandValidator {
