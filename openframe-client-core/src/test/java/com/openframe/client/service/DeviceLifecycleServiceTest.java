@@ -9,6 +9,7 @@ import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
+import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
@@ -28,8 +29,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +54,7 @@ class DeviceLifecycleServiceTest {
     @Mock private ToolConnectionRepository toolConnectionRepository;
     @Mock private MachineWriter machineWriter;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private ToolOsSupportService toolOsSupportService;
 
     @Captor private ArgumentCaptor<Criteria> guardCaptor;
     @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
@@ -63,7 +67,7 @@ class DeviceLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, true);
+        service = new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, toolOsSupportService, true);
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setStatus(DeviceStatus.PENDING);
@@ -237,13 +241,61 @@ class DeviceLifecycleServiceTest {
     void promoteIfReady_flagOffSeenAndBothToolsConnected_noop() {
         // setup
         DeviceLifecycleService managedStatusOff =
-                new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, false);
+                new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, toolOsSupportService, false);
 
         // execution
         managedStatusOff.promoteIfReady(MACHINE_ID);
 
         // verifications
         verifyNoInteractions(machineRepository, toolConnectionRepository, machineWriter, eventPublisher);
+    }
+
+    @Test
+    void promoteIfReady_fleetUnsupportedOnThisOs_promotedWithOnlyMeshConnected() {
+        // setup
+        stubMachineFound();
+        when(toolOsSupportService.unsupportedToolTypes(machine)).thenReturn(EnumSet.of(ToolType.FLEET_MDM));
+        when(toolConnectionRepository.findByMachineIdAndToolTypeInAndStatus(
+                MACHINE_ID, EnumSet.of(ToolType.MESHCENTRAL), ConnectionStatus.CONNECTED))
+                .thenReturn(List.of(mesh("mesh-node")));
+        stubWriteWins();
+
+        // execution
+        service.promoteIfReady(MACHINE_ID);
+
+        // verifications
+        verify(machineWriter).update(eq(MACHINE_ID), any(Criteria.class), any(MachineUpdate.class));
+        verify(eventPublisher).publishEvent(any(DeviceFirstConnectedEvent.class));
+    }
+
+    @Test
+    void promoteIfReady_everyToolSupportedAndOnlyMeshConnected_noop() {
+        // setup
+        stubMachineFound();
+        when(toolOsSupportService.unsupportedToolTypes(machine)).thenReturn(Set.of());
+        stubRequiredTools(mesh("mesh-node"));
+
+        // execution
+        service.promoteIfReady(MACHINE_ID);
+
+        // verifications
+        verifyNoInteractions(machineWriter, eventPublisher);
+    }
+
+    @Test
+    void promoteIfReady_fleetUnsupportedAndMeshNotConnected_noop() {
+        // setup
+        stubMachineFound();
+        when(toolOsSupportService.unsupportedToolTypes(machine)).thenReturn(EnumSet.of(ToolType.FLEET_MDM));
+        when(toolConnectionRepository.findByMachineIdAndToolTypeInAndStatus(
+                MACHINE_ID, EnumSet.of(ToolType.MESHCENTRAL), ConnectionStatus.CONNECTED))
+                .thenReturn(List.of());
+
+        // execution
+        service.promoteIfReady(MACHINE_ID);
+
+        // verifications
+        verifyNoInteractions(machineWriter, eventPublisher);
     }
 
     private void stubMachineFound() {
