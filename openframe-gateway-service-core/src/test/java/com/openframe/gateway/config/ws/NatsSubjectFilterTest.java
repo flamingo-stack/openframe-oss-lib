@@ -25,7 +25,6 @@ class NatsSubjectFilterTest {
     private static final String MACHINE_ID = "m-1";
     private static final String USER_ID = "u-1";
     private static final String NATS_PATH = "/ws/nats";
-    private static final String TOOL_PATH = "/ws/tools/meshcentral-server/control.ashx";
     private static final String TENANT = "tenant-1";
 
     @Mock private RequestJwtClaimsReader requestJwtClaimsReader;
@@ -54,13 +53,27 @@ class NatsSubjectFilterTest {
         assertThat(enabled).isTrue();
     }
 
-    @Test
-    void isEnabledFor_toolPath_false() {
+    @ParameterizedTest
+    @ValueSource(strings = {"/ws/tools/meshcentral-server/control.ashx", "/ws/nats-logs", "/ws/nats/"})
+    void isEnabledFor_otherPath_false(String path) {
         // execution
-        boolean enabled = natsSubjectFilter.isEnabledFor(TOOL_PATH);
+        boolean enabled = natsSubjectFilter.isEnabledFor(path);
 
         // verifications
         assertThat(enabled).isFalse();
+    }
+
+    @Test
+    void decorate_tokenWithoutIdentity_sessionRelayedUnfiltered() {
+        // setup
+        when(requestJwtClaimsReader.getMachineId(exchange)).thenReturn(Optional.empty());
+        when(requestJwtClaimsReader.getUserId(exchange)).thenThrow(new IllegalStateException("no sub"));
+
+        // execution
+        WebSocketSession decorated = natsSubjectFilter.decorate(exchange, session, NATS_PATH, TENANT);
+
+        // verifications
+        assertThat(decorated).isSameAs(session);
     }
 
     @Test

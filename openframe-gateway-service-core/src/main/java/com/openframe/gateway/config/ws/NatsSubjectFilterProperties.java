@@ -22,7 +22,8 @@ import static com.openframe.gateway.config.ws.WebSocketGatewayConfig.NATS_WS_END
  * Pattern tokens: a literal matches itself; {@code *} matches exactly one literal token, never a
  * wildcard sent by the client; {@code >} matches the rest of the subject, wildcards included;
  * {@code {id}} is the caller's id. The defaults mirror the subjects the NATS device user is allowed
- * today, scoped to the caller.
+ * today, scoped to the caller. A list set in config replaces its default wholesale (Spring binds a
+ * list, it does not merge one), so a config that touches a list has to carry every pattern of it.
  * <p>
  * Roll out in two steps: {@code enabled=true, enforce=false} logs what would be refused
  * ("NATS client ... not allowed" in the gateway log, {@code openframe.tenant.gateway.nats.command.refused}
@@ -91,9 +92,6 @@ public class NatsSubjectFilterProperties {
     }
 
     public boolean isNatsPath(String path) {
-        if (path == null) {
-            return false;
-        }
-        return path.startsWith(NATS_WS_ENDPOINT_PATH) || path.startsWith(NATS_API_WS_ENDPOINT_PATH);
+        return NATS_WS_ENDPOINT_PATH.equals(path) || NATS_API_WS_ENDPOINT_PATH.equals(path);
     }
 }

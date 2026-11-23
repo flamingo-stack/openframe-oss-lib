@@ -19,7 +19,6 @@ class NatsClientStreamFilterTest {
     private static final String FOREIGN_SUBJECT = "machine.m-2.command-execution";
     private static final String OWN_SUBSCRIBE = "SUB machine.m-1.command-execution 1\r\n";
     private static final String FOREIGN_SUBSCRIBE = "SUB " + FOREIGN_SUBJECT + " 1\r\n";
-    private static final String FOREIGN_SUBSCRIBE_REFUSED = "SUB _DENIED." + FOREIGN_SUBJECT + " 1\r\n";
     private static final String PING = "PING\r\n";
     private static final String CONNECT_DEVICE_USER = "CONNECT {\"verbose\":false,\"user\":\"machine\",\"pass\":\"\"}\r\n";
     private static final String CONNECT_WITH_PASSWORD = "CONNECT {\"user\":\"service\",\"pass\":\"secret\"}\r\n";
@@ -51,12 +50,12 @@ class NatsClientStreamFilterTest {
     }
 
     @Test
-    void filter_foreignMachineSubscribeEnforcing_subjectPrefixedAndReported() {
+    void filter_foreignMachineSubscribeEnforcing_droppedAndReported() {
         // execution
         String forwarded = filter(FOREIGN_SUBSCRIBE, ENFORCE);
 
         // verifications
-        assertThat(forwarded).isEqualTo(FOREIGN_SUBSCRIBE_REFUSED);
+        assertThat(forwarded).isEmpty();
         assertThat(violations)
                 .extracting(NatsViolation::operation, NatsViolation::detail)
                 .containsExactly(tuple("SUB", FOREIGN_SUBJECT));
@@ -75,7 +74,7 @@ class NatsClientStreamFilterTest {
     }
 
     @Test
-    void filter_severalCommandsInOneFrame_onlyTheRefusedOneRewritten() {
+    void filter_severalCommandsInOneFrame_onlyTheRefusedOneDropped() {
         // setup
         String frame = PING + FOREIGN_SUBSCRIBE + OWN_SUBSCRIBE;
 
@@ -83,7 +82,7 @@ class NatsClientStreamFilterTest {
         String forwarded = filter(frame, ENFORCE);
 
         // verifications
-        assertThat(forwarded).isEqualTo(PING + FOREIGN_SUBSCRIBE_REFUSED + OWN_SUBSCRIBE);
+        assertThat(forwarded).isEqualTo(PING + OWN_SUBSCRIBE);
         assertThat(violations).hasSize(1);
     }
 
@@ -91,7 +90,7 @@ class NatsClientStreamFilterTest {
     void filter_commandSplitAcrossFrames_heldBackUntilComplete() {
         // setup
         String head = "SUB machine.m-";
-        String tail = "2.command-execution 1\r\n" + PING;
+        String tail = "1.command-execution 1\r\n" + PING;
 
         // execution
         String forwardedHead = filter(head, ENFORCE);
@@ -99,19 +98,22 @@ class NatsClientStreamFilterTest {
 
         // verifications
         assertThat(forwardedHead).isEmpty();
-        assertThat(forwardedTail).isEqualTo(FOREIGN_SUBSCRIBE_REFUSED + PING);
+        assertThat(forwardedTail).isEqualTo(OWN_SUBSCRIBE + PING);
     }
 
     @Test
     void filter_subscribeWithQueueGroup_subjectIsTheSecondToken() {
         // setup
-        String frame = "SUB " + FOREIGN_SUBJECT + " workers 7\r\n";
+        String frame = "SUB " + FOREIGN_SUBJECT + " workers 7\r\n" + PING;
 
         // execution
         String forwarded = filter(frame, ENFORCE);
 
         // verifications
-        assertThat(forwarded).isEqualTo("SUB _DENIED." + FOREIGN_SUBJECT + " workers 7\r\n");
+        assertThat(forwarded).isEqualTo(PING);
+        assertThat(violations)
+                .extracting(NatsViolation::detail)
+                .containsExactly(FOREIGN_SUBJECT);
     }
 
     @Test
@@ -123,7 +125,8 @@ class NatsClientStreamFilterTest {
         String forwarded = filter(frame, ENFORCE);
 
         // verifications
-        assertThat(forwarded).isEqualTo("sub _DENIED." + FOREIGN_SUBJECT + " 1\r\n");
+        assertThat(forwarded).isEmpty();
+        assertThat(violations).hasSize(1);
     }
 
     @Test
@@ -135,7 +138,8 @@ class NatsClientStreamFilterTest {
         String forwarded = filter(frame, ENFORCE);
 
         // verifications
-        assertThat(forwarded).isEqualTo(FOREIGN_SUBSCRIBE_REFUSED);
+        assertThat(forwarded).isEmpty();
+        assertThat(violations).hasSize(1);
     }
 
     @Test
@@ -156,7 +160,7 @@ class NatsClientStreamFilterTest {
     void filter_payloadSplitAcrossFrames_remainderCopiedThenParsingResumes() {
         // setup
         String head = "PUB machine.m-1.heartbeat 5\r\nab";
-        String tail = "cde\r\n" + FOREIGN_SUBSCRIBE;
+        String tail = "cde\r\n" + FOREIGN_SUBSCRIBE + PING;
 
         // execution
         String forwardedHead = filter(head, ENFORCE);
@@ -164,7 +168,7 @@ class NatsClientStreamFilterTest {
 
         // verifications
         assertThat(forwardedHead).isEqualTo(head);
-        assertThat(forwardedTail).isEqualTo("cde\r\n" + FOREIGN_SUBSCRIBE_REFUSED);
+        assertThat(forwardedTail).isEqualTo("cde\r\n" + PING);
     }
 
     @Test
@@ -181,38 +185,82 @@ class NatsClientStreamFilterTest {
     }
 
     @Test
-    void filter_foreignMachinePublish_subjectPrefixedAndPayloadKept() {
+    void filter_foreignMachinePublish_droppedWithItsPayload() {
         // setup
-        String frame = "PUB machine.m-2.heartbeat 2\r\nhi\r\n";
+        String frame = "PUB machine.m-2.heartbeat 2\r\nhi\r\n" + PING;
 
         // execution
         String forwarded = filter(frame, ENFORCE);
 
         // verifications
-        assertThat(forwarded).isEqualTo("PUB _DENIED.machine.m-2.heartbeat 2\r\nhi\r\n");
+        assertThat(forwarded).isEqualTo(PING);
         assertThat(violations)
                 .extracting(NatsViolation::operation, NatsViolation::detail)
                 .containsExactly(tuple("PUB", "machine.m-2.heartbeat"));
     }
 
     @Test
-    void filter_foreignMachineHeaderPublish_subjectPrefixedAndHeadersKept() {
+    void filter_foreignMachinePublishPayloadSplitAcrossFrames_wholePayloadDropped() {
+        // setup
+        String head = "PUB machine.m-2.heartbeat 5\r\nab";
+        String tail = "cde\r\n" + PING;
+
+        // execution
+        String forwardedHead = filter(head, ENFORCE);
+        String forwardedTail = filter(tail, ENFORCE);
+
+        // verifications
+        assertThat(forwardedHead).isEmpty();
+        assertThat(forwardedTail).isEqualTo(PING);
+    }
+
+    @Test
+    void filter_foreignMachinePublishObserving_payloadKept() {
+        // setup
+        String frame = "PUB machine.m-2.heartbeat 2\r\nhi\r\n" + PING;
+
+        // execution
+        String forwarded = filter(frame, OBSERVE);
+
+        // verifications
+        assertThat(forwarded).isEqualTo(frame);
+        assertThat(violations).hasSize(1);
+    }
+
+    @Test
+    void filter_foreignMachineHeaderPublish_droppedWithHeadersAndPayload() {
         // setup
         String headers = "NATS/1.0\r\nX-Key: v\r\n\r\n";
         String body = "hello";
         int headerBytes = headers.length();
         int totalBytes = headerBytes + body.length();
-        String sizes = " " + headerBytes + " " + totalBytes + "\r\n";
-        String frame = "HPUB machine.m-2.cmd" + sizes + headers + body + "\r\n" + PING;
+        String frame = "HPUB machine.m-2.cmd " + headerBytes + " " + totalBytes + "\r\n" + headers + body + "\r\n" + PING;
 
         // execution
         String forwarded = filter(frame, ENFORCE);
 
         // verifications
-        assertThat(forwarded).isEqualTo("HPUB _DENIED.machine.m-2.cmd" + sizes + headers + body + "\r\n" + PING);
+        assertThat(forwarded).isEqualTo(PING);
         assertThat(violations)
                 .extracting(NatsViolation::operation, NatsViolation::detail)
                 .containsExactly(tuple("HPUB", "machine.m-2.cmd"));
+    }
+
+    @Test
+    void filter_ownMachineHeaderPublish_forwardedUnchanged() {
+        // setup
+        String headers = "NATS/1.0\r\n\r\n";
+        String body = "hello";
+        int headerBytes = headers.length();
+        int totalBytes = headerBytes + body.length();
+        String frame = "HPUB machine.m-1.hostname " + headerBytes + " " + totalBytes + "\r\n" + headers + body + "\r\n";
+
+        // execution
+        String forwarded = filter(frame, ENFORCE);
+
+        // verifications
+        assertThat(forwarded).isEqualTo(frame);
+        assertThat(violations).isEmpty();
     }
 
     @Test

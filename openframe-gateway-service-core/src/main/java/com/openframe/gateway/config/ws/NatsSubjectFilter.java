@@ -35,8 +35,19 @@ public class NatsSubjectFilter {
         return natsSubjectFilterProperties.isEnabled() && natsSubjectFilterProperties.isNatsPath(path);
     }
 
+    /**
+     * A token the identity cannot be read from (no {@code machine_id}, {@code userId} or {@code sub})
+     * leaves the session unfiltered rather than closed: the gateway already accepted that token, and
+     * the observation phase must never cut a client.
+     */
     public WebSocketSession decorate(ServerWebExchange exchange, WebSocketSession session, String path, String tenant) {
-        NatsClientIdentity identity = identityOf(exchange);
+        NatsClientIdentity identity;
+        try {
+            identity = identityOf(exchange);
+        } catch (IllegalStateException e) {
+            log.warn("NATS client identity unknown, relaying unfiltered: {} path={} tenant={}", e.getMessage(), path, tenant);
+            return session;
+        }
         return new NatsSubjectFilteringWebSocketSessionDecorator(session, path, tenant, identity,
                 natsSubjectFilterProperties, objectMapper, gatewayTrafficMetrics);
     }
