@@ -50,6 +50,14 @@ impl MachineIdService {
         Ok(id)
     }
 
+    pub fn regenerate(&self) -> Result<String> {
+        let id = Uuid::new_v4().to_string();
+        self.write(&id)?;
+        info!("Generated new machine ID: {}", id);
+        *self.cached_id.write().unwrap() = Some(id.clone());
+        Ok(id)
+    }
+
     // Cached id only; empty string until get_or_create has run.
     pub fn get(&self) -> String {
         self.cached_id.read().unwrap().clone().unwrap_or_default()
@@ -74,3 +82,7 @@ impl MachineIdService {
             .with_context(|| format!("Failed to write {}", self.file_path.display()))
     }
 }
+
+#[cfg(test)]
+#[path = "machine_id_service_tests.rs"]
+mod tests;

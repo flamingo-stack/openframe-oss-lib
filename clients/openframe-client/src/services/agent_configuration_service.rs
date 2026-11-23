@@ -47,6 +47,25 @@ impl AgentConfigurationService {
         Ok(())
     }
 
+    pub async fn replace_registration(
+        &self,
+        machine_id: String,
+        client_id: String,
+        client_secret: String,
+    ) -> Result<()> {
+        let _guard = self.write_lock.lock().await;
+        let mut config = self.get()?;
+        config.machine_id = machine_id;
+        config.client_id = client_id;
+        config.client_secret = client_secret;
+        config.access_token = String::new();
+        config.refresh_token = String::new();
+
+        self.save(&config).await?;
+
+        Ok(())
+    }
+
     pub async fn update_tokens(&self, access_token: String, refresh_token: String) -> Result<()> {
         let _guard = self.write_lock.lock().await;
         let mut config = self.get()?;

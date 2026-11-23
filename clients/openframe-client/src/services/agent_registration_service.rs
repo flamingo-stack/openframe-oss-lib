@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use tracing::{error, info, warn};
 
 use crate::clients::{RegistrationClient, RegistrationError};
-use crate::models::{AgentRegistrationRequest, AgentRegistrationResponse};
+use crate::models::{AgentRegistrationRequest, AgentRegistrationResponse, IdentitySplitMessage};
 use crate::platform::machine_info_persistence::{self, PersistedMachineInfo};
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
@@ -76,6 +76,50 @@ impl AgentRegistrationService {
 
         self.config_service
             .save_registration_data(
+                response.machine_id.clone(),
+                response.client_id.clone(),
+                response.client_secret.clone(),
+            )
+            .await?;
+
+        Ok(response)
+    }
+
+    pub async fn split_identity(&self, session_id: &str) -> Result<AgentRegistrationResponse> {
+        let (machine_id, client_secret) = self.config_service.get_registration_credentials()?;
+        anyhow::ensure!(
+            !machine_id.is_empty() && !client_secret.is_empty(),
+            "The agent is not registered, there is no identity to split"
+        );
+        let user_id = Self::read_persisted_credentials()
+            .await?
+            .and_then(|info| info.user_id);
+
+        let current = PersistedMachineInfo {
+            machine_id,
+            client_secret,
+            user_id: None,
+        };
+        let request = IdentitySplitMessage {
+            session_id: session_id.to_string(),
+        };
+        let response = self
+            .registration_client
+            .split(&current, &request)
+            .await
+            .context("Failed to split the machine identity")?;
+
+        let machine_info = PersistedMachineInfo {
+            machine_id: response.machine_id.clone(),
+            client_secret: response.client_secret.clone(),
+            user_id,
+        };
+        if let Err(e) = machine_info_persistence::write(&machine_info) {
+            error!("Failed to persist machine info: {}", e);
+        }
+
+        self.config_service
+            .replace_registration(
                 response.machine_id.clone(),
                 response.client_id.clone(),
                 response.client_secret.clone(),
