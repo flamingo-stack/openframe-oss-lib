@@ -292,7 +292,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         Sort.Direction direction = directionOf(sortDirection);
         boolean fetchDescending = direction.isDescending() != backward;
         Query pageQuery = keysetAnchor(position, sortField, direction)
-                .map(anchor -> keysetCriteria(anchor, sortField, fetchDescending))
+                .map(anchor -> keysetCriteria(anchor, fetchDescending))
                 .map(pastAnchor -> withCursorBound(query, pastAnchor))
                 .orElse(query);
         Sort sort = sortWithIdTieBreak(sortField, fetchDescending);
@@ -354,21 +354,30 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
     private KeysetCursor rowAnchor(String rowId, String sortField, Sort.Direction direction) {
         if (ID_FIELD.equals(sortField)) {
-            return new KeysetCursor(ID_FIELD, direction, NO_SORT_VALUE, rowId);
+            return idAnchor(rowId, direction);
         }
-        Ticket row = cursorRow(rowId);
-        return keysetOf(row, sortField, direction);
+        return cursorRow(rowId)
+                .map(row -> keysetOf(row, sortField, direction))
+                .orElseGet(() -> missingRowAnchor(rowId, sortField, direction));
     }
 
-    private Ticket cursorRow(String rowId) {
+    private static KeysetCursor idAnchor(String rowId, Sort.Direction direction) {
+        return new KeysetCursor(ID_FIELD, direction, NO_SORT_VALUE, rowId);
+    }
+
+    private static KeysetCursor missingRowAnchor(String rowId, String sortField, Sort.Direction direction) {
+        if (FIELD_CREATED_AT.equals(sortField)) {
+            return idAnchor(rowId, direction);
+        }
+        throw new InvalidCursorException();
+    }
+
+    private Optional<Ticket> cursorRow(String rowId) {
         ObjectId id = cursorObjectId(rowId);
         Criteria byId = Criteria.where(ID_FIELD).is(id);
         Query query = new Query(byId);
         Ticket row = mongoTemplate.findOne(query, Ticket.class);
-        if (row == null) {
-            throw new InvalidCursorException();
-        }
-        return row;
+        return Optional.ofNullable(row);
     }
 
     private static KeysetCursor keysetOf(Ticket ticket, String sortField, Sort.Direction direction) {
@@ -394,7 +403,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         };
     }
 
-    private static Criteria keysetCriteria(KeysetCursor cursor, String sortField, boolean fetchDescending) {
+    private static Criteria keysetCriteria(KeysetCursor cursor, boolean fetchDescending) {
+        String sortField = cursor.sortField();
         ObjectId cursorId = cursorObjectId(cursor.id());
         if (ID_FIELD.equals(sortField)) {
             Criteria id = Criteria.where(ID_FIELD);

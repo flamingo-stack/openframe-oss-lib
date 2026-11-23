@@ -12,7 +12,6 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
-import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.organization.Organization;
 import org.springframework.stereotype.Component;
 
@@ -48,21 +47,7 @@ public class GraphQLOrganizationMapper {
      * Convert GraphQL pagination input to internal pagination criteria.
      */
     public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
-        if (args != null) {
-            String after = args.getAfter();
-            String before = args.getBefore();
-            requireDecodable(after);
-            requireDecodable(before);
-        }
         return CursorPaginationCriteria.fromConnectionArgs(args);
-    }
-
-    // The organizations connection refuses an unreadable cursor; CursorCodec stays lenient for the other connections.
-    private static void requireDecodable(String opaqueCursor) {
-        boolean provided = opaqueCursor != null && !opaqueCursor.isBlank();
-        if (provided && CursorCodec.decode(opaqueCursor) == null) {
-            throw new InvalidCursorException();
-        }
     }
 
     /**

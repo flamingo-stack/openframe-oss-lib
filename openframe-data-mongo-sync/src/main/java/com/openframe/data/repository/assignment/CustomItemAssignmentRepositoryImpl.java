@@ -59,7 +59,7 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
         boolean fetchDescending = direction.isDescending() != backward;
         Query query = buildAssignmentQuery(itemId, targetType, search);
         keysetAnchor(position, sortField, direction)
-                .map(anchor -> keysetCriteria(anchor, sortField, fetchDescending))
+                .map(anchor -> keysetCriteria(anchor, fetchDescending))
                 .map(pastAnchor -> new Criteria().andOperator(pastAnchor))
                 .ifPresent(query::addCriteria);
         Sort sort = sortWithIdTieBreak(sortField, fetchDescending);
@@ -105,21 +105,30 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
 
     private KeysetCursor rowAnchor(String rowId, String sortField, Sort.Direction direction) {
         if (ID_FIELD.equals(sortField)) {
-            return new KeysetCursor(ID_FIELD, direction, NO_SORT_VALUE, rowId);
+            return idAnchor(rowId, direction);
         }
-        ItemAssignment row = cursorRow(rowId);
-        return keysetOf(row, sortField, direction);
+        return cursorRow(rowId)
+                .map(row -> keysetOf(row, sortField, direction))
+                .orElseGet(() -> missingRowAnchor(rowId, sortField, direction));
     }
 
-    private ItemAssignment cursorRow(String rowId) {
+    private static KeysetCursor idAnchor(String rowId, Sort.Direction direction) {
+        return new KeysetCursor(ID_FIELD, direction, NO_SORT_VALUE, rowId);
+    }
+
+    private static KeysetCursor missingRowAnchor(String rowId, String sortField, Sort.Direction direction) {
+        if (FIELD_CREATED_AT.equals(sortField)) {
+            return idAnchor(rowId, direction);
+        }
+        throw new InvalidCursorException();
+    }
+
+    private Optional<ItemAssignment> cursorRow(String rowId) {
         ObjectId id = cursorObjectId(rowId);
         Criteria byId = Criteria.where(ID_FIELD).is(id);
         Query query = new Query(byId);
         ItemAssignment row = mongoTemplate.findOne(query, ItemAssignment.class);
-        if (row == null) {
-            throw new InvalidCursorException();
-        }
-        return row;
+        return Optional.ofNullable(row);
     }
 
     private static KeysetCursor keysetOf(ItemAssignment assignment, String sortField, Sort.Direction direction) {
@@ -131,7 +140,8 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
         };
     }
 
-    private static Criteria keysetCriteria(KeysetCursor cursor, String sortField, boolean fetchDescending) {
+    private static Criteria keysetCriteria(KeysetCursor cursor, boolean fetchDescending) {
+        String sortField = cursor.sortField();
         ObjectId cursorId = cursorObjectId(cursor.id());
         if (ID_FIELD.equals(sortField)) {
             Criteria id = Criteria.where(ID_FIELD);
