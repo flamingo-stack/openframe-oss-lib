@@ -9,7 +9,7 @@ import { Copy02Icon, SearchIcon } from '../icons-v2-generated';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
-import { DataTable } from './data-table';
+import { DataTable, type DataTableLayout } from './data-table';
 import { DATA_TABLE_ROW_FRAME_CLASS, ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table/data-table-row-classes';
 import { useDataTable } from './data-table/use-data-table';
 import { LoadingItems, useLoadingScope } from './loading-scope';
@@ -83,39 +83,65 @@ function TestResultsSkeleton({
   );
 }
 
+/** A result value as a cell prints it: the value as returned, a dash for none. */
+const resultText = (value: QueryResultRow[string] | undefined) =>
+  value === null || value === undefined ? '-' : String(value);
+
+/**
+ * The columns a loading grid draws: a result set's columns arrive with its rows, so while a run has none the grid
+ * stands on `TEST_RESULTS_SKELETON_COLUMNS` unnamed ones (a loading grid header names no column anyway).
+ */
+const GRID_LOADING_COLUMNS: ColumnDef<QueryResultRow>[] = Array.from(
+  { length: TEST_RESULTS_SKELETON_COLUMNS },
+  (_, index) => ({ id: `loading-${index}`, header: '', enableSorting: false, size: RESULT_COLUMN_MIN_WIDTH }),
+);
+
 /**
  * Live test results rendered with the core DataTable (identical header,
  * skeleton, and card-row styling to the standard tables). Columns are derived
  * from the keys of the returned rows; wide result sets scroll horizontally.
  * Unlike the default tables, headers stay visible on every breakpoint.
+ *
+ * `layout="grid"` draws the grid table instead: one bordered table of 48px one-line rows, a column per key at the same
+ * least width, scrolling sideways inside itself. It has no settings gear: the columns are the query's own, so there is
+ * no layout of them to keep. While the run has no rows it draws the grid's own loading form.
  */
-export function TestResultsTable({ rows, loading: loadingProp }: { rows: QueryResultRow[]; loading: boolean }) {
+export function TestResultsTable({
+  rows,
+  loading: loadingProp,
+  layout = 'cards',
+}: {
+  rows: QueryResultRow[];
+  loading: boolean;
+  layout?: DataTableLayout;
+}) {
   const loading = useLoadingScope() || loadingProp;
+  const grid = layout === 'grid';
   const columnKeys = useMemo(() => (rows.length > 0 ? Object.keys(rows[0]) : []), [rows]);
 
-  const columns = useMemo<ColumnDef<QueryResultRow>[]>(() => {
+  const resultColumns = useMemo<ColumnDef<QueryResultRow>[]>(() => {
     return columnKeys.map(key => ({
       id: key,
       accessorFn: (row: QueryResultRow) => row[key],
       header: key,
       enableSorting: false,
-      cell: ({ row }: { row: Row<QueryResultRow> }) => {
-        const value = row.original[key];
-        return (
-          <span className="truncate text-ods-text-primary text-h4">
-            {value === null || value === undefined ? '-' : String(value)}
-          </span>
-        );
-      },
+      cell: ({ row }: { row: Row<QueryResultRow> }) => (
+        <span className="truncate text-ods-text-primary text-h4">{resultText(row.original[key])}</span>
+      ),
+      // The grid's width for the column; the cards table reads `meta.width`.
+      size: RESULT_COLUMN_MIN_WIDTH,
       meta: {
         width: RESULT_COLUMN_WIDTH_CLASS,
         // Show headers on every breakpoint; headerClassName sizes the cells
         // below lg where meta.width is not applied.
         alwaysShowHeader: true,
         headerClassName: RESULT_COLUMN_WIDTH_CLASS,
+        // A string is the grid's plain one-line text cell.
+        gridCell: ({ row }) => resultText(row.original[key]),
       },
     }));
   }, [columnKeys]);
+  const columns = grid && loading ? GRID_LOADING_COLUMNS : resultColumns;
 
   const table = useDataTable<QueryResultRow>({
     data: rows,
@@ -123,6 +149,16 @@ export function TestResultsTable({ rows, loading: loadingProp }: { rows: QueryRe
     getRowId: (_row: QueryResultRow, index: number) => String(index),
     enableSorting: false,
   });
+
+  if (grid) {
+    return (
+      <DataTable table={table} layout="grid">
+        <DataTable.Header loading={loading} />
+        {/* One row, as the cards skeleton draws: a run streams its rows in, and the block under it should not jump. */}
+        <DataTable.Body loading={loading} skeletonRows={1} />
+      </DataTable>
+    );
+  }
 
   if (loading) {
     return <TestResultsSkeleton />;
@@ -146,6 +182,8 @@ export interface TestRunResultsProps {
   isActive: boolean;
   displayRows: QueryResultRow[];
   firstError: string | null;
+  /** The results table's layout: card rows (the default) or the grid table (`DataTable`'s `layout`). */
+  layout?: DataTableLayout;
   className?: string;
 }
 
@@ -179,7 +217,13 @@ export function TestRunErrorBanner({ error, className }: { error: string; classN
 }
 
 /** Error line + empty state + result table for a finished/running test run. */
-export function TestRunResults({ isActive, displayRows, firstError, className }: TestRunResultsProps) {
+export function TestRunResults({
+  isActive,
+  displayRows,
+  firstError,
+  layout = 'cards',
+  className,
+}: TestRunResultsProps) {
   return (
     <div className={cn('flex flex-col gap-[var(--spacing-system-xsf)]', className)}>
       {firstError && <TestRunErrorBanner error={firstError} />}
@@ -188,12 +232,17 @@ export function TestRunResults({ isActive, displayRows, firstError, className }:
         // "No results returned" empty state next to it would mislead.
         // Otherwise: fixed-height empty state matching the 1-row
         // skeleton/result height (48px header + 80px row, no gap) so the
-        // block does not jump between loading/result/empty.
+        // block does not jump between loading/result/empty. The grid with one
+        // row is 98px: a 48px header, a 48px row and the frame's two 1px edges.
         !firstError && (
-          <NoData icon={<SearchIcon />} title="No results returned" className="h-[128px] justify-center !py-0" />
+          <NoData
+            icon={<SearchIcon />}
+            title="No results returned"
+            className={cn(layout === 'grid' ? 'h-[98px]' : 'h-[128px]', 'justify-center !py-0')}
+          />
         )
       ) : (
-        <TestResultsTable rows={displayRows} loading={isActive && displayRows.length === 0} />
+        <TestResultsTable rows={displayRows} loading={isActive && displayRows.length === 0} layout={layout} />
       )}
     </div>
   );
