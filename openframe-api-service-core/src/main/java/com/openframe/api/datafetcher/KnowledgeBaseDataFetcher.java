@@ -71,11 +71,12 @@ public class KnowledgeBaseDataFetcher {
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before) {
-        log.debug("Fetching KB items: filter={}, search={}, first={}, after={}",
-                filter, search, first, after);
+        log.debug("Fetching KB items: filter={}, search={}, first={}, after={}, last={}, before={}",
+                filter, search, first, after, last, before);
 
         KnowledgeBaseFilterCriteria criteria = mapper.toFilterCriteria(filter);
-        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).build();
+        ConnectionArgs connectionArgs =
+                ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
         CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(connectionArgs);
         CountedGenericQueryResult<KnowledgeBaseItem> result =
                 knowledgeBaseService.queryItems(criteria, search, pagination);
@@ -128,7 +129,8 @@ public class KnowledgeBaseDataFetcher {
         log.debug("Fetching archived KB articles: search={}, tagIds={}", search, tagIds);
 
         List<String> rawTagIds = relayIdCodec.decodeAll(tagIds, TAG);
-        ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).build();
+        ConnectionArgs connectionArgs =
+                ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
         CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(connectionArgs);
         CountedGenericQueryResult<KnowledgeBaseItem> result =
                 knowledgeBaseService.queryArchivedArticles(search, rawTagIds, pagination);

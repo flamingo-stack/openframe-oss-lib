@@ -1,9 +1,18 @@
 extend type Query {
+    """
+    Folders and articles of the knowledge base.
+    The order is fixed: folders first, by name (case-insensitive, digits by value), then articles,
+    most recently updated first; there are no sortable fields.
+    first/after page forward, last/before page backward; when both directions are sent, last/before wins.
+    Only pageInfo.startCursor / endCursor are valid paging cursors.
+    """
     knowledgeBaseItems(
         filter: KnowledgeBaseFilterInput
         search: String
+        "1-100, default 20."
         first: Int
         after: String
+        "1-100, default 20."
         last: Int
         before: String
     ): KnowledgeBaseItemConnection!
@@ -11,11 +20,19 @@ extend type Query {
     knowledgeBaseTags(folderId: ID, archived: Boolean, assignedTo: AssignmentTargetInput): [Tag!]!
     knowledgeBaseFolderTree: [KnowledgeBaseItem!]!
     knowledgeBaseArticleTree: [KnowledgeBaseItem!]!
+    """
+    Archived articles of the knowledge base.
+    The order is fixed: most recently updated first, then id; there are no sortable fields.
+    first/after page forward, last/before page backward; when both directions are sent, last/before wins.
+    Only pageInfo.startCursor / endCursor are valid paging cursors.
+    """
     archivedArticles(
         search: String
         tagIds: [ID]
+        "1-100, default 20."
         first: Int
         after: String
+        "1-100, default 20."
         last: Int
         before: String
     ): KnowledgeBaseItemConnection!
