@@ -25,6 +25,7 @@ public class ConsumerCreateRequestParser {
 
     static final String AMBIGUITY_BOTH_FILTER_FIELDS = "both filter_subject and filter_subjects set";
     static final String AMBIGUITY_SUBJECT_DIFFERS = "filter in the API subject differs from the body";
+    static final String AMBIGUITY_STREAM_DIFFERS = "stream_name in the body differs from the API subject";
 
     private static final String STREAM_FIELD = "stream_name";
     private static final String CONFIG_FIELD = "config";
@@ -39,16 +40,16 @@ public class ConsumerCreateRequestParser {
     public ConsumerCreateRequest parse(JetStreamApiSubject apiSubject, byte[] body) {
         JsonNode request = requestOf(body);
         JsonNode config = request.path(CONFIG_FIELD);
-        String stream = streamOf(request, apiSubject);
+        Optional<String> bodyStream = textOf(request, STREAM_FIELD);
         Optional<String> singleFilter = textOf(config, FILTER_SUBJECT_FIELD);
         List<String> listedFilters = listedFiltersOf(config);
         List<String> bodyFilters = bodyFiltersOf(singleFilter, listedFilters);
         List<String> filterSubjects = filterSubjectsOf(bodyFilters, apiSubject);
         ConsumerCreateRequest.ConsumerCreateRequestBuilder consumerCreateRequest = ConsumerCreateRequest.builder()
-                .stream(stream)
+                .stream(apiSubject.getStream())
                 .filterSubjects(filterSubjects);
         textOf(config, DELIVER_SUBJECT_FIELD).ifPresent(consumerCreateRequest::deliverSubject);
-        ambiguityOf(singleFilter, listedFilters, bodyFilters, apiSubject).ifPresent(consumerCreateRequest::ambiguity);
+        ambiguityOf(bodyStream, singleFilter, listedFilters, bodyFilters, apiSubject).ifPresent(consumerCreateRequest::ambiguity);
         boolean durable = textOf(config, DURABLE_NAME_FIELD).isPresent();
         consumerCreateRequest.durable(durable);
         return consumerCreateRequest.build();
@@ -60,10 +61,6 @@ public class ConsumerCreateRequestParser {
         } catch (Exception e) {
             throw new NatsProtocolException("consumer create request is not JSON");
         }
-    }
-
-    private static String streamOf(JsonNode request, JetStreamApiSubject apiSubject) {
-        return textOf(request, STREAM_FIELD).orElse(apiSubject.getStream());
     }
 
     private static List<String> listedFiltersOf(JsonNode config) {
@@ -90,8 +87,13 @@ public class ConsumerCreateRequestParser {
                 .orElse(List.of());
     }
 
-    private static Optional<String> ambiguityOf(Optional<String> singleFilter, List<String> listedFilters,
-                                                List<String> bodyFilters, JetStreamApiSubject apiSubject) {
+    /** NATS binds the call to the stream in the subject; a body that names another one is not read either way. */
+    private static Optional<String> ambiguityOf(Optional<String> bodyStream, Optional<String> singleFilter,
+                                                List<String> listedFilters, List<String> bodyFilters,
+                                                JetStreamApiSubject apiSubject) {
+        if (isStreamContradicted(bodyStream, apiSubject)) {
+            return Optional.of(AMBIGUITY_STREAM_DIFFERS);
+        }
         if (hasBothFilterFields(singleFilter, listedFilters)) {
             return Optional.of(AMBIGUITY_BOTH_FILTER_FIELDS);
         }
@@ -99,6 +101,13 @@ public class ConsumerCreateRequestParser {
             return Optional.of(AMBIGUITY_SUBJECT_DIFFERS);
         }
         return Optional.empty();
+    }
+
+    private static boolean isStreamContradicted(Optional<String> bodyStream, JetStreamApiSubject apiSubject) {
+        String subjectStream = apiSubject.getStream();
+        return bodyStream
+                .map(stream -> !stream.equals(subjectStream))
+                .orElse(false);
     }
 
     private static boolean hasBothFilterFields(Optional<String> singleFilter, List<String> listedFilters) {

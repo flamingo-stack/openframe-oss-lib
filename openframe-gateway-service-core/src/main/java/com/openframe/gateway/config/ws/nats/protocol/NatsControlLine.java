@@ -17,6 +17,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class NatsControlLine {
 
     private static final int SUBJECT_INDEX = 1;
+    private static final int REPLY_INDEX = 2;
+    private static final int PUB_TOKENS_WITH_REPLY = 4;
+    private static final int HPUB_TOKENS_WITH_REPLY = 5;
     private static final long NO_PAYLOAD = 0;
 
     NatsOperation operation;
@@ -29,6 +32,19 @@ public class NatsControlLine {
             return Optional.empty();
         }
         return Optional.of(tokens.get(SUBJECT_INDEX));
+    }
+
+    /** The reply-to subject of a {@code PUB}/{@code HPUB} that carries one: where the responder will publish. */
+    public Optional<String> getReplySubject() {
+        if (!operation.isPublish() || !hasReplyToken()) {
+            return Optional.empty();
+        }
+        return Optional.of(tokens.get(REPLY_INDEX));
+    }
+
+    private boolean hasReplyToken() {
+        int tokensWithReply = operation == NatsOperation.HPUB ? HPUB_TOKENS_WITH_REPLY : PUB_TOKENS_WITH_REPLY;
+        return tokens.size() == tokensWithReply;
     }
 
     public boolean hasPayload() {

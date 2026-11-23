@@ -60,6 +60,42 @@ class NatsControlLineParserTest {
     }
 
     @Test
+    void parse_publishWithReplySubject_replySubjectRead() {
+        // setup
+        byte[] raw = "PUB machine.m-1.hostname _INBOX.abc.1 12\r\n".getBytes(UTF_8);
+
+        // execution
+        NatsControlLine line = parser.parse(raw);
+
+        // verifications
+        assertThat(line.getReplySubject()).contains("_INBOX.abc.1");
+    }
+
+    @Test
+    void parse_headerPublishWithReplySubject_replySubjectRead() {
+        // setup
+        byte[] raw = "HPUB machine.m-1.hostname _INBOX.abc.1 12 17\r\n".getBytes(UTF_8);
+
+        // execution
+        NatsControlLine line = parser.parse(raw);
+
+        // verifications
+        assertThat(line.getReplySubject()).contains("_INBOX.abc.1");
+    }
+
+    @Test
+    void parse_publishWithoutReplySubject_noReplySubject() {
+        // setup
+        byte[] raw = "PUB machine.m-1.hostname 12\r\n".getBytes(UTF_8);
+
+        // execution
+        NatsControlLine line = parser.parse(raw);
+
+        // verifications
+        assertThat(line.getReplySubject()).isEmpty();
+    }
+
+    @Test
     void parse_headerPublish_sizeIsTheTotal() {
         // setup
         byte[] raw = "HPUB machine.m-1.hostname 12 17\r\n".getBytes(UTF_8);

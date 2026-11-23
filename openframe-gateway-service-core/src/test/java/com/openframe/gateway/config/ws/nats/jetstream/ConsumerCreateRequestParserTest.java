@@ -101,6 +101,19 @@ class ConsumerCreateRequestParserTest {
     }
 
     @Test
+    void parse_bodyStreamDiffersFromTheApiSubject_ambiguousAndStreamFromTheSubject() {
+        // setup
+        byte[] body = json("{\"stream_name\":\"OTHER_STREAM\",\"config\":{\"filter_subject\":\"chat.d-1.message\"}}");
+
+        // execution
+        ConsumerCreateRequest request = parser.parse(BARE_CREATE, body);
+
+        // verifications
+        assertThat(request.getStream()).isEqualTo("CHAT_CHUNKS");
+        assertThat(request.getAmbiguity()).contains(ConsumerCreateRequestParser.AMBIGUITY_STREAM_DIFFERS);
+    }
+
+    @Test
     void parse_durableName_durable() {
         // setup
         byte[] body = json("{\"config\":{\"durable_name\":\"d1\",\"filter_subject\":\"chat.d-1.message\"}}");

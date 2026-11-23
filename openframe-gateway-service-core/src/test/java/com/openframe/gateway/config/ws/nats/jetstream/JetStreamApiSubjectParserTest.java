@@ -68,4 +68,34 @@ class JetStreamApiSubjectParserTest {
         // verifications
         assertThat(call).isEmpty();
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "$JS.API.CONSUMER.INFO.CHAT_CHUNKS.c1",
+            "$JS.API.CONSUMER.DELETE.CHAT_CHUNKS.c1",
+            "$JS.API.CONSUMER.MSG.NEXT.CHAT_CHUNKS.c1"
+    })
+    void consumerAccessOf_callOnAnExistingConsumer_streamAndName(String subject) {
+        // execution
+        Optional<JetStreamConsumerAccess> access = parser.consumerAccessOf(subject);
+
+        // verifications
+        assertThat(access).contains(new JetStreamConsumerAccess("CHAT_CHUNKS", "c1"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "$JS.API.CONSUMER.CREATE.CHAT_CHUNKS.c1.chat.d-1.message",
+            "$JS.API.CONSUMER.INFO.CHAT_CHUNKS",
+            "$JS.API.CONSUMER.INFO.CHAT_CHUNKS.c1.extra",
+            "$JS.API.STREAM.INFO.CHAT_CHUNKS",
+            "machine.m-1.heartbeat"
+    })
+    void consumerAccessOf_otherSubject_empty(String subject) {
+        // execution
+        Optional<JetStreamConsumerAccess> access = parser.consumerAccessOf(subject);
+
+        // verifications
+        assertThat(access).isEmpty();
+    }
 }

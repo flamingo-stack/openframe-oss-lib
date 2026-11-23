@@ -61,6 +61,30 @@ class PublishSubjectValidatorTest {
     }
 
     @Test
+    void check_replyToOwnInbox_allowed() {
+        // setup
+        NatsClientCommand command = NatsTestCommands.command("PUB machine.m-1.hostname _INBOX.abc.1 2\r\nhi\r\n");
+
+        // execution
+        NatsValidationResult result = validator.validate(command, context).block();
+
+        // verifications
+        assertThat(result).isEqualTo(NatsValidationResult.ALLOWED);
+    }
+
+    @Test
+    void check_replyToAnotherMachinesSubject_refused() {
+        // setup
+        NatsClientCommand command = NatsTestCommands.command("PUB machine.m-1.hostname machine.m-2.command-execution 2\r\nhi\r\n");
+
+        // execution
+        NatsValidationResult result = validator.validate(command, context).block();
+
+        // verifications
+        assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.PUB, "machine.m-1.hostname"));
+    }
+
+    @Test
     void check_foreignMachineHeaderPublish_refusedWithOperationAndSubject() {
         // setup
         NatsClientCommand command = NatsTestCommands.command("HPUB machine.m-2.cmd 12 17\r\nNATS/1.0\r\n\r\nhello\r\n");

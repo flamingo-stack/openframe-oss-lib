@@ -134,6 +134,51 @@ class JetStreamConsumerCreateValidatorTest {
     }
 
     @Test
+    void check_allowedCreate_consumerRememberedForTheSession() {
+        // setup
+        NatsClientContext context = NatsTestContexts.device();
+        NatsClientCommand command = NatsTestCommands.consumerCreate(CHAT_STREAM, DIALOG_SUBJECT);
+        when(chatAuthorizer.supports(CHAT_STREAM)).thenReturn(true);
+        when(chatAuthorizer.mayConsume(eq(context), requestCaptor.capture())).thenReturn(Mono.just(true));
+
+        // execution
+        validator.validate(command, context).block();
+
+        // verifications
+        assertThat(context.getConsumerRegistry().isOwned(CHAT_STREAM, "c1")).isTrue();
+    }
+
+    @Test
+    void check_refusedCreate_consumerNotRemembered() {
+        // setup
+        NatsClientContext context = NatsTestContexts.device();
+        NatsClientCommand command = NatsTestCommands.consumerCreate(CHAT_STREAM, DIALOG_SUBJECT);
+        when(chatAuthorizer.supports(CHAT_STREAM)).thenReturn(true);
+        when(chatAuthorizer.mayConsume(eq(context), requestCaptor.capture())).thenReturn(Mono.just(false));
+
+        // execution
+        validator.validate(command, context).block();
+
+        // verifications
+        assertThat(context.getConsumerRegistry().isOwned(CHAT_STREAM, "c1")).isFalse();
+    }
+
+    @Test
+    void check_bodyStreamDiffersFromTheSubjectStream_refusedBeforeAnyAuthorizer() {
+        // setup
+        NatsClientContext context = NatsTestContexts.user();
+        String body = "{\"stream_name\":\"OTHER_STREAM\",\"config\":{\"filter_subject\":\"chat.d-1.message\"}}";
+        NatsClientCommand command = NatsTestCommands.publish(CREATE_SUBJECT, body);
+
+        // execution
+        NatsValidationResult result = validator.validate(command, context).block();
+
+        // verifications
+        assertThat(result).isEqualTo(new NatsValidationResult.Refused(NatsOperation.PUB, CREATE_SUBJECT));
+        verifyNoInteractions(chatAuthorizer);
+    }
+
+    @Test
     void check_durableConsumer_refusedBeforeAnyAuthorizer() {
         // setup
         NatsClientContext context = NatsTestContexts.user();

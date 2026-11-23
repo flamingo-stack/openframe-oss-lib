@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.gateway.config.ws.ToolWebSocketProxyUrlFilter.ORIGINAL_AUTHORIZATION_ATTR;
@@ -21,6 +23,7 @@ public class RequestJwtClaimsReader {
 
     private static final String MACHINE_ID_CLAIM = "machine_id";
     private static final String USER_ID_CLAIM = "userId";
+    private static final String ROLES_CLAIM = "roles";
 
     public Instant getExpiration(ServerWebExchange exchange) {
         Claims jwtClaims = getClaims(exchange);
@@ -51,6 +54,18 @@ public class RequestJwtClaimsReader {
             return String.valueOf(userId);
         }
         return requireSubject(claims);
+    }
+
+    /** The {@code roles} claim as strings; empty when the token has none. */
+    public List<String> getRoles(ServerWebExchange exchange) {
+        Claims claims = getClaims(exchange);
+        Object roles = claims.get(ROLES_CLAIM);
+        if (!(roles instanceof Collection<?> values)) {
+            return List.of();
+        }
+        return values.stream()
+                .map(String::valueOf)
+                .toList();
     }
 
     private static String requireSubject(Claims claims) {

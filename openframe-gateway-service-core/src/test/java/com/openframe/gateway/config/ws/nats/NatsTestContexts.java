@@ -1,5 +1,6 @@
 package com.openframe.gateway.config.ws.nats;
 
+import com.openframe.gateway.config.ws.nats.jetstream.SessionConsumerRegistry;
 import com.openframe.gateway.config.ws.nats.policy.NatsSubjectPatternContributor;
 import com.openframe.gateway.config.ws.nats.policy.NatsSubjectPolicy;
 import com.openframe.gateway.config.ws.nats.policy.NatsSubjectPolicyFactory;
@@ -38,6 +39,7 @@ public final class NatsTestContexts {
                 .tenantId(TENANT_ID)
                 .path(PATH)
                 .policy(policy)
+                .consumerRegistry(new SessionConsumerRegistry())
                 .reactorContext(Context.empty())
                 .build();
     }

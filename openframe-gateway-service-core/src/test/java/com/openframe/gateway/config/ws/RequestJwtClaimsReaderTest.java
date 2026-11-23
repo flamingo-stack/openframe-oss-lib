@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -114,6 +115,35 @@ class RequestJwtClaimsReaderTest {
 
         // verifications
         assertThat(userId).isEqualTo(USER_SUBJECT);
+    }
+
+    @Test
+    void getRoles_rolesClaimPresent_returnsThemAsStrings() {
+        // setup
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("sub", USER_SUBJECT);
+        claims.put("roles", List.of("ADMIN", "USER"));
+        MockServerWebExchange exchange = exchangeWithAuthorizationHeader(claims);
+
+        // execution
+        List<String> roles = reader.getRoles(exchange);
+
+        // verifications
+        assertThat(roles).containsExactly("ADMIN", "USER");
+    }
+
+    @Test
+    void getRoles_noRolesClaim_empty() {
+        // setup
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("sub", USER_SUBJECT);
+        MockServerWebExchange exchange = exchangeWithAuthorizationHeader(claims);
+
+        // execution
+        List<String> roles = reader.getRoles(exchange);
+
+        // verifications
+        assertThat(roles).isEmpty();
     }
 
     @Test

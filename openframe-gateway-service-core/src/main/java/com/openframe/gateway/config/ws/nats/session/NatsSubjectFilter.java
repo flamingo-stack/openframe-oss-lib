@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.route.Route;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.util.context.ContextView;
@@ -53,7 +54,7 @@ public class NatsSubjectFilter {
         try {
             context = natsClientContextFactory.create(exchange, path, tenant, reactorContext);
         } catch (IllegalStateException e) {
-            return relayUnfiltered(session, path, tenant, e);
+            return unidentified(session, path, tenant, e);
         }
         long maxPayloadBytes = natsSubjectFilterProperties.getMaxPayloadBytes();
         NatsCommandAssembler assembler = new NatsCommandAssembler(natsControlLineParser, maxPayloadBytes);
@@ -71,13 +72,20 @@ public class NatsSubjectFilter {
     }
 
     /**
-     * A token the identity cannot be read from (no {@code machine_id}, {@code userId} or {@code sub})
-     * leaves the session unfiltered rather than closed: the gateway already accepted that token, and
+     * A token the identity cannot be read from (no device or admin role, no {@code machine_id},
+     * an id that is not one subject token) has no policy to be filtered by. While enforcing that
+     * is a client that must not reach NATS at all; while observing it is relayed and logged, since
      * the observation phase must never cut a client.
      */
-    private static WebSocketSession relayUnfiltered(WebSocketSession session, String path, String tenant,
-                                                    IllegalStateException cause) {
-        log.warn("NATS client identity unknown, relaying unfiltered: {} path={} tenant={}", cause.getMessage(), path, tenant);
+    private WebSocketSession unidentified(WebSocketSession session, String path, String tenant,
+                                          IllegalStateException cause) {
+        if (natsSubjectFilterProperties.isEnforce()) {
+            log.warn("NATS client identity unknown, closing: {} path={} tenant={}", cause.getMessage(), path, tenant);
+            session.close(CloseStatus.POLICY_VIOLATION).subscribe();
+            return session;
+        }
+        log.warn("NATS client identity unknown, relaying unfiltered (enforce=false): {} path={} tenant={}",
+                cause.getMessage(), path, tenant);
         return session;
     }
 }
