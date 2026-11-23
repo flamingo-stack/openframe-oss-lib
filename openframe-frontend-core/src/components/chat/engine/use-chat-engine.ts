@@ -845,6 +845,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
               tailReplays &&
               (historyMaxSeq === null || replayCompletedForDialogRef.current === id)
             ),
+            // The tail resumes after this seq and first delivers what it held then: turns older than any send from here.
+            replayingBacklog: tailReplays && historyMaxSeq !== null && replayCompletedForDialogRef.current !== id,
           });
         }
         setHistorySeq({ dialogId: id, seq: historyMaxSeq });
@@ -1034,7 +1036,10 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     onReplayComplete: () => {
       if (!tailReplays || !dialogId || currentDialogIdRef.current !== dialogId) return;
       replayCompletedForDialogRef.current = dialogId;
-      store.mutate(keyOfDialog(dialogId), reducer => reducer.setTailReplaysHistory(false));
+      store.mutate(keyOfDialog(dialogId), reducer => {
+        reducer.setTailReplaysHistory(false);
+        reducer.setReplayingBacklog(false);
+      });
     },
     onSubscribed: () => {
       if (!dialogId) return;
