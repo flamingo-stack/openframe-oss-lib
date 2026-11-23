@@ -130,7 +130,7 @@ class SearchInputQuotingTest {
     @DisplayName("users page search: name and email clauses quote each search word")
     void userPageSearchIsQuoted() {
         MongoTemplate template = mock(MongoTemplate.class);
-        new CustomUserRepositoryImpl(template).findUsersPage(new UserListFilter(null, null, null, HOSTILE), null, 10);
+        new CustomUserRepositoryImpl(template).findUsersPage(new UserListFilter(null, null, null, HOSTILE), null, false, 10);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).find(captor.capture(), eq(User.class));
@@ -142,7 +142,7 @@ class SearchInputQuotingTest {
     void invitationPageSearchIsQuoted() {
         MongoTemplate template = mock(MongoTemplate.class);
         new CustomInvitationRepositoryImpl(template)
-                .findOpenInvitationsPage(new InvitationListFilter(null, null, HOSTILE), Instant.now(), null, 10);
+                .findOpenInvitationsPage(new InvitationListFilter(null, null, HOSTILE), Instant.now(), null, false, 10);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).find(captor.capture(), eq(Invitation.class));

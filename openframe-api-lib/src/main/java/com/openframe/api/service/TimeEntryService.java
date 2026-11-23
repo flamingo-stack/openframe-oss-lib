@@ -24,6 +24,7 @@ import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.TimeEntrySource;
 import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
 import com.openframe.data.document.timetracking.filter.TimeEntryStateFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.timetracking.TimeEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -278,8 +279,11 @@ public class TimeEntryService {
         long total = timeEntryRepository.countTimeEntries(query);
 
         int limit = normalized.getLimit();
+        CursorPosition position = normalized.hasCursor()
+                ? new CursorPosition.Unrecognised(normalized.getCursor())
+                : new CursorPosition.None();
         List<TimeEntry> raw = timeEntryRepository.findTimeEntriesWithCursor(
-                query, normalized.getCursor(), limit + 1, sortField, direction.name());
+                query, position, false, limit + 1, sortField, direction.name());
         boolean hasNext = raw.size() > limit;
         List<TimeEntry> page = hasNext ? raw.subList(0, limit) : raw;
 

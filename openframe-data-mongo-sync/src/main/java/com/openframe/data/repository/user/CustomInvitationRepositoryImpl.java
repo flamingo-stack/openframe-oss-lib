@@ -32,7 +32,7 @@ public class CustomInvitationRepositoryImpl implements CustomInvitationRepositor
 
     @Override
     public List<Invitation> findOpenInvitationsPage(InvitationListFilter filter, Instant now, String cursor,
-                                                    int limit) {
+                                                    boolean backward, int limit) {
         List<Criteria> criteria = listCriteria(filter, now);
         InvitationPageCursor.parse(cursor).map(CustomInvitationRepositoryImpl::after).ifPresent(criteria::add);
         Query query = new Query(new Criteria().andOperator(criteria))

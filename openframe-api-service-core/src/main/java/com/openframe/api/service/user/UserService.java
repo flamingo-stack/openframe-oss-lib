@@ -90,7 +90,7 @@ public class UserService {
         CursorPaginationCriteria page = pagination.normalize();
         UserListFilter listFilter = toListFilter(filter, search);
         long filteredCount = userRepository.countUsers(listFilter);
-        List<User> raw = userRepository.findUsersPage(listFilter, page.getCursor(), page.getLimit() + 1);
+        List<User> raw = userRepository.findUsersPage(listFilter, page.getCursor(), false, page.getLimit() + 1);
         boolean hasNextPage = raw.size() > page.getLimit();
         List<UserResponse> items = toResponses(hasNextPage ? raw.subList(0, page.getLimit()) : raw);
         return CountedGenericQueryResult.<UserResponse>builder()

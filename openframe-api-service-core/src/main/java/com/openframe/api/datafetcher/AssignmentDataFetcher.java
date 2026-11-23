@@ -66,7 +66,9 @@ public class AssignmentDataFetcher {
             @InputArgument String search,
             @InputArgument SortInput sort,
             @InputArgument Integer first,
-            @InputArgument String after) {
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
         log.debug("Fetching assigned items for item: {}, targetType: {}, search: {}, sort: {}, first: {}, after: {}",
                 itemId, targetType, search, sort, first, after);
         String rawItemId = decodeAssignableItemId(itemId);

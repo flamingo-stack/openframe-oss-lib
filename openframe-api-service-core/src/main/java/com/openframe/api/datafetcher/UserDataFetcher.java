@@ -49,7 +49,9 @@ public class UserDataFetcher {
             @InputArgument UserFilterInput filter,
             @InputArgument @Size(max = MAX_SEARCH_LENGTH) String search,
             @InputArgument Integer first,
-            @InputArgument String after) {
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
         log.debug("Fetching users: filter={}, search={}, first={}, after={}", filter, search, first, after);
         CursorPaginationCriteria pagination = CursorPaginationCriteria.fromConnectionArgs(
                 ConnectionArgs.builder().first(first).after(after).build());

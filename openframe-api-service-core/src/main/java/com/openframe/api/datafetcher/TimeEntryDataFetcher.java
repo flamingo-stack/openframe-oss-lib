@@ -86,7 +86,9 @@ public class TimeEntryDataFetcher {
             @InputArgument String search,
             @InputArgument SortInput sort,
             @InputArgument Integer first,
-            @InputArgument String after) {
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
         TimeEntryFilterInput filter = TimeEntryFilterInput.builder()
                 .employeeIds(List.of(getCurrentUserId()))
                 .startedFrom(period != null ? period.getStartDate().atStartOfDay().toInstant(ZoneOffset.UTC) : null)
@@ -101,7 +103,9 @@ public class TimeEntryDataFetcher {
             @InputArgument String search,
             @InputArgument SortInput sort,
             @InputArgument Integer first,
-            @InputArgument String after) {
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
         decodeFilterIds(filter);
         return queryEntries(filter, search, sort, first, after);
     }

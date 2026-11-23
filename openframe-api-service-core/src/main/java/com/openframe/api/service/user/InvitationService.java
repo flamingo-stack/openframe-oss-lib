@@ -167,7 +167,7 @@ public class InvitationService {
         Instant now = Instant.now();
         long filteredCount = invitationRepository.countOpenInvitations(listFilter, now);
         List<Invitation> raw = invitationRepository.findOpenInvitationsPage(
-                listFilter, now, page.getCursor(), page.getLimit() + 1);
+                listFilter, now, page.getCursor(), false, page.getLimit() + 1);
         boolean hasNextPage = raw.size() > page.getLimit();
         List<InvitationResponse> items = (hasNextPage ? raw.subList(0, page.getLimit()) : raw).stream()
                 .map(invitationMapper::toResponse)

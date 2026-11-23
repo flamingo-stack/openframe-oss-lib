@@ -44,7 +44,7 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
     }
 
     @Override
-    public List<User> findUsersPage(UserListFilter filter, String cursor, int limit) {
+    public List<User> findUsersPage(UserListFilter filter, String cursor, boolean backward, int limit) {
         List<Criteria> criteria = listCriteria(filter);
         UserPageCursor.parse(cursor).ifPresent(after -> criteria.add(new Criteria().orOperator(
                 Criteria.where(FIELD_EMAIL).gt(after.email()),

@@ -5,6 +5,8 @@ import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
 import com.openframe.data.document.timetracking.filter.TimeEntryStateFilter;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -128,8 +130,13 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
     }
 
     @Override
-    public List<TimeEntry> findTimeEntriesWithCursor(Query query, String cursor, int limit,
+    public List<TimeEntry> findTimeEntriesWithCursor(Query query, CursorPosition position, boolean backward, int limit,
                                                       String sortField, String sortDirection) {
+        String cursor = switch (position) {
+            case CursorPosition.RowId rowId -> rowId.id();
+            case CursorPosition.Unrecognised unrecognised -> unrecognised.decoded();
+            default -> null;
+        };
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
 
         if (DATE_FIELD.equals(sortField)) {
@@ -286,6 +293,11 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
             case FIELD_UPDATED_AT -> entry.getUpdatedAt();
             default -> null;
         };
+    }
+
+    @Override
+    public KeysetCursor keysetCursor(TimeEntry entry, String sortField, String sortDirection) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

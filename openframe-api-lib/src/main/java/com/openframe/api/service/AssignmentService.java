@@ -13,6 +13,7 @@ import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.repository.assignment.ItemAssignmentRepository;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -60,9 +61,12 @@ public class AssignmentService {
         int limit = normalizedPagination.getLimit();
         long totalFilteredCount = repository.countAssignments(itemId, targetType, search);
 
+        CursorPosition position = normalizedPagination.hasCursor()
+                ? new CursorPosition.RowId(normalizedPagination.getCursor())
+                : new CursorPosition.None();
         List<ItemAssignment> raw = repository.findAssignmentsWithCursor(
                 itemId, targetType, search, sortField, sortDirection.name(),
-                normalizedPagination.getCursor(), limit + 1);
+                position, false, limit + 1);
         boolean hasNextPage = raw.size() > limit;
         List<ItemAssignment> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 

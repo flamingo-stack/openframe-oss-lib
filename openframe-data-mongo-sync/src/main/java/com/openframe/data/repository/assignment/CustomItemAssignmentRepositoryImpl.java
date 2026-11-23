@@ -5,6 +5,8 @@ import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.util.StringUtils;
@@ -49,7 +51,8 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
     @Override
     public List<ItemAssignment> findAssignmentsWithCursor(String itemId, AssignmentTargetType targetType,
                                                           String search, String sortField, String sortDirection,
-                                                          String cursor, int limit) {
+                                                          CursorPosition position, boolean backward, int limit) {
+        String cursor = position instanceof CursorPosition.RowId rowId ? rowId.id() : null;
         Query query = buildAssignmentQuery(itemId, targetType, search);
         boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
         Sort.Direction direction = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
@@ -74,6 +77,11 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
         query.limit(limit);
 
         return mongoTemplate.find(query, ItemAssignment.class);
+    }
+
+    @Override
+    public KeysetCursor keysetCursor(ItemAssignment assignment, String sortField, String sortDirection) {
+        throw new UnsupportedOperationException();
     }
 
     private void applyCursorCriteria(Query query, ObjectId cursorId, String sortField, boolean isDesc) {
