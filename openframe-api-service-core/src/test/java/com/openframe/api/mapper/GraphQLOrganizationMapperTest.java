@@ -18,6 +18,8 @@ import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.organization.Organization;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.List;
@@ -30,6 +32,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * last-activity filter mapping, and compound edge-cursor encoding.
  */
 class GraphQLOrganizationMapperTest {
+
+    private static final String NOT_BASE64 = "%%%not-base64%%%";
+    private static final String KEYSET_WITH_BOTH_ALPHABET_MARKS = "1700000000000_>ab?";
+    private static final String STANDARD_ALPHABET_CURSOR = "MTcwMDAwMDAwMDAwMF8+YWI/";
+    private static final String URL_SAFE_ALPHABET_CURSOR = "MTcwMDAwMDAwMDAwMF8-YWI_";
 
     private final GraphQLOrganizationMapper mapper = new GraphQLOrganizationMapper();
 
@@ -89,7 +96,7 @@ class GraphQLOrganizationMapperTest {
     @Test
     void toCursorPaginationCriteria_undecodableAfter_throwsInvalidCursor() {
         // setup
-        ConnectionArgs args = ConnectionArgs.builder().first(2).after("not-a-cursor").build();
+        ConnectionArgs args = ConnectionArgs.builder().first(2).after(NOT_BASE64).build();
 
         // execution
         InvalidCursorException ex = assertThrows(InvalidCursorException.class,
@@ -103,7 +110,7 @@ class GraphQLOrganizationMapperTest {
     @Test
     void toCursorPaginationCriteria_undecodableBefore_throwsInvalidCursor() {
         // setup
-        ConnectionArgs args = ConnectionArgs.builder().last(2).before("not-a-cursor").build();
+        ConnectionArgs args = ConnectionArgs.builder().last(2).before(NOT_BASE64).build();
 
         // execution
         InvalidCursorException ex = assertThrows(InvalidCursorException.class,
@@ -127,5 +134,52 @@ class GraphQLOrganizationMapperTest {
                 .returns(true, CursorPaginationCriteria::isBackward)
                 .returns(2, CursorPaginationCriteria::getLimit)
                 .returns("300_id-3", CursorPaginationCriteria::getCursor);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {STANDARD_ALPHABET_CURSOR, URL_SAFE_ALPHABET_CURSOR})
+    void toCursorPaginationCriteria_afterInEitherBase64Alphabet_forwardCriteriaWithTheSameDecodedCursor(String after) {
+        // setup
+        ConnectionArgs args = ConnectionArgs.builder().first(2).after(after).build();
+
+        // execution
+        CursorPaginationCriteria criteria = mapper.toCursorPaginationCriteria(args);
+
+        // verifications
+        assertThat(criteria)
+                .returns(false, CursorPaginationCriteria::isBackward)
+                .returns(2, CursorPaginationCriteria::getLimit)
+                .returns(KEYSET_WITH_BOTH_ALPHABET_MARKS, CursorPaginationCriteria::getCursor);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {STANDARD_ALPHABET_CURSOR, URL_SAFE_ALPHABET_CURSOR})
+    void toCursorPaginationCriteria_beforeInEitherBase64Alphabet_backwardCriteriaWithTheSameDecodedCursor(
+            String before) {
+        // setup
+        ConnectionArgs args = ConnectionArgs.builder().last(2).before(before).build();
+
+        // execution
+        CursorPaginationCriteria criteria = mapper.toCursorPaginationCriteria(args);
+
+        // verifications
+        assertThat(criteria)
+                .returns(true, CursorPaginationCriteria::isBackward)
+                .returns(2, CursorPaginationCriteria::getLimit)
+                .returns(KEYSET_WITH_BOTH_ALPHABET_MARKS, CursorPaginationCriteria::getCursor);
+    }
+
+    @Test
+    void toCursorPaginationCriteria_noArguments_criteriaWithoutACursor() {
+        // setup
+        ConnectionArgs noArguments = null;
+
+        // execution
+        CursorPaginationCriteria criteria = mapper.toCursorPaginationCriteria(noArguments);
+
+        // verifications
+        assertThat(criteria)
+                .returns(false, CursorPaginationCriteria::isBackward)
+                .returns(false, CursorPaginationCriteria::hasCursor);
     }
 }

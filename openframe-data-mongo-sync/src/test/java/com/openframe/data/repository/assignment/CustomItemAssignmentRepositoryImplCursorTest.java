@@ -262,15 +262,48 @@ class CustomItemAssignmentRepositoryImplCursorTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {DISPLAY_NAME, CREATED_AT})
-    void findAssignmentsWithCursor_rowIdOfAMissingRowUnderAValueSort_throwsInvalidCursor(String sortField) {
+    @MethodSource("fetchDirections")
+    void findAssignmentsWithCursor_rowIdOfAMissingRowUnderTheCreatedAtSort_continuesPastTheIdInFetchDirection(
+            String direction, boolean backward, String operator, int order) {
+        // setup
+        CursorPosition rowId = new CursorPosition.RowId(CURSOR_HEX);
+        Document pastId = new Document(ID, new Document(operator, CURSOR_ID));
+        when(mongoTemplate.findOne(any(Query.class), eq(ItemAssignment.class))).thenReturn(null);
+
+        // execution
+        repository.findAssignmentsWithCursor(
+                ITEM_ID, TARGET_TYPE, null, CREATED_AT, direction, rowId, backward, FETCH_LIMIT);
+
+        // verifications
+        verify(mongoTemplate).findOne(queryCaptor.capture(), eq(ItemAssignment.class));
+        assertThat(queryCaptor.getValue().getQueryObject()).containsExactlyEntriesOf(new Document(ID, CURSOR_ID));
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(ItemAssignment.class));
+        Query query = queryCaptor.getValue();
+        assertThat(query.getQueryObject())
+                .containsEntry(ITEM_ID_FIELD, ITEM_ID)
+                .containsEntry(TARGET_TYPE_FIELD, TARGET_TYPE);
+        assertThat(query.getQueryObject().getList(AND, Document.class)).containsExactly(pastId);
+        assertThat(query.getSortObject()).containsExactlyEntriesOf(new Document(CREATED_AT, order).append(ID, order));
+        assertThat(query.getLimit()).isEqualTo(FETCH_LIMIT);
+        verify(mongoTemplate, never()).findById(any(Object.class), eq(ItemAssignment.class));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "ASC, false",
+            "ASC, true",
+            "DESC, false",
+            "DESC, true"
+    })
+    void findAssignmentsWithCursor_rowIdOfAMissingRowUnderTheDisplayNameSort_throwsInvalidCursor(
+            String direction, boolean backward) {
         // setup
         CursorPosition rowId = new CursorPosition.RowId(CURSOR_HEX);
         when(mongoTemplate.findOne(any(Query.class), eq(ItemAssignment.class))).thenReturn(null);
 
         // execution
         Throwable thrown = catchThrowable(() -> repository.findAssignmentsWithCursor(
-                ITEM_ID, TARGET_TYPE, null, sortField, ASC, rowId, false, FETCH_LIMIT));
+                ITEM_ID, TARGET_TYPE, null, DISPLAY_NAME, direction, rowId, backward, FETCH_LIMIT));
 
         // verifications
         assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
@@ -406,6 +439,7 @@ class CustomItemAssignmentRepositoryImplCursorTest {
                 arguments(new CursorPosition.Unrecognised("1700000000123_" + CURSOR_HEX), CREATED_AT),
                 arguments(new CursorPosition.RowId("not-an-object-id"), ID),
                 arguments(new CursorPosition.RowId("not-an-object-id"), DISPLAY_NAME),
+                arguments(new CursorPosition.RowId("not-an-object-id"), CREATED_AT),
                 arguments(new KeysetCursor(ID, Sort.Direction.ASC, "", "not-an-object-id"), ID),
                 arguments(KeysetCursor.ofString(DISPLAY_NAME, Sort.Direction.ASC, CURSOR_NAME, "not-an-object-id"),
                         DISPLAY_NAME),

@@ -347,8 +347,34 @@ class CustomTicketRepositoryCursorTest {
     }
 
     @ParameterizedTest
-    @MethodSource("valueSorts")
-    void findTicketsWithCursor_rowIdOfAMissingRowUnderAValueSort_throwsInvalidCursor(String sortField) {
+    @MethodSource("fetchDirections")
+    void findTicketsWithCursor_rowIdOfAMissingRowUnderTheCreatedAtSort_continuesPastTheIdInFetchDirection(
+            Sort.Direction direction, boolean backward, String operator, int order) {
+        // setup
+        Query unfiltered = new Query();
+        CursorPosition rowId = new CursorPosition.RowId(CURSOR_HEX);
+        Document pastId = new Document(ID_FIELD, new Document(operator, CURSOR_ID));
+        when(mongoTemplate.findOne(any(Query.class), eq(Ticket.class))).thenReturn(null);
+
+        // execution
+        repository.findTicketsWithCursor(unfiltered, rowId, backward, FETCH_LIMIT, CREATED_AT, direction.name());
+
+        // verifications
+        verify(mongoTemplate).findOne(queryCaptor.capture(), eq(Ticket.class));
+        assertThat(queryCaptor.getValue().getQueryObject()).containsExactlyEntriesOf(new Document(ID_FIELD, CURSOR_ID));
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(Ticket.class));
+        Query query = queryCaptor.getValue();
+        assertThat(query.getQueryObject().getList(AND_OPERATOR, Document.class)).containsExactly(pastId);
+        assertThat(query.getSortObject())
+                .containsExactlyEntriesOf(new Document(CREATED_AT, order).append(ID_FIELD, order));
+        assertThat(query.getLimit()).isEqualTo(FETCH_LIMIT);
+        verify(mongoTemplate, never()).findById(any(Object.class), eq(Ticket.class));
+    }
+
+    @ParameterizedTest
+    @MethodSource("valueSortsOtherThanCreatedAtInEachFetchDirection")
+    void findTicketsWithCursor_rowIdOfAMissingRowUnderAnotherValueSort_throwsInvalidCursor(
+            String sortField, String sortDirection, boolean backward) {
         // setup
         Query unfiltered = new Query();
         CursorPosition rowId = new CursorPosition.RowId(CURSOR_HEX);
@@ -356,7 +382,7 @@ class CustomTicketRepositoryCursorTest {
 
         // execution
         Throwable thrown = catchThrowable(() -> repository.findTicketsWithCursor(
-                unfiltered, rowId, false, FETCH_LIMIT, sortField, ASC));
+                unfiltered, rowId, backward, FETCH_LIMIT, sortField, sortDirection));
 
         // verifications
         assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
@@ -476,6 +502,16 @@ class CustomTicketRepositoryCursorTest {
                 arguments(sortField, ASC, true, -1),
                 arguments(sortField, DESC, false, -1),
                 arguments(sortField, DESC, true, 1)));
+    }
+
+    private static Stream<Arguments> valueSortsOtherThanCreatedAtInEachFetchDirection() {
+        return VALUE_SORTS.stream()
+                .filter(sortField -> !CREATED_AT.equals(sortField))
+                .flatMap(sortField -> Stream.of(
+                        arguments(sortField, ASC, false),
+                        arguments(sortField, ASC, true),
+                        arguments(sortField, DESC, false),
+                        arguments(sortField, DESC, true)));
     }
 
     private static Stream<Arguments> fetchDirections() {

@@ -21,15 +21,20 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
+import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -81,6 +86,9 @@ class AssignmentServicePaginationTest {
     @Mock private MachineRepository machineRepository;
     @Mock private TicketRepository ticketRepository;
     @Mock private KnowledgeBaseItemRepository knowledgeBaseItemRepository;
+    @Mock private TenantAwareMongoTemplate mongoTemplate;
+
+    @Captor private ArgumentCaptor<Query> queryCaptor;
 
     @InjectMocks private AssignmentService service;
 
@@ -221,17 +229,35 @@ class AssignmentServicePaginationTest {
     }
 
     @Test
-    void queryAssignments_rowIdWhoseRowIsGoneUnderTheDefaultSort_throwsInvalidCursor() {
+    void queryAssignments_rowIdWhoseRowIsGoneUnderTheDefaultSort_pagesOnPastThatId() {
         // setup
-        stubAssignmentPages(null);
+        CustomItemAssignmentRepository storedAssignments = new CustomItemAssignmentRepositoryImpl(mongoTemplate);
+        CursorPosition goneRow = new CursorPosition.RowId(GONE_ROW);
+        List<ItemAssignment> rowsPastTheGoneRow = List.of(
+                assignment(ROW_3, "beta", MIDDLE), assignment(ROW_2, "beta", MIDDLE), assignment(ROW_1, "alpha", EARLY));
+        Document pastTheGoneRow = new Document("_id", new Document("$lt", new ObjectId(GONE_ROW)));
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(2).cursor(GONE_ROW).build();
+        when(repository.getDefaultSortField()).thenReturn(CREATED_AT);
+        when(repository.findAssignmentsWithCursor(ITEM_ID, TARGET_TYPE, null, CREATED_AT, DESC, goneRow, false, 3))
+                .thenAnswer(call -> storedAssignments.findAssignmentsWithCursor(
+                        ITEM_ID, TARGET_TYPE, null, CREATED_AT, DESC, goneRow, false, 3));
+        when(repository.keysetCursor(any(ItemAssignment.class), eq(CREATED_AT), eq(DESC)))
+                .thenAnswer(call -> cursorIssuer.keysetCursor(call.getArgument(0), CREATED_AT, DESC));
+        when(mongoTemplate.findOne(any(Query.class), eq(ItemAssignment.class))).thenReturn(null);
+        when(mongoTemplate.find(any(Query.class), eq(ItemAssignment.class))).thenReturn(rowsPastTheGoneRow);
 
         // execution
-        Throwable thrown = catchThrowable(
-                () -> service.queryAssignments(ITEM_ID, TARGET_TYPE, pagination, null, null));
+        CountedGenericQueryResult<ItemAssignment> result =
+                service.queryAssignments(ITEM_ID, TARGET_TYPE, pagination, null, null);
 
         // verifications
-        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
+        assertThat(result.getItems()).extracting(ItemAssignment::getId).containsExactly(ROW_3, ROW_2);
+        assertThat(result.getPageInfo())
+                .returns(true, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(ItemAssignment.class));
+        assertThat(queryCaptor.getValue().getQueryObject().getList("$and", Document.class))
+                .containsExactly(pastTheGoneRow);
     }
 
     @Test
