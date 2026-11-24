@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm.osupdate;
 
+import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.client.publisher.EventLogsPublisher;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.model.enums.MessageType;
@@ -26,6 +27,7 @@ public class DeviceOsUpdateHistoryLogService {
 
     private final EventLogsPublisher eventLogsPublisher;
     private final ObjectMapper objectMapper;
+    private final DeviceOsReportMetrics deviceOsReportMetrics;
 
     // The stored history expires; the log keeps every install. An entry whose operation or result the
     // backend does not know is not logged: the log would have to guess whether it succeeded.
@@ -43,6 +45,7 @@ public class DeviceOsUpdateHistoryLogService {
         OsUpdateHistoryEvent osUpdateHistoryEvent = toEvent(historyEntry);
         CommonDebeziumMessage logEvent = toDebeziumMessage(osUpdateHistoryEvent);
         eventLogsPublisher.publish(historyEntry.getMachineId(), logEvent, LOG_EVENT_HEADERS);
+        deviceOsReportMetrics.recordHistoryLogPublished();
     }
 
     private static OsUpdateHistoryEvent toEvent(DeviceOsUpdateHistoryEntry historyEntry) {

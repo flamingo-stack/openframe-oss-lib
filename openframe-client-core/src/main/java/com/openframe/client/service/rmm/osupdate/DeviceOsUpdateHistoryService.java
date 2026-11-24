@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm.osupdate;
 
+import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 public class DeviceOsUpdateHistoryService {
 
     private final DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
+    private final DeviceOsReportMetrics deviceOsReportMetrics;
 
     // Every report repeats the device's past installs, and each is stored once. Installs older than the retention
     // are not stored: the collection has already dropped them, and the report would bring them back.
@@ -23,6 +25,7 @@ public class DeviceOsUpdateHistoryService {
     public List<DeviceOsUpdateHistoryEntry> saveMissing(Machine machine,
                                                         List<DeviceOsUpdateHistoryEntry> reportedHistoryEntries) {
         List<DeviceOsUpdateHistoryEntry> retainedEntries = findWithinRetention(reportedHistoryEntries);
+        deviceOsReportMetrics.recordHistoryOutsideRetention(reportedHistoryEntries.size() - retainedEntries.size());
         if (retainedEntries.isEmpty()) {
             return List.of();
         }
@@ -30,7 +33,9 @@ public class DeviceOsUpdateHistoryService {
         List<DeviceOsUpdateHistoryEntry> missingEntries = retainedEntries.stream()
                 .filter(retainedEntry -> !storedEntryKeys.contains(retainedEntry.getEntryKey()))
                 .toList();
-        return deviceOsUpdateHistoryRepository.saveAll(missingEntries);
+        List<DeviceOsUpdateHistoryEntry> savedEntries = deviceOsUpdateHistoryRepository.saveAll(missingEntries);
+        deviceOsReportMetrics.recordHistorySaved(savedEntries);
+        return savedEntries;
     }
 
     private static List<DeviceOsUpdateHistoryEntry> findWithinRetention(

@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm.osupdate;
 
+import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.OsRebootPending;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
@@ -14,6 +15,7 @@ import java.util.Optional;
 public class DeviceOsStateService {
 
     private final DeviceOsStateRepository deviceOsStateRepository;
+    private final DeviceOsReportMetrics deviceOsReportMetrics;
 
     // false = a newer report of this device is already stored, so nothing of this one may be applied.
     public boolean saveIfNotOlder(DeviceOsState reportedState) {
@@ -35,6 +37,7 @@ public class DeviceOsStateService {
         Instant rebootPendingSince = resolveRebootPendingSince(reportedState, reportedState.getReceivedAt());
         reportedState.setRebootPendingSince(rebootPendingSince);
         deviceOsStateRepository.save(reportedState);
+        deviceOsReportMetrics.recordFirstReport(reportedState.getPlatform());
     }
 
     // The version is the stored one: when another report replaced the state meanwhile, the save fails and the
@@ -45,6 +48,8 @@ public class DeviceOsStateService {
         reportedState.setVersion(storedState.getVersion());
         reportedState.setRebootPendingSince(rebootPendingSince);
         deviceOsStateRepository.save(reportedState);
+        deviceOsReportMetrics.recordReportInterval(
+                reportedState.getPlatform(), storedState.getReceivedAt(), reportedState.getReceivedAt());
     }
 
     private static boolean isOlder(DeviceOsState reportedState, DeviceOsState storedState) {

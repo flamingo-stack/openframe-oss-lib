@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm.osupdate;
 
+import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.DeviceOsPendingUpdate;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 public class DeviceOsPendingUpdateService {
 
     private final DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
+    private final DeviceOsReportMetrics deviceOsReportMetrics;
 
     // The report is the device's whole list: what it no longer names is gone, what it names again keeps its
     // discoveredAt.
@@ -28,8 +30,12 @@ public class DeviceOsPendingUpdateService {
         List<DeviceOsPendingUpdate> noLongerReported = findNoLongerReported(storedPendingUpdates, reportedPendingUpdates);
         List<DeviceOsPendingUpdate> newOrChanged = findNewOrChanged(storedPendingUpdates, reportedPendingUpdates);
 
+        long added = newOrChanged.stream().filter(pendingUpdate -> pendingUpdate.getId() == null).count();
+        long changed = newOrChanged.size() - added;
+
         deviceOsPendingUpdateRepository.deleteAll(noLongerReported);
         deviceOsPendingUpdateRepository.saveAll(newOrChanged);
+        deviceOsReportMetrics.recordPendingUpdatesWritten(added, changed, noLongerReported.size());
     }
 
     private static List<DeviceOsPendingUpdate> findNoLongerReported(List<DeviceOsPendingUpdate> storedPendingUpdates,

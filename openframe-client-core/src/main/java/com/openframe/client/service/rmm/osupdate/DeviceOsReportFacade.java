@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm.osupdate;
 
+import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.client.service.rmm.osupdate.parser.DeviceOsReportParser;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -27,40 +28,38 @@ public class DeviceOsReportFacade {
     private final DeviceOsPendingUpdateService deviceOsPendingUpdateService;
     private final DeviceOsUpdateHistoryService deviceOsUpdateHistoryService;
     private final DeviceOsUpdateHistoryLogService deviceOsUpdateHistoryLogService;
+    private final DeviceOsReportMetrics deviceOsReportMetrics;
 
-    public void applyReport(String machineId, byte[] payload, Instant receivedAt) {
-        Optional<Machine> reportingMachine = findReportingMachine(machineId);
-        if (reportingMachine.isEmpty()) {
-            return;
+    public DeviceOsReportOutcome applyReport(String machineId, byte[] payload, Instant receivedAt) {
+        Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
+        if (foundMachine.isEmpty()) {
+            log.warn("OS report of unknown machine {}, ignoring", machineId);
+            return DeviceOsReportOutcome.UNKNOWN_MACHINE;
         }
-        Machine machine = reportingMachine.get();
+        Machine machine = foundMachine.get();
+        if (DeviceStatus.FROZEN.contains(machine.getStatus())) {
+            log.debug("Ignoring OS report of machineId={} in status {}", machineId, machine.getStatus());
+            return DeviceOsReportOutcome.FROZEN_MACHINE;
+        }
+
         DeviceOsReport deviceOsReport = deviceOsReportParser.parse(machine, payload, receivedAt);
 
         boolean stateSaved = deviceOsStateService.saveIfNotOlder(deviceOsReport.getDeviceOsState());
         if (!stateSaved) {
             log.info("Ignoring OS report of machineId={} received at {}: a newer one is applied", machineId, receivedAt);
-            return;
+            return DeviceOsReportOutcome.IGNORED_OLDER;
         }
+
         if (deviceOsReport.isPendingUpdatesReadable()) {
             osUpdateService.saveMissing(deviceOsReport.getOsUpdates());
             deviceOsPendingUpdateService.replacePendingUpdates(machine, deviceOsReport.getPendingUpdates());
         }
+
         List<DeviceOsUpdateHistoryEntry> newHistoryEntries =
                 deviceOsUpdateHistoryService.saveMissing(machine, deviceOsReport.getHistoryEntries());
         deviceOsUpdateHistoryLogService.logNewEntries(newHistoryEntries);
-    }
 
-    private Optional<Machine> findReportingMachine(String machineId) {
-        Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
-        if (foundMachine.isEmpty()) {
-            log.warn("OS report of unknown machine {}, ignoring", machineId);
-            return Optional.empty();
-        }
-        Machine machine = foundMachine.get();
-        if (DeviceStatus.FROZEN.contains(machine.getStatus())) {
-            log.debug("Ignoring OS report of machineId={} in status {}", machineId, machine.getStatus());
-            return Optional.empty();
-        }
-        return foundMachine;
+        deviceOsReportMetrics.recordApplied(deviceOsReport);
+        return DeviceOsReportOutcome.APPLIED;
     }
 }

@@ -1,11 +1,14 @@
 package com.openframe.client.listener.rmm;
 
 import com.openframe.client.exception.MalformedDeviceOsReportException;
+import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.rmm.osupdate.DeviceOsReportFacade;
+import com.openframe.client.service.rmm.osupdate.DeviceOsReportOutcome;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage;
 import io.nats.client.Connection;
+import io.micrometer.core.instrument.Timer;
 import io.nats.client.Message;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,15 +23,18 @@ public class MachineOsUpdatesListener extends AbstractJetStreamPushListener {
 
     private final DeviceOsReportFacade deviceOsReportFacade;
     private final NatsTopicMachineIdExtractor natsTopicMachineIdExtractor;
+    private final DeviceOsReportMetrics deviceOsReportMetrics;
 
     public MachineOsUpdatesListener(
             Connection natsConnection,
             DeviceOsReportFacade deviceOsReportFacade,
-            NatsTopicMachineIdExtractor natsTopicMachineIdExtractor
+            NatsTopicMachineIdExtractor natsTopicMachineIdExtractor,
+            DeviceOsReportMetrics deviceOsReportMetrics
     ) {
         super(natsConnection);
         this.deviceOsReportFacade = deviceOsReportFacade;
         this.natsTopicMachineIdExtractor = natsTopicMachineIdExtractor;
+        this.deviceOsReportMetrics = deviceOsReportMetrics;
     }
 
     @Override
@@ -58,22 +64,40 @@ public class MachineOsUpdatesListener extends AbstractJetStreamPushListener {
 
     @Override
     protected void handleMessage(Message message) {
-        String subject = message.getSubject();
+        Timer.Sample reportStarted = deviceOsReportMetrics.startReport();
+        DeviceOsReportOutcome deviceOsReportOutcome = handleReport(message);
+        deviceOsReportMetrics.recordHandled(reportStarted, deviceOsReportOutcome);
+    }
+
+    private DeviceOsReportOutcome handleReport(Message message) {
         try {
-            applyReport(message);
+            DeviceOsReportOutcome deviceOsReportOutcome = applyReport(message);
             message.ack();
-        } catch (MalformedDeviceOsReportException | IllegalArgumentException permanentlyBad) {
+            return deviceOsReportOutcome;
+        } catch (MalformedDeviceOsReportException permanentlyBad) {
             dropMalformed(message, permanentlyBad);
+            return DeviceOsReportOutcome.MALFORMED;
         } catch (Exception e) {
-            log.error("Unexpected error processing OS report subject={}", subject, e);
+            log.error("Unexpected error processing OS report subject={}", message.getSubject(), e);
+            deviceOsReportMetrics.recordFailed(e);
+            return DeviceOsReportOutcome.FAILED;
         }
     }
 
-    private void applyReport(Message message) {
-        String machineId = natsTopicMachineIdExtractor.extract(message.getSubject());
+    private DeviceOsReportOutcome applyReport(Message message) {
         Instant receivedAt = message.metaData().timestamp().toInstant();
+        deviceOsReportMetrics.recordReceived(message.getData().length, receivedAt);
+        String machineId = extractMachineId(message);
         log.debug("Processing OS report: machineId={} receivedAt={}", machineId, receivedAt);
-        deviceOsReportFacade.applyReport(machineId, message.getData(), receivedAt);
+        return deviceOsReportFacade.applyReport(machineId, message.getData(), receivedAt);
+    }
+
+    private String extractMachineId(Message message) {
+        try {
+            return natsTopicMachineIdExtractor.extract(message.getSubject());
+        } catch (IllegalArgumentException invalidSubject) {
+            throw new MalformedDeviceOsReportException("OS report on an invalid subject", invalidSubject);
+        }
     }
 
     private static void dropMalformed(Message message, Exception permanentlyBad) {

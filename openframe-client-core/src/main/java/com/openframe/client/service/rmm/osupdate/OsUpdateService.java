@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm.osupdate;
 
+import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 public class OsUpdateService {
 
     private final OsUpdateRepository osUpdateRepository;
+    private final DeviceOsReportMetrics deviceOsReportMetrics;
 
     // An update is described once, by the first device that reports it. Later reports do not change it.
     public void saveMissing(List<OsUpdate> reportedOsUpdates) {
@@ -46,6 +48,7 @@ public class OsUpdateService {
     private void saveUnlessStoredMeanwhile(OsUpdate missingOsUpdate) {
         try {
             osUpdateRepository.save(missingOsUpdate);
+            deviceOsReportMetrics.recordOsUpdateSaved(missingOsUpdate.getPlatform());
         } catch (DuplicateKeyException storedMeanwhile) {
             log.debug("OS update {} of tenantId={} was stored by another report meanwhile",
                     missingOsUpdate.getIdentifier(), missingOsUpdate.getTenantId());
