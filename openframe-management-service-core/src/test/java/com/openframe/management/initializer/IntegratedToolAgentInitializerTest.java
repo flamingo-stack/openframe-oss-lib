@@ -31,6 +31,8 @@ class IntegratedToolAgentInitializerTest {
 
     private static final String FLEET_AGENT = "fleetmdm-agent";
     private static final String FLEET_CONFIGURATION = "agent-configurations/fleetmdm-agent.json";
+    private static final String CLIENT_AGENT = "default";
+    private static final String CLIENT_CONFIGURATION = "agent-configurations/client-configuration.json";
     private static final String CA_PATH = "/etc/openframe/local-ca.pem";
 
     @Mock private IntegratedToolAgentService integratedToolAgentService;
@@ -165,6 +167,20 @@ class IntegratedToolAgentInitializerTest {
         assertThat(configurationCaptor.getValue().getRunCommandArgs())
                 .endsWith("--openframe-token-path", "${client.openframeTokenPath}")
                 .doesNotContain("--insecure");
+    }
+
+    @Test
+    void run_extraRunArgsForAgentWithoutRunArgs_configurationStillApplied() {
+        // setup
+        agentConfigurationProperties.setAgentConfigurations(List.of(CLIENT_CONFIGURATION));
+        agentConfigurationProperties.setAgentExtraRunArgs(Map.of(CLIENT_AGENT, List.of("--fleet-certificate", CA_PATH)));
+
+        // execution
+        initializer.run(null);
+
+        // verifications
+        verify(integratedToolAgentService).updateConfigurationFields(configurationCaptor.capture());
+        assertThat(configurationCaptor.getValue().getRunCommandArgs()).isNull();
     }
 
     @Test

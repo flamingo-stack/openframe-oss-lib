@@ -99,10 +99,11 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
 
     private void applyExtraRunArgsFromProperties(IntegratedToolAgentConfiguration configuration) {
         List<String> extraRunArgs = agentConfigurationProperties.getAgentExtraRunArgs().get(configuration.getId());
-        if (extraRunArgs == null) {
+        List<String> runCommandArgs = configuration.getRunCommandArgs();
+        if (extraRunArgs == null || runCommandArgs == null) {
             return;
         }
-        configuration.getRunCommandArgs().addAll(extraRunArgs);
+        runCommandArgs.addAll(extraRunArgs);
     }
 
     private static void applyAssetVersion(IntegratedToolAgentConfiguration configuration, String assetId, String version) {
