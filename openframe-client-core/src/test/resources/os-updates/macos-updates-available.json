@@ -1,0 +1,73 @@
+{
+  "reportedAt": "2026-11-20T09:14:02.481293Z",
+  "platform": "MACOS",
+  "architecture": "ARM64",
+  "osVersion": "26.1",
+  "osBuild": "25B78",
+  "osProductName": "macOS",
+  "osVersionSource": "SYSTEM_VERSION_PLIST",
+  "rebootPending": "UNKNOWN",
+  "rebootUnknownReason": "EVIDENCE_KEY_ABSENT",
+  "osUpdateAuthorization": "AUTHORIZED",
+  "manageability": { "state": "MANAGEABLE", "reasons": [] },
+  "patchState": "UPDATES_AVAILABLE",
+  "updatesAvailableFresh": 2,
+  "scanState": "FRESH",
+  "scanAgeSeconds": 4120,
+  "lastScanAt": "2026-11-20T08:05:21Z",
+  "settingsSource": "LOCAL",
+  "managedKeys": [],
+  "updates": {
+    "confidence": "CONFIRMED",
+    "readAt": "2026-11-20T09:14:02Z",
+    "count": 3,
+    "truncated": false,
+    "items": [
+      {
+        "identifier": "MSU_UPDATE_25C56_patch_26.2",
+        "displayName": "macOS Sequoia 26.2",
+        "displayVersion": "26.2",
+        "macos": { "productKey": "052-62345", "presence": "FRESH" }
+      },
+      {
+        "identifier": "Command Line Tools for Xcode-26.6",
+        "displayName": "Command Line Tools for Xcode",
+        "displayVersion": "26.6",
+        "macos": { "presence": "FRESH" }
+      },
+      {
+        "identifier": "Safari-18.2",
+        "displayName": "Safari",
+        "displayVersion": "18.2",
+        "macos": {
+          "presence": "HELD_OVER",
+          "heldOverSince": "2026-11-20T09:12:58Z",
+          "missingSamples": 1
+        }
+      }
+    ]
+  },
+  "lastOsInstall": {
+    "displayName": "macOS 26.1",
+    "displayVersion": "26.1",
+    "installedAt": "2026-10-28T23:41:07Z"
+  },
+  "sourceErrors": [],
+  "macos": {
+    "updatesAvailableHeldOver": 1,
+    "offeredUpdates": [
+      { "identifier": "MSU_UPDATE_25C56_patch_26.2", "firstOfferedAt": "2026-11-18T07:02:11Z" }
+    ],
+    "offeredUpdatesTruncated": false,
+    "lastFullSuccessfulScanAt": "2026-11-20T08:05:21Z",
+    "lastBackgroundMsuScanAt": "2026-11-19T21:44:03Z",
+    "lastSuccessfulAt": "2026-11-20T08:05:21Z",
+    "lastSessionSuccessful": true,
+    "lastResultCode": 2,
+    "automaticDownload": true,
+    "automaticallyInstallMacOsUpdates": false,
+    "criticalUpdateInstall": true,
+    "configDataInstall": true,
+    "autoInstallProductKeys": []
+  }
+}
