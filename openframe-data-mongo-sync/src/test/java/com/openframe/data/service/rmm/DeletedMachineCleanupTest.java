@@ -3,6 +3,9 @@ package com.openframe.data.service.rmm;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +29,9 @@ class DeletedMachineCleanupTest {
     @Mock private DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjectionTrigger projectionTrigger;
+    @Mock private DeviceOsStateRepository deviceOsStateRepository;
+    @Mock private DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
+    @Mock private DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
 
     @InjectMocks private DeletedMachineCleanup cleanup;
 
@@ -45,7 +51,8 @@ class DeletedMachineCleanupTest {
         cleanup.cleanUpDeletedMachine("t-1", null);
 
         verifyNoInteractions(assignedRepository, onlineDeviceDispatchRepository,
-                deviceSoftwareRepository, projectionTrigger);
+                deviceSoftwareRepository, projectionTrigger,
+                deviceOsStateRepository, deviceOsPendingUpdateRepository, deviceOsUpdateHistoryRepository);
     }
 
     @Test
@@ -73,5 +80,34 @@ class DeletedMachineCleanupTest {
 
         verify(deviceSoftwareRepository).findByTenantIdAndMachineId("t-1", "m-1");
         verifyNoInteractions(projectionTrigger);
+    }
+
+    @Test
+    void cleanUpDeletedMachine_deviceWithOsReport_stateAndPendingUpdatesAndHistoryOfThatDeviceRemoved() {
+        // setup
+        when(deviceOsStateRepository.deleteByTenantIdAndMachineId("t-1", "m-1")).thenReturn(1L);
+        when(deviceOsPendingUpdateRepository.deleteByTenantIdAndMachineId("t-1", "m-1")).thenReturn(3L);
+        when(deviceOsUpdateHistoryRepository.deleteByTenantIdAndMachineId("t-1", "m-1")).thenReturn(7L);
+
+        // execution
+        cleanup.cleanUpDeletedMachine("t-1", "m-1");
+
+        // verifications
+        verify(deviceOsStateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+        verify(deviceOsPendingUpdateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+        verify(deviceOsUpdateHistoryRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+    }
+
+    @Test
+    void cleanUpDeletedMachine_deviceThatNeverReportedItsOs_threeDeletesStillAsked() {
+        // setup
+
+        // execution
+        cleanup.cleanUpDeletedMachine("t-1", "m-1");
+
+        // verifications
+        verify(deviceOsStateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+        verify(deviceOsPendingUpdateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+        verify(deviceOsUpdateHistoryRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
     }
 }
