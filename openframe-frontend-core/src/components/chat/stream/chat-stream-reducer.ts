@@ -181,6 +181,13 @@ export const OWN_ECHO_TTL_MS = 30_000;
  */
 export const OWN_ECHO_AUTHOR_TTL_MS = 10 * 60_000;
 
+/**
+ * How far a replayed request's stream publish time may sit from its persisted row's `createdAt`. Both are the server's
+ * clocks (the stream's and the backend's that wrote the row in the same request), so a replay lands within a moment;
+ * a new send of the same text is a user action later, past this.
+ */
+export const REPLAY_PUBLISH_TOLERANCE_MS = 3_000;
+
 /** Cap on simultaneously-armed echo entries (a backend that never echoes must
  *  not grow the list without bound). */
 const MAX_PENDING_ECHOES = 5;
@@ -210,6 +217,8 @@ export interface InitializeExtras {
    * the gate FORWARD (a lower value is ignored).
    */
   lastAppliedSeq?: number;
+  /** `getTrailingReplayMatched` PARKED from a previous instance of this key: the replay it saw is not delivered again. */
+  trailingReplayMatched?: boolean;
   /**
    * Armed optimistic-echo entries PARKED from a previous instance of this key.
    * Without them, a key LRU-evicted between `pushOptimisticSend` and its
@@ -352,6 +361,9 @@ export interface ChatStreamReducer {
    */
   getPendingEchoes(): readonly PendingEcho[];
 
+  /** Whether the trailing prompt's replay was already seen; parked across an eviction like the echo entries. */
+  getTrailingReplayMatched(): boolean;
+
   /**
    * Consume the armed echo of one of the viewer's own sends with this text (one-shot, within `OWN_ECHO_TTL_MS`), as a
    * `MESSAGE_REQUEST` echo does. For a direct message that names no author: it is the viewer's own only when it answers
@@ -387,6 +399,14 @@ function raisesCoverage(chunk: UiChunk): boolean {
 /** A row this client minted (a live synthetic or an optimistic send), not one read from the history. */
 function isClientMinted(id: string): boolean {
   return id.startsWith('optimistic-') || SYNTHETIC_REALTIME_ID_PREFIXES.some(prefix => id.startsWith(prefix));
+}
+
+/** The last row read from the history, past the ones this client minted after it. */
+function lastPersisted(messages: readonly ChatMessage[]): ChatMessage | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (!isClientMinted(messages[index].id)) return messages[index];
+  }
+  return undefined;
 }
 
 /**
@@ -507,25 +527,27 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
    *    `turnStartedAt` and a `finish` purges nothing. This is the shape a
    *    stopped prompt stamped with its seq produces: the tab resumes after
    *    that seq and replays the stopped turn's boundaries.
-   *  - NOT COVERED — a reconnect / resync catch-up (a NEW consumer after a
-   *    network drop or a return from a hidden tab, resuming after the highest
-   *    seq seen, and a backfill host's catch-up) that delivers BOTH a
-   *    pre-disconnect `start` and its `finish` after the user has
-   *    already sent. The backlog window above opens only at hydration, not per
-   *    consumer: covering this needs a "replay started" signal from the NATS
-   *    client. The replayed `start` restamps `turnStartedAt` to
-   *    now, so the following `finish` purges a still-live entry and the
-   *    echo renders a SECOND bubble. This is not fixable at this layer: with
-   *    no event-own timestamp, that interleaving is indistinguishable from
-   *    "the send was queued mid-turn, and this reducer's own turn opened and
-   *    closed before the echo landed" — a case the module deliberately
-   *    resolves toward the duplicate row rather than risk swallowing a real
-   *    message. `seq` does not disambiguate it either: a replay whose seqs
-   *    were already applied is dropped by `apply()`'s idempotency gate before
-   *    reaching here, so any replay that DOES reach here carries
-   *    strictly-increasing unseen seqs — exactly what a live turn carries.
-   *    Pinned by the "a replayed turn boundary after a send duplicates the
-   *    bubble" test. Fix it by giving the transport an event-own time, not by
+   *  - COVERED WHEN THE HOST SAYS SO — a reconnect / resync catch-up (a NEW
+   *    consumer after a network drop or a return from a hidden tab, resuming
+   *    after the highest seq seen, or one nats.ws recreated) that delivers BOTH
+   *    a pre-disconnect `start` and its `finish` after the user has already
+   *    sent. The JetStream tail reports such a catch-up (`onCatchUpStart`) and
+   *    the engine opens the same backlog window for it, closing it when the
+   *    tail has delivered what it held (`onResync`) or after a cap.
+   *  - NOT COVERED — the same interleaving with no window open: a host whose
+   *    tail does not report its catch-up, a backfill host, or a catch-up past
+   *    the cap. The replayed `start` restamps `turnStartedAt` to now, so the
+   *    following `finish` purges a still-live entry and the echo renders a
+   *    SECOND bubble. Without the window, that interleaving is
+   *    indistinguishable from "the send was queued mid-turn, and this
+   *    reducer's own turn opened and closed before the echo landed" — a case
+   *    the module deliberately resolves toward the duplicate row rather than
+   *    risk swallowing a real message. `seq` does not disambiguate it either:
+   *    a replay whose seqs were already applied is dropped by `apply()`'s
+   *    idempotency gate before reaching here, so any replay that DOES reach
+   *    here carries strictly-increasing unseen seqs — exactly what a live turn
+   *    carries. Pinned by the "a replayed turn boundary after a send
+   *    duplicates the bubble" test. Fix it by opening the window, not by
    *    widening the purge here.
    *
    *  `OWN_ECHO_AUTHOR_TTL_MS` remains the backstop for dialogs that never
@@ -576,6 +598,11 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   let replayingBacklog = false;
   /** A send's placeholder a backlog turn stepped around (`stepAroundSendPlaceholder`): the wire returns to it. */
   let parkedPlaceholderId: string | null = null;
+  /**
+   * The trailing prompt's replay has been seen (`isReplayOfTrailingPrompt`): the tail replays a request once, so the
+   * next echo with the same text is a new send. Cleared when a history seeds the thread.
+   */
+  let trailingReplayMatched = false;
 
   // ── Snapshot cache ─────────────────────────────────────────────────────
   let stateCache: ChatReducerState | null = null;
@@ -781,24 +808,41 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
    *  Dedup layers in priority order: seq identity → one-shot optimistic-echo
    *  consumption → same-author content window (seq-less transports only). */
   /**
-   * A replayed `MESSAGE_REQUEST` echo of the prompt the thread already holds as its last row. An older user row can
-   * lack a stream seq, so after a reload mid-reply the history has the prompt but its seq cannot move the
-   * live tail past the echo: the tail replays it. Its twin is the trailing persisted user row with the same text, when
-   * nothing in the thread reached the echo's seq. A new send that repeats an answered prompt is not one: the answer,
-   * stamped with its seq, sits after the older twin. A tail that opened on new messages or finished its replay
-   * (`setTailReplaysHistory(false)`) delivers fresh requests.
+   * A replayed `MESSAGE_REQUEST` echo of the prompt the thread already holds as its last persisted row. An older user
+   * row can lack a stream seq (rows saved before the backend stamped requests), so after a reload the history has the
+   * prompt but its seq cannot move the live tail past the echo: the tail replays it. Its twin is the trailing persisted
+   * user row with the same text, when nothing in the thread reached the echo's seq. A new send that repeats an answered
+   * prompt is not one: the answer, stamped with its seq, sits after the older twin. A tail that opened on new messages
+   * or finished its replay (`setTailReplaysHistory(false)`) delivers fresh requests.
+   *
+   * With the transport's publish time (`at`) the decision is exact: the replay was published as the row was written
+   * (`createdAt`, the same server side), a fresh repeat later; so a repeat of a stopped prompt whose turn has left the
+   * stream is a new send, whatever the tail is doing. The rows the tab minted itself (an optimistic send and its
+   * placeholder) are skipped: the prompt they follow is still the trailing persisted one. And a request replays once:
+   * after a match the next same-text echo is a send.
    */
-  function isReplayOfTrailingPrompt(text: string, authorType: 'admin' | 'user', seq: number): boolean {
-    if (!tailReplaysHistory) return false;
-    const last = messages[messages.length - 1];
+  function isReplayOfTrailingPrompt(
+    text: string,
+    authorType: 'admin' | 'user',
+    seq: number,
+    at: number | undefined,
+  ): boolean {
+    if (!tailReplaysHistory || trailingReplayMatched) return false;
+    const last = at === undefined ? messages[messages.length - 1] : lastPersisted(messages);
     if (!last || last.role !== 'user' || isClientMinted(last.id)) return false;
     // A direct or system row carries its persisted seq: seq coverage, not text, decides those.
     if (typeof last.metadata?.streamSeq === 'number') return false;
     if ((last.metadata?.author?.authorType ?? 'user') !== authorType || textOfParts(last.parts) !== text) return false;
-    return !messages.some(m => typeof m.metadata?.streamSeq === 'number' && m.metadata.streamSeq >= seq);
+    if (messages.some(m => typeof m.metadata?.streamSeq === 'number' && m.metadata.streamSeq >= seq)) return false;
+    if (at !== undefined) {
+      const written = Date.parse(last.metadata?.createdAt ?? '');
+      if (Number.isFinite(written) && Math.abs(at - written) > REPLAY_PUBLISH_TOLERANCE_MS) return false;
+    }
+    trailingReplayMatched = true;
+    return true;
   }
 
-  function applyUserMessage(data: ChatParticipantChunk['data'], seq: number | undefined): void {
+  function applyUserMessage(data: ChatParticipantChunk['data'], seq: number | undefined, at: number | undefined): void {
     const { text } = data;
     if (!text) return;
     // ADMIN rows are only echo-consumable when the host declares that its
@@ -822,9 +866,14 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     if (selfUserId !== undefined && !authorDeclared) warnIdLessAuthor();
     const authorMatched = selfUserId !== undefined && authorDeclared && data.userId === selfUserId;
     const authorEchoAllowed = selfUserId === undefined || !authorDeclared || authorMatched;
-    if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text, authorMatched)) return;
     const authorType = data.ownerType === OWNER_TYPE.ADMIN ? ('admin' as const) : ('user' as const);
-    if (typeof seq === 'number' && isReplayOfTrailingPrompt(text, authorType, seq)) return;
+    // A dated replay of the trailing prompt goes before the echo entries: it would otherwise spend the entry of a send
+    // with the same text, whose own echo then draws a second bubble. Undated, the check cannot tell the replay from that
+    // send's own echo, so the entry goes first, as before.
+    const dated = typeof seq === 'number' && at !== undefined;
+    if (dated && isReplayOfTrailingPrompt(text, authorType, seq, at)) return;
+    if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text, authorMatched)) return;
+    if (typeof seq === 'number' && !dated && isReplayOfTrailingPrompt(text, authorType, seq, undefined)) return;
     if (
       typeof seq !== 'number' &&
       hasRecentMessage(
@@ -918,9 +967,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     ]);
   }
 
-  function applyParticipant(chunk: ChatParticipantChunk, seq: number | undefined): void {
+  function applyParticipant(chunk: ChatParticipantChunk, seq: number | undefined, at: number | undefined): void {
     const before = messages;
-    if (chunk.data.kind === 'message-request') applyUserMessage(chunk.data, seq);
+    if (chunk.data.kind === 'message-request') applyUserMessage(chunk.data, seq, at);
     else if (chunk.data.kind === 'direct-message') applyDirectMessage(chunk.data, seq);
     else applySystemMessage(chunk.data, seq);
     // A row that lands between turns ends what a standalone chunk had gathered: the next one starts below it.
@@ -1023,7 +1072,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         break;
 
       case 'data-chat-participant':
-        applyParticipant(chunk, seq);
+        applyParticipant(chunk, seq, entry.at);
         break;
 
       case 'data-token-usage':
@@ -1078,6 +1127,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     adoptedMessageId = null;
     replayingBacklog = false;
     parkedPlaceholderId = null;
+    trailingReplayMatched = false;
     wire.setMessageId(null);
     wire.textOffsets.clear();
   }
@@ -1150,12 +1200,15 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   function initializeWithState(nextMessages: ChatMessage[] | null, extras?: InitializeExtras): void {
     if (nextMessages !== null) {
       messages = nextMessages;
+      // A new history: its trailing prompt has not been replayed yet. A parked flag (below) restores an evicted one.
+      trailingReplayMatched = false;
     }
     if (extras) {
       // Parked state from a previous instance of this key (see the fields'
       // docs). Both are restore-only: statuses merge monotonically, the seq
       // gate only moves forward.
       if (extras.approvalStatuses) mergeApprovalStatusesInternal(extras.approvalStatuses);
+      if (extras.trailingReplayMatched === true) trailingReplayMatched = true;
       if (typeof extras.lastAppliedSeq === 'number' && extras.lastAppliedSeq > lastAppliedSeq) {
         lastAppliedSeq = extras.lastAppliedSeq;
       }
@@ -1340,6 +1393,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
 
     getLastAppliedSeq() {
       return lastAppliedSeq;
+    },
+    getTrailingReplayMatched() {
+      return trailingReplayMatched;
     },
     getPendingEchoes() {
       // SNAPSHOT, not the live array: `pushOptimisticSend` pushes into and

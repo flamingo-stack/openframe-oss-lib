@@ -7,7 +7,7 @@ import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
 import { Button } from '../ui';
-import { usePortalContainer } from '../ui/portal-container';
+import { useCollisionBoundary, usePortalContainer } from '../ui/portal-container';
 
 // Types for filter configuration
 export interface FilterOption {
@@ -94,19 +94,76 @@ const FilterCheckbox: FC<{
   );
 };
 
-/** A floating panel's distance below its trigger and from the window's edges, in px. */
+/** A floating panel's distance from its trigger and from the edges of the room it has, in px. */
 const FLOATING_GAP = 8;
 const FLOATING_WIDTH = 320;
+/** The option list's own height limit: keep in step with its `max-h-[250px]` below. */
+const FLOATING_LIST_MAX_HEIGHT = 250;
 
-/** Where a floating panel goes: under its trigger, hung from the edge its placement names, kept inside the window. */
-function floatingPanelPosition(
-  panelWidth: number,
+/** Which side of its trigger a floating panel opens on. */
+type FloatingSide = 'below' | 'above';
+
+/**
+ * How tall a floating panel wants to be, and the least it can be while still useful: Reset / Apply and one row.
+ *
+ * Read from the content, not from the panel's current box: once a cap is set the box is the cap, and a height measured
+ * there would keep the cap after the window grows. The option list's scrollHeight is its whole content whatever its
+ * box; the rest of the card (padding, the buttons) does not change with the cap. `offsetHeight`, not
+ * `getBoundingClientRect`: the panel opens at `scale-95`, and a transformed rect is 5% short.
+ */
+function floatingPanelSize(card: HTMLElement | null): { natural: number; minimum: number } {
+  if (!card) return { natural: 0, minimum: 0 };
+  const list = card.querySelector<HTMLElement>('[data-filter-panel="list"]');
+  if (!list) return { natural: card.offsetHeight, minimum: card.offsetHeight };
+  const chrome = card.offsetHeight - list.offsetHeight;
+  const listNatural = Math.min(list.scrollHeight, FLOATING_LIST_MAX_HEIGHT);
+  const header = list.querySelector<HTMLElement>('[data-filter-panel="section-header"]');
+  const option = list.querySelector<HTMLElement>('[data-filter-panel="option"]');
+  const oneRow = (header?.offsetHeight ?? 0) + (option?.offsetHeight ?? 0);
+  return { natural: chrome + listNatural, minimum: chrome + Math.min(listNatural, oneRow) };
+}
+
+/**
+ * The vertical room a floating panel has: the collision boundary's (a chat panel the overlay must stay inside) when
+ * one is set, within the window. The same source Radix overlays flip against.
+ */
+function floatingVerticalBounds(boundary: HTMLElement | null): { top: number; bottom: number } {
+  if (!boundary) return { top: 0, bottom: window.innerHeight };
+  const rect = boundary.getBoundingClientRect();
+  return { top: Math.max(0, rect.top), bottom: Math.min(window.innerHeight, rect.bottom) };
+}
+
+/** Where a floating panel goes: inline styles for the panel (`left`, `top`, `bottom`) and its card (`maxHeight`). */
+interface FloatingLayout {
+  side: FloatingSide;
+  left: string;
+  top: string;
+  bottom: string;
+  maxHeight: string;
+}
+
+/**
+ * Where a floating panel (`fixed`, in a portal) goes at its trigger.
+ *
+ * Horizontally: hung from the edge its placement names, kept inside the window. Vertically: below its trigger when it
+ * fits there; otherwise on the side with more room, and capped to that room when neither side holds all of it (the
+ * option list shrinks and scrolls, Reset / Apply stay on screen). A panel that opened above is placed by `bottom`, so
+ * a change in its height never opens a gap between it and its trigger.
+ *
+ * `held` is the side the open panel is on: it keeps it while that side still holds Reset / Apply and a row, so a page
+ * scrolled near the threshold does not throw the panel across its trigger. `null` chooses afresh (opening).
+ */
+function floatingPanelLayout(
+  panel: HTMLElement,
+  card: HTMLElement | null,
   trigger: Element | null,
   placement: 'bottom-start' | 'bottom-end' | 'bottom',
-): { left: string; top: string } | null {
+  boundary: HTMLElement | null,
+  held: FloatingSide | null,
+): FloatingLayout | null {
   if (!trigger) return null;
   const rect = trigger.getBoundingClientRect();
-  const width = panelWidth || FLOATING_WIDTH;
+  const width = panel.offsetWidth || FLOATING_WIDTH;
   const wanted =
     placement === 'bottom-end'
       ? rect.right - width
@@ -114,7 +171,29 @@ function floatingPanelPosition(
         ? (rect.left + rect.right) / 2 - width / 2
         : rect.left;
   const max = Math.max(FLOATING_GAP, window.innerWidth - width - FLOATING_GAP);
-  return { left: `${Math.min(Math.max(wanted, FLOATING_GAP), max)}px`, top: `${rect.bottom + FLOATING_GAP}px` };
+
+  const size = floatingPanelSize(card);
+  const bounds = floatingVerticalBounds(boundary);
+  const roomBelow = bounds.bottom - FLOATING_GAP - (rect.bottom + FLOATING_GAP);
+  const roomAbove = rect.top - FLOATING_GAP - (bounds.top + FLOATING_GAP);
+
+  let side: FloatingSide;
+  if (held === null) {
+    side = size.natural <= roomBelow || roomBelow >= roomAbove ? 'below' : 'above';
+  } else {
+    const room = held === 'below' ? roomBelow : roomAbove;
+    const other = held === 'below' ? roomAbove : roomBelow;
+    side = room < size.minimum && other > room ? (held === 'below' ? 'above' : 'below') : held;
+  }
+  const room = side === 'below' ? roomBelow : roomAbove;
+
+  return {
+    side,
+    left: `${Math.min(Math.max(wanted, FLOATING_GAP), max)}px`,
+    top: side === 'below' ? `${rect.bottom + FLOATING_GAP}px` : '',
+    bottom: side === 'above' ? `${window.innerHeight - rect.top + FLOATING_GAP}px` : '',
+    maxHeight: size.natural > room ? `${Math.max(room, 0)}px` : '',
+  };
 }
 
 /**
@@ -155,6 +234,7 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
   floating = false,
 }) => {
   const portalContainer = usePortalContainer();
+  const collisionBoundary = useCollisionBoundary();
   const [isOpen, setIsOpen] = useState(false);
   // `shouldRender` controls mount/unmount.
   // `isVisible` controls the open/closed *visual* state and drives the CSS transition.
@@ -165,8 +245,13 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
   const [measuredMobile, setIsMobile] = useState(false);
   const [actualPlacement, setActualPlacement] = useState(placement);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement | HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The side a floating panel opened on. State for the classes that follow it (the animation's origin and direction),
+  // a ref for the placement code, which runs outside render (the layout effect, the scroll and resize handler).
+  const [floatingSide, setFloatingSide] = useState<FloatingSide | null>(null);
+  const floatingSideRef = useRef<FloatingSide | null>(null);
 
   // Drive mount/unmount and visual state from `isOpen`.
   //
@@ -184,6 +269,8 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
   // timer: the double-rAF entry and the delayed unmount.
   if (isOpen && !shouldRender) setShouldRender(true);
   if (!isOpen && isVisible) setIsVisible(false);
+  // Unmounted: the next open chooses its side afresh. Not on close — the panel is still on screen for its exit.
+  if (!shouldRender && floatingSide !== null) setFloatingSide(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -264,36 +351,49 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
     return () => window.removeEventListener('resize', calculateOptimalPlacement);
   }, [isOpen, isMobile, placement]);
 
-  // Mobile: the panel is `fixed`, so its `top` is a live measurement of where
-  // the trigger currently sits. Applied to the node in a layout effect rather
-  // than read during render — `getBoundingClientRect()` in the render body
-  // measured the PREVIOUS commit's layout, so the panel opened against a
-  // trigger position that could already be wrong (page scrolled between
-  // renders, chips above the trigger wrapping to a second line) and had no way
-  // to correct itself. Unconditional so every commit re-measures; runs before
-  // paint, so the panel never appears in the wrong place first.
+  // A `fixed` panel — floating, or any panel on mobile — is placed from a live
+  // measurement of where the trigger currently sits. Applied to the node in a
+  // layout effect rather than read during render — `getBoundingClientRect()`
+  // in the render body measured the PREVIOUS commit's layout, so the panel
+  // opened against a trigger position that could already be wrong (page
+  // scrolled between renders, chips above the trigger wrapping to a second
+  // line) and had no way to correct itself. Unconditional so every commit
+  // re-measures; runs before paint, so the panel never appears in the wrong
+  // place first.
   useIsomorphicLayoutEffect(() => {
     const dropdown = dropdownRef.current;
-    if (!dropdown) return;
-    if (!isMobile) {
-      if (floating) {
-        // Floating: `fixed` in a portal, placed from the trigger's rect on every commit.
-        const position = floatingPanelPosition(dropdown.offsetWidth, triggerRef.current, placement);
-        if (position) {
-          dropdown.style.left = position.left;
-          dropdown.style.top = position.top;
-        }
-        return;
-      }
-      // Desktop is `absolute` + placement classes — an inline top from a
-      // previous mobile layout would fight them.
-      dropdown.style.top = '';
-      dropdown.style.left = '';
+    if (!dropdown) {
+      floatingSideRef.current = null;
       return;
     }
+    if (isMobile || floating) {
+      // On the side it opened on, fitted to the room there (see `floatingPanelLayout`). The mobile panel's width and
+      // side margins are its classes (`left-4 right-4`), so only the vertical place is written for it.
+      const card = cardRef.current;
+      const layout = floatingPanelLayout(
+        dropdown,
+        card,
+        triggerRef.current,
+        placement,
+        collisionBoundary,
+        floatingSideRef.current,
+      );
+      if (layout) {
+        dropdown.style.left = isMobile ? '' : layout.left;
+        dropdown.style.top = layout.top;
+        dropdown.style.bottom = layout.bottom;
+        if (card) card.style.maxHeight = layout.maxHeight;
+        floatingSideRef.current = layout.side;
+        if (layout.side !== floatingSide) setFloatingSide(layout.side);
+      }
+      return;
+    }
+    // Desktop, not floating: `absolute` + placement classes — an inline place or
+    // cap left from a mobile or floating layout would fight them.
+    dropdown.style.top = '';
+    dropdown.style.bottom = '';
     dropdown.style.left = '';
-    const trigger = triggerRef.current;
-    dropdown.style.top = `${trigger ? trigger.getBoundingClientRect().bottom + window.scrollY + 8 : 0}px`;
+    if (cardRef.current) cardRef.current.style.maxHeight = '';
   });
 
   // Initialize state with current filters or defaults
@@ -362,15 +462,32 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
     };
   }, [isOpen]);
 
-  // A floating panel is `fixed`: it follows its trigger while anything scrolls or the window resizes.
+  // A floating panel, and any panel on mobile, is `fixed`: it follows its trigger while anything scrolls or the window
+  // resizes.
   useEffect(() => {
-    if (!isOpen || !floating || isMobile) return undefined;
-    const reposition = () => {
+    if (!isOpen || !(floating || isMobile)) return undefined;
+    const reposition = (event: Event) => {
       const dropdown = dropdownRef.current;
-      const position = dropdown && floatingPanelPosition(dropdown.offsetWidth, triggerRef.current, placement);
-      if (dropdown && position) {
-        dropdown.style.left = position.left;
-        dropdown.style.top = position.top;
+      if (!dropdown) return;
+      // The listener captures every scroll, the panel's own option list too: that one moves nothing, and re-placing
+      // the panel under a list being scrolled would only fight it.
+      if (event.type === 'scroll' && event.target instanceof Node && dropdown.contains(event.target)) return;
+      const card = cardRef.current;
+      const layout = floatingPanelLayout(
+        dropdown,
+        card,
+        triggerRef.current,
+        placement,
+        collisionBoundary,
+        floatingSideRef.current,
+      );
+      if (layout) {
+        dropdown.style.left = isMobile ? '' : layout.left;
+        dropdown.style.top = layout.top;
+        dropdown.style.bottom = layout.bottom;
+        if (card) card.style.maxHeight = layout.maxHeight;
+        floatingSideRef.current = layout.side;
+        setFloatingSide(layout.side);
       }
     };
     window.addEventListener('scroll', reposition, true);
@@ -379,7 +496,7 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
     };
-  }, [isOpen, floating, isMobile, placement]);
+  }, [isOpen, floating, isMobile, placement, collisionBoundary]);
 
   // Handle escape key
   useEffect(() => {
@@ -449,14 +566,9 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
     return Object.values(selectedFilters).reduce((acc: number, curr: string[]) => acc + curr.length, 0);
   };
 
-  // Dropdown positioning classes based on placement and mobile state
+  // Desktop (absolute) positioning classes based on placement. A `fixed` panel
+  // (mobile, floating) is placed by the layout effect instead.
   const getDropdownPositionClasses = () => {
-    if (isMobile) {
-      // On mobile, center horizontally with left offset for minimized sidebar
-      // Vertically position right under the trigger button
-      return 'top-full mt-2';
-    }
-
     // Desktop positioning based on placement prop
     const desktopClasses = {
       'bottom-start': 'top-full left-0 mt-2',
@@ -468,6 +580,8 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
   };
 
   const isFloating = floating && !isMobile;
+  // A `fixed` panel (floating, or on mobile) above its trigger grows from, and slides in towards, its bottom edge.
+  const opensAbove = (isFloating || isMobile) && floatingSide === 'above';
   // Floating: the panel leaves this component's box (and whatever clips it) for the active portal container.
   const renderPanel = (panel: ReactNode) =>
     isFloating ? createPortal(panel, portalContainer ?? document.body) : panel;
@@ -501,27 +615,33 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
           <div
             ref={dropdownRef}
             className={cn(
-              'z-50 origin-top',
+              'z-50',
+              opensAbove ? 'origin-bottom' : 'origin-top',
               // CSS transitions (not @keyframes) so mid-animation interruption
               // interpolates smoothly from the current computed value.
               'transition-[opacity,transform] duration-200 ease-out',
               'will-change-[opacity,transform]',
               isVisible
                 ? 'translate-y-0 scale-100 opacity-100'
-                : 'pointer-events-none -translate-y-2 scale-95 opacity-0',
+                : cn('pointer-events-none scale-95 opacity-0', opensAbove ? 'translate-y-2' : '-translate-y-2'),
               isMobile
                 ? 'fixed left-4 right-4 mx-auto max-w-[320px]'
                 : isFloating
                   ? 'fixed w-[320px]'
                   : 'absolute w-[320px]',
-              !isFloating && getDropdownPositionClasses(),
+              !isFloating && !isMobile && getDropdownPositionClasses(),
               dropdownClassName,
             )}
             // No `style` here: the mobile `top` is a DOM measurement and is owned
             // by the layout effect above.
           >
-            <div className="flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg p-4 shadow-xl">
-              <div className="max-h-[250px] min-h-0 flex-1 overflow-y-auto">
+            {/* A floating panel short of room caps this card (`maxHeight`): the list shrinks, the buttons do not. */}
+            <div
+              ref={cardRef}
+              data-filter-panel="card"
+              className="flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg p-4 shadow-xl"
+            >
+              <div data-filter-panel="list" className="max-h-[250px] min-h-0 flex-1 overflow-y-auto">
                 {sections.map((section, sectionIndex) => {
                   const sectionSelection = selectedFilters[section.id] || [];
                   const allSelected = section.options.every(opt => sectionSelection.includes(opt.id));
@@ -529,7 +649,10 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
                   return (
                     <div key={section.id} className={cn('space-y-2', sectionIndex > 0 && 'mt-4')}>
                       {/* Section Header — sticky so title + Select All stay visible while options scroll. */}
-                      <div className="sticky top-0 z-10 flex items-center justify-between bg-ods-bg pb-2">
+                      <div
+                        data-filter-panel="section-header"
+                        className="sticky top-0 z-10 flex items-center justify-between bg-ods-bg pb-2"
+                      >
                         <h3 className="text-ods-text-secondary text-h5">{section.title}</h3>
                         {section.allowSelectAll && section.type === 'checkbox' && (
                           <Button
@@ -564,6 +687,7 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
                               variant="row"
                               type="button"
                               key={`${section.id}-${option.id}-${index}`}
+                              data-filter-panel="option"
                               onClick={() => handleToggleOption(section.id, option.id, section.type)}
                               data-state={isSelected ? 'active' : undefined}
                               // A checked option sits on the raised surface; the hover still shows over it.

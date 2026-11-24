@@ -35,6 +35,9 @@ import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
@@ -243,7 +246,10 @@ class MachineFieldLevelWritesIT {
                     mock(ScriptScheduleMachineAssignedRepository.class), mock(DeviceOnlineDispatchRepository.class),
                     mock(SoftwareScheduleMachineAssignedRepository.class), mock(SoftwareScheduleOnlineDispatchRepository.class),
                     mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), machineWriter,
-                    new ScheduleMutationTransaction(template.getMongoDatabaseFactory()));
+                    new ScheduleMutationTransaction(template.getMongoDatabaseFactory()),
+                    mock(DeviceOsStateRepository.class),
+                    mock(DeviceOsPendingUpdateRepository.class),
+                    mock(DeviceOsUpdateHistoryRepository.class));
             return new AgentUninstallService(knownClient(false), mock(ClientSecretValidator.class), machines,
                     mock(ToolConnectionService.class), mock(InstalledAgentService.class),
                     cleanup, mock(ApplicationEventPublisher.class));

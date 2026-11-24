@@ -9,6 +9,9 @@ import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
@@ -31,7 +34,7 @@ import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static java.util.stream.Collectors.toSet;
 
-/** Removes a deleted device's schedule memberships and software inventory. */
+/** Removes a deleted device's schedule memberships, software inventory and OS update data. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -45,13 +48,34 @@ public class DeletedMachineCleanup {
     private final SoftwareProjectionTrigger projectionTrigger;
     private final MachineWriter machineWriter;
     private final ScheduleMutationTransaction scheduleTransaction;
+    private final DeviceOsStateRepository deviceOsStateRepository;
+    private final DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
+    private final DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
 
     public void cleanUpDeletedMachine(String tenantId, String machineId) {
         if (tenantId == null || machineId == null) {
             return;
         }
         removeScriptSchedules(tenantId, machineId);
+        cleanUpInventory(tenantId, machineId);
+    }
+
+    private void cleanUpInventory(String tenantId, String machineId) {
+        if (tenantId == null || machineId == null) {
+            return;
+        }
         cleanUpSoftwareInventory(tenantId, machineId);
+        removeOsUpdates(tenantId, machineId);
+    }
+
+    private void removeOsUpdates(String tenantId, String machineId) {
+        long removedStates = deviceOsStateRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        long removedPending = deviceOsPendingUpdateRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        long removedHistory = deviceOsUpdateHistoryRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        if (removedStates > 0 || removedPending > 0 || removedHistory > 0) {
+            log.info("Removed {} OS state(s), {} pending OS update row(s) and {} OS update history row(s) for deleted machineId={} tenantId={}",
+                    removedStates, removedPending, removedHistory, machineId, tenantId);
+        }
     }
 
     public Machine markDeleted(Machine expected) {
@@ -65,7 +89,7 @@ public class DeletedMachineCleanup {
 
     private Machine deleteDevice(Machine expected) {
         Machine deleted = writeAndClearSchedules(expected, machineUpdate().set(STATUS, DeviceStatus.DELETED));
-        cleanUpSoftwareInventory(deleted.getTenantId(), deleted.getMachineId());
+        cleanUpInventory(deleted.getTenantId(), deleted.getMachineId());
         return deleted;
     }
 

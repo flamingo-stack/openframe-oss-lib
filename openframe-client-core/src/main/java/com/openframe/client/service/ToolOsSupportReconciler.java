@@ -45,7 +45,7 @@ public class ToolOsSupportReconciler {
     private final IntegratedToolAgentService integratedToolAgentService;
 
     public void reconcile(Machine machine) {
-        reconcile(machine, toolOsSupportService.agentsWithMinOsVersion());
+        reconcile(machine, toolOsSupportService.agentsWithToolType());
     }
 
     public void reconcile(Machine machine, List<AgentWithToolType> agents) {
@@ -123,7 +123,7 @@ public class ToolOsSupportReconciler {
         ToolInstallationOutcome outcome = toolInstallationService.process(machineId, agent);
         if (outcome == ToolInstallationOutcome.DISPATCHED) {
             withheldToolAgents.release(machine, agentKey);
-            log.info("Installing {} on machine {}: its OS version now meets the agent's minimum", agentKey, machineId);
+            log.info("Installing {} on machine {}: its OS version is no longer below the agent's minimum", agentKey, machineId);
         }
     }
 
