@@ -19,4 +19,8 @@ public interface InstalledAgentRepository extends MongoRepository<InstalledAgent
 
     List<InstalledAgent> findByMachineIdInAndAgentType(Collection<String> machineIds, String agentType);
 
+    boolean existsByMachineIdAndAgentType(String machineId, String agentType);
+
+    long deleteByMachineIdAndAgentTypeIn(String machineId, Collection<String> agentTypes);
+
 }

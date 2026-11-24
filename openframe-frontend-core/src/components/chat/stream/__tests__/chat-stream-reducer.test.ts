@@ -980,8 +980,9 @@ describe('createChatStreamReducer — participant dedup', () => {
   });
 
   /**
-   * DOCUMENTED LIMIT, not an aspiration: when a reconnect catch-up replay
-   * delivers BOTH a pre-disconnect `start` and its `finish` after the
+   * DOCUMENTED LIMIT, not an aspiration: when a reconnect / resync catch-up (a
+   * NEW consumer, so the hydration-time backlog window is closed) delivers
+   * BOTH a pre-disconnect `start` and its `finish` after the
    * user has sent, the replayed `start` restamps the arrival-time
    * boundary and the `finish` purges the still-live entry — the echo then
    * renders a SECOND bubble. The chunk union carries no event-own
@@ -1729,5 +1730,201 @@ describe('createChatStreamReducer: a standalone chunk after a row between turns'
       ['assistant', 'text'],
       ['user', 'text'],
     ]);
+  });
+});
+
+/**
+ * The backlog a replaying tail holds when it first subscribes after the history (CU-17tkuw691j4). A stopped prompt the
+ * backend stamped with its seq makes the tail resume right after it and replay the stopped turn's boundaries; a send made
+ * before the tail subscribed must still draw one bubble, keep the composer busy, and take its own reply.
+ */
+describe('createChatStreamReducer: the replaying backlog window', () => {
+  const PROMPT = 'Same prompt';
+  const mine = (seq: number) =>
+    participant({ kind: 'message-request', text: PROMPT, ownerType: 'ADMIN', userId: 'me', seq });
+  const startOf = (seq: number): ChatStreamEntry => ({ seq, chunks: [{ type: 'start', messageId: `turn-${seq}` }] });
+
+  /** The receiving or sending tab after a reload: the stopped prompt, stamped with seq 100. */
+  function afterReload(window: boolean) {
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true, selfUserId: 'me' });
+    r.initializeWithState([
+      {
+        id: 'm1',
+        role: 'user',
+        parts: [{ type: 'text', text: PROMPT }],
+        metadata: { streamSeq: 100, author: { authorType: 'admin' } },
+      },
+    ]);
+    r.setReplayingBacklog(window);
+    return r;
+  }
+  const users = (r: ReturnType<typeof afterReload>) => r.state.messages.filter(m => m.role === 'user');
+
+  /** Wall clock pinned and moved by hand: the echo purge compares arrival times. */
+  function withClock(run: (tick: (ms: number) => void) => void) {
+    const realNow = Date.now;
+    let now = 1_000_000;
+    Date.now = () => now;
+    try {
+      run(ms => {
+        now += ms;
+      });
+    } finally {
+      Date.now = realNow;
+    }
+  }
+
+  it('a send before the tail subscribed, then the stopped turn replayed: one bubble, busy, the reply under it', () => {
+    withClock(tick => {
+      const r = afterReload(true);
+      r.pushOptimisticSend(PROMPT);
+      tick(5);
+      r.apply(startOf(101));
+      r.apply(end(102));
+      expect(r.state.streamingPhase).toBe('thinking');
+      r.apply(mine(104));
+      r.setReplayingBacklog(false);
+      expect(users(r)).toHaveLength(2);
+
+      r.apply(startOf(105));
+      r.apply(text('Red pencil', 106));
+      r.apply(end(107));
+      const roles = r.state.messages.map(m => m.role);
+      const secondPrompt = r.state.messages.lastIndexOf(users(r)[1]);
+      expect(roles.slice(secondPrompt)).toEqual(['user', 'assistant']);
+      expect(JSON.stringify(r.state.messages[secondPrompt + 1].parts)).toContain('Red pencil');
+      // The stopped turn sits above the new prompt, where it happened.
+      expect(r.state.messages.findIndex(m => m.id === 'turn-101')).toBeLessThan(secondPrompt);
+      expect(r.state.streamingPhase).toBe('idle');
+    });
+  });
+
+  it('the same interleaving with the window closed still duplicates (the reconnect catch-up limit)', () => {
+    withClock(tick => {
+      const r = afterReload(false);
+      r.pushOptimisticSend(PROMPT);
+      tick(5);
+      r.apply(startOf(101));
+      r.apply(end(102));
+      r.apply(mine(104));
+      expect(users(r)).toHaveLength(3);
+    });
+  });
+
+  it('a send while an older turn streams: its backlog finish keeps one bubble and hands the send its placeholder', () => {
+    withClock(tick => {
+      const r = afterReload(true);
+      r.pushOptimisticSend(PROMPT);
+      tick(5);
+      r.apply(startOf(101));
+      r.apply(text('Older answer', 102));
+      r.apply(end(103));
+      r.apply(mine(104));
+      r.setReplayingBacklog(false);
+      expect(users(r)).toHaveLength(2);
+      expect(r.state.streamingPhase).toBe('thinking');
+      r.apply(startOf(105));
+      r.apply(text('New answer', 106));
+      const last = r.state.messages[r.state.messages.length - 1];
+      expect(JSON.stringify(last.parts)).toContain('New answer');
+      expect(r.state.messages[r.state.messages.length - 2].role).toBe('user');
+    });
+  });
+
+  it('a send while an older turn streams: a live finish after the replay completed keeps one bubble too', () => {
+    withClock(tick => {
+      const r = afterReload(true);
+      r.pushOptimisticSend(PROMPT);
+      tick(5);
+      r.apply(startOf(101));
+      r.apply(text('Older answer', 102));
+      r.setReplayingBacklog(false);
+      tick(5);
+      r.apply(text(' continues', 103));
+      r.apply(end(104));
+      expect(r.state.streamingPhase).toBe('thinking');
+      r.apply(mine(105));
+      expect(users(r)).toHaveLength(2);
+      r.apply(startOf(106));
+      r.apply(text('New answer', 107));
+      const last = r.state.messages[r.state.messages.length - 1];
+      expect(JSON.stringify(last.parts)).toContain('New answer');
+      expect(JSON.stringify(r.state.messages.find(m => m.id === 'turn-101')?.parts)).toContain(
+        'Older answer continues',
+      );
+    });
+  });
+
+  it("another technician's identical message renders during and after the window, and leaves the sender's entry", () => {
+    withClock(tick => {
+      const r = afterReload(true);
+      r.pushOptimisticSend(PROMPT);
+      tick(5);
+      r.apply(participant({ kind: 'message-request', text: PROMPT, ownerType: 'ADMIN', userId: 'other', seq: 101 }));
+      expect(users(r)).toHaveLength(3);
+      r.apply(mine(102));
+      expect(users(r)).toHaveLength(3);
+      r.setReplayingBacklog(false);
+      r.apply(participant({ kind: 'message-request', text: PROMPT, ownerType: 'ADMIN', userId: 'other', seq: 103 }));
+      expect(users(r)).toHaveLength(4);
+    });
+  });
+
+  it('a live turn after the window closed purges as today: a second tab repeating the text later still renders', () => {
+    withClock(tick => {
+      const r = afterReload(true);
+      r.apply(startOf(101));
+      r.apply(end(102));
+      r.setReplayingBacklog(false);
+      r.pushOptimisticSend(PROMPT);
+      tick(5);
+      r.apply(startOf(103));
+      r.apply(end(104));
+      // The send's echo never came; the turn that opened after it ended, so its entry is spent.
+      tick(5);
+      r.apply(startOf(105));
+      r.apply(end(106));
+      r.apply(mine(107));
+      expect(users(r)).toHaveLength(3);
+    });
+  });
+
+  it('a reducer never given the window purges at turn end exactly as before', () => {
+    withClock(tick => {
+      const r = createChatStreamReducer({ ownEchoIncludesAdmin: true, selfUserId: 'me' });
+      r.apply(startOf(1));
+      tick(1);
+      r.pushOptimisticSend(PROMPT);
+      tick(1);
+      r.apply(startOf(2));
+      r.apply(end(3));
+      r.apply(mine(4));
+      expect(users(r)).toHaveLength(2);
+    });
+  });
+
+  it('a window that never closes is still bounded by the author TTL', () => {
+    withClock(tick => {
+      const r = afterReload(true);
+      r.pushOptimisticSend(PROMPT);
+      tick(OWN_ECHO_AUTHOR_TTL_MS + 1);
+      r.apply(mine(101));
+      expect(users(r)).toHaveLength(3);
+    });
+  });
+
+  it('every reset closes the window', () => {
+    withClock(tick => {
+      const r = afterReload(true);
+      r.resetForDialogSwitch();
+      r.initializeWithState([]);
+      r.pushOptimisticSend(PROMPT);
+      tick(5);
+      r.apply(startOf(1));
+      r.apply(end(2));
+      r.apply(mine(3));
+      // Two: the optimistic bubble and the un-deduped echo, the closed-window behaviour.
+      expect(users(r)).toHaveLength(2);
+    });
   });
 });
