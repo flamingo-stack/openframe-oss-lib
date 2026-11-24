@@ -4,7 +4,8 @@ extend type Query {
     deviceOsState(machineId: String!): DeviceOsState
 
     """OS updates waiting on the device, newest discovered first. An empty list alone does not mean "up to date":
-    read `deviceOsState.patchState` and `scanState`. Unknown machineId → DEVICE_NOT_FOUND."""
+    read `deviceOsState.patchState` and `scanState`. Always empty for a device we cannot manage
+    (`deviceOsState.manageability.state` NOT_MANAGEABLE). Unknown machineId → DEVICE_NOT_FOUND."""
     deviceOsPendingUpdates(machineId: String!): [DeviceOsPendingUpdate!]!
 
     """OS updates the device installed or failed to install, newest first. Windows only: a Mac reports no history.
@@ -109,6 +110,10 @@ type DeviceOsPendingUpdate {
     severity: OsUpdateSeverity
     """The vendor's category names, verbatim."""
     categories: [String!]!
+    """The vendor's category ids. The same on every device, whatever its language."""
+    categoryIds: [String!]!
+    """Windows only."""
+    updateType: OsUpdateType
     cveIds: [String!]!
     publishedAt: Instant
     sizeBytes: Long
@@ -127,6 +132,11 @@ enum OsUpdateSeverity {
     IMPORTANT
     MODERATE
     LOW
+}
+
+enum OsUpdateType {
+    SOFTWARE
+    DRIVER
 }
 
 enum OsUpdateRebootBehavior {

@@ -19,6 +19,7 @@ import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,6 +66,28 @@ class SoftwareDeviceLocalScheduleServiceTest {
         ArgumentCaptor<ScheduleLocalMachineTimeDispatch> sentinel = ArgumentCaptor.forClass(ScheduleLocalMachineTimeDispatch.class);
         verify(dispatchRepository).save(sentinel.capture());
         assertThat(sentinel.getValue().getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.FIRED);
+    }
+
+    @Test
+    void reenrolledDeviceWithStaleAssignmentDoesNotFireOrConsumeAnOccurrence() {
+        // setup
+        Instant now = Instant.now();
+        SoftwareSchedule schedule = deviceLocalSchedule(now.minusSeconds(60));
+        Machine reenrolled = machine("reenrolled", DeviceStatus.ONLINE, "UTC");
+        reenrolled.setStatus(DeviceStatus.MANAGED);
+        given(schedule, reenrolled);
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("reenrolled"), List.of());
+
+        // execution
+        service.runDueDeviceLocalSchedules(now);
+
+        // verifications
+        verify(fireDispatcher, never()).dispatch(any(), anyList(), any());
+        verify(dispatchRepository, never()).save(any());
+        InOrder reads = inOrder(targetResolver, machineRepository);
+        reads.verify(targetResolver).resolveMachineIds(schedule);
+        reads.verify(machineRepository).findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any());
+        reads.verify(targetResolver).resolveMachineIds(schedule);
     }
 
     @Test
@@ -117,7 +141,7 @@ class SoftwareDeviceLocalScheduleServiceTest {
                 .thenReturn(List.of(schedule));
         when(targetResolver.resolveMachineIds(schedule))
                 .thenReturn(List.of(machine.getMachineId()));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(machine));
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(machine));
         when(dispatchRepository.findByScheduleIdAndMachineIdIn(eq(SCHEDULE_ID), any())).thenReturn(List.of());
     }
 

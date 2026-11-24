@@ -22,6 +22,7 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRebootBehavior;
 import com.openframe.data.document.rmm.osupdate.OsUpdateScanState;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
+import com.openframe.data.document.rmm.osupdate.OsUpdateType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -217,6 +218,8 @@ class DeviceOsReportParserTest {
                 .kbArticleIds(List.of("5051987"))
                 .severity(OsUpdateSeverity.CRITICAL)
                 .categories(List.of("Security Updates"))
+                .categoryIds(List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
+                .updateType(OsUpdateType.SOFTWARE)
                 .cveIds(List.of("CVE-2026-21309", "CVE-2026-21311"))
                 .publishedAt(Instant.parse("2026-11-11T18:00:00Z"))
                 .sizeBytes(764317696L)
@@ -240,6 +243,36 @@ class DeviceOsReportParserTest {
         assertThat(report.isPendingUpdatesReadable()).isTrue();
         assertThat(report.getOsUpdates()).containsExactly(expectedOsUpdate);
         assertThat(report.getPendingUpdates()).containsExactly(expectedPendingUpdate);
+    }
+
+    @Test
+    void parse_minimalReportOfAWindowsDeviceThatIsNotManageable_stateParsedAndNothingToWriteBesidesIt() {
+        // setup
+        byte[] payload = fixture("windows-not-manageable-minimal");
+        OsUpdateManageability expectedManageability = OsUpdateManageability.builder()
+                .state(OsUpdateManageabilityState.NOT_MANAGEABLE)
+                .reasons(List.of("WSUS", "GROUP_POLICY"))
+                .build();
+
+        // execution
+        DeviceOsReport report = parser.parse(machine, payload, RECEIVED_AT);
+
+        // verifications
+        assertThat(report.getDeviceOsState())
+                .extracting(DeviceOsState::getPlatform, DeviceOsState::getOsVersion, DeviceOsState::getOsBuild,
+                        DeviceOsState::getOsProductName, DeviceOsState::getOsUpdateAuthorization,
+                        DeviceOsState::getManageability, DeviceOsState::getReceivedAt)
+                .containsExactly(OsPlatform.WINDOWS, "11 24H2", "26100.4061", "Windows 11 Pro",
+                        OsUpdateAuthorization.NOT_REQUIRED, expectedManageability, RECEIVED_AT);
+        assertThat(report.getDeviceOsState())
+                .extracting(DeviceOsState::getScanState, DeviceOsState::getLastScanAt,
+                        DeviceOsState::getPendingUpdatesConfidence, DeviceOsState::getPatchState,
+                        DeviceOsState::getRebootPending, DeviceOsState::getLastOsInstall)
+                .containsOnlyNulls();
+        assertThat(report.isPendingUpdatesReadable()).isFalse();
+        assertThat(report.getOsUpdates()).isEmpty();
+        assertThat(report.getPendingUpdates()).isEmpty();
+        assertThat(report.getHistoryEntries()).isEmpty();
     }
 
     @Test
