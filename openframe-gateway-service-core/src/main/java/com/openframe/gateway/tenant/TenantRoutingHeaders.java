@@ -106,7 +106,8 @@ public final class TenantRoutingHeaders {
         try {
             return new URI(sb.toString());
         } catch (URISyntaxException e) {
-            throw new IllegalStateException("Failed to rewrite tenant namespace in URI: " + uri, e);
+            throw new IllegalStateException("Failed to rewrite tenant namespace in URI for path " + uri.getRawPath()
+                    + ": " + e.getReason());
         }
     }
 }
