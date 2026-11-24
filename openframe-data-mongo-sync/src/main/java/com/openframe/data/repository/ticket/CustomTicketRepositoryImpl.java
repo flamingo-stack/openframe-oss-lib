@@ -1,6 +1,5 @@
 package com.openframe.data.repository.ticket;
 
-import com.mongodb.ReadPreference;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
@@ -572,24 +571,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         update.inc(FIELD_VERSION, 0);
         FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
         return Optional.ofNullable(mongoTemplate.findAndModify(query, update, options, Ticket.class));
-    }
-
-    @Override
-    public Optional<Ticket> findByIdFromPrimary(String ticketId) {
-        Query query = primaryTicketQuery(ticketId);
-        return Optional.ofNullable(mongoTemplate.findOne(query, Ticket.class));
-    }
-
-    @Override
-    public boolean existsByIdFromPrimary(String ticketId) {
-        Query query = primaryTicketQuery(ticketId);
-        return mongoTemplate.exists(query, Ticket.class);
-    }
-
-    // primary on purpose: a retried write-ahead resume must see the ticket its failed attempt saved a moment ago
-    private Query primaryTicketQuery(String ticketId) {
-        return Query.query(tenantCriteria()).addCriteria(Criteria.where(ID_FIELD).is(ticketId))
-                .withReadPreference(ReadPreference.primary());
     }
 
     @Override
