@@ -6,48 +6,56 @@ import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from './loading-scope';
 
-const statusBadgeVariants = cva('inline-flex items-center justify-center rounded', {
-  variants: {
-    // Two densities, not one style at two paddings. Both are the ODS h5
-    // label treatment (Azeret Mono 500, uppercase, -0.02em); they differ in
-    // scale. Putting BOTH on `text-h5` is what regressed the stamp: at
-    // 14/20 on desktop every inline badge grew ~40% and its box doubled,
-    // because the caption line-height replaced `leading-none`.
-    variant: {
-      // Standalone badge — the ODS caption composite, unmodified.
-      card: 'px-3 py-1.5 text-h5',
-      // Dense inline stamp. Family, weight and casing come from the SAME h5
-      // tokens as `card`; only the scale is set here, because ODS has no
-      // step below the 12/14px caption and this stamp is 10px by design.
-      button:
-        'px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] uppercase tracking-[-0.02em] text-badge',
+/**
+ * A badge is ONE LINE, as wide as its text and never wider than its container (Material, Carbon, Primer and Polaris
+ * badges alike): `w-fit` so a grid cell or a stretching flex parent cannot widen it, `max-w-full min-w-0` so a narrow
+ * one shortens it with an ellipsis (the whole text is its tooltip), `whitespace-nowrap` so its words never stack.
+ */
+const statusBadgeVariants = cva(
+  'inline-flex w-fit min-w-0 max-w-full items-center justify-center whitespace-nowrap rounded',
+  {
+    variants: {
+      // Two densities, not one style at two paddings. Both are the ODS h5
+      // label treatment (Azeret Mono 500, uppercase, -0.02em); they differ in
+      // scale. Putting BOTH on `text-h5` is what regressed the stamp: at
+      // 14/20 on desktop every inline badge grew ~40% and its box doubled,
+      // because the caption line-height replaced `leading-none`.
+      variant: {
+        // Standalone badge — the ODS caption composite, unmodified.
+        card: 'px-3 py-1.5 text-h5',
+        // Dense inline stamp. Family, weight and casing come from the SAME h5
+        // tokens as `card`; only the scale is set here, because ODS has no
+        // step below the 12/14px caption and this stamp is 10px by design.
+        button:
+          'px-2 py-0.5 font-[family-name:var(--font-h5-family)] font-[number:var(--font-h5-weight)] uppercase tracking-[-0.02em] text-badge',
+      },
+      colorScheme: {
+        cyan: 'bg-ods-flamingo-cyan text-ods-text-on-accent',
+        pink: 'bg-ods-flamingo-pink text-ods-text-on-accent',
+        yellow: 'border border-ods-border bg-ods-accent text-ods-text-on-accent',
+        green: 'bg-ods-success text-ods-text-on-accent',
+        purple: 'bg-ods-flamingo-pink text-ods-text-on-accent',
+        // Solid and soft ODS palette fills (`BADGE_PALETTE`): tokens only, no hex.
+        cyanSoft: 'bg-ods-flamingo-cyan-secondary text-ods-flamingo-cyan',
+        pinkSoft: 'bg-ods-flamingo-pink-secondary text-ods-flamingo-pink',
+        openYellow: 'bg-ods-open-yellow text-ods-text-on-accent',
+        red: 'bg-ods-error text-ods-text-on-accent',
+        success: 'bg-ods-success-secondary text-ods-success',
+        error: 'bg-ods-error-secondary text-ods-error',
+        warning: 'bg-ods-warning-secondary text-ods-warning',
+        default: 'bg-ods-bg-surface text-ods-text-primary',
+        // Border-only variants (no background) - for task type badges
+        accentBorder: 'border-2 border-ods-accent bg-transparent text-ods-accent',
+        errorBorder: 'border-2 border-ods-error bg-transparent text-ods-error',
+        whiteBorder: 'border-2 border-ods-text-primary bg-transparent text-ods-text-primary',
+      },
     },
-    colorScheme: {
-      cyan: 'bg-ods-flamingo-cyan text-ods-text-on-accent',
-      pink: 'bg-ods-flamingo-pink text-ods-text-on-accent',
-      yellow: 'border border-ods-border bg-ods-accent text-ods-text-on-accent',
-      green: 'bg-ods-success text-ods-text-on-accent',
-      purple: 'bg-ods-flamingo-pink text-ods-text-on-accent',
-      // Solid and soft ODS palette fills (`BADGE_PALETTE`): tokens only, no hex.
-      cyanSoft: 'bg-ods-flamingo-cyan-secondary text-ods-flamingo-cyan',
-      pinkSoft: 'bg-ods-flamingo-pink-secondary text-ods-flamingo-pink',
-      openYellow: 'bg-ods-open-yellow text-ods-text-on-accent',
-      red: 'bg-ods-error text-ods-text-on-accent',
-      success: 'bg-ods-success-secondary text-ods-success',
-      error: 'bg-ods-error-secondary text-ods-error',
-      warning: 'bg-ods-warning-secondary text-ods-warning',
-      default: 'bg-ods-bg-surface text-ods-text-primary',
-      // Border-only variants (no background) - for task type badges
-      accentBorder: 'border-2 border-ods-accent bg-transparent text-ods-accent',
-      errorBorder: 'border-2 border-ods-error bg-transparent text-ods-error',
-      whiteBorder: 'border-2 border-ods-text-primary bg-transparent text-ods-text-primary',
+    defaultVariants: {
+      variant: 'card',
+      colorScheme: 'default',
     },
   },
-  defaultVariants: {
-    variant: 'card',
-    colorScheme: 'default',
-  },
-});
+);
 
 /**
  * OpenFrame generation badge tint — the ONE ramp for the `gen` mode below.
@@ -77,13 +85,6 @@ export function generationTierFromLabel(label: string | null | undefined): numbe
 export interface StatusBadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof statusBadgeVariants> {
   text: string;
-  /**
-   * When true, renders `text` verbatim on a single line, bypassing the
-   * default multi-word vertical-stack behavior used by `variant="button"`.
-   * Use this for compact inline contexts (e.g. chat-inline roadmap cards)
-   * where the stamp-like stacked layout is undesirable.
-   */
-  singleLine?: boolean;
   /**
    * OpenFrame generation mode. Pass the gen number (1/2/3…) to render THIS badge
    * as a generation chip: constant full-accent text on a progressive-opacity
@@ -125,7 +126,6 @@ function StatusBadge({
   variant,
   colorScheme,
   className,
-  singleLine,
   gen,
   style,
   loading: loadingProp,
@@ -146,40 +146,16 @@ function StatusBadge({
           backgroundColor: `color-mix(in srgb, var(--ods-accent) ${genBadgeBgOpacity(gen)}%, transparent)`,
         }
       : undefined;
-  // Outer element is `<span>` so the badge is HTML-valid in any inline
-  // context (e.g. inside a markdown `<p>` next to a compact chat card,
-  // or inside an `<a>`). The `inline-flex` base class in
-  // `statusBadgeVariants` keeps the layout identical to the previous
-  // `<div>` outer — only the element name changed.
-  //
-  // Escape hatch: callers can pass `singleLine` to opt out of the
-  // multi-word stacking applied for `variant="button"`. This is needed
-  // for compact inline contexts (chat-inline roadmap cards) where the
-  // default stamp-like vertical stack ("TO" / "DO") breaks layout.
-  const renderText = () => {
-    if (singleLine) return text;
-    if (variant === 'button' && text.includes(' ')) {
-      const words = text.split(' ');
-      return (
-        <span className="flex flex-col items-center justify-center gap-0 text-center">
-          {words.map((word, index) => (
-            <span key={index} className="block">
-              {word}
-            </span>
-          ))}
-        </span>
-      );
-    }
-    return text;
-  };
-
+  // Outer element is `<span>` so the badge is HTML-valid in any inline context (a markdown `<p>`, an `<a>`). Its text
+  // is one line, shortened with an ellipsis when the badge is narrower than it; the whole text is the tooltip.
   return (
     <span
       className={cn(statusBadgeVariants({ variant, colorScheme: gen != null ? undefined : colorScheme }), className)}
       style={genStyle ? { ...genStyle, ...style } : style}
+      title={text}
       {...props}
     >
-      {renderText()}
+      <span className="min-w-0 truncate">{text}</span>
     </span>
   );
 }

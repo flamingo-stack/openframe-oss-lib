@@ -15,6 +15,7 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -46,28 +47,31 @@ public class SoftwareCatalogStatus {
     private final PackageCatalogRepository catalogRepository;
     private final SoftwarePackageMatcher packageMatcher;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final PackageAdoptReach packageAdoptReach;
     private final MachineRepository machineRepository;
     private final TenantIdProvider tenantIdProvider;
 
     // Runs after SoftwareAutoUpdateService: a policy's ON / OFF stays, a row without one gets what the catalog allows.
     public void apply(List<SoftwareResponse> rows) {
-        apply(rows, manager -> true, packageManagerAvailability::isEnabled);
+        apply(rows, manager -> true, packageManagerAvailability::isEnabled, Set.of());
     }
 
     // a manager counts on a device only where it runs: there winget's package gives way to the one to adopt into
-    public void applyOnDevice(String machineId, List<SoftwareResponse> rows) {
+    public void applyOnDevice(String machineId, List<SoftwareResponse> rows, Set<String> installedCasks) {
         String tenantId = tenantIdProvider.getTenantId();
         machineRepository.findByTenantIdAndMachineId(tenantId, machineId)
-                .ifPresentOrElse(device -> applyOn(device, rows), () -> apply(rows));
+                .ifPresentOrElse(device -> applyOn(device, rows, installedCasks), () -> apply(rows));
     }
 
-    private void applyOn(Machine device, List<SoftwareResponse> rows) {
+    private void applyOn(Machine device, List<SoftwareResponse> rows, Set<String> installedCasks) {
+        String machineId = device.getMachineId();
+        boolean reachable = packageAdoptReach.isReachable(machineId);
         apply(rows, manager -> PackageManagerAvailability.isPresentOn(device, manager),
-                manager -> packageManagerAvailability.isAdoptableOn(device, manager));
+                manager -> reachable && packageManagerAvailability.isAdoptableOn(device, manager), installedCasks);
     }
 
     private void apply(List<SoftwareResponse> rows, Predicate<PackageManagerType> manages,
-                       Predicate<PackageManagerType> adopts) {
+                       Predicate<PackageManagerType> adopts, Set<String> installedCasks) {
         if (rows == null || rows.isEmpty()) {
             return;
         }
@@ -83,10 +87,13 @@ public class SoftwareCatalogStatus {
             PackageMatch match = matches.get(program);
             PackageMatch adoptionMatch = adoptionMatches.get(program);
             PackageCatalogEntry managing = entryOf(match, manages);
-            PackageCatalogEntry adoption = entryOf(adoptionMatch, adopts);
+            PackageCatalogEntry installedCask = installedCaskOf(adoptionMatch, installedCasks);
+            // brew installs a cask into /Applications: adopting a copy kept only in the user's folder leaves two
+            PackageCatalogEntry adoption = Boolean.TRUE.equals(row.getUserApplicationsOnly())
+                    ? null : entryOf(adoptionMatch, adopts);
             // a Mac app is taken by no managing matcher: what is known about its package is the adoption match
             PackageMatch known = match != null ? match : adoptionMatch;
-            apply(row, brewPackages, known, managing, adoption);
+            apply(row, brewPackages, known, managing, installedCask, adoption);
         }
     }
 
@@ -96,6 +103,17 @@ public class SoftwareCatalogStatus {
         }
         PackageCatalogEntry entry = match.getEntry();
         return counts.test(entry.getManager()) ? entry : null;
+    }
+
+    // Fleet reports a cask's app twice, under apps and under homebrew_casks: where brew installed that very cask,
+    // the apps row is brew's too and adopting it would reinstall what brew already manages
+    private static PackageCatalogEntry installedCaskOf(PackageMatch adoptionMatch, Set<String> installedCasks) {
+        PackageCatalogEntry entry = entryOf(adoptionMatch, PackageManagerType.BREW::equals);
+        if (entry == null || entry.getBrewType() != BrewPackageType.CASK || entry.getPackageId() == null) {
+            return null;
+        }
+        String token = entry.getPackageId().toLowerCase(Locale.ROOT);
+        return installedCasks.contains(token) ? entry : null;
     }
 
     static InstalledProgram programOf(SoftwareResponse row) {
@@ -116,11 +134,14 @@ public class SoftwareCatalogStatus {
     }
 
     private static void apply(SoftwareResponse row, Map<String, List<PackageCatalogEntry>> brewPackages,
-                              PackageMatch match, PackageCatalogEntry managing, PackageCatalogEntry adoption) {
+                              PackageMatch match, PackageCatalogEntry managing, PackageCatalogEntry installedCask,
+                              PackageCatalogEntry adoption) {
         if (isBrewPackage(row)) {
             applyBrewPackage(row, brewPackages);
         } else if (managing != null) {
             applyManagingPackage(row, managing);
+        } else if (installedCask != null) {
+            applyInstalledCask(row, installedCask);
         } else if (adoption != null) {
             applyAdoptionPackage(row, adoption);
         } else {
@@ -145,6 +166,15 @@ public class SoftwareCatalogStatus {
         SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
         row.setSource(source);
         row.setManagingPackage(entry);
+        if (row.getAutoUpdate() == null) {
+            row.setAutoUpdate(SoftwareAutoUpdateStatus.OFF);
+        }
+    }
+
+    private static void applyInstalledCask(SoftwareResponse row, PackageCatalogEntry cask) {
+        String latest = PackageCatalogVersions.shownVersionOf(cask);
+        applyLatest(row, latest);
+        row.setSource(SoftwareSource.BREW);
         if (row.getAutoUpdate() == null) {
             row.setAutoUpdate(SoftwareAutoUpdateStatus.OFF);
         }
@@ -185,13 +215,7 @@ public class SoftwareCatalogStatus {
         row.setVersionStatus(status);
     }
 
-    // Devices behind each other are outdated whatever the catalog says; with one version everywhere only the catalog
-    // can tell whether a newer release is out.
     private static SoftwareVersionStatus versionStatus(SoftwareResponse row, String catalogLatest) {
-        Integer older = row.getOlderVersionsCount();
-        if (older != null && older > 0) {
-            return SoftwareVersionStatus.OUTDATED;
-        }
         String installed = row.getCurrentVersion();
         if (catalogLatest == null || installed == null) {
             return SoftwareVersionStatus.UNKNOWN;

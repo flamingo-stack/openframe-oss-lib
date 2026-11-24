@@ -8,6 +8,8 @@ import com.google.crypto.tink.aead.PredefinedAeadParameters;
 import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.core.exception.EncryptionException;
+import com.openframe.core.exception.AuthErrorCode;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import com.openframe.data.repository.tenant.SSOPerTenantConfigRepository;
@@ -21,6 +23,7 @@ import java.util.Optional;
 import static com.openframe.core.crypto.service.SecretPurpose.SSO_CLIENT_SECRET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -135,6 +138,24 @@ class SSOConfigServiceTest {
 
         assertThat(service.isOpenframeLoginEnabled("acme")).isTrue();
         assertThat(service.isOpenframeLoginEnabled("locked")).isFalse();
+    }
+
+    @Test
+    void shouldRefuseOnlyWhenBuiltInLoginIsTurnedOff() {
+        SSOPerTenantConfig off = tenantConfig(SSOConfig.OPENFRAME_PROVIDER, null);
+        off.setEnabled(false);
+        SSOPerTenantConfig on = tenantConfig(SSOConfig.OPENFRAME_PROVIDER, null);
+        on.setEnabled(true);
+        when(repository.findFirstByTenantIdAndProvider("never-set", SSOConfig.OPENFRAME_PROVIDER)).thenReturn(Optional.empty());
+        when(repository.findFirstByTenantIdAndProvider("on", SSOConfig.OPENFRAME_PROVIDER)).thenReturn(Optional.of(on));
+        when(repository.findFirstByTenantIdAndProvider("off", SSOConfig.OPENFRAME_PROVIDER)).thenReturn(Optional.of(off));
+
+        assertThatCode(() -> service.refuseUnlessOpenframeLoginEnabled("never-set")).doesNotThrowAnyException();
+        assertThatCode(() -> service.refuseUnlessOpenframeLoginEnabled("on")).doesNotThrowAnyException();
+        assertThatThrownBy(() -> service.refuseUnlessOpenframeLoginEnabled("off"))
+                .isInstanceOf(AuthFlowException.class)
+                .extracting(e -> ((AuthFlowException) e).getCode())
+                .isEqualTo(AuthErrorCode.PASSWORD_LOGIN_DISABLED);
     }
 
     @Test

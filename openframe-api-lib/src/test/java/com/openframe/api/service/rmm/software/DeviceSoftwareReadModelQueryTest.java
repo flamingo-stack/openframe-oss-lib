@@ -19,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -149,5 +151,96 @@ class DeviceSoftwareReadModelQueryTest {
                 .extracting(SoftwareResponse::getBundleIdentifier, SoftwareResponse::getAppFileNames,
                         SoftwareResponse::getTopLevelApp)
                 .containsExactly(tuple("com.tinyspeck.slackmacgap", List.of("Slack"), true));
+    }
+
+    @Test
+    void rowsForDevice_macAppKeptOnlyInTheUsersApplicationsFolder_rowCarriesTheDevicesFlagAndTheTitlesTopLevel() {
+        // setup
+        Software slack = software(4L, "Slack", "apps");
+        slack.setTopLevelApp(true);
+        DeviceSoftware installed = onM1(4L, "4.4").userApplicationsOnly(true).build();
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(installed));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleIdIn("t1", List.of(4L))).thenReturn(List.of(slack));
+
+        // execution
+        List<SoftwareResponse> rows = query.rowsForDevice("t1", "m1", null);
+
+        // verifications
+        assertThat(rows)
+                .extracting(SoftwareResponse::getUserApplicationsOnly, SoftwareResponse::getTopLevelApp)
+                .containsExactly(tuple(true, true));
+    }
+
+    @Test
+    void caskTokensByMachineId_casksOfTheDevices_lowerCaseTokensPerDevice() {
+        // setup
+        List<String> machineIds = List.of("m1", "m2");
+        DeviceSoftware hiddenBar = DeviceSoftware.builder().machineId("m1").name("HiddenBar").build();
+        DeviceSoftware zed = DeviceSoftware.builder().machineId("m1").name("zed").build();
+        DeviceSoftware discord = DeviceSoftware.builder().machineId("m2").name("discord").build();
+        DeviceSoftware unnamed = DeviceSoftware.builder().machineId("m2").build();
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdInAndSource("t1", machineIds, "homebrew_casks"))
+                .thenReturn(List.of(hiddenBar, zed, discord, unnamed));
+
+        // execution
+        Map<String, Set<String>> casks = query.caskTokensByMachineId("t1", machineIds);
+
+        // verifications
+        assertThat(casks)
+                .containsOnlyKeys("m1", "m2")
+                .containsEntry("m1", Set.of("hiddenbar", "zed"))
+                .containsEntry("m2", Set.of("discord"));
+    }
+
+    @Test
+    void machinesOutsideUserApplicationsByTitleId_copiesOfTheTitles_userFolderOnlyCopiesLeftOut() {
+        // setup
+        List<Long> titleIds = List.of(7L, 9L);
+        DeviceSoftware systemFolder = DeviceSoftware.builder().softwareTitleId(7L).machineId("m1")
+                .userApplicationsOnly(false).build();
+        DeviceSoftware userFolder = DeviceSoftware.builder().softwareTitleId(7L).machineId("m2")
+                .userApplicationsOnly(true).build();
+        DeviceSoftware unknown = DeviceSoftware.builder().softwareTitleId(9L).machineId("m3").build();
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdInAndMachineConnectedTrue("t1", titleIds))
+                .thenReturn(List.of(systemFolder, userFolder, unknown));
+
+        // execution
+        Map<Long, List<String>> machines = query.machinesOutsideUserApplicationsByTitleId("t1", titleIds);
+
+        // verifications
+        assertThat(machines)
+                .containsOnlyKeys(7L, 9L)
+                .containsEntry(7L, List.of("m1"))
+                .containsEntry(9L, List.of("m3"));
+    }
+
+    @Test
+    void caskTokensByMachineId_noDevices_emptyWithoutAQuery() {
+        // setup
+        List<String> machineIds = List.of();
+
+        // execution
+        Map<String, Set<String>> casks = query.caskTokensByMachineId("t1", machineIds);
+
+        // verifications
+        assertThat(casks).isEmpty();
+        verifyNoInteractions(deviceSoftwareRepository);
+    }
+
+    @Test
+    void machinesWithUserApplicationsOnlyCopy_devicesOfTheTitle_onlyThoseWhoseCopyIsInTheUsersFolder() {
+        // setup
+        List<String> machineIds = List.of("m1", "m2", "m3");
+        DeviceSoftware userFolder = DeviceSoftware.builder().machineId("m1").userApplicationsOnly(true).build();
+        DeviceSoftware systemFolder = DeviceSoftware.builder().machineId("m2").userApplicationsOnly(false).build();
+        DeviceSoftware unknown = DeviceSoftware.builder().machineId("m3").build();
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineIdIn("t1", 4L, machineIds))
+                .thenReturn(List.of(userFolder, systemFolder, unknown));
+
+        // execution
+        Set<String> machines = query.machinesWithUserApplicationsOnlyCopy("t1", 4L, machineIds);
+
+        // verifications
+        assertThat(machines).containsExactly("m1");
     }
 }

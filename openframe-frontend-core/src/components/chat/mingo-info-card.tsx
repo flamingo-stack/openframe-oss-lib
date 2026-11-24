@@ -7,7 +7,7 @@ import { AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
@@ -171,9 +171,10 @@ function MingoInfoCardSkeleton({ className }: { className?: string }) {
       )}
     >
       <UnifiedSkeleton as="span" className="block size-10 shrink-0 rounded-md border border-ods-border" />
-      <span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
-        <UnifiedSkeleton as="span" className="block h-4 w-1/2 rounded" />
-        <UnifiedSkeleton as="span" className="block h-3 w-3/4 rounded" />
+      {/* The title and description lines on the card's own type steps, so the card is one height loading and loaded. */}
+      <span className="flex min-w-0 flex-1 flex-col justify-center">
+        <TextLineSkeleton type="h4" as="span" className="w-1/2" />
+        <TextLineSkeleton type="h6" as="span" className="w-3/4" />
       </span>
       <UnifiedSkeleton as="span" className="block h-5 w-16 shrink-0 rounded" />
     </span>

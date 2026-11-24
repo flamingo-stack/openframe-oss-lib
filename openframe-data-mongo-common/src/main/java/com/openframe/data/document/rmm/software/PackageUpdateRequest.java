@@ -39,6 +39,8 @@ public class PackageUpdateRequest implements TenantScoped {
     private String packageName;
     private BrewPackageType brewPackageType;
 
+    private String softwareId;
+
     private PackageUpdateMode mode;
 
     private Integer forceCountdownSeconds;

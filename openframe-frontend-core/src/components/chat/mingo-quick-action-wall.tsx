@@ -20,11 +20,14 @@ export interface QuickActionSetProps {
   loading?: boolean;
   /** The group's accessible name. */
   label?: string;
-  /** Print the page's topic (`PageTopicLabel`, the stamp the FAQ block prints) over the set, right-aligned, so
-   *  whoever tags quick actions on the hub sees which topic this page asks for. Default: the host's choice
-   *  (`PageTopicsProvider showTopic`), so every surface that draws the set prints it alike. Drawn in the loading
-   *  form too, so the set is the same box either way. */
+  /** Print the page's topic (`PageTopicLabel`, the stamp the FAQ block prints) at the end of the set's line, so
+   *  whoever tags quick actions on the hub sees which topic this page asks for. On the chips' own line, never a line
+   *  of its own: it takes no height. Default: the host's choice (`PageTopicsProvider showTopic`), so every surface
+   *  that draws the set prints it alike. Drawn in the loading form too, so the set is the same box either way. */
   showTopic?: boolean;
+  /** Keep the line's height with no action to show, so whatever sits under or above the set (a composer, a centred
+   *  greeting) never moves when a page's actions load, or when a page has none. */
+  reserve?: boolean;
   className?: string;
 }
 
@@ -43,18 +46,29 @@ export function QuickActionSet({
   loading = false,
   label = 'Quick actions',
   showTopic: showTopicProp,
+  reserve = false,
   className,
 }: QuickActionSetProps) {
   const topicStamp = usePageTopicStamp();
   const showTopic = showTopicProp ?? topicStamp;
-  const row = (
-    <QuickActionRow chips={chips} leading={leading} theme={theme} accent={accent} loading={loading} label={label} />
-  );
+  const empty = !loading && chips.length === 0 && !leading?.length;
+  const row =
+    empty && reserve ? (
+      // No action to show: the row's loading form, unseen and out of reach, holds the line at the row's own height.
+      <div aria-hidden inert className="invisible">
+        <QuickActionRow chips={[]} loading label={label} />
+      </div>
+    ) : (
+      <QuickActionRow chips={chips} leading={leading} theme={theme} accent={accent} loading={loading} label={label} />
+    );
   if (!showTopic) return <div className={cn('shrink-0', className)}>{row}</div>;
   return (
-    <div className={cn('flex shrink-0 flex-col gap-[var(--spacing-system-xxs)]', className)}>
-      <PageTopicLabel className="text-right" />
-      {row}
+    <div
+      data-testid="quick-action-set-line"
+      className={cn('flex shrink-0 items-center gap-[var(--spacing-system-xs)]', className)}
+    >
+      <div className="min-w-0 flex-1">{row}</div>
+      <PageTopicLabel className="shrink-0" />
     </div>
   );
 }
@@ -73,6 +87,8 @@ export interface MingoQuickActionWallProps {
   accent?: QuickActionAccent;
   /** See {@link QuickActionSetProps.showTopic}. */
   showTopic?: boolean;
+  /** See {@link QuickActionSetProps.reserve}. */
+  reserve?: boolean;
   className?: string;
 }
 
@@ -87,6 +103,9 @@ const toChip = (action: MingoQuickAction): QuickActionChip => ({
 /**
  * Mingo's quick actions as the chat's empty state draws them (`MingoWelcome`): the {@link QuickActionSet}. One
  * component, so a host that shows the actions outside the chat (a docked composer's home) draws the very same row.
+ * A page with no action draws nothing, except the page's topic stamp where the host asks for it (whoever tags quick
+ * actions on the hub reads the path to tag on exactly the pages that have none yet); with `reserve`, the line keeps its
+ * height either way.
  */
 export function MingoQuickActionWall({
   quickActions,
@@ -94,9 +113,13 @@ export function MingoQuickActionWall({
   loading = false,
   accent,
   showTopic,
+  reserve = false,
   className,
 }: MingoQuickActionWallProps) {
-  if (quickActions.length === 0 && leading.length === 0 && !loading) return null;
+  const topicStamp = usePageTopicStamp();
+  if (quickActions.length === 0 && leading.length === 0 && !loading && !reserve) {
+    return (showTopic ?? topicStamp) ? <PageTopicLabel className={cn('shrink-0 text-right', className)} /> : null;
+  }
   return (
     <QuickActionSet
       chips={quickActions.map(toChip)}
@@ -104,6 +127,7 @@ export function MingoQuickActionWall({
       loading={loading}
       accent={accent}
       showTopic={showTopic}
+      reserve={reserve}
       className={className}
     />
   );

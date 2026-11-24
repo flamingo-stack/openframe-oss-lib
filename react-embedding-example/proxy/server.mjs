@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import httpProxy from 'http-proxy'
 import { CONTENT_PREFIX } from './content-prefix.mjs'
 import { hubTarget, rewrite } from './inject.mjs'
+import { handleMingoRequest } from './agent.mjs'
 
 const env = process.env
 const PORT = Number(env.PORT) || 4173
@@ -52,8 +53,9 @@ async function serveStatic(req, res) {
 }
 
 http
-  .createServer((req, res) => {
+  .createServer(async (req, res) => {
     const url = req.url || '/'
+    if (await handleMingoRequest(req, res, env)) return // Mingo's chat loop (agent.mjs)
     if (url === CONTENT_PREFIX || url.startsWith(`${CONTENT_PREFIX}/`)) {
       req.url = rewrite(url) // /content/api/x → /api/x
       return void proxy.web(req, res)

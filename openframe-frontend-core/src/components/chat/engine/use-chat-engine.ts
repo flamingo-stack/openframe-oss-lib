@@ -313,6 +313,10 @@ function withAvatarUrl(message: ChatMessage, avatarUrlOf: (stored: string) => st
 /** How long a send waits for the tail to subscribe to its dialog (`awaitsSubscription`). */
 const SUBSCRIPTION_WAIT_MS = 30_000;
 
+/** How long an intent dialog this chat just created waits before its history is read again, when the first read said
+ *  the server does not have it yet. */
+const FRESH_DIALOG_REREAD_MS = 1_000;
+
 /** What a dialog the list has not named yet is called. */
 const NEW_DIALOG_TITLE = 'New Chat';
 
@@ -420,6 +424,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   useEffect(() => {
     currentDialogIdRef.current = dialogId;
   });
+
+  const replayCompletedForDialogRef = useRef<string | null>(null);
+  useEffect(() => {
+    replayCompletedForDialogRef.current = null;
+  }, [dialogId]);
 
   // A dialog a stream's server minted mid-turn: its thread stays under the key the turn writes into (the draft's), until
   // the dialog is left.
@@ -761,6 +770,10 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   // Monotonic guard: a slow page for a dialog the user has left must not land on the one they switched to.
   const historyLoadSeqRef = useRef(0);
 
+  // Intent dialogs this chat created whose first history page has not landed yet. The server may not serve a dialog it
+  // created a moment ago: a `missing` first page is read once more, and such a dialog is never left for being missing.
+  const freshIntentDialogsRef = useRef(new Set<string>());
+
   /** One page, or `null` when a newer load superseded it, or `'failed'`. Writes nothing: `applyHistoryPage` does. */
   const readHistoryPage = useCallback(
     async (id: string, cursor?: string): Promise<FetchDialogMessagesResult | 'failed' | null> => {
@@ -799,7 +812,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       if (cursor === undefined && page.missing) {
         // Deleted, or no longer the caller's (claimed by an account this browser is signed out of): kept open, every
         // later send would go into a dialog the server refuses to record. Unless the viewer has already written in it.
-        if (store.snapshotOf(key).messages.length === 0 && currentDialogIdRef.current === id) {
+        if (
+          store.snapshotOf(key).messages.length === 0 &&
+          currentDialogIdRef.current === id &&
+          !freshIntentDialogsRef.current.has(id)
+        ) {
           leaveDialogRef.current(id);
         }
         return;
@@ -824,7 +841,12 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
           // never deliver again a prompt this history holds.
           store.hydrate(key, processed, {
             expectingReplay: backfills && isBufferingActive(),
-            tailReplaysHistory: !(tailReplays && historyMaxSeq === null),
+            tailReplaysHistory: !(
+              tailReplays &&
+              (historyMaxSeq === null || replayCompletedForDialogRef.current === id)
+            ),
+            // The tail resumes after this seq and first delivers what it held then: turns older than any send from here.
+            replayingBacklog: tailReplays && historyMaxSeq !== null && replayCompletedForDialogRef.current !== id,
           });
         }
         setHistorySeq({ dialogId: id, seq: historyMaxSeq });
@@ -848,8 +870,20 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   );
 
   const loadDialogHistory = useCallback(
-    (id: string, cursor?: string): Promise<void> =>
-      readHistoryPage(id, cursor).then(page => applyHistoryPage(id, cursor, page)),
+    async (id: string, cursor?: string): Promise<void> => {
+      const fresh = cursor === undefined && freshIntentDialogsRef.current.has(id);
+      let page = await readHistoryPage(id, cursor);
+      if (fresh && page !== null && page !== 'failed' && page.missing) {
+        await new Promise(resolve => setTimeout(resolve, FRESH_DIALOG_REREAD_MS));
+        if (currentDialogIdRef.current !== id) {
+          freshIntentDialogsRef.current.delete(id);
+          return;
+        }
+        page = await readHistoryPage(id, cursor);
+      }
+      applyHistoryPage(id, cursor, page);
+      if (fresh && page !== null) freshIntentDialogsRef.current.delete(id);
+    },
     [readHistoryPage, applyHistoryPage],
   );
 
@@ -999,6 +1033,14 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     onResync: () => {
       if (dialogId) void loadDialogHistory(dialogId);
     },
+    onReplayComplete: () => {
+      if (!tailReplays || !dialogId || currentDialogIdRef.current !== dialogId) return;
+      replayCompletedForDialogRef.current = dialogId;
+      store.mutate(keyOfDialog(dialogId), reducer => {
+        reducer.setTailReplaysHistory(false);
+        reducer.setReplayingBacklog(false);
+      });
+    },
     onSubscribed: () => {
       if (!dialogId) return;
       subscribedForRef.current = dialogId;
@@ -1076,7 +1118,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         });
         // The list shows the new conversation at once, under its name; the next refresh replaces it with the real entry.
         upsertDialogTop({ id: newId, title: create.title || NEW_DIALOG_TITLE, timestamp: new Date() });
-        createdDialogsRef.current.add(newId);
+        // An intent dialog's greeting is the server's, written as the dialog is created: it is read from history like
+        // any opened dialog. A dialog this chat starts with a send skips that read, an intent one included: its thread
+        // already holds the send, which entering through the history would clear before the server has it.
+        if (create.intent && !create.prompt) freshIntentDialogsRef.current.add(newId);
+        else createdDialogsRef.current.add(newId);
         openDialog(newId);
         currentDialogIdRef.current = newId;
         if (create.prompt && newDialogGreeting) {

@@ -4,6 +4,7 @@
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
+import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
@@ -671,11 +672,21 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
   onModelClick?: () => void;
   /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
   modelTooltip?: string;
+  /** The model is picked here: the provider icon + model name open this menu above the row. */
+  modelMenu?: ModelMenu;
   /**
    * The Usage panel's data (Mingo). When set, the token tail becomes a button with a ring in the chat context's colour
    * that opens the panel above it, and the hover-card breakdown is not drawn. Unset: the row is unchanged.
    */
   usagePanel?: ChatUsagePanelData;
+}
+
+/** `disabled`: the model cannot change now (e.g. while a reply streams); the name stays, the menu does not open. */
+export interface ModelMenu {
+  groups: ActionsMenuGroup[];
+  disabled?: boolean;
+  /** Enables the full-width provider and model views below the tablet breakpoint. */
+  mobileDrillDown?: boolean;
 }
 
 /**

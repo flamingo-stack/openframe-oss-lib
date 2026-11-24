@@ -89,13 +89,26 @@ needs the checklist above before a host asks it for the grid:
 
 | Table | Still to do |
 |---|---|
-| `ScriptsTable`, `ScriptSchedulesTable`, `ScriptExecutionsTable` | `size` / `minSize` in `scripts-table-columns.ts` (their `width` classes are card-only), `gridCell` for the name + description, date + time and initiator cells, `actions` and `open` as action columns |
 | `KnowledgeBaseTableBody` | `size` / `minSize`, `gridCell` for the name cell (icon, name, status, summary), `open` and the host's `actionsColumn` as action columns |
-| `DeviceSelector` | `size` / `minSize`, `gridCell` for the device and customer cells, its add / remove column as an action column |
+
+`ScriptsTable`, `ScriptSchedulesTable` and `ScriptExecutionsTable` are ready. Their layout is data
+(`features/scripts/scripts-table-columns.ts`: per column a `size`, a `minSize`, a `label`, and `gridKind: 'action'` on
+the row menu and the open button), read through `scriptsColumnSize()` and `scriptsColumnMeta()`; the one-line cells are
+the `...GridCell` components beside the card cells (`script-cells.tsx`, `execution-cells.tsx`). A host that builds its
+own columns on that layout (the web app's live Scripts tables) reads the same two helpers and cells.
 
 `DevicesTableBody` (`features/devices/devices-table-columns.tsx`) is the worked example: every column has a `size`, a
 `minSize` and a `gridCell`, its open column is kept by hand, and it adds `selectionColumn()` itself when the host
 passes `selectable` (off by default: the devices list has no bulk action yet).
+
+`DeviceSelector` is ready. Its device and customer cells are the devices list's (`DeviceNameGridCell` without the
+unread mark, `OrganizationGridCell`); the time a card row prints under the name ("Last Online: 5m ago") sits beside
+the status tag, and the customer's contact line is not drawn. Its add / remove column is an action column kept by
+hand, with a grid form of its own: a bare icon button (a plus, the accent check for a device that is in, the trash on
+the Selected tab), each named for a screen reader ("Add <device>"), and the reason a device cannot be added as the
+control's tooltip, since a 56px cell has no room for the text a card row prints beside the button. The picker keeps
+its own card (the tabs and the search row) around the table; "Add All Devices" or the device count sits above the
+table in `DataTable.Meta`.
 
 `PoliciesTable` and `LogsTableView` are ready too. Both put a card row's two lines on one with
 `GridTextWithDetailCell` (`features/feature-table-grid-cells.tsx`): the subject (a policy's name, a log's time, a
@@ -106,3 +119,13 @@ form (`<LogCopyIconButton grid />`).
 
 `TenantsTableView` (`features/cloud-tenants`, both variants) is ready too: its one-line cells are in
 `tenant-grid-cells.tsx`, and its open column is kept by hand because the card table hides it below `md` in one variant.
+
+## Tables whose columns are the data's
+
+`TestRunResults` (`ui/test-run.tsx`) and `QueryReportTable` (`ui/query-report-table/`) take `layout` too. Their
+columns are the keys of the rows they are given, so the grid form has no settings gear and keeps no layout: a column
+per key at the card rows' width (176px for a test run, `columnWidth` for a report), resizable for the session, each
+cell the value on one line with a dash for none. While rows are read they draw the grid's own loading form on unnamed
+columns. Both keep their own empty state outside the grid, and the report keeps its title bar and export above it;
+the report's scrollbar track and edge fades are the card rows' only, since the grid scrolls inside itself. A compact
+report (`variant="compact"`) ignores `layout`.

@@ -6,6 +6,7 @@ import io.nats.client.api.StreamConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -13,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
@@ -26,6 +28,7 @@ class NatsStreamConfigurationInitializerTest {
 
     @Mock private NatsStreamManagementService streams;
     @Mock private AdditionalStreamConfigurationProvider additional;
+    @Captor private ArgumentCaptor<StreamConfiguration> streamCaptor;
     @InjectMocks private NatsStreamConfigurationInitializer initializer;
 
     @Test
@@ -46,6 +49,22 @@ class NatsStreamConfigurationInitializerTest {
     }
 
     @Test
+    void run_packageAdoptStatusStream_savedForTheAgentsStatusSubject() {
+        // setup
+        when(additional.provide()).thenReturn(List.of());
+
+        // execution
+        initializer.run(null);
+
+        // verifications
+        ArgumentCaptor<StreamConfiguration> saved = ArgumentCaptor.forClass(StreamConfiguration.class);
+        verify(streams, atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues())
+                .extracting(StreamConfiguration::getName, StreamConfiguration::getSubjects)
+                .contains(tuple("PACKAGE_ADOPT_STATUS", List.of("machine.*.package-adopt.status")));
+    }
+
+    @Test
     void run_oneDeletionFails_theOthersGoOn_noException() {
         // setup
         when(additional.provide()).thenReturn(List.of());
@@ -56,5 +75,21 @@ class NatsStreamConfigurationInitializerTest {
 
         // verifications
         verify(streams).deleteIfExists("TOOL_UPDATE");
+    }
+
+    @Test
+    void run_machineOsInfoStream_savedWithOsInfoSubject() {
+        // setup
+        when(additional.provide()).thenReturn(List.of());
+
+        // execution
+        initializer.run(null);
+
+        // verifications
+        verify(streams, atLeastOnce()).save(streamCaptor.capture());
+        assertThat(streamCaptor.getAllValues())
+                .filteredOn(configuration -> "MACHINE_OS_INFO".equals(configuration.getName()))
+                .extracting(StreamConfiguration::getSubjects)
+                .containsExactly(List.of("machine.*.os-info"));
     }
 }

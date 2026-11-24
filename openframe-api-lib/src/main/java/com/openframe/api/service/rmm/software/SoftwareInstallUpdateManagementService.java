@@ -1,23 +1,33 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.rmm.software.AdoptSoftwareInput;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
+import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
+import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.nats.packageupdate.PackageUpdateEligibilityService;
@@ -50,6 +60,9 @@ public class SoftwareInstallUpdateManagementService {
     private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
     private final SoftwareActionResultRepository softwareActionResultRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final PackageAdoptReach packageAdoptReach;
+    private final SoftwareInventoryService softwareInventoryService;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -57,6 +70,64 @@ public class SoftwareInstallUpdateManagementService {
 
     public List<SoftwareDispatchResult> update(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.UPDATE, input, initiatedBy, source);
+    }
+
+    public List<String> adopt(AdoptSoftwareInput input, String initiatedBy) {
+        String softwareId = input.getSoftwareId();
+        SoftwareResponse software = softwareInventoryService.getAdoptableSoftware(softwareId);
+        SoftwareBundlePackage adoptionPackage = software.getAdoptionPackage();
+        PackageManagerType packageManager = adoptionPackage.getPackageManager();
+        String packageName = adoptionPackage.getPackageName();
+        if (packageManager == PackageManagerType.WINGET) {
+            throw new BadRequestException("A program is not adopted into WINGET: winget updates it as it is installed");
+        }
+        List<String> machineIds = input.getMachineIds().stream().distinct().toList();
+        List<String> adoptable = adoptableMachines(softwareId, adoptionPackage, machineIds);
+        if (adoptable.isEmpty()) {
+            throw new BadRequestException("None of the given devices can adopt " + packageName + " with " + packageManager);
+        }
+        List<String> targets = packageAdoptReach.filterReachable(adoptable);
+        if (targets.isEmpty()) {
+            throw new BadRequestException("The adopt order reaches none of the given devices: "
+                    + DeliveryType.PACKAGE_ADOPT + " is switched off or their agent is too old for it");
+        }
+        deviceService.verifyDispatchable(targets);
+
+        String executionId = UUID.randomUUID().toString();
+        BrewPackageType brewPackageType = adoptionPackage.getBrewPackageType();
+        boolean brew = packageManager == PackageManagerType.BREW;
+        String adoptScriptId = brew ? SoftwareScriptCode.BREW_ADOPT_SCRIPT_ID : SoftwareScriptCode.CHOCO_ADOPT_SCRIPT_ID;
+        PrivilegeLevel adoptPrivilegeLevel = brew ? PrivilegeLevel.USER : PrivilegeLevel.ADMIN;
+        String requestId = packageUpdateDispatchService.dispatchAdopt(RunningExecutionRows.builder()
+                .executionId(executionId)
+                .scriptId(adoptScriptId)
+                .machineIds(targets)
+                .privilegeLevel(adoptPrivilegeLevel)
+                .initiatedBy(initiatedBy)
+                .source(ExecutionSource.PACKAGE_INSTALLATION)
+                .packageManager(packageManager)
+                .packageName(packageName)
+                .softwareAction(SoftwareAction.ADOPT)
+                .build(), brewPackageType, softwareId, software.getBundleIdentifier());
+        SoftwarePackageInput pkg = new SoftwarePackageInput();
+        pkg.setPackageManager(packageManager);
+        pkg.setPackageName(packageName);
+        recordAction(executionId, SoftwareAction.ADOPT, pkg, targets, initiatedBy);
+
+        log.info("Software adopt order sent: requestId={} executionId={} softwareId={} package={}/{} machines={}/{}",
+                requestId, executionId, softwareId, packageManager, packageName, targets.size(), machineIds.size());
+        return targets;
+    }
+
+    private List<String> adoptableMachines(String softwareId, SoftwareBundlePackage adoptionPackage,
+                                           List<String> machineIds) {
+        PackageManagerType packageManager = adoptionPackage.getPackageManager();
+        Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
+        OsType packageOs = SoftwareBundleService.osTypeOf(packageManager);
+        Set<OsType> packageOsTypes = Set.of(packageOs);
+        List<String> compatible = machinePlatformResolver.compatible(machineIds, osTypes, packageOsTypes);
+        List<String> withManager = packageManagerAvailability.adoptableOn(compatible, packageManager);
+        return softwareInventoryService.withoutCopiesNotToAdopt(softwareId, adoptionPackage, withManager);
     }
 
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,
@@ -135,7 +206,7 @@ public class SoftwareInstallUpdateManagementService {
                 .tenantId(tenantId)
                 .executionId(executionId)
                 .action(action)
-                .kind(action.kind())
+                .kind(SoftwareActionKindMapper.kindOf(action))
                 .packageManager(pkg.getPackageManager())
                 .packageName(pkg.getPackageName())
                 .version(pkg.getVersion())

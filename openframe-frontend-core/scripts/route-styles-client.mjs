@@ -29,10 +29,19 @@ const LOADER =
   "l.onerror=function(){var g=f(h);if(g&&!l.hasAttribute('data-next-styles-fallback')){l.setAttribute('data-next-styles-fallback','');l.href=g}};" +
   "l.setAttribute('data-next-styles-full','');document.head.appendChild(l)})(document.currentScript)";
 
+/**
+ * Whether the server wrote rules into the page's `<style>`. A placeholder the build left unfilled holds none: the page
+ * would otherwise paint with no utilities at all and never load the sheet that has them.
+ */
+function hasServerRules(style) {
+  const css = style?.textContent?.trim();
+  return Boolean(css) && css !== markers.PLACEHOLDER && css !== markers.COMPLETE_PLACEHOLDER;
+}
+
 /** The complete sheet, once, unless the server wrote this page's rules (its loader then started the sheet already). */
 function loadCompleteSheet(build, fullUrl) {
   if (!fullUrl || document.querySelector('link[data-next-styles-full]')) return;
-  if (document.querySelector(`style[data-href="next-styles:${build}"]`)?.textContent) return;
+  if (hasServerRules(document.querySelector(`style[data-href="next-styles:${build}"]`))) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = fullUrl;

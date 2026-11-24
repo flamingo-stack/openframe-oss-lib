@@ -10,8 +10,8 @@ use tokio::time::{timeout, Duration};
 
 use super::{
     Begin, ClientUpdateHandler, CommandContext, CommandHandler, CommandListener,
-    FeatureFlagsHandler, Outcome, PackageUpdateHandler, RestartGate, ToolInstallationHandler,
-    ToolUpdateHandler,
+    FeatureFlagsHandler, Outcome, PackageAdoptHandler, PackageUpdateHandler, RestartGate,
+    ToolInstallationHandler, ToolUpdateHandler,
 };
 use crate::clients::ToolApiClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
@@ -30,7 +30,11 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
-use crate::services::package_manager::package_update::{OrderStore, StatusReporter};
+use crate::services::package_manager::adopt::PackageAdoptRunner;
+use crate::services::package_manager::brew::BrewLock;
+use crate::services::package_manager::package_update::{
+    OrderStore, RestartSignals, StatusReporter,
+};
 use crate::services::package_manager::{is_supported, ManagerId};
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::{LedgerState, ResultStore};
@@ -1313,6 +1317,120 @@ async fn a_waiting_package_order_holds_neither_a_restart_nor_the_next_order() {
     }
 }
 
+/// A package-adopt listener with its worker running, and the backend's status stream subscribed first.
+async fn launch_package_adopt(agent: &mut Agent) -> async_nats::Subscriber {
+    async_nats::jetstream::new(agent.tester.clone())
+        .create_stream(async_nats::jetstream::stream::Config {
+            name: "PACKAGE_ADOPT_STATUS".into(),
+            subjects: vec!["machine.*.package-adopt.status".into()],
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let statuses = agent
+        .tester
+        .subscribe(format!("machine.{MACHINE}.package-adopt.status"))
+        .await
+        .unwrap();
+    agent.tester.flush().await.unwrap();
+    let runner = Arc::new(PackageAdoptRunner::new(
+        agent.publisher.clone(),
+        agent.store.clone(),
+        agent.flush.clone(),
+        RestartSignals {
+            client_update: agent.tool_run_manager.client_update_pending(),
+            agent_restart: Latch::default().view(),
+        },
+        InProgress::default(),
+        BrewLock::default(),
+    ));
+    runner.start();
+    agent.launch_command(PackageAdoptHandler::new(runner)).await;
+    statuses
+}
+
+fn adopt_order(dispatch_id: &str, request_id: &str) -> serde_json::Value {
+    json!({
+        "delivery": {
+            "type": "PACKAGE_ADOPT",
+            "targetId": request_id,
+            "dispatchId": dispatch_id,
+            "sequence": 1,
+        },
+        "requestId": request_id,
+        "package": {"manager": "BREW", "kind": "FORMULA", "name": "wget"},
+        "bundleId": "org.gnu.wget",
+    })
+}
+
+#[tokio::test]
+async fn an_adopt_order_is_acked_then_answered_with_its_status_only() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let mut statuses = launch_package_adopt(&mut agent).await;
+    let subject = format!("machine.{MACHINE}.package-adopt");
+
+    agent
+        .send_to(subject.clone(), adopt_order("a1", "req-1"))
+        .await;
+
+    agent.expect("a1", DeliveryResult::Acked).await;
+    let message = timeout(BOUND, statuses.next())
+        .await
+        .expect("no event on the adopt status stream")
+        .expect("status subscription ended");
+    let status: serde_json::Value = serde_json::from_slice(&message.payload).unwrap();
+    assert_eq!(status["requestId"], "req-1");
+    assert_eq!(status["machineId"], MACHINE);
+    assert_eq!(status["state"], "FAILED");
+    assert_eq!(status["reason"], "NOT_SUPPORTED");
+    agent.until_flushed().await;
+    agent.expect_silence("a1").await;
+    assert!(
+        matches!(
+            agent.store.delivery_state("a1".to_string()).await.unwrap(),
+            Some(LedgerState::Settled(ref kept)) if kept.result == DeliveryResult::Done
+        ),
+        "the handled order is kept for repeats"
+    );
+
+    agent.send_to(subject, adopt_order("a1", "req-1")).await;
+    agent.expect("a1", DeliveryResult::Done).await;
+    let again = timeout(QUIET, statuses.next()).await;
+    assert!(again.is_err(), "a repeated dispatch ran again: {again:?}");
+}
+
+#[tokio::test]
+async fn an_adopt_order_lost_to_the_last_stop_is_failed_before_the_listener_subscribes() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let lost = DeliveryRef {
+        delivery_type: "PACKAGE_ADOPT".to_string(),
+        target_id: "req-9".to_string(),
+        dispatch_id: "lost".to_string(),
+        sequence: Some(1),
+    };
+    agent
+        .store
+        .delivery_accept(
+            format!("machine.{MACHINE}.delivery.result"),
+            lost,
+            LedgerState::Deferred,
+        )
+        .await
+        .unwrap();
+
+    let _statuses = launch_package_adopt(&mut agent).await;
+
+    let failed = agent.expect("lost", DeliveryResult::Failed).await;
+    assert_eq!(
+        failed.error.as_deref(),
+        Some("the agent lost the work it took on")
+    );
+}
+
 fn installed_tool(
     tool_agent_id: &str,
     version: &str,
@@ -1476,7 +1594,8 @@ async fn an_update_whose_old_binary_is_still_running_fails_and_keeps_the_recorde
     archive
         .start_file(
             "agent.exe",
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored),
         )
         .unwrap();
     archive.write_all(&new_agent).unwrap();
@@ -1542,7 +1661,7 @@ async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empt
 
     let helper = vec![9u8; 150 * 1024];
     let stored =
-        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     for (name, bytes) in [("agent", vec![7u8; 150 * 1024]), ("helper", helper.clone())] {
         archive.start_file(name, stored).unwrap();

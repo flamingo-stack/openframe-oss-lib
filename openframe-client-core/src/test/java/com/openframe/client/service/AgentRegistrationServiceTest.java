@@ -16,6 +16,7 @@ import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
+import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
@@ -92,6 +93,9 @@ class AgentRegistrationServiceTest {
     @Mock
     private AgentRegistrationClientUpdateService agentRegistrationClientUpdateService;
 
+    @Mock
+    private DeletedMachineCleanup deletedMachineCleanup;
+
     @Captor
     private ArgumentCaptor<OAuthClient> oauthClientCaptor;
 
@@ -123,7 +127,8 @@ class AgentRegistrationServiceTest {
                 installedAgentService,
                 toolConnectionService,
                 agentRegistrationClientFeatureFlagsService,
-                agentRegistrationClientUpdateService
+                agentRegistrationClientUpdateService,
+                deletedMachineCleanup
         );
         request = createTestRequest();
     }
@@ -550,6 +555,54 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
+    void registerAgent_WhenPostProcessingFails_CleansUpTheDiscardedMachine() {
+        // setup
+        stubNewMachineRegistration();
+        doThrow(new IllegalStateException("post-processing failed"))
+                .when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+        stubWriterOver(savedMachineOf("tenant-1"));
+
+        // execution
+        assertThrows(IllegalStateException.class, () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        // verifications
+        verify(deletedMachineCleanup).cleanUpDeletedMachine("tenant-1", MACHINE_ID);
+    }
+
+    @Test
+    void registerAgent_WhenTheDiscardedMachineIsGone_NothingToCleanUp() {
+        // setup
+        stubNewMachineRegistration();
+        doThrow(new IllegalStateException("post-processing failed"))
+                .when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        // execution
+        assertThrows(IllegalStateException.class, () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        // verifications
+        verifyNoInteractions(deletedMachineCleanup);
+    }
+
+    @Test
+    void registerAgent_WhenTheCleanupFails_StillThrowsTheOriginalError() {
+        // setup
+        stubNewMachineRegistration();
+        IllegalStateException failure = new IllegalStateException("post-processing failed");
+        doThrow(failure).when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+        stubWriterOver(savedMachineOf("tenant-1"));
+        doThrow(new IllegalStateException("mongo is down"))
+                .when(deletedMachineCleanup).cleanUpDeletedMachine("tenant-1", MACHINE_ID);
+
+        // execution
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        // verifications
+        assertSame(failure, thrown);
+    }
+
+    @Test
     void registerAgent_RetryAfterAFailedAttempt_LeavesOneLiveDevice() {
         when(machineIdGenerator.generate()).thenReturn("failed-machine-id", MACHINE_ID);
         when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
@@ -583,6 +636,72 @@ class AgentRegistrationServiceTest {
                 () -> agentRegistrationService.register(INITIAL_KEY, request));
 
         assertSame(failure, thrown);
+    }
+
+    @Test
+    void registerAgent_WithOsVersionAndBuild_CopiesThemOntoTheNewMachine() {
+        // setup
+        stubNewMachineRegistration();
+        request.setOsVersion("11.7.10");
+        request.setOsBuild("20G1427");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("11.7.10", "20G1427");
+    }
+
+    @Test
+    void registerAgent_WithBlankOsVersionAndBuild_LeavesThemUnset() {
+        // setup
+        stubNewMachineRegistration();
+        request.setOsVersion(" ");
+        request.setOsBuild("");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly(null, null);
+    }
+
+    @Test
+    void reinstall_WithOsVersionAndBuild_OverwritesTheStoredOnes() {
+        // setup
+        stubReinstallOf(machineWithOsInfo());
+        request.setOsVersion("14.2.1");
+        request.setOsBuild("23C71");
+
+        // execution
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertThat(writtenOver(machineWithOsInfo()))
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("14.2.1", "23C71");
+    }
+
+    @Test
+    void reinstall_WithBlankOsVersionAndBuild_KeepsTheStoredOnes() {
+        // setup
+        stubReinstallOf(machineWithOsInfo());
+        request.setOsVersion(" ");
+        request.setOsBuild(null);
+
+        // execution
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertThat(writtenOver(machineWithOsInfo()))
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("13.6.1", "22G313");
     }
 
     private void stubNewMachineRegistration() {
@@ -623,6 +742,14 @@ class AgentRegistrationServiceTest {
         return after;
     }
 
+    private static Machine savedMachineOf(String tenantId) {
+        Machine machine = new Machine();
+        machine.setTenantId(tenantId);
+        machine.setMachineId(MACHINE_ID);
+        machine.setStatus(DeviceStatus.PENDING);
+        return machine;
+    }
+
     private static Machine copyOf(Machine source) {
         Machine copy = new Machine();
         BeanUtils.copyProperties(source, copy);
@@ -637,6 +764,14 @@ class AgentRegistrationServiceTest {
         machine.setModel("ThinkPad T14");
         machine.setOsUuid("old-os-uuid");
         machine.setUserId("old-user");
+        return machine;
+    }
+
+    private static Machine machineWithOsInfo() {
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE_ID);
+        machine.setOsVersion("13.6.1");
+        machine.setOsBuild("22G313");
         return machine;
     }
 }

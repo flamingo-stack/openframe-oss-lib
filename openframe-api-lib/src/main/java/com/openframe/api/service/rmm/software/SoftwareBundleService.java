@@ -141,6 +141,7 @@ public class SoftwareBundleService {
         if (machineIds.isEmpty()) {
             throw new BadRequestException("Cannot submit software bundle " + input.getId() + ": no devices assigned");
         }
+        rejectAdopt(input.getAction());
         List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
         validatePackages(packages);
         Map<String, OsType> deviceOsTypes = requireEligibleDeviceOsTypes(machineIds, packages);
@@ -248,7 +249,7 @@ public class SoftwareBundleService {
                     .tenantId(bundle.getTenantId())
                     .executionId(executionId)
                     .action(bundle.getAction())
-                    .kind(bundle.getAction().kind())
+                    .kind(SoftwareActionKindMapper.kindOf(bundle.getAction()))
                     .packageManager(pkg.getPackageManager())
                     .packageName(pkg.getPackageName())
                     .version(pkg.getVersion())
@@ -316,7 +317,13 @@ public class SoftwareBundleService {
                 .toList();
     }
 
-    private static OsType osTypeOf(PackageManagerType packageManager) {
+    static void rejectAdopt(SoftwareAction action) {
+        if (action == SoftwareAction.ADOPT) {
+            throw new BadRequestException("ADOPT is not a bundle or schedule action: use adoptSoftware");
+        }
+    }
+
+    static OsType osTypeOf(PackageManagerType packageManager) {
         return packageManager == PackageManagerType.BREW ? OsType.MAC_OS : OsType.WINDOWS;
     }
 

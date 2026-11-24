@@ -79,11 +79,35 @@ describe('ModelDisplay usage panel', () => {
     expect(group).toHaveTextContent('Input—');
   });
 
+  it('draws no counter while the budget and the usage are both unknown (no chat, or a new chat before its first figures)', () => {
+    render(
+      <ModelDisplay
+        provider="anthropic"
+        modelName="Claude"
+        usagePanel={{ ...panel, context: { used: null, limit: null, compactionThreshold: null } }}
+      />,
+    );
+    expect(screen.getByText('Claude')).toBeInTheDocument();
+    expect(screen.queryByText(/context budget/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /show usage details/i })).not.toBeInTheDocument();
+  });
+
+  it('draws the counter once the budget is known, before the first usage', () => {
+    render(<ModelDisplay provider="anthropic" modelName="Claude" contextWindow={150_000} usagePanel={panel} />);
+    expect(screen.getByRole('button', { name: /show usage details/i })).toHaveTextContent('—/150K context budget');
+  });
+
+  it('draws the counter once the usage is known, before the budget', () => {
+    render(<ModelDisplay provider="anthropic" modelName="Claude" usedTokens={12_300} usagePanel={panel} />);
+    expect(screen.getByRole('button', { name: /show usage details/i })).toHaveTextContent('12.3K/— context budget');
+  });
+
   it("writes a compaction threshold the backend has not reported as a dash, never the design's 75% (a new chat)", async () => {
     render(
       <ModelDisplay
         provider="anthropic"
         modelName="Claude"
+        contextWindow={150_000}
         usagePanel={{ ...panel, context: { used: null, limit: null, compactionThreshold: null } }}
       />,
     );
@@ -98,6 +122,7 @@ describe('ModelDisplay usage panel', () => {
       <ModelDisplay
         provider="anthropic"
         modelName="Claude"
+        contextWindow={150_000}
         usagePanel={{ ...panel, balance: { tokens: 100_000_000_000, usd: 1_000_000, tone: 'default' } }}
       />,
     );

@@ -52,6 +52,8 @@ export interface ChatLiveTailOptions {
   onConnect: () => void;
   /** A replaying tail came back after a gap and delivered what the stream held: the engine refetches history. */
   onResync: () => void;
+  /** The ordered consumer finished replaying its initial backlog. */
+  onReplayComplete?: () => void;
   /** The tail is subscribed to `dialogId`: a transport that `awaitsSubscription` publishes only after it. */
   onSubscribed?: () => void;
 }
@@ -254,7 +256,16 @@ export function jetStreamLiveTail({
   /** Asked before the client reconnects (a token refresh). */
   onBeforeReconnect?: NatsBeforeReconnect;
 }): UseChatLiveTail {
-  return function useJetStreamLiveTail({ enabled, dialogId, fromSeq, onEvent, onConnect, onResync, onSubscribed }) {
+  return function useJetStreamLiveTail({
+    enabled,
+    dialogId,
+    fromSeq,
+    onEvent,
+    onConnect,
+    onResync,
+    onReplayComplete,
+    onSubscribed,
+  }) {
     const deliver = useRedeliveryGate(dialogId, onEvent);
     const { caughtUpCount } = useJetStreamDialogSubscription({
       enabled: enabled && fromSeq !== undefined,
@@ -266,6 +277,7 @@ export function jetStreamLiveTail({
       clientConfig,
       onEvent: deliver,
       onConnect,
+      ...(onReplayComplete ? { onReplayComplete } : {}),
       ...(onSubscribed ? { onSubscribed } : {}),
       ...(onBeforeReconnect ? { onBeforeReconnect } : {}),
     });

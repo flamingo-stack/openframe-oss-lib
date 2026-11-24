@@ -15,10 +15,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerReactiveAuthenticationManagerResolver;
 import org.springframework.security.oauth2.server.resource.authentication.JwtReactiveAuthenticationManager;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
@@ -130,7 +132,8 @@ public class JwtAuthConfig {
     public JwtIssuerReactiveAuthenticationManagerResolver jwtIssuerAuthenticationManagerResolver(
             LoadingCache<String, ReactiveAuthenticationManager> issuerManagersCache,
             JwtConfig jwtConfig,
-            IssuerUrlProvider issuerUrlProvider) {
+            IssuerUrlProvider issuerUrlProvider,
+            TokenRevocationChecker tokenRevocationChecker) {
 
         Cache<String, Boolean> unreachableIssuers = Caffeine.newBuilder()
                 .maximumSize(maximumSize)
@@ -154,7 +157,20 @@ public class JwtAuthConfig {
                         log.warn("JWT issuer {} unreachable, rejecting its tokens for {}: {}",
                                 issuer, discoveryFailureTtl, e.getMessage());
                         unreachableIssuers.put(issuer, Boolean.TRUE);
-                    }));
+                    })
+                    .flatMap(authenticated -> rejectRevoked(authenticated, tokenRevocationChecker)));
         });
+    }
+
+    /**
+     * A valid signature does not mean the token still counts: its user or device may have been
+     * revoked after it was issued (see {@link TokenRevocationChecker}).
+     */
+    private static Mono<Authentication> rejectRevoked(Authentication authenticated,
+                                                      TokenRevocationChecker tokenRevocationChecker) {
+        if (authenticated instanceof JwtAuthenticationToken token) {
+            return tokenRevocationChecker.verify(token.getToken()).thenReturn(authenticated);
+        }
+        return Mono.just(authenticated);
     }
 }

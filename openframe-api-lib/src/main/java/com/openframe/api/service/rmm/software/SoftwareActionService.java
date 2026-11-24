@@ -8,6 +8,7 @@ import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
@@ -49,12 +50,17 @@ public class SoftwareActionService {
     // UTC-12 is the last zone a wall-clock time comes in
     private static final Duration LATEST_ZONE_LAG = Duration.ofHours(12);
 
+    private static final String DEFAULT_SORT_FIELD = "dispatchedAt";
+    private static final String SORTABLE_FIELDS = "status, software, processedDevices, devices, dispatchedAt";
     private static final Map<String, String> SORT_FIELD = Map.of(
             "status", "status",
             "software", "packageName",
-            "processedDevices", "totalMachineCount",
+            "processedDevices", "respondedMachineCount",
             "devices", "totalMachineCount",
-            "dispatchedAt", "dispatchedAt");
+            DEFAULT_SORT_FIELD, DEFAULT_SORT_FIELD);
+
+    private static final Comparator<String> NULLS_FIRST_TEXT = Comparator.nullsFirst(String::compareTo);
+    private static final Comparator<Instant> NULLS_FIRST_TIME = Comparator.nullsFirst(Instant::compareTo);
 
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_ACTION = "action";
@@ -70,35 +76,70 @@ public class SoftwareActionService {
 
     public PageResult<SoftwareActionResponse> list(SoftwareActionFilterInput filter, String search,
                                                    SortInput sort, int page, Integer perPage) {
+        String sortField = resolveSortField(sort);
+        Sort.Direction direction = resolveDirection(sort);
+        Comparator<SoftwareActionResponse> order = rowOrder(sortField, direction);
         String tenantId = tenantIdProvider.getTenantId();
         int size = perPage != null && perPage > 0 ? perPage : DEFAULT_PER_PAGE;
         SoftwareActionQueryFilter queryFilter = toQueryFilter(filter);
-        String sortField = resolveSortField(sort);
-        Sort.Direction direction = resolveDirection(sort);
 
         List<SoftwareActionResponse> scheduled = includeScheduled(filter)
                 ? scheduledRows(tenantId, filter, search)
-                : List.of();
+                : new ArrayList<>();
+        int scheduledCount = scheduled.size();
         long executedTotal = aggregationRepository.count(tenantId, queryFilter, search);
-        long total = scheduled.size() + executedTotal;
+        long total = scheduledCount + executedTotal;
 
         int offset = Math.max(0, page) * size;
-        List<SoftwareActionResponse> items = new ArrayList<>(size);
-        if (offset < scheduled.size()) {
-            int to = Math.min(scheduled.size(), offset + size);
-            items.addAll(scheduled.subList(offset, to));
-            int remaining = size - items.size();
-            if (remaining > 0) {
-                items.addAll(mapExecuted(aggregationRepository.findPage(tenantId, queryFilter, search, sortField, direction, 0, remaining)));
-            }
-        } else {
-            int executedSkip = offset - scheduled.size();
-            items.addAll(mapExecuted(aggregationRepository.findPage(tenantId, queryFilter, search, sortField, direction, executedSkip, size)));
-        }
+        int executedSkip = Math.max(0, offset - scheduledCount);
+        int executedLimit = offset + size - executedSkip;
+        List<SoftwareActionSummary> executedPage = aggregationRepository.findPage(tenantId, queryFilter, search,
+                sortField, direction, executedSkip, executedLimit);
+        List<SoftwareActionResponse> executed = mapExecuted(executedPage);
+
+        List<SoftwareActionResponse> merged = merge(scheduled, executed, order);
+        int mergedCount = merged.size();
+        int from = Math.min(mergedCount, offset - executedSkip);
+        int to = Math.min(mergedCount, from + size);
+        List<SoftwareActionResponse> items = merged.subList(from, to).stream().toList();
 
         boolean hasNext = (long) offset + items.size() < total;
         boolean hasPrev = page > 0;
         return new PageResult<>(items, hasNext, hasPrev, (int) total, page);
+    }
+
+    private static List<SoftwareActionResponse> merge(List<SoftwareActionResponse> scheduled,
+                                                      List<SoftwareActionResponse> executed,
+                                                      Comparator<SoftwareActionResponse> order) {
+        List<SoftwareActionResponse> merged = new ArrayList<>(scheduled);
+        merged.addAll(executed);
+        merged.sort(order);
+        return merged;
+    }
+
+    private static Comparator<SoftwareActionResponse> rowOrder(String sortField, Sort.Direction direction) {
+        Comparator<SoftwareActionResponse> primary = switch (sortField) {
+            case "status" -> Comparator.comparingInt(SoftwareActionService::statusRank);
+            case "packageName" -> Comparator.comparing(SoftwareActionResponse::getSoftware, NULLS_FIRST_TEXT);
+            case "respondedMachineCount" -> Comparator.comparingInt(SoftwareActionResponse::getRespondedMachineCount)
+                    .thenComparingInt(SoftwareActionResponse::getTotalMachineCount);
+            case "totalMachineCount" -> Comparator.comparingInt(SoftwareActionResponse::getTotalMachineCount);
+            default -> Comparator.comparing(SoftwareActionService::actionTime, NULLS_FIRST_TIME);
+        };
+        Comparator<SoftwareActionResponse> withTime = primary.thenComparing(SoftwareActionService::actionTime,
+                NULLS_FIRST_TIME);
+        Comparator<SoftwareActionResponse> directed = direction == Sort.Direction.ASC ? withTime : withTime.reversed();
+        return directed.thenComparing(SoftwareActionResponse::getExecutionId, NULLS_FIRST_TEXT);
+    }
+
+    private static int statusRank(SoftwareActionResponse row) {
+        SoftwareActionStatus status = row.getStatus();
+        return status == null ? -1 : status.sortRank();
+    }
+
+    private static Instant actionTime(SoftwareActionResponse row) {
+        Instant dispatchedAt = row.getDispatchedAt();
+        return dispatchedAt != null ? dispatchedAt : row.getScheduledAt();
     }
 
     public SoftwareActionFilters filters(SoftwareActionFilterInput filter, String search) {
@@ -177,7 +218,7 @@ public class SoftwareActionService {
                         .executionId(executionId)
                         .software(pkg.getPackageName())
                         .action(schedule.getAction())
-                        .kind(schedule.getAction().kind())
+                        .kind(SoftwareActionKindMapper.kindOf(schedule.getAction()))
                         .engine(pkg.getPackageManager())
                         .status(SoftwareActionStatus.SCHEDULED)
                         .totalMachineCount(deviceCount)
@@ -189,7 +230,6 @@ public class SoftwareActionService {
                         .build());
             }
         }
-        rows.sort(Comparator.comparing(SoftwareActionResponse::getScheduledAt));
         return rows;
     }
 
@@ -226,7 +266,7 @@ public class SoftwareActionService {
                 return false;
             }
             if (filter.getKinds() != null && !filter.getKinds().isEmpty()
-                    && !filter.getKinds().contains(schedule.getAction().kind())) {
+                    && !filter.getKinds().contains(SoftwareActionKindMapper.kindOf(schedule.getAction()))) {
                 return false;
             }
             if (filter.getEngines() != null && !filter.getEngines().isEmpty()
@@ -246,13 +286,16 @@ public class SoftwareActionService {
                 || filter.getStatuses().contains(SoftwareActionStatus.SCHEDULED);
     }
 
-    private String resolveSortField(SortInput sort) {
-        if (sort == null || sort.getField() == null) {
-            return aggregationRepository.getDefaultSortField();
+    private static String resolveSortField(SortInput sort) {
+        String field = sort == null ? null : sort.getField();
+        if (field == null) {
+            return DEFAULT_SORT_FIELD;
         }
-        String mapped = SORT_FIELD.get(sort.getField());
-        return mapped != null && aggregationRepository.isSortableField(mapped)
-                ? mapped : aggregationRepository.getDefaultSortField();
+        String mapped = SORT_FIELD.get(field);
+        if (mapped == null) {
+            throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
+        }
+        return mapped;
     }
 
     private static Sort.Direction resolveDirection(SortInput sort) {
