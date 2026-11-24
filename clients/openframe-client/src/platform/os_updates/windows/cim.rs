@@ -62,22 +62,20 @@ fn run<T: DeserializeOwned>(step: &'static str, script: &str, limit: Duration) -
     let started = Instant::now();
     let status = loop {
         match child.try_wait() {
-            Ok(Some(status)) => break Ok(status),
+            Ok(Some(status)) => break status,
             Ok(None) if started.elapsed() >= limit => {
                 let _ = child.kill();
-                let _ = child.wait();
-                break Err(failure(format!("timed out after {limit:?}")));
+                return Err(failure(format!("timed out after {limit:?}")));
             }
             Ok(None) => thread::sleep(POLL_INTERVAL),
             Err(error) => {
                 let _ = child.kill();
-                break Err(ReadError::io(step, error));
+                return Err(ReadError::io(step, error));
             }
         }
     };
     let stdout = joined(stdout);
     let stderr = joined(stderr);
-    let status = status?;
     if !status.success() {
         return Err(failure(format!("{status}: {}", stderr.trim())));
     }

@@ -1,20 +1,22 @@
 use std::thread;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use tokio::sync::oneshot;
 use tokio::time::{sleep, timeout, Duration};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use super::report::report;
 use super::report_publisher::OsUpdatesReportPublisher;
 use crate::platform::os_updates;
-use crate::platform::os_updates::windows::{Manageability, WindowsInventory};
+use crate::platform::os_updates::windows::{Manageability, NotManageableReason, WindowsInventory};
 use crate::utils::failure_log_backoff::FailureLogBackoff;
+use crate::utils::in_progress::InProgress;
 
 const TIMING: ReportTiming = ReportTiming {
     first: Duration::from_secs(120),
     interval: Duration::from_secs(3600),
     retry: Duration::from_secs(900),
+    read_limit: Duration::from_secs(300),
 };
 const PUBLISH_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -24,6 +26,7 @@ struct ReportTiming {
     first: Duration,
     interval: Duration,
     retry: Duration,
+    read_limit: Duration,
 }
 
 pub struct OsUpdatesReportRunManager {
@@ -47,14 +50,17 @@ async fn run(
     source: impl Fn() -> Option<OsUpdates> + Clone + Send + 'static,
     timing: ReportTiming,
 ) {
+    let reads = InProgress::default();
     let mut backoff = FailureLogBackoff::new();
     let mut logged_manageability = None;
+    let mut unsettled = false;
     let mut delay = timing.first;
 
     loop {
         sleep(delay).await;
 
-        let (inventory, manageability) = match read(source.clone()).await {
+        let (inventory, manageability) = match read(&reads, source.clone(), timing.read_limit).await
+        {
             Ok(Some(read)) => read,
             Ok(None) => {
                 info!("OS updates are not reported on this OS");
@@ -62,7 +68,7 @@ async fn run(
             }
             Err(e) => {
                 error!("Failed to read OS updates: {:#}", e);
-                delay = timing.retry;
+                delay = next_delay(&timing, &mut unsettled, false);
                 continue;
             }
         };
@@ -81,31 +87,56 @@ async fn run(
                         "OS updates report is delivered again"
                     );
                 }
-                delay = timing.interval;
+                let unreadable = matches!(
+                    &manageability,
+                    Manageability::NotManageable { reasons }
+                        if reasons.contains(&NotManageableReason::Unreadable)
+                );
+                delay = next_delay(&timing, &mut unsettled, !unreadable);
             }
             Err(e) => {
                 let log = backoff.should_log();
                 let failures = backoff.record_failure(log);
                 if log {
-                    error!(failures, "Failed to report OS updates: {:#}", e);
+                    warn!(failures, "Failed to report OS updates: {:#}", e);
                 }
-                delay = timing.retry;
+                delay = next_delay(&timing, &mut unsettled, false);
             }
         }
     }
 }
 
+fn next_delay(timing: &ReportTiming, unsettled: &mut bool, settled: bool) -> Duration {
+    let retried = std::mem::replace(unsettled, !settled);
+    if settled || retried {
+        timing.interval
+    } else {
+        timing.retry
+    }
+}
+
 async fn read(
+    reads: &InProgress,
     source: impl Fn() -> Option<OsUpdates> + Send + 'static,
+    limit: Duration,
 ) -> Result<Option<OsUpdates>> {
+    if reads.view().is_active() {
+        bail!("the previous read has not finished");
+    }
+    let reading = reads.begin();
     let (sender, receiver) = oneshot::channel();
     thread::Builder::new()
         .name("os-updates-read".into())
         .spawn(move || {
-            let _ = sender.send(source());
+            let read = source();
+            drop(reading);
+            let _ = sender.send(read);
         })
         .context("spawn the reader thread")?;
-    receiver.await.context("the reader thread ended early")
+    timeout(limit, receiver)
+        .await
+        .map_err(|_| anyhow!("no answer within {limit:?}"))?
+        .context("the reader thread ended early")
 }
 
 async fn publish(

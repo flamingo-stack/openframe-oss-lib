@@ -41,8 +41,8 @@ impl Feature {
             Feature::DeliveryToolInstallation
             | Feature::DeliveryClientUninstall
             | Feature::DeliveryClientUpdate
-            | Feature::PackageAutoUpdate
-            | Feature::OsUpdateReport => false,
+            | Feature::PackageAutoUpdate => false,
+            Feature::OsUpdateReport => true,
         }
     }
 }

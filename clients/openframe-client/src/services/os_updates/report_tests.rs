@@ -263,65 +263,11 @@ fn the_build_without_a_revision_is_itself() {
 }
 
 #[test]
-fn the_architecture_uses_the_backend_names() {
-    for (native, expected) in [
-        ("AMD64", json!("X86_64")),
-        ("ARM64", json!("ARM64")),
-        ("IA64", Value::Null),
-    ] {
-        let mut inventory = manageable();
-        inventory.system.as_mut().unwrap().native_architecture = native.into();
-        let message = report(&inventory, &Manageability::Manageable);
-        assert_eq!(
-            serde_json::to_value(&message).unwrap()["architecture"],
-            expected,
-            "{native}"
-        );
-    }
-}
-
-#[test]
-fn wua_codes_become_the_names_the_backend_parses() {
-    let item = |update: windows::WindowsUpdate| {
-        serde_json::to_value(&state_of(&with_updates(vec![update])).updates).unwrap()["items"][0]
-            ["windows"]
-            .clone()
-    };
-    for (code, expected) in [
-        (0, json!("NEVER")),
-        (1, json!("ALWAYS")),
-        (2, json!("MAY_REQUIRE")),
-        (9, Value::Null),
-    ] {
-        let windows = item(changed(|update| update.reboot_behavior = code));
-        assert_eq!(
-            windows["rebootBehavior"], expected,
-            "reboot behavior {code}"
-        );
-    }
-    for (code, expected) in [
-        (1, json!("SOFTWARE")),
-        (2, json!("DRIVER")),
-        (9, Value::Null),
-    ] {
-        let windows = item(changed(|update| update.update_type = code));
-        assert_eq!(windows["updateType"], expected, "update type {code}");
-    }
-    for (code, expected) in [(0, false), (1, false), (2, true)] {
-        let windows = item(changed(|update| update.impact = code));
-        assert_eq!(
-            windows["requiresExclusiveInstall"], expected,
-            "impact {code}"
-        );
-    }
-}
-
-#[test]
 fn finished_history_is_sent_by_name_and_unfinished_history_is_not_sent() {
     let entry = |operation: i32, result_code: i32, hresult: i32| {
         let mut entry = installed();
-        entry.operation = operation;
-        entry.result_code = result_code;
+        entry.operation = HistoryOperation::from_code(operation);
+        entry.result = HistoryResult::from_code(result_code);
         entry.hresult = hresult;
         entry
     };
@@ -344,7 +290,7 @@ fn finished_history_is_sent_by_name_and_unfinished_history_is_not_sent() {
         (entry(3, 2, 0), None),
     ];
     for (entry, expected) in cases {
-        let what = format!("operation {} result {}", entry.operation, entry.result_code);
+        let what = format!("operation {:?} result {:?}", entry.operation, entry.result);
         let history =
             serde_json::to_value(state_of(&with_history(vec![entry])).windows.history).unwrap();
         match expected {
@@ -382,18 +328,9 @@ fn history_covers_the_last_thirty_days_and_needs_a_date() {
 
 #[test]
 fn definition_updates_are_never_sent_as_updates() {
-    let by_category = changed(|update| update.categories = vec![category(DEFINITION_UPDATES)]);
-    let by_category_upper =
-        changed(|update| update.categories = vec![category(&DEFINITION_UPDATES.to_uppercase())]);
-    let by_kb = changed(|update| update.kb_article_ids = vec!["2267602".into()]);
-    let by_prefixed_kb = changed(|update| update.kb_article_ids = vec!["KB4052623".into()]);
+    let definition = changed(|update| update.kb_article_ids = vec!["2267602".into()]);
 
-    let state = state_of(&with_updates(vec![
-        by_category,
-        by_category_upper,
-        by_kb,
-        by_prefixed_kb,
-    ]));
+    let state = state_of(&with_updates(vec![definition]));
 
     assert_eq!(state.updates.items.unwrap().len(), 0);
     assert_eq!(state.patch_state, PatchState::UpToDate);
@@ -402,12 +339,14 @@ fn definition_updates_are_never_sent_as_updates() {
 #[test]
 fn only_installable_updates_put_a_device_behind_but_all_of_them_are_sent() {
     let driver = changed(|update| {
-        update.update_type = 2;
+        update.update_type = Some(UpdateType::Driver);
         update.categories = vec![category(DRIVERS)];
     });
     let optional = changed(|update| update.browse_only = true);
-    let upgrade = changed(|update| update.categories = vec![category(UPGRADES)]);
-    let unknown_type = changed(|update| update.update_type = 7);
+    let upgrade = changed(|update| {
+        update.categories = vec![category("3689bdc8-b205-4af4-8d4a-a63924c5e9d5")]
+    });
+    let unknown_type = changed(|update| update.update_type = None);
     let cases = [
         (vec![], PatchState::UpToDate, "nothing"),
         (vec![driver.clone()], PatchState::UpToDate, "a driver"),
@@ -503,29 +442,41 @@ fn a_pending_update_is_still_pending_on_a_stale_scan() {
 
 #[test]
 fn only_a_full_search_after_a_scan_is_confirmed() {
-    let searched = |code: i32, scanned: bool| {
+    let searched = |succeeded: bool, scanned: bool| {
         let mut inventory = scanned_at(scanned.then_some("2026-11-24T10:00:00Z"));
         let set = inventory.applicable.as_mut().unwrap();
-        set.search_result_code = code;
+        set.search_succeeded = succeeded;
         set.updates = vec![update()];
         state_of(&inventory)
     };
     let cases = [
         (
-            2,
+            true,
             true,
             ListConfidence::Confirmed,
             PatchState::UpdatesAvailable,
         ),
-        (3, true, ListConfidence::Unconfirmed, PatchState::Unknown),
-        (4, true, ListConfidence::Unconfirmed, PatchState::Unknown),
-        (2, false, ListConfidence::Unconfirmed, PatchState::Unknown),
+        (
+            false,
+            true,
+            ListConfidence::Unconfirmed,
+            PatchState::Unknown,
+        ),
+        (
+            true,
+            false,
+            ListConfidence::Unconfirmed,
+            PatchState::Unknown,
+        ),
     ];
-    for (code, scanned, confidence, patch_state) in cases {
-        let state = searched(code, scanned);
-        assert_eq!(state.updates.confidence, confidence, "{code} {scanned}");
-        assert_eq!(state.patch_state, patch_state, "{code} {scanned}");
-        assert!(state.updates.items.is_some(), "{code} {scanned}");
+    for (succeeded, scanned, confidence, patch_state) in cases {
+        let state = searched(succeeded, scanned);
+        assert_eq!(
+            state.updates.confidence, confidence,
+            "{succeeded} {scanned}"
+        );
+        assert_eq!(state.patch_state, patch_state, "{succeeded} {scanned}");
+        assert!(state.updates.items.is_some(), "{succeeded} {scanned}");
     }
 }
 
@@ -576,7 +527,7 @@ fn the_last_os_install_is_the_newest_successful_update_of_the_os() {
             "2026-11 Cumulative Update (KB5068861)",
             "2026-11-22T03:00:00Z",
         );
-        entry.result_code = 4;
+        entry.result = Some(HistoryResult::Failed);
         entry
     };
     let uninstalled = {
@@ -584,7 +535,7 @@ fn the_last_os_install_is_the_newest_successful_update_of_the_os() {
             "2026-11 Cumulative Update (KB5068861)",
             "2026-11-23T03:00:00Z",
         );
-        entry.operation = 2;
+        entry.operation = Some(HistoryOperation::Uninstall);
         entry
     };
     let inventory = with_history(vec![
@@ -600,7 +551,6 @@ fn the_last_os_install_is_the_newest_successful_update_of_the_os() {
             "Defender platform - KB4052623 (Version 4)",
             "2026-11-24T01:00:00Z",
         ),
-        titled("Security Intelligence - KB2267602", "2026-11-24T00:30:00Z"),
         uninstalled,
         failed,
         titled("Обновление (KB5066835)", "2026-10-15T03:00:00Z"),

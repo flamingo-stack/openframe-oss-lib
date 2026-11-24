@@ -2,7 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 use crate::platform::os_updates::windows::{
-    DefenderFacts, Manageability, RebootPending, UpdateCategory, UpdateService,
+    Architecture, DefenderFacts, HistoryOperation, HistoryResult, Manageability, RebootBehavior,
+    RebootPending, UpdateCategory, UpdateService, UpdateType,
 };
 
 #[derive(Debug, Serialize)]
@@ -24,14 +25,6 @@ pub struct MachineOsUpdatesMessage {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OsPlatform {
     Windows,
-}
-
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum Architecture {
-    #[serde(rename = "X86_64")]
-    X86_64,
-    #[serde(rename = "ARM64")]
-    Arm64,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -114,21 +107,6 @@ pub struct WindowsUpdateDetails {
     pub is_uninstallable: bool,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum RebootBehavior {
-    Never,
-    MayRequire,
-    Always,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum UpdateType {
-    Software,
-    Driver,
-}
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LastOsInstall {
@@ -162,20 +140,4 @@ pub struct HistoryEntry {
     pub operation: HistoryOperation,
     pub result_code: HistoryResult,
     pub hresult: i32,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum HistoryOperation {
-    Install,
-    Uninstall,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum HistoryResult {
-    Succeeded,
-    SucceededWithErrors,
-    Failed,
-    Aborted,
 }

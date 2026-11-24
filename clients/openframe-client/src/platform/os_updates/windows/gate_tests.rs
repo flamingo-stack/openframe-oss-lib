@@ -3,7 +3,7 @@ use crate::platform::os_updates::windows::fixtures::{
     manageable, unreadable, update_service, values,
 };
 use crate::platform::os_updates::windows::model::{
-    BitLockerFacts, MdmEnrollment, RegValues, WriteFilterFacts,
+    Architecture, BitLockerFacts, MdmEnrollment, RegValues, WriteFilterFacts,
 };
 use NotManageableReason::*;
 
@@ -323,6 +323,67 @@ fn mdm_closes_the_gate_by_enrollment_or_by_update_policy() {
     assert_eq!(empty_key, []);
 }
 
+fn enrolled(provider_id: &str, enrollment_type: Option<u32>) -> MdmEnrollment {
+    MdmEnrollment {
+        provider_id: provider_id.into(),
+        enrollment_type,
+        enrollment_state: Some(1),
+    }
+}
+
+fn windows_11_built_in() -> Vec<MdmEnrollment> {
+    vec![
+        enrolled("Local Authority", Some(28)),
+        enrolled("Cloud Authority", Some(31)),
+        enrolled("Deploy Authority", Some(30)),
+        enrolled("WMI_Bridge_SCCM_Server", Some(12)),
+    ]
+}
+
+#[test]
+fn the_enrollments_windows_11_creates_for_itself_are_not_mdm() {
+    let reasons = reasons_after(|inventory| {
+        inventory.management.mdm_enrollments = Ok(windows_11_built_in());
+    });
+    assert_eq!(reasons, []);
+}
+
+#[test]
+fn a_real_enrollment_among_the_built_in_ones_is_mdm() {
+    let reasons = reasons_after(|inventory| {
+        let mut enrollments = windows_11_built_in();
+        enrollments.push(enrollment());
+        inventory.management.mdm_enrollments = Ok(enrollments);
+    });
+    assert_eq!(reasons, [Mdm]);
+}
+
+#[test]
+fn a_built_in_enrollment_needs_both_its_name_and_its_type() {
+    for (provider_id, enrollment_type) in [
+        ("Local Authority", Some(6)),
+        ("Local Authority", Some(31)),
+        ("Local Authority", None),
+        ("local authority", Some(28)),
+        ("Some MDM", Some(28)),
+        ("MS DM Server", Some(12)),
+    ] {
+        let reasons = reasons_after(|inventory| {
+            inventory.management.mdm_enrollments = Ok(vec![enrolled(provider_id, enrollment_type)]);
+        });
+        assert_eq!(reasons, [Mdm], "{provider_id} {enrollment_type:?}");
+    }
+}
+
+#[test]
+fn update_policies_from_mdm_close_the_gate_beside_the_built_in_enrollments() {
+    let reasons = reasons_after(|inventory| {
+        inventory.management.mdm_enrollments = Ok(windows_11_built_in());
+        inventory.management.mdm_update_policies = values(&[("AllowAutoUpdate", 1)]);
+    });
+    assert_eq!(reasons, [Mdm]);
+}
+
 #[test]
 fn a_config_mgr_client_closes_the_gate() {
     let reasons = reasons_after(|inventory| inventory.management.config_mgr_client = Ok(true));
@@ -445,7 +506,7 @@ fn readings_the_gate_does_not_use_never_close_it() {
             i.system.as_mut().unwrap().cluster_node = true
         }),
         ("arm64", |i| {
-            i.system.as_mut().unwrap().native_architecture = "ARM64".into()
+            i.system.as_mut().unwrap().native_architecture = Some(Architecture::Arm64)
         }),
     ];
     for (reading, change) in cases {

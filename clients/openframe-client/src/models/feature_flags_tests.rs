@@ -172,7 +172,7 @@ fn each_backend_name_switches_only_its_own_feature() {
         for other in Feature::ALL {
             assert_eq!(
                 flags.is_enabled(other),
-                other == feature,
+                other == feature || other.default_enabled(),
                 "{} set, {} checked",
                 feature.name(),
                 other.name()
@@ -182,11 +182,13 @@ fn each_backend_name_switches_only_its_own_feature() {
 }
 
 #[test]
-fn the_os_update_report_is_off_until_the_backend_names_it() {
-    let named = resolve(&[("os-update-report", flag(true, "1.0.0"))], "1.5.1");
+fn the_os_update_report_is_on_until_the_backend_switches_it_off() {
+    let switched_off = resolve(&[("os-update-report", flag(false, "1.0.0"))], "1.5.1");
+    let off_for_newer = resolve(&[("os-update-report", flag(false, "2.0.0"))], "1.5.1");
 
-    assert!(named.is_enabled(Feature::OsUpdateReport));
-    assert!(!resolve(&[], "1.5.1").is_enabled(Feature::OsUpdateReport));
+    assert!(resolve(&[], "1.5.1").is_enabled(Feature::OsUpdateReport));
+    assert!(!switched_off.is_enabled(Feature::OsUpdateReport));
+    assert!(off_for_newer.is_enabled(Feature::OsUpdateReport));
 }
 
 #[test]

@@ -129,7 +129,7 @@ fn the_system_is_described() {
     let system = system_facts().unwrap();
     assert!(system.current_build.parse::<u32>().unwrap() >= 14393);
     assert!(["WinNT", "ServerNT", "LanmanNT"].contains(&system.product_type.as_str()));
-    assert!(["AMD64", "ARM64"].contains(&system.native_architecture.as_str()));
+    assert!(system.native_architecture.is_some());
     assert!(system.os_name().unwrap().starts_with("Windows"));
     assert!(!system.edition_id.is_empty());
 }

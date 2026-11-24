@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use super::model::{
     Manageability, NotManageableReason, Reading, RegValue, SystemFacts, WindowsInventory,
-    WINDOWS_11_FIRST_BUILD,
+    DOMAIN_CONTROLLER, WINDOWS_11_FIRST_BUILD,
 };
 
 const GENERAL_EDITIONS: [&str; 12] = [
@@ -26,6 +26,12 @@ const WINDOWS_10_22H2_BUILD: u32 = 19045;
 const LTSC_BUILDS: [u32; 2] = [17763, 19044];
 const SERVER_BUILDS: [u32; 3] = [14393, 17763, 20348];
 const WINDOWS_24H2_BUILD: u32 = 26100;
+const BUILT_IN_ENROLLMENTS: [(&str, u32); 4] = [
+    ("WMI_Bridge_SCCM_Server", 12),
+    ("Local Authority", 28),
+    ("Deploy Authority", 30),
+    ("Cloud Authority", 31),
+];
 const ENGINE_SERVICES: [&str; 2] = ["wuauserv", "TrustedInstaller"];
 const DISABLED_START: u32 = 4;
 const PRE_BOOT_INPUT_PROTECTORS: [u32; 4] = [2, 4, 5, 6];
@@ -94,7 +100,12 @@ pub fn manageability(inventory: &WindowsInventory) -> Manageability {
         }
     }
     if let Some(enrollments) = known(&management.mdm_enrollments, &mut reasons) {
-        if !enrollments.is_empty() {
+        let managed = enrollments.iter().any(|enrollment| {
+            !BUILT_IN_ENROLLMENTS.iter().any(|(provider_id, kind)| {
+                enrollment.provider_id == *provider_id && enrollment.enrollment_type == Some(*kind)
+            })
+        });
+        if managed {
             reasons.insert(Mdm);
         }
     }
@@ -147,7 +158,7 @@ fn channel(system: &SystemFacts) -> Option<Channel> {
         "WinNT" if GENERAL_EDITIONS.contains(&edition) => Some(Channel::General),
         "WinNT" if LTSC_EDITIONS.contains(&edition) => Some(Channel::Ltsc),
         "ServerNT" if edition == MULTI_SESSION_EDITION => Some(Channel::General),
-        "ServerNT" | "LanmanNT"
+        "ServerNT" | DOMAIN_CONTROLLER
             if edition.starts_with("Server") && !AZURE_SERVER_EDITIONS.contains(&edition) =>
         {
             Some(Channel::Server)

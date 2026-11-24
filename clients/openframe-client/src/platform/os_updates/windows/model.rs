@@ -4,6 +4,12 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 pub(super) const WINDOWS_11_FIRST_BUILD: u32 = 22000;
+pub(super) const DOMAIN_CONTROLLER: &str = "LanmanNT";
+pub const DEFENDER_DEFINITIONS_KB: &str = "2267602";
+pub const DEFENDER_PLATFORM_KB: &str = "4052623";
+pub const MALICIOUS_SOFTWARE_REMOVAL_KB: &str = "890830";
+const DEFINITION_UPDATES: &str = "e0789628-ce08-4437-be74-2495b842f43b";
+const UPGRADES: &str = "3689bdc8-b205-4af4-8d4a-a63924c5e9d5";
 
 pub type Reading<T> = Result<T, ReadError>;
 
@@ -44,11 +50,15 @@ pub struct SystemFacts {
     pub ubr: Option<u32>,
     pub installation_type: String,
     pub product_type: String,
-    pub native_architecture: String,
+    pub native_architecture: Option<Architecture>,
     pub cluster_node: bool,
 }
 
 impl SystemFacts {
+    pub fn is_domain_controller(&self) -> bool {
+        self.product_type == DOMAIN_CONTROLLER
+    }
+
     pub fn os_name(&self) -> Option<String> {
         let product_name = self.product_name.as_deref()?;
         let build = self.current_build.parse::<u32>().ok()?;
@@ -64,7 +74,7 @@ impl SystemFacts {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicableSet {
-    pub search_result_code: i32,
+    pub search_succeeded: bool,
     pub search_duration_ms: u64,
     pub updates: Vec<WindowsUpdate>,
 }
@@ -78,7 +88,7 @@ pub struct WindowsUpdate {
     pub kb_article_ids: Vec<String>,
     pub msrc_severity: Option<String>,
     pub categories: Vec<UpdateCategory>,
-    pub update_type: i32,
+    pub update_type: Option<UpdateType>,
     pub deployment_action: i32,
     pub browse_only: bool,
     pub auto_select_on_web_sites: bool,
@@ -87,11 +97,123 @@ pub struct WindowsUpdate {
     pub is_uninstallable: bool,
     pub is_downloaded: bool,
     pub max_download_bytes: Option<u64>,
-    pub reboot_behavior: i32,
-    pub impact: i32,
+    pub reboot_behavior: Option<RebootBehavior>,
+    pub requires_exclusive_install: bool,
     pub reboot_required: bool,
     pub last_deployment_change: Option<DateTime<Utc>>,
     pub cve_ids: Vec<String>,
+}
+
+impl WindowsUpdate {
+    pub fn is_definition(&self) -> bool {
+        self.in_category(DEFINITION_UPDATES)
+            || self
+                .kb_article_ids
+                .iter()
+                .any(|kb| [DEFENDER_DEFINITIONS_KB, DEFENDER_PLATFORM_KB].contains(&kb.as_str()))
+    }
+
+    pub fn is_upgrade(&self) -> bool {
+        self.in_category(UPGRADES)
+    }
+
+    fn in_category(&self, id: &str) -> bool {
+        self.categories
+            .iter()
+            .any(|category| category.id.eq_ignore_ascii_case(id))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum Architecture {
+    #[serde(rename = "X86_64")]
+    X86_64,
+    #[serde(rename = "ARM64")]
+    Arm64,
+}
+
+impl Architecture {
+    pub fn from_registry(name: &str) -> Option<Self> {
+        match name {
+            "AMD64" => Some(Self::X86_64),
+            "ARM64" => Some(Self::Arm64),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum UpdateType {
+    Software,
+    Driver,
+}
+
+impl UpdateType {
+    pub fn from_code(code: i32) -> Option<Self> {
+        match code {
+            1 => Some(Self::Software),
+            2 => Some(Self::Driver),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RebootBehavior {
+    Never,
+    MayRequire,
+    Always,
+}
+
+impl RebootBehavior {
+    pub fn from_code(code: i32) -> Option<Self> {
+        match code {
+            0 => Some(Self::Never),
+            1 => Some(Self::Always),
+            2 => Some(Self::MayRequire),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum HistoryOperation {
+    Install,
+    Uninstall,
+}
+
+impl HistoryOperation {
+    pub fn from_code(code: i32) -> Option<Self> {
+        match code {
+            1 => Some(Self::Install),
+            2 => Some(Self::Uninstall),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum HistoryResult {
+    Succeeded,
+    SucceededWithErrors,
+    Failed,
+    Aborted,
+}
+
+impl HistoryResult {
+    pub fn from_code(code: i32) -> Option<Self> {
+        match code {
+            2 => Some(Self::Succeeded),
+            3 => Some(Self::SucceededWithErrors),
+            4 => Some(Self::Failed),
+            5 => Some(Self::Aborted),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -122,8 +244,8 @@ pub struct HistoryWindow {
 #[serde(rename_all = "camelCase")]
 pub struct HistoryEntry {
     pub date: Option<DateTime<Utc>>,
-    pub operation: i32,
-    pub result_code: i32,
+    pub operation: Option<HistoryOperation>,
+    pub result: Option<HistoryResult>,
     pub hresult: i32,
     pub update_id: String,
     pub revision: i32,

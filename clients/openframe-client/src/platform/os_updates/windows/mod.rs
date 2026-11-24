@@ -1,5 +1,6 @@
 #[cfg(test)]
 pub(crate) mod fixtures;
+#[cfg(any(target_os = "windows", test))]
 mod gate;
 mod model;
 
@@ -12,7 +13,8 @@ mod read;
 #[cfg(target_os = "windows")]
 mod wua;
 
-pub use gate::manageability;
+#[cfg(any(target_os = "windows", test))]
+pub(crate) use gate::manageability;
 pub use model::*;
 #[cfg(target_os = "windows")]
-pub use read::read_inventory;
+pub(super) use read::read_inventory;

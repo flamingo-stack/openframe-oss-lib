@@ -25,7 +25,6 @@ const CBS_REBOOT_IN_PROGRESS: &str =
     r"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootInProgress";
 
 pub fn read_inventory() -> WindowsInventory {
-    let read_at = chrono::Utc::now();
     let started = std::time::Instant::now();
     let wua = wua::read();
     let reboot = RebootSignals {
@@ -57,7 +56,6 @@ pub fn read_inventory() -> WindowsInventory {
         }
     });
     WindowsInventory {
-        read_at,
         system: machine::system_facts(),
         applicable: wua.applicable,
         last_scan: wua.last_scan,
@@ -68,6 +66,11 @@ pub fn read_inventory() -> WindowsInventory {
         defender: machine::defender(),
         bitlocker: cim::bitlocker(),
         write_filter,
+        read_at: chrono::Utc::now(),
         read_duration_ms: started.elapsed().as_millis() as u64,
     }
 }
+
+#[cfg(test)]
+#[path = "read_tests.rs"]
+mod tests;

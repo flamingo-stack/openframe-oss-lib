@@ -10,20 +10,21 @@ use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
 use windows::Win32::System::UpdateAgent::{
-    AutomaticUpdates, IAutomaticUpdates2, ICategoryCollection, IStringCollection,
-    ISystemInformation, IUpdate, IUpdate2, IUpdate3, IUpdateSearcher, IUpdateService2,
-    IUpdateServiceManager2, IUpdateSession, SystemInformation, UpdateServiceManager, UpdateSession,
+    iiRequiresExclusiveHandling, orcSucceeded, AutomaticUpdates, IAutomaticUpdates2,
+    ICategoryCollection, IStringCollection, ISystemInformation, IUpdate, IUpdate2, IUpdate3,
+    IUpdateSearcher, IUpdateService2, IUpdateServiceManager2, IUpdateSession, SystemInformation,
+    UpdateServiceManager, UpdateSession,
 };
 use windows::Win32::System::Variant::{VARIANT, VT_DATE};
 
 use super::model::{
-    ApplicableSet, HistoryEntry, HistoryWindow, ReadError, Reading, ScanDates, UpdateCategory,
-    UpdateService, WindowsUpdate,
+    ApplicableSet, HistoryEntry, HistoryOperation, HistoryResult, HistoryWindow, ReadError,
+    Reading, RebootBehavior, ScanDates, UpdateCategory, UpdateService, UpdateType, WindowsUpdate,
+    DEFENDER_DEFINITIONS_KB,
 };
 use crate::utils::in_progress::InProgress;
 
 const APPLICABLE_CRITERIA: &str = "IsInstalled=0 and IsHidden=0";
-const DEFENDER_DEFINITION_KB: &str = "KB2267602";
 const OLE_EPOCH_UNIX_MILLIS: i64 = -2_209_161_600_000;
 const HISTORY_SCAN_LIMIT: i32 = 500;
 const HISTORY_KEEP_LIMIT: usize = 200;
@@ -156,7 +157,7 @@ unsafe fn applicable(searcher: &IUpdateSearcher) -> ComResult<ApplicableSet> {
         updates.push(update(&collection.get_Item(index)?)?);
     }
     Ok(ApplicableSet {
-        search_result_code: result.ResultCode()?.0,
+        search_succeeded: result.ResultCode()? == orcSucceeded,
         search_duration_ms,
         updates,
     })
@@ -175,7 +176,7 @@ unsafe fn update(update: &IUpdate) -> ComResult<WindowsUpdate> {
         kb_article_ids: strings(&update.KBArticleIDs()?)?,
         msrc_severity: (!severity.is_empty()).then_some(severity),
         categories: categories(&update.Categories()?)?,
-        update_type: update.Type()?.0,
+        update_type: UpdateType::from_code(update.Type()?.0),
         deployment_action: update.DeploymentAction()?.0,
         browse_only: update3.BrowseOnly()?.as_bool(),
         auto_select_on_web_sites: update.AutoSelectOnWebSites()?.as_bool(),
@@ -184,8 +185,8 @@ unsafe fn update(update: &IUpdate) -> ComResult<WindowsUpdate> {
         is_uninstallable: update.IsUninstallable()?.as_bool(),
         is_downloaded: update.IsDownloaded()?.as_bool(),
         max_download_bytes: decimal_bytes(update.MaxDownloadSize()?),
-        reboot_behavior: behavior.RebootBehavior()?.0,
-        impact: behavior.Impact()?.0,
+        reboot_behavior: RebootBehavior::from_code(behavior.RebootBehavior()?.0),
+        requires_exclusive_install: behavior.Impact()? == iiRequiresExclusiveHandling,
         reboot_required: update2.RebootRequired()?.as_bool(),
         last_deployment_change: ole_date(update.LastDeploymentChangeTime()?),
         cve_ids: strings(&update2.CveIDs()?)?,
@@ -228,7 +229,7 @@ unsafe fn history(searcher: &IUpdateSearcher) -> ComResult<HistoryWindow> {
         let entry = entries.get_Item(index)?;
         window.scanned += 1;
         let title = entry.Title()?.to_string();
-        if title.contains(DEFENDER_DEFINITION_KB) {
+        if title.contains(DEFENDER_DEFINITIONS_KB) {
             window.dropped_definition_updates += 1;
             continue;
         }
@@ -238,8 +239,8 @@ unsafe fn history(searcher: &IUpdateSearcher) -> ComResult<HistoryWindow> {
         let identity = entry.UpdateIdentity()?;
         window.entries.push(HistoryEntry {
             date: ole_date(entry.Date()?),
-            operation: entry.Operation()?.0,
-            result_code: entry.ResultCode()?.0,
+            operation: HistoryOperation::from_code(entry.Operation()?.0),
+            result: HistoryResult::from_code(entry.ResultCode()?.0),
             hresult: entry.HResult()?,
             update_id: identity.UpdateID()?.to_string(),
             revision: identity.RevisionNumber()?,

@@ -1,21 +1,15 @@
 use chrono::{DateTime, TimeDelta, Utc};
 
 use super::message::{
-    Architecture, HistoryEntry, HistoryOperation, HistoryResult, LastOsInstall, ListConfidence,
-    MachineOsUpdatesMessage, OsPlatform, OsUpdateAuthorization, PatchState, RebootBehavior,
-    ScanState, UpdateItem, UpdateSet, UpdateState, UpdateType, WindowsDetails,
-    WindowsUpdateDetails,
+    HistoryEntry, LastOsInstall, ListConfidence, MachineOsUpdatesMessage, OsPlatform,
+    OsUpdateAuthorization, PatchState, ScanState, UpdateItem, UpdateSet, UpdateState,
+    WindowsDetails, WindowsUpdateDetails,
 };
-use crate::platform::os_updates::windows::{self, Manageability, SystemFacts, WindowsInventory};
+use crate::platform::os_updates::windows::{
+    self, HistoryOperation, HistoryResult, Manageability, SystemFacts, UpdateType,
+    WindowsInventory, DEFENDER_PLATFORM_KB, MALICIOUS_SOFTWARE_REMOVAL_KB,
+};
 
-const SEARCH_SUCCEEDED: i32 = 2;
-const IMPACT_EXCLUSIVE: i32 = 2;
-const DEFINITION_UPDATES: &str = "e0789628-ce08-4437-be74-2495b842f43b";
-const UPGRADES: &str = "3689bdc8-b205-4af4-8d4a-a63924c5e9d5";
-const DEFENDER_KBS: [&str; 2] = ["2267602", "4052623"];
-const NOT_OS_INSTALL_KBS: [&str; 3] = ["KB2267602", "KB4052623", "KB890830"];
-const KB_PREFIX: &str = "KB";
-const DOMAIN_CONTROLLER: &str = "LanmanNT";
 const FRESH_SCAN: TimeDelta = TimeDelta::hours(48);
 const AGING_SCAN: TimeDelta = TimeDelta::days(7);
 const HISTORY_WINDOW: TimeDelta = TimeDelta::days(30);
@@ -28,7 +22,7 @@ pub fn report(
     MachineOsUpdatesMessage {
         reported_at: inventory.read_at,
         platform: OsPlatform::Windows,
-        architecture: system.and_then(architecture),
+        architecture: system.and_then(|system| system.native_architecture),
         os_version: system.and_then(os_version),
         os_build: system.map(os_build),
         os_product_name: system.and_then(SystemFacts::os_name),
@@ -56,14 +50,6 @@ fn os_version(system: &SystemFacts) -> Option<String> {
     }
 }
 
-fn architecture(system: &SystemFacts) -> Option<Architecture> {
-    match system.native_architecture.as_str() {
-        "AMD64" => Some(Architecture::X86_64),
-        "ARM64" => Some(Architecture::Arm64),
-        _ => None,
-    }
-}
-
 fn os_build(system: &SystemFacts) -> String {
     match system.ubr {
         Some(ubr) => format!("{}.{ubr}", system.current_build),
@@ -80,21 +66,19 @@ fn update_state(inventory: &WindowsInventory, system: &SystemFacts) -> UpdateSta
     let scan_state = scan_state(inventory.read_at, last_scan_at);
     let confidence = match &inventory.applicable {
         Err(_) => ListConfidence::Unreadable,
-        Ok(set) if set.search_result_code == SEARCH_SUCCEEDED && last_scan_at.is_some() => {
-            ListConfidence::Confirmed
-        }
+        Ok(set) if set.search_succeeded && last_scan_at.is_some() => ListConfidence::Confirmed,
         Ok(_) => ListConfidence::Unconfirmed,
     };
     let applicable = inventory.applicable.as_ref().ok().map(|set| {
         set.updates
             .iter()
-            .filter(|update| !is_definition(update))
+            .filter(|update| !update.is_definition())
             .collect::<Vec<_>>()
     });
     let behind = applicable.iter().flatten().any(|update| {
-        update_type(update.update_type) != Some(UpdateType::Driver)
+        update.update_type != Some(UpdateType::Driver)
             && !update.browse_only
-            && !in_category(update, UPGRADES)
+            && !update.is_upgrade()
     });
     UpdateState {
         reboot_pending: inventory.reboot_pending,
@@ -118,7 +102,7 @@ fn update_state(inventory: &WindowsInventory, system: &SystemFacts) -> UpdateSta
             installation_type: system.installation_type.clone(),
             product_type: system.product_type.clone(),
             domain_joined: inventory.management.domain_joined.as_ref().ok().copied(),
-            domain_controller: system.product_type == DOMAIN_CONTROLLER,
+            domain_controller: system.is_domain_controller(),
             cluster_node: system.cluster_node,
             defender: inventory.defender.as_ref().ok().cloned().flatten(),
             update_services: inventory.management.update_services.as_ref().ok().cloned(),
@@ -142,21 +126,6 @@ fn scan_state(now: DateTime<Utc>, last_scan_at: Option<DateTime<Utc>>) -> ScanSt
     }
 }
 
-fn in_category(update: &windows::WindowsUpdate, id: &str) -> bool {
-    update
-        .categories
-        .iter()
-        .any(|category| category.id.eq_ignore_ascii_case(id))
-}
-
-fn is_definition(update: &windows::WindowsUpdate) -> bool {
-    in_category(update, DEFINITION_UPDATES)
-        || update
-            .kb_article_ids
-            .iter()
-            .any(|kb| DEFENDER_KBS.contains(&kb.trim_start_matches("KB")))
-}
-
 fn update_item(update: &windows::WindowsUpdate) -> UpdateItem {
     UpdateItem {
         identifier: identifier(&update.update_id, update.revision),
@@ -169,29 +138,16 @@ fn update_item(update: &windows::WindowsUpdate) -> UpdateItem {
             published_at: update.last_deployment_change,
             max_download_bytes: update.max_download_bytes,
             is_downloaded: update.is_downloaded,
-            reboot_behavior: match update.reboot_behavior {
-                0 => Some(RebootBehavior::Never),
-                1 => Some(RebootBehavior::Always),
-                2 => Some(RebootBehavior::MayRequire),
-                _ => None,
-            },
+            reboot_behavior: update.reboot_behavior,
             browse_only: update.browse_only,
-            update_type: update_type(update.update_type),
+            update_type: update.update_type,
             reboot_required: update.reboot_required,
-            requires_exclusive_install: update.impact == IMPACT_EXCLUSIVE,
+            requires_exclusive_install: update.requires_exclusive_install,
             can_request_user_input: update.can_request_user_input,
             eula_accepted: update.eula_accepted,
             auto_select_on_web_sites: update.auto_select_on_web_sites,
             is_uninstallable: update.is_uninstallable,
         },
-    }
-}
-
-fn update_type(code: i32) -> Option<UpdateType> {
-    match code {
-        1 => Some(UpdateType::Software),
-        2 => Some(UpdateType::Driver),
-        _ => None,
     }
 }
 
@@ -223,8 +179,9 @@ fn last_os_install(inventory: &WindowsInventory) -> Option<LastOsInstall> {
         .filter(|entry| {
             entry.operation == HistoryOperation::Install
                 && entry.result_code == HistoryResult::Succeeded
-                && entry.title.contains(KB_PREFIX)
-                && !NOT_OS_INSTALL_KBS.iter().any(|kb| entry.title.contains(kb))
+                && entry.title.contains("KB")
+                && !entry.title.contains(DEFENDER_PLATFORM_KB)
+                && !entry.title.contains(MALICIOUS_SOFTWARE_REMOVAL_KB)
         })
         .max_by_key(|entry| entry.installed_at)
         .map(|entry| LastOsInstall {
@@ -240,18 +197,8 @@ fn finished(entry: &windows::HistoryEntry) -> Option<HistoryEntry> {
         revision: entry.revision,
         title: entry.title.clone(),
         installed_at: entry.date?,
-        operation: match entry.operation {
-            1 => HistoryOperation::Install,
-            2 => HistoryOperation::Uninstall,
-            _ => return None,
-        },
-        result_code: match entry.result_code {
-            2 => HistoryResult::Succeeded,
-            3 => HistoryResult::SucceededWithErrors,
-            4 => HistoryResult::Failed,
-            5 => HistoryResult::Aborted,
-            _ => return None,
-        },
+        operation: entry.operation?,
+        result_code: entry.result?,
         hresult: entry.hresult,
     })
 }

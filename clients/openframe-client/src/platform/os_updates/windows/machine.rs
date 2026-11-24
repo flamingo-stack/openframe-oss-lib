@@ -13,7 +13,8 @@ use winreg::types::FromRegValue;
 use winreg::RegKey;
 
 use super::model::{
-    DefenderFacts, MdmEnrollment, ReadError, Reading, RegValue, RegValues, SystemFacts,
+    Architecture, DefenderFacts, MdmEnrollment, ReadError, Reading, RegValue, RegValues,
+    SystemFacts,
 };
 
 const CURRENT_VERSION: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
@@ -69,7 +70,7 @@ pub(super) fn system_facts() -> Reading<SystemFacts> {
         .open_subkey(PRODUCT_OPTIONS)
         .and_then(|key| key.get_value("ProductType"))
         .map_err(|error| ReadError::io(PRODUCT_OPTIONS, error))?;
-    let native_architecture = hklm()
+    let native_architecture: String = hklm()
         .open_subkey(SESSION_ENVIRONMENT)
         .and_then(|key| key.get_value("PROCESSOR_ARCHITECTURE"))
         .map_err(|error| ReadError::io(SESSION_ENVIRONMENT, error))?;
@@ -83,7 +84,7 @@ pub(super) fn system_facts() -> Reading<SystemFacts> {
         ubr: optional(&version, "UBR"),
         installation_type: required("InstallationType")?,
         product_type,
-        native_architecture,
+        native_architecture: Architecture::from_registry(&native_architecture),
         cluster_node: open_if_present(CLUSTER)?.is_some(),
     })
 }

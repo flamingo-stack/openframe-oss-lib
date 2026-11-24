@@ -1,5 +1,5 @@
 use super::*;
-use crate::platform::os_updates::windows::fixtures::{manageable, unreadable, update};
+use crate::platform::os_updates::windows::fixtures::{category, manageable, unreadable, update};
 
 type Change = fn(&mut RebootSignals);
 
@@ -119,4 +119,107 @@ fn the_os_name_is_the_registry_name_with_windows_11_corrected() {
             "{product_name:?} {build}"
         );
     }
+}
+
+#[test]
+fn windows_codes_become_names_and_unknown_codes_become_nothing() {
+    use serde_json::{json, to_value, Value};
+
+    let names = |codes: [Value; 7]| codes.to_vec();
+    let codes = [-1, 0, 1, 2, 3, 4, 5];
+    assert_eq!(
+        codes
+            .map(|code| to_value(RebootBehavior::from_code(code)).unwrap())
+            .to_vec(),
+        names([
+            Value::Null,
+            json!("NEVER"),
+            json!("ALWAYS"),
+            json!("MAY_REQUIRE"),
+            Value::Null,
+            Value::Null,
+            Value::Null
+        ])
+    );
+    assert_eq!(
+        codes
+            .map(|code| to_value(UpdateType::from_code(code)).unwrap())
+            .to_vec(),
+        names([
+            Value::Null,
+            Value::Null,
+            json!("SOFTWARE"),
+            json!("DRIVER"),
+            Value::Null,
+            Value::Null,
+            Value::Null
+        ])
+    );
+    assert_eq!(
+        codes
+            .map(|code| to_value(HistoryOperation::from_code(code)).unwrap())
+            .to_vec(),
+        names([
+            Value::Null,
+            Value::Null,
+            json!("INSTALL"),
+            json!("UNINSTALL"),
+            Value::Null,
+            Value::Null,
+            Value::Null
+        ])
+    );
+    assert_eq!(
+        codes
+            .map(|code| to_value(HistoryResult::from_code(code)).unwrap())
+            .to_vec(),
+        names([
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            json!("SUCCEEDED"),
+            json!("SUCCEEDED_WITH_ERRORS"),
+            json!("FAILED"),
+            json!("ABORTED")
+        ])
+    );
+}
+
+#[test]
+fn the_architecture_uses_the_backend_names() {
+    let name =
+        |registry: &str| serde_json::to_value(Architecture::from_registry(registry)).unwrap();
+    assert_eq!(name("AMD64"), "X86_64");
+    assert_eq!(name("ARM64"), "ARM64");
+    assert_eq!(name("x86"), serde_json::Value::Null);
+}
+
+#[test]
+fn definitions_and_upgrades_are_told_by_category_or_kb() {
+    let with = |change: fn(&mut WindowsUpdate)| {
+        let mut update = update();
+        change(&mut update);
+        (update.is_definition(), update.is_upgrade())
+    };
+    assert_eq!(with(|_| {}), (false, false));
+    assert_eq!(
+        with(|u| u.categories = vec![category(DEFINITION_UPDATES)]),
+        (true, false)
+    );
+    assert_eq!(
+        with(|u| u.categories = vec![category(&DEFINITION_UPDATES.to_uppercase())]),
+        (true, false)
+    );
+    assert_eq!(
+        with(|u| u.kb_article_ids = vec!["2267602".into()]),
+        (true, false)
+    );
+    assert_eq!(
+        with(|u| u.kb_article_ids = vec!["4052623".into()]),
+        (true, false)
+    );
+    assert_eq!(
+        with(|u| u.categories = vec![category(UPGRADES)]),
+        (false, true)
+    );
 }
