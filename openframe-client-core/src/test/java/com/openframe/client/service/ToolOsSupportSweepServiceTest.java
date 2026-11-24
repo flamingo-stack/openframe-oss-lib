@@ -61,9 +61,9 @@ class ToolOsSupportSweepServiceTest {
     }
 
     @Test
-    void sweep_noAgentWithMinimum_noMachineRead() {
+    void sweep_noAgentWithToolType_noMachineRead() {
         // setup
-        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(List.of());
+        when(toolOsSupportService.agentsWithToolType()).thenReturn(List.of());
 
         // execution
         sweepService.sweep();
@@ -78,7 +78,7 @@ class ToolOsSupportSweepServiceTest {
         Machine below = machine("id-1", "m-1", OLD_MAC_VERSION, null);
         Machine supported = machine("id-2", "m-2", NEW_MAC_VERSION, null);
         Machine withheld = machine("id-3", "m-3", NEW_MAC_VERSION, Set.of(AGENT_KEY));
-        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.agentsWithToolType()).thenReturn(agents);
         when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(SWEPT, ToolOsSupportSweepService.BEFORE_FIRST_MACHINE, PAGE))
                 .thenReturn(List.of(below, supported, withheld));
 
@@ -92,12 +92,32 @@ class ToolOsSupportSweepServiceTest {
     }
 
     @Test
+    void sweep_agentWithoutMinimumWithheldOnAMachine_machineReconciled() {
+        // setup
+        IntegratedToolAgent withoutMinimum = new IntegratedToolAgent();
+        withoutMinimum.setKey(AGENT_KEY);
+        List<AgentWithToolType> noMinimum = List.of(new AgentWithToolType(withoutMinimum, ToolType.FLEET_MDM));
+        Machine withheld = machine("id-1", "m-1", OLD_MAC_VERSION, Set.of(AGENT_KEY));
+        Machine untouched = machine("id-2", "m-2", OLD_MAC_VERSION, null);
+        when(toolOsSupportService.agentsWithToolType()).thenReturn(noMinimum);
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(SWEPT, ToolOsSupportSweepService.BEFORE_FIRST_MACHINE, PAGE))
+                .thenReturn(List.of(withheld, untouched));
+
+        // execution
+        sweepService.sweep();
+
+        // verifications
+        verify(toolOsSupportReconciler).reconcileCurrent("m-1", noMinimum);
+        verify(toolOsSupportReconciler, never()).reconcileCurrent("m-2", noMinimum);
+    }
+
+    @Test
     void sweep_fullPage_nextPageReadFromTheLastIdAndSweepStopsOnAShortPage() {
         // setup
         List<Machine> fullPage = supportedMachines(0, ToolOsSupportSweepService.PAGE_SIZE);
         Machine below = machine("id-9999", "m-9999", OLD_MAC_VERSION, null);
         String lastId = "id-" + (ToolOsSupportSweepService.PAGE_SIZE - 1);
-        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.agentsWithToolType()).thenReturn(agents);
         when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(SWEPT, ToolOsSupportSweepService.BEFORE_FIRST_MACHINE, PAGE))
                 .thenReturn(fullPage);
         when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(SWEPT, lastId, PAGE))
@@ -117,7 +137,7 @@ class ToolOsSupportSweepServiceTest {
         // setup
         List<Machine> fullPage = supportedMachines(0, ToolOsSupportSweepService.PAGE_SIZE);
         String lastId = "id-" + (ToolOsSupportSweepService.PAGE_SIZE - 1);
-        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.agentsWithToolType()).thenReturn(agents);
         when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(SWEPT, ToolOsSupportSweepService.BEFORE_FIRST_MACHINE, PAGE))
                 .thenReturn(fullPage);
         when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(SWEPT, lastId, PAGE))
@@ -134,7 +154,7 @@ class ToolOsSupportSweepServiceTest {
     @Test
     void sweep_emptyFirstPage_nothingReconciled() {
         // setup
-        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.agentsWithToolType()).thenReturn(agents);
         when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(SWEPT, ToolOsSupportSweepService.BEFORE_FIRST_MACHINE, PAGE))
                 .thenReturn(List.of());
 
@@ -150,7 +170,7 @@ class ToolOsSupportSweepServiceTest {
         // setup
         Machine failing = machine("id-1", "m-1", OLD_MAC_VERSION, null);
         Machine next = machine("id-2", "m-2", OLD_MAC_VERSION, null);
-        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.agentsWithToolType()).thenReturn(agents);
         when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(SWEPT, ToolOsSupportSweepService.BEFORE_FIRST_MACHINE, PAGE))
                 .thenReturn(List.of(failing, next));
         doThrow(new IllegalStateException("mongo away")).when(toolOsSupportReconciler).reconcileCurrent("m-1", agents);
