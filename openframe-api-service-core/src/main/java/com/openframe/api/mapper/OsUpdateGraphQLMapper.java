@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.function.Function;
 
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
@@ -36,37 +37,29 @@ public class OsUpdateGraphQLMapper {
 
     public GenericConnection<GenericEdge<OsUpdateResponse>> toOsUpdateConnection(
             GenericQueryResult<OsUpdateResponse> osUpdates) {
-        List<GenericEdge<OsUpdateResponse>> edges = osUpdates.getItems().stream()
-                .map(OsUpdateGraphQLMapper::toEdge)
-                .toList();
-        return GenericConnection.<GenericEdge<OsUpdateResponse>>builder()
-                .edges(edges)
-                .pageInfo(osUpdates.getPageInfo())
-                .build();
+        return toConnection(osUpdates, OsUpdateResponse::getCursor);
     }
 
     public GenericConnection<GenericEdge<OsUpdateDeviceResponse>> toDeviceConnection(
             GenericQueryResult<OsUpdateDeviceResponse> devices) {
-        List<GenericEdge<OsUpdateDeviceResponse>> edges = devices.getItems().stream()
-                .map(OsUpdateGraphQLMapper::toEdge)
+        return toConnection(devices, OsUpdateDeviceResponse::getCursor);
+    }
+
+    private static <T> GenericConnection<GenericEdge<T>> toConnection(GenericQueryResult<T> queryResult,
+                                                                      Function<T, String> cursorReader) {
+        List<GenericEdge<T>> edges = queryResult.getItems().stream()
+                .map(item -> toEdge(item, cursorReader.apply(item)))
                 .toList();
-        return GenericConnection.<GenericEdge<OsUpdateDeviceResponse>>builder()
+        return GenericConnection.<GenericEdge<T>>builder()
                 .edges(edges)
-                .pageInfo(devices.getPageInfo())
+                .pageInfo(queryResult.getPageInfo())
                 .build();
     }
 
-    private static GenericEdge<OsUpdateResponse> toEdge(OsUpdateResponse osUpdate) {
-        return GenericEdge.<OsUpdateResponse>builder()
-                .node(osUpdate)
-                .cursor(osUpdate.getCursor())
-                .build();
-    }
-
-    private static GenericEdge<OsUpdateDeviceResponse> toEdge(OsUpdateDeviceResponse device) {
-        return GenericEdge.<OsUpdateDeviceResponse>builder()
-                .node(device)
-                .cursor(device.getCursor())
+    private static <T> GenericEdge<T> toEdge(T node, String cursor) {
+        return GenericEdge.<T>builder()
+                .node(node)
+                .cursor(cursor)
                 .build();
     }
 }

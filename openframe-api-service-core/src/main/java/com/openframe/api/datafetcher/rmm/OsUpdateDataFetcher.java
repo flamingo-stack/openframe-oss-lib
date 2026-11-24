@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.dataloader.DataLoader;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @DgsComponent
@@ -46,7 +47,8 @@ public class OsUpdateDataFetcher {
 
     @DgsQuery
     public OsUpdateResponse osUpdate(@InputArgument String id) {
-        return osUpdateQueryService.findOsUpdate(id);
+        Optional<OsUpdateResponse> osUpdate = osUpdateQueryService.findOsUpdate(id);
+        return osUpdate.orElse(null);
     }
 
     @DgsQuery

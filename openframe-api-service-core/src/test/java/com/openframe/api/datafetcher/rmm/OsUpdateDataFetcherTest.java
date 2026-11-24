@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,7 +83,7 @@ class OsUpdateDataFetcherTest {
     @Test
     void osUpdate_updateOfTheTenant_updateOfTheService() {
         // setup
-        when(osUpdateQueryService.findOsUpdate(OS_UPDATE_ID)).thenReturn(osUpdate);
+        when(osUpdateQueryService.findOsUpdate(OS_UPDATE_ID)).thenReturn(Optional.of(osUpdate));
 
         // execution
         OsUpdateResponse found = dataFetcher.osUpdate(OS_UPDATE_ID);
@@ -94,7 +95,7 @@ class OsUpdateDataFetcherTest {
     @Test
     void osUpdate_noSuchUpdate_null() {
         // setup
-        when(osUpdateQueryService.findOsUpdate(OS_UPDATE_ID)).thenReturn(null);
+        when(osUpdateQueryService.findOsUpdate(OS_UPDATE_ID)).thenReturn(Optional.empty());
 
         // execution
         OsUpdateResponse found = dataFetcher.osUpdate(OS_UPDATE_ID);

@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNullElse;
+
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
 public class DeviceOsResponseMapper {
@@ -45,13 +47,13 @@ public class DeviceOsResponseMapper {
                 .macosPresence(pendingUpdate.getMacosPresence())
                 .displayName(osUpdate.getDisplayName())
                 .displayVersion(osUpdate.getDisplayVersion())
-                .kbArticleIds(orEmpty(osUpdate.getKbArticleIds()))
+                .kbArticleIds(requireNonNullElse(osUpdate.getKbArticleIds(), List.of()))
                 .severity(osUpdate.getSeverity())
-                .categories(orEmpty(osUpdate.getCategories()))
-                .categoryIds(orEmpty(osUpdate.getCategoryIds()))
+                .categories(requireNonNullElse(osUpdate.getCategories(), List.of()))
+                .categoryIds(requireNonNullElse(osUpdate.getCategoryIds(), List.of()))
                 .updateType(osUpdate.getUpdateType())
                 .classification(osUpdate.getClassification())
-                .cveIds(orEmpty(osUpdate.getCveIds()))
+                .cveIds(requireNonNullElse(osUpdate.getCveIds(), List.of()))
                 .publishedAt(osUpdate.getPublishedAt())
                 .sizeBytes(osUpdate.getSizeBytes())
                 .rebootBehavior(osUpdate.getRebootBehavior())
@@ -69,9 +71,5 @@ public class DeviceOsResponseMapper {
                 .errorCode(historyEntry.getErrorCode())
                 .cursor(cursor)
                 .build();
-    }
-
-    private static List<String> orEmpty(List<String> values) {
-        return values != null ? values : List.of();
     }
 }

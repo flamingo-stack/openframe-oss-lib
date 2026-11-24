@@ -62,12 +62,9 @@ public class OsUpdateQueryService {
         return toQueryResult(pageOsUpdates, OsUpdateResponse::getCursor, hasNextPage, normalizedPagination);
     }
 
-    // null = the tenant has no such update.
-    public OsUpdateResponse findOsUpdate(String osUpdateId) {
+    public Optional<OsUpdateResponse> findOsUpdate(String osUpdateId) {
         Optional<OsUpdate> osUpdate = osUpdateRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), osUpdateId);
-        return osUpdate
-                .map(this::toResponse)
-                .orElse(null);
+        return osUpdate.map(this::toResponse);
     }
 
     // Pending: devices that list the update now, without the devices we cannot manage. Installed: devices whose

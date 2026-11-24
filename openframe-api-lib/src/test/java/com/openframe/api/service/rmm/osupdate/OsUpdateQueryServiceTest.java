@@ -170,23 +170,23 @@ class OsUpdateQueryServiceTest {
         when(osUpdateResponseMapper.toResponse(windowsUpdate, CursorCodec.encode("raw-1"))).thenReturn(windowsResponse);
 
         // execution
-        OsUpdateResponse found = service.findOsUpdate(WINDOWS_ID);
+        Optional<OsUpdateResponse> found = service.findOsUpdate(WINDOWS_ID);
 
         // verifications
-        assertThat(found).isSameAs(windowsResponse);
+        assertThat(found).containsSame(windowsResponse);
     }
 
     @Test
-    void findOsUpdate_noSuchUpdateInTheTenant_null() {
+    void findOsUpdate_noSuchUpdateInTheTenant_empty() {
         // setup
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(osUpdateRepository.findByTenantIdAndId(TENANT_ID, WINDOWS_ID)).thenReturn(Optional.empty());
 
         // execution
-        OsUpdateResponse found = service.findOsUpdate(WINDOWS_ID);
+        Optional<OsUpdateResponse> found = service.findOsUpdate(WINDOWS_ID);
 
         // verifications
-        assertThat(found).isNull();
+        assertThat(found).isEmpty();
         verifyNoInteractions(osUpdateResponseMapper);
     }
 
