@@ -7,6 +7,7 @@ import { Download02Icon } from '../../icons-v2-generated/interface/download-02-i
 import { Button } from '../button';
 import { DataTableEmpty } from '../data-table/data-table-empty';
 import { InertWhileLoading, useLoadingScope } from '../loading-scope';
+import { QueryReportTableGrid } from './query-report-table-grid';
 import { QueryReportTableHeader } from './query-report-table-header';
 import { QueryReportTableRow, queryReportRowsClass } from './query-report-table-row';
 import { QueryReportTableSkeleton } from './query-report-table-skeleton';
@@ -34,11 +35,14 @@ export function QueryReportTable({
   onExport,
   headerActions,
   variant = 'default',
+  layout = 'cards',
   className,
   tableClassName,
 }: QueryReportTableProps) {
   const loading = useLoadingScope() || loadingProp;
   const isCompact = variant === 'compact';
+  // The grid table is the default variant's other layout: a compact report keeps its flat rows.
+  const isGrid = layout === 'grid' && !isCompact;
   const showExportButton = showExport && (loading || data.length > 0);
   const columns = useMemo(() => deriveColumns(data, columnOrder), [data, columnOrder]);
 
@@ -91,8 +95,20 @@ export function QueryReportTable({
       )}
 
       {/* One slot, three forms: loading (the rows' skeleton), empty (the same mapping `DataTable.Body` makes:
-          `emptyState` wins; `emptyMessage` is its title), and the table. */}
-      {loading ? (
+          `emptyState` wins; `emptyMessage` is its title), and the table. The grid layout draws the first and the last
+          as the grid table, which scrolls inside itself (so no scrollbar track and no edge fades of the report's own). */}
+      {isGrid && (loading || data.length > 0) ? (
+        <QueryReportTableGrid
+          data={data}
+          columns={columns}
+          columnWidth={columnWidth}
+          loading={loading}
+          loadingRegion={loadingRegion}
+          skeletonRows={skeletonRows}
+          skeletonColumns={skeletonColumns}
+          className={tableClassName}
+        />
+      ) : loading ? (
         <QueryReportTableSkeleton
           rows={skeletonRows}
           columns={skeletonColumns}
