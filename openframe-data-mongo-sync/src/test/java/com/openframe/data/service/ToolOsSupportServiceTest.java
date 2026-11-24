@@ -24,6 +24,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -74,6 +75,48 @@ class ToolOsSupportServiceTest {
 
         // verifications
         assertThat(agents).containsExactly(new AgentWithToolType(agent, ToolType.FLEET_MDM));
+    }
+
+    @Test
+    void agentsWithToolType_agentWithoutMinimum_kept() {
+        // setup
+        agent.setDownloadConfigurations(List.of(downloadConfiguration("macos", null)));
+        stubEnabledAgentWithTool();
+
+        // execution
+        List<AgentWithToolType> agents = service.agentsWithToolType();
+
+        // verifications
+        assertThat(agents).containsExactly(new AgentWithToolType(agent, ToolType.FLEET_MDM));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void agentsWithToolType_agentWithoutToolId_skippedWithoutToolLookup(String toolId) {
+        // setup
+        agent.setToolId(toolId);
+        when(integratedToolAgentService.getAllEnabled()).thenReturn(List.of(agent));
+
+        // execution
+        List<AgentWithToolType> agents = service.agentsWithToolType();
+
+        // verifications
+        assertThat(agents).isEmpty();
+        verify(integratedToolService, never()).getToolByKey(any());
+    }
+
+    @Test
+    void agentsWithToolType_unknownToolType_skipped() {
+        // setup
+        tool.setToolType("NOT_A_TOOL");
+        stubEnabledAgentWithTool();
+
+        // execution
+        List<AgentWithToolType> agents = service.agentsWithToolType();
+
+        // verifications
+        assertThat(agents).isEmpty();
     }
 
     @Test
