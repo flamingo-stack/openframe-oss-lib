@@ -23,6 +23,7 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -80,6 +81,27 @@ class ProxySessionCleanupWebSocketClientTest {
                 .onErrorResume(e -> Mono.empty()).block();
 
         assertThat(levelOf("connection FAILED")).isEqualTo(Level.WARN);
+    }
+
+    @Test
+    void execute_upstreamUrlWithQuery_loggedWithoutTheQuery() {
+        // setup
+        URI urlWithQuery = URI.create("ws://mesh/tenant-x/agent.ashx?id=42&token=s3cr3t-value");
+        HttpHeaders headers = new HttpHeaders();
+        WebSocketClient delegate = mock(WebSocketClient.class);
+        when(delegate.execute(eq(urlWithQuery), eq(headers), any(WebSocketHandler.class)))
+                .thenReturn(Mono.error(new RuntimeException(PEER_ABORT)));
+
+        // execution
+        client(delegate).execute(urlWithQuery, headers, session -> Mono.empty())
+                .onErrorResume(e -> Mono.empty()).block();
+
+        // verifications
+        assertThat(appender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .isNotEmpty()
+                .allMatch(message -> message.contains("url=ws://mesh/tenant-x/agent.ashx "))
+                .noneMatch(message -> message.contains("s3cr3t-value"));
     }
 
     @Test

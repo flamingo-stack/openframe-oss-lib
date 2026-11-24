@@ -1,0 +1,183 @@
+extend type Query {
+    """OS and update state as the device agent last reported it. Null = the device never sent an OS report.
+    Unknown machineId → DEVICE_NOT_FOUND."""
+    deviceOsState(machineId: String!): DeviceOsState
+
+    """OS updates waiting on the device, newest discovered first. An empty list alone does not mean "up to date":
+    read `deviceOsState.patchState` and `scanState`. Always empty for a device we cannot manage
+    (`deviceOsState.manageability.state` NOT_MANAGEABLE). Unknown machineId → DEVICE_NOT_FOUND."""
+    deviceOsPendingUpdates(machineId: String!): [DeviceOsPendingUpdate!]!
+
+    """OS updates the device installed or failed to install, newest first. Windows only: a Mac reports no history.
+    `first`: 1-100, default 20. Unknown machineId → DEVICE_NOT_FOUND."""
+    deviceOsUpdateHistory(machineId: String!, first: Int, after: String): DeviceOsUpdateHistoryConnection!
+}
+
+type DeviceOsState {
+    platform: OsPlatform
+    osVersion: String
+    osBuild: String
+    osProductName: String
+
+    """How current the OS's own check for updates is. UNKNOWN or null = we do not know what is pending."""
+    scanState: OsUpdateScanState
+    """Last successful check by the OS. Null = never."""
+    lastScanAt: Instant
+    """Anything but CONFIRMED: the device could not read its updates, the pending updates are from an earlier report."""
+    pendingUpdatesConfidence: OsUpdateListConfidence
+    """UNKNOWN is its own answer, neither up to date nor behind."""
+    patchState: OsPatchState
+
+    """UNKNOWN = may be pending. A Mac never answers NO."""
+    rebootPending: OsRebootPending
+    """When the device first reported the reboot that is still pending."""
+    rebootPendingSince: Instant
+
+    manageability: OsUpdateManageability
+    """Null = the agent has not determined it."""
+    osUpdateAuthorization: OsUpdateAuthorization
+    lastOsInstall: LastOsInstall
+
+    """When the agent built the report."""
+    reportedAt: Instant
+    receivedAt: Instant!
+}
+
+enum OsPlatform {
+    WINDOWS
+    MACOS
+}
+
+enum OsUpdateScanState {
+    FRESH
+    AGING
+    STALE
+    UNKNOWN
+}
+
+enum OsUpdateListConfidence {
+    CONFIRMED
+    UNCONFIRMED
+    RETAINED
+    UNREADABLE
+    TOO_LARGE
+}
+
+enum OsPatchState {
+    UP_TO_DATE
+    UPDATES_AVAILABLE
+    UNKNOWN
+}
+
+enum OsRebootPending {
+    YES
+    NO
+    UNKNOWN
+}
+
+type OsUpdateManageability {
+    state: OsUpdateManageabilityState
+    """Why the device is not manageable, as the agent names it (WSUS, GROUP_POLICY, MDM, ...). The list is open:
+    show an unknown reason as it is."""
+    reasons: [String!]!
+}
+
+enum OsUpdateManageabilityState {
+    MANAGEABLE
+    NOT_MANAGEABLE
+}
+
+enum OsUpdateAuthorization {
+    AUTHORIZED
+    NOT_AUTHORIZED
+    NOT_REQUIRED
+}
+
+type LastOsInstall {
+    identifier: String
+    displayName: String
+    displayVersion: String
+    installedAt: Instant!
+}
+
+type DeviceOsPendingUpdate {
+    """Opaque id of the update, as the OS names it."""
+    identifier: String!
+    displayName: String
+    displayVersion: String
+    kbArticleIds: [String!]!
+    """The vendor's own severity. Null = the vendor gave none; always null on macOS for now."""
+    severity: OsUpdateSeverity
+    """The vendor's category names, verbatim."""
+    categories: [String!]!
+    """The vendor's category ids. The same on every device, whatever its language."""
+    categoryIds: [String!]!
+    """Windows only."""
+    updateType: OsUpdateType
+    cveIds: [String!]!
+    publishedAt: Instant
+    sizeBytes: Long
+    rebootBehavior: OsUpdateRebootBehavior
+    """An optional or preview update."""
+    browseOnly: Boolean
+
+    """When this device first reported the update. Does not move while the update stays pending."""
+    discoveredAt: Instant!
+    downloaded: Boolean
+    macosPresence: MacosUpdatePresence
+}
+
+enum OsUpdateSeverity {
+    CRITICAL
+    IMPORTANT
+    MODERATE
+    LOW
+}
+
+enum OsUpdateType {
+    SOFTWARE
+    DRIVER
+}
+
+enum OsUpdateRebootBehavior {
+    NEVER
+    MAY_REQUIRE
+    ALWAYS
+}
+
+enum MacosUpdatePresence {
+    FRESH
+    HELD_OVER
+}
+
+type DeviceOsUpdateHistoryConnection {
+    edges: [DeviceOsUpdateHistoryEdge!]!
+    pageInfo: PageInfo!
+}
+
+type DeviceOsUpdateHistoryEdge {
+    node: DeviceOsUpdateHistoryEntry!
+    cursor: String!
+}
+
+type DeviceOsUpdateHistoryEntry {
+    identifier: String!
+    title: String
+    installedAt: Instant!
+    operation: OsUpdateOperation
+    result: OsUpdateInstallResult
+    """Windows HRESULT as hex. Null on success."""
+    errorCode: String
+}
+
+enum OsUpdateOperation {
+    INSTALL
+    UNINSTALL
+}
+
+enum OsUpdateInstallResult {
+    SUCCEEDED
+    SUCCEEDED_WITH_ERRORS
+    FAILED
+    ABORTED
+}

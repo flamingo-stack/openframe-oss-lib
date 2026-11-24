@@ -47,6 +47,8 @@ public interface ToolConnectionRepository extends MongoRepository<ToolConnection
 
     Optional<ToolConnection> findByMachineIdAndToolType(String machineId, ToolType toolType);
 
+    long deleteByMachineIdAndToolType(String machineId, ToolType toolType);
+
     List<ToolConnection> findByMachineIdAndToolTypeInAndStatus(String machineId, Collection<ToolType> toolTypes,
                                                               ConnectionStatus status);
 

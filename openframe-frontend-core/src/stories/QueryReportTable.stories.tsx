@@ -271,3 +271,64 @@ export const SingleRow: Story = {
     data: [sampleData[0]],
   },
 };
+
+/**
+ * The grid layout: the same report as one bordered table of one-line rows. No settings gear (the columns are the
+ * query's own); each column starts `columnWidth` wide and resizes by its header's edge.
+ */
+export const Grid: Story = {
+  args: {
+    title: 'Server Health Report',
+    data: sampleData,
+    layout: 'grid',
+  },
+};
+
+/**
+ * The grid with more columns than fit: it scrolls sideways inside itself, with no scrollbar track above it.
+ */
+export const GridManyColumns: Story = {
+  args: {
+    title: 'Full Device Inventory',
+    data: manyColumnsData,
+    layout: 'grid',
+  },
+};
+
+/**
+ * The grid without a title bar, as the web app's query page and incident page draw it.
+ */
+export const GridNoTitleBar: Story = {
+  args: {
+    data: sampleData,
+    columnOrder: ['status', 'hostname'],
+    showExport: false,
+    layout: 'grid',
+  },
+};
+
+/**
+ * The grid while the report is read: its own loading form, on unnamed columns.
+ */
+export const GridLoading: Story = {
+  args: {
+    title: 'Server Health Report',
+    data: [],
+    loading: true,
+    skeletonRows: 8,
+    skeletonColumns: 6,
+    layout: 'grid',
+  },
+};
+
+/**
+ * The grid layout with no rows: the report's own empty state, as on card rows.
+ */
+export const GridEmpty: Story = {
+  args: {
+    title: 'Server Health Report',
+    data: [],
+    emptyMessage: 'No results matched your query',
+    layout: 'grid',
+  },
+};

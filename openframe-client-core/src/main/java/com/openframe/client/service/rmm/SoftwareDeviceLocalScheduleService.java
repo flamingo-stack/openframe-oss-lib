@@ -3,6 +3,7 @@ package com.openframe.client.service.rmm;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceLocalTimeDispatchStatus;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
@@ -26,11 +27,13 @@ import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+/** Runs software schedules at the target devices' local time. */
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -81,24 +84,24 @@ public class SoftwareDeviceLocalScheduleService {
                 .findByScheduleIdAndMachineIdIn(schedule.getId(), targets).stream()
                 .collect(Collectors.toMap(ScheduleLocalMachineTimeDispatch::getMachineId, Function.identity(), (a, b) -> a));
         Map<String, Machine> machinesById = machineRepository
-                .findByTenantIdAndMachineIdIn(schedule.getTenantId(), new HashSet<>(targets)).stream()
+                .findOnPrimaryByTenantIdAndMachineIdIn(schedule.getTenantId(), new HashSet<>(targets)).stream()
                 .collect(Collectors.toMap(Machine::getMachineId, Function.identity(), (a, b) -> a));
 
+        Set<String> currentTargets = schedule.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA
+                ? Set.copyOf(targets) : Set.copyOf(resolveTargets(schedule));
         LocalDateTime startWallClock = LocalDateTime.ofInstant(startAt, ZoneOffset.UTC);
-        Long repeat = schedule.getRepeat();
-        long window = catchupSeconds;
+        targets.stream().filter(currentTargets::contains).map(machinesById::get)
+                .filter(DeviceDispatchEligibility::isManaged)
+                .forEach(machine -> evaluateDevice(schedule, machine, startWallClock, now,
+                        sentinelByMachine.get(machine.getMachineId())));
+    }
 
-        for (String machineId : targets) {
-            Machine machine = machinesById.get(machineId);
-            if (machine == null) {
-                continue;
-            }
-            ScheduleLocalMachineTimeDispatch sentinel = sentinelByMachine.get(machineId);
-            if (machine.getTelemetryStatus() == TelemetryStatus.ONLINE) {
-                evaluateOnline(schedule, machine, startWallClock, repeat, now, sentinel, window);
-            } else {
-                evaluateOffline(schedule, machine, startWallClock, repeat, now, sentinel, window);
-            }
+    private void evaluateDevice(SoftwareSchedule schedule, Machine machine, LocalDateTime startWallClock,
+                                Instant now, ScheduleLocalMachineTimeDispatch sentinel) {
+        if (machine.getTelemetryStatus() == TelemetryStatus.ONLINE) {
+            evaluateOnline(schedule, machine, startWallClock, schedule.getRepeat(), now, sentinel, catchupSeconds);
+        } else {
+            evaluateOffline(schedule, machine, startWallClock, schedule.getRepeat(), now, sentinel, catchupSeconds);
         }
     }
 

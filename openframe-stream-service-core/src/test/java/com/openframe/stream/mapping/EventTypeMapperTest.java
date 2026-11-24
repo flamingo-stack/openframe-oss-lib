@@ -61,7 +61,11 @@ class EventTypeMapperTest {
     @CsvSource({
             "script_run.finished, SCRIPT_EXECUTED",
             "script_run.failed, SCRIPT_FAILED",
-            "cmd_run.finished, COMMAND_RUN_FINISHED"
+            "cmd_run.finished, COMMAND_RUN_FINISHED",
+            "os_update.installed, OS_UPDATE_INSTALLED",
+            "os_update.install_failed, OS_UPDATE_INSTALL_FAILED",
+            "os_update.uninstalled, OS_UPDATE_UNINSTALLED",
+            "os_update.uninstall_failed, OS_UPDATE_UNINSTALL_FAILED"
     })
     void mapsRmmResultOutcomesToUnifiedTypes(String sourceEventType, UnifiedEventType expected) {
         assertEquals(expected, EventTypeMapper.mapToUnifiedType(IntegratedToolType.RMM, sourceEventType));

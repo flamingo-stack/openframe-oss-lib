@@ -54,7 +54,7 @@ import type {
   UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
-import { isCompactingTail } from '../utils/extract-incomplete-message-state';
+import { extractIncompleteTailState, isCompactingTail } from '../utils/extract-incomplete-message-state';
 import { processHistoricalMessages } from '../utils/process-historical-messages';
 import { formatSingularLookupInvocation, sanitizeTitleForChat } from '../utils/slash-dispatch-utils';
 import {
@@ -312,6 +312,26 @@ function withAvatarUrl(message: ChatMessage, avatarUrlOf: (stored: string) => st
 
 /** How long a send waits for the tail to subscribe to its dialog (`awaitsSubscription`). */
 const SUBSCRIPTION_WAIT_MS = 30_000;
+
+/** How long an intent dialog this chat just created waits before its history is read again, when the first read said
+ *  the server does not have it yet. */
+const FRESH_DIALOG_REREAD_MS = 1_000;
+
+/** How long a send made while its dialog's first history page is still being read waits for it (`awaitFirstPage`). */
+const FIRST_PAGE_WAIT_MS = SUBSCRIPTION_WAIT_MS;
+
+/**
+ * How long a replaying tail's catch-up after a gap may hold the backlog window open (`onCatchUpStart`): it closes when
+ * the tail says it has delivered what it held (`onResync`), and at the latest after this, so a catch-up that never
+ * reports cannot keep the echo purge off.
+ */
+const CATCH_UP_WINDOW_MS = 10_000;
+
+/** A send that could not go out because the dialog never became readable or subscribed. */
+const CONNECT_FAILURE = 'The chat could not connect. Please try again.';
+
+/** How a held send's wait for its dialog's first history page ended. */
+type FirstPageOutcome = 'ready' | 'unread' | 'stopped';
 
 /** What a dialog the list has not named yet is called. */
 const NEW_DIALOG_TITLE = 'New Chat';
@@ -766,6 +786,23 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   // Monotonic guard: a slow page for a dialog the user has left must not land on the one they switched to.
   const historyLoadSeqRef = useRef(0);
 
+  // Intent dialogs this chat created whose first history page has not landed yet. The server may not serve a dialog it
+  // created a moment ago: a `missing` first page is read once more, and such a dialog is never left for being missing.
+  const freshIntentDialogsRef = useRef(new Set<string>());
+
+  // A send into a dialog whose first history page has not landed shows at once but publishes only after it: the page
+  // then cannot hold the send (it was read before the send left), so it goes before it instead of replacing it. The
+  // dialog whose first page has landed (or that has none to read), the dialogs holding such sends, and the sends' waits.
+  const firstPageForRef = useRef<string | null>(null);
+  const heldSendsRef = useRef(new Set<string>());
+  const firstPageWaitersRef = useRef(new Map<string, Array<(outcome: FirstPageOutcome) => void>>());
+  const settleFirstPageWaiters = useCallback((id: string, outcome: FirstPageOutcome) => {
+    const waiters = firstPageWaitersRef.current.get(id);
+    if (!waiters) return;
+    firstPageWaitersRef.current.delete(id);
+    for (const settle of waiters) settle(outcome);
+  }, []);
+
   /** One page, or `null` when a newer load superseded it, or `'failed'`. Writes nothing: `applyHistoryPage` does. */
   const readHistoryPage = useCallback(
     async (id: string, cursor?: string): Promise<FetchDialogMessagesResult | 'failed' | null> => {
@@ -804,7 +841,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       if (cursor === undefined && page.missing) {
         // Deleted, or no longer the caller's (claimed by an account this browser is signed out of): kept open, every
         // later send would go into a dialog the server refuses to record. Unless the viewer has already written in it.
-        if (store.snapshotOf(key).messages.length === 0 && currentDialogIdRef.current === id) {
+        if (
+          store.snapshotOf(key).messages.length === 0 &&
+          currentDialogIdRef.current === id &&
+          !freshIntentDialogsRef.current.has(id)
+        ) {
           leaveDialogRef.current(id);
         }
         return;
@@ -820,19 +861,35 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         }).messages;
       if (cursor === undefined) {
         const historyMaxSeq = maxStreamSeq(processed);
+        const tailReplaysFlag = !(
+          tailReplays &&
+          (historyMaxSeq === null || replayCompletedForDialogRef.current === id)
+        );
+        const replayingBacklogFlag =
+          tailReplays && historyMaxSeq !== null && replayCompletedForDialogRef.current !== id;
         if (isStream && store.snapshotOf(key).messages.length > 0) {
           // A send that went out before the history landed: nothing typed is lost, the history goes before it.
           store.mutate(key, r => r.prependMessages(processed));
+        } else if (heldSendsRef.current.has(id) && store.snapshotOf(key).messages.length > 0) {
+          // Sends typed while this page was read: their publish is held until now (`awaitFirstPage`), so the page cannot
+          // hold them. It goes before them, with what a hydration would say of the tail and of an unfinished last turn
+          // (no adoption: the send owns the open turn).
+          const extras = extractIncompleteTailState(processed);
+          store.mutate(key, r => {
+            r.prependMessages(processed);
+            r.setTailReplaysHistory(tailReplaysFlag);
+            r.setReplayingBacklog(replayingBacklogFlag);
+            if (extras) r.initializeWithState(null, extras);
+          });
         } else {
           // The first page: THE hydration door. Adoption is armed only while a back-fill is still buffering, the replay
           // that would consume it. A replaying tail with no seq to resume after opens on new messages only, so it can
           // never deliver again a prompt this history holds.
           store.hydrate(key, processed, {
             expectingReplay: backfills && isBufferingActive(),
-            tailReplaysHistory: !(
-              tailReplays &&
-              (historyMaxSeq === null || replayCompletedForDialogRef.current === id)
-            ),
+            tailReplaysHistory: tailReplaysFlag,
+            // The tail resumes after this seq and first delivers what it held then: turns older than any send from here.
+            replayingBacklog: replayingBacklogFlag,
           });
         }
         setHistorySeq({ dialogId: id, seq: historyMaxSeq });
@@ -856,9 +913,33 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   );
 
   const loadDialogHistory = useCallback(
-    (id: string, cursor?: string): Promise<void> =>
-      readHistoryPage(id, cursor).then(page => applyHistoryPage(id, cursor, page)),
-    [readHistoryPage, applyHistoryPage],
+    async (id: string, cursor?: string): Promise<void> => {
+      const fresh = cursor === undefined && freshIntentDialogsRef.current.has(id);
+      let page = await readHistoryPage(id, cursor);
+      if (fresh && page !== null && page !== 'failed' && page.missing) {
+        await new Promise(resolve => setTimeout(resolve, FRESH_DIALOG_REREAD_MS));
+        if (currentDialogIdRef.current !== id) {
+          freshIntentDialogsRef.current.delete(id);
+          settleFirstPageWaiters(id, 'unread');
+          return;
+        }
+        page = await readHistoryPage(id, cursor);
+      }
+      applyHistoryPage(id, cursor, page);
+      if (fresh && page !== null) freshIntentDialogsRef.current.delete(id);
+      // The FINAL first page (after a fresh intent dialog's re-read) releases the sends held for it: a read that failed
+      // leaves nothing to replace them, a missing dialog cannot take them.
+      if (cursor === undefined && page !== null) {
+        heldSendsRef.current.delete(id);
+        if (page === 'failed' || !page.missing) {
+          firstPageForRef.current = id;
+          settleFirstPageWaiters(id, 'ready');
+        } else {
+          settleFirstPageWaiters(id, 'unread');
+        }
+      }
+    },
+    [readHistoryPage, applyHistoryPage, settleFirstPageWaiters],
   );
 
   // Dialogs this chat just created: their thread already holds the send that created them, and they have no history to
@@ -875,7 +956,13 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       requestedForRef.current = null;
       // Invalidates an in-flight page of the previous dialog, the clear path too.
       historyLoadSeqRef.current += 1;
+      // Sends held for a dialog that is no longer open will not see its page: they fail where they were typed.
+      for (const id of [...firstPageWaitersRef.current.keys()])
+        if (id !== dialogId) settleFirstPageWaiters(id, 'unread');
+      heldSendsRef.current.clear();
+      if (firstPageForRef.current !== dialogId) firstPageForRef.current = null;
       if (dialogId && createdDialogsRef.current.delete(dialogId)) {
+        firstPageForRef.current = dialogId;
         requestedForRef.current = dialogId;
         setLoadedFor(dialogId);
         setHistorySeq({ dialogId, seq: 0 });
@@ -889,7 +976,13 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     if (!active || !dialogId || requestedForRef.current === dialogId) return;
     requestedForRef.current = dialogId;
     void loadDialogHistory(dialogId);
-  }, [active, dialogId, dialogKey, store, globalApprovalStatuses, loadDialogHistory]);
+  }, [active, dialogId, dialogKey, store, globalApprovalStatuses, loadDialogHistory, settleFirstPageWaiters]);
+  useEffect(
+    () => () => {
+      for (const id of [...firstPageWaitersRef.current.keys()]) settleFirstPageWaiters(id, 'unread');
+    },
+    [settleFirstPageWaiters],
+  );
 
   /** The open dialog's history read again (a reopened ticket): its first page through the hydration door. */
   const reloadHistory = useCallback(() => {
@@ -988,6 +1081,23 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     [settleSubscriptionWaiters],
   );
 
+  // A catch-up's backlog window (`onCatchUpStart`) and its cap.
+  const catchUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeCatchUpWindow = useCallback(
+    (id: string) => {
+      if (catchUpTimerRef.current) clearTimeout(catchUpTimerRef.current);
+      catchUpTimerRef.current = null;
+      store.mutate(keyOfDialogRef.current(id), reducer => reducer.setReplayingBacklog(false));
+    },
+    [store],
+  );
+  useEffect(
+    () => () => {
+      if (catchUpTimerRef.current) clearTimeout(catchUpTimerRef.current);
+    },
+    [],
+  );
+
   // When the tail last delivered: a record that says the backend is idle is believed only if nothing came after it was asked.
   const lastEventAtRef = useRef(0);
   const tailPort = liveTail ?? NO_TAIL_PORT;
@@ -1005,12 +1115,25 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     },
     onConnect: handleConnect,
     onResync: () => {
-      if (dialogId) void loadDialogHistory(dialogId);
+      if (!dialogId) return;
+      closeCatchUpWindow(dialogId);
+      void loadDialogHistory(dialogId);
+    },
+    onCatchUpStart: () => {
+      if (!tailReplays || !dialogId || currentDialogIdRef.current !== dialogId) return;
+      // A tail back from a gap replays turns that began before a send made since: the same backlog window a first
+      // subscribe opens at hydration, so their boundaries neither purge a live echo entry nor take a send's placeholder.
+      store.mutate(keyOfDialog(dialogId), reducer => reducer.setReplayingBacklog(true));
+      if (catchUpTimerRef.current) clearTimeout(catchUpTimerRef.current);
+      catchUpTimerRef.current = setTimeout(() => closeCatchUpWindow(dialogId), CATCH_UP_WINDOW_MS);
     },
     onReplayComplete: () => {
       if (!tailReplays || !dialogId || currentDialogIdRef.current !== dialogId) return;
       replayCompletedForDialogRef.current = dialogId;
-      store.mutate(keyOfDialog(dialogId), reducer => reducer.setTailReplaysHistory(false));
+      store.mutate(keyOfDialog(dialogId), reducer => {
+        reducer.setTailReplaysHistory(false);
+        reducer.setReplayingBacklog(false);
+      });
     },
     onSubscribed: () => {
       if (!dialogId) return;
@@ -1033,6 +1156,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     // history is this turn (a read of it would put the same turn in twice once the server has stored it).
     onMinted: (newId, key, hidden) => {
       createdDialogsRef.current.add(newId);
+      firstPageForRef.current = newId;
       setMintedAlias({ dialogId: newId, key });
       setInternalDialogId(newId);
       currentDialogIdRef.current = newId;
@@ -1089,7 +1213,15 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         });
         // The list shows the new conversation at once, under its name; the next refresh replaces it with the real entry.
         upsertDialogTop({ id: newId, title: create.title || NEW_DIALOG_TITLE, timestamp: new Date() });
-        createdDialogsRef.current.add(newId);
+        // An intent dialog's greeting is the server's, written as the dialog is created: it is read from history like
+        // any opened dialog. A dialog this chat starts with a send skips that read, an intent one included: its thread
+        // already holds the send, which entering through the history would clear before the server has it.
+        if (create.intent && !create.prompt) freshIntentDialogsRef.current.add(newId);
+        else {
+          createdDialogsRef.current.add(newId);
+          // No history to read: a send into it goes out at once.
+          firstPageForRef.current = newId;
+        }
         openDialog(newId);
         currentDialogIdRef.current = newId;
         if (create.prompt && newDialogGreeting) {
@@ -1111,14 +1243,68 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     [store, openDialog, upsertDialogTop, newDialogGreeting, assistantName, assistantType],
   );
 
+  /**
+   * Resolves once the dialog's final first history page has landed ('ready'), when it never will (missing, the dialog
+   * left, the wait over: 'unread'), or when the user stopped the send first ('stopped').
+   */
+  const awaitFirstPage = useCallback(
+    (id: string): Promise<FirstPageOutcome> => {
+      if (firstPageForRef.current === id) return Promise.resolve('ready');
+      return new Promise<FirstPageOutcome>(resolve => {
+        const timer = setTimeout(() => settleFirstPageWaiters(id, 'unread'), FIRST_PAGE_WAIT_MS);
+        const waiters = firstPageWaitersRef.current.get(id) ?? [];
+        waiters.push(outcome => {
+          clearTimeout(timer);
+          resolve(outcome);
+        });
+        firstPageWaitersRef.current.set(id, waiters);
+      });
+    },
+    [settleFirstPageWaiters],
+  );
+
+  /** Sending over a pending approval interrupts it, and over a pending escalation offer supersedes it. */
+  const supersedePending = useCallback(
+    (key: string) => {
+      if (!sendSupersedesPending) return;
+      // Each card resolves as the bubble appears (the backend answers the approval rejected a moment later).
+      const { messages: thread } = store.snapshotOf(key);
+      const pendingId = findLatestPendingId(thread, pendingApprovalIdOf);
+      const pendingOfferId = findLatestPendingId(thread, pendingOfferIdOf);
+      store.mutate(key, r => {
+        if (pendingId) r.projectApprovalResolution(pendingId, 'rejected');
+        if (pendingOfferId) r.projectApprovalResolution(pendingOfferId, 'cancelled');
+      });
+    },
+    [store, sendSupersedesPending],
+  );
+
   /** Publish into a dialog: once its tail is subscribed when the transport needs that, and a failure left as a row. */
   const publishInto = useCallback(
     async (key: string, targetDialogId: string | null, text: string, sendOptions: UnifiedSendMessageOptions) => {
       const { transport: port, sendFailureText: failureText } = portsRef.current;
       try {
         if (port.kind === 'stream') throw new Error('A stream transport sends its own turns.');
+        if (
+          targetDialogId &&
+          portsRef.current.history.fetchDialogMessages &&
+          firstPageForRef.current !== targetDialogId
+        ) {
+          // The dialog's first page is still being read: the send waits for it, then for the tail a replaying transport
+          // opens only after it, so the page cannot hold the send and the tail is there for its echo and its answer.
+          heldSendsRef.current.add(targetDialogId);
+          const outcome = await awaitFirstPage(targetDialogId);
+          if (outcome === 'stopped') {
+            // Stopped before it went out: nothing reaches the server, and its echo entry is spent.
+            store.mutate(key, r => r.consumeOwnEcho(text));
+            return false;
+          }
+          if (outcome === 'unread') throw new Error(CONNECT_FAILURE);
+          if (port.replays && !(await awaitSubscription(targetDialogId))) throw new Error(CONNECT_FAILURE);
+          supersedePending(key);
+        }
         if (port.awaitsSubscription && targetDialogId && !(await awaitSubscription(targetDialogId))) {
-          throw new Error('The chat could not connect. Please try again.');
+          throw new Error(CONNECT_FAILURE);
         }
         const sent = await port.publish(text, { ...sendOptions, dialogId: targetDialogId });
         return sent !== false;
@@ -1132,7 +1318,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         return false;
       }
     },
-    [store, awaitSubscription],
+    [store, awaitSubscription, awaitFirstPage, supersedePending],
   );
 
   const sendMessage = useCallback(
@@ -1148,32 +1334,13 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         store.pushOptimisticSend(newKey, text, { hidden });
         return publishInto(newKey, newId, text, send);
       }
-      if (sendSupersedesPending) {
-        // Sending over a pending approval interrupts it (the backend answers it rejected a moment later), and over a
-        // pending escalation offer supersedes it: each card resolves as the bubble appears.
-        const { messages: thread } = store.snapshotOf(dialogKey);
-        const pendingId = findLatestPendingId(thread, pendingApprovalIdOf);
-        const pendingOfferId = findLatestPendingId(thread, pendingOfferIdOf);
-        store.mutate(dialogKey, r => {
-          if (pendingId) r.projectApprovalResolution(pendingId, 'rejected');
-          if (pendingOfferId) r.projectApprovalResolution(pendingOfferId, 'cancelled');
-        });
-      }
+      // A send held for the first page resolves the cards that page brings when it goes out (`publishInto`).
+      supersedePending(dialogKey);
       // The bubble, its placeholder, the echo it expects and the phase: all the reducer's.
       store.pushOptimisticSend(dialogKey, text, { hidden });
       return publishInto(dialogKey, dialogId, text, send);
     },
-    [
-      store,
-      dialogKey,
-      dialogId,
-      isControlled,
-      createAndOpenDialog,
-      publishInto,
-      sendSupersedesPending,
-      isStream,
-      sendTurn,
-    ],
+    [store, dialogKey, dialogId, isControlled, createAndOpenDialog, publishInto, supersedePending, isStream, sendTurn],
   );
 
   const stopMessage = useCallback(() => {
@@ -1182,6 +1349,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       return;
     }
     store.mutate(dialogKey, r => r.setPhase('idle'));
+    if (dialogId && firstPageWaitersRef.current.has(dialogId)) {
+      // The send has not gone out yet (`awaitFirstPage`): it never will, and there is no turn on the server to stop.
+      settleFirstPageWaiters(dialogId, 'stopped');
+      return;
+    }
     const port = portsRef.current.transport;
     const stop = port.kind === 'stream' ? undefined : port.stop;
     if (stop && dialogId) {
@@ -1189,7 +1361,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         console.error('[useChatEngine] stop failed:', err);
       });
     }
-  }, [store, dialogKey, dialogId, isStream, stopTurn]);
+  }, [store, dialogKey, dialogId, isStream, stopTurn, settleFirstPageWaiters]);
 
   const clearMessages = useCallback(() => {
     if (isStream) {

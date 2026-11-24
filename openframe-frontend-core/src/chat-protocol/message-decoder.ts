@@ -288,6 +288,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       if (seq <= lastSeq) return { seq, chunks: out };
       lastSeq = seq;
     }
+    const at = typeof raw.streamPublishedAt === 'number' ? raw.streamPublishedAt : undefined;
     const resolvedByName = str(raw.resolvedByName) ?? str(raw.displayName);
 
     switch (raw.type) {
@@ -568,7 +569,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       default:
         break;
     }
-    return { ...(seq !== undefined ? { seq } : {}), chunks: out };
+    return { ...(seq !== undefined ? { seq } : {}), ...(at !== undefined ? { at } : {}), chunks: out };
   }
 
   return { decode };

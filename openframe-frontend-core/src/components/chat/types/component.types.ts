@@ -685,6 +685,8 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
 export interface ModelMenu {
   groups: ActionsMenuGroup[];
   disabled?: boolean;
+  /** Enables the full-width provider and model views below the tablet breakpoint. */
+  mobileDrillDown?: boolean;
 }
 
 /**

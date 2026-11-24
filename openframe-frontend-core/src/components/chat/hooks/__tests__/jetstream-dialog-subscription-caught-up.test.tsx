@@ -28,16 +28,19 @@ const SUBJECT = `chat.${DIALOG}.admin-message`;
 /** Shared connections are cached per URL in module state: one URL per test. */
 let testIndex = 0;
 let log: string[];
+let payloads: Record<string, unknown>[];
 let latest: UseJetStreamDialogSubscriptionReturn;
 
 function Probe({
   url,
   optStartSeq,
   onReplayComplete,
+  onCatchUpStart,
 }: {
   url: string;
   optStartSeq: number | null;
   onReplayComplete?: () => void;
+  onCatchUpStart?: () => void;
 }) {
   const result = useJetStreamDialogSubscription({
     enabled: true,
@@ -46,8 +49,10 @@ function Probe({
     optStartSeq,
     getNatsWsUrl: () => url,
     ...(onReplayComplete ? { onReplayComplete } : {}),
+    ...(onCatchUpStart ? { onCatchUpStart } : {}),
     reconnectionBackoff: { initialDelayMs: 20, maxDelayMs: 20 },
     onEvent: payload => {
+      payloads.push(payload as Record<string, unknown>);
       log.push(`msg:${(payload as { streamSeq: number }).streamSeq}`);
     },
   });
@@ -77,6 +82,7 @@ function publish(text: string) {
 beforeEach(() => {
   server.current = new FakeJetStream();
   log = [];
+  payloads = [];
   testIndex += 1;
 });
 
@@ -192,5 +198,49 @@ describe('useJetStreamDialogSubscription caughtUpCount', () => {
     await until(() => log.length === 1);
     expect(log).toEqual([`msg:${live}`]);
     expect(server.current.createdConsumers[0]).toMatchObject({ deliver_policy: 'new' });
+  });
+
+  it('says a catch-up starts before a resumed consumer delivers what it missed, never for the first consumer', async () => {
+    const seen = publish('seen');
+    render(
+      <Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seen - 1} onCatchUpStart={() => log.push('catch-up')} />,
+    );
+    await until(() => latest.isSubscribed && log.length === 1);
+    expect(log).toEqual([`msg:${seen}`]);
+
+    server.current.consumeDelayMs = 50;
+    server.current.disconnectAll();
+    await wait(5);
+    const missed = publish('missed');
+
+    await until(() => latest.caughtUpCount === 1);
+    expect(log).toEqual([`msg:${seen}`, 'catch-up', `msg:${missed}`, 'caught-up:1']);
+  });
+
+  it('says a catch-up starts when nats.ws recreates the consumer', async () => {
+    const seen = publish('seen');
+    render(
+      <Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seen - 1} onCatchUpStart={() => log.push('catch-up')} />,
+    );
+    await until(() => latest.isSubscribed && log.length === 1);
+
+    server.current.dropConsumers();
+    const missed = publish('missed');
+    server.current.consumeDelayMs = 50;
+    server.current.recreateConsumers();
+
+    await until(() => latest.caughtUpCount === 1);
+    expect(log.indexOf('catch-up')).toBeGreaterThan(-1);
+    expect(log.indexOf('catch-up')).toBeLessThan(log.indexOf(`msg:${missed}`));
+  });
+
+  it("stamps each payload with the stream's publish time, beside its seq", async () => {
+    const before = Date.now();
+    const seq = publish('dated');
+    render(<Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seq - 1} />);
+    await until(() => payloads.length === 1);
+    expect(payloads[0]).toMatchObject({ streamSeq: seq });
+    expect(payloads[0].streamPublishedAt).toBeGreaterThanOrEqual(before);
+    expect(payloads[0].streamPublishedAt).toBeLessThanOrEqual(Date.now());
   });
 });
