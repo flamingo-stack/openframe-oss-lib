@@ -147,7 +147,7 @@ public class ScheduleScriptDeviceService {
     public long removeAssignedDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
         if (machineIds == null || machineIds.isEmpty()) {
-            requireSpecificSelection(tenantId, scheduleId);
+            requireVisibleSchedule(tenantId, scheduleId);
             return 0;
         }
         Set<String> ids = new LinkedHashSet<>(machineIds);
