@@ -777,3 +777,16 @@ describe('docSearchFieldsOf', () => {
     expect(docSearchFieldsOf({ title: 'Folder' })).toEqual({ sourceId: null, title: 'Folder', url: null });
   });
 });
+
+describe('createMingoDecoder: the stream publish time', () => {
+  it("carries the transport's publish time on the entry, beside its seq", () => {
+    const decoder = createMingoDecoder();
+    const entry = decoder.decode({ type: 'MESSAGE_REQUEST', text: 'hi', streamSeq: 3, streamPublishedAt: 1_700_000 });
+    expect(entry).toMatchObject({ seq: 3, at: 1_700_000 });
+  });
+
+  it('leaves it off when the transport does not say', () => {
+    const entry = createMingoDecoder().decode({ type: 'MESSAGE_REQUEST', text: 'hi', streamSeq: 4 });
+    expect(entry).not.toHaveProperty('at');
+  });
+});

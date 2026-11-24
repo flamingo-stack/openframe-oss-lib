@@ -70,24 +70,39 @@ public class PasswordResetService {
         }
         String activeKey = activeKey(email);
         Duration ttl = Duration.ofMinutes(ttlMinutes);
+        // Every failure below still answers 202: a 500 would tell the caller the account exists.
         // Claimed before the send, atomically: parallel requests for one email send one email
-        if (!Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(activeKey, ACTIVE_MARK, ttl))) {
+        Boolean claimed;
+        try {
+            claimed = redisTemplate.opsForValue().setIfAbsent(activeKey, ACTIVE_MARK, ttl);
+        } catch (RuntimeException e) {
+            logFailure("redis_unavailable", tenantIds, ip, e);
+            return;
+        }
+        if (!Boolean.TRUE.equals(claimed)) {
             logRequest("token_active", tenantIds, ip);
             return;
         }
 
-        String token = generateResetToken();
-        redisTemplate.opsForValue().set(tokenKey(token), email, ttl);
         try {
+            String token = generateResetToken();
+            redisTemplate.opsForValue().set(tokenKey(token), email, ttl);
             emailService.sendPasswordResetEmail(email, token);
         } catch (RuntimeException e) {
-            // Still 202: a 500 here would tell the caller the account exists. The mark goes, so a retry sends.
-            redisTemplate.delete(activeKey);
-            log.warn("event=password_reset_request outcome=send_failed tenantIds={} ip={} error={}", tenantIds, ip,
-                    e.getClass().getSimpleName());
+            dropActiveMark(activeKey);
+            logFailure("send_failed", tenantIds, ip, e);
             return;
         }
         logRequest("sent", tenantIds, ip);
+    }
+
+    // Dropped so a retry sends; if Redis is still down, the mark expires with its TTL.
+    private void dropActiveMark(String activeKey) {
+        try {
+            redisTemplate.delete(activeKey);
+        } catch (RuntimeException e) {
+            log.warn("Reset mark not dropped, Redis unavailable: {}", e.getClass().getSimpleName());
+        }
     }
 
     public void resetPassword(String token, String newPassword) {
@@ -148,6 +163,11 @@ public class PasswordResetService {
 
     private static void logRequest(String outcome, List<String> tenantIds, String ip) {
         log.info("event=password_reset_request outcome={} tenantIds={} ip={}", outcome, tenantIds, ip);
+    }
+
+    private static void logFailure(String outcome, List<String> tenantIds, String ip, RuntimeException e) {
+        log.warn("event=password_reset_request outcome={} tenantIds={} ip={} error={}", outcome, tenantIds, ip,
+                e.getClass().getSimpleName());
     }
 
     private static void logConfirm(String outcome, AuthUser user, String ip) {

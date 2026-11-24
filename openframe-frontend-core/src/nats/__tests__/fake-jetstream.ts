@@ -203,7 +203,7 @@ export class FakeJetStream {
             const toJsMsg = (m: StoredMsg, pending: number) => ({
               data: m.data,
               subject: m.subject,
-              info: { streamSequence: m.seq, pending },
+              info: { streamSequence: m.seq, pending, timestampNanos: m.time * 1e6 },
             });
 
             // Highest stream sequence handed to the client — where a recreation resumes.

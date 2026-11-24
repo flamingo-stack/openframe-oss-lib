@@ -117,6 +117,12 @@ export interface UseJetStreamDialogSubscriptionOptions {
   onSubscribed?: () => void;
   /** The ordered consumer finished replaying its initial backlog. */
   onReplayComplete?: () => void;
+  /**
+   * A tail that came back after a gap starts delivering what the stream held meanwhile: a reconnect's new consumer, or
+   * one nats.ws recreated. Its catch-up can replay turns that began before a send made since; `caughtUpCount` moves
+   * once it has delivered them. Never for a dialog's first consumer (that backlog is `onReplayComplete`'s).
+   */
+  onCatchUpStart?: () => void;
   /** Called on disconnect, before reconnect attempt. Use to refresh auth. May return a verdict; see {@link NatsBeforeReconnect}. */
   onBeforeReconnect?: NatsBeforeReconnect;
   /** Build the NATS WebSocket URL (or null when not yet available). */
