@@ -43,6 +43,7 @@
           "rebootBehavior": "ALWAYS",
           "requiresExclusiveInstall": true,
           "browseOnly": false,
+          "updateType": "SOFTWARE",
           "canRequestUserInput": false,
           "isUninstallable": true,
           "eulaAccepted": true

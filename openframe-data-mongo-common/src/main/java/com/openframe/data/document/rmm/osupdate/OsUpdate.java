@@ -42,6 +42,9 @@ public class OsUpdate implements TenantScoped {
     private OsUpdateSeverity severity;
 
     private List<String> categories;
+    // Category names follow the language of the device, the ids do not.
+    private List<String> categoryIds;
+    private OsUpdateType updateType;
 
     private List<String> cveIds;
 
