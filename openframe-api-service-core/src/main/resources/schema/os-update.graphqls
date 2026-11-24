@@ -79,11 +79,6 @@ type OsUpdate {
     installedDeviceCount: Int!
 }
 
-enum OsUpdateType {
-    SOFTWARE
-    DRIVER
-}
-
 """Set once, when the update is first stored. The rule is a first draft and Windows only: every macOS update is
 OTHER."""
 enum OsUpdateClassification {
@@ -242,6 +237,11 @@ enum OsUpdateSeverity {
     IMPORTANT
     MODERATE
     LOW
+}
+
+enum OsUpdateType {
+    SOFTWARE
+    DRIVER
 }
 
 enum OsUpdateRebootBehavior {
