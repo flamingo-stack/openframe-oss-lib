@@ -1,6 +1,7 @@
 package com.openframe.gateway.upstream.meshcentral;
 
 import lombok.Data;
+import lombok.ToString;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,8 @@ public class MeshCentralRoutingProperties {
     /** MeshCentral WebSocket endpoint. Handles control.ashx, meshrelay.ashx, agent.ashx. */
     private Upstream websocket;
 
+    private Credentials credentials = new Credentials();
+
     @Data
     public static class Upstream {
         private String url;
@@ -47,5 +50,12 @@ public class MeshCentralRoutingProperties {
          * empty for the {@code api} upstream.
          */
         private String pathPrefix;
+    }
+
+    @Data
+    public static class Credentials {
+        private String username;
+        @ToString.Exclude
+        private String password;
     }
 }

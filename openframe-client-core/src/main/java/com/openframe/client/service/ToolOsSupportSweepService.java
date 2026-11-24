@@ -29,7 +29,7 @@ public class ToolOsSupportSweepService {
     private final MachineRepository machineRepository;
 
     public void sweep() {
-        List<AgentWithToolType> agents = toolOsSupportService.agentsWithMinOsVersion();
+        List<AgentWithToolType> agents = toolOsSupportService.agentsWithToolType();
         if (agents.isEmpty()) {
             return;
         }
