@@ -66,10 +66,14 @@ class NatsSubjectPolicyFactoryTest {
             "DEVICE, machine.m-2.heartbeat,                false",
             "DEVICE, user.u-1.installed-agent,             false",
             "DEVICE, $JS.API.CONSUMER.CREATE.CHAT_CHUNKS.c1.chat.d-1.message, false",
+            "USER,   user.u-1.installed-agent,             true",
+            "USER,   user.u-2.installed-agent,             false",
+            "USER,   user.*.installed-agent,               false",
+            "USER,   user.u-1.notification,                false",
             "USER,   machine.m-1.command-execution,        false",
             "USER,   $JS.API.STREAM.INFO.CHAT_CHUNKS,      false"
     })
-    void policyFor_ossDefaultsAlone_devicePublishesItsOwnMachineOnly(NatsClientKind kind, String subject, boolean expected) {
+    void policyFor_ossDefaultsAlone_publishesOwnSubjectsOnly(NatsClientKind kind, String subject, boolean expected) {
         // setup
         NatsClientIdentity identity = identityOf(kind);
 

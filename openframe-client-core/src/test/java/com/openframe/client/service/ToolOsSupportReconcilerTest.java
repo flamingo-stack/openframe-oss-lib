@@ -305,6 +305,24 @@ class ToolOsSupportReconcilerTest {
         verify(withheldToolAgents).release(machine, AGENT_KEY);
     }
 
+    @Test
+    void reconcile_minimumRemovedWithheldNotInstalled_installDispatchedAndReleased() {
+        // setup
+        agent.setDownloadConfigurations(List.of());
+        machine.setOsVersion(OLD_MAC_VERSION);
+        machine.setWithheldToolAgents(Set.of(AGENT_KEY));
+        stubNoUninstallDelivery();
+        when(installedAgentRepository.existsByMachineIdAndAgentType(MACHINE_ID, AGENT_KEY)).thenReturn(false);
+        when(toolInstallationService.process(MACHINE_ID, agent)).thenReturn(ToolInstallationOutcome.DISPATCHED);
+
+        // execution
+        reconciler.reconcile(machine, agents);
+
+        // verifications
+        verify(toolInstallationService).process(MACHINE_ID, agent);
+        verify(withheldToolAgents).release(machine, AGENT_KEY);
+    }
+
     @ParameterizedTest
     @EnumSource(value = ToolInstallationOutcome.class, names = {"NOT_CARRIED", "FAILED", "NOT_SUPPORTED"})
     void reconcile_supportedWithheldInstallNotDispatched_keptWithheld(ToolInstallationOutcome outcome) {
@@ -386,9 +404,9 @@ class ToolOsSupportReconcilerTest {
     }
 
     @Test
-    void reconcile_machineOnly_agentsWithMinimumLoaded() {
+    void reconcile_machineOnly_agentsWithToolTypeLoaded() {
         // setup
-        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.agentsWithToolType()).thenReturn(agents);
         stubAbsent();
 
         // execution
