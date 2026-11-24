@@ -30,7 +30,8 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
 
     @Override
     public List<DeviceOsUpdateHistoryEntry> findPage(String tenantId, String machineId, String cursor, int limit) {
-        Criteria page = after(ofMachine(tenantId, machineId), cursor);
+        Criteria ofMachine = ofMachine(tenantId, machineId);
+        Criteria page = after(ofMachine, cursor);
         Query query = Query.query(page).with(NEWEST_INSTALLED_FIRST).limit(limit);
         return mongoTemplate.find(query, DeviceOsUpdateHistoryEntry.class);
     }
@@ -52,8 +53,10 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
         if (separator < 0) {
             throw new BadRequestException("Invalid OS update history cursor (no separator): " + cursor);
         }
-        Instant installedAt = parseInstant(cursor.substring(0, separator));
-        ObjectId id = parseId(cursor.substring(separator + 1));
+        String installedAtMillis = cursor.substring(0, separator);
+        String idHex = cursor.substring(separator + 1);
+        Instant installedAt = parseInstant(installedAtMillis);
+        ObjectId id = parseId(idHex);
         Criteria olderInstall = Criteria.where(FIELD_INSTALLED_AT).lt(installedAt);
         Criteria sameInstallOlderId = Criteria.where(FIELD_INSTALLED_AT).is(installedAt).and(FIELD_ID).lt(id);
         Criteria keyset = new Criteria().orOperator(olderInstall, sameInstallOlderId);

@@ -50,7 +50,7 @@ public class DeviceOsUpdateHistoryParser {
         return DeviceOsUpdateHistoryEntry.builder()
                 .tenantId(reportingDevice.getTenantId())
                 .machineId(reportingDevice.getMachineId())
-                .entryKey(parseEntryKey(identifier, reportedEntry))
+                .entryKey(parseEntryKey(identifier, reportedEntry, operation))
                 .identifier(identifier)
                 .title(reportedEntry.getTitle())
                 .installedAt(reportedEntry.getInstalledAt())
@@ -68,9 +68,12 @@ public class DeviceOsUpdateHistoryParser {
         return reportedEntry.getUpdateId() + ":" + reportedEntry.getRevision();
     }
 
-    private static String parseEntryKey(String identifier, MachineOsUpdatesMessage.WindowsHistoryEntry reportedEntry) {
+    // The operation as the backend knows it, so "install" and "INSTALL" of one install are one entry.
+    private static String parseEntryKey(String identifier, MachineOsUpdatesMessage.WindowsHistoryEntry reportedEntry,
+                                        OsUpdateOperation operation) {
         long installedAtMillis = reportedEntry.getInstalledAt().toEpochMilli();
-        return identifier + "|" + installedAtMillis + "|" + reportedEntry.getOperation();
+        String operationKey = operation != null ? operation.name() : reportedEntry.getOperation();
+        return identifier + "|" + installedAtMillis + "|" + operationKey;
     }
 
     private static String parseErrorCode(Long hresult) {

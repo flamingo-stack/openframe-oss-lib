@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -19,13 +18,13 @@ public class DeviceOsStateService {
 
     // false = a newer report of this device is already stored, so nothing of this one may be applied.
     public boolean saveIfNotOlder(DeviceOsState reportedState) {
-        Optional<DeviceOsState> foundState = deviceOsStateRepository.findByTenantIdAndMachineId(
-                reportedState.getTenantId(), reportedState.getMachineId());
-        if (foundState.isEmpty()) {
-            saveFirstState(reportedState);
-            return true;
-        }
-        DeviceOsState storedState = foundState.get();
+        return deviceOsStateRepository
+                .findByTenantIdAndMachineId(reportedState.getTenantId(), reportedState.getMachineId())
+                .map(storedState -> replaceIfNotOlder(storedState, reportedState))
+                .orElseGet(() -> saveFirstState(reportedState));
+    }
+
+    private boolean replaceIfNotOlder(DeviceOsState storedState, DeviceOsState reportedState) {
         if (isOlder(reportedState, storedState)) {
             return false;
         }
@@ -33,11 +32,12 @@ public class DeviceOsStateService {
         return true;
     }
 
-    private void saveFirstState(DeviceOsState reportedState) {
+    private boolean saveFirstState(DeviceOsState reportedState) {
         Instant rebootPendingSince = resolveRebootPendingSince(reportedState, reportedState.getReceivedAt());
         reportedState.setRebootPendingSince(rebootPendingSince);
         deviceOsStateRepository.save(reportedState);
         deviceOsReportMetrics.recordFirstReport(reportedState.getPlatform());
+        return true;
     }
 
     // The version is the stored one: when another report replaced the state meanwhile, the save fails and the

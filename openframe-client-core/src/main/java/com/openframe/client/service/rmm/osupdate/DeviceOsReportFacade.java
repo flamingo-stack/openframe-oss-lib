@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
@@ -31,12 +30,18 @@ public class DeviceOsReportFacade {
     private final DeviceOsReportMetrics deviceOsReportMetrics;
 
     public DeviceOsReportOutcome applyReport(String machineId, byte[] payload, Instant receivedAt) {
-        Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
-        if (foundMachine.isEmpty()) {
-            log.warn("OS report of unknown machine {}, ignoring", machineId);
-            return DeviceOsReportOutcome.UNKNOWN_MACHINE;
-        }
-        Machine machine = foundMachine.get();
+        return machineRepository.findByMachineId(machineId)
+                .map(machine -> applyReport(machine, payload, receivedAt))
+                .orElseGet(() -> ignoreUnknownMachine(machineId));
+    }
+
+    private static DeviceOsReportOutcome ignoreUnknownMachine(String machineId) {
+        log.warn("OS report of unknown machine {}, ignoring", machineId);
+        return DeviceOsReportOutcome.UNKNOWN_MACHINE;
+    }
+
+    private DeviceOsReportOutcome applyReport(Machine machine, byte[] payload, Instant receivedAt) {
+        String machineId = machine.getMachineId();
         if (DeviceStatus.FROZEN.contains(machine.getStatus())) {
             log.debug("Ignoring OS report of machineId={} in status {}", machineId, machine.getStatus());
             return DeviceOsReportOutcome.FROZEN_MACHINE;

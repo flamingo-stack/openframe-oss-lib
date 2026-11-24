@@ -8,6 +8,7 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -17,6 +18,7 @@ import java.util.Locale;
 
 // Tenant and machine ids are never tags: every tenant's client service is its own scrape target.
 @Component
+@RequiredArgsConstructor
 public class DeviceOsReportMetrics {
 
     private static final String REPORT_DURATION_TIMER = "openframe.rmm.os_update.report.duration";
@@ -54,10 +56,6 @@ public class DeviceOsReportMetrics {
             Duration.ofHours(1), Duration.ofHours(6), Duration.ofHours(24)};
 
     private final MeterRegistry meterRegistry;
-
-    public DeviceOsReportMetrics(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-    }
 
     // Lag = how long the report waited in the stream. The stream drops a report after an hour.
     public void recordReceived(int payloadBytes, Instant storedInStreamAt) {

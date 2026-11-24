@@ -76,12 +76,9 @@ public class OsUpdateHistoryEventDeserializer extends IntegratedToolEventDeseria
     // The same install is the same log event, however many times it is published.
     @Override
     protected Optional<String> getEventToolId(JsonNode after) {
-        Optional<String> machineId = parseStringField(after, FIELD_MACHINE_ID);
         Optional<String> entryKey = parseStringField(after, FIELD_ENTRY_KEY);
-        if (machineId.isEmpty() || entryKey.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(machineId.get() + ":" + entryKey.get());
+        return parseStringField(after, FIELD_MACHINE_ID)
+                .flatMap(machineId -> entryKey.map(key -> machineId + ":" + key));
     }
 
     @Override
