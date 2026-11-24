@@ -1,3 +1,5 @@
+#[cfg(test)]
+pub(crate) mod fixtures;
 mod gate;
 mod model;
 

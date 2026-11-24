@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+pub(super) const WINDOWS_11_FIRST_BUILD: u32 = 22000;
+
 pub type Reading<T> = Result<T, ReadError>;
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,6 +35,7 @@ pub struct WindowsInventory {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemFacts {
+    pub product_name: Option<String>,
     pub edition_id: String,
     pub composition_edition_id: Option<String>,
     pub display_version: Option<String>,
@@ -43,6 +46,19 @@ pub struct SystemFacts {
     pub product_type: String,
     pub native_architecture: String,
     pub cluster_node: bool,
+}
+
+impl SystemFacts {
+    pub fn os_name(&self) -> Option<String> {
+        let product_name = self.product_name.as_deref()?;
+        let build = self.current_build.parse::<u32>().ok()?;
+        match product_name.strip_prefix("Windows 10") {
+            Some(edition) if build >= WINDOWS_11_FIRST_BUILD => {
+                Some(format!("Windows 11{edition}"))
+            }
+            _ => Some(product_name.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -246,3 +262,7 @@ pub enum NotManageableReason {
     #[serde(rename = "BITLOCKER_PRE_BOOT_INPUT")]
     BitLockerPreBootInput,
 }
+
+#[cfg(test)]
+#[path = "model_tests.rs"]
+mod tests;

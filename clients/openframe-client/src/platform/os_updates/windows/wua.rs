@@ -1,4 +1,5 @@
 use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::LazyLock;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -19,6 +20,7 @@ use super::model::{
     ApplicableSet, HistoryEntry, HistoryWindow, ReadError, Reading, ScanDates, UpdateCategory,
     UpdateService, WindowsUpdate,
 };
+use crate::utils::in_progress::InProgress;
 
 const APPLICABLE_CRITERIA: &str = "IsInstalled=0 and IsHidden=0";
 const DEFENDER_DEFINITION_KB: &str = "KB2267602";
@@ -26,6 +28,8 @@ const OLE_EPOCH_UNIX_MILLIS: i64 = -2_209_161_600_000;
 const HISTORY_SCAN_LIMIT: i32 = 500;
 const HISTORY_KEEP_LIMIT: usize = 200;
 const TIMEOUT: Duration = Duration::from_secs(120);
+
+static READER: LazyLock<InProgress> = LazyLock::new(InProgress::default);
 
 pub(super) struct WuaReadings {
     pub(super) applicable: Reading<ApplicableSet>,
@@ -80,11 +84,21 @@ impl Drop for ComApartment {
 }
 
 pub(super) fn read() -> WuaReadings {
+    if READER.view().is_active() {
+        return WuaReadings::failed(ReadError {
+            step: "WUA",
+            hresult: None,
+            message: "the previous read has not finished".to_string(),
+        });
+    }
+    let reading = READER.begin();
     let (sender, receiver) = mpsc::sync_channel(1);
     let spawned = thread::Builder::new()
         .name("wua-inventory".into())
         .spawn(move || {
-            let _ = sender.send(read_in_apartment());
+            let readings = read_in_apartment();
+            drop(reading);
+            let _ = sender.send(readings);
         });
     if let Err(error) = spawned {
         return WuaReadings::failed(ReadError::io("WUA thread", error));
@@ -299,3 +313,7 @@ fn decimal_bytes(value: DECIMAL) -> Option<u64> {
     let mantissa = (u128::from(value.Hi32) << 64) | u128::from(low);
     u64::try_from(mantissa / 10u128.checked_pow(u32::from(scale))?).ok()
 }
+
+#[cfg(test)]
+#[path = "wua_tests.rs"]
+mod tests;

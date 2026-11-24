@@ -36,14 +36,14 @@ const WRITE_FILTER_SCRIPT: &str = concat!(
 );
 
 pub(super) fn bitlocker() -> Reading<Option<BitLockerFacts>> {
-    run("BitLocker", BITLOCKER_SCRIPT)
+    run("BitLocker", BITLOCKER_SCRIPT, TIMEOUT)
 }
 
 pub(super) fn write_filter() -> Reading<WriteFilterFacts> {
-    run("UWF_Filter", WRITE_FILTER_SCRIPT)
+    run("UWF_Filter", WRITE_FILTER_SCRIPT, TIMEOUT)
 }
 
-fn run<T: DeserializeOwned>(step: &'static str, script: &str) -> Reading<T> {
+fn run<T: DeserializeOwned>(step: &'static str, script: &str, limit: Duration) -> Reading<T> {
     let failure = |message: String| ReadError {
         step,
         hresult: None,
@@ -63,10 +63,10 @@ fn run<T: DeserializeOwned>(step: &'static str, script: &str) -> Reading<T> {
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break Ok(status),
-            Ok(None) if started.elapsed() >= TIMEOUT => {
+            Ok(None) if started.elapsed() >= limit => {
                 let _ = child.kill();
                 let _ = child.wait();
-                break Err(failure(format!("timed out after {TIMEOUT:?}")));
+                break Err(failure(format!("timed out after {limit:?}")));
             }
             Ok(None) => thread::sleep(POLL_INTERVAL),
             Err(error) => {
@@ -98,3 +98,7 @@ fn joined(reader: Option<JoinHandle<String>>) -> String {
         .and_then(|handle| handle.join().ok())
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+#[path = "cim_tests.rs"]
+mod tests;

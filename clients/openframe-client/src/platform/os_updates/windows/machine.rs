@@ -74,6 +74,7 @@ pub(super) fn system_facts() -> Reading<SystemFacts> {
         .and_then(|key| key.get_value("PROCESSOR_ARCHITECTURE"))
         .map_err(|error| ReadError::io(SESSION_ENVIRONMENT, error))?;
     Ok(SystemFacts {
+        product_name: optional(&version, "ProductName"),
         edition_id: required("EditionID")?,
         composition_edition_id: optional(&version, "CompositionEditionID"),
         display_version: optional(&version, "DisplayVersion"),
@@ -157,9 +158,13 @@ pub(super) fn pending_file_rename_entries() -> Reading<usize> {
 }
 
 pub(super) fn mdm_enrollments() -> Reading<Vec<MdmEnrollment>> {
-    let Some(root) = open_if_present(ENROLLMENTS)? else {
-        return Ok(Vec::new());
-    };
+    match open_if_present(ENROLLMENTS)? {
+        Some(root) => enrollments_under(&root),
+        None => Ok(Vec::new()),
+    }
+}
+
+fn enrollments_under(root: &RegKey) -> Reading<Vec<MdmEnrollment>> {
     let mut enrollments = Vec::new();
     for name in root.enum_keys() {
         let name = name.map_err(|error| ReadError::io(ENROLLMENTS, error))?;
@@ -228,3 +233,7 @@ pub(super) fn defender() -> Reading<Option<DefenderFacts>> {
         service_start: service.as_ref().and_then(|key| optional(key, "Start")),
     }))
 }
+
+#[cfg(test)]
+#[path = "machine_tests.rs"]
+mod tests;

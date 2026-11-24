@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use super::model::{
     Manageability, NotManageableReason, Reading, RegValue, SystemFacts, WindowsInventory,
+    WINDOWS_11_FIRST_BUILD,
 };
 
 const GENERAL_EDITIONS: [&str; 12] = [
@@ -22,7 +23,6 @@ const MULTI_SESSION_EDITION: &str = "ServerRdsh";
 const LTSC_EDITIONS: [&str; 3] = ["EnterpriseS", "EnterpriseSN", "IoTEnterpriseS"];
 const AZURE_SERVER_EDITIONS: [&str; 2] = ["ServerAzureEdition", "ServerTurbine"];
 const WINDOWS_10_22H2_BUILD: u32 = 19045;
-const WINDOWS_11_FIRST_BUILD: u32 = 22000;
 const LTSC_BUILDS: [u32; 2] = [17763, 19044];
 const SERVER_BUILDS: [u32; 3] = [14393, 17763, 20348];
 const WINDOWS_24H2_BUILD: u32 = 26100;
@@ -163,3 +163,7 @@ fn build_supported(channel: Channel, build: u32) -> bool {
         Channel::Server => SERVER_BUILDS.contains(&build) || build >= WINDOWS_24H2_BUILD,
     }
 }
+
+#[cfg(test)]
+#[path = "gate_tests.rs"]
+mod tests;

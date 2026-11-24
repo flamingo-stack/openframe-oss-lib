@@ -1,18 +1,15 @@
-#[cfg(target_os = "windows")]
-fn main() -> anyhow::Result<()> {
-    use openframe::platform::os_updates::windows::{manageability, read_inventory};
+use openframe::platform::os_updates;
+use openframe::services::os_updates::report::report;
 
-    let inventory = read_inventory();
-    let report = serde_json::json!({
-        "manageability": manageability(&inventory),
+fn main() -> anyhow::Result<()> {
+    let Some((inventory, manageability)) = os_updates::read() else {
+        anyhow::bail!("probe_os_updates reads Windows Update state and runs on Windows only");
+    };
+    let output = serde_json::json!({
+        "manageability": manageability,
+        "report": report(&inventory, &manageability),
         "inventory": inventory,
     });
-    println!("{}", serde_json::to_string_pretty(&report)?);
+    println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn main() {
-    eprintln!("probe_os_updates reads Windows Update state and runs on Windows only");
-    std::process::exit(2);
 }
