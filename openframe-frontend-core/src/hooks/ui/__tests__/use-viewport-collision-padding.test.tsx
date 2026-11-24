@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ComposerDockHeightContext } from '../../../components/navigation/app-layout-context';
+import { ViewportBreakpoints } from '../use-content-breakpoint';
 import { useViewportCollisionPadding, withViewportPadding } from '../use-viewport-collision-padding';
 
 function underDock(height: number) {
@@ -41,6 +42,18 @@ describe('useViewportCollisionPadding', () => {
   it('keeps a list that opens downwards out from under the composer dock', () => {
     const { result } = renderHook(() => useViewportCollisionPadding(), { wrapper: underDock(120) });
     expect(result.current).toEqual({ top: 0, bottom: 120 });
+  });
+
+  it('reserves nothing for the dock inside window chrome (a modal lies over the dock)', () => {
+    function InModalUnderDock({ children }: { children: ReactNode }) {
+      return (
+        <ComposerDockHeightContext.Provider value={120}>
+          <ViewportBreakpoints>{children}</ViewportBreakpoints>
+        </ComposerDockHeightContext.Provider>
+      );
+    }
+    const { result } = renderHook(() => useViewportCollisionPadding(), { wrapper: InModalUnderDock });
+    expect(result.current).toEqual({ top: 0, bottom: 0 });
   });
 
   it('reserves the keyboard, not the dock, when the keyboard rises higher', () => {

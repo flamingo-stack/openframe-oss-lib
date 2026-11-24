@@ -2,6 +2,7 @@
 
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import { ColumnBackSlotReset } from '../../components/layout/column-back-slot';
+import { ComposerDockHeightContext } from '../../components/navigation/app-layout-context';
 import { LAYOUT_STEPS } from '../../styles/layout-steps';
 import { breakpoints, useLgUp, useMdUp, useMediaQuery } from './use-media-query';
 
@@ -35,13 +36,14 @@ export const ContentAreaWidthContext = createContext<number | null>(null);
  * is back on the viewport's steps. Context crosses a portal, so without this
  * the hooks below would still answer with the content area's width. A page title in
  * it keeps its own Back too, instead of handing it to the column's header
- * (`ColumnBackSlot`).
+ * (`ColumnBackSlot`). And it lies over the composer dock rather than above it, so
+ * its poppers do not reserve the dock's height (`useViewportCollisionPadding`).
  */
 export function ViewportBreakpoints({ children }: { children: ReactNode }) {
   return createElement(
     ContentAreaWidthContext.Provider,
     { value: null },
-    createElement(ColumnBackSlotReset, null, children),
+    createElement(ComposerDockHeightContext.Provider, { value: 0 }, createElement(ColumnBackSlotReset, null, children)),
   );
 }
 
