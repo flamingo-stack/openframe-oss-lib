@@ -10,7 +10,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.ReadPreference;
-import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -58,14 +57,6 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     @ReadPreference("primary")
     Optional<Machine> findOnPrimaryByTenantIdAndMachineId(String tenantId, String machineId);
-
-    @Query("{ 'tenantId': ?0, 'machineId': ?1, 'version': ?2, 'status': { '$in': ?3 } }")
-    @Update(pipeline = "{ '$set': { 'version': { '$add': [{ '$ifNull': ['$version', 0] }, 1] } } }")
-    long reserveForSoftwareReconnect(String tenantId, String machineId, Long version, Collection<DeviceStatus> managedStatuses);
-
-    @Query("{ 'tenantId': ?0, 'machineId': { '$in': ?1 }, 'status': { '$in': ?2 } }")
-    @Update(pipeline = "{ '$set': { 'version': { '$add': [{ '$ifNull': ['$version', 0] }, 1] } } }")
-    long reserveForSoftwareAssignments(String tenantId, Collection<String> machineIds, Collection<DeviceStatus> managedStatuses);
 
     List<Machine> findByMachineIdInAndStatus(Collection<String> machineIds, DeviceStatus status);
 
