@@ -111,6 +111,10 @@ pub fn get_app_support_directory() -> PathBuf {
     }
 }
 
+/// macOS folder for GUI app bundles.
+#[cfg(target_os = "macos")]
+pub(crate) const APPLICATIONS_DIR: &str = "/Applications";
+
 /// Returns the platform-specific logs directory path
 pub fn get_logs_directory() -> PathBuf {
     // First check for environment variable override

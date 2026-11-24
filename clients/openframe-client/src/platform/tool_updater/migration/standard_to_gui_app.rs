@@ -4,7 +4,7 @@ use tracing::{info, warn};
 
 use super::{MigrationContext, ToolMigrator};
 use crate::models::{DownloadConfiguration, Installation, InstallationType, InstalledTool};
-use crate::platform::tool_updater::ToolUpdaterDeps;
+use crate::platform::tool_updater::{Staged, ToolUpdaterDeps};
 
 pub(super) struct StandardToGuiAppMigrator {
     deps: ToolUpdaterDeps,
@@ -26,6 +26,20 @@ impl ToolMigrator for StandardToGuiAppMigrator {
         InstallationType::GuiApp
     }
 
+    async fn fetch(&self, tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Staged> {
+        #[cfg(target_os = "macos")]
+        {
+            crate::platform::tool_updater::stage_app_bundle(&self.deps, config, &tool.tool_agent_id)
+                .await
+        }
+
+        #[cfg(windows)]
+        {
+            crate::platform::tool_updater::fetch_binary(&self.deps, config, &tool.tool_agent_id)
+                .await
+        }
+    }
+
     async fn prepare(&self, tool: &InstalledTool) -> Result<MigrationContext> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Preparing migration: Standard -> GuiApp");
@@ -33,16 +47,14 @@ impl ToolMigrator for StandardToGuiAppMigrator {
         self.deps.tool_kill_service.stop_tool(tool_agent_id).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-        Ok(MigrationContext {
-            old_cleaned: false,
-            needs_start: true,
-        })
+        Ok(MigrationContext { needs_start: true })
     }
 
     async fn migrate(
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
+        staged: &Staged,
         _ctx: &MigrationContext,
     ) -> Result<Installation> {
         let tool_agent_id = &tool.tool_agent_id;
@@ -50,12 +62,12 @@ impl ToolMigrator for StandardToGuiAppMigrator {
 
         #[cfg(target_os = "macos")]
         {
-            self.migrate_macos(tool, config).await
+            self.migrate_macos(tool, config, staged).await
         }
 
         #[cfg(windows)]
         {
-            self.migrate_windows(tool, config).await
+            self.migrate_windows(tool, config, staged).await
         }
     }
 
@@ -109,6 +121,7 @@ impl StandardToGuiAppMigrator {
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
+        staged: &Staged,
     ) -> Result<Installation> {
         use crate::platform::DirectoryManager;
         use std::path::PathBuf;
@@ -127,18 +140,17 @@ impl StandardToGuiAppMigrator {
             fs::remove_file(&old_agent_path).await.ok();
         }
 
-        // 2. Download and extract new .app bundle to /Applications
-        let applications_dir = PathBuf::from("/Applications");
+        // 2. Move the staged .app bundle into /Applications
+        let Staged::Tree(staging) = staged else {
+            anyhow::bail!("Expected a staged app bundle for tool: {}", tool_agent_id);
+        };
+        let applications_dir = PathBuf::from(crate::platform::directories::APPLICATIONS_DIR);
         info!(
             tool_id = %tool_agent_id,
             "Installing GuiApp to: {}",
             applications_dir.display()
         );
-
-        self.deps
-            .github_download_service
-            .download_and_extract_all(config, &applications_dir)
-            .await?;
+        staging.move_into().await?;
 
         // 3. Resolve executable path from .app bundle
         let new_app_path = applications_dir.join(&config.target_file_name);
@@ -230,13 +242,14 @@ impl StandardToGuiAppMigrator {
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
+        staged: &Staged,
     ) -> Result<Installation> {
-        use crate::platform::tool_updater::download_and_write_binary;
+        use crate::platform::tool_updater::write_binary;
 
         let tool_agent_id = &tool.tool_agent_id;
 
         let agent_path = self.deps.directory_manager.get_agent_path(tool_agent_id);
-        download_and_write_binary(&self.deps, config, &agent_path, tool_agent_id).await?;
+        write_binary(staged, &agent_path, tool_agent_id).await?;
 
         let executable_path = agent_path.to_string_lossy().to_string();
         info!(

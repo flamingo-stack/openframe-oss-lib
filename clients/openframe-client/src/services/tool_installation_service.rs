@@ -902,7 +902,7 @@ impl ToolInstallationService {
         config: &DownloadConfiguration,
         tool_agent_id: &str,
     ) -> Result<Option<String>> {
-        let applications_dir = PathBuf::from("/Applications");
+        let applications_dir = PathBuf::from(crate::platform::directories::APPLICATIONS_DIR);
 
         self.github_download_service
             .download_and_save(config, &applications_dir, &applications_dir.join("dummy"))

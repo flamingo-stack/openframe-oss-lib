@@ -3,8 +3,9 @@ use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 use tracing::{error, info, warn};
 
-use super::{ToolUpdater, ToolUpdaterDeps, UpdateContext};
+use super::{stage_app_bundle, Staged, ToolUpdater, ToolUpdaterDeps, UpdateContext};
 use crate::models::{DownloadConfiguration, Installation, InstalledTool};
+use crate::platform::directories::APPLICATIONS_DIR;
 use crate::platform::preferences_writer::{args_to_pairs, write as write_preferences};
 use crate::platform::user_session::{get_console_user, launch_as_user};
 use crate::platform::DirectoryManager;
@@ -61,6 +62,10 @@ impl GuiAppToolUpdater {
 
 #[async_trait]
 impl ToolUpdater for GuiAppToolUpdater {
+    async fn fetch(&self, tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Staged> {
+        stage_app_bundle(&self.deps, config, &tool.tool_agent_id).await
+    }
+
     async fn prepare(&self, tool: &InstalledTool) -> Result<UpdateContext> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Preparing GuiApp for update");
@@ -91,7 +96,7 @@ impl ToolUpdater for GuiAppToolUpdater {
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
-        _ctx: &UpdateContext,
+        staged: &Staged,
     ) -> Result<Option<Installation>> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying GuiApp update");
@@ -103,16 +108,17 @@ impl ToolUpdater for GuiAppToolUpdater {
             );
         };
 
-        let applications_dir = PathBuf::from("/Applications");
+        let Staged::Tree(staging) = staged else {
+            anyhow::bail!("Expected a staged app bundle for tool: {}", tool_agent_id);
+        };
 
-        info!(tool_id = %tool_agent_id, "Downloading and installing new version from: {}", config.link);
-        self.deps
-            .github_download_service
-            .download_and_extract_all(config, &applications_dir)
+        info!(tool_id = %tool_agent_id, "Moving the new version into {}", APPLICATIONS_DIR);
+        staging
+            .move_into()
             .await
-            .with_context(|| {
-                format!("Failed to download and install GUI app: {}", tool_agent_id)
-            })?;
+            .with_context(|| format!("Failed to install GUI app: {}", tool_agent_id))?;
+
+        let applications_dir = PathBuf::from(APPLICATIONS_DIR);
 
         let new_app_path = applications_dir.join(&config.target_file_name);
         if !new_app_path.exists() {

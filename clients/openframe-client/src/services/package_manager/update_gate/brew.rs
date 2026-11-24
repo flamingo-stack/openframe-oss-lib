@@ -1,8 +1,7 @@
 use super::{app_bundle, AppIdentity, Undetermined, RESOLVE_TIMEOUT_SECS};
 use crate::executor::{execute_script, Privilege, ScriptParams};
-use crate::services::package_manager::brew::{
-    self, Cask, CaskApp, CaskInfo, APPLICATIONS, CASK_INFO,
-};
+use crate::platform::directories::APPLICATIONS_DIR;
+use crate::services::package_manager::brew::{self, Cask, CaskApp, CaskInfo, CASK_INFO};
 use std::path::Path;
 
 /// Where brew installed the cask's app.
@@ -12,7 +11,7 @@ pub(super) async fn resolve(name: &str) -> Result<AppIdentity, Undetermined> {
         .iter()
         .find(|cask| cask.is_named(name))
         .map_or(Err(Undetermined::NotInstalled), |cask| {
-            identity(cask, Path::new(APPLICATIONS))
+            identity(cask, Path::new(APPLICATIONS_DIR))
         })
 }
 

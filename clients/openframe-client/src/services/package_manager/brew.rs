@@ -6,8 +6,6 @@ use tokio::sync::{Mutex, OwnedMutexGuard};
 /// Apple silicon first, then Intel.
 pub(crate) const PATHS: [&str; 2] = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"];
 
-pub(crate) const APPLICATIONS: &str = "/Applications";
-
 pub(crate) const COULD_NOT_LAUNCH: i32 = 85;
 
 pub(crate) const CASK_INFO: &str = r#"HOMEBREW_NO_AUTO_UPDATE=1 "$BREW" info --json=v2 --cask "$@"

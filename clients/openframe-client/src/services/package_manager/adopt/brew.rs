@@ -10,9 +10,10 @@ use crate::executor::console_user_present;
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::{AdoptFailReason, AdoptOutcome, PackageAdoptMessage};
 use crate::platform::app_bundle::owner_uid;
+use crate::platform::directories::APPLICATIONS_DIR;
 use crate::platform::user_session::get_console_user;
 use crate::services::package_manager::brew::{
-    self, BrewLock, Cask, CaskInfo, APPLICATIONS, CASK_INFO, COULD_NOT_LAUNCH,
+    self, BrewLock, Cask, CaskInfo, CASK_INFO, COULD_NOT_LAUNCH,
 };
 use crate::services::package_manager::{last_line, update_gate, ManagerId, Presence};
 use crate::utils::in_progress::InProgressGuard;
@@ -111,7 +112,11 @@ async fn prepare<'a>(
         let _turn = brew.turn().await;
         info(name, INFO, INFO_TIMEOUT_SECS).await?
     };
-    let plan = plan(&cask, order.bundle_id.as_deref(), Path::new(APPLICATIONS))?;
+    let plan = plan(
+        &cask,
+        order.bundle_id.as_deref(),
+        Path::new(APPLICATIONS_DIR),
+    )?;
     if let Plan::Install { app, .. } = &plan {
         owned_by_console_user(app)?;
         let _turn = brew.turn().await;

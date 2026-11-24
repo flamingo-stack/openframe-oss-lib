@@ -1,10 +1,10 @@
 use crate::models::{Installation, InstalledTool};
 #[cfg(target_os = "windows")]
 use crate::platform::file_lock::log_file_lock_info;
-#[cfg(target_os = "macos")]
-use crate::platform::remove_app_bundle;
 use crate::platform::system_service;
 use crate::platform::DirectoryManager;
+#[cfg(target_os = "macos")]
+use crate::platform::{remove_app_bundle, remove_update_staging};
 use crate::services::InstalledToolsService;
 use crate::services::ToolCommandParamsResolver;
 use crate::services::ToolKillService;
@@ -345,6 +345,9 @@ impl ToolUninstallService {
     }
 
     async fn cleanup_gui_app_bundle(&self, tool: &InstalledTool) {
+        #[cfg(target_os = "macos")]
+        remove_update_staging(&tool.tool_agent_id).await;
+
         let Installation::GuiApp {
             executable_path, ..
         } = &tool.installation

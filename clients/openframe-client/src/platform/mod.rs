@@ -17,7 +17,7 @@ pub mod process_kill;
 pub mod process_snapshot;
 pub mod process_tree;
 pub mod system_service;
-pub mod tool_updater;
+mod tool_updater;
 pub mod uninstall;
 pub mod update_scripts;
 pub mod updater_launcher;
@@ -51,8 +51,7 @@ pub use permissions::{Capability, PermissionError, PermissionUtils, Permissions}
 #[cfg(target_os = "windows")]
 pub use powershell::get_powershell_path;
 pub(crate) use tool_updater::clear_aside_binary;
-pub use tool_updater::{
-    create_migrator, create_updater, needs_migration, run_migration, run_update, ToolUpdater,
-    ToolUpdaterDeps, UpdateContext,
-};
+#[cfg(target_os = "macos")]
+pub(crate) use tool_updater::remove_update_staging;
+pub use tool_updater::{needs_migration, run_migration, run_update, ToolUpdaterDeps};
 pub use uninstall::{orbit_dir, remove_directory_with_retry};

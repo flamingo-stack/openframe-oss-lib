@@ -3,9 +3,11 @@ use async_trait::async_trait;
 use std::path::PathBuf;
 use tracing::{info, warn};
 
+#[cfg(target_os = "macos")]
+use super::stage_tree;
 use super::{
-    backup_binary, cleanup_backup, clear_aside_binary, download_and_write_binary,
-    log_update_survivors, restore_from_backup, ToolUpdater, ToolUpdaterDeps, UpdateContext,
+    backup_binary, cleanup_backup, clear_aside_binary, fetch_binary, log_update_survivors,
+    restore_from_backup, write_binary, Staged, ToolUpdater, ToolUpdaterDeps, UpdateContext,
 };
 #[cfg(target_os = "windows")]
 use crate::config::service_stop::EXEC_UNLOCK_WAIT_SECS;
@@ -108,6 +110,19 @@ impl ServiceToolUpdater {
 
 #[async_trait]
 impl ToolUpdater for ServiceToolUpdater {
+    async fn fetch(&self, tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Staged> {
+        let tool_agent_id = &tool.tool_agent_id;
+
+        #[cfg(target_os = "macos")]
+        if Self::is_app_bundle_download(config) {
+            // A bundle cannot be held in memory as one file: stage it in the tool folder.
+            let tool_folder = self.deps.directory_manager.get_tool_folder(tool_agent_id);
+            return stage_tree(&self.deps, config, &tool_folder, tool_agent_id).await;
+        }
+
+        fetch_binary(&self.deps, config, tool_agent_id).await
+    }
+
     async fn prepare(&self, tool: &InstalledTool) -> Result<UpdateContext> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Preparing Service tool for update");
@@ -152,43 +167,36 @@ impl ToolUpdater for ServiceToolUpdater {
     async fn apply(
         &self,
         tool: &InstalledTool,
-        config: &DownloadConfiguration,
-        _ctx: &UpdateContext,
+        _config: &DownloadConfiguration,
+        staged: &Staged,
     ) -> Result<Option<Installation>> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying Service tool update");
 
         let exec_path = self.resolve_executable_path(tool);
 
-        // For .app bundles: remove old bundle, extract entire archive
         #[cfg(target_os = "macos")]
-        if Self::is_app_bundle_download(config) {
-            info!(tool_id = %tool_agent_id, "Detected .app bundle - using full extraction");
+        if let Staged::Tree(staging) = staged {
+            info!(tool_id = %tool_agent_id, "Detected .app bundle - replacing the whole bundle");
 
-            // Remove old .app bundle if exists
             remove_app_bundle_path(&exec_path).await?;
-
-            // Extract entire archive to tool folder
-            let tool_folder = self.deps.directory_manager.get_tool_folder(tool_agent_id);
-            info!(tool_id = %tool_agent_id, "Extracting to: {}", tool_folder.display());
-
-            self.deps
-                .github_download_service
-                .download_and_extract_all(config, &tool_folder)
-                .await
-                .with_context(|| format!("Failed to download and extract: {}", tool_agent_id))?;
+            staging.move_into().await.with_context(|| {
+                format!(
+                    "Failed to move the new app bundle into place: {}",
+                    tool_agent_id
+                )
+            })?;
 
             // Set executable permissions on the binary
             if exec_path.exists() {
                 binary_writer::set_executable_permissions(&exec_path).await?;
             }
 
-            info!(tool_id = %tool_agent_id, "App bundle extracted successfully");
+            info!(tool_id = %tool_agent_id, "App bundle replaced successfully");
             return Ok(None);
         }
 
-        // Standard single binary update
-        download_and_write_binary(&self.deps, config, &exec_path, tool_agent_id).await?;
+        write_binary(staged, &exec_path, tool_agent_id).await?;
         Ok(None)
     }
 

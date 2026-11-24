@@ -6,20 +6,102 @@ mod standard;
 
 #[cfg(target_os = "macos")]
 pub use gui_app::GuiAppToolUpdater;
-pub use migration::{create_migrator, needs_migration, MigrationContext, ToolMigrator};
+use migration::create_migrator;
+pub use migration::needs_migration;
 pub use service::ServiceToolUpdater;
 pub use standard::StandardToolUpdater;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
 use tracing::{error, info, warn};
 
 use crate::models::{DownloadConfiguration, Installation, InstallationType, InstalledTool};
+#[cfg(target_os = "macos")]
+use crate::platform::directories::APPLICATIONS_DIR;
 use crate::platform::{binary_writer, DirectoryManager};
 use crate::services::{GithubDownloadService, ToolCommandParamsResolver, ToolKillService};
+
+/// The new version, downloaded before the running tool is stopped so a failed download leaves it untouched.
+pub(crate) enum Staged {
+    /// A single executable, kept in memory and written after the stop.
+    Binary(Bytes),
+    /// An extracted archive (`.app` bundle, `.dmg`), moved into place after the stop.
+    #[cfg(target_os = "macos")]
+    Tree(StagingDir),
+}
+
+impl Staged {
+    /// Removes what the update did not move into place; in-memory bytes need nothing.
+    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
+    async fn discard(self, tool_agent_id: &str) {
+        match self {
+            Staged::Binary(_) => {}
+            #[cfg(target_os = "macos")]
+            Staged::Tree(staging) => staging.discard(tool_agent_id).await,
+        }
+    }
+}
+
+/// Staging folder beside the target, on the same volume, so moving it into place is a rename and not a copy.
+#[cfg(target_os = "macos")]
+pub(crate) struct StagingDir {
+    root: PathBuf,
+    target_dir: PathBuf,
+}
+
+#[cfg(target_os = "macos")]
+impl StagingDir {
+    fn new(target_dir: &Path, tool_agent_id: &str) -> Self {
+        Self {
+            root: target_dir.join(format!(".{tool_agent_id}.update-staging")),
+            target_dir: target_dir.to_path_buf(),
+        }
+    }
+
+    /// Renames each top-level entry into the target; an existing folder of the same name is replaced, not merged.
+    pub(crate) async fn move_into(&self) -> Result<()> {
+        let mut entries = fs::read_dir(&self.root)
+            .await
+            .with_context(|| format!("Failed to read {}", self.root.display()))?;
+        while let Some(entry) = entries.next_entry().await? {
+            let dest = self.target_dir.join(entry.file_name());
+            match fs::symlink_metadata(&dest).await {
+                Ok(meta) if meta.is_dir() => fs::remove_dir_all(&dest)
+                    .await
+                    .with_context(|| format!("Failed to remove {}", dest.display()))?,
+                Ok(_) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => {
+                    return Err(e).with_context(|| format!("Failed to inspect {}", dest.display()))
+                }
+            }
+            fs::rename(entry.path(), &dest).await.with_context(|| {
+                format!(
+                    "Failed to move {} to {}",
+                    entry.path().display(),
+                    dest.display()
+                )
+            })?;
+        }
+        fs::remove_dir(&self.root)
+            .await
+            .with_context(|| format!("Failed to remove {}", self.root.display()))
+    }
+
+    async fn discard(&self, tool_agent_id: &str) {
+        match fs::remove_dir_all(&self.root).await {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                warn!(tool_id = %tool_agent_id, "Failed to remove staging {}: {:#}", self.root.display(), e)
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct UpdateContext {
@@ -37,14 +119,17 @@ impl Default for UpdateContext {
 }
 
 #[async_trait]
-pub trait ToolUpdater: Send + Sync {
+pub(crate) trait ToolUpdater: Send + Sync {
+    /// Downloads the new version without touching the running tool.
+    async fn fetch(&self, tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Staged>;
+
     async fn prepare(&self, tool: &InstalledTool) -> Result<UpdateContext>;
 
     async fn apply(
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
-        ctx: &UpdateContext,
+        staged: &Staged,
     ) -> Result<Option<Installation>>;
 
     async fn finalize(&self, tool: &InstalledTool, ctx: &UpdateContext) -> Result<()>;
@@ -60,7 +145,7 @@ pub struct ToolUpdaterDeps {
     pub command_params_resolver: ToolCommandParamsResolver,
 }
 
-pub fn create_updater(installation: &Installation, deps: ToolUpdaterDeps) -> Arc<dyn ToolUpdater> {
+fn create_updater(installation: &Installation, deps: ToolUpdaterDeps) -> Arc<dyn ToolUpdater> {
     match installation {
         Installation::Standard { .. } => Arc::new(StandardToolUpdater::new(deps)),
         Installation::GuiApp { .. } => {
@@ -84,42 +169,65 @@ pub async fn run_update(
     config: &DownloadConfiguration,
     deps: ToolUpdaterDeps,
 ) -> Result<Option<Installation>> {
-    let tool_id = &tool.tool_agent_id;
     let updater = create_updater(&tool.installation, deps);
+    run_updater(updater.as_ref(), tool, config).await
+}
 
-    info!(tool_id = %tool_id, "Phase 1: Preparing update");
-    let ctx = updater
-        .prepare(tool)
-        .await
-        .with_context(|| format!("Failed to prepare update for: {}", tool_id))?;
+/// fetch -> prepare (stop) -> apply -> finalize; the staging is removed on every exit after the fetch.
+async fn run_updater(
+    updater: &dyn ToolUpdater,
+    tool: &InstalledTool,
+    config: &DownloadConfiguration,
+) -> Result<Option<Installation>> {
+    let tool_id = &tool.tool_agent_id;
 
-    info!(tool_id = %tool_id, "Phase 2: Applying update");
-    let new_installation = match updater.apply(tool, config, &ctx).await {
-        Ok(new_installation) => new_installation,
-        Err(e) => {
-            error!(tool_id = %tool_id, error = %e, "Update failed, rolling back");
-            if let Err(rollback_err) = updater.rollback(tool, &ctx).await {
-                error!(tool_id = %tool_id, error = %rollback_err, "Rollback also failed");
+    info!(tool_id = %tool_id, "Phase 1: Downloading update");
+    let staged = updater.fetch(tool, config).await.with_context(|| {
+        format!(
+            "Failed to download update for: {}, the running tool was not touched",
+            tool_id
+        )
+    })?;
+
+    let result: Result<Option<Installation>> = async {
+        info!(tool_id = %tool_id, "Phase 2: Preparing update");
+        let ctx = updater
+            .prepare(tool)
+            .await
+            .with_context(|| format!("Failed to prepare update for: {}", tool_id))?;
+
+        info!(tool_id = %tool_id, "Phase 3: Applying update");
+        let new_installation = match updater.apply(tool, config, &staged).await {
+            Ok(new_installation) => new_installation,
+            Err(e) => {
+                error!(tool_id = %tool_id, error = %e, "Update failed, rolling back");
+                if let Err(rollback_err) = updater.rollback(tool, &ctx).await {
+                    error!(tool_id = %tool_id, error = %rollback_err, "Rollback also failed");
+                }
+                return Err(e).with_context(|| format!("Update failed for: {}", tool_id));
             }
-            return Err(e).with_context(|| format!("Update failed for: {}", tool_id));
-        }
-    };
+        };
 
-    info!(tool_id = %tool_id, "Phase 3: Finalizing update");
-    let finalize_tool = match &new_installation {
-        Some(installation) => {
-            let mut updated = tool.clone();
-            updated.installation = installation.clone();
-            updated
-        }
-        None => tool.clone(),
-    };
-    updater
-        .finalize(&finalize_tool, &ctx)
-        .await
-        .with_context(|| format!("Failed to finalize update for: {}", tool_id))?;
+        info!(tool_id = %tool_id, "Phase 4: Finalizing update");
+        let finalize_tool = match &new_installation {
+            Some(installation) => {
+                let mut updated = tool.clone();
+                updated.installation = installation.clone();
+                updated
+            }
+            None => tool.clone(),
+        };
+        updater
+            .finalize(&finalize_tool, &ctx)
+            .await
+            .with_context(|| format!("Failed to finalize update for: {}", tool_id))?;
 
-    Ok(new_installation)
+        Ok(new_installation)
+    }
+    .await;
+
+    staged.discard(tool_id).await;
+    result
 }
 
 pub async fn run_migration(
@@ -138,32 +246,46 @@ pub async fn run_migration(
         )
     })?;
 
-    info!(tool_id = %tool_id, "Migration Phase 1: Preparing");
-    let ctx = migrator
-        .prepare(tool)
-        .await
-        .with_context(|| format!("Failed to prepare migration for: {}", tool_id))?;
+    info!(tool_id = %tool_id, "Migration Phase 1: Downloading");
+    let staged = migrator.fetch(tool, config).await.with_context(|| {
+        format!(
+            "Failed to download migration for: {}, the running tool was not touched",
+            tool_id
+        )
+    })?;
 
-    info!(tool_id = %tool_id, "Migration Phase 2: Migrating");
-    match migrator.migrate(tool, config, &ctx).await {
-        Ok(new_installation) => {
-            info!(tool_id = %tool_id, "Migration Phase 3: Finalizing");
-            migrator
-                .finalize(tool, &new_installation, &ctx)
-                .await
-                .with_context(|| format!("Failed to finalize migration for: {}", tool_id))?;
+    let result: Result<Installation> = async {
+        info!(tool_id = %tool_id, "Migration Phase 2: Preparing");
+        let ctx = migrator
+            .prepare(tool)
+            .await
+            .with_context(|| format!("Failed to prepare migration for: {}", tool_id))?;
 
-            info!(tool_id = %tool_id, "Migration completed: {:?}", new_installation);
-            Ok(new_installation)
-        }
-        Err(e) => {
-            error!(tool_id = %tool_id, error = %e, "Migration failed, attempting rollback");
-            if let Err(rollback_err) = migrator.rollback(tool, &ctx).await {
-                error!(tool_id = %tool_id, error = %rollback_err, "Rollback also failed");
+        info!(tool_id = %tool_id, "Migration Phase 3: Migrating");
+        match migrator.migrate(tool, config, &staged, &ctx).await {
+            Ok(new_installation) => {
+                info!(tool_id = %tool_id, "Migration Phase 4: Finalizing");
+                migrator
+                    .finalize(tool, &new_installation, &ctx)
+                    .await
+                    .with_context(|| format!("Failed to finalize migration for: {}", tool_id))?;
+
+                info!(tool_id = %tool_id, "Migration completed: {:?}", new_installation);
+                Ok(new_installation)
             }
-            Err(e).with_context(|| format!("Migration failed for: {}", tool_id))
+            Err(e) => {
+                error!(tool_id = %tool_id, error = %e, "Migration failed, attempting rollback");
+                if let Err(rollback_err) = migrator.rollback(tool, &ctx).await {
+                    error!(tool_id = %tool_id, error = %rollback_err, "Rollback also failed");
+                }
+                Err(e).with_context(|| format!("Migration failed for: {}", tool_id))
+            }
         }
     }
+    .await;
+
+    staged.discard(tool_id).await;
+    result
 }
 
 /// Delete a leftover `.old` rename-aside; returns false when it is locked, i.e. a process from a previous update still executes it.
@@ -215,23 +337,84 @@ pub(crate) async fn backup_binary(
     Ok(Some(backup_path))
 }
 
-pub(crate) async fn download_and_write_binary(
+pub(crate) async fn fetch_binary(
     deps: &ToolUpdaterDeps,
     config: &DownloadConfiguration,
-    target_path: &Path,
     tool_agent_id: &str,
-) -> Result<()> {
+) -> Result<Staged> {
     info!(tool_id = %tool_agent_id, "Downloading binary from: {}", config.link);
-    let binary_bytes = deps
+    let bytes = deps
         .github_download_service
         .download_and_extract(config)
         .await
         .with_context(|| format!("Failed to download: {}", tool_agent_id))?;
+    Ok(Staged::Binary(bytes))
+}
 
+// Elsewhere `Staged` has only `Binary`, which clippy flags as an infallible match.
+#[cfg_attr(
+    not(target_os = "macos"),
+    allow(clippy::infallible_destructuring_match)
+)]
+pub(crate) async fn write_binary(
+    staged: &Staged,
+    target_path: &Path,
+    tool_agent_id: &str,
+) -> Result<()> {
+    let bytes = match staged {
+        Staged::Binary(bytes) => bytes,
+        #[cfg(target_os = "macos")]
+        // Unreachable: only the updaters that stage a tree fetch one, and they never write a binary.
+        Staged::Tree(_) => anyhow::bail!("Expected a downloaded binary for: {}", tool_agent_id),
+    };
     info!(tool_id = %tool_agent_id, "Writing binary to: {}", target_path.display());
-    binary_writer::write_executable(&binary_bytes, target_path)
+    binary_writer::write_executable(bytes, target_path)
         .await
         .with_context(|| format!("Failed to write binary for: {}", tool_agent_id))
+}
+
+/// Removes the app bundle staging a crashed update left in /Applications; uninstall calls it.
+#[cfg(target_os = "macos")]
+pub(crate) async fn remove_update_staging(tool_agent_id: &str) {
+    StagingDir::new(Path::new(APPLICATIONS_DIR), tool_agent_id)
+        .discard(tool_agent_id)
+        .await;
+}
+
+/// Stages a GuiApp `.app` bundle beside /Applications.
+#[cfg(target_os = "macos")]
+pub(crate) async fn stage_app_bundle(
+    deps: &ToolUpdaterDeps,
+    config: &DownloadConfiguration,
+    tool_agent_id: &str,
+) -> Result<Staged> {
+    stage_tree(deps, config, Path::new(APPLICATIONS_DIR), tool_agent_id).await
+}
+
+/// Extracts the archive into the staging beside `target_dir`; a leftover from a crashed update is removed first.
+#[cfg(target_os = "macos")]
+pub(crate) async fn stage_tree(
+    deps: &ToolUpdaterDeps,
+    config: &DownloadConfiguration,
+    target_dir: &Path,
+    tool_agent_id: &str,
+) -> Result<Staged> {
+    let staging = StagingDir::new(target_dir, tool_agent_id);
+    staging.discard(tool_agent_id).await;
+    fs::create_dir_all(&staging.root)
+        .await
+        .with_context(|| format!("Failed to create {}", staging.root.display()))?;
+
+    info!(tool_id = %tool_agent_id, "Downloading {} into {}", config.link, staging.root.display());
+    if let Err(e) = deps
+        .github_download_service
+        .download_and_extract_all(config, &staging.root)
+        .await
+    {
+        staging.discard(tool_agent_id).await;
+        return Err(e).with_context(|| format!("Failed to download: {}", tool_agent_id));
+    }
+    Ok(Staged::Tree(staging))
 }
 
 pub(crate) async fn cleanup_backup(backup_path: Option<&PathBuf>, tool_agent_id: &str) {
@@ -277,41 +460,6 @@ pub(crate) async fn restore_from_backup(
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
-pub struct UnsupportedToolUpdater {
-    message: String,
-}
-
-#[cfg(not(target_os = "macos"))]
-impl UnsupportedToolUpdater {
-    pub fn new(message: &str) -> Self {
-        Self {
-            message: message.to_string(),
-        }
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-#[async_trait]
-impl ToolUpdater for UnsupportedToolUpdater {
-    async fn prepare(&self, _tool: &InstalledTool) -> Result<UpdateContext> {
-        anyhow::bail!("{}", self.message)
-    }
-
-    async fn apply(
-        &self,
-        _tool: &InstalledTool,
-        _config: &DownloadConfiguration,
-        _ctx: &UpdateContext,
-    ) -> Result<Option<Installation>> {
-        anyhow::bail!("{}", self.message)
-    }
-
-    async fn finalize(&self, _tool: &InstalledTool, _ctx: &UpdateContext) -> Result<()> {
-        Ok(())
-    }
-
-    async fn rollback(&self, _tool: &InstalledTool, _ctx: &UpdateContext) -> Result<()> {
-        Ok(())
-    }
-}
+#[cfg(test)]
+#[path = "mod_tests.rs"]
+mod tests;

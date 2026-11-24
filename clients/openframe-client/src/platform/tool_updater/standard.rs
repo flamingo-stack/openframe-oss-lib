@@ -3,8 +3,8 @@ use async_trait::async_trait;
 use tracing::info;
 
 use super::{
-    backup_binary, cleanup_backup, clear_aside_binary, download_and_write_binary,
-    log_update_survivors, restore_from_backup, ToolUpdater, ToolUpdaterDeps, UpdateContext,
+    backup_binary, cleanup_backup, clear_aside_binary, fetch_binary, log_update_survivors,
+    restore_from_backup, write_binary, Staged, ToolUpdater, ToolUpdaterDeps, UpdateContext,
 };
 use crate::models::{DownloadConfiguration, Installation, InstalledTool};
 
@@ -20,6 +20,10 @@ impl StandardToolUpdater {
 
 #[async_trait]
 impl ToolUpdater for StandardToolUpdater {
+    async fn fetch(&self, tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Staged> {
+        fetch_binary(&self.deps, config, &tool.tool_agent_id).await
+    }
+
     async fn prepare(&self, tool: &InstalledTool) -> Result<UpdateContext> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Preparing Standard tool for update");
@@ -49,8 +53,8 @@ impl ToolUpdater for StandardToolUpdater {
     async fn apply(
         &self,
         tool: &InstalledTool,
-        config: &DownloadConfiguration,
-        _ctx: &UpdateContext,
+        _config: &DownloadConfiguration,
+        staged: &Staged,
     ) -> Result<Option<Installation>> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying Standard tool update");
@@ -59,7 +63,7 @@ impl ToolUpdater for StandardToolUpdater {
             .deps
             .directory_manager
             .get_tool_executable_path(&tool.tool_agent_id, tool.installation.executable_path());
-        download_and_write_binary(&self.deps, config, &agent_path, tool_agent_id).await?;
+        write_binary(staged, &agent_path, tool_agent_id).await?;
         Ok(None)
     }
 

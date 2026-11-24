@@ -95,7 +95,7 @@ fn main_images_are_the_files_directly_in_contents_macos() {
     };
 
     assert_eq!(
-        identity(&cask(bundle.path()), Path::new(APPLICATIONS)),
+        identity(&cask(bundle.path()), Path::new(APPLICATIONS_DIR)),
         Ok(AppIdentity::App {
             install_dir: bundle.path().to_path_buf(),
             main_images: MainImages::Derived(vec![
@@ -106,7 +106,7 @@ fn main_images_are_the_files_directly_in_contents_macos() {
     );
     let missing = bundle.path().join("Missing.app");
     assert_eq!(
-        identity(&cask(&missing), Path::new(APPLICATIONS)),
+        identity(&cask(&missing), Path::new(APPLICATIONS_DIR)),
         Ok(AppIdentity::App {
             install_dir: missing,
             main_images: MainImages::Unknown,
