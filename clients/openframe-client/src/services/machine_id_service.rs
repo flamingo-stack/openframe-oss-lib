@@ -110,6 +110,27 @@ impl MachineIdService {
         Ok(id)
     }
 
+    pub fn renew_if_restored(&self, restored: Option<&str>) -> Result<()> {
+        let current = self.get_or_create()?;
+        if restored != Some(current.as_str()) {
+            return Ok(());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.write(&id)?;
+        *self.cached_id.write().unwrap() = Some(id.clone());
+        info!(
+            "Generated new machine ID {} for a new machine, replacing the restored {}",
+            id, current
+        );
+        Ok(())
+    }
+
+    pub fn keep_with_machine_info(&self) {
+        if let Ok(id) = self.read() {
+            self.saved.save(&id);
+        }
+    }
+
     // Cached id only; empty string until get_or_create has run.
     pub fn get(&self) -> String {
         self.cached_id.read().unwrap().clone().unwrap_or_default()

@@ -161,6 +161,7 @@ impl AgentRegistrationService {
         user_id: &str,
     ) -> Result<AgentRegistrationResponse> {
         let request = self.build_registration_request(user_id)?;
+        let restored_local_machine_id = machine_info.local_machine_id.clone();
 
         match self
             .registration_client
@@ -172,6 +173,8 @@ impl AgentRegistrationService {
                 warn!(
                     "Server rejected the saved machine credentials; registering as a new machine"
                 );
+                self.machine_id_service
+                    .renew_if_restored(restored_local_machine_id.as_deref())?;
                 self.fresh_install(initial_key, user_id).await
             }
             Err(RegistrationError::Other(e)) => Err(e).context("Failed to reinstall agent"),

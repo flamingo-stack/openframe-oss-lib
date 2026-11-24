@@ -9,7 +9,9 @@ use crate::installation_initial_config_service::{
 use crate::platform::machine_info_persistence::{self, PersistedMachineInfo};
 use crate::platform::permissions::{Capability, PermissionUtils};
 use crate::service_adapter::{CrossPlatformServiceManager, RecoveryConfig, ServiceConfig};
-use crate::services::{AgentConfigurationService, AgentRegistrationService, DeregistrationService};
+use crate::services::{
+    AgentConfigurationService, AgentRegistrationService, DeregistrationService, MachineIdService,
+};
 use crate::utils::fs::CorruptJson;
 use crate::{platform::DirectoryManager, Client};
 
@@ -249,6 +251,7 @@ impl Service {
             } else {
                 info!("Persisted machine info was found");
             }
+            MachineIdService::new(&DirectoryManager::new()).keep_with_machine_info();
 
             info!("To proceed with the new installation, the old version must be removed\n");
             info!("Uninstalling existing installation...");
