@@ -15,6 +15,8 @@ public enum MessageType {
             List.of(Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT, Destination.MONGO_COMMAND_HISTORY), EventHandlerType.COMMON_TYPE),
     SCRIPT_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.RMM_RESULTS,
             List.of(Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT, Destination.MONGO_HISTORY), EventHandlerType.COMMON_TYPE),
+    OS_UPDATE_HISTORY_EVENT(IntegratedToolType.RMM, DataEnrichmentServiceType.RMM_RESULTS,
+            List.of(Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_QUERY_RESULT_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,

@@ -21,8 +21,8 @@ import java.util.List;
  * Pattern tokens: a literal matches itself; {@code *} matches exactly one literal token, never a
  * wildcard sent by the client; {@code >} matches the rest of the subject, wildcards included;
  * {@code {id}} is the caller's id. The defaults are the OSS subjects only: a device's own machine
- * subjects, a user's own notifications, and the inboxes every client needs for request/reply and
- * JetStream deliveries. A product built on the gateway adds its own streams in code, through
+ * subjects, a user's own notifications and installed-agent report, and the inboxes every client
+ * needs for request/reply and JetStream deliveries. A product built on the gateway adds its own streams in code, through
  * {@code NatsSubjectPatternContributor} beans (the saas gateway contributes the chat stream); those
  * are always added. A list set in config replaces its default wholesale (Spring binds a list, it
  * does not merge one), so a config that touches a list has to carry every pattern of it.
@@ -68,7 +68,11 @@ public class NatsSubjectFilterProperties {
             "user.{id}.notification"
     );
 
-    private List<String> userPublish = List.of();
+    /** The desktop app reports its installed version on {@code user.<id>.installed-agent} (its updater) and
+     *  the server's {@code INSTALLED_AGENTS} stream consumes it — a live flow, not a leftover of the allow-list. */
+    private List<String> userPublish = List.of(
+            "user.{id}.installed-agent"
+    );
 
     public List<String> publishPatternsFor(NatsClientKind kind) {
         return switch (kind) {

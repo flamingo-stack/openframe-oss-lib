@@ -31,8 +31,18 @@ public class ToolOsSupportService {
     private final IntegratedToolService integratedToolService;
 
     public List<AgentWithToolType> agentsWithMinOsVersion() {
-        return integratedToolAgentService.getAllEnabled().stream()
-                .filter(ToolOsSupport::hasMinOsVersion)
+        Stream<IntegratedToolAgent> withMinimum = integratedToolAgentService.getAllEnabled().stream()
+                .filter(ToolOsSupport::hasMinOsVersion);
+        return withToolType(withMinimum);
+    }
+
+    public List<AgentWithToolType> agentsWithToolType() {
+        Stream<IntegratedToolAgent> enabled = integratedToolAgentService.getAllEnabled().stream();
+        return withToolType(enabled);
+    }
+
+    private List<AgentWithToolType> withToolType(Stream<IntegratedToolAgent> agents) {
+        return agents
                 .flatMap(agent -> findToolType(agent).map(type -> new AgentWithToolType(agent, type)).stream())
                 .toList();
     }
@@ -54,7 +64,11 @@ public class ToolOsSupportService {
     }
 
     public Optional<ToolType> findToolType(IntegratedToolAgent agent) {
-        return integratedToolService.getToolByKey(agent.getToolId())
+        String toolId = agent.getToolId();
+        if (toolId == null || toolId.isBlank()) {
+            return Optional.empty();
+        }
+        return integratedToolService.getToolByKey(toolId)
                 .map(IntegratedTool::getToolType)
                 .flatMap(ToolOsSupportService::parseToolType);
     }
