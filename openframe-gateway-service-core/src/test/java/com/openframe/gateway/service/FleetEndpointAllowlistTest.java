@@ -82,4 +82,36 @@ class FleetEndpointAllowlistTest {
         FleetEndpointAllowlist a = allowlist(true, List.of());
         assertThat(a.isAllowed(FLEET, HttpMethod.GET, "/api/latest/fleet/hosts")).isFalse();
     }
+
+    @Test
+    void isAllowed_extraEndpoint_allowedNextToTheSharedList() {
+        // setup
+        FleetMultiTenancyProperties props = new FleetMultiTenancyProperties();
+        props.setEnabled(true);
+        props.setAllowedEndpoints(FLEET_ENDPOINTS);
+        props.setExtraAllowedEndpoints(List.of("POST /api/{v}/fleet/trigger"));
+        FleetEndpointAllowlist allowlist = new FleetEndpointAllowlist(props);
+
+        // execution
+        boolean extraAllowed = allowlist.isAllowed(FLEET, HttpMethod.POST, "/api/latest/fleet/trigger");
+        boolean sharedAllowed = allowlist.isAllowed(FLEET, HttpMethod.GET, "/api/latest/fleet/hosts");
+        boolean otherAllowed = allowlist.isAllowed(FLEET, HttpMethod.POST, "/api/latest/fleet/hosts/transfer");
+
+        // verifications
+        assertThat(extraAllowed).isTrue();
+        assertThat(sharedAllowed).isTrue();
+        assertThat(otherAllowed).isFalse();
+    }
+
+    @Test
+    void isAllowed_noExtraEndpoints_triggerBlocked() {
+        // setup
+        FleetEndpointAllowlist allowlist = allowlist(true, FLEET_ENDPOINTS);
+
+        // execution
+        boolean allowed = allowlist.isAllowed(FLEET, HttpMethod.POST, "/api/latest/fleet/trigger");
+
+        // verifications
+        assertThat(allowed).isFalse();
+    }
 }
