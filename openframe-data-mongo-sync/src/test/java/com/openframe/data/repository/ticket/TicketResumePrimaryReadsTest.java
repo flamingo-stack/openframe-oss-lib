@@ -27,6 +27,8 @@ class TicketResumePrimaryReadsTest {
 
     private static Stream<Arguments> resumeReads() throws NoSuchMethodException {
         return Stream.of(
+                Arguments.of(TicketRepository.class.getMethod("findByIdFromPrimary", String.class)),
+                Arguments.of(TicketRepository.class.getMethod("existsByIdFromPrimary", String.class)),
                 Arguments.of(TicketAttachmentRepository.class.getMethod("findByTicketIdAndStoragePathFromPrimary",
                         String.class, String.class)),
                 Arguments.of(TicketNoteRepository.class.getMethod("existsByIdFromPrimary", String.class)));
