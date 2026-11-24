@@ -3,6 +3,9 @@ package com.openframe.data.service.rmm;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +25,9 @@ public class DeletedMachineCleanup {
     private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjectionTrigger projectionTrigger;
+    private final DeviceOsStateRepository deviceOsStateRepository;
+    private final DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
+    private final DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
 
     public void cleanUpDeletedMachine(String tenantId, String machineId) {
         if (tenantId == null || machineId == null) {
@@ -29,6 +35,17 @@ public class DeletedMachineCleanup {
         }
         removeFromSchedules(tenantId, machineId);
         removeFromSoftwareReadModel(tenantId, machineId);
+        removeOsUpdates(tenantId, machineId);
+    }
+
+    private void removeOsUpdates(String tenantId, String machineId) {
+        long removedStates = deviceOsStateRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        long removedPending = deviceOsPendingUpdateRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        long removedHistory = deviceOsUpdateHistoryRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        if (removedStates > 0 || removedPending > 0 || removedHistory > 0) {
+            log.info("Removed {} OS state(s), {} pending OS update row(s) and {} OS update history row(s) for deleted machineId={} tenantId={}",
+                    removedStates, removedPending, removedHistory, machineId, tenantId);
+        }
     }
 
     private void removeFromSchedules(String tenantId, String machineId) {
