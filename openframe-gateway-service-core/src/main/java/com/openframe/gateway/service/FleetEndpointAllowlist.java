@@ -6,8 +6,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Stream;
 
 /**
  * Global endpoint allowlist for the Fleet MDM browser proxy ({@code /tools/fleetmdm-server/**}).
@@ -41,12 +39,7 @@ public class FleetEndpointAllowlist {
     private final FleetEndpointMatcher fleetEndpoints;
 
     public FleetEndpointAllowlist(FleetMultiTenancyProperties properties) {
-        List<String> sharedEndpoints = properties.getAllowedEndpoints();
-        List<String> extraEndpoints = properties.getExtraAllowedEndpoints();
-        List<String> configuredEndpoints = Stream.of(sharedEndpoints, extraEndpoints)
-                .filter(Objects::nonNull)
-                .flatMap(List::stream)
-                .toList();
+        List<String> configuredEndpoints = properties.getAllowedEndpoints();
         this.multiTenancyEnabled = properties.isEnabled();
         this.fleetEndpoints = new FleetEndpointMatcher(configuredEndpoints);
     }

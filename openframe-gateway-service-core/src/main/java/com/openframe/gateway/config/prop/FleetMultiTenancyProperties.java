@@ -50,8 +50,6 @@ public class FleetMultiTenancyProperties {
      */
     private List<String> allowedEndpoints = new ArrayList<>();
 
-    private List<String> extraAllowedEndpoints = new ArrayList<>();
-
     private Upstream upstream = new Upstream();
 
     @Data
