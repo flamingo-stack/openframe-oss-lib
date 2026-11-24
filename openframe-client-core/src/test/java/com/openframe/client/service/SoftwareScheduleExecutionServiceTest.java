@@ -96,6 +96,7 @@ class SoftwareScheduleExecutionServiceTest {
 
     @Test
     void runDue_deletedTargetsNeitherDispatchNorArmReconnect() {
+        // setup
         SoftwareSchedule schedule = SoftwareSchedule.builder()
                 .id("ss-1").tenantId(TENANT).nextRunAt(Instant.now().minusSeconds(30))
                 .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
@@ -109,14 +110,17 @@ class SoftwareScheduleExecutionServiceTest {
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(online, offline));
 
+        // execution
         service.runDueSchedules();
 
+        // verifications
         verify(fireDispatcher, never()).dispatch(any(), any(), any());
         verify(onlineDispatchRepository, never()).insert(any(SoftwareScheduleOnlineDispatch.class));
     }
 
     @Test
     void runDue_refreshesAssignmentsAfterReadingManagedDevices() {
+        // setup
         SoftwareSchedule schedule = SoftwareSchedule.builder()
                 .id("ss-1").tenantId(TENANT).nextRunAt(Instant.now().minusSeconds(30)).build();
         due(schedule);
@@ -129,8 +133,10 @@ class SoftwareScheduleExecutionServiceTest {
                 machine("retained-first", DeviceStatus.ONLINE), reenrolled,
                 machine("retained-last", DeviceStatus.ONLINE)));
 
+        // execution
         service.runDueSchedules();
 
+        // verifications
         verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("retained-first", "retained-last")), any());
         InOrder readsAndDispatch = inOrder(targetResolver, machineRepository, fireDispatcher);
         readsAndDispatch.verify(targetResolver).resolveMachineIds(schedule);
@@ -164,6 +170,7 @@ class SoftwareScheduleExecutionServiceTest {
 
     @Test
     void runDue_armsReconnectAfterAnOfflineTargetIsRenamed() {
+        // setup
         SoftwareSchedule schedule = SoftwareSchedule.builder()
                 .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE)
                 .nextRunAt(Instant.now().minusSeconds(30))
@@ -182,8 +189,10 @@ class SoftwareScheduleExecutionServiceTest {
                 .thenThrow(new OptimisticLockingFailureException("device changed while arming reconnect"));
         when(machineRepository.reserveForSoftwareReconnect(TENANT, "m-off", 3L, DeviceStatus.CONNECTED)).thenReturn(1L);
 
+        // execution
         service.runDueSchedules();
 
+        // verifications
         ArgumentCaptor<SoftwareScheduleOnlineDispatch> pending = ArgumentCaptor.forClass(SoftwareScheduleOnlineDispatch.class);
         verify(onlineDispatchRepository).insert(pending.capture());
         assertThat(pending.getValue().getMachineId()).isEqualTo("m-off");
@@ -191,7 +200,75 @@ class SoftwareScheduleExecutionServiceTest {
     }
 
     @Test
+    void runDue_retriesOneShotAfterRepeatedReconnectWriteConflicts() {
+        // setup
+        Instant scheduledFor = Instant.now().minusSeconds(7200);
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE).nextRunAt(scheduledFor)
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
+                .build();
+        dueOfflineTarget(schedule);
+        Machine offline = machine("m-off", DeviceStatus.OFFLINE);
+        Machine online = machine("m-on", DeviceStatus.ONLINE);
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-on", "m-off"));
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(online, offline));
+        when(machineRepository.reserveForSoftwareReconnect(TENANT, "m-off", null, DeviceStatus.CONNECTED))
+                .thenThrow(new OptimisticLockingFailureException("first write conflict"))
+                .thenThrow(new OptimisticLockingFailureException("second write conflict"))
+                .thenReturn(1L);
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        assertThat(schedule.getNextRunAt()).isEqualTo(scheduledFor);
+        assertThat(schedule.getLastRunAt()).isNull();
+        verify(scheduleRepository, never()).save(any());
+        verify(fireDispatcher, never()).dispatch(any(), any(), any());
+        verify(onlineDispatchRepository, never()).insert(any(SoftwareScheduleOnlineDispatch.class));
+
+        service.runDueSchedules();
+
+        ArgumentCaptor<SoftwareScheduleOnlineDispatch> pending = ArgumentCaptor.forClass(SoftwareScheduleOnlineDispatch.class);
+        verify(onlineDispatchRepository).insert(pending.capture());
+        assertThat(pending.getValue().getScheduledFor()).isEqualTo(scheduledFor);
+        assertThat(pending.getValue().getExpiresAt()).isEqualTo(pending.getValue().getFirstSeenAt().plusSeconds(3600L));
+        verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("m-on")), any());
+        verify(scheduleRepository).save(schedule);
+        assertThat(schedule.getNextRunAt()).isNull();
+    }
+
+    @Test
+    void runDue_skipsDirectDispatchForDevicesAlreadyHandledByReconnect() {
+        // setup
+        Instant scheduledFor = Instant.now().minusSeconds(30);
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE).nextRunAt(scheduledFor)
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
+                .build();
+        due(schedule);
+        List<String> candidates = List.of("m-on", "m-reconnected");
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(candidates);
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-on", DeviceStatus.ONLINE), machine("m-reconnected", DeviceStatus.ONLINE)));
+        SoftwareScheduleOnlineDispatch dispatchedOnReconnect = SoftwareScheduleOnlineDispatch.builder()
+                .tenantId(TENANT).scheduleId(schedule.getId()).machineId("m-reconnected")
+                .scheduledFor(scheduledFor).status(DeviceOnlineDispatchStatus.DISPATCHED).build();
+        when(onlineDispatchRepository.findByTenantIdAndMachineIdInAndScheduleIdAndScheduledFor(
+                TENANT, candidates, schedule.getId(), scheduledFor)).thenReturn(List.of(dispatchedOnReconnect));
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("m-on")), any());
+        assertThat(schedule.getNextRunAt()).isNull();
+    }
+
+    @Test
     void runDue_doesNotArmFromStaleMachineSnapshot() {
+        // setup
         SoftwareSchedule schedule = SoftwareSchedule.builder()
                 .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE)
                 .nextRunAt(Instant.now().minusSeconds(30))
@@ -199,8 +276,10 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         dueOfflineTarget(schedule);
 
+        // execution
         service.runDueSchedules();
 
+        // verifications
         verify(machineRepository).reserveForSoftwareReconnect(TENANT, "m-off", null, DeviceStatus.CONNECTED);
         verify(onlineDispatchRepository, never()).insert(any(SoftwareScheduleOnlineDispatch.class));
     }

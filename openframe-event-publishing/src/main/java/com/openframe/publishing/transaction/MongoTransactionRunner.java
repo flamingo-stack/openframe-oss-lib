@@ -51,7 +51,7 @@ public class MongoTransactionRunner {
             T result = transactionOperations.execute(status -> execute(action));
             log.debug("Outbox transaction committed");
             return result;
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             throw translateRollback(e);
         }
     }
@@ -60,12 +60,12 @@ public class MongoTransactionRunner {
         try {
             transactionOperations.executeWithoutResult(status -> action.run());
             log.debug("Outbox transaction committed");
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             throw translateRollback(e);
         }
     }
 
-    private static RuntimeException translateRollback(RuntimeException error) {
+    private static RuntimeException translateRollback(Exception error) {
         Throwable failure = unwrapUndeclaredThrowable(error);
         log.debug("Outbox transaction rolled back: {}", failure.getClass().getName());
         return rethrow(failure);
@@ -145,7 +145,7 @@ public class MongoTransactionRunner {
     }
 
     // TransactionTemplate wraps an escaping checked exception; hand the caller the original.
-    private static Throwable unwrapUndeclaredThrowable(RuntimeException failure) {
+    private static Throwable unwrapUndeclaredThrowable(Exception failure) {
         if (failure instanceof UndeclaredThrowableException undeclared) {
             return undeclared.getUndeclaredThrowable();
         }

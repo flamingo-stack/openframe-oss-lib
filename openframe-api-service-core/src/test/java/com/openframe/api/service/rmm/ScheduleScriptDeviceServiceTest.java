@@ -142,6 +142,7 @@ class ScheduleScriptDeviceServiceTest {
 
     @Test
     void removeDevices_rejectsCriteriaWithoutChangingAssignmentsOrDispatches() {
+        // setup
         ScheduleScript schedule = ScheduleScript.builder()
                 .id(SCHEDULE_ID)
                 .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
@@ -149,9 +150,12 @@ class ScheduleScriptDeviceServiceTest {
                 .build();
         when(scheduleRepository.findOnPrimaryByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule));
 
+        // execution
         assertThatThrownBy(() -> service.removeDevices(SCHEDULE_ID, List.of("m-1"), "user-1"))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("selects devices by criteria");
+
+        // verifications
         verifyNoInteractions(assignedRepository, dispatchRepository, deliveryRefresher);
     }
 
@@ -549,12 +553,18 @@ class ScheduleScriptDeviceServiceTest {
 
     @Test
     void removeAssignedDevices_returnsCommittedDeleteCount() {
+        // setup
         when(scheduleRepository.markSpecificAssignmentChange(TENANT_ID, SCHEDULE_ID, ScriptStatus.DELETED, ScheduleDeviceSelectionMode.CRITERIA)).thenReturn(1L);
         when(assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
                 TENANT_ID, SCHEDULE_ID, Set.of("m-1", "m-absent"))).thenReturn(1L, 0L);
 
-        assertThat(service.removeAssignedDevices(SCHEDULE_ID, List.of("m-1", "m-1", "m-absent"), "user-1")).isEqualTo(1L);
-        assertThat(service.removeAssignedDevices(SCHEDULE_ID, List.of("m-1", "m-absent"), "user-1")).isZero();
+        // execution
+        long removed = service.removeAssignedDevices(SCHEDULE_ID, List.of("m-1", "m-1", "m-absent"), "user-1");
+        long alreadyRemoved = service.removeAssignedDevices(SCHEDULE_ID, List.of("m-1", "m-absent"), "user-1");
+
+        // verifications
+        assertThat(removed).isEqualTo(1L);
+        assertThat(alreadyRemoved).isZero();
     }
 
     @Test

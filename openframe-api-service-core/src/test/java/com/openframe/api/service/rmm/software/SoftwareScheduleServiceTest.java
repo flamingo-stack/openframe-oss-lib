@@ -126,15 +126,19 @@ class SoftwareScheduleServiceTest {
 
     @Test
     void createRejectsUnknownOrDeletedTargetsBeforeWriting() {
+        // setup
         Machine deleted = managedMachine("m2");
         deleted.setStatus(DeviceStatus.DELETED);
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenReturn(List.of(deleted));
 
+        // execution
         assertThatThrownBy(() -> service.create(createInput, ACTOR))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Devices must be managed by this tenant")
                 .hasMessageContaining("m1")
                 .hasMessageContaining("m2");
+
+        // verifications
         verify(scheduleRepository, never()).save(any());
         verify(assignedRepository, never()).saveAll(any());
     }

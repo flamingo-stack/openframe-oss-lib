@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +24,10 @@ public interface SoftwareScheduleOnlineDispatchRepository extends MongoRepositor
 
     @ReadPreference("primary")
     Optional<SoftwareScheduleOnlineDispatch> findByTenantIdAndMachineIdAndScheduleId(String tenantId, String machineId, String scheduleId);
+
+    @ReadPreference("primary")
+    List<SoftwareScheduleOnlineDispatch> findByTenantIdAndMachineIdInAndScheduleIdAndScheduledFor(
+            String tenantId, Collection<String> machineIds, String scheduleId, Instant scheduledFor);
 
     List<SoftwareScheduleOnlineDispatch> findByTenantIdAndScheduleId(String tenantId, String scheduleId);
 

@@ -149,24 +149,30 @@ class SoftwareScheduleOnlineDispatchServiceTest {
 
     @Test
     void reinstalledDeviceWithoutCurrentAssignmentIsNotDispatched() {
+        // setup
         SoftwareScheduleOnlineDispatch row = sentinel("m-reinstalled", Instant.now().plusSeconds(600));
         setOnlineScheduleAndPendingRow(row);
 
+        // execution
         service.processReconnectedDevices();
 
+        // verifications
         verifyNoInteractions(fireDispatcher);
         verify(dispatchRepository).transitionIfNew(TENANT, row.getId(), DeviceOnlineDispatchStatus.EXPIRED, null);
     }
 
     @Test
     void reconnectRowRemovedAfterBatchReadIsNotDispatchedOrRecreated() {
+        // setup
         SoftwareScheduleOnlineDispatch row = sentinel("m-reinstalled", Instant.now().plusSeconds(600));
         setOnlineScheduleAndPendingRow(row);
         when(assignedRepository.existsOnPrimaryByTenantIdAndSoftwareScheduleIdAndMachineId(
                 TENANT, SCHEDULE_ID, row.getMachineId())).thenReturn(true);
 
+        // execution
         service.processReconnectedDevices();
 
+        // verifications
         verifyNoInteractions(fireDispatcher);
         verify(dispatchRepository, never()).transitionIfNew(eq(TENANT), eq(row.getId()), any(), any());
         verify(dispatchRepository, never()).saveAll(any());
@@ -174,6 +180,7 @@ class SoftwareScheduleOnlineDispatchServiceTest {
 
     @Test
     void reconnectRespectsCurrentCriteria() {
+        // setup
         SoftwareScheduleOnlineDispatch row = sentinel("m-reconnected", Instant.now().plusSeconds(600));
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
                 .thenReturn(List.of(row));
@@ -188,8 +195,10 @@ class SoftwareScheduleOnlineDispatchServiceTest {
         when(scheduleRepository.findOnPrimaryByTenantIdAndIdAndStatus(TENANT, SCHEDULE_ID, ScriptStatus.ACTIVE))
                 .thenReturn(Optional.of(schedule));
 
+        // execution
         service.processReconnectedDevices();
 
+        // verifications
         verifyNoInteractions(fireDispatcher);
     }
 

@@ -70,6 +70,7 @@ class SoftwareDeviceLocalScheduleServiceTest {
 
     @Test
     void reenrolledDeviceWithStaleAssignmentDoesNotFireOrConsumeAnOccurrence() {
+        // setup
         Instant now = Instant.now();
         SoftwareSchedule schedule = deviceLocalSchedule(now.minusSeconds(60));
         Machine reenrolled = machine("reenrolled", DeviceStatus.ONLINE, "UTC");
@@ -77,8 +78,10 @@ class SoftwareDeviceLocalScheduleServiceTest {
         given(schedule, reenrolled);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("reenrolled"), List.of());
 
+        // execution
         service.runDueDeviceLocalSchedules(now);
 
+        // verifications
         verify(fireDispatcher, never()).dispatch(any(), anyList(), any());
         verify(dispatchRepository, never()).save(any());
         InOrder reads = inOrder(targetResolver, machineRepository);

@@ -334,6 +334,7 @@ class AgentRegistrationServiceTest {
 
     @Test
     void reinstall_FromDeletedStateClearsLegacyMembershipBeforeRestoring() {
+        // setup
         OAuthClient existingClient = new OAuthClient();
         existingClient.setMachineId(MACHINE_ID);
         Machine deleted = new Machine();
@@ -345,8 +346,10 @@ class AgentRegistrationServiceTest {
         when(deletedMachineCleanup.reenrollDeleted(eq(deleted), any())).thenAnswer(invocation ->
                 writeResult(deleted, invocation.getArgument(1, MachineUpdate.class)).orElseThrow().after());
 
+        // execution
         AgentRegistrationResponse response = agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
 
+        // verifications
         assertEquals(MACHINE_ID, response.getMachineId());
         verify(deletedMachineCleanup).reenrollDeleted(eq(deleted), any(MachineUpdate.class));
         verifyNoInteractions(machineWriter);

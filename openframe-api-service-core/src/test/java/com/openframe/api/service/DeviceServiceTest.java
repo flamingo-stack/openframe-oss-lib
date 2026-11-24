@@ -477,13 +477,16 @@ class DeviceServiceTest {
 
     @Test
     void deletingAlreadyDeletedDeviceRepeatsScheduleCleanupWithoutPublishingAgain() {
+        // setup
         Machine machine = new Machine();
         machine.setTenantId("t-1");
         machine.setStatus(DeviceStatus.DELETED);
         when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(machine));
 
+        // execution
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
+        // verifications
         verify(deletedMachineCleanup).markDeleted(machine);
         verifyNoInteractions(machineWriter, deviceStatusProcessor);
     }

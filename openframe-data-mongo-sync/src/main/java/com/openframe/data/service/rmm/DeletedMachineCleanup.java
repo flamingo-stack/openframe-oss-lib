@@ -24,7 +24,9 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
+import static com.openframe.data.service.machine.MachineFields.ENROLLMENT_ID;
 import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static java.util.stream.Collectors.toSet;
@@ -57,6 +59,7 @@ public class DeletedMachineCleanup {
     }
 
     public Machine reenrollDeleted(Machine expected, MachineUpdate update) {
+        update.set(ENROLLMENT_ID, UUID.randomUUID().toString());
         return runLifecycleChange(expected, () -> writeAndClearSchedules(expected, update));
     }
 
@@ -77,10 +80,9 @@ public class DeletedMachineCleanup {
     private Machine writeAndClearSchedules(Machine expected, MachineUpdate update) {
         String tenantId = expected.getTenantId();
         String machineId = expected.getMachineId();
-        Criteria lifecycle = Criteria.where("tenantId").is(tenantId).and(STATUS.path()).is(expected.getStatus());
-        if (expected.getStatus() == DeviceStatus.DELETED) {
-            lifecycle.and("version").is(expected.getVersion());
-        }
+        Criteria lifecycle = Criteria.where("tenantId").is(tenantId)
+                .and(STATUS.path()).is(expected.getStatus())
+                .and(ENROLLMENT_ID.path()).is(expected.getEnrollmentId());
         Machine updated = machineWriter.update(machineId, lifecycle, update)
                 .map(MachineWriteResult::after)
                 .orElseThrow(() -> statusChanged(expected));
