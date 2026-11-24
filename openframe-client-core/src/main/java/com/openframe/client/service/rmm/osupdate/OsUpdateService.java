@@ -2,6 +2,7 @@ package com.openframe.client.service.rmm.osupdate;
 
 import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,9 +19,11 @@ import java.util.stream.Collectors;
 public class OsUpdateService {
 
     private final OsUpdateRepository osUpdateRepository;
+    private final OsUpdateClassifier osUpdateClassifier;
     private final DeviceOsReportMetrics deviceOsReportMetrics;
 
-    // An update is described once, by the first device that reports it. Later reports do not change it.
+    // An update is described and classified once, by the first device that reports it. Later reports do not
+    // change it.
     public void saveMissing(List<OsUpdate> reportedOsUpdates) {
         if (reportedOsUpdates.isEmpty()) {
             return;
@@ -46,6 +49,8 @@ public class OsUpdateService {
 
     // One by one: another device of the tenant reporting the same new update must not stop the rest.
     private void saveUnlessStoredMeanwhile(OsUpdate missingOsUpdate) {
+        OsUpdateClassification classification = osUpdateClassifier.classify(missingOsUpdate);
+        missingOsUpdate.setClassification(classification);
         try {
             osUpdateRepository.save(missingOsUpdate);
             deviceOsReportMetrics.recordOsUpdateSaved(missingOsUpdate.getPlatform());

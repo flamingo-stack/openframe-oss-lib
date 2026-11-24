@@ -7,7 +7,8 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface DeviceOsStateRepository extends MongoRepository<DeviceOsState, String> {
+public interface DeviceOsStateRepository
+        extends MongoRepository<DeviceOsState, String>, CustomDeviceOsStateRepository {
 
     Optional<DeviceOsState> findByTenantIdAndMachineId(String tenantId, String machineId);
 

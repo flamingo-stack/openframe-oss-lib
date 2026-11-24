@@ -19,6 +19,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
@@ -43,6 +45,7 @@ class CustomDeviceOsUpdateHistoryRepositoryImplTest {
     @Mock private MongoTemplate mongoTemplate;
 
     @Captor private ArgumentCaptor<Query> queryCaptor;
+    @Captor private ArgumentCaptor<Aggregation> aggregationCaptor;
 
     @InjectMocks private CustomDeviceOsUpdateHistoryRepositoryImpl repository;
 
@@ -126,6 +129,115 @@ class CustomDeviceOsUpdateHistoryRepositoryImplTest {
 
         // verifications
         assertThat(cursor).isEqualTo(CURSOR);
+    }
+
+    @Test
+    void countInstalledDevicesByIdentifier_identifiers_countsEachDeviceOncePerIdentifierAmongSuccessfulInstalls() {
+        // setup
+        List<String> identifiers = List.of(IDENTIFIER);
+        List<OsUpdateDeviceCount> counted = List.of(new OsUpdateDeviceCount(IDENTIFIER, 2));
+        AggregationResults<OsUpdateDeviceCount> aggregationResults = new AggregationResults<>(counted, new Document());
+        when(mongoTemplate.aggregate(aggregationCaptor.capture(), eq(DeviceOsUpdateHistoryEntry.class),
+                eq(OsUpdateDeviceCount.class))).thenReturn(aggregationResults);
+        Document installs = successfulInstalls().append("identifier", new Document("$in", identifiers));
+        Document oncePerDevice = new Document("_id",
+                new Document("identifier", "$identifier").append("machineId", "$machineId"));
+        Document countByIdentifier = new Document("_id", "$_id.identifier")
+                .append("deviceCount", new Document("$sum", 1));
+
+        // execution
+        List<OsUpdateDeviceCount> deviceCounts = repository.countInstalledDevicesByIdentifier(TENANT_ID, identifiers);
+
+        // verifications
+        assertThat(deviceCounts).containsExactly(new OsUpdateDeviceCount(IDENTIFIER, 2));
+        assertThat(aggregationCaptor.getValue().toPipeline(Aggregation.DEFAULT_CONTEXT)).containsExactly(
+                new Document("$match", installs),
+                new Document("$group", oncePerDevice),
+                new Document("$group", countByIdentifier));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void findInstalledDevicePage_noCursor_latestInstallPerDeviceNewestFirst(String cursor) {
+        // setup
+        List<InstalledOsUpdateDevice> grouped = List.of(new InstalledOsUpdateDevice(MACHINE_ID, INSTALLED_AT));
+        AggregationResults<InstalledOsUpdateDevice> aggregationResults =
+                new AggregationResults<>(grouped, new Document());
+        when(mongoTemplate.aggregate(aggregationCaptor.capture(), eq(DeviceOsUpdateHistoryEntry.class),
+                eq(InstalledOsUpdateDevice.class))).thenReturn(aggregationResults);
+
+        // execution
+        List<InstalledOsUpdateDevice> page = repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, cursor, 21);
+
+        // verifications
+        assertThat(page).containsExactly(new InstalledOsUpdateDevice(MACHINE_ID, INSTALLED_AT));
+        assertThat(aggregationCaptor.getValue().toPipeline(Aggregation.DEFAULT_CONTEXT)).containsExactly(
+                new Document("$match", successfulInstalls().append("identifier", IDENTIFIER)),
+                new Document("$group", latestPerDevice()),
+                new Document("$sort", newestFirst()),
+                new Document("$limit", 21L));
+    }
+
+    @Test
+    void findInstalledDevicePage_cursorOfADevice_readsStrictlyAfterItByInstallTimeThenMachineId() {
+        // setup
+        String cursor = INSTALLED_AT.toEpochMilli() + "|" + MACHINE_ID;
+        AggregationResults<InstalledOsUpdateDevice> aggregationResults =
+                new AggregationResults<>(List.of(), new Document());
+        when(mongoTemplate.aggregate(aggregationCaptor.capture(), eq(DeviceOsUpdateHistoryEntry.class),
+                eq(InstalledOsUpdateDevice.class))).thenReturn(aggregationResults);
+        Document installedEarlier = new Document("installedAt", new Document("$lt", INSTALLED_AT));
+        Document installedTogetherLowerMachineId = new Document("installedAt", INSTALLED_AT)
+                .append("_id", new Document("$lt", MACHINE_ID));
+        Document keyset = new Document("$or", List.of(installedEarlier, installedTogetherLowerMachineId));
+
+        // execution
+        repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, cursor, 5);
+
+        // verifications
+        assertThat(aggregationCaptor.getValue().toPipeline(Aggregation.DEFAULT_CONTEXT)).containsExactly(
+                new Document("$match", successfulInstalls().append("identifier", IDENTIFIER)),
+                new Document("$group", latestPerDevice()),
+                new Document("$match", keyset),
+                new Document("$sort", newestFirst()),
+                new Document("$limit", 5L));
+    }
+
+    @Test
+    void findInstalledDevicePage_cursorOfAnotherShape_throwsBadRequest() {
+        // setup
+        String cursor = "yesterday|machine-1";
+
+        // execution
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, cursor, 5));
+
+        // verifications
+        assertThat(ex.getMessage()).contains("Unparseable epoch millis");
+    }
+
+    @Test
+    void encodeInstalledDeviceCursor_installedDevice_installMillisThenMachineId() {
+        // setup
+        InstalledOsUpdateDevice installedDevice = new InstalledOsUpdateDevice(MACHINE_ID, INSTALLED_AT);
+
+        // execution
+        String cursor = repository.encodeInstalledDeviceCursor(installedDevice);
+
+        // verifications
+        assertThat(cursor).isEqualTo(INSTALLED_AT.toEpochMilli() + "|" + MACHINE_ID);
+    }
+
+    private static Document successfulInstalls() {
+        return new Document("tenantId", TENANT_ID)
+                .append("operation", OsUpdateOperation.INSTALL)
+                .append("result", new Document("$in",
+                        List.of(OsUpdateInstallResult.SUCCEEDED, OsUpdateInstallResult.SUCCEEDED_WITH_ERRORS)));
+    }
+
+    private static Document latestPerDevice() {
+        return new Document("_id", "$machineId").append("installedAt", new Document("$max", "$installedAt"));
     }
 
     private static Document machineFilter() {

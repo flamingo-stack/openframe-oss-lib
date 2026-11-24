@@ -1,8 +1,12 @@
 package com.openframe.api.datafetcher.rmm;
 
+import com.openframe.api.dataloader.OsUpdateDeviceCountsDataLoader;
 import com.openframe.api.mapper.DeviceOsGraphQLMapper;
 import com.openframe.api.mapper.DeviceOsResponseMapper;
+import com.openframe.api.mapper.OsUpdateGraphQLMapper;
+import com.openframe.api.mapper.OsUpdateResponseMapper;
 import com.openframe.api.service.rmm.osupdate.DeviceOsQueryService;
+import com.openframe.api.service.rmm.osupdate.OsUpdateQueryService;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
@@ -29,7 +33,9 @@ class DeviceOsWiringTest {
             .withBean(DeviceOsUpdateHistoryRepository.class, () -> mock(DeviceOsUpdateHistoryRepository.class))
             .withBean(TenantIdProvider.class, () -> mock(TenantIdProvider.class))
             .withUserConfiguration(DeviceOsDataFetcher.class, DeviceOsQueryService.class,
-                    DeviceOsResponseMapper.class, DeviceOsGraphQLMapper.class);
+                    DeviceOsResponseMapper.class, DeviceOsGraphQLMapper.class,
+                    OsUpdateDataFetcher.class, OsUpdateQueryService.class, OsUpdateResponseMapper.class,
+                    OsUpdateGraphQLMapper.class, OsUpdateDeviceCountsDataLoader.class);
 
     @Test
     void osUpdateFlagAbsent_nothingOfTheReadSideRuns() {
@@ -38,7 +44,12 @@ class DeviceOsWiringTest {
                 .doesNotHaveBean(DeviceOsDataFetcher.class)
                 .doesNotHaveBean(DeviceOsQueryService.class)
                 .doesNotHaveBean(DeviceOsResponseMapper.class)
-                .doesNotHaveBean(DeviceOsGraphQLMapper.class));
+                .doesNotHaveBean(DeviceOsGraphQLMapper.class)
+                .doesNotHaveBean(OsUpdateDataFetcher.class)
+                .doesNotHaveBean(OsUpdateQueryService.class)
+                .doesNotHaveBean(OsUpdateResponseMapper.class)
+                .doesNotHaveBean(OsUpdateGraphQLMapper.class)
+                .doesNotHaveBean(OsUpdateDeviceCountsDataLoader.class));
     }
 
     @ParameterizedTest
@@ -49,7 +60,12 @@ class DeviceOsWiringTest {
                 .doesNotHaveBean(DeviceOsDataFetcher.class)
                 .doesNotHaveBean(DeviceOsQueryService.class)
                 .doesNotHaveBean(DeviceOsResponseMapper.class)
-                .doesNotHaveBean(DeviceOsGraphQLMapper.class));
+                .doesNotHaveBean(DeviceOsGraphQLMapper.class)
+                .doesNotHaveBean(OsUpdateDataFetcher.class)
+                .doesNotHaveBean(OsUpdateQueryService.class)
+                .doesNotHaveBean(OsUpdateResponseMapper.class)
+                .doesNotHaveBean(OsUpdateGraphQLMapper.class)
+                .doesNotHaveBean(OsUpdateDeviceCountsDataLoader.class));
     }
 
     @Test
@@ -59,6 +75,11 @@ class DeviceOsWiringTest {
                 .hasSingleBean(DeviceOsDataFetcher.class)
                 .hasSingleBean(DeviceOsQueryService.class)
                 .hasSingleBean(DeviceOsResponseMapper.class)
-                .hasSingleBean(DeviceOsGraphQLMapper.class));
+                .hasSingleBean(DeviceOsGraphQLMapper.class)
+                .hasSingleBean(OsUpdateDataFetcher.class)
+                .hasSingleBean(OsUpdateQueryService.class)
+                .hasSingleBean(OsUpdateResponseMapper.class)
+                .hasSingleBean(OsUpdateGraphQLMapper.class)
+                .hasSingleBean(OsUpdateDeviceCountsDataLoader.class));
     }
 }

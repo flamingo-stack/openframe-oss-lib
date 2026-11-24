@@ -3,10 +3,13 @@ package com.openframe.client.service.rmm.osupdate;
 import com.openframe.client.metrics.DeviceOsReportMetrics;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -17,6 +20,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -31,7 +35,10 @@ class OsUpdateServiceTest {
     private static final Instant RECEIVED_AT = Instant.parse("2026-11-20T09:14:03.120Z");
 
     @Mock private OsUpdateRepository osUpdateRepository;
+    @Mock private OsUpdateClassifier osUpdateClassifier;
     @Mock private DeviceOsReportMetrics deviceOsReportMetrics;
+
+    @Captor private ArgumentCaptor<OsUpdate> osUpdateCaptor;
 
     @InjectMocks private OsUpdateService service;
 
@@ -70,6 +77,37 @@ class OsUpdateServiceTest {
         // verifications
         verify(osUpdateRepository).save(first);
         verify(osUpdateRepository).save(second);
+    }
+
+    @Test
+    void saveMissing_missingUpdate_savedWithTheClassificationOfTheClassifier() {
+        // setup
+        when(osUpdateRepository.findByTenantIdAndPlatformAndIdentifierIn(
+                TENANT_ID, OsPlatform.WINDOWS, List.of("kb-1", "kb-2"))).thenReturn(List.of());
+        when(osUpdateClassifier.classify(first)).thenReturn(OsUpdateClassification.SECURITY);
+        when(osUpdateClassifier.classify(second)).thenReturn(OsUpdateClassification.DRIVER);
+
+        // execution
+        service.saveMissing(List.of(first, second));
+
+        // verifications
+        verify(osUpdateRepository, times(2)).save(osUpdateCaptor.capture());
+        assertThat(osUpdateCaptor.getAllValues())
+                .extracting(OsUpdate::getIdentifier, OsUpdate::getClassification)
+                .containsExactly(tuple("kb-1", OsUpdateClassification.SECURITY), tuple("kb-2", OsUpdateClassification.DRIVER));
+    }
+
+    @Test
+    void saveMissing_updateAlreadyStored_notClassifiedAgain() {
+        // setup
+        when(osUpdateRepository.findByTenantIdAndPlatformAndIdentifierIn(
+                TENANT_ID, OsPlatform.WINDOWS, List.of("kb-1"))).thenReturn(List.of(first));
+
+        // execution
+        service.saveMissing(List.of(first));
+
+        // verifications
+        verifyNoInteractions(osUpdateClassifier);
     }
 
     @Test

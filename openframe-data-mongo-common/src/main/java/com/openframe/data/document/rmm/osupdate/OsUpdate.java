@@ -21,6 +21,9 @@ import java.util.List;
         name = "tenant_platform_identifier",
         def = "{'tenantId': 1, 'platform': 1, 'identifier': 1}",
         unique = true)
+@CompoundIndex(
+        name = "tenant_first_seen",
+        def = "{'tenantId': 1, 'firstSeenAt': -1, '_id': -1}")
 public class OsUpdate implements TenantScoped {
 
     @Id
@@ -42,6 +45,10 @@ public class OsUpdate implements TenantScoped {
     private OsUpdateSeverity severity;
 
     private List<String> categories;
+    // Category names follow the language of the device, the ids do not.
+    private List<String> categoryIds;
+    private OsUpdateType updateType;
+    private OsUpdateClassification classification;
 
     private List<String> cveIds;
 

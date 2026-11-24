@@ -7,7 +7,8 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface DeviceOsPendingUpdateRepository extends MongoRepository<DeviceOsPendingUpdate, String> {
+public interface DeviceOsPendingUpdateRepository
+        extends MongoRepository<DeviceOsPendingUpdate, String>, CustomDeviceOsPendingUpdateRepository {
 
     List<DeviceOsPendingUpdate> findByTenantIdAndMachineIdOrderByDiscoveredAtDescIdentifierAsc(
             String tenantId, String machineId);

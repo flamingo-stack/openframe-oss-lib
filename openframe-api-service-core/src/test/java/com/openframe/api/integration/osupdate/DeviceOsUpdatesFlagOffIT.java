@@ -88,7 +88,8 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
         assertThat(beans).contains("DeviceDataFetcher");
         assertThat(beans)
                 .doesNotContain("DeviceOsDataFetcher", "DeviceOsQueryService", "DeviceOsResponseMapper",
-                        "DeviceOsGraphQLMapper");
+                        "DeviceOsGraphQLMapper", "OsUpdateDataFetcher", "OsUpdateQueryService",
+                        "OsUpdateResponseMapper", "OsUpdateGraphQLMapper", "OsUpdateDeviceCountsDataLoader");
         assertThat(device.getErrors()).isEmpty();
         assertThat(device.<Map<String, Object>>getData())
                 .containsEntry("device", Map.of("machineId", READ, "osVersion", "Windows 11 Pro"));
@@ -106,6 +107,23 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
         // execution
         ExecutionResult result = queryExecutor.execute(
                 "query($machineId: String!) { " + read + " }", Map.of("machineId", READ));
+
+        // verifications
+        assertThat(result.getErrors()).as("errors of %s", read).isNotEmpty();
+        assertThat(result.getErrors()).extracting(GraphQLError::getMessage)
+                .as("%s is in the schema: no FieldUndefined validation error", read)
+                .noneMatch(message -> message.contains("FieldUndefined"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "osUpdates { pageInfo { hasNextPage } }",
+            "osUpdateDevices(osUpdateId: \"6aff19c07ce86a3f0386ff82\", status: PENDING) { pageInfo { hasNextPage } }"})
+    void osUpdateFlagAbsent_tenantWideListReadIsInTheSchemaAndAnswersWithAnError(String read) {
+        // setup
+
+        // execution
+        ExecutionResult result = queryExecutor.execute("query { " + read + " }");
 
         // verifications
         assertThat(result.getErrors()).as("errors of %s", read).isNotEmpty();

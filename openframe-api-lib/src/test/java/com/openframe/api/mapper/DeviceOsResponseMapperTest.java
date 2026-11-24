@@ -12,6 +12,7 @@ import com.openframe.data.document.rmm.osupdate.OsPatchState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsRebootPending;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import com.openframe.data.document.rmm.osupdate.OsUpdateAuthorization;
 import com.openframe.data.document.rmm.osupdate.OsUpdateInstallResult;
 import com.openframe.data.document.rmm.osupdate.OsUpdateListConfidence;
@@ -21,6 +22,7 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRebootBehavior;
 import com.openframe.data.document.rmm.osupdate.OsUpdateScanState;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
+import com.openframe.data.document.rmm.osupdate.OsUpdateType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -133,6 +135,9 @@ class DeviceOsResponseMapperTest {
                 .kbArticleIds(List.of("5051987"))
                 .severity(OsUpdateSeverity.CRITICAL)
                 .categories(List.of("Security Updates"))
+                .categoryIds(List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
+                .updateType(OsUpdateType.SOFTWARE)
+                .classification(OsUpdateClassification.SECURITY)
                 .cveIds(List.of("CVE-2026-21309"))
                 .publishedAt(PUBLISHED_AT)
                 .sizeBytes(764317696L)
@@ -147,6 +152,9 @@ class DeviceOsResponseMapperTest {
                 .kbArticleIds(List.of("5051987"))
                 .severity(OsUpdateSeverity.CRITICAL)
                 .categories(List.of("Security Updates"))
+                .categoryIds(List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
+                .updateType(OsUpdateType.SOFTWARE)
+                .classification(OsUpdateClassification.SECURITY)
                 .cveIds(List.of("CVE-2026-21309"))
                 .publishedAt(PUBLISHED_AT)
                 .sizeBytes(764317696L)
@@ -182,6 +190,7 @@ class DeviceOsResponseMapperTest {
                 .displayVersion("18.2")
                 .kbArticleIds(List.of())
                 .categories(List.of())
+                .categoryIds(List.of())
                 .cveIds(List.of())
                 .discoveredAt(RECEIVED_AT)
                 .macosPresence(MacosUpdatePresence.HELD_OVER)

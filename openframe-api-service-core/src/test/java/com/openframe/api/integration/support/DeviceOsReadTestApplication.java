@@ -6,6 +6,7 @@ import com.openframe.api.config.InstantScalarConfig;
 import com.openframe.api.config.JsonScalarConfig;
 import com.openframe.api.config.LongScalarConfig;
 import com.openframe.api.datafetcher.DeviceDataFetcher;
+import com.openframe.api.dataloader.MachineDataLoader;
 import com.openframe.api.exception.GraphQLExceptionHandler;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
@@ -69,6 +70,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         includeFilters = @ComponentScan.Filter(type = FilterType.CUSTOM, classes = OsUpdateComponentFilter.class))
 @Import({
         DeviceDataFetcher.class,
+        MachineDataLoader.class,
         DeviceService.class,
         GraphQLExceptionHandler.class,
         InstantScalarConfig.class,

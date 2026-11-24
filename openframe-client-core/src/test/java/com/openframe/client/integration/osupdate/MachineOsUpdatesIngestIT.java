@@ -9,6 +9,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
@@ -88,6 +89,7 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
     private static final String MAC_UPDATES_AVAILABLE = "macos-updates-available";
     private static final String MAC_UPDATES_UNREADABLE = "macos-updates-unreadable";
     private static final String WINDOWS_MANAGED_BY_WSUS = "windows-managed-by-wsus";
+    private static final String WINDOWS_NOT_MANAGEABLE_MINIMAL = "windows-not-manageable-minimal";
 
     private static final String WINDOWS_PENDING = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
     private static final String WINDOWS_PENDING_NAME =
@@ -120,6 +122,9 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
 
     @Autowired
     private EventLogsPublisher eventLogsPublisher;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     private final ArgumentCaptor<CommonDebeziumMessage> logEventCaptor = ArgumentCaptor.captor();
 
@@ -234,6 +239,9 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
                     .containsEntry("kbArticleIds", List.of("5051987"))
                     .containsEntry("severity", "CRITICAL")
                     .containsEntry("categories", List.of("Security Updates"))
+                    .containsEntry("categoryIds", List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
+                    .containsEntry("updateType", "SOFTWARE")
+                    .containsEntry("classification", "SECURITY")
                     .containsEntry("cveIds", List.of("CVE-2026-21309", "CVE-2026-21311"))
                     .containsEntry("sizeBytes", 764317696L)
                     .containsEntry("rebootBehavior", "ALWAYS")
@@ -416,6 +424,66 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         // verifications
         assertThat(osState(machineId)).doesNotContainKey("pendingUpdatesConfidence");
         assertThat(pendingByIdentifier(machineId)).containsOnlyKeys(MAC_OS_UPDATE, MAC_XCODE, MAC_SAFARI);
+    }
+
+    @Test
+    void minimalReportOfADeviceThatIsNotManageable_applied_stateWritten_pendingUpdatesAndHistoryKept() {
+        // setup
+        String machineId = newMachine();
+        ObjectNode manageable = windowsReport();
+        ((ObjectNode) manageable.get("manageability")).put("state", "MANAGEABLE").remove("reasons");
+        publish(machineId, manageable.toString());
+        awaitProcessed();
+        long appliedBefore = handledReports("applied");
+        long malformedBefore = handledReports("malformed");
+
+        // execution
+        Instant storedByNats = publish(machineId, fixtureText(WINDOWS_NOT_MANAGEABLE_MINIMAL));
+        awaitProcessed();
+        assertNothingLeftForRedelivery();
+
+        // verifications
+        await().atMost(SHORT_WAIT).untilAsserted(() ->
+                assertThat(handledReports("applied")).isEqualTo(appliedBefore + 1));
+        assertThat(handledReports("malformed")).isEqualTo(malformedBefore);
+        Document osState = osState(machineId);
+        assertThat(osState)
+                .containsEntry("platform", "WINDOWS")
+                .containsEntry("osVersion", "11 24H2")
+                .containsEntry("osBuild", "26100.4061")
+                .containsEntry("osProductName", "Windows 11 Pro")
+                .containsEntry("osUpdateAuthorization", "NOT_REQUIRED")
+                .doesNotContainKeys("pendingUpdatesConfidence", "patchState", "scanState", "lastScanAt",
+                        "rebootPending", "lastOsInstall");
+        assertThat(osState.get("manageability", Document.class))
+                .containsEntry("state", "NOT_MANAGEABLE")
+                .containsEntry("reasons", List.of("WSUS", "GROUP_POLICY"));
+        assertThat(instant(osState, "receivedAt")).isEqualTo(storedByNats);
+        assertThat(instant(osState, "reportedAt")).isEqualTo(Instant.parse("2026-11-24T12:00:00Z"));
+        assertThat(pendingByIdentifier(machineId)).containsOnlyKeys(WINDOWS_PENDING);
+        assertThat(historyRows(machineId)).extracting(entry -> entry.getString("identifier"))
+                .containsExactly(WINDOWS_INSTALLED);
+        assertThat(osUpdates()).extracting(osUpdate -> osUpdate.getString("identifier"))
+                .containsExactly(WINDOWS_PENDING);
+    }
+
+    @Test
+    void minimalReportAsTheFirstReportOfADevice_applied_stateWrittenAndNothingElse() {
+        // setup
+        String machineId = newMachine();
+
+        // execution
+        Instant storedByNats = publish(machineId, fixtureText(WINDOWS_NOT_MANAGEABLE_MINIMAL));
+        awaitProcessed();
+        assertNothingLeftForRedelivery();
+
+        // verifications
+        assertThat(instant(osState(machineId), "receivedAt")).isEqualTo(storedByNats);
+        assertThat(osState(machineId).get("manageability", Document.class))
+                .containsEntry("state", "NOT_MANAGEABLE");
+        assertThat(pendingRows(machineId)).isEmpty();
+        assertThat(historyRows(machineId)).isEmpty();
+        assertThat(osUpdates()).isEmpty();
     }
 
     @Test
@@ -1279,6 +1347,10 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
             throw new AssertionError("The report under sequence " + lastStored + " of " + OS_UPDATES_STREAM
                     + " was not acknowledged within " + wait, timeout);
         }
+    }
+
+    private long handledReports(String outcome) {
+        return meterRegistry.timer("openframe.rmm.os_update.report.duration", "outcome", outcome).count();
     }
 
     private void assertNothingLeftForRedelivery() {
