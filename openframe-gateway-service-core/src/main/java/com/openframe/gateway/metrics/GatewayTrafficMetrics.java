@@ -70,6 +70,18 @@ public class GatewayTrafficMetrics {
     }
 
     /**
+     * Counts a NATS command the subject filter refused for a client. {@code enforced=false} is the
+     * observation phase: the command was relayed and only logged, so a rise there is what to look at
+     * before turning enforcement on.
+     */
+    public void recordNatsCommandRefused(String operation, String clientKind, boolean enforced) {
+        registry.counter("openframe.tenant.gateway.nats.command.refused",
+                "operation", operation,
+                "kind", clientKind,
+                "enforced", String.valueOf(enforced)).increment();
+    }
+
+    /**
      * Counts an authenticated request by the client build in {@code X-OpenFrame-Client}. The versions come
      * from a header any caller can set, so the number of distinct kind/shell/bundle series is capped: once
      * the cap is reached, new combinations are counted under {@code other} versions of their kind. A series

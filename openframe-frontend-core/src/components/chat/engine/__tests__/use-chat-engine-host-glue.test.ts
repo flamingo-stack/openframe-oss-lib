@@ -9,6 +9,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DialogItem, HistoricalMessage, SlashCommandSummary } from '../../types';
 import type { DialogTokenUsage, FetchDialogsParams } from '../../types/unified-chat-state.types';
+import { createChatThreadStore } from '../chat-thread-store';
 import type {
   ChatDialogRecord,
   ChatHistoryBackend,
@@ -579,5 +580,47 @@ describe('useChatEngine: a reload while a reply streams', () => {
     expect(after[0].role).toBe('assistant');
     expect(JSON.stringify(after[0].parts)).toContain('Backups matter');
     expect(result.current.messages.filter(m => m.role === 'user').map(m => m.id)).toEqual(['u2']);
+  });
+});
+
+describe('useChatEngine: a send before the tail subscribed after a stopped prompt (CU-17tkuw691j4)', () => {
+  it("draws the repeat once: the stopped turn's replayed end does not spend the send's echo", async () => {
+    const history: HistoricalMessage[] = [
+      {
+        id: 'u1',
+        createdAt: '2026-11-04T10:00:00Z',
+        owner: { type: 'ADMIN' },
+        lastChunkStreamSeq: 8,
+        parts: [{ type: 'TEXT', text: 'Stopped' }],
+      },
+    ];
+    // Mingo's own store: the operator IS the admin, so its echo is consumable.
+    const store = createChatThreadStore<string>({ options: () => ({ ownEchoIncludesAdmin: true }) });
+    const { result, tail } = setup({
+      dialogId: 'd1',
+      store,
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: history, nextCursor: null }) },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(8));
+    // The send goes out before the tail has delivered anything: its echo lands in the backlog, after the stopped turn.
+    await act(async () => {
+      await result.current.sendMessage('Stopped');
+    });
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 9 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 10 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_REQUEST', text: 'Stopped', ownerType: 'ADMIN', streamSeq: 11 }, 'message');
+      tail.current?.onReplayComplete?.();
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 12 }, 'message');
+      tail.current?.onEvent({ type: 'TEXT', text: 'Red pencil', streamSeq: 13 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 14 }, 'message');
+    });
+    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    const { messages } = result.current;
+    expect(messages.filter(m => m.role === 'user')).toHaveLength(2);
+    const last = messages[messages.length - 1];
+    expect(last.role).toBe('assistant');
+    expect(JSON.stringify(last.parts)).toContain('Red pencil');
+    expect(messages[messages.length - 2].role).toBe('user');
   });
 });
