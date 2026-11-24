@@ -2,10 +2,13 @@ package com.openframe.authz.service.tenant;
 
 import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
+import com.openframe.authz.service.sso.CompanySsoLoginService;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.config.AuthHardeningProperties;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.sso.SSOConfig;
+import com.openframe.data.document.tenant.SSOPerTenantConfig;
 import com.openframe.data.document.tenant.Tenant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,11 +21,7 @@ import java.util.Optional;
 
 import static java.util.Locale.ROOT;
 
-/**
- * Resolves which tenant a login email belongs to and which authentication providers that tenant
- * offers. An existing account wins; otherwise the email's domain is matched against per-tenant
- * auto-provisioning SSO configs, then against the global domain policy.
- */
+/** Resolves sign-in choices under the deployment's workspace discovery policy. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,7 +32,9 @@ public class TenantDiscoveryService {
     private final UserService userService;
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
+    private final CompanySsoLoginService companySsoLoginService;
     private final GlobalDomainPolicyLookup globalDomainPolicyLookup;
+    private final AuthHardeningProperties hardening;
 
     public TenantDiscoveryResponse discoverTenantForEmail(String email) {
         log.debug("Discovering tenants for email: {}", email);
@@ -56,38 +57,53 @@ public class TenantDiscoveryService {
 
     private TenantDiscoveryResponse respondByEmailDomain(String email) {
         String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
+        if (!hardening.enabled()) {
+            return findLegacyTenant(domain).map(tenant -> tenantFound(email, tenant)).orElseGet(() -> noAccounts(email));
+        }
 
-        return tenantByAutoProvisionSso(domain)
-                .or(() -> tenantByGlobalDomainPolicy(domain))
-                .map(tenant -> tenantFound(email, tenant))
+        return ssoConfigService.findAutoProvisionByDomain(domain)
+                .filter(config -> !OPENFRAME_PROVIDER.equalsIgnoreCase(config.getProvider()))
+                .filter(config -> findActiveTenant(config.getTenantId()).isPresent())
+                .map(config -> companySsoForUnknownAccount(email, config))
                 .orElseGet(() -> noAccounts(email));
     }
 
-    private Optional<Tenant> tenantByAutoProvisionSso(String domain) {
+    private Optional<Tenant> findLegacyTenant(String domain) {
         return ssoConfigService.findAutoProvisionByDomain(domain)
-                .flatMap(cfg -> resolveActiveTenant(cfg.getTenantId()));
+                .flatMap(config -> findActiveTenant(config.getTenantId()))
+                .or(() -> globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                        .flatMap(this::findActiveTenant));
     }
 
-    private Optional<Tenant> tenantByGlobalDomainPolicy(String domain) {
-        return globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
-                .flatMap(this::resolveActiveTenant);
-    }
-
-    private Optional<Tenant> resolveActiveTenant(String tenantId) {
+    private Optional<Tenant> findActiveTenant(String tenantId) {
         return tenantService.findById(tenantId).filter(Tenant::isActive);
+    }
+
+    private TenantDiscoveryResponse companySsoForUnknownAccount(String email, SSOPerTenantConfig config) {
+        List<String> providers = List.of(config.getProvider().toLowerCase(ROOT));
+        return TenantDiscoveryResponse.builder()
+                .email(email)
+                .hasExistingAccounts(false)
+                .customProviders(providers)
+                .ssoLoginHandle(companySsoLoginService.issue(config.getTenantId(), providers))
+                .build();
     }
 
     private TenantDiscoveryResponse tenantFound(String email, Tenant tenant) {
         boolean openframeLoginEnabled = ssoConfigService.isOpenframeLoginEnabled(tenant.getId());
+        List<String> customProviders = ssoConfigService.getCustomProvidersForTenant(tenant.getId());
+        String handle = hardening.enabled() && !customProviders.isEmpty()
+                ? companySsoLoginService.issue(tenant.getId(), customProviders) : null;
         return TenantDiscoveryResponse.builder()
                 .email(email)
                 .hasExistingAccounts(true)
                 .tenantId(tenant.getId())
-                .tenantName(tenant.getName())
+                .tenantName(hardening.enabled() ? null : tenant.getName())
                 .domain(tenant.getDomain())
                 .authProviders(availableAuthProviders(tenant, openframeLoginEnabled))
                 .openframeLoginEnabled(openframeLoginEnabled)
-                .customProviders(ssoConfigService.getCustomProvidersForTenant(tenant.getId()))
+                .customProviders(customProviders)
+                .ssoLoginHandle(handle)
                 .build();
     }
 

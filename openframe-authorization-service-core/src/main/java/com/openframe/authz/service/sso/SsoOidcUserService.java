@@ -32,6 +32,7 @@ import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.util.OidcUserUtils.resolveNames;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
 import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static java.util.Locale.ROOT;
 
@@ -117,6 +118,18 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
             // fails at token issuance because the user does not exist in the tenant.
             log.warn("SSO auto-provisioning failed. tenantId={}, provider={}: {}", tenantId, provider, e.getMessage(), e);
         }
+    }
+
+    public AuthUser provisionCompanyAccount(String tenantId, String provider, OidcUser user) {
+        String email = resolveEmail(user);
+        boolean eligible = ssoConfigService.getSSOConfig(tenantId, provider)
+                .filter(SSOPerTenantConfig::isAutoProvisionUsers)
+                .filter(config -> isEmailAllowedByDomains(config.getAllowedDomains(), email))
+                .isPresent();
+        if (!eligible) {
+            throw new AuthFlowException(SSO_SESSION_INVALID, SSO_SESSION_INVALID.getMessage());
+        }
+        return provisionOrRefresh(tenantId, email, email.toLowerCase(ROOT), user, provider, resolvePictureUrl(user));
     }
 
     private AuthUser provisionOrRefresh(String tenantId,

@@ -8,6 +8,7 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,7 @@ import java.util.List;
 import static com.openframe.data.document.user.UserRole.OWNER;
 import static java.util.Locale.ROOT;
 
+/** Creates the tenant, owner and default organization required for a new workspace. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -46,8 +48,14 @@ public class TenantRegistrationService {
             throw new IllegalArgumentException("This account already belongs to another tenant.");
         }
 
-        String reservedTenantId = registrationProcessor.reserveTenantIdForRegistration(request);
-        Tenant tenant = tenantService.createTenant(reservedTenantId, request.getTenantName(), tenantDomain);
+        ProvisionedTenant result = provisionTenant(registrationProcessor.reserveTenantIdForRegistration(request), request);
+        registrationProcessor.postProcessTenantRegistration(result.getTenant(), result.getOwner(), request);
+        return result.getTenant();
+    }
+
+    public ProvisionedTenant provisionTenant(String tenantId, TenantRegistrationRequest request) {
+        String userEmail = request.getEmail().toLowerCase(ROOT);
+        Tenant tenant = tenantService.createTenant(tenantId, request.getTenantName(), request.getTenantDomain().toLowerCase(ROOT));
 
         // Verified-at-creation when the SSO flow proved the email, so downstream post-processing
         // (e.g. the SaaS verification email) sees the final state rather than racing an update.
@@ -63,8 +71,13 @@ public class TenantRegistrationService {
 
         organizationService.createDefaultOrganization(savedTenant.getId());
 
-        registrationProcessor.postProcessTenantRegistration(savedTenant, user, request);
+        return new ProvisionedTenant(savedTenant, user);
+    }
 
-        return savedTenant;
+    /** Workspace and owner created together for registration post-processing. */
+    @Value
+    public static class ProvisionedTenant {
+        Tenant tenant;
+        AuthUser owner;
     }
 }

@@ -2,6 +2,7 @@ package com.openframe.data.repository.tenant;
 
 import com.openframe.data.document.tenant.Tenant;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.ReadPreference;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -19,10 +20,9 @@ public interface TenantRepository extends MongoRepository<Tenant, String>, BaseT
     @Override
     Optional<Tenant> findByDomain(String domain);
 
-    /**
-     * Check if domain exists
-     */
+    /** Includes newly registered workspaces when checking whether a domain is available. */
     @Override
+    @ReadPreference("primary")
     Boolean existsByDomain(String domain);
 
     interface DomainView { String getDomain(); }

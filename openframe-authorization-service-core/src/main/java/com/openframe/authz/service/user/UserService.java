@@ -316,7 +316,7 @@ public class UserService {
         if (userId == null || userId.isBlank()) {
             return;
         }
-        userRepository.findById(userId).ifPresent(user -> {
+        userRepository.findPrimaryById(userId).ifPresent(user -> {
             if (user.isEmailVerified()) {
                 return;
             }

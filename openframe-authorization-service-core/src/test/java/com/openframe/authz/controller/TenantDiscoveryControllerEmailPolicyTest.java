@@ -5,14 +5,15 @@ import com.openframe.authz.dto.EmailDomainAllowedResponse;
 import com.openframe.authz.dto.EmailRefusalReason;
 import com.openframe.authz.service.tenant.TenantDiscoveryService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.config.AuthHardeningProperties;
 import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.core.email.EmailVerdict;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,8 +38,13 @@ class TenantDiscoveryControllerEmailPolicyTest {
     private UserService userService;
     @Mock
     private EmailDomainPolicy emailDomainPolicy;
-    @InjectMocks
     private TenantDiscoveryController controller;
+
+    @BeforeEach
+    void setUp() {
+        controller = new TenantDiscoveryController(tenantDiscoveryService, userService, emailDomainPolicy,
+                new AuthHardeningProperties(false));
+    }
 
     @ParameterizedTest
     @MethodSource("refusals")
@@ -124,6 +131,23 @@ class TenantDiscoveryControllerEmailPolicyTest {
 
         // verifications
         verify(emailDomainPolicy, never()).verdict(anyString());
+    }
+
+    @Test
+    void emailAvailable_enabledHardening_usesOnlyEmailPolicy() {
+        // setup
+        var protectedController = new TenantDiscoveryController(tenantDiscoveryService, userService, emailDomainPolicy,
+                new AuthHardeningProperties(true));
+        when(emailDomainPolicy.verdict(EMAIL)).thenReturn(EmailVerdict.ALLOWED);
+
+        // execution
+        EmailAvailabilityResponse response = protectedController.emailAvailable(EMAIL);
+
+        // verifications
+        assertThat(response)
+                .extracting(EmailAvailabilityResponse::isAvailable, EmailAvailabilityResponse::getReason)
+                .containsExactly(true, null);
+        verifyNoInteractions(userService);
     }
 
     private static Stream<Arguments> refusals() {
