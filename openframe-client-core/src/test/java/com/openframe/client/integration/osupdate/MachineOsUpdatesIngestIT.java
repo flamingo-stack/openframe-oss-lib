@@ -629,6 +629,33 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
     }
 
     @Test
+    void updateFirstReportedByAnOldAgentWithoutCategoryIds_otherUntilADeviceReportsThem_thenSecurity() {
+        // setup
+        String oldAgentMachineId = newMachine();
+        String machineId = newMachine();
+        ObjectNode oldAgentReport = windowsReport();
+        ObjectNode windowsOfTheItem = (ObjectNode) items(oldAgentReport).get(0).get("windows");
+        windowsOfTheItem.remove("updateType");
+        ((ObjectNode) windowsOfTheItem.get("categories").get(0)).remove("id");
+        publish(oldAgentMachineId, oldAgentReport.toString());
+        awaitProcessed();
+        assertThat(osUpdates()).singleElement().satisfies(osUpdate -> assertThat(osUpdate)
+                .containsEntry("classification", "OTHER")
+                .doesNotContainKey("updateType"));
+
+        // execution
+        publish(machineId, windowsReport().toString());
+        awaitProcessed();
+
+        // verifications
+        assertThat(osUpdates()).singleElement().satisfies(osUpdate -> assertThat(osUpdate)
+                .containsEntry("identifier", WINDOWS_PENDING)
+                .containsEntry("categoryIds", List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
+                .containsEntry("updateType", "SOFTWARE")
+                .containsEntry("classification", "SECURITY"));
+    }
+
+    @Test
     void sameIdentifierInAnotherTenantAndOnAnotherPlatform_oneUpdateEach() {
         // setup
         String windowsMachineId = newMachine();
