@@ -34,38 +34,46 @@ public class IntegrationController {
             answers 403 `ENDPOINT_NOT_ALLOWED`. Paths start with `/tools/fleetmdm-server/api/latest/fleet`.
 
             **Hosts**
-            - `GET .../hosts`
-            - `GET .../hosts/{id}`
-            - `GET .../hosts/identifier/{identifier}`
-            - `GET .../hosts/{id}/software`
-            - `GET .../hosts/{id}/queries`
-            - `POST .../hosts/{id}/refetch`
+            ```
+            GET     .../hosts
+            GET     .../hosts/{id}
+            GET     .../hosts/identifier/{identifier}
+            GET     .../hosts/{id}/software
+            GET     .../hosts/{id}/queries
+            POST    .../hosts/{id}/refetch
+            ```
 
             **Policies**
-            - `GET .../policies`
-            - `POST .../policies`
-            - `GET .../policies/{id}`
-            - `PATCH .../policies/{id}`
-            - `GET .../policies/count`
-            - `POST .../policies/delete`
-            - `GET .../policies/{id}/hosts`
-            - `PUT .../policies/{id}/hosts`
+            ```
+            GET     .../policies
+            POST    .../policies
+            GET     .../policies/{id}
+            PATCH   .../policies/{id}
+            GET     .../policies/count
+            POST    .../policies/delete
+            GET     .../policies/{id}/hosts
+            PUT     .../policies/{id}/hosts
+            ```
 
             **Queries**
-            - `GET .../queries`
-            - `POST .../queries`
-            - `GET .../queries/{id}`
-            - `PATCH .../queries/{id}`
-            - `DELETE .../queries/id/{id}`
-            - `POST .../queries/run`
-            - `GET .../queries/{id}/report`
-            - `GET .../queries/{id}/hosts`
-            - `PUT .../queries/{id}/hosts`
+            ```
+            GET     .../queries
+            POST    .../queries
+            GET     .../queries/{id}
+            PATCH   .../queries/{id}
+            DELETE  .../queries/id/{id}
+            POST    .../queries/run
+            GET     .../queries/{id}/report
+            GET     .../queries/{id}/hosts
+            PUT     .../queries/{id}/hosts
+            ```
 
             **Labels**
-            - `GET .../labels`
-            - `POST .../labels`
-            - `DELETE .../labels/id/{id}`
+            ```
+            GET     .../labels
+            POST    .../labels
+            DELETE  .../labels/id/{id}
+            ```
 
             Writes need `Content-Type: application/json`. `POST .../queries/run` starts a live query; its \
             results cannot be read through this API.
