@@ -13,10 +13,10 @@ public class HostMdm {
     private Boolean connectedToFleet;
 
     @JsonProperty("device_status")
-    private String deviceStatus;
+    private HostDeviceStatus deviceStatus;
 
     @JsonProperty("pending_action")
-    private String pendingAction;
+    private HostPendingAction pendingAction;
 
     public String getEnrollmentStatus() { return enrollmentStatus; }
     public void setEnrollmentStatus(String enrollmentStatus) { this.enrollmentStatus = enrollmentStatus; }
@@ -24,9 +24,9 @@ public class HostMdm {
     public Boolean getConnectedToFleet() { return connectedToFleet; }
     public void setConnectedToFleet(Boolean connectedToFleet) { this.connectedToFleet = connectedToFleet; }
 
-    public String getDeviceStatus() { return deviceStatus; }
-    public void setDeviceStatus(String deviceStatus) { this.deviceStatus = deviceStatus; }
+    public HostDeviceStatus getDeviceStatus() { return deviceStatus; }
+    public void setDeviceStatus(HostDeviceStatus deviceStatus) { this.deviceStatus = deviceStatus; }
 
-    public String getPendingAction() { return pendingAction; }
-    public void setPendingAction(String pendingAction) { this.pendingAction = pendingAction; }
+    public HostPendingAction getPendingAction() { return pendingAction; }
+    public void setPendingAction(HostPendingAction pendingAction) { this.pendingAction = pendingAction; }
 }

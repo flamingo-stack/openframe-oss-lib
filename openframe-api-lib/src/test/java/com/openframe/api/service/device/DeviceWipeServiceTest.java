@@ -8,13 +8,16 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.model.Host;
+import com.openframe.sdk.fleetmdm.model.HostDeviceStatus;
 import com.openframe.sdk.fleetmdm.model.HostMdm;
+import com.openframe.sdk.fleetmdm.model.HostPendingAction;
 import com.openframe.sdk.fleetmdm.model.WindowsWipeType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,10 +31,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -51,10 +51,10 @@ class DeviceWipeServiceTest {
     private DeviceWipeService service;
 
     @Test
-    void wipe_windowsHostInFleetMdm_requestsProtectedWipeAndReportsPending() {
+    void wipe_managedWindowsDeviceOnFleet_requestsProtectedWipeAndReportsPending() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "unlocked", null)));
+        givenDeviceOnHost(machine(DeviceStatus.MANAGED, OsType.WINDOWS));
+        when(fleetMdmClientProvider.client()).thenReturn(fleet);
 
         // execution
         DeviceWipe result = service.wipe(MACHINE_ID);
@@ -78,7 +78,19 @@ class DeviceWipeServiceTest {
     @Test
     void wipe_deletedDevice_refusedWithoutCallingFleet() {
         // setup
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine(DeviceStatus.DELETED)));
+        when(deviceService.findByMachineId(MACHINE_ID))
+                .thenReturn(Optional.of(machine(DeviceStatus.DELETED, OsType.WINDOWS)));
+
+        // execution / verifications
+        assertThatThrownBy(() -> service.wipe(MACHINE_ID)).isInstanceOf(BadRequestException.class);
+        verifyNoInteractions(fleetMdmClientProvider);
+    }
+
+    @Test
+    void wipe_macDevice_refusedWithoutCallingFleet() {
+        // setup
+        when(deviceService.findByMachineId(MACHINE_ID))
+                .thenReturn(Optional.of(machine(DeviceStatus.MANAGED, OsType.MAC_OS)));
 
         // execution / verifications
         assertThatThrownBy(() -> service.wipe(MACHINE_ID)).isInstanceOf(BadRequestException.class);
@@ -88,7 +100,8 @@ class DeviceWipeServiceTest {
     @Test
     void wipe_deviceWithoutFleetConnection_refusedWithoutCallingFleet() {
         // setup
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine(DeviceStatus.MANAGED)));
+        when(deviceService.findByMachineId(MACHINE_ID))
+                .thenReturn(Optional.of(machine(DeviceStatus.MANAGED, OsType.WINDOWS)));
         when(toolConnectionRepository.findByMachineIdAndToolType(MACHINE_ID, ToolType.FLEET_MDM))
                 .thenReturn(Optional.empty());
 
@@ -97,38 +110,11 @@ class DeviceWipeServiceTest {
         verifyNoInteractions(fleetMdmClientProvider);
     }
 
-    @Test
-    void wipe_hostMissingInFleet_refused() {
-        // setup
-        givenManagedDeviceOnHost();
-        givenHost(null);
-
-        // execution / verifications
-        assertThatThrownBy(() -> service.wipe(MACHINE_ID)).isInstanceOf(BadRequestException.class);
-        verify(fleet, never()).wipeHost(anyLong(), any());
-    }
-
-    @Test
-    void wipe_macHost_refusedWithoutWipeCall() {
-        // setup
-        givenManagedDeviceOnHost();
-        Host host = windowsHost(mdm(true, "unlocked", null));
-        host.setPlatform("darwin");
-        givenHost(host);
-
-        // execution / verifications
-        assertThatThrownBy(() -> service.wipe(MACHINE_ID)).isInstanceOf(BadRequestException.class);
-        verify(fleet, never()).wipeHost(anyLong(), any());
-    }
-
     @ParameterizedTest
-    @ValueSource(ints = {402, 422})
+    @ValueSource(ints = {402, 404, 422})
     void wipe_fleetRefusesRequest_badRequest(int status) {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "unlocked", null)));
-        doThrow(new FleetMdmApiException("refused", status, "{}"))
-                .when(fleet).wipeHost(HOST_ID, WindowsWipeType.DO_WIPE_PROTECTED);
+        givenFleetAnswersWipe(status);
 
         // execution / verifications
         assertThatThrownBy(() -> service.wipe(MACHINE_ID)).isInstanceOf(BadRequestException.class);
@@ -137,22 +123,17 @@ class DeviceWipeServiceTest {
     @Test
     void wipe_hostAlreadyWiped_conflict() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "unlocked", null)));
-        doThrow(new FleetMdmApiException("wiped", 409, "{}"))
-                .when(fleet).wipeHost(HOST_ID, WindowsWipeType.DO_WIPE_PROTECTED);
+        givenFleetAnswersWipe(409);
 
         // execution / verifications
         assertThatThrownBy(() -> service.wipe(MACHINE_ID)).isInstanceOf(ConflictException.class);
     }
 
-    @Test
-    void wipe_fleetServerError_propagatesFleetException() {
+    @ParameterizedTest
+    @ValueSource(ints = {500, 599})
+    void wipe_fleetServerError_propagatesFleetException(int status) {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "unlocked", null)));
-        FleetMdmApiException failure = new FleetMdmApiException("boom", 500, "{}");
-        doThrow(failure).when(fleet).wipeHost(HOST_ID, WindowsWipeType.DO_WIPE_PROTECTED);
+        FleetMdmApiException failure = givenFleetAnswersWipe(status);
 
         // execution / verifications
         assertThatThrownBy(() -> service.wipe(MACHINE_ID)).isSameAs(failure);
@@ -161,8 +142,7 @@ class DeviceWipeServiceTest {
     @Test
     void getWipe_windowsHostInFleetMdmWithNothingPending_available() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "unlocked", null)));
+        givenWindowsDeviceWithHost(windowsHost(mdm(true, HostDeviceStatus.UNLOCKED, HostPendingAction.NONE)));
 
         // execution
         DeviceWipe result = service.getWipe(MACHINE_ID);
@@ -173,10 +153,21 @@ class DeviceWipeServiceTest {
     }
 
     @Test
+    void getWipe_pendingActionAbsent_readAsNothingPending() {
+        // setup
+        givenWindowsDeviceWithHost(windowsHost(mdm(true, HostDeviceStatus.UNLOCKED, null)));
+
+        // execution
+        DeviceWipe result = service.getWipe(MACHINE_ID);
+
+        // verifications
+        assertThat(result.isAvailable()).isTrue();
+    }
+
+    @Test
     void getWipe_pendingWipe_pendingAndUnavailable() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "unlocked", "wipe")));
+        givenWindowsDeviceWithHost(windowsHost(mdm(true, HostDeviceStatus.UNLOCKED, HostPendingAction.WIPE)));
 
         // execution
         DeviceWipe result = service.getWipe(MACHINE_ID);
@@ -189,8 +180,7 @@ class DeviceWipeServiceTest {
     @Test
     void getWipe_wipedHost_wipedAndUnavailable() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "wiped", null)));
+        givenWindowsDeviceWithHost(windowsHost(mdm(true, HostDeviceStatus.WIPED, HostPendingAction.NONE)));
 
         // execution
         DeviceWipe result = service.getWipe(MACHINE_ID);
@@ -203,8 +193,7 @@ class DeviceWipeServiceTest {
     @Test
     void getWipe_pendingLock_unavailable() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "unlocked", "lock")));
+        givenWindowsDeviceWithHost(windowsHost(mdm(true, HostDeviceStatus.UNLOCKED, HostPendingAction.LOCK)));
 
         // execution
         DeviceWipe result = service.getWipe(MACHINE_ID);
@@ -217,8 +206,7 @@ class DeviceWipeServiceTest {
     @Test
     void getWipe_lockedHost_unavailable() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(true, "locked", null)));
+        givenWindowsDeviceWithHost(windowsHost(mdm(true, HostDeviceStatus.LOCKED, HostPendingAction.NONE)));
 
         // execution
         DeviceWipe result = service.getWipe(MACHINE_ID);
@@ -229,37 +217,9 @@ class DeviceWipeServiceTest {
     }
 
     @Test
-    void getWipe_fleetUnreachable_unavailable() {
-        // setup
-        givenManagedDeviceOnHost();
-        when(fleetMdmClientProvider.client()).thenReturn(fleet);
-        when(fleet.getHostById(HOST_ID)).thenThrow(new FleetMdmApiException("down", 503, ""));
-
-        // execution
-        DeviceWipe result = service.getWipe(MACHINE_ID);
-
-        // verifications
-        assertThat(result).isEqualTo(DeviceWipe.unavailable());
-    }
-
-    @Test
-    void getWipe_hostMissingInFleet_unavailable() {
-        // setup
-        givenManagedDeviceOnHost();
-        givenHost(null);
-
-        // execution
-        DeviceWipe result = service.getWipe(MACHINE_ID);
-
-        // verifications
-        assertThat(result).isEqualTo(DeviceWipe.unavailable());
-    }
-
-    @Test
     void getWipe_hostNotInFleetMdm_unavailable() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(mdm(false, "unlocked", null)));
+        givenWindowsDeviceWithHost(windowsHost(mdm(false, HostDeviceStatus.UNLOCKED, HostPendingAction.NONE)));
 
         // execution
         DeviceWipe result = service.getWipe(MACHINE_ID);
@@ -271,8 +231,7 @@ class DeviceWipeServiceTest {
     @Test
     void getWipe_hostWithoutMdmSection_unavailable() {
         // setup
-        givenManagedDeviceOnHost();
-        givenHost(windowsHost(null));
+        givenWindowsDeviceWithHost(windowsHost(null));
 
         // execution
         DeviceWipe result = service.getWipe(MACHINE_ID);
@@ -282,9 +241,50 @@ class DeviceWipeServiceTest {
     }
 
     @Test
+    void getWipe_hostMissingInFleet_unavailable() {
+        // setup
+        givenWindowsDeviceWithHost(null);
+
+        // execution
+        DeviceWipe result = service.getWipe(MACHINE_ID);
+
+        // verifications
+        assertThat(result).isEqualTo(DeviceWipe.unavailable());
+    }
+
+    @Test
+    void getWipe_fleetUnreachable_unavailable() {
+        // setup
+        givenDeviceOnHost(machine(DeviceStatus.MANAGED, OsType.WINDOWS));
+        when(fleetMdmClientProvider.client()).thenReturn(fleet);
+        when(fleet.getHostById(HOST_ID)).thenThrow(new FleetMdmApiException("down", 503, ""));
+
+        // execution
+        DeviceWipe result = service.getWipe(MACHINE_ID);
+
+        // verifications
+        assertThat(result).isEqualTo(DeviceWipe.unavailable());
+    }
+
+    @Test
+    void getWipe_macDevice_unavailableWithoutCallingFleet() {
+        // setup
+        when(deviceService.findByMachineId(MACHINE_ID))
+                .thenReturn(Optional.of(machine(DeviceStatus.MANAGED, OsType.MAC_OS)));
+
+        // execution
+        DeviceWipe result = service.getWipe(MACHINE_ID);
+
+        // verifications
+        assertThat(result).isEqualTo(DeviceWipe.unavailable());
+        verifyNoInteractions(fleetMdmClientProvider);
+    }
+
+    @Test
     void getWipe_archivedDevice_unavailableWithoutCallingFleet() {
         // setup
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine(DeviceStatus.ARCHIVED)));
+        when(deviceService.findByMachineId(MACHINE_ID))
+                .thenReturn(Optional.of(machine(DeviceStatus.ARCHIVED, OsType.WINDOWS)));
 
         // execution
         DeviceWipe result = service.getWipe(MACHINE_ID);
@@ -297,7 +297,8 @@ class DeviceWipeServiceTest {
     @Test
     void getWipe_nonNumericFleetAgentId_unavailableWithoutCallingFleet() {
         // setup
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine(DeviceStatus.MANAGED)));
+        when(deviceService.findByMachineId(MACHINE_ID))
+                .thenReturn(Optional.of(machine(DeviceStatus.MANAGED, OsType.WINDOWS)));
         when(toolConnectionRepository.findByMachineIdAndToolType(MACHINE_ID, ToolType.FLEET_MDM))
                 .thenReturn(Optional.of(connection("4C4C4544-0044-3510-8052-B4C04F4B4E33")));
 
@@ -309,21 +310,31 @@ class DeviceWipeServiceTest {
         verifyNoInteractions(fleetMdmClientProvider);
     }
 
-    private void givenManagedDeviceOnHost() {
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine(DeviceStatus.MANAGED)));
-        when(toolConnectionRepository.findByMachineIdAndToolType(MACHINE_ID, ToolType.FLEET_MDM))
-                .thenReturn(Optional.of(connection(String.valueOf(HOST_ID))));
+    private FleetMdmApiException givenFleetAnswersWipe(int status) {
+        givenDeviceOnHost(machine(DeviceStatus.MANAGED, OsType.WINDOWS));
+        when(fleetMdmClientProvider.client()).thenReturn(fleet);
+        FleetMdmApiException failure = new FleetMdmApiException("refused", status, "{}");
+        doThrow(failure).when(fleet).wipeHost(HOST_ID, WindowsWipeType.DO_WIPE_PROTECTED);
+        return failure;
     }
 
-    private void givenHost(Host host) {
+    private void givenWindowsDeviceWithHost(Host host) {
+        givenDeviceOnHost(machine(DeviceStatus.MANAGED, OsType.WINDOWS));
         when(fleetMdmClientProvider.client()).thenReturn(fleet);
         when(fleet.getHostById(HOST_ID)).thenReturn(host);
     }
 
-    private static Machine machine(DeviceStatus status) {
+    private void givenDeviceOnHost(Machine machine) {
+        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+        when(toolConnectionRepository.findByMachineIdAndToolType(MACHINE_ID, ToolType.FLEET_MDM))
+                .thenReturn(Optional.of(connection(String.valueOf(HOST_ID))));
+    }
+
+    private static Machine machine(DeviceStatus status, OsType osType) {
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setStatus(status);
+        machine.setOsType(osType);
         return machine;
     }
 
@@ -343,7 +354,7 @@ class DeviceWipeServiceTest {
         return host;
     }
 
-    private static HostMdm mdm(boolean connectedToFleet, String deviceStatus, String pendingAction) {
+    private static HostMdm mdm(boolean connectedToFleet, HostDeviceStatus deviceStatus, HostPendingAction pendingAction) {
         HostMdm mdm = new HostMdm();
         mdm.setConnectedToFleet(connectedToFleet);
         mdm.setDeviceStatus(deviceStatus);
