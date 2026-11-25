@@ -34,6 +34,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class CustomDeviceOsUpdateHistoryRepositoryImplTest {
 
+    private static final List<String> EVERY_DEVICE = null;
+
     private static final String TENANT_ID = "tenant-1";
     private static final String MACHINE_ID = "machine-1";
     private static final String ENTRY_ID = "6aff19c07ce86a3f0386ff82";
@@ -143,7 +145,7 @@ class CustomDeviceOsUpdateHistoryRepositoryImplTest {
                 eq(InstalledOsUpdateDevice.class))).thenReturn(aggregationResults);
 
         // execution
-        List<InstalledOsUpdateDevice> page = repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, cursor, 21);
+        List<InstalledOsUpdateDevice> page = repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, EVERY_DEVICE, cursor, 21);
 
         // verifications
         assertThat(page).containsExactly(new InstalledOsUpdateDevice(MACHINE_ID, INSTALLED_AT));
@@ -168,7 +170,7 @@ class CustomDeviceOsUpdateHistoryRepositoryImplTest {
         Document keyset = new Document("$or", List.of(installedEarlier, installedTogetherLowerMachineId));
 
         // execution
-        repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, cursor, 5);
+        repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, EVERY_DEVICE, cursor, 5);
 
         // verifications
         assertThat(aggregationCaptor.getValue().toPipeline(Aggregation.DEFAULT_CONTEXT)).containsExactly(
@@ -186,7 +188,7 @@ class CustomDeviceOsUpdateHistoryRepositoryImplTest {
 
         // execution
         BadRequestException ex = assertThrows(BadRequestException.class,
-                () -> repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, cursor, 5));
+                () -> repository.findInstalledDevicePage(TENANT_ID, IDENTIFIER, EVERY_DEVICE, cursor, 5));
 
         // verifications
         assertThat(ex.getMessage()).contains("Unparseable epoch millis");

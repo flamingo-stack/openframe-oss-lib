@@ -64,6 +64,32 @@ class OsUpdateGraphQLMapperTest {
     }
 
     @Test
+    void toOrganizationIds_inputWithOrganizations_thoseOrganizations() {
+        // setup
+        OsUpdateFilterInput input = OsUpdateFilterInput.builder().organizationIds(List.of("org-1")).build();
+
+        // execution
+        List<String> organizationIds = mapper.toOrganizationIds(input);
+
+        // verifications
+        assertThat(organizationIds).containsExactly("org-1");
+    }
+
+    @Test
+    void toOrganizationIds_noInputOrNoOrganizations_empty() {
+        // setup
+        OsUpdateFilterInput withoutOrganizations = OsUpdateFilterInput.builder().search("KB").build();
+
+        // execution
+        List<String> ofNoInput = mapper.toOrganizationIds(null);
+        List<String> ofNoOrganizations = mapper.toOrganizationIds(withoutOrganizations);
+
+        // verifications
+        assertThat(ofNoInput).isEmpty();
+        assertThat(ofNoOrganizations).isEmpty();
+    }
+
+    @Test
     void toCursorPaginationCriteria_firstAndAfter_forwardPageFromTheDecodedCursor() {
         // setup
         String after = CursorCodec.encode("1795142470000|machine-1");

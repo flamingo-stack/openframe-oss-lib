@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -31,17 +32,24 @@ public class CustomDeviceOsPendingUpdateRepositoryImpl implements CustomDeviceOs
 
     @Override
     public List<DeviceOsPendingUpdate> findDevicePage(String tenantId, OsPlatform platform, String identifier,
-                                                      Collection<String> excludedMachineIds, String cursor,
-                                                      int limit) {
+                                                      Collection<String> excludedMachineIds,
+                                                      Collection<String> machineIds, String cursor, int limit) {
         Criteria pendingOnListedDevices = Criteria.where(FIELD_TENANT_ID).is(tenantId)
                 .and(FIELD_PLATFORM).is(platform)
                 .and(FIELD_IDENTIFIER).is(identifier);
         Criteria notExcluded = Criteria.where(FIELD_MACHINE_ID).nin(excludedMachineIds);
-        Criteria page = new Criteria().andOperator(pendingOnListedDevices, notExcluded);
+        List<Criteria> conditions = new ArrayList<>();
+        conditions.add(pendingOnListedDevices);
+        conditions.add(notExcluded);
+        if (machineIds != null) {
+            Criteria onMachines = Criteria.where(FIELD_MACHINE_ID).in(machineIds);
+            conditions.add(onMachines);
+        }
         if (!isBlank(cursor)) {
             Criteria afterCursor = after(cursor);
-            page = new Criteria().andOperator(pendingOnListedDevices, notExcluded, afterCursor);
+            conditions.add(afterCursor);
         }
+        Criteria page = new Criteria().andOperator(conditions);
         Query query = Query.query(page).with(NEWEST_DISCOVERED_FIRST).limit(limit);
         return mongoTemplate.find(query, DeviceOsPendingUpdate.class);
     }

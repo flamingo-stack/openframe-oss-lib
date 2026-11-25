@@ -30,6 +30,13 @@ public class OsUpdateGraphQLMapper {
                 .build();
     }
 
+    public List<String> toOrganizationIds(OsUpdateFilterInput osUpdateFilterInput) {
+        if (osUpdateFilterInput == null || osUpdateFilterInput.getOrganizationIds() == null) {
+            return List.of();
+        }
+        return osUpdateFilterInput.getOrganizationIds();
+    }
+
     public CursorPaginationCriteria toCursorPaginationCriteria(Integer first, String after) {
         ConnectionArgs connectionArgs = ConnectionArgs.builder().first(first).after(after).build();
         return CursorPaginationCriteria.fromConnectionArgs(connectionArgs);

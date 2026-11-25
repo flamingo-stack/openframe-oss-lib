@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -54,6 +55,11 @@ public class CustomOsUpdateRepositoryImpl implements CustomOsUpdateRepository {
         if (isNotBlank(search)) {
             Criteria matchingSearch = matchingSearch(search);
             conditions.add(matchingSearch);
+        }
+        Collection<String> osUpdateIds = filter.getOsUpdateIds();
+        if (osUpdateIds != null) {
+            Criteria ofOsUpdateIds = Criteria.where(FIELD_ID).in(osUpdateIds);
+            conditions.add(ofOsUpdateIds);
         }
         if (isNotBlank(cursor)) {
             Criteria afterCursor = after(cursor);

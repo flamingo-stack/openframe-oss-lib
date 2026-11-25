@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
+import com.openframe.api.dataloader.OsUpdateDeviceCountsKey;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
@@ -16,6 +17,7 @@ import com.openframe.api.service.rmm.osupdate.OsUpdateQueryService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateFilter;
+import graphql.execution.DataFetcherResult;
 import org.dataloader.DataLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class OsUpdateDataFetcherTest {
 
+    private static final List<String> ORGANIZATION_IDS = List.of("org-1");
+
     private static final String OS_UPDATE_ID = "6aff19c07ce86a3f0386ff82";
     private static final String MACHINE_ID = "machine-1";
     private static final String AFTER = "after-cursor";
@@ -45,7 +49,7 @@ class OsUpdateDataFetcherTest {
     @Mock private OsUpdateQueryService osUpdateQueryService;
     @Mock private OsUpdateGraphQLMapper osUpdateGraphQLMapper;
     @Mock private DgsDataFetchingEnvironment dfe;
-    @Mock private DataLoader<String, OsUpdateDeviceCounts> deviceCountsDataLoader;
+    @Mock private DataLoader<OsUpdateDeviceCountsKey, OsUpdateDeviceCounts> deviceCountsDataLoader;
     @Mock private DataLoader<String, Machine> machineDataLoader;
 
     @InjectMocks private OsUpdateDataFetcher dataFetcher;
@@ -70,14 +74,17 @@ class OsUpdateDataFetcherTest {
                 GenericConnection.<GenericEdge<OsUpdateResponse>>builder().edges(List.of()).build();
         when(osUpdateGraphQLMapper.toOsUpdateFilter(filterInput)).thenReturn(osUpdateFilter);
         when(osUpdateGraphQLMapper.toCursorPaginationCriteria(5, AFTER)).thenReturn(pagination);
-        when(osUpdateQueryService.listOsUpdates(osUpdateFilter, pagination)).thenReturn(osUpdates);
+        when(osUpdateGraphQLMapper.toOrganizationIds(filterInput)).thenReturn(ORGANIZATION_IDS);
+        when(osUpdateQueryService.listOsUpdates(osUpdateFilter, ORGANIZATION_IDS, pagination)).thenReturn(osUpdates);
         when(osUpdateGraphQLMapper.toOsUpdateConnection(osUpdates)).thenReturn(connection);
 
         // execution
-        GenericConnection<GenericEdge<OsUpdateResponse>> found = dataFetcher.osUpdates(filterInput, 5, AFTER);
+        DataFetcherResult<GenericConnection<GenericEdge<OsUpdateResponse>>> found =
+                dataFetcher.osUpdates(filterInput, 5, AFTER);
 
         // verifications
-        assertThat(found).isSameAs(connection);
+        assertThat(found.getData()).isSameAs(connection);
+        assertThat(found.getLocalContext()).isEqualTo(ORGANIZATION_IDS);
     }
 
     @Test
@@ -112,13 +119,13 @@ class OsUpdateDataFetcherTest {
         GenericConnection<GenericEdge<OsUpdateDeviceResponse>> connection =
                 GenericConnection.<GenericEdge<OsUpdateDeviceResponse>>builder().edges(List.of()).build();
         when(osUpdateGraphQLMapper.toCursorPaginationCriteria(5, AFTER)).thenReturn(pagination);
-        when(osUpdateQueryService.listDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.INSTALLED, pagination))
+        when(osUpdateQueryService.listDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.INSTALLED, ORGANIZATION_IDS, pagination))
                 .thenReturn(devices);
         when(osUpdateGraphQLMapper.toDeviceConnection(devices)).thenReturn(connection);
 
         // execution
         GenericConnection<GenericEdge<OsUpdateDeviceResponse>> found =
-                dataFetcher.osUpdateDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.INSTALLED, 5, AFTER);
+                dataFetcher.osUpdateDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.INSTALLED, ORGANIZATION_IDS, 5, AFTER);
 
         // verifications
         assertThat(found).isSameAs(connection);
@@ -128,12 +135,12 @@ class OsUpdateDataFetcherTest {
     void osUpdateDevices_noSuchUpdate_osUpdateNotFoundPassedOn() {
         // setup
         when(osUpdateGraphQLMapper.toCursorPaginationCriteria(null, null)).thenReturn(pagination);
-        when(osUpdateQueryService.listDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.PENDING, pagination))
+        when(osUpdateQueryService.listDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.PENDING, null, pagination))
                 .thenThrow(new OsUpdateNotFoundException(NOT_FOUND));
 
         // execution
         OsUpdateNotFoundException ex = assertThrows(OsUpdateNotFoundException.class,
-                () -> dataFetcher.osUpdateDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.PENDING, null, null));
+                () -> dataFetcher.osUpdateDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.PENDING, null, null, null));
 
         // verifications
         assertThat(ex.getMessage()).isEqualTo(NOT_FOUND);
@@ -166,6 +173,25 @@ class OsUpdateDataFetcherTest {
     }
 
     @Test
+    void pendingDeviceCount_updateListedForOrganizations_countsLoadedForThoseOrganizations() {
+        // setup
+        OsUpdateDeviceCounts deviceCounts = OsUpdateDeviceCounts.builder().pendingDeviceCount(2).build();
+        OsUpdateDeviceCountsKey osUpdateDeviceCountsKey =
+                OsUpdateDeviceCountsKey.builder().osUpdateId(OS_UPDATE_ID).organizationIds(ORGANIZATION_IDS).build();
+        doReturn(osUpdate).when(dfe).getSource();
+        doReturn(ORGANIZATION_IDS).when(dfe).getLocalContext();
+        doReturn(deviceCountsDataLoader).when(dfe).getDataLoader("osUpdateDeviceCountsDataLoader");
+        when(deviceCountsDataLoader.load(osUpdateDeviceCountsKey))
+                .thenReturn(CompletableFuture.completedFuture(deviceCounts));
+
+        // execution
+        CompletableFuture<Integer> pendingDeviceCount = dataFetcher.pendingDeviceCount(dfe);
+
+        // verifications
+        assertThat(pendingDeviceCount).isCompletedWithValue(2);
+    }
+
+    @Test
     void machine_deviceOfAnUpdate_machineOfTheMachineLoaderByItsMachineId() {
         // setup
         OsUpdateDeviceResponse device = OsUpdateDeviceResponse.builder().machineId(MACHINE_ID).build();
@@ -186,6 +212,9 @@ class OsUpdateDataFetcherTest {
                 OsUpdateDeviceCounts.builder().pendingDeviceCount(7).installedDeviceCount(3).build();
         doReturn(osUpdate).when(dfe).getSource();
         doReturn(deviceCountsDataLoader).when(dfe).getDataLoader("osUpdateDeviceCountsDataLoader");
-        when(deviceCountsDataLoader.load(OS_UPDATE_ID)).thenReturn(CompletableFuture.completedFuture(deviceCounts));
+        OsUpdateDeviceCountsKey osUpdateDeviceCountsKey =
+                OsUpdateDeviceCountsKey.builder().osUpdateId(OS_UPDATE_ID).organizationIds(List.of()).build();
+        when(deviceCountsDataLoader.load(osUpdateDeviceCountsKey))
+                .thenReturn(CompletableFuture.completedFuture(deviceCounts));
     }
 }

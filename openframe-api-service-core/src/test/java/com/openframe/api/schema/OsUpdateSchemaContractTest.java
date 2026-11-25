@@ -123,7 +123,8 @@ class OsUpdateSchemaContractTest {
         assertThat(inputFields("OsUpdateFilterInput")).containsExactlyInAnyOrderEntriesOf(Map.of(
                 "platform", "OsPlatform",
                 "classifications", "[OsUpdateClassification!]",
-                "search", "String"));
+                "search", "String",
+                "organizationIds", "[String!]"));
     }
 
     @Test
@@ -149,7 +150,8 @@ class OsUpdateSchemaContractTest {
         // verifications
         assertThat(query).as("Query.osUpdateDevices").isPresent();
         assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(Map.of(
-                "osUpdateId", "ID!", "status", "OsUpdateDeviceStatus!", "first", "Int", "after", "String"));
+                "osUpdateId", "ID!", "status", "OsUpdateDeviceStatus!", "organizationIds", "[String!]", "first", "Int",
+                "after", "String"));
         assertThat(print(query.get().getType())).isEqualTo("OsUpdateDeviceConnection!");
         assertThat(fields("OsUpdateDeviceConnection")).containsExactlyInAnyOrderEntriesOf(
                 Map.of("edges", "[OsUpdateDeviceEdge!]!", "pageInfo", "PageInfo!"));

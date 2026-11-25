@@ -5,10 +5,11 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import lombok.Builder;
 import lombok.Value;
 
+import java.util.Collection;
 import java.util.List;
 
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class OsUpdateFilter {
 
     public static final OsUpdateFilter NONE = OsUpdateFilter.builder().build();
@@ -16,4 +17,6 @@ public class OsUpdateFilter {
     OsPlatform platform;
     List<OsUpdateClassification> classifications;
     String search;
+    // null = every update; empty = none
+    Collection<String> osUpdateIds;
 }

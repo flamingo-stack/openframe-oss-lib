@@ -62,6 +62,10 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
     private static final String GONE = OWN_MACHINES + "gone";
     private static final String OTHER_TENANT_MACHINE = OWN_MACHINES + "of-tenant-b";
 
+    private static final String ORG_A = "org-a";
+    private static final String ORG_B = "org-b";
+    private static final String ORG_WITHOUT_DEVICES = "org-without-devices";
+
     private static final String CUMULATIVE = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
     private static final String CUMULATIVE_NAME = "2026-11 Cumulative Update for Windows 11 Version 24H2 (KB5051987)";
     private static final String DRIVER = "0d1e2f3a-5555-4666-8777-112233445566:1";
@@ -95,8 +99,10 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
             }
             """;
     private static final String DEVICES = """
-            query($osUpdateId: ID!, $status: OsUpdateDeviceStatus!, $first: Int, $after: String) {
-              osUpdateDevices(osUpdateId: $osUpdateId, status: $status, first: $first, after: $after) {
+            query($osUpdateId: ID!, $status: OsUpdateDeviceStatus!, $organizationIds: [String!], $first: Int,
+                  $after: String) {
+              osUpdateDevices(osUpdateId: $osUpdateId, status: $status, organizationIds: $organizationIds,
+                  first: $first, after: $after) {
                 edges { cursor node { machineId status discoveredAt installedAt machine { machineId hostname } } }
                 pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
               }
@@ -129,9 +135,11 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         historyCollection().deleteMany(new Document());
         osUpdateCollection().deleteMany(new Document());
 
-        Stream.of(WIN_1, WIN_2, WIN_NOT_MANAGEABLE, WIN_4, MAC_1)
-                .forEach(machineId -> machines().insertOne(machine(machineId, TENANT_ID)));
-        machines().insertOne(machine(OTHER_TENANT_MACHINE, OTHER_TENANT_ID));
+        Stream.of(WIN_1, WIN_NOT_MANAGEABLE)
+                .forEach(machineId -> machines().insertOne(machine(machineId, TENANT_ID, ORG_A)));
+        Stream.of(WIN_2, WIN_4, MAC_1)
+                .forEach(machineId -> machines().insertOne(machine(machineId, TENANT_ID, ORG_B)));
+        machines().insertOne(machine(OTHER_TENANT_MACHINE, OTHER_TENANT_ID, ORG_A));
         stateCollection().insertOne(state(WIN_1, TENANT_ID, "MANAGEABLE"));
         stateCollection().insertOne(state(WIN_NOT_MANAGEABLE, TENANT_ID, "NOT_MANAGEABLE"));
         stateCollection().insertOne(state(OTHER_TENANT_MACHINE, OTHER_TENANT_ID, "MANAGEABLE"));
@@ -188,7 +196,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                         node -> node.get("installedDeviceCount"))
                 .containsExactly(tuple(CUMULATIVE, 2, 3), tuple(DRIVER, 1, 0), tuple(SAFARI, 1, 0));
         assertThat(page.hasNextPage()).isFalse();
-        verify(osUpdateQueryService).countDevices(List.of(cumulativeId, driverId, safariId));
+        verify(osUpdateQueryService).countDevices(List.of(cumulativeId, driverId, safariId), List.of());
     }
 
     @Test
@@ -285,8 +293,8 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         assertThat(identifiers(secondPage)).containsExactly(SAFARI);
         assertThat(secondPage.hasNextPage()).isFalse();
         assertThat(secondPage.hasPreviousPage()).isTrue();
-        verify(osUpdateQueryService).countDevices(List.of(cumulativeId, driverId));
-        verify(osUpdateQueryService).countDevices(List.of(safariId));
+        verify(osUpdateQueryService).countDevices(List.of(cumulativeId, driverId), List.of());
+        verify(osUpdateQueryService).countDevices(List.of(safariId), List.of());
     }
 
     @Test
@@ -485,6 +493,115 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .singleElement().asString().contains("status");
     }
 
+    @Test
+    void osUpdates_oneOrganization_onlyItsDevicesUpdates_countedOnItsDevicesOnly() {
+        // setup
+
+        // execution
+        Page orgA = osUpdates(Map.of("organizationIds", List.of(ORG_A)), null, null);
+        Page orgB = osUpdates(Map.of("organizationIds", List.of(ORG_B)), null, null);
+        Page both = osUpdates(Map.of("organizationIds", List.of(ORG_A, ORG_B)), null, null);
+
+        // verifications
+        assertThat(orgA.nodes())
+                .extracting(node -> node.get("identifier"), node -> node.get("pendingDeviceCount"),
+                        node -> node.get("installedDeviceCount"))
+                .containsExactly(tuple(CUMULATIVE, 1, 1), tuple(DRIVER, 1, 0));
+        assertThat(orgB.nodes())
+                .extracting(node -> node.get("identifier"), node -> node.get("pendingDeviceCount"),
+                        node -> node.get("installedDeviceCount"))
+                .containsExactly(tuple(CUMULATIVE, 1, 1), tuple(SAFARI, 1, 0));
+        assertThat(both.nodes())
+                .extracting(node -> node.get("identifier"), node -> node.get("pendingDeviceCount"),
+                        node -> node.get("installedDeviceCount"))
+                .containsExactly(tuple(CUMULATIVE, 2, 2), tuple(DRIVER, 1, 0), tuple(SAFARI, 1, 0));
+    }
+
+    @Test
+    void osUpdates_organizationWithoutDevices_noUpdate() {
+        // setup
+
+        // execution
+        Page page = osUpdates(Map.of("organizationIds", List.of(ORG_WITHOUT_DEVICES)), null, null);
+
+        // verifications
+        assertThat(page.nodes()).isEmpty();
+        assertThat(page.hasNextPage()).isFalse();
+    }
+
+    @Test
+    void osUpdates_emptyOrganizationList_everyUpdateOfTheTenantCountedOnAllDevices() {
+        // setup
+
+        // execution
+        Page page = osUpdates(Map.of("organizationIds", List.of()), null, null);
+
+        // verifications
+        assertThat(page.nodes())
+                .extracting(node -> node.get("identifier"), node -> node.get("pendingDeviceCount"),
+                        node -> node.get("installedDeviceCount"))
+                .containsExactly(tuple(CUMULATIVE, 2, 3), tuple(DRIVER, 1, 0), tuple(SAFARI, 1, 0));
+    }
+
+    @Test
+    void osUpdates_organizationAndOtherFilterInPagesOfOne_everyUpdateOnce() {
+        // setup
+        Map<String, Object> windowsOfOrgA = Map.of("organizationIds", List.of(ORG_A), "platform", "WINDOWS");
+
+        // execution
+        Page firstPage = osUpdates(windowsOfOrgA, 1, null);
+        Page secondPage = osUpdates(windowsOfOrgA, 1, firstPage.endCursor());
+
+        // verifications
+        assertThat(identifiers(firstPage)).containsExactly(CUMULATIVE);
+        assertThat(firstPage.hasNextPage()).isTrue();
+        assertThat(identifiers(secondPage)).containsExactly(DRIVER);
+        assertThat(secondPage.hasNextPage()).isFalse();
+    }
+
+    @Test
+    void osUpdateDevices_oneOrganization_onlyItsDevices() {
+        // setup
+
+        // execution
+        Page pendingOfOrgB = devices(cumulativeId, "PENDING", List.of(ORG_B), null, null);
+        Page installedOfOrgA = devices(cumulativeId, "INSTALLED", List.of(ORG_A), null, null);
+        Page installedOfOrgBInPagesOfOne = devices(cumulativeId, "INSTALLED", List.of(ORG_B), 1, null);
+
+        // verifications
+        assertThat(machineIds(pendingOfOrgB)).containsExactly(WIN_2);
+        assertThat(machineIds(installedOfOrgA)).containsExactly(WIN_1);
+        assertThat(machineIds(installedOfOrgBInPagesOfOne)).containsExactly(WIN_4);
+        assertThat(installedOfOrgBInPagesOfOne.hasNextPage()).isFalse();
+    }
+
+    @Test
+    void osUpdateDevices_organizationWithoutDevices_noDevice() {
+        // setup
+        List<String> withoutDevices = List.of(ORG_WITHOUT_DEVICES);
+
+        // execution
+        Page pending = devices(cumulativeId, "PENDING", withoutDevices, null, null);
+        Page installed = devices(cumulativeId, "INSTALLED", withoutDevices, null, null);
+
+        // verifications
+        assertThat(pending.nodes()).isEmpty();
+        assertThat(installed.nodes()).isEmpty();
+    }
+
+    @Test
+    void osUpdateDevices_emptyOrganizationList_everyDevice() {
+        // setup
+
+        // execution
+        Page pending = devices(cumulativeId, "PENDING", List.of(), null, null);
+        Page installed = devices(cumulativeId, "INSTALLED", List.of(), null, null);
+
+        // verifications
+        assertThat(machineIds(pending)).containsExactly(WIN_2, WIN_1);
+        assertThat(machineIds(installed)).containsExactly(WIN_1, WIN_4, GONE);
+    }
+
     private Page osUpdates(Map<String, Object> filter, Integer first, String after) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("filter", filter);
@@ -498,9 +615,15 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
     }
 
     private Page devices(String osUpdateId, String status, Integer first, String after) {
+        return devices(osUpdateId, status, null, first, after);
+    }
+
+    private Page devices(String osUpdateId, String status, List<String> organizationIds, Integer first,
+                         String after) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("osUpdateId", osUpdateId);
         variables.put("status", status);
+        variables.put("organizationIds", organizationIds);
         variables.put("first", first);
         variables.put("after", after);
         return page(data(DEVICES, variables).get("osUpdateDevices"));
@@ -552,9 +675,10 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                         boolean hasPreviousPage, String endCursor) {
     }
 
-    private static Document machine(String machineId, String tenantId) {
+    private static Document machine(String machineId, String tenantId, String organizationId) {
         return new Document("machineId", machineId)
                 .append("tenantId", tenantId)
+                .append("organizationId", organizationId)
                 .append("status", "ONLINE")
                 .append("hostname", "host-" + machineId)
                 .append("osType", "WINDOWS");

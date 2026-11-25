@@ -20,8 +20,10 @@ extend type Query {
     osUpdate(id: ID!): OsUpdate
 
     """Devices of one OS update in one status. PENDING: newest discovered first. INSTALLED: latest installed first,
-    Windows only. `first`: 1-100, default 20. Unknown osUpdateId → OS_UPDATE_NOT_FOUND."""
-    osUpdateDevices(osUpdateId: ID!, status: OsUpdateDeviceStatus!, first: Int, after: String): OsUpdateDeviceConnection!
+    Windows only. `organizationIds`: only devices of these organizations; omitted or empty = every organization.
+    `first`: 1-100, default 20. Unknown osUpdateId → OS_UPDATE_NOT_FOUND."""
+    osUpdateDevices(osUpdateId: ID!, status: OsUpdateDeviceStatus!, organizationIds: [String!], first: Int,
+        after: String): OsUpdateDeviceConnection!
 }
 
 input OsUpdateFilterInput {
@@ -30,6 +32,9 @@ input OsUpdateFilterInput {
     classifications: [OsUpdateClassification!]
     """Part of the display name, of a KB article id or of a CVE id. Case-insensitive."""
     search: String
+    """Only updates pending on or installed by a device of these organizations, and both device counts count only
+    those devices. Omitted or empty = every organization; organizations without devices = no update."""
+    organizationIds: [String!]
 }
 
 type OsUpdateConnection {

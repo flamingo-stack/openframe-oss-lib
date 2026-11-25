@@ -21,6 +21,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -58,9 +59,13 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
 
     // One row per device: its latest successful install of the update.
     @Override
-    public List<InstalledOsUpdateDevice> findInstalledDevicePage(String tenantId, String identifier, String cursor,
+    public List<InstalledOsUpdateDevice> findInstalledDevicePage(String tenantId, String identifier,
+                                                                 Collection<String> machineIds, String cursor,
                                                                  int limit) {
         Criteria installs = installs(tenantId).and(FIELD_IDENTIFIER).is(identifier);
+        if (machineIds != null) {
+            installs = installs.and(FIELD_MACHINE_ID).in(machineIds);
+        }
         MatchOperation matchInstalls = Aggregation.match(installs);
         GroupOperation latestPerDevice =
                 Aggregation.group(FIELD_MACHINE_ID).max(FIELD_INSTALLED_AT).as(FIELD_INSTALLED_AT);

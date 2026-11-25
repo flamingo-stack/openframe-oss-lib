@@ -37,6 +37,8 @@ import static org.assertj.core.api.Assertions.tuple;
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
 class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
 
+    private static final List<String> EVERY_DEVICE = null;
+
     private static final String TENANT_ID = "tenant-1";
     private static final String OTHER_TENANT_ID = "tenant-2";
     private static final String CUMULATIVE = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
@@ -240,13 +242,13 @@ class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
 
         // execution
         List<DeviceOsPendingUpdate> firstPage = deviceOsPendingUpdateRepository.findDevicePage(
-                TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, excludedMachineIds, null, 2);
+                TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, excludedMachineIds, EVERY_DEVICE, null, 2);
         String afterFirstPage = deviceOsPendingUpdateRepository.encodeDeviceCursor(firstPage.getLast());
         List<DeviceOsPendingUpdate> secondPage = deviceOsPendingUpdateRepository.findDevicePage(
-                TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, excludedMachineIds, afterFirstPage, 2);
+                TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, excludedMachineIds, EVERY_DEVICE, afterFirstPage, 2);
         String afterSecondPage = deviceOsPendingUpdateRepository.encodeDeviceCursor(secondPage.getLast());
         List<DeviceOsPendingUpdate> thirdPage = deviceOsPendingUpdateRepository.findDevicePage(
-                TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, excludedMachineIds, afterSecondPage, 2);
+                TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, excludedMachineIds, EVERY_DEVICE, afterSecondPage, 2);
 
         // verifications
         assertThat(firstPage).extracting(DeviceOsPendingUpdate::getMachineId).containsExactly("machine-3", "machine-2");
@@ -294,13 +296,13 @@ class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
 
         // execution
         List<InstalledOsUpdateDevice> firstPage =
-                deviceOsUpdateHistoryRepository.findInstalledDevicePage(TENANT_ID, CUMULATIVE, null, 2);
+                deviceOsUpdateHistoryRepository.findInstalledDevicePage(TENANT_ID, CUMULATIVE, EVERY_DEVICE, null, 2);
         String afterFirstPage = deviceOsUpdateHistoryRepository.encodeInstalledDeviceCursor(firstPage.getLast());
         List<InstalledOsUpdateDevice> secondPage =
-                deviceOsUpdateHistoryRepository.findInstalledDevicePage(TENANT_ID, CUMULATIVE, afterFirstPage, 2);
+                deviceOsUpdateHistoryRepository.findInstalledDevicePage(TENANT_ID, CUMULATIVE, EVERY_DEVICE, afterFirstPage, 2);
         String afterSecondPage = deviceOsUpdateHistoryRepository.encodeInstalledDeviceCursor(secondPage.getLast());
         List<InstalledOsUpdateDevice> thirdPage =
-                deviceOsUpdateHistoryRepository.findInstalledDevicePage(TENANT_ID, CUMULATIVE, afterSecondPage, 2);
+                deviceOsUpdateHistoryRepository.findInstalledDevicePage(TENANT_ID, CUMULATIVE, EVERY_DEVICE, afterSecondPage, 2);
 
         // verifications
         assertThat(firstPage).containsExactly(
@@ -308,6 +310,72 @@ class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
         assertThat(secondPage).containsExactly(
                 new InstalledOsUpdateDevice("machine-1", MIDDLE), new InstalledOsUpdateDevice("machine-4", OLDEST));
         assertThat(thirdPage).isEmpty();
+    }
+
+    @Test
+    void machineScopedReads_onlyTheRowsOfTheGivenMachines() {
+        // setup
+        deviceOsPendingUpdateRepository.saveAll(List.of(
+                pendingUpdate(TENANT_ID, "machine-1", OsPlatform.WINDOWS, CUMULATIVE, NEWEST),
+                pendingUpdate(TENANT_ID, "machine-2", OsPlatform.WINDOWS, CUMULATIVE, MIDDLE),
+                pendingUpdate(TENANT_ID, "machine-1", OsPlatform.WINDOWS, DRIVER, NEWEST),
+                pendingUpdate(TENANT_ID, "machine-3", OsPlatform.MACOS, SEQUOIA, NEWEST),
+                pendingUpdate(OTHER_TENANT_ID, "machine-1", OsPlatform.WINDOWS, "of-another-tenant", NEWEST)));
+        deviceOsUpdateHistoryRepository.saveAll(List.of(
+                historyEntry(TENANT_ID, "machine-1", CUMULATIVE, NEWEST, OsUpdateOperation.INSTALL, OsUpdateInstallResult.SUCCEEDED),
+                historyEntry(TENANT_ID, "machine-2", CUMULATIVE, MIDDLE, OsUpdateOperation.INSTALL, OsUpdateInstallResult.SUCCEEDED),
+                historyEntry(TENANT_ID, "machine-1", "installed-only", NEWEST, OsUpdateOperation.INSTALL, OsUpdateInstallResult.SUCCEEDED),
+                historyEntry(TENANT_ID, "machine-1", "failed-only", NEWEST, OsUpdateOperation.INSTALL, OsUpdateInstallResult.FAILED)));
+        List<String> machine1 = List.of("machine-1");
+        List<String> identifiers = List.of(CUMULATIVE, DRIVER);
+
+        // execution
+        List<OsUpdateDeviceCount> pendingCounts = deviceOsPendingUpdateRepository.countDevicesByIdentifierOnMachines(
+                TENANT_ID, OsPlatform.WINDOWS, identifiers, machine1);
+        List<OsUpdateIdentifiersOfPlatform> pendingIdentifiers =
+                deviceOsPendingUpdateRepository.findIdentifiersByPlatformOnMachines(TENANT_ID, List.of("machine-1", "machine-3"));
+        List<OsUpdateDeviceCount> installedCounts = deviceOsUpdateHistoryRepository
+                .countInstalledDevicesByIdentifierOnMachines(TENANT_ID, identifiers, machine1);
+        List<String> installedIdentifiers =
+                deviceOsUpdateHistoryRepository.findInstalledIdentifiersOnMachines(TENANT_ID, machine1);
+        List<DeviceOsPendingUpdate> pendingPage = deviceOsPendingUpdateRepository.findDevicePage(
+                TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, NO_MACHINES, List.of("machine-2"), null, 10);
+        List<InstalledOsUpdateDevice> installedPage = deviceOsUpdateHistoryRepository.findInstalledDevicePage(
+                TENANT_ID, CUMULATIVE, List.of("machine-2"), null, 10);
+        List<DeviceOsPendingUpdate> pendingOnNoMachine = deviceOsPendingUpdateRepository.findDevicePage(
+                TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, NO_MACHINES, NO_MACHINES, null, 10);
+
+        // verifications
+        assertThat(pendingCounts).containsExactlyInAnyOrder(
+                new OsUpdateDeviceCount(CUMULATIVE, 1), new OsUpdateDeviceCount(DRIVER, 1));
+        assertThat(pendingIdentifiers)
+                .extracting(OsUpdateIdentifiersOfPlatform::getPlatform,
+                        identifiersOfPlatform -> identifiersOfPlatform.getIdentifiers().stream().sorted().toList())
+                .containsExactlyInAnyOrder(
+                        tuple(OsPlatform.WINDOWS, List.of(DRIVER, CUMULATIVE).stream().sorted().toList()),
+                        tuple(OsPlatform.MACOS, List.of(SEQUOIA)));
+        assertThat(installedCounts).containsExactly(new OsUpdateDeviceCount(CUMULATIVE, 1));
+        assertThat(installedIdentifiers).containsExactlyInAnyOrder(CUMULATIVE, "installed-only");
+        assertThat(pendingPage).extracting(DeviceOsPendingUpdate::getMachineId).containsExactly("machine-2");
+        assertThat(installedPage).extracting(InstalledOsUpdateDevice::getMachineId).containsExactly("machine-2");
+        assertThat(pendingOnNoMachine).isEmpty();
+    }
+
+    @Test
+    void findPage_osUpdateIds_onlyThoseUpdates_emptyIdsNoUpdate() {
+        // setup
+        OsUpdate cumulative = osUpdateRepository.save(osUpdate(TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, NEWEST));
+        osUpdateRepository.save(osUpdate(TENANT_ID, OsPlatform.WINDOWS, DRIVER, MIDDLE));
+        OsUpdateFilter ofCumulative = OsUpdateFilter.builder().osUpdateIds(List.of(cumulative.getId())).build();
+        OsUpdateFilter ofNone = OsUpdateFilter.builder().osUpdateIds(List.of()).build();
+
+        // execution
+        List<OsUpdate> cumulativePage = osUpdateRepository.findPage(TENANT_ID, ofCumulative, null, 10);
+        List<OsUpdate> nonePage = osUpdateRepository.findPage(TENANT_ID, ofNone, null, 10);
+
+        // verifications
+        assertThat(cumulativePage).extracting(OsUpdate::getIdentifier).containsExactly(CUMULATIVE);
+        assertThat(nonePage).isEmpty();
     }
 
     @Test

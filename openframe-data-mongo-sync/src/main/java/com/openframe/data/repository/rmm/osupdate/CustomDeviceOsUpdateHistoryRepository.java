@@ -2,6 +2,7 @@ package com.openframe.data.repository.rmm.osupdate;
 
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface CustomDeviceOsUpdateHistoryRepository {
@@ -10,7 +11,9 @@ public interface CustomDeviceOsUpdateHistoryRepository {
 
     String encodeCursor(DeviceOsUpdateHistoryEntry historyEntry);
 
-    List<InstalledOsUpdateDevice> findInstalledDevicePage(String tenantId, String identifier, String cursor, int limit);
+    // machineIds null = every device
+    List<InstalledOsUpdateDevice> findInstalledDevicePage(String tenantId, String identifier,
+                                                          Collection<String> machineIds, String cursor, int limit);
 
     String encodeInstalledDeviceCursor(InstalledOsUpdateDevice installedDevice);
 }

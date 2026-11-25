@@ -29,6 +29,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class CustomDeviceOsPendingUpdateRepositoryImplTest {
 
+    private static final List<String> EVERY_DEVICE = null;
+
     private static final String TENANT_ID = "tenant-1";
     private static final String MACHINE_ID = "machine-1";
     private static final String IDENTIFIER = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
@@ -66,7 +68,7 @@ class CustomDeviceOsPendingUpdateRepositoryImplTest {
 
         // execution
         List<DeviceOsPendingUpdate> page = repository.findDevicePage(
-                TENANT_ID, OsPlatform.WINDOWS, IDENTIFIER, EXCLUDED_MACHINE_IDS, cursor, 21);
+                TENANT_ID, OsPlatform.WINDOWS, IDENTIFIER, EXCLUDED_MACHINE_IDS, EVERY_DEVICE, cursor, 21);
 
         // verifications
         assertThat(page).containsExactly(pendingUpdate);
@@ -86,7 +88,7 @@ class CustomDeviceOsPendingUpdateRepositoryImplTest {
         Document expectedFilter = new Document("$and", List.of(pendingOnListedDevices(), notExcluded(), keyset));
 
         // execution
-        repository.findDevicePage(TENANT_ID, OsPlatform.WINDOWS, IDENTIFIER, EXCLUDED_MACHINE_IDS, CURSOR, 5);
+        repository.findDevicePage(TENANT_ID, OsPlatform.WINDOWS, IDENTIFIER, EXCLUDED_MACHINE_IDS, EVERY_DEVICE, CURSOR, 5);
 
         // verifications
         assertThat(queryCaptor.getValue().getQueryObject()).isEqualTo(expectedFilter);
@@ -101,7 +103,7 @@ class CustomDeviceOsPendingUpdateRepositoryImplTest {
 
         // execution
         BadRequestException ex = assertThrows(BadRequestException.class, () -> repository.findDevicePage(
-                TENANT_ID, OsPlatform.WINDOWS, IDENTIFIER, EXCLUDED_MACHINE_IDS, cursor, 5));
+                TENANT_ID, OsPlatform.WINDOWS, IDENTIFIER, EXCLUDED_MACHINE_IDS, EVERY_DEVICE, cursor, 5));
 
         // verifications
         assertThat(ex.getMessage()).contains("Unparseable epoch millis");

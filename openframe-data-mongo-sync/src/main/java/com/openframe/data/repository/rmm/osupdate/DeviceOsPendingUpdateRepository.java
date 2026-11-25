@@ -25,4 +25,17 @@ public interface DeviceOsPendingUpdateRepository
     List<OsUpdateDeviceCount> countDevicesByIdentifier(String tenantId, OsPlatform platform,
                                                        Collection<String> identifiers,
                                                        Collection<String> excludedMachineIds);
+
+    @Aggregation(pipeline = {
+            "{ '$match': { 'tenantId': ?0, 'platform': ?1, 'identifier': { '$in': ?2 }, 'machineId': { '$in': ?3 } } }",
+            "{ '$group': { '_id': '$identifier', 'deviceCount': { '$sum': 1 } } }"})
+    List<OsUpdateDeviceCount> countDevicesByIdentifierOnMachines(String tenantId, OsPlatform platform,
+                                                                 Collection<String> identifiers,
+                                                                 Collection<String> machineIds);
+
+    @Aggregation(pipeline = {
+            "{ '$match': { 'tenantId': ?0, 'machineId': { '$in': ?1 } } }",
+            "{ '$group': { '_id': '$platform', 'identifiers': { '$addToSet': '$identifier' } } }"})
+    List<OsUpdateIdentifiersOfPlatform> findIdentifiersByPlatformOnMachines(String tenantId,
+                                                                            Collection<String> machineIds);
 }

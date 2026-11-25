@@ -8,8 +8,10 @@ import java.util.List;
 
 public interface CustomDeviceOsPendingUpdateRepository {
 
+    // machineIds null = every device
     List<DeviceOsPendingUpdate> findDevicePage(String tenantId, OsPlatform platform, String identifier,
-                                               Collection<String> excludedMachineIds, String cursor, int limit);
+                                               Collection<String> excludedMachineIds, Collection<String> machineIds,
+                                               String cursor, int limit);
 
     String encodeDeviceCursor(DeviceOsPendingUpdate pendingUpdate);
 }

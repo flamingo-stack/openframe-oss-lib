@@ -18,4 +18,5 @@ public class OsUpdateFilterInput {
     private OsPlatform platform;
     private List<OsUpdateClassification> classifications;
     private String search;
+    private List<String> organizationIds;
 }
