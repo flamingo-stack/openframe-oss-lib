@@ -18,6 +18,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +39,7 @@ class PinotConfigInitializerTest {
     private static final String CONTROLLER = "pinot-controller:9000";
     private static final String DEVICES_SCHEMA_URL = "http://" + CONTROLLER + "/schemas/devices";
     private static final String DEVICES_FORCE_COMMIT_URL = "http://" + CONTROLLER + "/tables/devices/forceCommit";
+    private static final String LOGS_RELOAD_URL_PREFIX = "http://" + CONTROLLER + "/segments/logs";
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}:]+)(:[^}]*)?}");
 
     @Mock
@@ -50,11 +52,7 @@ class PinotConfigInitializerTest {
 
     @BeforeEach
     void setUp() {
-        initializer = new PinotConfigInitializer(new DefaultResourceLoader(), environment, restTemplate);
-        ReflectionTestUtils.setField(initializer, "pinotControllerUrl", CONTROLLER);
-        ReflectionTestUtils.setField(initializer, "pinotConfigEnabled", true);
-        ReflectionTestUtils.setField(initializer, "maxRetries", 1);
-        ReflectionTestUtils.setField(initializer, "retryDelayMs", 0L);
+        initializer = initializerFor(ossTables());
         when(environment.resolveRequiredPlaceholders(anyString())).thenAnswer(invocation -> resolve(invocation.getArgument(0)));
         lenient().when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok("{}"));
@@ -123,7 +121,24 @@ class PinotConfigInitializerTest {
         assertThatCode(() -> initializer.init()).doesNotThrowAnyException();
 
         // verifications
-        verify(restTemplate).exchange(startsWith("http://" + CONTROLLER + "/segments/logs"), eq(HttpMethod.POST),
+        verify(restTemplate).exchange(startsWith(LOGS_RELOAD_URL_PREFIX), eq(HttpMethod.POST),
+                any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    void init_onlyDevicesRegistered_leavesOtherTablesUntouched() {
+        // setup
+        OssPinotTables ossPinotTables = new OssPinotTables();
+        PinotTableDefinition devices = ossPinotTables.devicesPinotTable();
+        List<PinotTableDefinition> onlyDevices = List.of(devices);
+        PinotConfigInitializer devicesOnly = initializerFor(onlyDevices);
+
+        // execution
+        devicesOnly.init();
+
+        // verifications
+        verify(restTemplate).exchange(eq(DEVICES_SCHEMA_URL), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class));
+        verify(restTemplate, never()).exchange(startsWith(LOGS_RELOAD_URL_PREFIX), any(HttpMethod.class),
                 any(HttpEntity.class), eq(String.class));
     }
 
@@ -141,6 +156,23 @@ class PinotConfigInitializerTest {
         // verifications
         assertThat(output).contains("Forced commit of the consuming segments of devices")
                 .doesNotContain("Force commit of the consuming segments of devices answered");
+    }
+
+    private PinotConfigInitializer initializerFor(List<PinotTableDefinition> tables) {
+        DefaultResourceLoader resourceLoader = new DefaultResourceLoader();
+        PinotConfigInitializer created = new PinotConfigInitializer(resourceLoader, environment, tables, restTemplate);
+        ReflectionTestUtils.setField(created, "pinotControllerUrl", CONTROLLER);
+        ReflectionTestUtils.setField(created, "pinotConfigEnabled", true);
+        ReflectionTestUtils.setField(created, "maxRetries", 1);
+        ReflectionTestUtils.setField(created, "retryDelayMs", 0L);
+        return created;
+    }
+
+    private static List<PinotTableDefinition> ossTables() {
+        OssPinotTables ossPinotTables = new OssPinotTables();
+        PinotTableDefinition devices = ossPinotTables.devicesPinotTable();
+        PinotTableDefinition logs = ossPinotTables.logsPinotTable();
+        return List.of(devices, logs);
     }
 
     private void storedDevicesSchema(String body) {
