@@ -17,11 +17,9 @@ async fn startup_report_carries_the_running_os_on_the_machine_subject() {
     let dm = directories(&dir);
     let config = registered_agent(&dm).await;
     let manager = connection_manager(server.url(), &dm, &config);
-    manager.use_client_for_tests(async_nats::connect(server.url()).await.unwrap());
-
-    let backend = async_nats::connect(server.url()).await.unwrap();
-    let mut reports = backend.subscribe("machine.machine.os-info").await.unwrap();
-    backend.flush().await.unwrap();
+    let client = async_nats::connect(server.url()).await.unwrap();
+    let mut reports = client.subscribe("machine.machine.os-info").await.unwrap();
+    manager.use_client_for_tests(client);
 
     OsInfoReportPublisher::new(NatsMessagePublisher::new(manager), config)
         .publish()
