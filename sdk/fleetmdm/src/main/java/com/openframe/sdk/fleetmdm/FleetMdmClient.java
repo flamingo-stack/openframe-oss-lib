@@ -35,6 +35,7 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.VulnerabilitiesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
 import com.openframe.sdk.fleetmdm.model.VulnerabilityRequest;
+import com.openframe.sdk.fleetmdm.model.WindowsWipeType;
 
 import java.io.IOException;
 import java.net.URI;
@@ -46,6 +47,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -189,6 +191,19 @@ public class FleetMdmClient {
             }
             checkResponse(response, action);
             return MAPPER.readValue(response.body(), HostSoftwareResponse.class);
+        });
+    }
+
+    public void wipeHost(long hostId, WindowsWipeType wipeType) {
+        String action = "wipe Fleet host " + hostId;
+        call(action, () -> {
+            String body = MAPPER.writeValueAsString(Map.of("windows", Map.of("wipe_type", wipeType.getValue())));
+            HttpResponse<String> response = sendRequest(HOSTS_URL + "/" + hostId + "/wipe", "POST", body);
+            if (response.statusCode() == 404) {
+                throw new FleetMdmNotFoundException("Fleet host not found: " + hostId, response.body());
+            }
+            checkResponse(response, action);
+            return null;
         });
     }
 

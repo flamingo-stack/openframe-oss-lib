@@ -131,6 +131,7 @@ public class AgentRegistrationService {
         addClaimedOrganization(auditDetails, request, resolvedOrganizationId);
 
         createOAuthClient(machineId, clientId, clientSecret);
+        // TODO(CU-17tkuw6a582): a real serial number matching a WIPED device of the tenant reuses that device instead
         Machine machine = createMachine(machineId, request, resolvedOrganizationId);
 
         try {

@@ -68,6 +68,8 @@ public class Host {
     @JsonProperty("platform_like")
     private String platformLike;
 
+    private HostMdm mdm;
+
     @JsonProperty("code_name")
     private String codeName;
 
@@ -243,6 +245,9 @@ public class Host {
 
     public String getPlatformLike() { return platformLike; }
     public void setPlatformLike(String platformLike) { this.platformLike = platformLike; }
+
+    public HostMdm getMdm() { return mdm; }
+    public void setMdm(HostMdm mdm) { this.mdm = mdm; }
 
     public String getCodeName() { return codeName; }
     public void setCodeName(String codeName) { this.codeName = codeName; }

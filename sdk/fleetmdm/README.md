@@ -43,6 +43,7 @@ unfenced and why: `openframe/docs/mysql-multitenancy-feature.md` in the fork ("D
 | `getHostVulnerabilityInventoryById` | `GET /api/v1/fleet/hosts/{id}` | fenced | as above, plus `LoadHostSoftware` keyed by the fenced host | |
 | `listHostSoftware` | `GET /api/v1/fleet/hosts/{id}/software` | fenced | `HostLite` (404 for a foreign host); `ListHostSoftware` keyed by the fenced host | Installer and VPP availability joins use the host's own team. |
 | `runQuery`, `runQueryAsync` | `POST /api/v1/fleet/hosts/{id}/query` | fenced | `HostLiteByID`; ad-hoc query re-homed to the pinned team by `NewQuery`; `HostIDsInTargets`, `CountHostsInTargets` | |
+| `wipeHost` | `POST /api/v1/fleet/hosts/{id}/wipe` | fenced | `Host` (404 for a foreign host); `IsHostConnectedToFleetMDM`, `GetHostLockWipeStatus` and `WipeHostViaWindowsMDM` keyed by the fenced host | Sends `{"windows":{"wipe_type":...}}`. A Windows host needs the fork's Free wipe for Windows; until that Fleet image ships, Fleet answers 402. 422 when the host has no MDM turned on or a lock, unlock or wipe is pending; 409 when it is already wiped. |
 
 ### Queries and live queries
 
