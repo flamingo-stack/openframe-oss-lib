@@ -156,7 +156,7 @@ checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
 [[package]]
 name = "async-nats"
 version = "0.42.0"
-source = "git+https://github.com/flamingo-stack/nats.rs.git?rev=3cfbf0f393a964be1255b382065079a82f316069#3cfbf0f393a964be1255b382065079a82f316069"
+source = "git+https://github.com/flamingo-stack/nats.rs.git?branch=main#7514c5986b09c8f2a6564e7f54d27d1273f05ee3"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -173,7 +173,7 @@ dependencies = [
  "ring",
  "rustls-native-certs",
  "rustls-pemfile 2.2.0",
- "rustls-webpki 0.102.8",
+ "rustls-webpki",
  "serde",
  "serde_json",
  "serde_nanos",
@@ -2269,7 +2269,7 @@ dependencies = [
  "once_cell",
  "ring",
  "rustls-pki-types",
- "rustls-webpki 0.103.15",
+ "rustls-webpki",
  "subtle",
  "zeroize",
 ]
@@ -2312,16 +2312,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "229a4a4c221013e7e1f1a043678c5cc39fe5171437c88fb47151a21e6f5b5c79"
 dependencies = [
  "zeroize",
-]
-
-[[package]]
-name = "rustls-webpki"
-version = "0.102.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64ca1bc8749bd4cf37b5ce386cc146580777b4e8572c7b97baf22c83f444bee9"
-dependencies = [
- "rustls-pki-types",
- "untrusted",
 ]
 
 [[package]]
