@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm.osupdate.release;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import com.openframe.core.rest.PackageSearchRestClientFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,21 +37,28 @@ public class WindowsReleaseClient {
             @Value("${openframe.rmm.os-update.os-versions.endoflife.base-url:https://endoflife.date}") String baseUrl,
             @Value("${openframe.rmm.os-update.os-versions.endoflife.path:/api/windows.json}") String releasesPath,
             @Value("${openframe.rmm.os-update.os-versions.endoflife.timeout:10s}") Duration timeout,
-            @Value("${openframe.rmm.os-update.os-versions.endoflife.cache-ttl:6h}") Duration cacheTtl) {
+            @Value("${openframe.rmm.os-update.os-versions.endoflife.cache-ttl:6h}") Duration cacheTtl,
+            @Value("${openframe.rmm.os-update.os-versions.endoflife.failure-cache-ttl:5m}") Duration failureCacheTtl) {
         this.windowsReleaseParser = windowsReleaseParser;
         this.windowsReleaseMetrics = windowsReleaseMetrics;
         this.releasesPath = releasesPath;
         this.restClient = PackageSearchRestClientFactory.create(baseUrl, timeout);
         this.windowsReleases = Caffeine.newBuilder()
-                .expireAfterWrite(cacheTtl)
+                .expireAfter(Expiry.creating((String key, List<WindowsRelease> releases) ->
+                        releases.isEmpty() ? failureCacheTtl : cacheTtl))
                 .maximumSize(1)
                 .build();
     }
 
-    // A failure is not cached: empty now, the next call asks again.
+    // A failure is cached as empty for failure-cache-ttl: while the source is down, requests do not each wait
+    // for the timeout.
     public List<WindowsRelease> listWindowsReleases() {
+        return windowsReleases.get(RELEASES, key -> fetchOrEmpty());
+    }
+
+    private List<WindowsRelease> fetchOrEmpty() {
         try {
-            return windowsReleases.get(RELEASES, key -> fetchWindowsReleases());
+            return fetchWindowsReleases();
         } catch (RestClientException | JacksonException | IllegalArgumentException | IllegalStateException failure) {
             log.warn("endoflife.date Windows releases could not be read: {}", failure.getMessage());
             windowsReleaseMetrics.recordSourceFailed();

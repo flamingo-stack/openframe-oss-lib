@@ -32,7 +32,6 @@ class OsVersionResponseMapperTest {
         OsVersionResponse expected = OsVersionResponse.builder()
                 .osVersion("11 24H2")
                 .deviceCount(5)
-                .devicesBehindCount(3)
                 .currentBuild("26100")
                 .endOfSupportAt(LocalDate.parse("2026-10-13"))
                 .supportEnded(true)
@@ -41,7 +40,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionResponse response =
-                osVersionResponseMapper.toResponse(osVersionDeviceCounts, windowsRelease, 3, TODAY, "cursor-1");
+                osVersionResponseMapper.toResponse(osVersionDeviceCounts, windowsRelease, TODAY, "cursor-1");
 
         // verifications
         assertThat(response).isEqualTo(expected);
@@ -55,7 +54,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionResponse response =
-                osVersionResponseMapper.toResponse(osVersionDeviceCounts, windowsRelease, 0, TODAY, "c");
+                osVersionResponseMapper.toResponse(osVersionDeviceCounts, windowsRelease, TODAY, "c");
 
         // verifications
         assertThat(response.getSupportEnded()).isEqualTo(expectedEnded);
@@ -67,7 +66,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionResponse response =
-                osVersionResponseMapper.toResponse(osVersionDeviceCounts, null, null, TODAY, "cursor-1");
+                osVersionResponseMapper.toResponse(osVersionDeviceCounts, null, TODAY, "cursor-1");
 
         // verifications
         assertThat(response.getDeviceCount()).isEqualTo(5);
@@ -78,17 +77,17 @@ class OsVersionResponseMapperTest {
     }
 
     @Test
-    void toDeviceResponse_state_machineBuildProductAndFlag() {
+    void toDeviceResponse_state_machineBuildProductAndNoFlag() {
         // setup
         DeviceOsState deviceOsState = DeviceOsState.builder()
                 .machineId("machine-1").osBuild("26100.4061").osProductName("Windows 11 Pro").build();
 
         // execution
-        OsVersionDeviceResponse response = osVersionResponseMapper.toDeviceResponse(deviceOsState, true, "cursor-1");
+        OsVersionDeviceResponse response = osVersionResponseMapper.toDeviceResponse(deviceOsState, "cursor-1");
 
         // verifications
         assertThat(response).isEqualTo(OsVersionDeviceResponse.builder()
                 .machineId("machine-1").osBuild("26100.4061").osProductName("Windows 11 Pro")
-                .upToDate(true).cursor("cursor-1").build());
+                .cursor("cursor-1").build());
     }
 }

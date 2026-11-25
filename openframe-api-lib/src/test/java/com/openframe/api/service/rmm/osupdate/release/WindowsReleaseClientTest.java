@@ -24,6 +24,7 @@ class WindowsReleaseClientTest {
     private static final String ANSWER = "[{\"cycle\": \"11-24h2-w\", \"latest\": \"10.0.26100\", \"eol\": \"2026-10-13\"}]";
 
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+    private String baseUrl;
     private final AtomicInteger requests = new AtomicInteger();
     private volatile int status = 200;
     private HttpServer httpServer;
@@ -41,9 +42,8 @@ class WindowsReleaseClientTest {
             }
         });
         httpServer.start();
-        String baseUrl = "http://127.0.0.1:" + httpServer.getAddress().getPort();
-        windowsReleaseClient = new WindowsReleaseClient(new WindowsReleaseParser(JsonMapper.builder().build()),
-                new WindowsReleaseMetrics(meterRegistry), baseUrl, PATH, Duration.ofSeconds(5), Duration.ofHours(6));
+        baseUrl = "http://127.0.0.1:" + httpServer.getAddress().getPort();
+        windowsReleaseClient = client(Duration.ZERO);
     }
 
     @AfterEach
@@ -84,6 +84,24 @@ class WindowsReleaseClientTest {
     }
 
     @Test
+    void listWindowsReleases_sourceFailsWithinTheFailureTtl_emptyWithoutAskingAgain() {
+        // setup
+        status = 503;
+        WindowsReleaseClient failureCachingClient = client(Duration.ofMinutes(5));
+
+        // execution
+        List<WindowsRelease> whileDown = failureCachingClient.listWindowsReleases();
+        status = 200;
+        List<WindowsRelease> withinTheFailureTtl = failureCachingClient.listWindowsReleases();
+
+        // verifications
+        assertThat(whileDown).isEmpty();
+        assertThat(withinTheFailureTtl).isEmpty();
+        assertThat(requests).hasValue(1);
+        assertThat(meterRegistry.get(SOURCE_FAILED).counter().count()).isEqualTo(1.0);
+    }
+
+    @Test
     void listWindowsReleases_sourceUnreachable_emptyAndCounted() {
         // setup
         httpServer.stop(0);
@@ -94,5 +112,11 @@ class WindowsReleaseClientTest {
         // verifications
         assertThat(windowsReleases).isEmpty();
         assertThat(meterRegistry.get(SOURCE_FAILED).counter().count()).isEqualTo(1.0);
+    }
+
+    private WindowsReleaseClient client(Duration failureCacheTtl) {
+        return new WindowsReleaseClient(new WindowsReleaseParser(JsonMapper.builder().build()),
+                new WindowsReleaseMetrics(meterRegistry), baseUrl, PATH, Duration.ofSeconds(5), Duration.ofHours(6),
+                failureCacheTtl);
     }
 }

@@ -74,7 +74,7 @@ class OsVersionsReferenceDownIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    void osVersionsAndDevices_sourceDown_countsWithoutReferenceAndEachFailureCounted() {
+    void osVersionsAndDevices_sourceDown_countsWithoutReferenceAndTheFailureCountedOnce() {
         // setup
         double failedBefore = failed();
 
@@ -100,7 +100,7 @@ class OsVersionsReferenceDownIT extends BaseMongoIntegrationTest {
         assertThat(page(map(devices.<Map<String, Object>>getData()).get("osVersionDevices")).nodes())
                 .extracting(node -> node.get("machineId"), node -> node.get("osBuild"), node -> node.get("upToDate"))
                 .containsExactly(tuple(MACHINE, "26100.4061", null));
-        assertThat(failed() - failedBefore).isEqualTo(2.0);
+        assertThat(failed() - failedBefore).isEqualTo(1.0);
     }
 
     private double failed() {

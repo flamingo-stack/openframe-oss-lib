@@ -13,9 +13,7 @@ import com.openframe.api.service.rmm.osupdate.release.WindowsReleaseClient;
 import com.openframe.api.service.rmm.osupdate.release.WindowsReleaseMatcher;
 import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
-import com.openframe.data.document.toolagent.ToolOsSupport;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
-import com.openframe.data.repository.rmm.osupdate.OsVersionBuildCount;
 import com.openframe.data.repository.rmm.osupdate.OsVersionDeviceCounts;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -77,50 +75,21 @@ public class OsVersionService {
                         tenantId, OsPlatform.WINDOWS, osVersion, afterMachineId, limit)
                 : deviceOsStateRepository.findOsVersionDevicePageOnMachines(
                         tenantId, OsPlatform.WINDOWS, osVersion, afterMachineId, scopeMachineIds, limit);
-        WindowsRelease windowsRelease = windowsReleaseMatcher.findWindowsRelease(listWindowsReleases(), osVersion);
-        String currentBuild = windowsRelease == null ? null : windowsRelease.getLatestBuild();
-        return cursorPageAssembler.toPage(fetchedDevices, normalizedPagination,
-                deviceOsState -> toDeviceResponse(deviceOsState, currentBuild),
+        return cursorPageAssembler.toPage(fetchedDevices, normalizedPagination, this::toDeviceResponse,
                 OsVersionDeviceResponse::getCursor);
     }
 
-    private OsVersionDeviceResponse toDeviceResponse(DeviceOsState deviceOsState, String currentBuild) {
-        Boolean upToDate = isUpToDate(deviceOsState.getOsBuild(), currentBuild);
+    private OsVersionDeviceResponse toDeviceResponse(DeviceOsState deviceOsState) {
         String cursor = CursorCodec.encode(deviceOsState.getMachineId());
-        return osVersionResponseMapper.toDeviceResponse(deviceOsState, upToDate, cursor);
+        return osVersionResponseMapper.toDeviceResponse(deviceOsState, cursor);
     }
 
     private OsVersionResponse toResponse(OsVersionDeviceCounts osVersionDeviceCounts,
                                          List<WindowsRelease> windowsReleases, LocalDate today) {
         WindowsRelease windowsRelease = windowsReleaseMatcher
                 .findWindowsRelease(windowsReleases, osVersionDeviceCounts.getOsVersion());
-        Integer devicesBehindCount = windowsRelease == null || windowsRelease.getLatestBuild() == null
-                ? null
-                : countDevicesBehind(osVersionDeviceCounts, windowsRelease.getLatestBuild());
         String cursor = CursorCodec.encode(osVersionDeviceCounts.getOsVersion());
-        return osVersionResponseMapper.toResponse(osVersionDeviceCounts, windowsRelease, devicesBehindCount, today,
-                cursor);
-    }
-
-    private static int countDevicesBehind(OsVersionDeviceCounts osVersionDeviceCounts, String currentBuild) {
-        long devicesBehind = osVersionDeviceCounts.getOsVersionBuildCounts().stream()
-                .filter(osVersionBuildCount -> isBehind(osVersionBuildCount.getOsBuild(), currentBuild))
-                .mapToLong(OsVersionBuildCount::getDeviceCount)
-                .sum();
-        return Math.toIntExact(devicesBehind);
-    }
-
-    // Null = no reference data for the version, or the device reported no build.
-    private static Boolean isUpToDate(String osBuild, String currentBuild) {
-        if (osBuild == null || currentBuild == null) {
-            return null;
-        }
-        return !isBehind(osBuild, currentBuild);
-    }
-
-    // A build that is no dotted number is not counted as behind.
-    private static boolean isBehind(String osBuild, String currentBuild) {
-        return ToolOsSupport.isBelow(osBuild, currentBuild);
+        return osVersionResponseMapper.toResponse(osVersionDeviceCounts, windowsRelease, today, cursor);
     }
 
     private List<WindowsRelease> listWindowsReleases() {

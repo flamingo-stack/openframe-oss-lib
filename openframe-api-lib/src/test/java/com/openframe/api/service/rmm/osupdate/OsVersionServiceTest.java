@@ -59,7 +59,7 @@ class OsVersionServiceTest {
     }
 
     @Test
-    void listOsVersions_withReleases_countsBehindTheBaseBuildAndANextPage() {
+    void listOsVersions_withReleases_referenceFieldsWithoutDevicesBehindAndANextPage() {
         // setup
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(1).build();
         OsVersionDeviceCounts windows11 = new OsVersionDeviceCounts("11 24H2", List.of(
@@ -79,7 +79,6 @@ class OsVersionServiceTest {
         assertThat(osVersions.getItems()).singleElement().isEqualTo(OsVersionResponse.builder()
                 .osVersion("11 24H2")
                 .deviceCount(6)
-                .devicesBehindCount(2)
                 .currentBuild("26100")
                 .endOfSupportAt(LocalDate.parse("2026-10-13"))
                 .supportEnded(true)
@@ -113,15 +112,13 @@ class OsVersionServiceTest {
     }
 
     @Test
-    void listOsVersionDevices_withRelease_upToDateFlagPerDevice() {
+    void listOsVersionDevices_firstPage_devicesWithoutUpToDateFlag() {
         // setup
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(5).build();
         when(deviceOsStateRepository.findOsVersionDevicePage(
                 TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "", Limit.of(6)))
                 .thenReturn(List.of(state("machine-1", "26100.4061"), state("machine-2", "26099.1"),
                         state("machine-3", null)));
-        when(windowsReleaseClientProvider.getIfAvailable()).thenReturn(windowsReleaseClient);
-        when(windowsReleaseClient.listWindowsReleases()).thenReturn(List.of(WINDOWS_11_24H2));
 
         // execution
         GenericQueryResult<OsVersionDeviceResponse> devices =
@@ -131,22 +128,21 @@ class OsVersionServiceTest {
         assertThat(devices.getItems())
                 .extracting(OsVersionDeviceResponse::getMachineId, OsVersionDeviceResponse::getUpToDate,
                         OsVersionDeviceResponse::getCursor)
-                .containsExactly(tuple("machine-1", true, CursorCodec.encode("machine-1")),
-                        tuple("machine-2", false, CursorCodec.encode("machine-2")),
+                .containsExactly(tuple("machine-1", null, CursorCodec.encode("machine-1")),
+                        tuple("machine-2", null, CursorCodec.encode("machine-2")),
                         tuple("machine-3", null, CursorCodec.encode("machine-3")));
         assertThat(devices.getPageInfo().isHasNextPage()).isFalse();
+        verifyNoInteractions(windowsReleaseClientProvider);
     }
 
     @Test
-    void listOsVersionDevices_organizationsAfterACursorWithoutRelease_theirDevicesAndNoFlag() {
+    void listOsVersionDevices_organizationsAfterACursor_theirDevicesAndNoFlag() {
         // setup
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(1).cursor("machine-1").build();
         when(deviceService.findDeviceIdsOfOrganizations(ORGANIZATIONS)).thenReturn(ORGANIZATION_MACHINE_IDS);
         when(deviceOsStateRepository.findOsVersionDevicePageOnMachines(
                 TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "machine-1", ORGANIZATION_MACHINE_IDS, Limit.of(2)))
                 .thenReturn(List.of(state("machine-2", "26100.1")));
-        when(windowsReleaseClientProvider.getIfAvailable()).thenReturn(windowsReleaseClient);
-        when(windowsReleaseClient.listWindowsReleases()).thenReturn(List.of());
 
         // execution
         GenericQueryResult<OsVersionDeviceResponse> devices =

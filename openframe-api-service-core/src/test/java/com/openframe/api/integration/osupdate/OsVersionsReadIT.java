@@ -140,9 +140,9 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
                         node -> node.get("devicesBehindCount"), node -> node.get("currentBuild"),
                         node -> node.get("endOfSupportAt"), node -> node.get("supportEnded"))
                 .containsExactly(
-                        tuple("11 25H2", 1, 0, "26200", "2027-10-12", false),
-                        tuple("11 24H2", 3, 1, "26100", "2026-10-13", true),
-                        tuple("10 22H2", 1, 0, "19045", "2025-10-14", true));
+                        tuple("11 25H2", 1, null, "26200", "2027-10-12", false),
+                        tuple("11 24H2", 3, null, "26100", "2026-10-13", true),
+                        tuple("10 22H2", 1, null, "19045", "2025-10-14", true));
         assertThat(page.hasNextPage()).isFalse();
         assertThat(meterRegistry.find("openframe.rmm.os_update.os_versions.source_failed").counter()).isNull();
     }
@@ -158,7 +158,8 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
 
         // verifications
         assertThat(orgA.nodes()).extracting(node -> node.get("osVersion"), node -> node.get("deviceCount"),
-                node -> node.get("devicesBehindCount")).containsExactly(tuple("11 25H2", 1, 0), tuple("11 24H2", 2, 1));
+                node -> node.get("devicesBehindCount"))
+                .containsExactly(tuple("11 25H2", 1, null), tuple("11 24H2", 2, null));
         assertThat(orgB.nodes()).extracting(node -> node.get("osVersion"), node -> node.get("deviceCount"))
                 .containsExactly(tuple("11 24H2", 1), tuple("10 22H2", 1));
         assertThat(withoutDevices.nodes()).isEmpty();
@@ -182,7 +183,7 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    void osVersionDevices_devicesOfTheVersion_byMachineIdWithBuildFlagAndMachine() {
+    void osVersionDevices_devicesOfTheVersion_byMachineIdWithBuildAndMachineWithoutFlag() {
         // setup
 
         // execution
@@ -194,9 +195,9 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
                         node -> node.get("osProductName"), node -> node.get("upToDate"),
                         node -> map(node.get("machine")).get("hostname"))
                 .containsExactly(
-                        tuple(W11_A, "26100.4061", "Windows 11 Pro", true, "host-" + W11_A),
-                        tuple(W11_B, "26100.2033", "Windows 11 Enterprise", true, "host-" + W11_B),
-                        tuple(W11_OLD_BASE, "22631.4460", "Windows 11 Pro", false, "host-" + W11_OLD_BASE));
+                        tuple(W11_A, "26100.4061", "Windows 11 Pro", null, "host-" + W11_A),
+                        tuple(W11_B, "26100.2033", "Windows 11 Enterprise", null, "host-" + W11_B),
+                        tuple(W11_OLD_BASE, "22631.4460", "Windows 11 Pro", null, "host-" + W11_OLD_BASE));
     }
 
     @Test

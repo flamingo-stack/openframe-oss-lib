@@ -16,9 +16,10 @@ import java.time.LocalDate;
 public class OsVersionResponseMapper {
 
     // windowsRelease null = no reference data for the version.
+    // WARNING: devicesBehindCount and upToDate stay null: endoflife's latest is only the base build, a device
+    // compared to it always looks current. They need the MSRC FixedBuild follow-up.
     public OsVersionResponse toResponse(OsVersionDeviceCounts osVersionDeviceCounts,
-                                        WindowsRelease windowsRelease, Integer devicesBehindCount,
-                                        LocalDate today, String cursor) {
+                                        WindowsRelease windowsRelease, LocalDate today, String cursor) {
         long deviceCount = osVersionDeviceCounts.getOsVersionBuildCounts().stream()
                 .mapToLong(OsVersionBuildCount::getDeviceCount)
                 .sum();
@@ -26,7 +27,6 @@ public class OsVersionResponseMapper {
         return OsVersionResponse.builder()
                 .osVersion(osVersionDeviceCounts.getOsVersion())
                 .deviceCount(Math.toIntExact(deviceCount))
-                .devicesBehindCount(devicesBehindCount)
                 .currentBuild(windowsRelease == null ? null : windowsRelease.getLatestBuild())
                 .endOfSupportAt(endOfSupportAt)
                 .supportEnded(endOfSupportAt == null ? null : endOfSupportAt.isBefore(today))
@@ -34,12 +34,11 @@ public class OsVersionResponseMapper {
                 .build();
     }
 
-    public OsVersionDeviceResponse toDeviceResponse(DeviceOsState deviceOsState, Boolean upToDate, String cursor) {
+    public OsVersionDeviceResponse toDeviceResponse(DeviceOsState deviceOsState, String cursor) {
         return OsVersionDeviceResponse.builder()
                 .machineId(deviceOsState.getMachineId())
                 .osBuild(deviceOsState.getOsBuild())
                 .osProductName(deviceOsState.getOsProductName())
-                .upToDate(upToDate)
                 .cursor(cursor)
                 .build();
     }
