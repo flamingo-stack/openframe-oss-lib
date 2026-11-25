@@ -4,6 +4,8 @@ import com.mongodb.client.MongoCollection;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
 import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.DeviceOsReadTestApplication;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import graphql.ExecutionResult;
@@ -38,7 +40,9 @@ import java.util.stream.Stream;
 import static com.openframe.api.integration.support.DeviceOsReadTestApplication.TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest(
@@ -75,6 +79,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
     private static final String NEWEST_SEEN = "2026-11-20T09:14:03.120Z";
     private static final String MIDDLE_SEEN = "2026-11-19T07:02:11Z";
     private static final String OLDEST_SEEN = "2026-11-18T07:02:11Z";
+    private static final String ENRICHED_AT = "2026-11-21T08:25:00Z";
     // WARNING: history rows older than the retention are deleted by the TTL monitor where the collection has its
     // TTL index, so every install time of this class is counted from now
     private static final String LATER_INSTALL = stepsAgo(3);
@@ -87,6 +92,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 edges { cursor node {
                   id platform identifier displayName displayVersion kbArticleIds severity categories categoryIds
                   updateType classification cveIds publishedAt sizeBytes rebootBehavior browseOnly firstSeenAt
+                  exploited enrichedAt
                   pendingDeviceCount installedDeviceCount
                 } }
                 pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
@@ -120,6 +126,9 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
 
     @MockitoSpyBean
     private OsUpdateService osUpdateService;
+
+    @MockitoSpyBean
+    private DeviceService deviceService;
 
     private String cumulativeId;
     private String driverId;
@@ -196,7 +205,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                         node -> node.get("installedDeviceCount"))
                 .containsExactly(tuple(CUMULATIVE, 2, 3), tuple(DRIVER, 1, 0), tuple(SAFARI, 1, 0));
         assertThat(page.hasNextPage()).isFalse();
-        verify(osUpdateService).countDevices(List.of(cumulativeId, driverId, safariId), List.of());
+        verify(osUpdateService).countDevices(List.of(cumulativeId, driverId, safariId), OsUpdateDeviceScope.EVERY_DEVICE);
     }
 
     @Test
@@ -220,6 +229,8 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         expected.put("rebootBehavior", "ALWAYS");
         expected.put("browseOnly", false);
         expected.put("firstSeenAt", NEWEST_SEEN);
+        expected.put("exploited", true);
+        expected.put("enrichedAt", ENRICHED_AT);
         expected.put("pendingDeviceCount", 2);
         expected.put("installedDeviceCount", 3);
 
@@ -248,6 +259,8 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .containsEntry("categoryIds", List.of())
                 .containsEntry("classification", null)
                 .containsEntry("updateType", null)
+                .containsEntry("exploited", null)
+                .containsEntry("enrichedAt", null)
                 .containsEntry("pendingDeviceCount", 0)
                 .containsEntry("installedDeviceCount", 0));
     }
@@ -293,8 +306,8 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         assertThat(identifiers(secondPage)).containsExactly(SAFARI);
         assertThat(secondPage.hasNextPage()).isFalse();
         assertThat(secondPage.hasPreviousPage()).isTrue();
-        verify(osUpdateService).countDevices(List.of(cumulativeId, driverId), List.of());
-        verify(osUpdateService).countDevices(List.of(safariId), List.of());
+        verify(osUpdateService).countDevices(List.of(cumulativeId, driverId), OsUpdateDeviceScope.EVERY_DEVICE);
+        verify(osUpdateService).countDevices(List.of(safariId), OsUpdateDeviceScope.EVERY_DEVICE);
     }
 
     @Test
@@ -518,6 +531,19 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    void osUpdates_organizationPageWithBothCounts_devicesOfTheOrganizationReadOnce() {
+        // setup
+        clearInvocations(deviceService);
+
+        // execution
+        Page page = osUpdates(Map.of("organizationIds", List.of(ORG_A, ORG_B)), null, null);
+
+        // verifications
+        assertThat(page.nodes()).hasSize(3);
+        verify(deviceService, times(1)).findDeviceIdsOfOrganizations(any());
+    }
+
+    @Test
     void osUpdates_organizationWithoutDevices_noUpdate() {
         // setup
 
@@ -714,7 +740,9 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("publishedAt", date("2026-11-11T18:00:00Z"))
                 .append("sizeBytes", 764317696L)
                 .append("rebootBehavior", "ALWAYS")
-                .append("browseOnly", false);
+                .append("browseOnly", false)
+                .append("exploited", true)
+                .append("enrichedAt", date(ENRICHED_AT));
     }
 
     private static Document pendingUpdate(String machineId, String tenantId, String platform, String identifier,

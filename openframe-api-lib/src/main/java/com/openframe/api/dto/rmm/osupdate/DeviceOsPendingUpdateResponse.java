@@ -29,6 +29,8 @@ public class DeviceOsPendingUpdateResponse {
     private Long sizeBytes;
     private OsUpdateRebootBehavior rebootBehavior;
     private Boolean browseOnly;
+    private Boolean exploited;
+    private Instant enrichedAt;
     private Instant discoveredAt;
     private Boolean downloaded;
     private MacosUpdatePresence macosPresence;

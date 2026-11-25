@@ -10,6 +10,7 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceStatus;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateFilterInput;
@@ -43,17 +44,18 @@ public class OsUpdateDataFetcher {
     private final OsUpdateGraphQLMapper osUpdateGraphQLMapper;
 
     @DgsQuery
-    // The organizations go down as the local context: the device counts of the listed updates read them.
+    // The devices of the organizations are read once and go down as the local context to the device counts.
     public DataFetcherResult<GenericConnection<GenericEdge<OsUpdateResponse>>> osUpdates(
             @InputArgument OsUpdateFilterInput filter, @InputArgument Integer first, @InputArgument String after) {
         OsUpdateFilter osUpdateFilter = osUpdateGraphQLMapper.toOsUpdateFilter(filter);
         List<String> organizationIds = osUpdateGraphQLMapper.toOrganizationIds(filter);
+        OsUpdateDeviceScope osUpdateDeviceScope = osUpdateService.findDeviceScope(organizationIds);
         CursorPaginationCriteria pagination = osUpdateGraphQLMapper.toCursorPaginationCriteria(first, after);
         GenericQueryResult<OsUpdateResponse> osUpdates =
-                osUpdateService.listOsUpdates(osUpdateFilter, organizationIds, pagination);
+                osUpdateService.listOsUpdates(osUpdateFilter, osUpdateDeviceScope, pagination);
         return DataFetcherResult.<GenericConnection<GenericEdge<OsUpdateResponse>>>newResult()
                 .data(osUpdateGraphQLMapper.toOsUpdateConnection(osUpdates))
-                .localContext(organizationIds)
+                .localContext(osUpdateDeviceScope)
                 .build();
     }
 
@@ -93,10 +95,11 @@ public class OsUpdateDataFetcher {
     // Asking for both counts of one update loads them once: the loader keeps what it loaded for the request.
     private static CompletableFuture<OsUpdateDeviceCounts> loadDeviceCounts(DgsDataFetchingEnvironment dfe) {
         OsUpdateResponse osUpdate = dfe.getSource();
-        List<String> organizationIds = Objects.requireNonNullElse(dfe.getLocalContext(), List.of());
+        OsUpdateDeviceScope osUpdateDeviceScope =
+                Objects.requireNonNullElse(dfe.getLocalContext(), OsUpdateDeviceScope.EVERY_DEVICE);
         OsUpdateDeviceCountsKey osUpdateDeviceCountsKey = OsUpdateDeviceCountsKey.builder()
                 .osUpdateId(osUpdate.getId())
-                .organizationIds(organizationIds)
+                .osUpdateDeviceScope(osUpdateDeviceScope)
                 .build();
         DataLoader<OsUpdateDeviceCountsKey, OsUpdateDeviceCounts> deviceCountsDataLoader =
                 dfe.getDataLoader(DEVICE_COUNTS_DATA_LOADER);
