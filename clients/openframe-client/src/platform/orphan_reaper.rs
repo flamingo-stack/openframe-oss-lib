@@ -25,7 +25,7 @@ pub(crate) enum OrphanReason {
 }
 
 /// Normalizes an executable path for comparison (Windows paths are case-insensitive and may carry `\\?\`).
-fn normalize_exe(path: &str, case_insensitive: bool) -> String {
+pub(crate) fn normalize_exe(path: &str, case_insensitive: bool) -> String {
     let trimmed = path.strip_prefix(r"\\?\").unwrap_or(path);
     if case_insensitive {
         trimmed.to_lowercase()
