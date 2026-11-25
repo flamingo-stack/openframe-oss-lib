@@ -711,6 +711,10 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
 
   const { fetchDialog } = history;
   const openRecord = recordEntry && recordEntry.dialogId === dialogId ? recordEntry : null;
+  // The dialog whose agent is known to be working on a turn of its own: its record says an answer is being written, its
+  // history ends with an unfinished turn, or the tail started a turn and has not ended it. Stop stops it on the server
+  // even while it cancels unsent sends.
+  const serverTurnForRef = useRef<string | null>(null);
   /** How many times the open record was asked for again (the refresh timer): each one reads it once more. */
   const [recordReads, setRecordReads] = useState(0);
   // The host's model changed (its settings): the open dialog's budget is the new model's, which only its record says
@@ -735,6 +739,9 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       .then(record => {
         if (!current) return;
         setRecordEntry({ dialogId, record, error: record ? null : 'This conversation could not be found.' });
+        if (record?.streamState === 'STREAMING' && currentDialogIdRef.current === dialogId) {
+          serverTurnForRef.current = dialogId;
+        }
         // A title the list does not have yet (generated since the list was read).
         if (record) patchDialog(dialogId, { title: record.dialog.title });
         // The dialog's usage until the stream says more.
@@ -826,9 +833,6 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       else unsentSendsRef.current.delete(id);
     };
   }, []);
-  // The dialog whose agent is known to be working on a turn of its own: an unfinished last turn its history ends with, or
-  // a turn the tail started and has not ended. Stop stops it on the server even while it cancels unsent sends.
-  const serverTurnForRef = useRef<string | null>(null);
 
   /** One page, or `null` when a newer load superseded it, or `'failed'`. Writes nothing: `applyHistoryPage` does. */
   const readHistoryPage = useCallback(
@@ -895,8 +899,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         const replayingBacklogFlag =
           tailReplays && historyMaxSeq !== null && replayCompletedForDialogRef.current !== id;
         const incompleteTail = extractIncompleteTailState(processed);
+        // Only ever noted here: the record may know of an answer this page cannot show, and the turn's end comes on the tail.
         if (incompleteTail?.agentBusy) serverTurnForRef.current = id;
-        else if (serverTurnForRef.current === id) serverTurnForRef.current = null;
         if (isStream && store.snapshotOf(key).messages.length > 0) {
           // A send that went out before the history landed: nothing typed is lost, the history goes before it.
           store.mutate(key, r => r.prependMessages(processed));

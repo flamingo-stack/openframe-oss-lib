@@ -791,6 +791,36 @@ describe('useChatEngine: a send waiting for the live tail', () => {
     expect(stop).toHaveBeenCalledWith('w4');
   });
 
+  it('an answer the record says is being written: Stop cancels the held send and still stops it', async () => {
+    const page = deferred<FetchDialogMessagesResult>();
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const fetchDialog = vi.fn((id: string) =>
+      Promise.resolve({ dialog: { id, title: 'Writing' }, streamState: 'STREAMING' as const }),
+    );
+    const { result, tail } = setup({
+      dialogId: 'w9',
+      history: { fetchDialogMessages: () => page.promise, fetchDialog },
+      transport: { publish, stop },
+    });
+    await waitFor(() => expect(result.current.activeDialog?.title).toBe('Writing'));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('first');
+    });
+    await act(async () => {
+      page.resolve({ messages: withSeq, nextCursor: null });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).toHaveBeenCalledWith('w9');
+  });
+
   it('another turn the tail is delivering: Stop cancels the queued send and stops that turn', async () => {
     const publish = vi.fn();
     const stop = vi.fn(() => Promise.resolve());
