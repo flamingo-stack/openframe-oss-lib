@@ -28,4 +28,6 @@ public class DeviceFilterInput {
     private List<String> tagValues;
     private List<DirectorySource> directorySources;
     private List<DirectoryUserLink> userLinks;
+    private List<String> mdmStates;
+    private List<String> diskEncryptionStates;
 } 
