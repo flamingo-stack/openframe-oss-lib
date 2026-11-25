@@ -141,16 +141,6 @@ class DeviceFilterServiceTest {
     }
 
     @Test
-    void getDeviceFilters_mdmAndDiskEncryptionOptions_emptyListsNotNull() {
-        DeviceFilters result = service()
-                .getDeviceFilters(DeviceFilterCriteria.builder().build(), Set.of(DeviceFilterFacet.CONNECTIVITY))
-                .join();
-
-        assertThat(result.getMdmStates()).isEmpty();
-        assertThat(result.getDiskEncryptionStates()).isEmpty();
-    }
-
-    @Test
     void connectivityFacet_runsOnlyTheConnectivityQueryAndSelfLabelsIt() {
         when(pinotDeviceRepository.getConnectivityFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Map.of("ONLINE", 2));

@@ -141,8 +141,6 @@ public class DeviceFilterService {
                         .tagKeys(optionMapper.tagLabeled(tagKeysFuture.join()))
                         .directorySources(optionMapper.selfLabeled(directorySourcesFuture.join()))
                         .userLinks(optionMapper.selfLabeled(userLinksFuture.join()))
-                        .mdmStates(List.of())
-                        .diskEncryptionStates(List.of())
                         .filteredCount(filteredCountFuture.join())
                         .build()
                 );

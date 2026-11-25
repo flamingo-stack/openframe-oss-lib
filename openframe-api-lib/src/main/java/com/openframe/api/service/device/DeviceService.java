@@ -251,8 +251,6 @@ public class DeviceService {
                 // The pickers' Mongo facets have no directory dimension: the two filters apply, their counts are []
                 .directorySources(List.of())
                 .userLinks(List.of())
-                .mdmStates(List.of())
-                .diskEncryptionStates(List.of())
                 .filteredCount((int) machineRepository.countMachines(tenantId, filter, search))
                 .build();
     }

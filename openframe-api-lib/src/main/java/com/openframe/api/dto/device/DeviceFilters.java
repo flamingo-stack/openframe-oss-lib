@@ -21,7 +21,9 @@ public class DeviceFilters {
     private List<TagFilterOption> tagKeys;
     private List<DeviceFilterOption> directorySources;
     private List<DeviceFilterOption> userLinks;
-    private List<DeviceFilterOption> mdmStates;
-    private List<DeviceFilterOption> diskEncryptionStates;
+    @Builder.Default
+    private List<DeviceFilterOption> mdmStates = List.of();
+    @Builder.Default
+    private List<DeviceFilterOption> diskEncryptionStates = List.of();
     private Integer filteredCount;
 } 
