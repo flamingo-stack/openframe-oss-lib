@@ -19,6 +19,7 @@ public class OsUpdateComponentFilter implements TypeFilter {
     }
 
     private static boolean ofTheFeature(String className) {
-        return className.contains("OsUpdate") || className.contains("DeviceOs") || className.contains(".osupdate.");
+        return className.contains("OsUpdate") || className.contains("DeviceOs") || className.contains("OsVersion")
+                || className.contains(".osupdate.");
     }
 }

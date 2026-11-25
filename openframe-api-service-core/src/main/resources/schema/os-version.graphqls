@@ -1,0 +1,61 @@
+extend type Query {
+    """Windows versions the devices of the tenant run, one row per version, the highest version first.
+    `first`: 1-100, default 20."""
+    osVersions(filter: OsVersionFilterInput, first: Int, after: String): OsVersionConnection!
+
+    """Windows devices of one OS version, by machineId. `organizationIds`: only devices of these organizations;
+    omitted or empty = every organization. `first`: 1-100, default 20. An unknown version has no devices."""
+    osVersionDevices(osVersion: String!, organizationIds: [String!], first: Int, after: String):
+        OsVersionDeviceConnection!
+}
+
+input OsVersionFilterInput {
+    """Only devices of these organizations are counted. Omitted or empty = every organization; organizations
+    without devices = no version."""
+    organizationIds: [String!]
+}
+
+type OsVersionConnection {
+    edges: [OsVersionEdge!]!
+    pageInfo: PageInfo!
+}
+
+type OsVersionEdge {
+    node: OsVersion!
+    cursor: String!
+}
+
+"""The reference fields come from endoflife.date, Home and Pro editions. All of them are null when the source
+is off or cannot be read, or does not know the version."""
+type OsVersion {
+    """As the agent reports it, e.g. "11 24H2"."""
+    osVersion: String!
+    deviceCount: Int!
+    """Devices whose build is below currentBuild. The reference build has no monthly revision, so only a device on
+    an older base build is counted."""
+    devicesBehindCount: Int
+    """Base build of the version, e.g. "26100"."""
+    currentBuild: String
+    endOfSupportAt: Date
+    supportEnded: Boolean
+}
+
+type OsVersionDeviceConnection {
+    edges: [OsVersionDeviceEdge!]!
+    pageInfo: PageInfo!
+}
+
+type OsVersionDeviceEdge {
+    node: OsVersionDevice!
+    cursor: String!
+}
+
+type OsVersionDevice {
+    machineId: String!
+    osBuild: String
+    osProductName: String
+    """Null = no reference data for the version, or the device reported no build."""
+    upToDate: Boolean
+    """Null = the device is no longer in the tenant."""
+    machine: Machine
+}
