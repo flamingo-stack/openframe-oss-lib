@@ -24,12 +24,12 @@ public class CisaKevCatalogParser {
             throw new IllegalArgumentException("KEV catalog has no vulnerabilities list");
         }
         Set<String> cveIds = new HashSet<>();
-        vulnerabilities.forEach(vulnerability -> {
+        for (JsonNode vulnerability : vulnerabilities) {
             String cveId = vulnerability.path("cveID").asString("");
             if (!cveId.isBlank()) {
                 cveIds.add(cveId);
             }
-        });
+        }
         return cveIds;
     }
 }

@@ -80,10 +80,12 @@ public class MsrcCvrfDocumentParser {
         if (cveId.isBlank()) {
             return;
         }
-        boolean exploited = elements(vulnerability.path("Threats")).stream()
+        JsonNode threats = vulnerability.path("Threats");
+        boolean exploited = elements(threats).stream()
                 .filter(threat -> threat.path("Type").asInt(-1) == THREAT_EXPLOIT_STATUS)
                 .anyMatch(threat -> threat.path("Description").path("Value").asString("").contains(EXPLOITED_YES));
-        for (JsonNode remediation : elements(vulnerability.path("Remediations"))) {
+        JsonNode remediations = vulnerability.path("Remediations");
+        for (JsonNode remediation : elements(remediations)) {
             String kb = remediation.path("Description").path("Value").asString("").trim();
             if (remediation.path("Type").asInt(-1) != REMEDIATION_VENDOR_FIX || !KB_NUMBER.matcher(kb).matches()) {
                 continue;
@@ -101,7 +103,8 @@ public class MsrcCvrfDocumentParser {
     }
 
     private static Optional<Double> maxCvssScore(JsonNode vulnerability, Set<String> productIds) {
-        return elements(vulnerability.path("CVSSScoreSets")).stream()
+        JsonNode cvssScoreSets = vulnerability.path("CVSSScoreSets");
+        return elements(cvssScoreSets).stream()
                 .filter(scoreSet -> appliesTo(scoreSet, productIds))
                 .map(scoreSet -> scoreSet.path("BaseScore"))
                 .filter(JsonNode::isNumber)
@@ -110,7 +113,8 @@ public class MsrcCvrfDocumentParser {
     }
 
     private static Optional<OsUpdateSeverity> maxSeverity(JsonNode vulnerability, Set<String> productIds) {
-        return elements(vulnerability.path("Threats")).stream()
+        JsonNode threats = vulnerability.path("Threats");
+        return elements(threats).stream()
                 .filter(threat -> threat.path("Type").asInt(-1) == THREAT_SEVERITY)
                 .filter(threat -> appliesTo(threat, productIds))
                 .map(threat -> toSeverity(threat.path("Description").path("Value").asString("")))
@@ -139,7 +143,8 @@ public class MsrcCvrfDocumentParser {
 
     private static Set<String> productIds(JsonNode entry) {
         Set<String> productIds = new HashSet<>();
-        elements(entry.path("ProductID")).forEach(productId -> productIds.add(productId.asString("")));
+        JsonNode entryProductIds = entry.path("ProductID");
+        elements(entryProductIds).forEach(productId -> productIds.add(productId.asString("")));
         return productIds;
     }
 

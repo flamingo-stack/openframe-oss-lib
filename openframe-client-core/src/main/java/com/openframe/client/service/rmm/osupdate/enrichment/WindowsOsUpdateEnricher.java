@@ -46,18 +46,23 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
 
     @Override
     public void enrich(List<OsUpdate> osUpdates, Instant enrichedAt) {
-        Optional<Set<String>> knownExploitedCveIds = findKnownExploitedCveIds();
+        Set<String> knownExploitedCveIds = findKnownExploitedCveIds().orElse(null);
         Map<Optional<YearMonth>, List<OsUpdate>> osUpdatesByMonth = new LinkedHashMap<>();
         osUpdates.forEach(osUpdate -> osUpdatesByMonth
                 .computeIfAbsent(bulletinMonth(osUpdate), month -> new ArrayList<>())
                 .add(osUpdate));
-        osUpdatesByMonth.forEach((month, monthOsUpdates) -> {
-            Optional<Map<String, MsrcKbArticle>> kbArticles = month.isEmpty()
-                    ? Optional.of(Map.of())
-                    : findKbArticles(month.get());
-            kbArticles.ifPresent(monthKbArticles -> monthOsUpdates.forEach(osUpdate ->
-                    enrich(osUpdate, monthKbArticles, knownExploitedCveIds, enrichedAt)));
-        });
+        osUpdatesByMonth.forEach((month, monthOsUpdates) ->
+                enrichMonth(month.orElse(null), monthOsUpdates, knownExploitedCveIds, enrichedAt));
+    }
+
+    // month is null for an update without a bulletin month: checked, no MSRC data.
+    private void enrichMonth(YearMonth month, List<OsUpdate> monthOsUpdates,
+                             Set<String> knownExploitedCveIds, Instant enrichedAt) {
+        Optional<Map<String, MsrcKbArticle>> kbArticles = month == null
+                ? Optional.of(Map.of())
+                : findKbArticles(month);
+        kbArticles.ifPresent(monthKbArticles -> monthOsUpdates.forEach(osUpdate ->
+                enrich(osUpdate, monthKbArticles, knownExploitedCveIds, enrichedAt)));
     }
 
     // Empty = KEV unavailable this run; it is asked again when the entry's TTL runs out.
@@ -86,8 +91,9 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
     }
 
     // MSRC is authoritative for the CVEs, rating and score of a KB it lists; without MSRC data the stored ones stay.
+    // knownExploitedCveIds is null when KEV was unavailable this run.
     private void enrich(OsUpdate osUpdate, Map<String, MsrcKbArticle> kbArticles,
-                        Optional<Set<String>> knownExploitedCveIds, Instant enrichedAt) {
+                        Set<String> knownExploitedCveIds, Instant enrichedAt) {
         List<MsrcKbArticle> matchedKbArticles = Objects.requireNonNullElse(osUpdate.getKbArticleIds(), List.<String>of())
                 .stream()
                 .map(WindowsOsUpdateEnricher::toKbNumber)
@@ -113,9 +119,9 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         List<String> cveIds = Objects.requireNonNullElse(osUpdate.getCveIds(), List.of());
         if (exploitedByMsrc || !cveIds.isEmpty()) {
             // Without KEV a flag KEV set earlier must not drop
-            boolean exploitedByKev = knownExploitedCveIds
-                    .map(kevCveIds -> cveIds.stream().anyMatch(kevCveIds::contains))
-                    .orElse(Boolean.TRUE.equals(osUpdate.getExploited()));
+            boolean exploitedByKev = knownExploitedCveIds == null
+                    ? Boolean.TRUE.equals(osUpdate.getExploited())
+                    : cveIds.stream().anyMatch(knownExploitedCveIds::contains);
             osUpdate.setExploited(exploitedByMsrc || exploitedByKev);
         }
         osUpdate.setEnrichedAt(enrichedAt);

@@ -94,26 +94,31 @@ public class OsUpdateService {
     // the others.
     public void enrichNotEnrichedSince(Instant enrichedBefore, int limit) {
         Timer.Sample runStarted = osUpdateEnrichmentMetrics.startRun();
-        List<OsUpdate> staleOsUpdates = osUpdateRepository.findEnrichedBefore(
-                tenantIdProvider.getTenantId(), enrichedBefore, PageRequest.of(0, limit));
+        String tenantId = tenantIdProvider.getTenantId();
+        PageRequest firstPage = PageRequest.of(0, limit);
+        List<OsUpdate> staleOsUpdates = osUpdateRepository.findEnrichedBefore(tenantId, enrichedBefore, firstPage);
         Instant enrichedAt = Instant.now();
         List<OsUpdate> unclaimedOsUpdates = new ArrayList<>(staleOsUpdates);
-        osUpdateEnrichers.orderedStream().forEach(osUpdateEnricher -> {
-            List<OsUpdate> applicableOsUpdates = unclaimedOsUpdates.stream()
-                    .filter(osUpdateEnricher::applicableTo)
-                    .toList();
-            unclaimedOsUpdates.removeAll(applicableOsUpdates);
-            enrichSafely(osUpdateEnricher, applicableOsUpdates, enrichedAt);
-        });
-        unclaimedOsUpdates.forEach(unclaimedOsUpdate -> {
+        osUpdateEnrichers.orderedStream()
+                .forEach(osUpdateEnricher -> claimAndEnrich(osUpdateEnricher, unclaimedOsUpdates, enrichedAt));
+        for (OsUpdate unclaimedOsUpdate : unclaimedOsUpdates) {
             unclaimedOsUpdate.setEnrichedAt(enrichedAt);
             osUpdateEnrichmentMetrics.recordNoData(unclaimedOsUpdate.getPlatform());
-        });
-        staleOsUpdates.forEach(staleOsUpdate -> {
+        }
+        for (OsUpdate staleOsUpdate : staleOsUpdates) {
             staleOsUpdate.setEnrichmentAttemptedAt(enrichedAt);
             saveEnrichedUnlessChangedMeanwhile(staleOsUpdate);
-        });
+        }
         osUpdateEnrichmentMetrics.recordRun(runStarted);
+    }
+
+    private void claimAndEnrich(OsUpdateEnricher osUpdateEnricher, List<OsUpdate> unclaimedOsUpdates,
+                                Instant enrichedAt) {
+        List<OsUpdate> applicableOsUpdates = unclaimedOsUpdates.stream()
+                .filter(osUpdateEnricher::applicableTo)
+                .toList();
+        unclaimedOsUpdates.removeAll(applicableOsUpdates);
+        enrichSafely(osUpdateEnricher, applicableOsUpdates, enrichedAt);
     }
 
     // One by one: an entry a report changed meanwhile is skipped and enriched on the next run.
