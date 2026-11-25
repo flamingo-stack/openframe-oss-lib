@@ -179,20 +179,22 @@ class WindowsOsUpdateEnricherTest {
     }
 
     @Test
-    void enrich_kevFails_noUpdateTouched() {
+    void enrich_kevFails_enrichedFromMsrcOnly() {
         // setup
-        OsUpdate cumulative = osUpdate(OsPlatform.WINDOWS, "2026-11 Cumulative Update (KB5132061)", List.of("5132061"));
+        OsUpdate cumulative = osUpdate(OsPlatform.WINDOWS, "2026-10 Cumulative Update (KB5126868)", List.of("5126868"));
         when(cisaKevClient.getKnownExploitedCveIds())
                 .thenThrow(new OsUpdateSourceUnavailableException(OsUpdateSource.CISA_KEV, "503"));
+        when(msrcCvrfClient.getKbArticles(OCTOBER)).thenReturn(Map.of("5126868", OCTOBER_CUMULATIVE));
 
         // execution
         enricher.enrich(List.of(cumulative), ENRICHED_AT);
 
         // verifications
-        assertThat(cumulative.getEnrichedAt()).isNull();
-        assertThat(cumulative.getCveIds()).isEmpty();
+        assertThat(cumulative.getCveIds()).containsExactly("CVE-2026-96951");
+        assertThat(cumulative.getCvssScore()).isEqualTo(8.8);
+        assertThat(cumulative.getExploited()).isTrue();
+        assertThat(cumulative.getEnrichedAt()).isEqualTo(ENRICHED_AT);
         verify(osUpdateEnrichmentMetrics).recordSourceFailed(OsUpdateSource.CISA_KEV);
-        verify(msrcCvrfClient, never()).getKbArticles(any());
     }
 
     private static OsUpdate osUpdate(OsPlatform platform, String displayName, List<String> kbArticleIds) {

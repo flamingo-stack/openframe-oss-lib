@@ -222,7 +222,7 @@ class OsUpdateEnrichmentIT {
     }
 
     @Test
-    void run_kevTruncated_nothingMarkedChecked() {
+    void run_kevTruncated_enrichedFromMsrcOnly() {
         // setup
         OsUpdate november = osUpdateRepository.save(windows("nov", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061"));
         FAILING_PATHS.put("/kev.json", 0);
@@ -231,7 +231,11 @@ class OsUpdateEnrichmentIT {
         osUpdateEnrichmentScheduler.run();
 
         // verifications
-        assertThat(stored(november).getEnrichedAt()).isNull();
+        OsUpdate storedNovember = stored(november);
+        assertThat(storedNovember.getCvssScore()).isEqualTo(9.8);
+        assertThat(storedNovember.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
+        assertThat(storedNovember.getExploited()).isFalse();
+        assertThat(storedNovember.getEnrichedAt()).isNotNull();
         assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_failed")
                 .tag("source", "cisa_kev").counter().count()).isPositive();
     }

@@ -44,13 +44,7 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
 
     @Override
     public void enrich(List<OsUpdate> osUpdates, Instant enrichedAt) {
-        Set<String> knownExploitedCveIds;
-        try {
-            knownExploitedCveIds = cisaKevClient.getKnownExploitedCveIds();
-        } catch (OsUpdateSourceUnavailableException failure) {
-            recordSourceFailed(failure);
-            return;
-        }
+        Set<String> knownExploitedCveIds = findKnownExploitedCveIds();
         Map<Optional<YearMonth>, List<OsUpdate>> osUpdatesByMonth = new LinkedHashMap<>();
         osUpdates.forEach(osUpdate -> osUpdatesByMonth
                 .computeIfAbsent(bulletinMonth(osUpdate), month -> new ArrayList<>())
@@ -62,6 +56,16 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
             kbArticles.ifPresent(monthKbArticles -> monthOsUpdates.forEach(osUpdate ->
                     enrich(osUpdate, monthKbArticles, knownExploitedCveIds, enrichedAt)));
         });
+    }
+
+    // Without KEV only MSRC's own exploited flag counts; KEV is asked again when the entry's TTL runs out.
+    private Set<String> findKnownExploitedCveIds() {
+        try {
+            return cisaKevClient.getKnownExploitedCveIds();
+        } catch (OsUpdateSourceUnavailableException failure) {
+            recordSourceFailed(failure);
+            return Set.of();
+        }
     }
 
     private Optional<Map<String, MsrcKbArticle>> findKbArticles(YearMonth month) {
