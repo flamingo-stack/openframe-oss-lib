@@ -6,7 +6,7 @@ use serde::de::IgnoredAny;
 use super::{Begin, CommandHandler, Outcome};
 use crate::models::{
     DeliveryRef, FeatureFlagsMessage, OpenFrameClientUpdateMessage, ToolAgentUpdateMessage,
-    ToolInstallationMessage,
+    ToolInstallationMessage, ToolUninstallMessage,
 };
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::feature_flags_service::{FeatureFlagsService, FlagsApplied};
@@ -17,6 +17,7 @@ use crate::services::tool_agent_update_service::ToolAgentUpdateService;
 use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_ops::{ToolOpGuard, ToolOps};
 use crate::services::tool_run_manager::{ClientUpdatePending, ToolRunManager};
+use crate::services::ToolUninstallService;
 
 const TOOL_BUSY: &str = "tool busy with another operation";
 const CLIENT_UPDATE_PENDING: &str = "client update pending";
@@ -167,6 +168,59 @@ impl CommandHandler for ToolUpdateHandler {
         op: ToolOpGuard,
     ) -> Outcome {
         self.service.process_update_locked(command, op).await.into()
+    }
+}
+
+#[derive(Clone)]
+pub struct ToolUninstallHandler {
+    service: ToolUninstallService,
+    tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
+}
+
+impl ToolUninstallHandler {
+    pub fn new(
+        service: ToolUninstallService,
+        tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
+    ) -> Self {
+        Self {
+            service,
+            tool_run_manager,
+            tool_ops,
+        }
+    }
+}
+
+impl CommandHandler for ToolUninstallHandler {
+    type Command = ToolUninstallMessage;
+    type Guard = ToolOpGuard;
+
+    const KIND: &'static str = "tool-uninstall";
+
+    fn subject(machine_id: &str) -> String {
+        format!("machine.{}.tool-uninstall.v2", machine_id)
+    }
+
+    fn begin(&self, command: &Self::Command) -> Begin<ToolOpGuard> {
+        reserve_tool(
+            &self.tool_ops,
+            &self.tool_run_manager.client_update_pending(),
+            &command.tool_agent_id,
+        )
+    }
+
+    async fn run(
+        &self,
+        _machine_id: &str,
+        _delivery: &DeliveryRef,
+        command: Self::Command,
+        op: ToolOpGuard,
+    ) -> Outcome {
+        self.service
+            .uninstall_reserved(&command.tool_agent_id, op, &self.tool_run_manager)
+            .await
+            .into()
     }
 }
 

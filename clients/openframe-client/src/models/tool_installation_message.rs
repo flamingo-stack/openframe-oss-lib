@@ -1,4 +1,4 @@
-use super::download_configuration::DownloadConfiguration;
+use super::download_configuration::{is_current_os, DownloadConfiguration};
 use super::tool_version_overrides;
 use serde::{Deserialize, Serialize};
 
@@ -65,16 +65,7 @@ pub struct LocalFilenameConfig {
 
 impl LocalFilenameConfig {
     pub fn matches_current_os(&self) -> bool {
-        let current_os = if cfg!(target_os = "windows") {
-            "windows"
-        } else if cfg!(target_os = "macos") {
-            "macos"
-        } else if cfg!(target_os = "linux") {
-            "linux"
-        } else {
-            return false;
-        };
-        self.os.eq_ignore_ascii_case(current_os)
+        is_current_os(&self.os)
     }
 }
 

@@ -195,7 +195,12 @@ async fn conclude<H: CommandHandler>(
     let context = &listener.context;
     let dispatch_id = delivery.dispatch_id.clone();
     // Restarting is left out: UpdateHandlerService records it once the next start settles it done
-    if H::SEQUENCED && matches!(outcome, Outcome::Done | Outcome::RestartRequired) {
+    if H::SEQUENCED
+        && matches!(
+            outcome,
+            Outcome::Done | Outcome::NotSupported(_) | Outcome::RestartRequired
+        )
+    {
         context.delivery.record_applied(machine_id, &delivery).await;
     }
 
@@ -224,6 +229,11 @@ async fn conclude<H: CommandHandler>(
         Outcome::Done => {
             info!(kind = H::KIND, dispatch_id = %dispatch_id, "Command done");
             let done = DeliveryResultMessage::done(delivery);
+            context.delivery.settle(machine_id, done).await;
+        }
+        Outcome::NotSupported(detail) => {
+            info!(kind = H::KIND, dispatch_id = %dispatch_id, "Command not supported on this device: {}", detail);
+            let done = DeliveryResultMessage::not_supported(delivery, &detail);
             context.delivery.settle(machine_id, done).await;
         }
         Outcome::Failed(reason) => {
