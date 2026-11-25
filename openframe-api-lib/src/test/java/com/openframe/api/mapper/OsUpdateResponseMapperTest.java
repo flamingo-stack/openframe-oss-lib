@@ -56,6 +56,8 @@ class OsUpdateResponseMapperTest {
                 .sizeBytes(764317696L)
                 .rebootBehavior(OsUpdateRebootBehavior.ALWAYS)
                 .browseOnly(false)
+                .exploited(true)
+                .enrichedAt(FIRST_SEEN_AT)
                 .firstSeenAt(FIRST_SEEN_AT)
                 .build();
         OsUpdateResponse expected = OsUpdateResponse.builder()
@@ -75,6 +77,8 @@ class OsUpdateResponseMapperTest {
                 .sizeBytes(764317696L)
                 .rebootBehavior(OsUpdateRebootBehavior.ALWAYS)
                 .browseOnly(false)
+                .exploited(true)
+                .enrichedAt(FIRST_SEEN_AT)
                 .firstSeenAt(FIRST_SEEN_AT)
                 .cursor(CURSOR)
                 .build();

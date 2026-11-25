@@ -49,14 +49,14 @@ public class DeviceOsUpdateHistoryService {
                                                                        List<String> scopeMachineIds) {
         String tenantId = tenantIdProvider.getTenantId();
         return scopeMachineIds == null
-                ? deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifier(tenantId, identifiers)
+                ? deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifier(identifiers, tenantId)
                 : deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifierOnMachines(
-                        tenantId, identifiers, scopeMachineIds);
+                        identifiers, scopeMachineIds, tenantId);
     }
 
     public List<String> listInstalledIdentifiers(List<String> machineIds) {
         return deviceOsUpdateHistoryRepository.findInstalledIdentifiersOnMachines(
-                tenantIdProvider.getTenantId(), machineIds);
+                machineIds, tenantIdProvider.getTenantId());
     }
 
     // One row per device: its latest successful install. scopeMachineIds null = every device.

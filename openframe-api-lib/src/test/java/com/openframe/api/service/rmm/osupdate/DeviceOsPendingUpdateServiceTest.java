@@ -154,7 +154,7 @@ class DeviceOsPendingUpdateServiceTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(deviceOsStateService.listNotManageableMachineIds()).thenReturn(NOT_MANAGEABLE_MACHINE_IDS);
         when(deviceOsPendingUpdateRepository.countDevicesByIdentifier(
-                TENANT_ID, OsPlatform.WINDOWS, List.of(IDENTIFIER), NOT_MANAGEABLE_MACHINE_IDS))
+                OsPlatform.WINDOWS, List.of(IDENTIFIER), NOT_MANAGEABLE_MACHINE_IDS, TENANT_ID))
                 .thenReturn(deviceCounts);
 
         // execution
@@ -172,7 +172,7 @@ class DeviceOsPendingUpdateServiceTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(deviceOsStateService.listNotManageableMachineIds()).thenReturn(NOT_MANAGEABLE_MACHINE_IDS);
         when(deviceOsPendingUpdateRepository.countDevicesByIdentifierOnMachines(
-                TENANT_ID, OsPlatform.WINDOWS, List.of(IDENTIFIER), List.of(MACHINE_ID)))
+                OsPlatform.WINDOWS, List.of(IDENTIFIER), List.of(MACHINE_ID), TENANT_ID))
                 .thenReturn(deviceCounts);
 
         // execution
@@ -190,7 +190,7 @@ class DeviceOsPendingUpdateServiceTest {
         List<OsUpdateIdentifiersOfPlatform> identifiers =
                 List.of(new OsUpdateIdentifiersOfPlatform(OsPlatform.WINDOWS, List.of(IDENTIFIER)));
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(deviceOsPendingUpdateRepository.findIdentifiersByPlatformOnMachines(TENANT_ID, List.of(MACHINE_ID)))
+        when(deviceOsPendingUpdateRepository.findIdentifiersByPlatformOnMachines(List.of(MACHINE_ID), TENANT_ID))
                 .thenReturn(identifiers);
 
         // execution

@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.PackageUpdateSettingsInput;
 import com.openframe.api.dto.rmm.software.SoftwareAutoUpdateInput;
@@ -11,6 +13,7 @@ import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -25,6 +28,7 @@ import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleStatus;
+import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleRepository;
@@ -48,6 +52,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,6 +83,7 @@ class SoftwareBundleServiceTest {
             .mode(PackageUpdateMode.WAIT).deadlineSeconds(3600L).countdownSeconds(120).build();
     private static final PackageCatalogEntry WINGET_CHROME = PackageCatalogEntry.builder()
             .manager(PackageManagerType.WINGET).packageId("Google.Chrome").build();
+    private static final Instant NIGHTLY_START = Instant.parse("2026-09-15T02:00:00Z");
 
     @Mock private SoftwareBundleRepository bundleRepository;
     @Mock private SoftwareBundleOnlineDispatchRepository onlineDispatchRepository;
@@ -88,14 +98,16 @@ class SoftwareBundleServiceTest {
     @Captor private ArgumentCaptor<SoftwareBundle> softwareBundleCaptor;
     @Captor private ArgumentCaptor<List<SoftwareActionResult>> softwareActionResultsCaptor;
 
+    private AuditedMethodRunner auditedMethodRunner;
     private SoftwareBundleService service;
 
     @BeforeEach
     void setUp() {
+        auditedMethodRunner = mock(AuditedMethodRunner.class, CALLS_REAL_METHODS);
         service = new SoftwareBundleService(bundleRepository, onlineDispatchRepository, softwareScheduleService,
                 softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability,
                 new SoftwarePackageSelectionResolver(softwareInventoryService), softwareInventoryService,
-                packageCatalogVersions);
+                packageCatalogVersions, auditedMethodRunner);
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(1));
         ReflectionTestUtils.setField(service, "scheduleReconnectWindowSeconds", RECONNECT_WINDOW);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -143,6 +155,8 @@ class SoftwareBundleServiceTest {
                 .thenReturn(Optional.empty());
 
         SoftwareBundleResponse res = service.submit(submitInput(brewPkg("slack"), brewPkg("chrome")), USER);
+
+        assertThat(auditedCall().action()).isEqualTo(SOFTWARE_INSTALL);
 
         verify(onlineDispatchRepository, times(2)).save(any());
         ArgumentCaptor<SoftwareBundle> saved = ArgumentCaptor.forClass(SoftwareBundle.class);
@@ -195,6 +209,7 @@ class SoftwareBundleServiceTest {
                 .hasMessageContaining("m-win");
         verify(bundleRepository, never()).save(any());
         verifyNoInteractions(onlineDispatchRepository);
+        assertThat(auditedCall().detailsFromResult().apply(null)).containsEntry("packages", List.of("slack"));
     }
 
     @Test
@@ -262,6 +277,7 @@ class SoftwareBundleServiceTest {
 
         SoftwareBundleResponse res = service.submit(input, USER);
 
+        assertThat(auditedCall().action()).isEqualTo(SOFTWARE_UPDATE);
         ArgumentCaptor<SoftwareBundle> saved = ArgumentCaptor.forClass(SoftwareBundle.class);
         verify(bundleRepository).save(saved.capture());
         assertThat(saved.getValue().getUpdateSettings()).satisfies(s -> {
@@ -310,8 +326,12 @@ class SoftwareBundleServiceTest {
         input.setUpdateSettings(settings);
         input.setAutoUpdate(autoUpdate);
 
-        service.submit(input, USER);
+        SoftwareBundleResponse response = service.submit(input, USER);
 
+        assertThat(auditedCall())
+                .returns(SOFTWARE_SCHEDULE_CREATE, AuditCall::action)
+                .returns(true, AuditCall::targetIdInResult)
+                .returns("s1", call -> call.targetIdFromResult().apply(response));
         ArgumentCaptor<CreateSoftwareScheduleInput> created = ArgumentCaptor.forClass(CreateSoftwareScheduleInput.class);
         verify(softwareScheduleService).create(created.capture(), eq(USER));
         assertThat(created.getValue().getUpdateSettings()).isSameAs(settings);
@@ -360,6 +380,7 @@ class SoftwareBundleServiceTest {
                 .hasMessage("No package manager manages Adobe Acrobat");
         verify(bundleRepository, never()).save(any());
         verifyNoInteractions(onlineDispatchRepository, softwareActionResultRepository, softwareScheduleService);
+        assertThat(auditedCall().detailsFromResult().apply(null)).containsEntry("packages", List.of("title-7"));
     }
 
     @Test
@@ -474,6 +495,99 @@ class SoftwareBundleServiceTest {
     }
 
     @Test
+    void submit_nowWingetUnsupportedOnTheWindowsDevice_storesOnlyTheSentPackage() {
+        stubPendingBundle(List.of("m-mac", "m-win"));
+        when(machinePlatformResolver.osTypesByMachineId(List.of("m-mac", "m-win")))
+                .thenReturn(Map.of("m-mac", OsType.MAC_OS, "m-win", OsType.WINDOWS));
+        when(packageManagerAvailability.supporting(List.of("m-mac"), PackageManagerType.BREW)).thenReturn(List.of("m-mac"));
+        when(packageManagerAvailability.supporting(List.of("m-win"), PackageManagerType.WINGET)).thenReturn(List.of());
+        SoftwarePackageInput chrome = new SoftwarePackageInput();
+        chrome.setPackageManager(PackageManagerType.WINGET);
+        chrome.setPackageName("Google.Chrome");
+        chrome.setVersion("131.0");
+
+        SoftwareBundleResponse response = service.submit(submitInput(brewPkg("slack"), chrome), USER);
+
+        assertThat(auditedCall().detailsFromResult().apply(response))
+                .containsEntry("packages", List.of("slack"))
+                .containsEntry("executionIds",
+                        List.of(SoftwareExecutionId.forBundle(BUNDLE_ID, PackageManagerType.BREW, "slack")));
+    }
+
+    @Test
+    void submit_nowUpdateWithAutoUpdateOn_storesTheSettingsAndAutoUpdateButNoAction() {
+        stubPendingBundle(List.of("m1"));
+        SubmitSoftwareBundleInput input = updateWithAutoUpdate(true);
+        input.setUpdateSettings(settingsInput(PackageUpdateMode.WAIT, 86_400L, 120));
+
+        SoftwareBundleResponse response = service.submit(input, USER);
+
+        assertThat(auditedCall().detailsFromResult().apply(response))
+                .containsEntry("updateMode", PackageUpdateMode.WAIT)
+                .containsEntry("deadlineSeconds", 86_400L)
+                .containsEntry("countdownSeconds", 120)
+                .containsEntry("autoUpdate", true)
+                .doesNotContainKey("softwareAction");
+    }
+
+    @Test
+    void submit_nowUpdateWithAutoUpdateOff_storesNoAutoUpdate() {
+        stubPendingBundle(List.of("m1"));
+
+        SoftwareBundleResponse response = service.submit(updateWithAutoUpdate(false), USER);
+
+        assertThat(auditedCall().detailsFromResult().apply(response)).extractingByKey("autoUpdate").isNull();
+    }
+
+    @Test
+    void submit_scheduleRefused_eventKeepsTheAskedNameTimingAndAction() {
+        stubPendingBundle(List.of("m1"));
+        when(softwareScheduleService.create(any(CreateSoftwareScheduleInput.class), eq(USER)))
+                .thenThrow(new ConflictException("Software schedule with name 'Nightly Slack' already exists"));
+        SubmitSoftwareBundleInput input = nightlySlackSchedule();
+
+        assertThatThrownBy(() -> service.submit(input, USER))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Software schedule with name 'Nightly Slack' already exists");
+
+        AuditCall call = auditedCall();
+        assertThat(call.targetNameOf().apply(null)).isEqualTo("Nightly Slack");
+        assertThat(call.detailsFromResult().apply(null))
+                .containsEntry("softwareAction", SoftwareAction.INSTALL)
+                .containsEntry("startAt", NIGHTLY_START)
+                .containsEntry("repeat", 86_400L);
+    }
+
+    @Test
+    void submit_scheduleCreated_eventLeavesTheTimingToTheSchedule() {
+        stubPendingBundle(List.of("m1"));
+        when(softwareScheduleService.create(any(CreateSoftwareScheduleInput.class), eq(USER)))
+                .thenReturn(SoftwareScheduleResponse.builder().id("s1").build());
+
+        SoftwareBundleResponse response = service.submit(nightlySlackSchedule(), USER);
+
+        assertThat(auditedCall().detailsFromResult().apply(response)).doesNotContainKeys("startAt", "repeat");
+    }
+
+    @Test
+    void submit_nowOnOneDevice_targetsThatDevice() {
+        stubPendingBundle(List.of("m1"));
+
+        service.submit(submitInput(brewPkg("slack")), USER);
+
+        assertThat(auditedCall().targetIdBeforeCall().get()).isEqualTo("m1");
+    }
+
+    @Test
+    void submit_nowOnSeveralDevices_storedWithoutATargetDevice() {
+        stubPendingBundle(List.of("m1", "m2"));
+
+        service.submit(submitInput(brewPkg("slack")), USER);
+
+        assertThat(auditedCall().targetIdBeforeCall().get()).isNull();
+    }
+
+    @Test
     @DisplayName("turnOnAutoUpdate: the bundle's devices and the settings go to the Software, the bundle is COMPLETED, no update runs")
     void turnOnAutoUpdate_pendingBundleWithDevices_turnsOnForItsDevicesAndCompletesTheBundle() {
         SoftwareBundle draft = pending(null, null, List.of("m1", "m2"));
@@ -484,7 +598,7 @@ class SoftwareBundleServiceTest {
                 .thenReturn(java.util.Map.of("m1", OsType.WINDOWS, "m2", OsType.WINDOWS));
         SoftwareResponse chrome = SoftwareResponse.builder().id("title-7").name("Chrome").build();
         when(softwareInventoryService.turnOnAutoUpdate("title-7", List.of("m1", "m2"), AUTO_UPDATE_SETTINGS, USER))
-                .thenReturn(chrome);
+                .thenReturn(new SoftwareInventoryService.AutoUpdateDevicesChanged(chrome, List.of("m1", "m2"), List.of()));
 
         SoftwareResponse result = service.turnOnAutoUpdate(turnOnInput(), USER);
 
@@ -497,6 +611,12 @@ class SoftwareBundleServiceTest {
         assertThat(completed.getUpdatedAt()).isEqualTo(completed.getCompletedAt());
         assertThat(completed.getExpireAt()).isNull();
         verifyNoInteractions(onlineDispatchRepository, softwareActionResultRepository, softwareScheduleService);
+        AuditCall call = auditedCall();
+        assertThat(call.targetNameOf().apply(result)).isEqualTo("Chrome");
+        assertThat(call.detailsFromResult().apply(result))
+                .containsEntry("updateMode", PackageUpdateMode.WAIT)
+                .containsEntry("deadlineSeconds", 3600L)
+                .containsEntry("countdownSeconds", 120);
     }
 
     @Test
@@ -511,6 +631,7 @@ class SoftwareBundleServiceTest {
                 .hasMessage("Cannot turn on auto-update from software bundle b1: no devices assigned");
         verify(bundleRepository, never()).save(any());
         verifyNoInteractions(softwareInventoryService);
+        assertThat(auditedCall().targetNameOf().apply(null)).isNull();
     }
 
     @Test
@@ -601,11 +722,36 @@ class SoftwareBundleServiceTest {
         return input;
     }
 
+    private AuditCall auditedCall() {
+        ArgumentCaptor<AuditCall> call = ArgumentCaptor.forClass(AuditCall.class);
+        verify(auditedMethodRunner).run(call.capture(), any());
+        return call.getValue();
+    }
+
     private static SubmitSoftwareBundleInput submitInput(SoftwarePackageInput... packages) {
         SubmitSoftwareBundleInput input = new SubmitSoftwareBundleInput();
         input.setId(BUNDLE_ID);
         input.setAction(SoftwareAction.INSTALL);
         input.setPackages(List.of(packages));
+        return input;
+    }
+
+    private static SubmitSoftwareBundleInput nightlySlackSchedule() {
+        SoftwareBundleScheduleInput schedule = new SoftwareBundleScheduleInput();
+        schedule.setName("Nightly Slack");
+        schedule.setStartAt(NIGHTLY_START);
+        schedule.setRepeat(86_400L);
+        SubmitSoftwareBundleInput input = submitInput(brewPkg("slack"));
+        input.setSchedule(schedule);
+        return input;
+    }
+
+    private static SubmitSoftwareBundleInput updateWithAutoUpdate(boolean enabled) {
+        SoftwareAutoUpdateInput autoUpdate = new SoftwareAutoUpdateInput();
+        autoUpdate.setEnabled(enabled);
+        SubmitSoftwareBundleInput input = submitInput(brewPkg("slack"));
+        input.setAction(SoftwareAction.UPDATE);
+        input.setAutoUpdate(autoUpdate);
         return input;
     }
 
@@ -628,6 +774,11 @@ class SoftwareBundleServiceTest {
         SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
         when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
         when(machinePlatformResolver.osTypesByMachineId(List.of("m1"))).thenReturn(Map.of("m1", OsType.MAC_OS));
+    }
+
+    private void stubPendingBundle(List<String> machineIds) {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, machineIds);
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
     }
 
     private void stubNoSentinelYet() {

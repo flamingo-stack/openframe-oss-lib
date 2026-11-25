@@ -32,7 +32,9 @@ public class CustomOsUpdateRepositoryImpl implements CustomOsUpdateRepository {
     private static final String FIELD_KB_ARTICLE_IDS = "kbArticleIds";
     private static final String FIELD_CVE_IDS = "cveIds";
     private static final String FIELD_FIRST_SEEN_AT = "firstSeenAt";
+    private static final String FIELD_ENRICHED_AT = "enrichedAt";
     private static final Sort NEWEST_SEEN_FIRST = Sort.by(Sort.Direction.DESC, FIELD_FIRST_SEEN_AT, FIELD_ID);
+    private static final Sort LOWEST_ID_FIRST = Sort.by(Sort.Direction.ASC, FIELD_ID);
 
     private final MongoTemplate mongoTemplate;
 
@@ -75,6 +77,19 @@ public class CustomOsUpdateRepositoryImpl implements CustomOsUpdateRepository {
         Instant firstSeenAt = osUpdate.getFirstSeenAt();
         String id = osUpdate.getId();
         return OsUpdateKeysetCursor.encode(firstSeenAt, id);
+    }
+
+    @Override
+    public List<OsUpdate> findEnrichedBefore(String tenantId, Instant enrichedBefore, String afterId, int limit) {
+        Criteria neverEnriched = Criteria.where(FIELD_ENRICHED_AT).is(null);
+        Criteria enrichedEarlier = Criteria.where(FIELD_ENRICHED_AT).lt(enrichedBefore);
+        Criteria stale = Criteria.where(FIELD_TENANT_ID).is(tenantId).orOperator(neverEnriched, enrichedEarlier);
+        if (afterId != null) {
+            ObjectId afterObjectId = parseId(afterId);
+            stale.and(FIELD_ID).gt(afterObjectId);
+        }
+        Query query = Query.query(stale).with(LOWEST_ID_FIRST).limit(limit);
+        return mongoTemplate.find(query, OsUpdate.class);
     }
 
     // The search text is matched as it is typed, never as a pattern.
