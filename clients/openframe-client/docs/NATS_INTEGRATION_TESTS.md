@@ -148,6 +148,13 @@ tester.flush().await.unwrap();
 Core NATS has no backlog: anything published before the subscription exists is
 lost. The same applies to the agent's listener — see the next step.
 
+`flush()` only writes to the socket; it does not wait for the server to process
+the `SUB`, and nats-server keeps no order between connections. Here that is
+safe: the agent publishes only in reply to a command the tester sends after the
+`SUB` on the same connection. When the agent publishes on its own (a startup
+report), subscribe on the connection the agent publishes on, as
+`os_info_report_publisher_tests.rs` does.
+
 ### 5. Wait until the listener is subscribed
 
 A listener subscribes asynchronously after `start()`. Don't `sleep`; send a probe
