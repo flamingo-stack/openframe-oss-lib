@@ -2,14 +2,26 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.MachineTag;
+import com.openframe.api.service.knowledgebase.KnowledgeBaseService;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.audit.AuditTargetType;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,20 +31,26 @@ import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.KB_ITEM_TAG_REMOVE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_TAG_REMOVE;
+import static com.openframe.data.document.audit.AuditAction.TAG_CREATE;
+import static com.openframe.data.document.audit.AuditAction.TAG_DELETE;
+import static com.openframe.data.document.audit.AuditAction.TAG_UPDATE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_TAG_REMOVE;
+
 @Service
 @Slf4j
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TagService {
 
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
+    private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
+    private final KnowledgeBaseItemRepository knowledgeBaseItemRepository;
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
-
-    public TagService(TagRepository tagRepository, TagAssignmentRepository tagAssignmentRepository) {
-        this.tagRepository = tagRepository;
-        this.tagAssignmentRepository = tagAssignmentRepository;
-    }
 
     public Optional<Tag> findById(String id) {
         return tagRepository.findById(id);
@@ -249,6 +267,18 @@ public class TagService {
         if (existing != null) {
             return existing;
         }
+        Map<String, Object> details = new HashMap<>();
+        details.put("entityType", entityType);
+        withAskedValues(details, key, description, color);
+        AuditCall auditCall = AuditCall.of(TAG_CREATE, null, details)
+                .withCompare(false)
+                .withTargetIdInResult(true)
+                .withTargetIdFromResult(created -> ((Tag) created).getId())
+                .withTargetNameOf(_ -> key);
+        return auditedMethodRunner.run(auditCall, () -> saveNewTag(key, entityType, description, color));
+    }
+
+    private Tag saveNewTag(String key, TagEntityType entityType, String description, String color) {
         boolean caseVariantExists = tagRepository.existsByKeyIgnoreCaseAndEntityType(key, entityType);
         if (caseVariantExists) {
             throw new ConflictException("Tag with key '" + key + "' already exists");
@@ -268,8 +298,25 @@ public class TagService {
     @Transactional
     public Tag updateTag(String tagId, String key, String description, String color) {
         log.info("Updating tag: {}", tagId);
+        Map<String, Object> details = new HashMap<>();
+        AuditCall auditCall = AuditCall.of(TAG_UPDATE, tagId, details)
+                .withDetailsFromResult(updatedTag -> updatedTag == null
+                        ? withAskedValues(details, key, description, color) : details);
+        return auditedMethodRunner.run(auditCall, () -> applyUpdate(tagId, key, description, color, details));
+    }
 
+    private static Map<String, Object> withAskedValues(Map<String, Object> details, String key,
+                                                       String description, String color) {
+        details.put("key", key);
+        details.put("description", description);
+        details.put("color", color);
+        return details;
+    }
+
+    private Tag applyUpdate(String tagId, String key, String description, String color,
+                            Map<String, Object> auditDetails) {
         Tag tag = requireTag(tagId);
+        auditDetails.put("entityType", tag.getEntityType());
 
         if (key != null) {
             TagEntityType entityType = tag.getEntityType();
@@ -290,16 +337,58 @@ public class TagService {
     }
 
     @Transactional
-    public void deleteTag(String tagId) {
+    @Audited(action = TAG_DELETE, targetId = "#tagId",
+            details = {"entityType=#result.entityType", "removedAssignments=#result.removedAssignments"})
+    public DeletedTag deleteTag(String tagId) {
         log.info("Deleting tag: {}", tagId);
-
-        if (!tagRepository.existsById(tagId)) {
-            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId);
-        }
-
+        Tag tag = requireTag(tagId);
+        List<String> entityIds = tagAssignmentRepository.findByTagId(tagId).stream()
+                .map(TagAssignment::getEntityId)
+                .distinct()
+                .toList();
         tagAssignmentRepository.deleteByTagId(tagId);
         tagRepository.deleteById(tagId);
+        auditRecorder.recordAll(removalEventsOf(tag, entityIds));
         log.info("Tag deleted with cascade: {}", tagId);
+        return new DeletedTag(tag.getEntityType(), entityIds.size());
+    }
+
+    public record DeletedTag(TagEntityType entityType, int removedAssignments) {
+    }
+
+    private List<AuditEntry> removalEventsOf(Tag tag, List<String> entityIds) {
+        return switch (tag.getEntityType()) {
+            case TICKET -> entityIds.stream()
+                    .map(ticketId -> removalEventOf(TICKET_TAG_REMOVE, AuditTargetType.TICKET, ticketId, tag))
+                    .toList();
+            case SCRIPT -> entityIds.stream()
+                    .map(scriptId -> removalEventOf(SCRIPT_TAG_REMOVE, AuditTargetType.SCRIPT, scriptId, tag))
+                    .toList();
+            case KNOWLEDGE_ARTICLE -> knowledgeBaseRemovalEventsOf(tag, entityIds);
+            case DEVICE -> List.of();
+        };
+    }
+
+    private List<AuditEntry> knowledgeBaseRemovalEventsOf(Tag tag, List<String> itemIds) {
+        List<KnowledgeBaseItem> items = knowledgeBaseItemRepository.findAllById(itemIds);
+        int gone = itemIds.size() - items.size();
+        if (gone > 0) {
+            log.info("Tag {} was on {} knowledge base item(s) that no longer exist", tag.getId(), gone);
+        }
+        return items.stream()
+                .map(item -> removalEventOf(KB_ITEM_TAG_REMOVE, KnowledgeBaseService.targetTypeOf(item), item.getId(),
+                        tag))
+                .toList();
+    }
+
+    private static AuditEntry removalEventOf(AuditAction action, AuditTargetType targetType, String entityId, Tag tag) {
+        return AuditEntry.builder()
+                .action(action)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetType(targetType)
+                .targetId(entityId)
+                .details(Map.of("tagIds", List.of(tag.getId()), "tagKeys", List.of(tag.getKey())))
+                .build();
     }
 
     private MachineTag buildMachineTag(TagAssignment assignment, Tag tag) {

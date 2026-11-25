@@ -1,5 +1,7 @@
 package com.openframe.management.controller;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.targets.ToolCredentialParts;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.IntegratedToolService;
@@ -27,19 +29,23 @@ public class IntegratedToolController {
     private final DebeziumService debeziumService;
     private final TenantIdProvider tenantIdProvider;
     private final List<IntegratedToolPostSaveHook> postSaveHooks;
+    private final AuditRecorder auditRecorder;
 
     @GetMapping
     public Map<String, Object> getTools() {
+        List<IntegratedTool> tools = toolService.getAllTools();
+        auditRecorder.recordAll(ToolCredentialParts.views(tools));
         return Map.of(
             "status", "success",
-            "tools", toolService.getAllTools()
+            "tools", tools
         );
     }
 
     @GetMapping("/{id}")
     public Map<String, Object> getTool(@PathVariable String id) {
-        return toolService.getTool(id)
-            .map(tool -> Map.of("status", "success", "tool", tool))
+        Optional<IntegratedTool> tool = toolService.getTool(id);
+        tool.ifPresent(found -> auditRecorder.recordAll(ToolCredentialParts.views(List.of(found))));
+        return tool.map(found -> Map.of("status", "success", "tool", found))
             .orElse(Map.of("status", "error", "message", "Tool not found"));
     }
 

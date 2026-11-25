@@ -14,12 +14,14 @@ import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.TimeEntryService;
 import com.openframe.data.document.timetracking.TimeEntry;
+import com.openframe.audit.AuditedMethodRunner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -52,6 +54,7 @@ class TimeEntryDataFetcherRelayIdTest {
     private static final String PADDED_ORGANIZATION_SENTINEL = "T3JnYW5pemF0aW9uOg==";
 
     @Mock private TimeEntryService timeEntryService;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private TimeEntryDataFetcher dataFetcher;

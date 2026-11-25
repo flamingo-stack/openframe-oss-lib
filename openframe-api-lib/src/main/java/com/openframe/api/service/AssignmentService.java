@@ -7,9 +7,13 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.repository.assignment.ItemAssignmentRepository;
@@ -19,6 +23,7 @@ import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +33,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static com.openframe.data.document.audit.AuditAction.LINK_CREATE;
+import static com.openframe.data.document.audit.AuditAction.LINK_DELETE;
 
 @Service
 @Slf4j
@@ -40,6 +48,7 @@ public class AssignmentService {
     private final MachineRepository machineRepository;
     private final TicketRepository ticketRepository;
     private final KnowledgeBaseItemRepository knowledgeBaseItemRepository;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     public Map<AssignmentTargetType, Long> countAssignmentsByTargetType(String itemId) {
         return repository.countByItemIdGroupedByTargetType(itemId);
@@ -109,7 +118,49 @@ public class AssignmentService {
     @Transactional
     public ItemAssignment assignItem(String itemId, AssignmentItemType itemType,
                                       AssignmentTargetType targetType, String targetId) {
-        String displayName = resolveDisplayName(targetType, targetId);
+        return repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
+                .orElseGet(() -> {
+                    String displayName = resolveDisplayName(targetType, targetId);
+                    AuditCall auditCall = auditCallOfAssignment(LINK_CREATE, itemType, itemId, targetType, targetId,
+                            displayName);
+                    return auditedMethodRunner.run(auditCall,
+                            () -> createAssignment(itemId, itemType, targetType, targetId, displayName));
+                });
+    }
+
+    private static AuditCall auditCallOfAssignment(AuditAction action, AssignmentItemType itemType, String itemId,
+                                                   AssignmentTargetType targetType, String targetId,
+                                                   String targetName) {
+        Map<String, Object> details = Map.of("targetType", auditTypeOf(targetType),
+                "targetIds", List.of(targetId), "targetNames", List.of(targetName));
+        String linkedOrganizationId = targetType == AssignmentTargetType.ORGANIZATION ? targetId : null;
+        String linkedDeviceId = targetType == AssignmentTargetType.DEVICE ? targetId : null;
+        return AuditCall.of(action, auditTypeOf(itemType), itemId, details)
+                .withCompare(false)
+                .withIgnoresTargetOrganizationAndDevice(linkedOrganizationId != null || linkedDeviceId != null)
+                .withOrganizationIdOf(_ -> linkedOrganizationId)
+                .withDeviceIdOf(_ -> linkedDeviceId);
+    }
+
+    private static AuditTargetType auditTypeOf(AssignmentTargetType targetType) {
+        return switch (targetType) {
+            case ORGANIZATION -> AuditTargetType.ORGANIZATION;
+            case DEVICE -> AuditTargetType.DEVICE;
+            case TICKET -> AuditTargetType.TICKET;
+            case KNOWLEDGE_ARTICLE -> AuditTargetType.KB_ARTICLE;
+        };
+    }
+
+    private static AuditTargetType auditTypeOf(AssignmentItemType itemType) {
+        return switch (itemType) {
+            case TICKET -> AuditTargetType.TICKET;
+            case INSIGHT -> AuditTargetType.INSIGHT;
+            case KNOWLEDGE_ARTICLE -> AuditTargetType.KB_ARTICLE;
+        };
+    }
+
+    private ItemAssignment createAssignment(String itemId, AssignmentItemType itemType,
+                                            AssignmentTargetType targetType, String targetId, String displayName) {
         log.info("Assigning {}:{} ({}) to {} {}", targetType, targetId, displayName, itemType, itemId);
         ItemAssignment assignment = ItemAssignment.builder()
                 .itemId(itemId)
@@ -130,7 +181,19 @@ public class AssignmentService {
     @Transactional
     public void unassignItem(String itemId, AssignmentTargetType targetType, String targetId) {
         log.info("Unassigning {}:{} from item {}", targetType, targetId, itemId);
-        repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+        repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId).ifPresent(this::unlink);
+    }
+
+    private void unlink(ItemAssignment assignment) {
+        String itemId = assignment.getItemId();
+        AssignmentTargetType targetType = assignment.getTargetType();
+        String targetId = assignment.getTargetId();
+        AuditCall auditCall = auditCallOfAssignment(LINK_DELETE, assignment.getItemType(), itemId, targetType, targetId,
+                assignment.getDisplayName());
+        auditedMethodRunner.run(auditCall, () -> {
+            repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+            return null;
+        });
     }
 
     /**
@@ -170,7 +233,7 @@ public class AssignmentService {
     @Transactional
     public void unassignAllByType(String itemId, AssignmentTargetType targetType) {
         log.info("Unassigning all {} from item {}", targetType, itemId);
-        repository.deleteByItemIdAndTargetType(itemId, targetType);
+        repository.findByItemIdAndTargetType(itemId, targetType).forEach(this::unlink);
     }
 
     private String resolveDisplayName(AssignmentTargetType type, String targetId) {
@@ -178,10 +241,13 @@ public class AssignmentService {
             case ORGANIZATION -> organizationRepository.findByOrganizationId(targetId)
                     .map(Organization::getName).orElse(targetId);
             case DEVICE -> machineRepository.findByMachineId(targetId)
-                    .map(m -> m.getHostname() != null ? m.getHostname() : m.getDisplayName())
+                    .map(m -> ObjectUtils.firstNonNull(m.getHostname(), m.getDisplayName()))
                     .orElse(targetId);
             case TICKET -> ticketRepository.findById(targetId)
-                    .map(t -> t.getTicketNumber() + " - " + t.getTitle()).orElse(targetId);
+                    .map(t -> t.getTitle() == null
+                            ? String.valueOf(t.getTicketNumber())
+                            : t.getTicketNumber() + " - " + t.getTitle())
+                    .orElse(targetId);
             case KNOWLEDGE_ARTICLE -> knowledgeBaseItemRepository.findById(targetId)
                     .map(KnowledgeBaseItem::getName).orElse(targetId);
         };

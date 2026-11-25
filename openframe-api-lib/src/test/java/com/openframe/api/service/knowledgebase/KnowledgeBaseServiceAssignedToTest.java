@@ -1,5 +1,7 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.assignment.AssignmentTarget;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -64,7 +67,7 @@ class KnowledgeBaseServiceAssignedToTest {
         // "No tag filter" is null, not the empty list a bare mock would answer with.
         when(tagService.findItemIdsByTags(any())).thenReturn(null);
         service = new KnowledgeBaseService(repository, tagService, assignmentService,
-                mock(KnowledgeBaseTempAttachmentService.class), mock(KnowledgeBaseAttachmentService.class));
+                mock(KnowledgeBaseTempAttachmentService.class), mock(KnowledgeBaseAttachmentService.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
     }
 
     // ------------------------------------------------------------ the assigned set

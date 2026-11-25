@@ -1,7 +1,10 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.document.ticket.TempAttachment;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemAttachmentRepository;
 import com.openframe.data.repository.ticket.TempAttachmentRepository;
 import com.openframe.data.service.GcsPresignedUrlService;
@@ -13,8 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+
+import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_ADD;
 
 /**
  * Service for Knowledge Base temporary file uploads before article save.
@@ -42,6 +48,7 @@ public class KnowledgeBaseTempAttachmentService {
     private final TempAttachmentRepository tempAttachmentRepository;
     private final KnowledgeBaseItemAttachmentRepository attachmentRepository;
     private final GcsPresignedUrlService gcsPresignedUrlService;
+    private final AuditRecorder auditRecorder;
 
     @Transactional
     public TempAttachment createUploadUrl(String uploaderId, String fileName, String contentType, Long fileSize) {
@@ -106,11 +113,20 @@ public class KnowledgeBaseTempAttachmentService {
                 .filter(Objects::nonNull)
                 .toList();
 
-        if (!attachments.isEmpty()) {
-            attachmentRepository.saveAll(attachments);
+        List<KnowledgeBaseItemAttachment> saved = attachments.isEmpty()
+                ? List.of()
+                : attachmentRepository.saveAll(attachments);
+        if (!saved.isEmpty()) {
+            auditRecorder.record(AuditEntry.builder()
+                    .action(KB_ATTACHMENT_ADD)
+                    .outcome(AuditOutcome.SUCCESS)
+                    .targetId(articleId)
+                    .details(Map.of("attachmentIds", saved.stream().map(KnowledgeBaseItemAttachment::getId).toList(),
+                            "fileNames", saved.stream().map(KnowledgeBaseItemAttachment::getFileName).toList()))
+                    .build());
         }
-        log.info("Linked {} of {} attachments to article: {}", attachments.size(), temps.size(), articleId);
-        return attachments;
+        log.info("Linked {} of {} attachments to article: {}", saved.size(), temps.size(), articleId);
+        return saved;
     }
 
     private KnowledgeBaseItemAttachment moveToArticle(String articleId, TempAttachment temp, String uploadedBy) {
@@ -131,6 +147,10 @@ public class KnowledgeBaseTempAttachmentService {
                     .build();
         } catch (Exception e) {
             log.error("Failed to move temp file to article: {}", temp.getId(), e);
+            auditRecorder.recordFailure(AuditEntry.builder()
+                    .action(KB_ATTACHMENT_ADD)
+                    .targetId(articleId)
+                    .details(Map.of("fileNames", List.of(temp.getFileName()))), e);
             return null;
         }
     }

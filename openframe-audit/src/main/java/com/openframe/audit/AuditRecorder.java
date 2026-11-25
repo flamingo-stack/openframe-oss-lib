@@ -222,6 +222,10 @@ public class AuditRecorder {
         write(entries, this::context, true);
     }
 
+    public void recordAllWithoutLoadingTargets(List<AuditEntry> entries) {
+        write(entries, this::context, false);
+    }
+
     boolean recordAudited(AuditEntry entry, AuditContext context) {
         return write(List.of(entry), () -> context, false);
     }

@@ -1,6 +1,8 @@
 package com.openframe.audit.targets;
 
 import com.openframe.data.document.auth.AuthUser;
+import com.openframe.data.document.ticket.Ticket;
+import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.user.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ResolvableType;
@@ -35,6 +37,49 @@ class OssAuditTargetsTest {
                 .filter(masked -> masked.contains("."))
                 .forEach(masked -> assertThat(fieldsHeldBy(target.documentType(), masked.split("\\.")[0]))
                         .contains(masked.substring(masked.indexOf('.') + 1))));
+    }
+
+    @Test
+    void ticketName_titleSet_returnsTitle() {
+        Ticket ticket = Ticket.builder().ticketNumber(42).title("Printer offline").build();
+
+        assertThat(OssAuditTargets.ticketName(ticket)).isEqualTo("Printer offline");
+    }
+
+    @Test
+    void ticketName_noTitle_returnsTicketNumber() {
+        Ticket ticket = Ticket.builder().ticketNumber(42).build();
+
+        assertThat(OssAuditTargets.ticketName(ticket)).isEqualTo("42");
+    }
+
+    @Test
+    void timeEntryName_ticketTitleSet_returnsTicketTitle() {
+        TimeEntry entry = TimeEntry.builder().ticketNumber(42).ticketTitle("Printer offline").build();
+
+        assertThat(timeEntryNameOf(entry)).isEqualTo("Printer offline");
+    }
+
+    @Test
+    void timeEntryName_noTicketTitle_returnsTicketNumber() {
+        TimeEntry entry = TimeEntry.builder().ticketNumber(42).build();
+
+        assertThat(timeEntryNameOf(entry)).isEqualTo("42");
+    }
+
+    @Test
+    void timeEntryName_entryWithoutTicket_returnsNull() {
+        TimeEntry entryWithoutTicket = TimeEntry.builder().userId("user-1").build();
+
+        assertThat(timeEntryNameOf(entryWithoutTicket)).isNull();
+    }
+
+    private String timeEntryNameOf(TimeEntry entry) {
+        return provider.targets().stream()
+                .filter(target -> target.documentType() == TimeEntry.class)
+                .findFirst()
+                .orElseThrow()
+                .nameOf(entry);
     }
 
     private static Set<String> namedFieldsOf(AuditTarget<?> target) {
