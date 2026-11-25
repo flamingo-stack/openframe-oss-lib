@@ -15,4 +15,5 @@ public class MachinePackageManagersResponse {
     private PackageManagerState brew;
     private PackageManagerState winget;
     private PackageManagerState choco;
+    private MachineChocolateyResponse chocolatey;
 }

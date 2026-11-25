@@ -3,6 +3,7 @@ package com.openframe.client.service.rmm;
 import java.util.List;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.client.support.TestEncryption;
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -22,6 +23,8 @@ import com.openframe.data.repository.rmm.ScriptRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -31,6 +34,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,11 +46,17 @@ class PackageManagerBootstrapServiceTest {
     private static final String MACHINE_ID = "machine-1";
     private static final String SCRIPT_ID = "script-1";
     private static final long COOLDOWN_SECONDS = 1800;
+    private static final String CHOCO_FEED_URL = "https://feed.openframe.test/choco/index.json";
+    private static final String CHOCO_VERSION = "2.7.5";
+    private static final String CHOCO_SHA256 = "f86f99a18d236c2f99e6f67a20be7adc65c6c7756bf6cf3b43759e7ec0aa5839";
 
     private MachineRepository machineRepository;
     private ScriptRepository scriptRepository;
     private ScriptExecutionRepository scriptExecutionRepository;
     private ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
+    private ArgumentCaptor<ScriptMessage> messageCaptor;
+    private ArgumentCaptor<ScriptExecution> executionCaptor;
+    private PackageManagerProperties packageManagerProperties;
     private PackageManagerBootstrapService service;
 
     @BeforeEach
@@ -55,9 +65,16 @@ class PackageManagerBootstrapServiceTest {
         scriptRepository = mock(ScriptRepository.class);
         scriptExecutionRepository = mock(ScriptExecutionRepository.class);
         scriptBootstrapNatsPublisher = mock(ScriptBootstrapNatsPublisher.class);
+        messageCaptor = ArgumentCaptor.forClass(ScriptMessage.class);
+        executionCaptor = ArgumentCaptor.forClass(ScriptExecution.class);
+        packageManagerProperties = new PackageManagerProperties();
+        packageManagerProperties.setChocoEnabled(true);
+        packageManagerProperties.getChoco().setFeedUrl(CHOCO_FEED_URL);
+        packageManagerProperties.getChoco().setVersion(CHOCO_VERSION);
+        packageManagerProperties.getChoco().setSha256(CHOCO_SHA256);
         service = new PackageManagerBootstrapService(
                 machineRepository, scriptRepository, scriptExecutionRepository,
-                scriptBootstrapNatsPublisher, TestEncryption.SERVICE);
+                scriptBootstrapNatsPublisher, TestEncryption.SERVICE, packageManagerProperties);
         ReflectionTestUtils.setField(service, "cooldownSeconds", COOLDOWN_SECONDS);
     }
 
@@ -101,6 +118,12 @@ class PackageManagerBootstrapServiceTest {
         when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
                 TENANT_ID, MACHINE_ID, SCRIPT_ID, ExecutionSource.SYSTEM_BOOTSTRAP))
                 .thenReturn(Optional.of(execution));
+    }
+
+    private void givenNoLastExecution() {
+        when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
+                TENANT_ID, MACHINE_ID, SCRIPT_ID, ExecutionSource.SYSTEM_BOOTSTRAP))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -252,5 +275,295 @@ class PackageManagerBootstrapServiceTest {
 
         verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
         verify(scriptExecutionRepository, never()).save(any());
+    }
+
+    @Test
+    void dispatchInstall_choco_argsAreFeedUrlVersionSha256() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        Script script = givenSeededScript(SystemScriptCode.INSTALL_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        script.setDefaultArgs(List.of("-Source community"));
+        givenNoLastExecution();
+
+        // execution
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.CHOCO);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getArgs()).containsExactly(CHOCO_FEED_URL, CHOCO_VERSION, CHOCO_SHA256);
+    }
+
+    @Test
+    void dispatchInstall_winget_argsAreTokenizedDefaultArgs() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        Script script = givenSeededScript(SystemScriptCode.INSTALL_WINGET, PrivilegeLevel.USER);
+        script.setDefaultArgs(List.of("-Scope machine", "-Force"));
+        givenNoLastExecution();
+
+        // execution
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getArgs()).containsExactly("-Scope", "machine", "-Force");
+    }
+
+    @Test
+    void dispatchInstall_wingetDependency_argsAreTokenizedDefaultArgs() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        Script script = givenSeededScript(SystemScriptCode.INSTALL_WINGET_CLIENT_MODULE, PrivilegeLevel.ADMIN);
+        script.setDefaultArgs(List.of("-Scope AllUsers"));
+        givenNoLastExecution();
+
+        // execution
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET, SystemScriptCode.INSTALL_WINGET_CLIENT_MODULE);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getArgs()).containsExactly("-Scope", "AllUsers");
+    }
+
+    @Test
+    void dispatchInstall_brewWithoutDefaultArgs_argsNull() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.INSTALL_BREW, PrivilegeLevel.USER);
+        givenNoLastExecution();
+
+        // execution
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.BREW);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getArgs()).isNull();
+    }
+
+    @Test
+    void dispatchChocolateyUpgrade_noPriorExecution_upgradeScriptPublishedWithFeedUrlVersionSha256() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        Script script = givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        script.setDefaultArgs(List.of("-Source community"));
+        givenNoLastExecution();
+
+        // execution
+        service.dispatchChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), messageCaptor.capture());
+        assertThat(messageCaptor.getValue())
+                .returns(SCRIPT_ID, ScriptMessage::getScriptId)
+                .returns("__system__upgrade-chocolatey body", ScriptMessage::getCode)
+                .returns(PrivilegeLevel.ADMIN, ScriptMessage::getPrivilegeLevel)
+                .returns(List.of(CHOCO_FEED_URL, CHOCO_VERSION, CHOCO_SHA256), ScriptMessage::getArgs);
+    }
+
+    @Test
+    void dispatchChocolateyUpgrade_noPriorExecution_runningBootstrapRowSavedForChoco() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        givenNoLastExecution();
+
+        // execution
+        service.dispatchChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        verify(scriptExecutionRepository).save(executionCaptor.capture());
+        assertThat(executionCaptor.getValue())
+                .returns(TENANT_ID, ScriptExecution::getTenantId)
+                .returns(MACHINE_ID, ScriptExecution::getMachineId)
+                .returns(SCRIPT_ID, ScriptExecution::getScriptId)
+                .returns(ExecutionSource.SYSTEM_BOOTSTRAP, ScriptExecution::getSource)
+                .returns(ExecutionStatus.RUNNING, ScriptExecution::getStatus)
+                .returns(PackageManagerType.CHOCO, ScriptExecution::getPackageManager);
+    }
+
+    @Test
+    void dispatchChocolateyUpgrade_withinCooldown_suppressed() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        givenLastExecution(ExecutionStatus.FAILED, Instant.now().minusSeconds(60));
+
+        // execution
+        service.dispatchChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+        verify(scriptExecutionRepository, never()).save(any(ScriptExecution.class));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ExecutionStatus.class, names = {"QUEUED", "RUNNING"})
+    void dispatchChocolateyUpgrade_executionInFlight_suppressed(ExecutionStatus status) {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        givenLastExecution(status, Instant.now().minusSeconds(COOLDOWN_SECONDS * 10));
+
+        // execution
+        service.dispatchChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+        verify(scriptExecutionRepository, never()).save(any(ScriptExecution.class));
+    }
+
+    @Test
+    void dispatchChocolateyUpgrade_failedRunPastCooldown_dispatchedAgain() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        givenLastExecution(ExecutionStatus.FAILED, Instant.now().minusSeconds(COOLDOWN_SECONDS + 60));
+
+        // execution
+        service.dispatchChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @Test
+    void dispatchChocolateyUpgrade_scriptNotSeeded_ignored() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        when(scriptRepository.findByTenantIdAndNameAndType(
+                TENANT_ID, SystemScriptCode.UPGRADE_CHOCOLATEY.canonicalName(), ScriptType.SYSTEM))
+                .thenReturn(Optional.empty());
+
+        // execution
+        service.dispatchChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+        verify(scriptExecutionRepository, never()).save(any(ScriptExecution.class));
+    }
+
+    @Test
+    void dispatchChocolateyUpgrade_machineNotConnected_ignored() {
+        // setup
+        givenMachine(DeviceStatus.ARCHIVED);
+
+        // execution
+        service.dispatchChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ExecutionStatus.class, names = {"FAILED", "SCRIPT_ERROR", "SUCCESS"})
+    void resendChocolateyUpgrade_finishedRunWithinCooldown_upgradeScriptPublished(ExecutionStatus status) {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        givenLastExecution(status, Instant.now().minusSeconds(60));
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isTrue();
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), messageCaptor.capture());
+        assertThat(messageCaptor.getValue())
+                .returns("__system__upgrade-chocolatey body", ScriptMessage::getCode)
+                .returns(List.of(CHOCO_FEED_URL, CHOCO_VERSION, CHOCO_SHA256), ScriptMessage::getArgs);
+    }
+
+    @Test
+    void resendChocolateyUpgrade_withinCooldown_runningBootstrapRowSavedForChoco() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        givenLastExecution(ExecutionStatus.FAILED, Instant.now().minusSeconds(60));
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isTrue();
+        verify(scriptExecutionRepository).save(executionCaptor.capture());
+        assertThat(executionCaptor.getValue())
+                .returns(SCRIPT_ID, ScriptExecution::getScriptId)
+                .returns(ExecutionSource.SYSTEM_BOOTSTRAP, ScriptExecution::getSource)
+                .returns(ExecutionStatus.RUNNING, ScriptExecution::getStatus)
+                .returns(PackageManagerType.CHOCO, ScriptExecution::getPackageManager);
+    }
+
+    @Test
+    void resendChocolateyUpgrade_noPriorExecution_upgradeScriptPublished() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        givenNoLastExecution();
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isTrue();
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ExecutionStatus.class, names = {"QUEUED", "RUNNING"})
+    void resendChocolateyUpgrade_executionInFlight_suppressed(ExecutionStatus status) {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.UPGRADE_CHOCOLATEY, PrivilegeLevel.ADMIN);
+        givenLastExecution(status, Instant.now().minusSeconds(60));
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isFalse();
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+        verify(scriptExecutionRepository, never()).save(any(ScriptExecution.class));
+    }
+
+    @Test
+    void resendChocolateyUpgrade_scriptNotSeeded_ignored() {
+        // setup
+        givenMachine(DeviceStatus.ONLINE);
+        when(scriptRepository.findByTenantIdAndNameAndType(
+                TENANT_ID, SystemScriptCode.UPGRADE_CHOCOLATEY.canonicalName(), ScriptType.SYSTEM))
+                .thenReturn(Optional.empty());
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isFalse();
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @Test
+    void resendChocolateyUpgrade_machineNotConnected_ignored() {
+        // setup
+        givenMachine(DeviceStatus.ARCHIVED);
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isFalse();
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
+    }
+
+    @Test
+    void resendChocolateyUpgrade_unknownMachine_ignored() {
+        // setup
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+
+        // execution
+        boolean dispatched = service.resendChocolateyUpgrade(MACHINE_ID);
+
+        // verifications
+        assertThat(dispatched).isFalse();
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(eq(MACHINE_ID), any(ScriptMessage.class));
     }
 }

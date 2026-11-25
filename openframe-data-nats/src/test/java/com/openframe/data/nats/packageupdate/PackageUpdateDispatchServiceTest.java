@@ -1,5 +1,6 @@
 package com.openframe.data.nats.packageupdate;
 
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -21,9 +22,11 @@ import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
@@ -35,6 +38,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
@@ -49,13 +53,27 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PackageUpdateDispatchServiceTest {
 
+    private static final String CHOCO_FEED = "https://feed.openframe.build/choco/index.json";
+
     @Mock private DeliveryRouter deliveryRouter;
     @Mock private PackageUpdateRequestRepository requestRepository;
     @Mock private PackageUpdateDeviceStateRepository deviceStateRepository;
     @Mock private ScriptExecutionRepository scriptExecutionRepository;
     @Mock private TenantIdProvider tenantIdProvider;
 
-    @InjectMocks private PackageUpdateDispatchService service;
+    @Captor private ArgumentCaptor<PackageUpdateRequest> requestCaptor;
+    @Captor private ArgumentCaptor<PackageUpdateDeliverySeed> seedCaptor;
+
+    private PackageManagerProperties packageManagerProperties;
+    private PackageUpdateDispatchService service;
+
+    @BeforeEach
+    void setUp() {
+        packageManagerProperties = new PackageManagerProperties();
+        packageManagerProperties.getChoco().setFeedUrl(CHOCO_FEED);
+        service = new PackageUpdateDispatchService(deliveryRouter, requestRepository, deviceStateRepository,
+                scriptExecutionRepository, tenantIdProvider, packageManagerProperties);
+    }
 
     @BeforeEach
     void everyMachineReachable() {
@@ -293,5 +311,102 @@ class PackageUpdateDispatchServiceTest {
 
         verifyNoInteractions(scriptExecutionRepository, requestRepository, deviceStateRepository);
         verify(deliveryRouter, never()).dispatch(any());
+    }
+
+    @Test
+    void dispatch_choco_requestStoresTheFeedFromProperties() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        RunningExecutionRows execution = rows("exec-1", PackageManagerType.CHOCO, "googlechrome", "m1");
+
+        // execution
+        service.dispatchAdminUpdateNow(execution, null);
+
+        // verifications
+        verify(requestRepository).save(requestCaptor.capture());
+        assertThat(requestCaptor.getValue())
+                .extracting(PackageUpdateRequest::getPackageManager, PackageUpdateRequest::getPackageName,
+                        PackageUpdateRequest::getFeed)
+                .containsExactly(PackageManagerType.CHOCO, "googlechrome", CHOCO_FEED);
+    }
+
+    @Test
+    void dispatch_choco_seedsCarryTheFeed() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        RunningExecutionRows execution = rows("exec-1", PackageManagerType.CHOCO, "googlechrome", "m1", "m2");
+        PackageReference chocoRef = PackageReference.builder()
+                .manager(PackageManagerType.CHOCO)
+                .id("googlechrome")
+                .feed(CHOCO_FEED)
+                .build();
+
+        // execution
+        service.dispatchAdminUpdateNow(execution, null);
+
+        // verifications
+        verify(deliveryRouter, times(2)).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getAllValues())
+                .extracting(PackageUpdateDeliverySeed::getMachineId, PackageUpdateDeliverySeed::getPackageRef)
+                .containsExactlyInAnyOrder(tuple("m1", chocoRef), tuple("m2", chocoRef));
+    }
+
+    @Test
+    void dispatch_chocoAutoUpdateWithSettings_requestStoresTheFeedFromProperties() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        RunningExecutionRows execution = rows("exec-auto", PackageManagerType.CHOCO, "googlechrome", "m1");
+        PackageUpdateSettings settings = PackageUpdateSettings.builder()
+                .mode(PackageUpdateMode.FORCE)
+                .countdownSeconds(120)
+                .build();
+
+        // execution
+        service.dispatchAutoUpdate(execution, null, settings);
+
+        // verifications
+        verify(requestRepository).save(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getFeed()).isEqualTo(CHOCO_FEED);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "BREW,   postman,       CASK",
+            "WINGET, Google.Chrome, "
+    })
+    void dispatch_brewOrWinget_requestHasNoFeed(PackageManagerType manager, String packageName,
+                                                BrewPackageType brewPackageType) {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        RunningExecutionRows execution = rows("exec-1", manager, packageName, "m1");
+
+        // execution
+        service.dispatchAdminUpdateNow(execution, brewPackageType);
+
+        // verifications
+        verify(requestRepository).save(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getFeed()).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "BREW,   postman,       CASK",
+            "WINGET, Google.Chrome, "
+    })
+    void dispatch_brewOrWinget_seedHasNoFeed(PackageManagerType manager, String packageName,
+                                             BrewPackageType brewPackageType) {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        RunningExecutionRows execution = rows("exec-1", manager, packageName, "m1");
+
+        // execution
+        service.dispatchAdminUpdateNow(execution, brewPackageType);
+
+        // verifications
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getAllValues())
+                .extracting(PackageUpdateDeliverySeed::getPackageRef)
+                .extracting(PackageReference::getFeed)
+                .containsOnlyNulls();
     }
 }

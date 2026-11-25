@@ -143,6 +143,9 @@ extend type Query {
     """Faceted severity counts for one device's CVEs — same scope as deviceVulnerabilities(machineId, search);
     mirrors vulnerabilityFilters. Unknown machineId → NOT_FOUND; a device with no CVEs → empty facets."""
     deviceVulnerabilityFilters(machineId: String!, filter: VulnerabilityFilterInput, search: String): VulnerabilityFilters!
+
+    """The tenant's Software Management settings. The defaults until they are saved for the first time."""
+    softwareSettings: SoftwareSettings!
 }
 
 # ────────── Software (aggregate row) ──────────
@@ -509,7 +512,8 @@ extend type Mutation {
     Returns the devices (Machine global ids) the order was sent to. Left out: devices of another OS, devices without
     the package manager reported PRESENT, devices whose copy is only in ~/Applications, and devices the order cannot
     reach (the order is switched off or the agent is too old for it). NOT_FOUND for an unknown title. BAD_REQUEST
-    when the title has no adoption package, when no device is left, and when a device is not managed."""
+    when the title has no adoption package, when no device is left, and when a device is not managed.
+    Adoption into Chocolatey is not available yet: BAD_REQUEST for a Chocolatey adoption package."""
     adoptSoftware(input: AdoptSoftwareInput!): [ID!]!
 
     """Save the Auto-update form: on with these settings for the bundle's devices, off for the title's other
@@ -521,13 +525,16 @@ extend type Mutation {
     Software (autoUpdate).
     Idempotent: a title that has no auto-update is returned as it is. Unknown softwareId → NOT_FOUND."""
     turnOffSoftwareAutoUpdate(softwareId: ID!): Software!
+
+    """Save the tenant's Software Management settings. Returns the settings as stored."""
+    updateSoftwareSettings(input: SoftwareSettingsInput!): SoftwareSettings!
 }
 
 # ────────── Adopt ──────────
 
 input AdoptSoftwareInput {
     """The software title (Software.id). It is adopted into its Software.adoptionPackage: a Homebrew cask on
-    macOS, a Chocolatey package on Windows."""
+    macOS. Adoption into Chocolatey on Windows is not available yet."""
     softwareId: ID!
     "The devices (Machine global ids), 1..100."
     machineIds: [ID!]!
@@ -617,4 +624,16 @@ input TurnOnSoftwareAutoUpdateInput {
     "A PENDING SoftwareBundle with the devices to keep updated, at least one."
     bundleId: ID!
     settings: PackageUpdateSettingsInput!
+}
+
+"""Software Management settings of the tenant."""
+type SoftwareSettings {
+    """Update existing Chocolatey packages: when true, OpenFrame also updates the Chocolatey packages that were on
+    a device before OpenFrame managed its Chocolatey, not only the ones it installed. Off by default."""
+    updateExistingChocolateyPackages: Boolean!
+}
+
+input SoftwareSettingsInput {
+    "True to also update the Chocolatey packages OpenFrame did not install."
+    updateExistingChocolateyPackages: Boolean!
 }

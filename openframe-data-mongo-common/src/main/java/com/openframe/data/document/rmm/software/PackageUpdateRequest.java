@@ -38,6 +38,7 @@ public class PackageUpdateRequest implements TenantScoped {
     private PackageManagerType packageManager;
     private String packageName;
     private BrewPackageType brewPackageType;
+    private String feed;
 
     private String softwareId;
 

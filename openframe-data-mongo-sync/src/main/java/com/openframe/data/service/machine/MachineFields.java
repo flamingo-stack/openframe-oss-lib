@@ -6,6 +6,8 @@ import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.device.chocolatey.ChocolateyDecision;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
@@ -44,6 +46,9 @@ public final class MachineFields {
     public static final MachineField<Instant> STUCK_NOTIFIED_AT = field("stuckNotifiedAt", Machine::setStuckNotifiedAt);
     public static final MachineField<Map<PackageManagerType, PackageManagerState>> PACKAGE_MANAGERS =
             field("packageManagers", Machine::setPackageManagers);
+    public static final MachineField<MachineChocolatey> CHOCOLATEY = field("chocolatey", Machine::setChocolatey);
+    public static final MachineField<ChocolateyDecision> CHOCOLATEY_DECISION =
+            field("chocolateyDecision", Machine::setChocolateyDecision);
 
     // Hardware facts: copied from the registration request, then filled from the Fleet host where still blank
     public static final MachineField<String> SERIAL_NUMBER = field("serialNumber", Machine::setSerialNumber);

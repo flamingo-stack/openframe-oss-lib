@@ -1,7 +1,9 @@
 package com.openframe.data.nats.packageupdate;
 
+import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
@@ -39,6 +41,7 @@ public class PackageUpdateDispatchService {
     private final PackageUpdateDeviceStateRepository deviceStateRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final PackageManagerProperties packageManagerProperties;
 
     public String dispatchAdminUpdateNow(RunningExecutionRows execution, BrewPackageType brewPackageType) {
         return dispatch(execution, brewPackageType, PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT,
@@ -107,7 +110,7 @@ public class PackageUpdateDispatchService {
 
         String requestId = request.getRequestId();
         PackageReference packageRef = PackageUpdateWire.reference(execution.getPackageManager(),
-                execution.getPackageName(), brewPackageType);
+                execution.getPackageName(), brewPackageType, request.getFeed());
         targets.stream()
                 .map(machineId -> PackageAdoptDeliverySeed.builder()
                         .machineId(machineId)
@@ -135,6 +138,7 @@ public class PackageUpdateDispatchService {
                 .action(action)
                 .packageManager(execution.getPackageManager())
                 .packageName(execution.getPackageName())
+                .feed(feedOf(execution.getPackageManager()))
                 .status(status)
                 .machineIds(targets)
                 .totalMachineCount(targets.size())
@@ -142,6 +146,10 @@ public class PackageUpdateDispatchService {
                 .initiatedBy(execution.getInitiatedBy())
                 .createdAt(now)
                 .updatedAt(now);
+    }
+
+    private String feedOf(PackageManagerType manager) {
+        return manager == PackageManagerType.CHOCO ? packageManagerProperties.getChoco().getFeedUrl() : null;
     }
 
     private void record(RunningExecutionRows execution, PackageUpdateRequest request) {

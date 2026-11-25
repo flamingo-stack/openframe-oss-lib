@@ -69,6 +69,7 @@ import com.openframe.sdk.fleetmdm.model.Vulnerability;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.nats.delivery.PackageAdoptReach;
 import lombok.RequiredArgsConstructor;
@@ -134,6 +135,7 @@ public class SoftwareInventoryService {
     private final SoftwareAdoptionService softwareAdoptionService;
     private final PackageManagerAvailability packageManagerAvailability;
     private final PackageAdoptReach packageAdoptReach;
+    private final ChocoPackageOwnership chocoPackageOwnership;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -259,10 +261,24 @@ public class SoftwareInventoryService {
                                              String actor) {
         SoftwareResponse software = getManagedSoftware(softwareId);
         PackageCatalogEntry managingPackage = software.getManagingPackage();
-        autoUpdateService.turnOn(softwareId, managingPackage, machineIds, settings, actor);
+        List<String> targets = autoUpdateTargets(software, machineIds);
+        autoUpdateService.turnOn(softwareId, managingPackage, targets, settings, actor);
         List<SoftwareResponse> rows = List.of(software);
         applyStatuses(rows);
         return software;
+    }
+
+    private List<String> autoUpdateTargets(SoftwareResponse software, List<String> machineIds) {
+        PackageCatalogEntry managingPackage = software.getManagingPackage();
+        if (managingPackage.getManager() != PackageManagerType.CHOCO) {
+            return machineIds;
+        }
+        List<String> owners = chocoPackageOwnership.owners(machineIds, managingPackage.getPackageId());
+        if (owners.isEmpty()) {
+            throw new BadRequestException("None of the given devices has " + software.getName()
+                    + " installed through Chocolatey by OpenFrame");
+        }
+        return owners;
     }
 
     // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there
@@ -692,7 +708,7 @@ public class SoftwareInventoryService {
         SoftwareSource installedBy = source == SoftwareSource.UNMANAGED ? null : source;
         List<SoftwareOnDeviceResponse> rows = tenantSoftwareReadModelQuery
                 .devicesForSoftwareRows(tenantId, softwareId, search, latestVersion);
-        rows.forEach(row -> row.setInstalledBy(managedByOn(row.getDevice(), installedBy)));
+        markManagedBy(rows, installedBy, titleRow.getManagingPackage());
         markInstalledCasks(titleRow, rows);
         markScheduledUpdates(softwareId, titleRow, rows);
         return rows;
@@ -1024,7 +1040,7 @@ public class SoftwareInventoryService {
 
         // one machine can carry several versions (e.g. a pip per Python install) and several Fleet hosts
         Map<String, List<SoftwareOnDeviceResponse>> rowsByMachine = hostVersions.stream()
-                .map(hv -> toDeviceResponse(hv, machinesByHostId, latestVersion, installedBy))
+                .map(hv -> toDeviceResponse(hv, machinesByHostId, latestVersion))
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(row -> row.getDevice().getMachineId(),
                         java.util.LinkedHashMap::new, Collectors.toList()));
@@ -1032,6 +1048,7 @@ public class SoftwareInventoryService {
                 .map(SoftwareInventoryService::mergeDeviceRows)
                 .filter(row -> matchesDeviceSearch(row, search))
                 .toList();
+        markManagedBy(rows, installedBy, titleRow.getManagingPackage());
         markScheduledUpdates(softwareId, titleRow, rows);
         return rows;
     }
@@ -1042,7 +1059,6 @@ public class SoftwareInventoryService {
                 .device(rows.get(0).getDevice())
                 .softwareVersion(joinVersions(rows.stream().map(SoftwareOnDeviceResponse::getSoftwareVersion).toList()))
                 .status(upToDate ? SoftwareOnDeviceStatus.UP_TO_DATE : SoftwareOnDeviceStatus.OUTDATED)
-                .installedBy(rows.get(0).getInstalledBy())
                 .build();
     }
 
@@ -1058,11 +1074,24 @@ public class SoftwareInventoryService {
         return titleRow.getSource() == SoftwareSource.WINGET ? SoftwareSource.WINGET : installedBy(fleetSource);
     }
 
-    private static SoftwareSource managedByOn(Machine device, SoftwareSource managedBy) {
-        if (managedBy != SoftwareSource.WINGET) {
-            return managedBy;
+    private void markManagedBy(List<SoftwareOnDeviceResponse> rows, SoftwareSource managedBy,
+                               PackageCatalogEntry managingPackage) {
+        rows.forEach(row -> row.setInstalledBy(managedByOn(row.getDevice(), managedBy, managingPackage)));
+    }
+
+    private SoftwareSource managedByOn(Machine device, SoftwareSource managedBy, PackageCatalogEntry managingPackage) {
+        if (managedBy == SoftwareSource.WINGET) {
+            return PackageManagerAvailability.isPresentOn(device, PackageManagerType.WINGET) ? managedBy : null;
         }
-        return PackageManagerAvailability.isPresentOn(device, PackageManagerType.WINGET) ? managedBy : null;
+        if (managedBy == SoftwareSource.CHOCOLATEY) {
+            return ownsChocoPackage(device, managingPackage) ? managedBy : null;
+        }
+        return managedBy;
+    }
+
+    private boolean ownsChocoPackage(Machine device, PackageCatalogEntry managingPackage) {
+        return managingPackage != null && managingPackage.getManager() == PackageManagerType.CHOCO
+                && chocoPackageOwnership.owns(device, managingPackage.getPackageId());
     }
 
     private List<HostVersion> hostVersionsOf(SoftwareTitleVersion version) {
@@ -1075,7 +1104,7 @@ public class SoftwareInventoryService {
     }
 
     private static SoftwareOnDeviceResponse toDeviceResponse(HostVersion hv, Map<Long, Machine> machinesByHostId,
-                                                             String latestVersion, SoftwareSource installedBy) {
+                                                             String latestVersion) {
         Machine device = hv.host().getId() == null ? null : machinesByHostId.get(hv.host().getId());
         if (device == null) {
             return null;
@@ -1088,7 +1117,6 @@ public class SoftwareInventoryService {
                 .device(device)
                 .softwareVersion(hv.version())
                 .status(status)
-                .installedBy(managedByOn(device, installedBy))
                 .build();
     }
 

@@ -19,6 +19,7 @@ class PackageAdoptDeliverySpecTest {
     private static final String MACHINE_ID = "mach-42";
     private static final String REQUEST_ID = "req-1";
     private static final String DISPATCH_ID = "disp-1";
+    private static final String CHOCO_FEED = "https://feed.openframe.build/choco/index.json";
 
     private final PackageAdoptDeliverySpec spec = new PackageAdoptDeliverySpec();
     private final JsonMapper jsonMapper = new JsonMapper();
@@ -122,7 +123,7 @@ class PackageAdoptDeliverySpecTest {
     }
 
     @Test
-    void message_chocoPackageWithoutABundleId_serializedWithTheIdOnly() {
+    void message_chocoPackageWithoutABundleId_serializedWithTheIdAndTheFeed() {
         // setup
         PackageAdoptMessage message = new PackageAdoptMessage();
         message.setRequestId(REQUEST_ID);
@@ -130,7 +131,8 @@ class PackageAdoptDeliverySpecTest {
         JsonNode expected = jsonMapper.readTree("""
                 {
                   "requestId": "req-1",
-                  "package": {"manager": "CHOCO", "id": "googlechrome"}
+                  "package": {"manager": "CHOCO", "id": "googlechrome",
+                              "feed": "https://feed.openframe.build/choco/index.json"}
                 }
                 """);
 
@@ -145,6 +147,7 @@ class PackageAdoptDeliverySpecTest {
         return PackageReference.builder()
                 .manager(PackageManagerType.CHOCO)
                 .id("googlechrome")
+                .feed(CHOCO_FEED)
                 .build();
     }
 }

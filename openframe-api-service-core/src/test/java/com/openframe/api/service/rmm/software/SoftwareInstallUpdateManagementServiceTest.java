@@ -9,6 +9,8 @@ import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerState;
@@ -30,6 +32,8 @@ import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+import com.openframe.data.service.rmm.software.ChocoPackageManagerHandler;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.nats.packageupdate.PackageUpdateEligibilityService;
@@ -38,6 +42,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -50,7 +55,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -65,6 +72,8 @@ class SoftwareInstallUpdateManagementServiceTest {
     private static final List<String> MACHINES = List.of("m1", "m2");
 
     private static final String TENANT = "t1";
+    private static final String FEED_URL = "https://feed.openframe.build/choco/index.json";
+    private static final List<String> WINDOWS_MACHINES = List.of("w1", "w2", "w3");
 
     @Mock private PackageManagerRegistry registry;
     @Mock private ScriptService scriptService;
@@ -77,6 +86,10 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Mock private SoftwareInventoryService softwareInventoryService;
     @Mock private SoftwareActionResultRepository softwareActionResultRepository;
     @Mock private PackageAdoptReach packageAdoptReach;
+    @Mock private ChocoPackageOwnership chocoPackageOwnership;
+
+    @Captor private ArgumentCaptor<RunningExecutionRows> orderRowsCaptor;
+    @Captor private ArgumentCaptor<SoftwareActionResult> actionRowCaptor;
 
     private final PackageManagerProperties packageManagerProperties = new PackageManagerProperties();
 
@@ -91,10 +104,13 @@ class SoftwareInstallUpdateManagementServiceTest {
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
                 platformResolver, packageUpdateEligibility, packageUpdateDispatchService, deviceService,
                 new SoftwarePackageSelectionResolver(softwareInventoryService), softwareActionResultRepository,
-                tenantIdProvider, packageAdoptReach, softwareInventoryService, packageManagerAvailability);
-        // A real brew handler so we exercise real script-code + arg building.
-        when(registry.handlerFor(PackageManagerType.BREW)).thenReturn(new BrewPackageManagerHandler());
+                tenantIdProvider, packageAdoptReach, softwareInventoryService, packageManagerAvailability,
+                chocoPackageOwnership);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+    }
+
+    private void brewHandlerRegistered() {
+        when(registry.handlerFor(PackageManagerType.BREW)).thenReturn(new BrewPackageManagerHandler());
     }
 
     private void allMacTargets() {
@@ -105,6 +121,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Test
     @DisplayName("install: each package dispatched with the right script + args; system script resolved once; one execution id per package")
     void install_dispatchesPerPackage() {
+        brewHandlerRegistered();
         allMacTargets();
         ScriptResponse installScript = systemScript("brew-install-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(installScript);
@@ -137,6 +154,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Test
     @DisplayName("update: routes to the BREW_UPDATE system script and propagates the caller's ExecutionSource (e.g. AI_ASSISTANT for MingoAI)")
     void update_usesUpdateScript_andPropagatesSource() {
+        brewHandlerRegistered();
         allMacTargets();
         ScriptResponse updateScript = systemScript("brew-update-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
@@ -154,10 +172,12 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Test
     @DisplayName("install: a winget package skips the Windows device that cannot run winget, even though Chocolatey manages that device")
     void install_deviceThatCannotRunTheManager_isNotATarget() {
+        brewHandlerRegistered();
         packageManagerProperties.setChocoEnabled(true);
         Machine server = machine("m-server", OsType.WINDOWS);
         server.setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.UNSUPPORTED,
                 PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        server.setChocolatey(MachineChocolatey.builder().status(ChocolateyStatus.MANAGED).ours(true).build());
         when(registry.handlerFor(PackageManagerType.WINGET)).thenReturn(new WingetPackageManagerHandler());
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(machine("m-mac", OsType.MAC_OS), machine("m-win", OsType.WINDOWS), server));
@@ -180,6 +200,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Test
     @DisplayName("install: a mixed brew+winget bundle routes each package to its own OS — brew→macOS, winget→Windows")
     void install_mixedOs_routesPerPackage() {
+        brewHandlerRegistered();
         when(registry.handlerFor(PackageManagerType.WINGET)).thenReturn(new WingetPackageManagerHandler());
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(machine("m-mac", OsType.MAC_OS), machine("m-win", OsType.WINDOWS)));
@@ -205,6 +226,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Test
     @DisplayName("install: a package with no OS-compatible device is skipped, while a compatible one still dispatches")
     void install_incompatiblePackage_skipped() {
+        brewHandlerRegistered();
         when(registry.handlerFor(PackageManagerType.WINGET)).thenReturn(new WingetPackageManagerHandler());
         // Only a macOS device is assigned — the winget package has nowhere to go.
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
@@ -232,6 +254,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Test
     @DisplayName("update: feature-enabled devices take the order path, the rest the script path, under one shared execution id")
     void update_mixedFleet_splitsTargets_sharedExecutionId() {
+        brewHandlerRegistered();
         allMacTargets();
         ScriptResponse updateScript = systemScript("brew-update-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
@@ -278,6 +301,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Test
     @DisplayName("update: a feature-enabled device that is not dispatchable is refused and nothing is sent for the package")
     void update_orderTargetNotDispatchable_nothingSent() {
+        brewHandlerRegistered();
         allMacTargets();
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(systemScript("brew-update-id"));
         when(packageUpdateEligibility.eligibleMachines(SoftwareAction.UPDATE, MACHINES)).thenReturn(Set.of("m1"));
@@ -294,6 +318,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Test
     @DisplayName("update: a package given only by its Software is dispatched as the package that manages the title")
     void update_softwareIdOnly_dispatchesTheManagingPackage() {
+        brewHandlerRegistered();
         allMacTargets();
         ScriptResponse updateScript = systemScript("brew-update-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
@@ -310,6 +335,163 @@ class SoftwareInstallUpdateManagementServiceTest {
         assertThat(results)
                 .extracting(SoftwareDispatchResult::getPackageManager, SoftwareDispatchResult::getPackageName)
                 .containsExactly(tuple(PackageManagerType.BREW, "slack"));
+    }
+
+    @Test
+    void update_chocoPackageOnScriptPath_scriptSentOnlyToOwningDevices() {
+        // setup
+        ScriptResponse chocoUpdate = stubChocoUpdateOnWindowsMachines();
+        when(chocoPackageOwnership.owners(WINDOWS_MACHINES, "7zip")).thenReturn(List.of("w1", "w3"));
+        SoftwareManagementInput input = input(List.of("m-mac", "w1", "w2", "w3"), pkg(PackageManagerType.CHOCO, "7zip", null));
+
+        // execution
+        List<SoftwareDispatchResult> results = service.update(input, USER, ExecutionSource.MANUAL);
+
+        // verifications
+        verify(softwareDispatchService).dispatch(anyString(), eq(chocoUpdate), eq(List.of("w1", "w3")),
+                eq(List.of("7zip", FEED_URL)), eq(USER), eq(ExecutionSource.MANUAL), eq(PackageManagerType.CHOCO),
+                eq("7zip"), eq(SoftwareAction.UPDATE));
+        verifyNoInteractions(packageUpdateDispatchService);
+        verify(softwareActionResultRepository).save(actionRowCaptor.capture());
+        assertThat(actionRowCaptor.getValue().getMachineIds()).containsExactly("w1", "w3");
+        assertThat(results)
+                .extracting(SoftwareDispatchResult::getPackageManager, SoftwareDispatchResult::getPackageName)
+                .containsExactly(tuple(PackageManagerType.CHOCO, "7zip"));
+    }
+
+    @Test
+    void update_chocoPackageOnOrderPath_orderSentOnlyToOwningDevices() {
+        // setup
+        stubChocoUpdateOnWindowsMachines();
+        List<String> machineIds = List.of("m-mac", "w1", "w2", "w3");
+        when(packageUpdateEligibility.eligibleMachines(SoftwareAction.UPDATE, machineIds))
+                .thenReturn(Set.of("w1", "w2", "w3"));
+        when(chocoPackageOwnership.owners(WINDOWS_MACHINES, "7zip")).thenReturn(List.of("w2"));
+        SoftwareManagementInput input = input(machineIds, pkg(PackageManagerType.CHOCO, "7zip", null));
+
+        // execution
+        service.update(input, USER, ExecutionSource.MANUAL);
+
+        // verifications
+        verify(deviceService).verifyDispatchable(List.of("w2"));
+        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(orderRowsCaptor.capture(), isNull());
+        assertThat(orderRowsCaptor.getValue())
+                .extracting(RunningExecutionRows::getMachineIds, RunningExecutionRows::getPackageManager,
+                        RunningExecutionRows::getPackageName, RunningExecutionRows::getSoftwareAction)
+                .containsExactly(List.of("w2"), PackageManagerType.CHOCO, "7zip", SoftwareAction.UPDATE);
+        verifyNoInteractions(softwareDispatchService);
+        verify(softwareActionResultRepository).save(actionRowCaptor.capture());
+        assertThat(actionRowCaptor.getValue().getMachineIds()).containsExactly("w2");
+    }
+
+    @Test
+    void update_chocoPackageOwnedByNoDevice_packageSkippedLikeAPackageWithoutACompatibleDevice() {
+        // setup
+        stubChocoUpdateOnWindowsMachines();
+        when(chocoPackageOwnership.owners(WINDOWS_MACHINES, "7zip")).thenReturn(List.of());
+        SoftwareManagementInput input = input(List.of("m-mac", "w1", "w2", "w3"), pkg(PackageManagerType.CHOCO, "7zip", null));
+
+        // execution
+        List<SoftwareDispatchResult> results = service.update(input, USER, ExecutionSource.MANUAL);
+
+        // verifications
+        assertThat(results).isEmpty();
+        verifyNoInteractions(softwareDispatchService, packageUpdateDispatchService, softwareActionResultRepository);
+        verify(deviceService, never()).verifyDispatchable(anyList());
+    }
+
+    @Test
+    void update_chocoAndWingetPackages_onlyTheChocoOneIsNarrowedToOwners() {
+        // setup
+        ScriptResponse chocoUpdate = stubChocoUpdateOnWindowsMachines();
+        ScriptResponse wingetUpdate = script("winget-update-id", OsType.WINDOWS);
+        when(registry.handlerFor(PackageManagerType.WINGET)).thenReturn(new WingetPackageManagerHandler());
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.WINGET_UPDATE)).thenReturn(wingetUpdate);
+        when(chocoPackageOwnership.owners(WINDOWS_MACHINES, "7zip")).thenReturn(List.of("w3"));
+        SoftwareManagementInput input = input(WINDOWS_MACHINES,
+                pkg(PackageManagerType.CHOCO, "7zip", null),
+                pkg(PackageManagerType.WINGET, "Mozilla.Firefox", null));
+
+        // execution
+        service.update(input, USER, ExecutionSource.MANUAL);
+
+        // verifications
+        verify(softwareDispatchService).dispatch(anyString(), eq(chocoUpdate), eq(List.of("w3")),
+                eq(List.of("7zip", FEED_URL)), eq(USER), eq(ExecutionSource.MANUAL), eq(PackageManagerType.CHOCO),
+                eq("7zip"), eq(SoftwareAction.UPDATE));
+        verify(softwareDispatchService).dispatch(anyString(), eq(wingetUpdate), eq(WINDOWS_MACHINES),
+                eq(List.of("--id", "Mozilla.Firefox", "-e")), eq(USER), eq(ExecutionSource.MANUAL),
+                eq(PackageManagerType.WINGET), eq("Mozilla.Firefox"), eq(SoftwareAction.UPDATE));
+        verify(chocoPackageOwnership, never()).owners(WINDOWS_MACHINES, "Mozilla.Firefox");
+    }
+
+    @Test
+    void update_wingetPackage_ownershipNeverConsulted() {
+        // setup
+        stubWindowsMachines();
+        ScriptResponse wingetUpdate = script("winget-update-id", OsType.WINDOWS);
+        when(registry.handlerFor(PackageManagerType.WINGET)).thenReturn(new WingetPackageManagerHandler());
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.WINGET_UPDATE)).thenReturn(wingetUpdate);
+        SoftwareManagementInput input = input(WINDOWS_MACHINES, pkg(PackageManagerType.WINGET, "Mozilla.Firefox", null));
+
+        // execution
+        service.update(input, USER, ExecutionSource.MANUAL);
+
+        // verifications
+        verify(softwareDispatchService).dispatch(anyString(), eq(wingetUpdate), eq(WINDOWS_MACHINES),
+                eq(List.of("--id", "Mozilla.Firefox", "-e")), eq(USER), eq(ExecutionSource.MANUAL),
+                eq(PackageManagerType.WINGET), eq("Mozilla.Firefox"), eq(SoftwareAction.UPDATE));
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    @Test
+    void install_chocoPackage_sentToEveryUsableDeviceWithoutConsultingOwnership() {
+        // setup
+        stubWindowsMachines();
+        ScriptResponse chocoInstall = script("choco-install-id", OsType.WINDOWS);
+        when(registry.handlerFor(PackageManagerType.CHOCO)).thenReturn(new ChocoPackageManagerHandler(packageManagerProperties));
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.CHOCO_INSTALL)).thenReturn(chocoInstall);
+        SoftwareManagementInput input = input(List.of("m-mac", "w1", "w2", "w3"), pkg(PackageManagerType.CHOCO, "7zip", null));
+
+        // execution
+        service.install(input, USER, ExecutionSource.MANUAL);
+
+        // verifications
+        verify(softwareDispatchService).dispatch(anyString(), eq(chocoInstall), eq(WINDOWS_MACHINES),
+                eq(List.of("7zip", FEED_URL)), eq(USER), eq(ExecutionSource.MANUAL), eq(PackageManagerType.CHOCO),
+                eq("7zip"), eq(SoftwareAction.INSTALL));
+        verifyNoInteractions(chocoPackageOwnership);
+    }
+
+    private ScriptResponse stubChocoUpdateOnWindowsMachines() {
+        stubWindowsMachines();
+        ScriptResponse chocoUpdate = script("choco-update-id", OsType.WINDOWS);
+        when(registry.handlerFor(PackageManagerType.CHOCO)).thenReturn(new ChocoPackageManagerHandler(packageManagerProperties));
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.CHOCO_UPDATE)).thenReturn(chocoUpdate);
+        return chocoUpdate;
+    }
+
+    private void stubWindowsMachines() {
+        packageManagerProperties.setChocoEnabled(true);
+        packageManagerProperties.getChoco().setFeedUrl(FEED_URL);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-mac", OsType.MAC_OS), managedChocoMachine("w1"),
+                        managedChocoMachine("w2"), managedChocoMachine("w3")));
+    }
+
+    private static Machine managedChocoMachine(String machineId) {
+        Machine windows = machine(machineId, OsType.WINDOWS);
+        windows.setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.PRESENT,
+                PackageManagerType.CHOCO, PackageManagerState.PRESENT));
+        windows.setChocolatey(MachineChocolatey.builder().status(ChocolateyStatus.MANAGED).ours(true).build());
+        return windows;
+    }
+
+    private static SoftwareManagementInput input(List<String> machineIds, SoftwarePackageInput... packages) {
+        SoftwareManagementInput input = new SoftwareManagementInput();
+        input.setMachineIds(machineIds);
+        input.setPackages(List.of(packages));
+        return input;
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {

@@ -14,6 +14,10 @@ import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.device.chocolatey.ChocolateyAdminOption;
+import com.openframe.data.document.device.chocolatey.ChocolateyDecision;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.tool.ConnectionStatus;
@@ -31,6 +35,9 @@ import java.util.stream.Collectors;
 
 @Component
 public class GraphQLDeviceMapper {
+
+    private static final List<ChocolateyAdminOption> CHOCOLATEY_ADMIN_OPTIONS =
+            List.of(ChocolateyAdminOption.DONT_TOUCH, ChocolateyAdminOption.ADMIN_FIXES);
 
     public DeviceFilterCriteria toDeviceFilterCriteria(DeviceFilterInput input) {
         if (input == null) {
@@ -58,14 +65,36 @@ public class GraphQLDeviceMapper {
         return criteria;
     }
 
-    public MachinePackageManagersResponse toPackageManagers(Map<PackageManagerType, PackageManagerState> states) {
-        if (states == null) {
+    public MachinePackageManagersResponse toPackageManagers(Machine machine) {
+        Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
+        MachineChocolatey chocolatey = machine.getChocolatey();
+        if (reported == null && chocolatey == null) {
             return null;
         }
+        Map<PackageManagerType, PackageManagerState> states = reported != null ? reported : Map.of();
         return MachinePackageManagersResponse.builder()
                 .brew(states.get(PackageManagerType.BREW))
                 .winget(states.get(PackageManagerType.WINGET))
                 .choco(states.get(PackageManagerType.CHOCO))
+                .chocolatey(toChocolatey(chocolatey, machine.getChocolateyDecision()))
+                .build();
+    }
+
+    private static MachineChocolateyResponse toChocolatey(MachineChocolatey chocolatey, ChocolateyDecision decision) {
+        if (chocolatey == null) {
+            return null;
+        }
+        ChocolateyStatus status = chocolatey.getStatus();
+        List<ChocolateyAdminOption> options = status == ChocolateyStatus.ACTION_REQUIRED
+                ? CHOCOLATEY_ADMIN_OPTIONS : List.of();
+        return MachineChocolateyResponse.builder()
+                .version(chocolatey.getVersion())
+                .edition(chocolatey.getEdition())
+                .ours(chocolatey.isOurs())
+                .status(status)
+                .reason(chocolatey.getReason())
+                .options(options)
+                .decision(decision != null ? decision.getOption() : null)
                 .build();
     }
 

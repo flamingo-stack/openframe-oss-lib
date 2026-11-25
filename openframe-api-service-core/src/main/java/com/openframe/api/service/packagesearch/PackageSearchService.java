@@ -24,8 +24,7 @@ import static org.springframework.util.StringUtils.hasText;
 @Service
 public class PackageSearchService {
 
-    // Chocolatey's server caps a page at 40 entries and we fetch one extra row there to compute
-    // hasMore exactly, so a page is at most 39; a uniform cap keeps paging identical across managers.
+    // one cap for every manager keeps paging identical across them
     private static final int MAX_LIMIT = 39;
     private static final int DEFAULT_LIMIT = 25;
 

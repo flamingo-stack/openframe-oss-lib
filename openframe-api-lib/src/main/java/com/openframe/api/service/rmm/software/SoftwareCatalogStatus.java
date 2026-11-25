@@ -19,6 +19,7 @@ import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -42,7 +43,8 @@ import static java.util.stream.Collectors.toSet;
 public class SoftwareCatalogStatus {
 
     private static final Map<PackageManagerType, SoftwareSource> SOURCE_BY_MANAGER =
-            Map.of(PackageManagerType.WINGET, SoftwareSource.WINGET);
+            Map.of(PackageManagerType.WINGET, SoftwareSource.WINGET,
+                    PackageManagerType.CHOCO, SoftwareSource.CHOCOLATEY);
 
     private final PackageCatalogRepository catalogRepository;
     private final SoftwarePackageMatcher packageMatcher;
@@ -50,10 +52,12 @@ public class SoftwareCatalogStatus {
     private final PackageAdoptReach packageAdoptReach;
     private final MachineRepository machineRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final ChocoPackageOwnership chocoPackageOwnership;
 
     // Runs after SoftwareAutoUpdateService: a policy's ON / OFF stays, a row without one gets what the catalog allows.
     public void apply(List<SoftwareResponse> rows) {
-        apply(rows, manager -> true, packageManagerAvailability::isEnabled, Set.of());
+        apply(rows, entry -> true, entry -> packageManagerAvailability.isAdoptionOffered(entry.getManager()),
+                Set.of());
     }
 
     // a manager counts on a device only where it runs: there winget's package gives way to the one to adopt into
@@ -66,12 +70,21 @@ public class SoftwareCatalogStatus {
     private void applyOn(Machine device, List<SoftwareResponse> rows, Set<String> installedCasks) {
         String machineId = device.getMachineId();
         boolean reachable = packageAdoptReach.isReachable(machineId);
-        apply(rows, manager -> PackageManagerAvailability.isPresentOn(device, manager),
-                manager -> reachable && packageManagerAvailability.isAdoptableOn(device, manager), installedCasks);
+        apply(rows, entry -> managesOn(device, entry),
+                entry -> reachable && packageManagerAvailability.isAdoptableOn(device, entry.getManager()),
+                installedCasks);
     }
 
-    private void apply(List<SoftwareResponse> rows, Predicate<PackageManagerType> manages,
-                       Predicate<PackageManagerType> adopts, Set<String> installedCasks) {
+    private boolean managesOn(Machine device, PackageCatalogEntry entry) {
+        PackageManagerType manager = entry.getManager();
+        if (manager == PackageManagerType.CHOCO) {
+            return chocoPackageOwnership.owns(device, entry.getPackageId());
+        }
+        return PackageManagerAvailability.isPresentOn(device, manager);
+    }
+
+    private void apply(List<SoftwareResponse> rows, Predicate<PackageCatalogEntry> manages,
+                       Predicate<PackageCatalogEntry> adopts, Set<String> installedCasks) {
         if (rows == null || rows.isEmpty()) {
             return;
         }
@@ -97,18 +110,18 @@ public class SoftwareCatalogStatus {
         }
     }
 
-    private static PackageCatalogEntry entryOf(PackageMatch match, Predicate<PackageManagerType> counts) {
+    private static PackageCatalogEntry entryOf(PackageMatch match, Predicate<PackageCatalogEntry> counts) {
         if (match == null || !match.isMatched()) {
             return null;
         }
         PackageCatalogEntry entry = match.getEntry();
-        return counts.test(entry.getManager()) ? entry : null;
+        return counts.test(entry) ? entry : null;
     }
 
     // Fleet reports a cask's app twice, under apps and under homebrew_casks: where brew installed that very cask,
     // the apps row is brew's too and adopting it would reinstall what brew already manages
     private static PackageCatalogEntry installedCaskOf(PackageMatch adoptionMatch, Set<String> installedCasks) {
-        PackageCatalogEntry entry = entryOf(adoptionMatch, PackageManagerType.BREW::equals);
+        PackageCatalogEntry entry = entryOf(adoptionMatch, SoftwareCatalogStatus::isBrew);
         if (entry == null || entry.getBrewType() != BrewPackageType.CASK || entry.getPackageId() == null) {
             return null;
         }
@@ -251,6 +264,10 @@ public class SoftwareCatalogStatus {
         return catalogRepository.findByManagerAndPackageIdIn(PackageManagerType.BREW, tokens).stream()
                 .filter(entry -> entry.getPackageId() != null && entry.getVersion() != null)
                 .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)));
+    }
+
+    private static boolean isBrew(PackageCatalogEntry entry) {
+        return entry.getManager() == PackageManagerType.BREW;
     }
 
     private static boolean isBrewPackage(SoftwareResponse row) {

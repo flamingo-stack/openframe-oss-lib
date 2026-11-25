@@ -1,8 +1,10 @@
 extend type Query {
     """
-    Search packages in a public package-manager repository (Homebrew, Chocolatey, winget).
+    Search packages of a package manager (Homebrew, Chocolatey, winget). Homebrew and winget packages come
+    from their public repositories; Chocolatey packages come from the OpenFrame feed catalog, with a name,
+    a description, a homepage and one current version each.
     Homebrew and winget results are ranked by match quality with popularity/canonical-id
-    tiebreaks; Chocolatey results come in the repository's own relevance order.
+    tiebreaks; Chocolatey results are ranked by match quality, then by name.
     Forward cursor pagination only: pass `pageInfo.endCursor` back as `after`.
     """
     searchPackages(
@@ -14,7 +16,8 @@ extend type Query {
         before: String
     ): PackageSearchConnection!
     """
-    Package details by identifier, including available versions (newest first).
+    Package details by identifier, including available versions (newest first; Chocolatey has the one
+    current version of the OpenFrame feed catalog).
     Errors with NOT_FOUND when the id is unknown to the package manager.
     """
     packageDetails(packageManager: PackageManagerType!, packageId: ID!, packageType: BrewPackageType): PackageDetails!
@@ -63,13 +66,13 @@ type PackageSearchItem {
     "WINGET only in search results."
     publisher: String
     homepage: String
-    "CHOCO only in search results; winget provides it in packageDetails."
+    "Not set in search results; winget provides it in packageDetails."
     iconUrl: String
     "Ready-to-run install command, e.g. `brew install --cask slack`."
     installCommand: String!
     "BREW only — pass it back to packageDetails to open exactly this package, not its twin of the other type."
     packageType: BrewPackageType
-    "Install/download count where the source publishes one: brew 30-day installs, Chocolatey total downloads."
+    "Install count where the source publishes one: brew 30-day installs. Not set for Chocolatey and winget."
     popularity: Int
     packageManager: PackageManagerType!
 }
@@ -85,16 +88,16 @@ type PackageDetails {
     license: String
     installCommand: String!
     packageType: BrewPackageType
-    "BREW and CHOCO only."
+    "BREW only."
     popularity: Int
     tags: [String!]!
-    "Available versions, newest first. Homebrew publishes only the current one; Chocolatey returns the newest 40."
+    "Available versions, newest first. Homebrew and Chocolatey have only the current one."
     versions: [PackageVersion!]!
 }
 
 type PackageVersion {
     version: String!
-    "Chocolatey only — the other sources do not publish release dates."
+    "Not set: the catalogs do not carry release dates."
     releasedAt: Instant
     prerelease: Boolean
 }

@@ -12,6 +12,8 @@ import java.util.List;
 
 public interface PackageCatalogRepository extends MongoRepository<PackageCatalogEntry, String>, PackageCatalogRepositoryCustom {
 
+    List<PackageCatalogEntry> findByManager(PackageManagerType manager);
+
     List<PackageCatalogEntry> findByManagerAndPackageIdIgnoreCase(PackageManagerType manager, String packageId);
 
     List<PackageCatalogEntry> findByManagerAndPackageIdIn(PackageManagerType manager, Collection<String> packageIds);

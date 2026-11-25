@@ -16,6 +16,7 @@ public class PackageCatalogSyncProperties {
     private Duration initialDelay = Duration.ofSeconds(10);
     private Duration brewInterval = Duration.ofMinutes(15);
     private Duration wingetInterval = Duration.ofMinutes(30);
+    private Duration chocoInterval = Duration.ofMinutes(30);
 
     private Brew brew = new Brew();
     private Winget winget = new Winget();

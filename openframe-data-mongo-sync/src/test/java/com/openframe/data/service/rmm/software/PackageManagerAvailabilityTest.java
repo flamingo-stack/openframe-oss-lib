@@ -3,6 +3,8 @@ package com.openframe.data.service.rmm.software;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.device.MachineRepository;
@@ -13,6 +15,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -140,11 +144,12 @@ class PackageManagerAvailabilityTest {
         assertThat(result).isFalse();
     }
 
-    @Test
-    void isSoftwareManageable_enabledChocoMissing_true() {
+    @ParameterizedTest
+    @EnumSource(value = PackageManagerState.class, names = {"MISSING", "UNKNOWN"})
+    void isSoftwareManageable_enabledChocoMissingOrUnknown_true(PackageManagerState state) {
         // setup
         packageManagerProperties.setChocoEnabled(true);
-        Machine machine = machine("m-old-win", Map.of(BREW, UNSUPPORTED, WINGET, UNSUPPORTED, CHOCO, MISSING));
+        Machine machine = machine("m-old-win", Map.of(BREW, UNSUPPORTED, WINGET, UNSUPPORTED, CHOCO, state));
 
         // execution
         boolean result = availability.isSoftwareManageable(machine);
@@ -222,7 +227,7 @@ class PackageManagerAvailabilityTest {
     void requireSoftwareManageable_deviceSupportsNoneOfTheRequestedManagers_badRequestNamesOnlyIt() {
         // setup
         packageManagerProperties.setChocoEnabled(true);
-        Machine server = machine("m-server", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT));
+        Machine server = machine("m-server", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT), ChocolateyStatus.MANAGED);
         Machine desktop = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, MISSING));
         stubMachines(Set.of("m-server", "m-win"), server, desktop);
         List<String> machineIds = List.of("m-server", "m-win");
@@ -233,6 +238,7 @@ class PackageManagerAvailabilityTest {
 
         // verifications
         assertThat(thrown).isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("support none of the requested package managers")
                 .hasMessageContaining("m-server").hasMessageNotContaining("m-win");
     }
 
@@ -266,19 +272,18 @@ class PackageManagerAvailabilityTest {
     @Test
     void adoptableOn_devicesWithoutTheManagerPresent_leftOut() {
         // setup
-        Machine server = machine("m-server", Map.of(CHOCO, UNSUPPORTED));
-        Machine desktop = machine("m-win", Map.of(CHOCO, PRESENT));
-        Machine notYet = machine("m-new", Map.of(CHOCO, MISSING));
+        Machine intel = machine("m-intel", Map.of(BREW, UNSUPPORTED));
+        Machine arm = machine("m-arm", Map.of(BREW, PRESENT));
+        Machine notYet = machine("m-new", Map.of(BREW, MISSING));
         Machine oldAgent = machine("m-old-agent", null);
-        stubMachines(Set.of("m-old-agent", "m-server", "m-new", "m-win", "m-gone"), desktop, server, oldAgent, notYet);
-        List<String> machineIds = List.of("m-old-agent", "m-server", "m-new", "m-win", "m-gone");
-        packageManagerProperties.setChocoEnabled(true);
+        stubMachines(Set.of("m-old-agent", "m-intel", "m-new", "m-arm", "m-gone"), arm, intel, oldAgent, notYet);
+        List<String> machineIds = List.of("m-old-agent", "m-intel", "m-new", "m-arm", "m-gone");
 
         // execution
-        List<String> result = availability.adoptableOn(machineIds, CHOCO);
+        List<String> result = availability.adoptableOn(machineIds, BREW);
 
         // verifications
-        assertThat(result).containsExactly("m-win");
+        assertThat(result).containsExactly("m-arm");
     }
 
     @Test
@@ -348,11 +353,10 @@ class PackageManagerAvailabilityTest {
     @Test
     void isAdoptableOn_enabledManagerPresent_true() {
         // setup
-        packageManagerProperties.setChocoEnabled(true);
-        Machine machine = machine("m-server", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT));
+        Machine machine = machine("m-arm", Map.of(BREW, PRESENT, WINGET, UNSUPPORTED));
 
         // execution
-        boolean result = availability.isAdoptableOn(machine, CHOCO);
+        boolean result = availability.isAdoptableOn(machine, BREW);
 
         // verifications
         assertThat(result).isTrue();
@@ -362,11 +366,10 @@ class PackageManagerAvailabilityTest {
     @EnumSource(value = PackageManagerState.class, names = {"MISSING", "UNKNOWN", "UNSUPPORTED"})
     void isAdoptableOn_managerNotKnownPresent_false(PackageManagerState state) {
         // setup
-        packageManagerProperties.setChocoEnabled(true);
-        Machine machine = machine("m-arm", Map.of(WINGET, PRESENT, CHOCO, state));
+        Machine machine = machine("m-intel", Map.of(WINGET, PRESENT, BREW, state));
 
         // execution
-        boolean result = availability.isAdoptableOn(machine, CHOCO);
+        boolean result = availability.isAdoptableOn(machine, BREW);
 
         // verifications
         assertThat(result).isFalse();
@@ -375,11 +378,10 @@ class PackageManagerAvailabilityTest {
     @Test
     void isAdoptableOn_managerTheDeviceDidNotReport_false() {
         // setup
-        packageManagerProperties.setChocoEnabled(true);
         Machine machine = machine("m-win", Map.of(WINGET, PRESENT));
 
         // execution
-        boolean result = availability.isAdoptableOn(machine, CHOCO);
+        boolean result = availability.isAdoptableOn(machine, BREW);
 
         // verifications
         assertThat(result).isFalse();
@@ -388,11 +390,10 @@ class PackageManagerAvailabilityTest {
     @Test
     void isAdoptableOn_deviceThatNeverReportedItsManagers_false() {
         // setup
-        packageManagerProperties.setChocoEnabled(true);
         Machine machine = machine("m-old-agent", null);
 
         // execution
-        boolean result = availability.isAdoptableOn(machine, CHOCO);
+        boolean result = availability.isAdoptableOn(machine, BREW);
 
         // verifications
         assertThat(result).isFalse();
@@ -411,10 +412,377 @@ class PackageManagerAvailabilityTest {
         assertThat(result).isFalse();
     }
 
+    @Test
+    void isSoftwareManageable_chocoPresentManaged_true() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine machine = machine("m-win", Map.of(BREW, UNSUPPORTED, WINGET, UNSUPPORTED, CHOCO, PRESENT),
+                ChocolateyStatus.MANAGED);
+
+        // execution
+        boolean result = availability.isSoftwareManageable(machine);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @EnumSource(value = ChocolateyStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "MANAGED")
+    void isSoftwareManageable_chocoPresentNotManaged_false(ChocolateyStatus status) {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine machine = machine("m-win", Map.of(BREW, UNSUPPORTED, WINGET, UNSUPPORTED, CHOCO, PRESENT), status);
+
+        // execution
+        boolean result = availability.isSoftwareManageable(machine);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isSoftwareManageable_chocoPresentWithoutChocolateyObject_false() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine machine = machine("m-win", Map.of(BREW, UNSUPPORTED, WINGET, UNSUPPORTED, CHOCO, PRESENT));
+
+        // execution
+        boolean result = availability.isSoftwareManageable(machine);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isSoftwareManageable_chocoEnabledDeviceNeverReported_true() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine machine = machine("m-old-agent", null);
+
+        // execution
+        boolean result = availability.isSoftwareManageable(machine);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isSoftwareManageable_chocoNotManagedButWingetPresent_true() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine machine = machine("m-win", Map.of(BREW, UNSUPPORTED, WINGET, PRESENT, CHOCO, PRESENT),
+                ChocolateyStatus.ACTION_REQUIRED);
+
+        // execution
+        boolean result = availability.isSoftwareManageable(machine);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void requireSoftwareManageable_chocoOnlyDeviceNotManaged_badRequestNamesOnlyIt() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine blocked = machine("m-blocked", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT),
+                ChocolateyStatus.ACTION_REQUIRED);
+        Machine managed = machine("m-managed", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT), ChocolateyStatus.MANAGED);
+        stubMachines(Set.of("m-blocked", "m-managed"), blocked, managed);
+        List<String> machineIds = List.of("m-blocked", "m-managed");
+        List<PackageManagerType> managers = List.of(CHOCO);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> availability.requireSoftwareManageable(machineIds, managers));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("m-blocked").hasMessageNotContaining("m-managed");
+    }
+
+    @Test
+    void supporting_chocoDevicesNotManaged_leftOutInTheOrderAsked() {
+        // setup
+        Map<PackageManagerType, PackageManagerState> chocoPresent = Map.of(CHOCO, PRESENT);
+        Machine managed = machine("m-managed", chocoPresent, ChocolateyStatus.MANAGED);
+        Machine upgrade = machine("m-upgrade", chocoPresent, ChocolateyStatus.UPGRADE_REQUIRED);
+        Machine noObject = machine("m-no-object", chocoPresent);
+        Machine missing = machine("m-missing", Map.of(CHOCO, MISSING));
+        Machine unsupported = machine("m-unsupported", Map.of(CHOCO, UNSUPPORTED));
+        Machine oldAgent = machine("m-old-agent", null);
+        stubMachines(Set.of("m-old-agent", "m-upgrade", "m-missing", "m-no-object", "m-managed", "m-unsupported"),
+                managed, upgrade, noObject, missing, unsupported, oldAgent);
+        List<String> machineIds = List.of("m-old-agent", "m-upgrade", "m-missing", "m-no-object", "m-managed",
+                "m-unsupported");
+
+        // execution
+        List<String> result = availability.supporting(machineIds, CHOCO);
+
+        // verifications
+        assertThat(result).containsExactly("m-old-agent", "m-missing", "m-managed");
+    }
+
+    @Test
+    void isPresentOn_chocoPresentManaged_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, PRESENT), ChocolateyStatus.MANAGED);
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @EnumSource(value = ChocolateyStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "MANAGED")
+    void isPresentOn_chocoPresentNotManaged_false(ChocolateyStatus status) {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, PRESENT), status);
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isPresentOn_chocoPresentWithoutChocolateyObject_false() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, PRESENT));
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PackageManagerState.class, names = {"MISSING", "UNKNOWN", "UNSUPPORTED"})
+    void isPresentOn_chocoNotPresent_false(PackageManagerState state) {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, state));
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isPresentOn_chocoOnDeviceThatNeverReportedItsManagers_true() {
+        // setup
+        Machine machine = machine("m-old-agent", null);
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isPresentOn_wingetPresentWhileChocoNotManaged_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, PRESENT), ChocolateyStatus.ACTION_REQUIRED);
+
+        // execution
+        boolean result = PackageManagerAvailability.isPresentOn(machine, WINGET);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isSupportedOn_chocoPresentManaged_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, PRESENT), ChocolateyStatus.MANAGED);
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @EnumSource(value = ChocolateyStatus.class, mode = EnumSource.Mode.EXCLUDE, names = "MANAGED")
+    void isSupportedOn_chocoPresentNotManaged_false(ChocolateyStatus status) {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, PRESENT), status);
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isSupportedOn_chocoPresentWithoutChocolateyObject_false() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, PRESENT));
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PackageManagerState.class, names = {"MISSING", "UNKNOWN"})
+    void isSupportedOn_chocoMissingOrUnknown_true(PackageManagerState state) {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, state));
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isSupportedOn_chocoAbsentFromANonEmptyReport_false() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT));
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isSupportedOn_wingetAbsentFromANonEmptyReport_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of(CHOCO, UNSUPPORTED));
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, WINGET);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isSupportedOn_chocoOnAnEmptyReport_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of());
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isSupportedOn_chocoUnsupported_false() {
+        // setup
+        Machine machine = machine("m-server", Map.of(WINGET, PRESENT, CHOCO, UNSUPPORTED));
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isSupportedOn_chocoOnDeviceThatNeverReportedItsManagers_true() {
+        // setup
+        Machine machine = machine("m-old-agent", null);
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void isSupportedOn_wingetPresentWhileChocoNotManaged_true() {
+        // setup
+        Machine machine = machine("m-win", Map.of(WINGET, PRESENT, CHOCO, PRESENT), ChocolateyStatus.ACTION_REQUIRED);
+
+        // execution
+        boolean result = PackageManagerAvailability.isSupportedOn(machine, WINGET);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void isAdoptionOffered_choco_falseWhetherEnabledOrNot(boolean chocoEnabled) {
+        // setup
+        packageManagerProperties.setChocoEnabled(chocoEnabled);
+
+        // execution
+        boolean result = availability.isAdoptionOffered(CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PackageManagerType.class, names = {"BREW", "WINGET"})
+    void isAdoptionOffered_brewOrWinget_true(PackageManagerType manager) {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+
+        // execution
+        boolean result = availability.isAdoptionOffered(manager);
+
+        // verifications
+        assertThat(result).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void adoptionManagers_chocoEnabledOrNot_brewAndWingetOnly(boolean chocoEnabled) {
+        // setup
+        packageManagerProperties.setChocoEnabled(chocoEnabled);
+
+        // execution
+        List<PackageManagerType> result = availability.adoptionManagers();
+
+        // verifications
+        assertThat(result).containsExactlyInAnyOrder(BREW, WINGET);
+    }
+
+    @Test
+    void isAdoptableOn_enabledChocoPresentManaged_false() {
+        // setup
+        packageManagerProperties.setChocoEnabled(true);
+        Machine machine = machine("m-server", Map.of(WINGET, UNSUPPORTED, CHOCO, PRESENT), ChocolateyStatus.MANAGED);
+
+        // execution
+        boolean result = availability.isAdoptableOn(machine, CHOCO);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
     private static Machine machine(String machineId, Map<PackageManagerType, PackageManagerState> packageManagers) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
         machine.setPackageManagers(packageManagers);
+        return machine;
+    }
+
+    private static Machine machine(String machineId, Map<PackageManagerType, PackageManagerState> packageManagers,
+                                   ChocolateyStatus chocolateyStatus) {
+        Machine machine = machine(machineId, packageManagers);
+        machine.setChocolatey(MachineChocolatey.builder().status(chocolateyStatus).build());
         return machine;
     }
 }

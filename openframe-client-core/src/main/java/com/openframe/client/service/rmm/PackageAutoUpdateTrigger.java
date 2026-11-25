@@ -21,6 +21,7 @@ import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
@@ -58,6 +59,7 @@ public class PackageAutoUpdateTrigger {
     private final PackageAutoUpdateWithdrawal withdrawal;
     private final TenantIdProvider tenantIdProvider;
     private final MachinePlatformResolver machinePlatformResolver;
+    private final ChocoPackageOwnership chocoPackageOwnership;
 
     public void run() {
         String tenantId = tenantIdProvider.getTenantId();
@@ -87,7 +89,8 @@ public class PackageAutoUpdateTrigger {
         // the manager is never ordered
         List<String> outdatedMachines = machineIds(outdated);
         List<String> supporting = machinePlatformResolver.supporting(outdatedMachines, pkg.manager());
-        Set<String> eligible = packageUpdateEligibility.eligibleConnectedMachines(SoftwareAction.UPDATE, supporting);
+        List<String> owning = owning(supporting, pkg);
+        Set<String> eligible = packageUpdateEligibility.eligibleConnectedMachines(SoftwareAction.UPDATE, owning);
         List<PackageAutoUpdatePolicy> due = outdated.stream()
                 .filter(policy -> eligible.contains(policy.getMachineId()))
                 .toList();
@@ -118,6 +121,12 @@ public class PackageAutoUpdateTrigger {
         });
         log.info("Auto-update ordered package={}/{} version={} machines={} executionId={}",
                 pkg.manager(), pkg.name(), version, due.size(), executionId);
+    }
+
+    private List<String> owning(List<String> machineIds, PackageKey pkg) {
+        return pkg.manager() == PackageManagerType.CHOCO
+                ? chocoPackageOwnership.owners(machineIds, pkg.name())
+                : machineIds;
     }
 
     // every tenant is seeded with the update scripts, so a missing one is a broken tenant, not a skip

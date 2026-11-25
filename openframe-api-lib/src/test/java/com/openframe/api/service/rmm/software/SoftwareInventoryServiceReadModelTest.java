@@ -40,6 +40,7 @@ import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.ChocoPackageOwnership;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.nats.delivery.PackageAdoptReach;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
@@ -101,6 +102,7 @@ class SoftwareInventoryServiceReadModelTest {
     @Mock private SoftwareAdoptionService softwareAdoptionService;
     @Mock private PackageManagerAvailability packageManagerAvailability;
     @Mock private PackageAdoptReach packageAdoptReach;
+    @Mock private ChocoPackageOwnership chocoPackageOwnership;
 
     private SoftwareInventoryService service;
 
@@ -110,7 +112,7 @@ class SoftwareInventoryServiceReadModelTest {
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
                 autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
                 softwareScheduleRepository, softwareScheduleTargetResolver,
-                softwareAdoptionService, packageManagerAvailability, packageAdoptReach);
+                softwareAdoptionService, packageManagerAvailability, packageAdoptReach, chocoPackageOwnership);
         ReflectionTestUtils.setField(service, "softwareReadModel", true);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
@@ -830,6 +832,75 @@ class SoftwareInventoryServiceReadModelTest {
 
         assertThat(service.listDevicesForSoftware("7", null, null, 0, 20, null).items()).isEmpty();
         assertThat(service.listDevicesForSoftware("8", null, null, 0, 20, null).items().getFirst().getInstalledBy()).isNull();
+    }
+
+    @Test
+    void listDevicesForSoftware_chocolateyTitle_installedByChocolateyOnlyOnDevicesOwningItsManagingPackage() {
+        // setup
+        SoftwareOnDeviceResponse owner = onDevice("m1");
+        SoftwareOnDeviceResponse notOwner = onDevice("m2");
+        PackageCatalogEntry sevenZip = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.CHOCO).packageId("7zip").build();
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.CHOCOLATEY));
+        catalogManagesWith(sevenZip);
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
+                .thenReturn(List.of(owner, notOwner));
+        when(chocoPackageOwnership.owns(owner.getDevice(), "7zip")).thenReturn(true);
+        when(chocoPackageOwnership.owns(notOwner.getDevice(), "7zip")).thenReturn(false);
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items())
+                .extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getInstalledBy,
+                        SoftwareOnDeviceResponse::getAutoUpdate)
+                .containsExactly(tuple("m1", SoftwareSource.CHOCOLATEY, SoftwareAutoUpdateStatus.OFF),
+                        tuple("m2", null, null));
+    }
+
+    @Test
+    void listDevicesForSoftware_installedByChocolateyFilter_onlyDevicesOwningTheManagingPackage() {
+        // setup
+        SoftwareOnDeviceResponse owner = onDevice("m1");
+        SoftwareOnDeviceResponse notOwner = onDevice("m2");
+        PackageCatalogEntry sevenZip = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.CHOCO).packageId("7zip").build();
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.CHOCOLATEY));
+        catalogManagesWith(sevenZip);
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
+                .thenReturn(List.of(owner, notOwner));
+        when(chocoPackageOwnership.owns(owner.getDevice(), "7zip")).thenReturn(true);
+        when(chocoPackageOwnership.owns(notOwner.getDevice(), "7zip")).thenReturn(false);
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setInstalledBy(List.of(SoftwareSource.CHOCOLATEY));
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", filter, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items()).extracting(row -> row.getDevice().getMachineId()).containsExactly("m1");
+    }
+
+    @Test
+    void listDevicesForSoftware_wingetTitle_chocoOwnershipNeverConsulted() {
+        // setup
+        SoftwareOnDeviceResponse withWinget = onDevice("m1");
+        withWinget.getDevice().setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.PRESENT));
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "9")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "9")).thenReturn(row("9", SoftwareSource.WINGET));
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "9", null, null))
+                .thenReturn(List.of(withWinget));
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("9", null, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareOnDeviceResponse::getInstalledBy)
+                .containsExactly(SoftwareSource.WINGET);
+        verifyNoInteractions(chocoPackageOwnership);
     }
 
     @Test

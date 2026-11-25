@@ -1,57 +1,28 @@
 package com.openframe.api.service.packagesearch;
 
-import com.openframe.core.rest.PackageSearchRestClientFactory;
-import com.github.benmanes.caffeine.cache.Cache;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.openframe.api.service.packagesearch.PackageSearchProperties;
-import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.api.dto.packagesearch.PackageDetails;
-import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.api.dto.packagesearch.PackageSearchHit;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.dto.packagesearch.PackageVersion;
 import com.openframe.api.exception.PackageNotFoundException;
-import com.openframe.api.exception.PackageSourceUnavailableException;
+import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.repository.packagesearch.PackageCatalogHit;
+import com.openframe.data.repository.packagesearch.PackageCatalogOrder;
+import com.openframe.data.repository.packagesearch.PackageCatalogPage;
+import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.util.UriBuilder;
 
-import java.net.URI;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
-import java.util.function.Supplier;
-import java.util.stream.IntStream;
 
 @Service
+@RequiredArgsConstructor
 public class ChocoPackageClient implements PackageManagerClient {
 
-    private static final String UNAVAILABLE_MESSAGE =
-            "The Chocolatey repository is temporarily unavailable. Please try again later.";
-    private static final String FILTER_LATEST_VERSION = "IsLatestVersion";
-    private static final String EMPTY_TARGET_FRAMEWORK = "''";
-    private static final String ORDER_BY_PUBLISHED = "Published desc";
-    private static final int SEARCH_ITEM_DESCRIPTION_LIMIT = 300;
-    private static final int CACHE_MAX_SIZE = 2000;
-
-    private final RestClient restClient;
-    private final ChocoFeedParser chocoFeedParser;
-    private final Cache<String, PackageDetails> detailsCache;
-
-    public ChocoPackageClient(PackageSearchProperties packageSearchProperties, ChocoFeedParser chocoFeedParser) {
-        PackageSearchProperties.Choco choco = packageSearchProperties.getChoco();
-        this.restClient = PackageSearchRestClientFactory.create(choco.getBaseUrl(), choco.getTimeout());
-        this.chocoFeedParser = chocoFeedParser;
-        this.detailsCache = Caffeine.newBuilder()
-                .expireAfterWrite(choco.getCacheTtl())
-                .maximumSize(CACHE_MAX_SIZE)
-                .build();
-    }
+    private final PackageCatalogRepository packageCatalogRepository;
 
     @Override
     public PackageManagerType getPackageManagerType() {
@@ -60,261 +31,66 @@ public class ChocoPackageClient implements PackageManagerClient {
 
     @Override
     public PackageSearchResult search(String query, String afterCursor, int limit) {
-        String trimmedQuery = query.trim();
-        int offset = offsetAfter(afterCursor);
-        return requestSearchPage(trimmedQuery, limit, offset);
+        PackageCatalogPage page = packageCatalogRepository.searchByName(
+                PackageManagerType.CHOCO, query, PackageCatalogOrder.BY_NAME, afterCursor, limit);
+        List<PackageSearchHit> hits = page.getHits().stream()
+                .map(this::toHit)
+                .toList();
+        int total = (int) page.getTotal();
+        return PackageSearchResult.builder()
+                .hits(hits)
+                .total(total)
+                .hasMore(page.isHasMore())
+                .build();
     }
 
-    // the community feed pages by $skip, so a hit's cursor is its 0-based index; a missing or tampered one restarts at 0
-    private static int offsetAfter(String afterCursor) {
-        if (afterCursor == null) {
-            return 0;
-        }
-        try {
-            return Math.max(0, Integer.parseInt(afterCursor) + 1);
-        } catch (NumberFormatException e) {
-            return 0;
-        }
+    private PackageSearchHit toHit(PackageCatalogHit hit) {
+        PackageSearchItem item = toItem(hit.getEntry());
+        return new PackageSearchHit(item, hit.getCursor());
     }
 
     @Override
     public PackageDetails findPackage(String packageId, BrewPackageType packageType) {
-        String cacheKey = packageId.toLowerCase(Locale.ROOT);
-        return detailsCache.get(cacheKey, key -> loadDetails(packageId));
-    }
-
-    private PackageSearchResult requestSearchPage(String query, int limit, int offset) {
-        // one extra row makes hasMore exact without a second $count request;
-        // the server caps a page at 40, which is why the router clamps limit to 39
-        int probeSize = limit + 1;
-        String quotedQuery = quote(query);
-        String xml = callCommunityRepo(() -> restClient.get()
-                .uri(builder -> searchUri(builder, quotedQuery, probeSize, offset))
-                .retrieve()
-                .body(String.class));
-        List<ChocoEntry> entries = parseFeed(xml);
-        boolean hasMore = entries.size() > limit;
-        List<ChocoEntry> page = entries.stream().limit(limit).toList();
-        List<PackageSearchItem> items = rankAndMap(query, page);
-        List<PackageSearchHit> hits = withIndexCursors(items, offset);
-        return PackageSearchResult.builder()
-                .hits(hits)
-                .total(null)
-                .hasMore(hasMore)
-                .build();
-    }
-
-    private static List<PackageSearchHit> withIndexCursors(List<PackageSearchItem> items, int offset) {
-        return IntStream.range(0, items.size())
-                .mapToObj(position -> indexedHit(items, offset, position))
-                .toList();
-    }
-
-    private static PackageSearchHit indexedHit(List<PackageSearchItem> items, int offset, int position) {
-        PackageSearchItem item = items.get(position);
-        String cursor = String.valueOf(offset + position);
-        return new PackageSearchHit(item, cursor);
-    }
-
-    private List<PackageSearchItem> rankAndMap(String query, List<ChocoEntry> page) {
-        String matcherQuery = query.toLowerCase(Locale.ROOT);
-        return page.stream()
-                .map(entry -> new Scored(scoreEntry(matcherQuery, entry), entry))
-                .sorted(byRelevance())
-                .map(scored -> toItem(scored.getEntry()))
-                .toList();
-    }
-
-    private static int scoreEntry(String query, ChocoEntry entry) {
-        String description = firstNonNull(entry.getDescription(), entry.getSummary());
-        return PackageMatcher.score(query, entry.getId(), displayName(entry), null, description);
-    }
-
-    private static Comparator<Scored> byRelevance() {
-        Comparator<Scored> byScore = Comparator.comparingInt(Scored::getScore).reversed();
-        Comparator<Scored> byDownloads = Comparator.comparingInt(Scored::downloadsOrZero).reversed();
-        return byScore.thenComparing(byDownloads).thenComparing(Scored::entryId);
-    }
-
-    @Getter
-    @AllArgsConstructor
-    private static final class Scored {
-        private final int score;
-        private final ChocoEntry entry;
-
-        private int downloadsOrZero() {
-            Integer downloads = entry.getDownloadCount();
-            return downloads == null ? 0 : downloads;
-        }
-
-        private String entryId() {
-            return entry.getId();
-        }
-    }
-
-    private URI searchUri(UriBuilder builder, String quotedQuery, int top, int skip) {
-        return builder.path("/Search()")
-                .queryParam("$filter", FILTER_LATEST_VERSION)
-                .queryParam("searchTerm", quotedQuery)
-                .queryParam("targetFramework", EMPTY_TARGET_FRAMEWORK)
-                .queryParam("includePrerelease", "false")
-                .queryParam("$top", top)
-                .queryParam("$skip", skip)
-                .build();
-    }
-
-    private PackageDetails loadDetails(String packageId) {
-        ChocoEntry latest = fetchLatestEntry(packageId);
-        List<PackageVersion> versions = fetchVersions(latest);
-        String id = latest.getId();
-        String name = displayName(latest);
-        String description = firstNonNull(latest.getDescription(), latest.getSummary());
+        PackageCatalogEntry entry = findEntry(packageId);
+        String id = entry.getPackageId();
         String installCommand = installCommand(id);
+        PackageVersion version = PackageVersion.builder().version(entry.getVersion()).build();
         return PackageDetails.builder()
                 .id(id)
                 .packageManager(PackageManagerType.CHOCO)
-                .name(name)
-                .description(description)
-                .homepage(latest.getProjectUrl())
-                .iconUrl(latest.getIconUrl())
+                .name(entry.getName())
+                .description(entry.getDescription())
+                .homepage(entry.getHomepage())
                 .installCommand(installCommand)
-                .popularity(latest.getDownloadCount())
-                .tags(tags(latest))
-                .versions(versions)
+                .tags(List.of())
+                .versions(List.of(version))
                 .build();
     }
 
-    private ChocoEntry fetchLatestEntry(String packageId) {
-        String lowerId = packageId.toLowerCase(Locale.ROOT);
-        String quotedId = quote(lowerId);
-        String filter = "tolower(Id) eq " + quotedId + " and " + FILTER_LATEST_VERSION;
-        String xml = callCommunityRepo(() -> restClient.get()
-                .uri(builder -> latestEntryUri(builder, filter))
-                .retrieve()
-                .body(String.class));
-        List<ChocoEntry> entries = parseFeed(xml);
-        if (entries.isEmpty()) {
+    private PackageCatalogEntry findEntry(String packageId) {
+        List<PackageCatalogEntry> found =
+                packageCatalogRepository.findByManagerAndPackageIdIgnoreCase(PackageManagerType.CHOCO, packageId);
+        if (found.isEmpty()) {
             throw new PackageNotFoundException(packageId);
         }
-        return entries.getFirst();
+        return found.getFirst();
     }
 
-    private URI latestEntryUri(UriBuilder builder, String filter) {
-        return builder.path("/Packages()")
-                .queryParam("$filter", filter)
-                .queryParam("$top", 1)
-                .build();
-    }
-
-    // the community feed serves at most one OData page here, so this is the newest 40 versions
-    private List<PackageVersion> fetchVersions(ChocoEntry latest) {
-        String quotedId = quote(latest.getId());
-        String xml = callCommunityRepo(() -> restClient.get()
-                .uri(builder -> versionsUri(builder, quotedId))
-                .retrieve()
-                .body(String.class));
-        List<ChocoEntry> entries = parseFeed(xml);
-        List<PackageVersion> versions = entries.stream()
-                .map(this::toVersion)
-                .toList();
-        if (versions.isEmpty()) {
-            PackageVersion onlyKnown = toVersion(latest);
-            return List.of(onlyKnown);
-        }
-        return versions;
-    }
-
-    private URI versionsUri(UriBuilder builder, String quotedId) {
-        return builder.path("/FindPackagesById()")
-                .queryParam("id", quotedId)
-                .queryParam("$orderby", ORDER_BY_PUBLISHED)
-                .build();
-    }
-
-    private PackageVersion toVersion(ChocoEntry entry) {
-        return PackageVersion.builder()
-                .version(entry.getVersion())
-                .releasedAt(entry.getPublished())
-                .prerelease(entry.getPrerelease())
-                .build();
-    }
-
-    private <T> T callCommunityRepo(Supplier<T> call) {
-        try {
-            return call.get();
-        } catch (RestClientException e) {
-            throw new PackageSourceUnavailableException(UNAVAILABLE_MESSAGE, e);
-        }
-    }
-
-    private List<ChocoEntry> parseFeed(String xml) {
-        if (xml == null) {
-            throw new PackageSourceUnavailableException(UNAVAILABLE_MESSAGE);
-        }
-        try {
-            return chocoFeedParser.parse(xml);
-        } catch (IllegalStateException e) {
-            throw new PackageSourceUnavailableException(UNAVAILABLE_MESSAGE, e);
-        }
-    }
-
-    private PackageSearchItem toItem(ChocoEntry entry) {
-        String id = entry.getId();
-        String name = displayName(entry);
-        String description = shortDescription(entry);
+    private PackageSearchItem toItem(PackageCatalogEntry entry) {
+        String id = entry.getPackageId();
         String installCommand = installCommand(id);
         return PackageSearchItem.builder()
                 .id(id)
-                .name(name)
-                .description(description)
+                .name(entry.getName())
+                .description(entry.getDescription())
                 .version(entry.getVersion())
-                .homepage(entry.getProjectUrl())
-                .iconUrl(entry.getIconUrl())
+                .homepage(entry.getHomepage())
                 .installCommand(installCommand)
-                .popularity(entry.getDownloadCount())
                 .packageManager(PackageManagerType.CHOCO)
                 .build();
-    }
-
-    private static String displayName(ChocoEntry entry) {
-        String title = entry.getTitle();
-        return title != null ? title : entry.getId();
-    }
-
-    private static String shortDescription(ChocoEntry entry) {
-        String summary = entry.getSummary();
-        if (summary != null) {
-            return summary;
-        }
-        String description = entry.getDescription();
-        if (description == null || description.length() <= SEARCH_ITEM_DESCRIPTION_LIMIT) {
-            return description;
-        }
-        return description.substring(0, SEARCH_ITEM_DESCRIPTION_LIMIT) + "…";
-    }
-
-    private static List<String> tags(ChocoEntry entry) {
-        String rawTags = entry.getTags();
-        if (rawTags == null) {
-            return List.of();
-        }
-        String[] parts = rawTags.trim().split("\\s+");
-        return Arrays.stream(parts)
-                .filter(tag -> !tag.isBlank())
-                .toList();
     }
 
     private static String installCommand(String packageId) {
         return "choco install " + packageId;
-    }
-
-    private static String firstNonNull(String first, String second) {
-        return first != null ? first : second;
-    }
-
-    // OData string literals: wrap in single quotes, escape embedded quotes by doubling
-    private static String quote(String value) {
-        String escaped = value.replace("'", "''");
-        return "'" + escaped + "'";
     }
 }

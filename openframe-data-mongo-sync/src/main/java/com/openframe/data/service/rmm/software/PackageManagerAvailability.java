@@ -3,6 +3,8 @@ package com.openframe.data.service.rmm.software;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.chocolatey.ChocolateyStatus;
+import com.openframe.data.document.device.chocolatey.MachineChocolatey;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.device.MachineRepository;
@@ -13,7 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,9 +28,6 @@ import static org.springframework.util.CollectionUtils.isEmpty;
 @Component
 @RequiredArgsConstructor
 public class PackageManagerAvailability {
-
-    private static final Set<PackageManagerState> NOT_YET_USABLE =
-            EnumSet.of(PackageManagerState.MISSING, PackageManagerState.UNKNOWN);
 
     private final PackageManagerProperties packageManagerProperties;
     private final MachineRepository machineRepository;
@@ -47,6 +45,7 @@ public class PackageManagerAvailability {
             return true;
         }
         return enabledManagers().stream()
+                .filter(manager -> !isBlockedChoco(machine, manager))
                 .map(reported::get)
                 .anyMatch(PackageManagerState.MANAGEABLE::contains);
     }
@@ -55,17 +54,28 @@ public class PackageManagerAvailability {
     // having it, as everywhere else in Software Management
     public static boolean isPresentOn(Machine machine, PackageManagerType manager) {
         Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
-        return reported == null || reported.get(manager) == PackageManagerState.PRESENT;
+        return reported == null
+                || (reported.get(manager) == PackageManagerState.PRESENT && !isBlockedChoco(machine, manager));
     }
 
     // unlike isPresentOn, a device that never reported its managers cannot adopt: only a manager known PRESENT may
     // reinstall a program, a MISSING or UNKNOWN one would leave it removed and not installed
     public boolean isAdoptableOn(Machine machine, PackageManagerType manager) {
-        if (!isEnabled(manager)) {
+        if (!isAdoptionOffered(manager)) {
             return false;
         }
         Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
         return !isEmpty(reported) && reported.get(manager) == PackageManagerState.PRESENT;
+    }
+
+    public boolean isAdoptionOffered(PackageManagerType manager) {
+        return isEnabled(manager) && manager != PackageManagerType.CHOCO;
+    }
+
+    public List<PackageManagerType> adoptionManagers() {
+        return Arrays.stream(PackageManagerType.values())
+                .filter(this::isAdoptionOffered)
+                .toList();
     }
 
     // in the order of machineIds; a machine that is not found is left out
@@ -80,7 +90,9 @@ public class PackageManagerAvailability {
     // an order of a manager the device cannot run would only fail there; MISSING and UNKNOWN change over time
     public static boolean isSupportedOn(Machine machine, PackageManagerType manager) {
         Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
-        return reported == null || reported.get(manager) != PackageManagerState.UNSUPPORTED;
+        return reported == null
+                || (reported.get(manager) != PackageManagerState.UNSUPPORTED
+                && !isBlockedChoco(machine, manager) && !isUnreportedChoco(reported, manager));
     }
 
     // in the order of machineIds; a machine that is not found is left out
@@ -131,8 +143,25 @@ public class PackageManagerAvailability {
             return Stream.empty();
         }
         return packageManagers.stream()
-                .filter(manager -> NOT_YET_USABLE.contains(reported.get(manager)))
+                .filter(manager -> PackageManagerState.NOT_YET_USABLE.contains(reported.get(manager)))
                 .map(manager -> machine.getMachineId() + " " + manager + "=" + reported.get(manager));
+    }
+
+    static boolean hasManagedChocolatey(Machine machine) {
+        MachineChocolatey chocolatey = machine.getChocolatey();
+        return chocolatey != null && chocolatey.getStatus() == ChocolateyStatus.MANAGED;
+    }
+
+    private static boolean isBlockedChoco(Machine machine, PackageManagerType manager) {
+        Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
+        return manager == PackageManagerType.CHOCO
+                && reported != null && reported.get(manager) == PackageManagerState.PRESENT
+                && !hasManagedChocolatey(machine);
+    }
+
+    private static boolean isUnreportedChoco(Map<PackageManagerType, PackageManagerState> reported,
+                                             PackageManagerType manager) {
+        return manager == PackageManagerType.CHOCO && !reported.isEmpty() && reported.get(manager) == null;
     }
 
     private List<Machine> machines(Collection<String> machineIds) {
