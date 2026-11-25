@@ -633,6 +633,8 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         header: 'DEVICE',
         cell: ({ row }: { row: Row<T> }) => <DeviceCell device={row.original} />,
         enableSorting: false,
+        // The name says which device a row adds: the grid's settings menu cannot hide it.
+        enableHiding: false,
         size: 280,
         minSize: GRID_MIN_WIDTH.icon,
         meta: {
@@ -844,6 +846,10 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     if (hidden.size === 0) return columns;
     return columns.filter(c => !c.id || !hidden.has(c.id));
   }, [columns, hideColumns, isCriteria]);
+  // The add / remove column is pinned right at every width, so on a desktop window the device's name stays pinned
+  // beside it even in a narrow content column (the Mingo panel docked): otherwise a sideways scroll leaves a row of OS,
+  // status and a plus with no name. Without that column (criteria mode, `hideColumns`) the table keeps the shared rule.
+  const pinFirstColumn = visibleColumns.some(column => column.id === 'actions') ? 'desktop' : 'wide';
 
   // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
   const loadingRows = useMemo(
@@ -927,7 +933,11 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   );
 
   const deviceTable = (
-    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+    <DataTable
+      table={table}
+      {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}
+      pinFirstColumn={pinFirstColumn}
+    >
       {/* The grid shows the same slot above the table; the card header carries it at its right end. */}
       {showHeader && layout === 'grid' && <DataTable.Meta>{headerSlot}</DataTable.Meta>}
       {showHeader && <DataTable.Header rightSlot={headerSlot} loading={loading} />}

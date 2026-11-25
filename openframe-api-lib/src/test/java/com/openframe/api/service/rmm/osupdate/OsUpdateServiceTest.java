@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm.osupdate;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -49,9 +50,11 @@ class OsUpdateServiceTest {
     private static final String OTHER_WINDOWS_IDENTIFIER = "0d1e2f3a-5555-4666-8777-112233445566:1";
     private static final String MAC_IDENTIFIER = "Safari-18.2";
     private static final List<String> EVERY_ORGANIZATION = List.of();
+    private static final OsUpdateDeviceScope NO_DEVICE = new OsUpdateDeviceScope(List.of());
     private static final List<String> EVERY_DEVICE = null;
     private static final List<String> ORGANIZATIONS = List.of("org-1");
     private static final List<String> ORGANIZATION_MACHINE_IDS = List.of("machine-1", "machine-2");
+    private static final OsUpdateDeviceScope ORGANIZATION_DEVICES = new OsUpdateDeviceScope(ORGANIZATION_MACHINE_IDS);
     private static final OsUpdateFilter FILTER = OsUpdateFilter.builder().platform(OsPlatform.WINDOWS).build();
 
     @Mock private OsUpdateRepository osUpdateRepository;
@@ -96,7 +99,7 @@ class OsUpdateServiceTest {
 
         // execution
         GenericQueryResult<OsUpdateResponse> osUpdates =
-                osUpdateService.listOsUpdates(FILTER, EVERY_ORGANIZATION, pagination);
+                osUpdateService.listOsUpdates(FILTER, OsUpdateDeviceScope.EVERY_DEVICE, pagination);
 
         // verifications
         assertThat(osUpdates.getItems()).containsExactly(windowsResponse, otherWindowsResponse);
@@ -119,10 +122,33 @@ class OsUpdateServiceTest {
         when(osUpdateRepository.findPage(TENANT_ID, FILTER, null, expectedFetch)).thenReturn(List.of());
 
         // execution
-        osUpdateService.listOsUpdates(FILTER, EVERY_ORGANIZATION, pagination);
+        osUpdateService.listOsUpdates(FILTER, OsUpdateDeviceScope.EVERY_DEVICE, pagination);
 
         // verifications
         verify(osUpdateRepository).findPage(TENANT_ID, FILTER, null, expectedFetch);
+    }
+
+    @Test
+    void findDeviceScope_organizations_theirDevicesReadOnce() {
+        // setup
+        when(deviceService.findDeviceIdsOfOrganizations(ORGANIZATIONS)).thenReturn(ORGANIZATION_MACHINE_IDS);
+
+        // execution
+        OsUpdateDeviceScope osUpdateDeviceScope = osUpdateService.findDeviceScope(ORGANIZATIONS);
+
+        // verifications
+        assertThat(osUpdateDeviceScope).isEqualTo(ORGANIZATION_DEVICES);
+        verify(deviceService).findDeviceIdsOfOrganizations(ORGANIZATIONS);
+    }
+
+    @Test
+    void findDeviceScope_noOrganization_everyDeviceWithoutReadingThem() {
+        // execution
+        OsUpdateDeviceScope osUpdateDeviceScope = osUpdateService.findDeviceScope(EVERY_ORGANIZATION);
+
+        // verifications
+        assertThat(osUpdateDeviceScope).isEqualTo(OsUpdateDeviceScope.EVERY_DEVICE);
+        verifyNoInteractions(deviceService);
     }
 
     @Test
@@ -130,7 +156,6 @@ class OsUpdateServiceTest {
         // setup
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(2).build();
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(deviceService.findDeviceIdsOfOrganizations(ORGANIZATIONS)).thenReturn(ORGANIZATION_MACHINE_IDS);
         when(deviceOsPendingUpdateService.listIdentifiersByPlatform(ORGANIZATION_MACHINE_IDS))
                 .thenReturn(List.of(new OsUpdateIdentifiersOfPlatform(OsPlatform.MACOS, List.of(MAC_IDENTIFIER))));
         when(deviceOsUpdateHistoryService.listInstalledIdentifiers(ORGANIZATION_MACHINE_IDS))
@@ -143,7 +168,7 @@ class OsUpdateServiceTest {
         when(osUpdateRepository.findPage(TENANT_ID, expectedFilter, null, 3)).thenReturn(List.of());
 
         // execution
-        GenericQueryResult<OsUpdateResponse> osUpdates = osUpdateService.listOsUpdates(FILTER, ORGANIZATIONS, pagination);
+        GenericQueryResult<OsUpdateResponse> osUpdates = osUpdateService.listOsUpdates(FILTER, ORGANIZATION_DEVICES, pagination);
 
         // verifications
         assertThat(osUpdates.getItems()).isEmpty();
@@ -155,14 +180,13 @@ class OsUpdateServiceTest {
         // setup
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(2).build();
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(deviceService.findDeviceIdsOfOrganizations(ORGANIZATIONS)).thenReturn(List.of());
         when(deviceOsPendingUpdateService.listIdentifiersByPlatform(List.of())).thenReturn(List.of());
         when(deviceOsUpdateHistoryService.listInstalledIdentifiers(List.of())).thenReturn(List.of());
         OsUpdateFilter expectedFilter = FILTER.toBuilder().osUpdateIds(List.of()).build();
         when(osUpdateRepository.findPage(TENANT_ID, expectedFilter, null, 3)).thenReturn(List.of());
 
         // execution
-        GenericQueryResult<OsUpdateResponse> osUpdates = osUpdateService.listOsUpdates(FILTER, ORGANIZATIONS, pagination);
+        GenericQueryResult<OsUpdateResponse> osUpdates = osUpdateService.listOsUpdates(FILTER, NO_DEVICE, pagination);
 
         // verifications
         assertThat(osUpdates.getItems()).isEmpty();
@@ -226,7 +250,7 @@ class OsUpdateServiceTest {
                         new OsUpdateDeviceCount(OTHER_WINDOWS_IDENTIFIER, 5)));
 
         // execution
-        Map<String, OsUpdateDeviceCounts> deviceCounts = osUpdateService.countDevices(osUpdateIds, EVERY_ORGANIZATION);
+        Map<String, OsUpdateDeviceCounts> deviceCounts = osUpdateService.countDevices(osUpdateIds, OsUpdateDeviceScope.EVERY_DEVICE);
 
         // verifications
         assertThat(deviceCounts)
@@ -251,7 +275,7 @@ class OsUpdateServiceTest {
                 .thenReturn(List.of());
 
         // execution
-        Map<String, OsUpdateDeviceCounts> deviceCounts = osUpdateService.countDevices(osUpdateIds, EVERY_ORGANIZATION);
+        Map<String, OsUpdateDeviceCounts> deviceCounts = osUpdateService.countDevices(osUpdateIds, OsUpdateDeviceScope.EVERY_DEVICE);
 
         // verifications
         assertThat(deviceCounts)
@@ -266,7 +290,6 @@ class OsUpdateServiceTest {
         List<String> osUpdateIds = List.of(WINDOWS_ID);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(osUpdateRepository.findByTenantIdAndIdIn(TENANT_ID, osUpdateIds)).thenReturn(List.of(windowsUpdate));
-        when(deviceService.findDeviceIdsOfOrganizations(ORGANIZATIONS)).thenReturn(ORGANIZATION_MACHINE_IDS);
         when(deviceOsPendingUpdateService.countDevicesByIdentifier(
                 OsPlatform.WINDOWS, List.of(WINDOWS_IDENTIFIER), ORGANIZATION_MACHINE_IDS))
                 .thenReturn(List.of(new OsUpdateDeviceCount(WINDOWS_IDENTIFIER, 1)));
@@ -275,7 +298,7 @@ class OsUpdateServiceTest {
                 .thenReturn(List.of(new OsUpdateDeviceCount(WINDOWS_IDENTIFIER, 2)));
 
         // execution
-        Map<String, OsUpdateDeviceCounts> deviceCounts = osUpdateService.countDevices(osUpdateIds, ORGANIZATIONS);
+        Map<String, OsUpdateDeviceCounts> deviceCounts = osUpdateService.countDevices(osUpdateIds, ORGANIZATION_DEVICES);
 
         // verifications
         assertThat(deviceCounts).containsExactly(Map.entry(WINDOWS_ID,
@@ -290,7 +313,7 @@ class OsUpdateServiceTest {
         when(osUpdateRepository.findByTenantIdAndIdIn(TENANT_ID, osUpdateIds)).thenReturn(List.of());
 
         // execution
-        Map<String, OsUpdateDeviceCounts> deviceCounts = osUpdateService.countDevices(osUpdateIds, ORGANIZATIONS);
+        Map<String, OsUpdateDeviceCounts> deviceCounts = osUpdateService.countDevices(osUpdateIds, ORGANIZATION_DEVICES);
 
         // verifications
         assertThat(deviceCounts).isEmpty();

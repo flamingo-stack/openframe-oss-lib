@@ -19,6 +19,4 @@ public interface ItemAssignmentRepository extends MongoRepository<ItemAssignment
                                                                   String targetId);
 
     void deleteByItemIdAndTargetTypeAndTargetId(String itemId, AssignmentTargetType targetType, String targetId);
-
-    void deleteByItemIdAndTargetType(String itemId, AssignmentTargetType targetType);
 }

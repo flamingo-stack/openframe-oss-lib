@@ -13,6 +13,8 @@ import java.time.Instant;
 @Builder
 public class SoftwareActionDeviceResponse {
 
+    private String executionRowId;
+    private String executionId;
     private String machineId;
     private String hostname;
     private String organizationId;

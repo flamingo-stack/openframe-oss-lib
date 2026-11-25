@@ -3,6 +3,7 @@ package com.openframe.api.service;
 import com.openframe.api.dto.AgentRegistrationSecretResponse;
 import com.openframe.api.service.processor.AgentRegistrationSecretProcessor;
 import com.openframe.api.support.TestEncryption;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.core.exception.EncryptionException;
@@ -21,8 +22,8 @@ import static com.openframe.core.crypto.service.SecretPurpose.AGENT_LOG_KEY;
 import static com.openframe.core.crypto.service.SecretPurpose.AGENT_REGISTRATION_SECRET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -41,7 +42,8 @@ class AgentRegistrationSecretServiceTest {
     @BeforeEach
     void setUp() {
         service = new AgentRegistrationSecretService(repository, encryptionService, secretGenerator,
-                mock(AgentRegistrationSecretProcessor.class), TestEncryption.tenant());
+                mock(AgentRegistrationSecretProcessor.class), TestEncryption.tenant(),
+                mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
     }
 
     private static AgentRegistrationSecret secret(String id, String encryptedKey, boolean active) {
@@ -99,7 +101,13 @@ class AgentRegistrationSecretServiceTest {
         when(repository.findByActiveTrue()).thenReturn(Optional.of(
                 secret("s-1", encryptionService.encrypt("old-key", SECRET_CONTEXT), true)));
         when(secretGenerator.generate()).thenReturn("new-key");
-        when(repository.save(any(AgentRegistrationSecret.class))).then(returnsFirstArg());
+        when(repository.save(any(AgentRegistrationSecret.class))).then(invocation -> {
+            AgentRegistrationSecret saving = invocation.getArgument(0);
+            if (saving.getId() == null) {
+                saving.setId("s-2");
+            }
+            return saving;
+        });
 
         AgentRegistrationSecretResponse response = service.generateNewSecret();
 

@@ -3,6 +3,7 @@ package com.openframe.client.service.rmm.osupdate;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
+import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
 import com.openframe.data.document.rmm.osupdate.OsUpdateType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,25 @@ class StoredOsUpdateRefresherTest {
     @BeforeEach
     void setUp() {
         refresher = new StoredOsUpdateRefresher(new OsUpdateClassifier());
+    }
+
+    @Test
+    void refresh_reportWithOtherCvesAndRating_msrcValuesStoredByTheEnricherKept() {
+        // setup
+        OsUpdate stored = osUpdate(List.of(SECURITY_UPDATES_CATEGORY_ID), OsUpdateType.SOFTWARE,
+                OsUpdateClassification.SECURITY);
+        stored.setCveIds(List.of("CVE-2026-113766", "CVE-2026-96157"));
+        stored.setSeverity(OsUpdateSeverity.IMPORTANT);
+        OsUpdate reported = osUpdate(List.of(SECURITY_UPDATES_CATEGORY_ID), OsUpdateType.SOFTWARE, null);
+        reported.setCveIds(List.of("CVE-2026-124194"));
+        reported.setSeverity(OsUpdateSeverity.CRITICAL);
+
+        // execution
+        refresher.refresh(stored, reported);
+
+        // verifications
+        assertThat(stored.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
+        assertThat(stored.getSeverity()).isEqualTo(OsUpdateSeverity.IMPORTANT);
     }
 
     @Test

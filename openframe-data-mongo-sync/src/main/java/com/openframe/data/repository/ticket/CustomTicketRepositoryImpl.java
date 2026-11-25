@@ -1,5 +1,6 @@
 package com.openframe.data.repository.ticket;
 
+import com.mongodb.ReadPreference;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
@@ -457,6 +458,15 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         }
 
         return Optional.empty();
+    }
+
+    @Override
+    public List<Ticket> findAuditFieldsByStatusId(String statusId) {
+        Query query = new Query(Criteria.where(FIELD_STATUS_ID).is(statusId))
+                .withReadPreference(ReadPreference.primary());
+        query.fields().include(FIELD_TITLE, FIELD_TICKET_NUMBER, FIELD_ORGANIZATION_ID, FIELD_DEVICE_ID, FIELD_STATUS_ID,
+                FIELD_STATUS_KIND);
+        return mongoTemplate.find(query, Ticket.class);
     }
 
     @Override

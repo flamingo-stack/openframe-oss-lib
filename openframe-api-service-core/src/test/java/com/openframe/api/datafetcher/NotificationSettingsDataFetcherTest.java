@@ -3,6 +3,7 @@ package com.openframe.api.datafetcher;
 import com.openframe.api.dto.NotificationSettingsView;
 import com.openframe.api.dto.NotificationTypeSettingInput;
 import com.openframe.api.service.NotificationSettingsService;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.security.authentication.ActorType;
@@ -15,6 +16,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -28,7 +30,7 @@ class NotificationSettingsDataFetcherTest {
     @BeforeEach
     void setUp() {
         service = mock(NotificationSettingsService.class);
-        fetcher = new NotificationSettingsDataFetcher(service);
+        fetcher = new NotificationSettingsDataFetcher(service, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
     }
 
     @Test

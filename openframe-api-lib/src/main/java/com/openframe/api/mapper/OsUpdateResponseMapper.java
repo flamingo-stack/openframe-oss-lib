@@ -35,6 +35,8 @@ public class OsUpdateResponseMapper {
                 .sizeBytes(osUpdate.getSizeBytes())
                 .rebootBehavior(osUpdate.getRebootBehavior())
                 .browseOnly(osUpdate.getBrowseOnly())
+                .exploited(osUpdate.getExploited())
+                .enrichedAt(osUpdate.getEnrichedAt())
                 .firstSeenAt(osUpdate.getFirstSeenAt())
                 .cursor(cursor)
                 .build();

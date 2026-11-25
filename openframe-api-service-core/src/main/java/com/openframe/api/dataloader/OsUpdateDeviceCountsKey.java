@@ -1,15 +1,13 @@
 package com.openframe.api.dataloader;
 
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import lombok.Builder;
 import lombok.Value;
-
-import java.util.List;
 
 @Value
 @Builder
 public class OsUpdateDeviceCountsKey {
 
     String osUpdateId;
-    // empty = every organization
-    List<String> organizationIds;
+    OsUpdateDeviceScope osUpdateDeviceScope;
 }

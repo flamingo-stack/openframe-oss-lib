@@ -1,8 +1,14 @@
 package com.openframe.api.service;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.audit.AuditedWork;
 import com.openframe.api.dto.force.request.ForceClientUninstallRequest;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
+import com.openframe.api.dto.force.response.ForceClientUninstallResponseItem;
+import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.delivery.ClientUninstallDeliverySeed;
@@ -15,14 +21,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,19 +43,25 @@ import static org.mockito.Mockito.when;
 class ForceClientUninstallServiceTest {
 
     private static final String MACHINE_ID = "mach-42";
+    private static final String OTHER_MACHINE_ID = "mach-77";
 
     @Mock private MachineRepository machineRepository;
     @Mock private DeliveryRouter deliveryRouter;
     @Mock private MachineWriter machineWriter;
+    @Mock(answer = CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
     @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
     @Captor private ArgumentCaptor<ClientUninstallDeliverySeed> seedCaptor;
-    @InjectMocks private ForceClientUninstallService service;
+    @Captor private ArgumentCaptor<AuditCall> callCaptor;
+    @Captor private ArgumentCaptor<AuditedWork<Object, RuntimeException>> workCaptor;
+    private ForceClientUninstallService service;
 
     private Machine machine;
     private ForceClientUninstallRequest request;
 
     @BeforeEach
     void setUp() {
+        service = new ForceClientUninstallService(machineRepository, machineWriter, deliveryRouter,
+                auditedMethodRunner);
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setStatus(DeviceStatus.ONLINE);
@@ -98,5 +113,71 @@ class ForceClientUninstallServiceTest {
         // verifications
         verify(deliveryRouter, never()).dispatch(any());
         assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.FAILED);
+    }
+
+    @Test
+    void process_unknownMachine_refusedAsUnknownMachine() {
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+
+        service.process(request);
+
+        verify(auditedMethodRunner).run(any(AuditCall.class), workCaptor.capture());
+        assertThatThrownBy(() -> workCaptor.getValue().run())
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Unknown machine mach-42");
+    }
+
+    @Test
+    void process_machineAlreadyDeleted_refusedAsAlreadyDeleted() {
+        machine.setStatus(DeviceStatus.DELETED);
+
+        service.process(request);
+
+        verify(auditedMethodRunner).run(any(AuditCall.class), workCaptor.capture());
+        assertThatThrownBy(() -> workCaptor.getValue().run())
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Machine mach-42 is already deleted");
+    }
+
+    @Test
+    void process_noRouteReachesTheMachine_refusedAsUnreachable() {
+        when(deliveryRouter.dispatch(any())).thenReturn(false);
+
+        service.process(request);
+
+        verify(auditedMethodRunner).run(any(AuditCall.class), workCaptor.capture());
+        assertThatThrownBy(() -> workCaptor.getValue().run())
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("the device's agent cannot receive this command");
+    }
+
+    @Test
+    void process_firstMachineFailsUnexpectedly_onlyThatMachineFailed() {
+        requestTwoMachines();
+        when(machineRepository.findByMachineId(MACHINE_ID))
+                .thenThrow(new DataAccessResourceFailureException("Mongo unreachable"));
+        when(deliveryRouter.dispatch(any())).thenReturn(true);
+
+        ForceClientUninstallResponse response = service.process(request);
+
+        assertThat(response.getItems())
+                .extracting(ForceClientUninstallResponseItem::getMachineId, ForceClientUninstallResponseItem::getStatus)
+                .containsExactly(tuple(MACHINE_ID, ForceAgentStatus.FAILED),
+                        tuple(OTHER_MACHINE_ID, ForceAgentStatus.PROCESSED));
+    }
+
+    @Test
+    void process_uninstallRequested_recordedEvenWhenMachineRecordUnchanged() {
+        service.process(request);
+
+        verify(auditedMethodRunner).run(callCaptor.capture(), any());
+        assertThat(callCaptor.getValue().storeIfUnchanged().test(null)).isTrue();
+    }
+
+    private void requestTwoMachines() {
+        Machine otherMachine = new Machine();
+        otherMachine.setMachineId(OTHER_MACHINE_ID);
+        when(machineRepository.findByMachineId(OTHER_MACHINE_ID)).thenReturn(Optional.of(otherMachine));
+        request.setMachineIds(List.of(MACHINE_ID, OTHER_MACHINE_ID));
     }
 }

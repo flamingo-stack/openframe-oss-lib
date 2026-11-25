@@ -1,0 +1,19 @@
+package com.openframe.management.osupdate;
+
+import lombok.Getter;
+
+@Getter
+public class OsUpdateSourceUnavailableException extends RuntimeException {
+
+    private final OsUpdateSource osUpdateSource;
+
+    public OsUpdateSourceUnavailableException(OsUpdateSource osUpdateSource, String message, Throwable cause) {
+        super(message, cause);
+        this.osUpdateSource = osUpdateSource;
+    }
+
+    public OsUpdateSourceUnavailableException(OsUpdateSource osUpdateSource, String message) {
+        super(message);
+        this.osUpdateSource = osUpdateSource;
+    }
+}

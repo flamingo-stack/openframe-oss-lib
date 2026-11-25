@@ -3,6 +3,9 @@ package com.openframe.api.service;
 import com.openframe.api.dto.AgentRegistrationSecretResponse;
 import com.openframe.api.exception.AgentRegistrationSecretNotFoundException;
 import com.openframe.api.service.processor.AgentRegistrationSecretProcessor;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.service.SecretKeyGenerator;
 import com.openframe.core.crypto.service.EncryptionContext;
@@ -15,7 +18,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static com.openframe.data.document.audit.AuditAction.AGENT_REGISTRATION_SECRET_ROTATE;
+import static com.openframe.data.document.audit.AuditAction.AGENT_REGISTRATION_SECRET_VIEW;
 
 import static com.openframe.core.crypto.service.SecretPurpose.AGENT_REGISTRATION_SECRET;
 
@@ -29,13 +37,16 @@ public class AgentRegistrationSecretService {
     private final SecretKeyGenerator secretGenerator;
     private final AgentRegistrationSecretProcessor secretProcessor;
     private final TenantIdProvider tenantIdProvider;
+    private final AuditedMethodRunner auditedMethodRunner;
 
+    @Audited(action = AGENT_REGISTRATION_SECRET_VIEW, details = "secretIds={#result.id}")
     public AgentRegistrationSecretResponse getActiveSecret() {
         return secretRepository.findByActiveTrue()
                 .map(this::toResponse)
                 .orElseThrow(() -> new AgentRegistrationSecretNotFoundException(ErrorCode.AGENT_REGISTRATION_SECRET_NOT_FOUND, "Active agent registration secret not found"));
     }
 
+    @Audited(action = AGENT_REGISTRATION_SECRET_VIEW, details = "secretIds=#result.![id]")
     public List<AgentRegistrationSecretResponse> getAllSecrets() {
         List<AgentRegistrationSecret> secrets = secretRepository.findAll();
         return secrets.stream()
@@ -44,7 +55,13 @@ public class AgentRegistrationSecretService {
     }
 
     public AgentRegistrationSecretResponse generateNewSecret() {
-        deactivateExisting();
+        Map<String, Object> details = new HashMap<>();
+        AuditCall auditCall = AuditCall.of(AGENT_REGISTRATION_SECRET_ROTATE, null, details).withCompare(false);
+        return auditedMethodRunner.run(auditCall, () -> rotate(details));
+    }
+
+    private AgentRegistrationSecretResponse rotate(Map<String, Object> auditDetails) {
+        auditDetails.put("deactivatedSecretIds", List.of(deactivateExisting()));
         String newSecretKey = secretGenerator.generate();
 
         AgentRegistrationSecret newSecret = new AgentRegistrationSecret();
@@ -55,6 +72,7 @@ public class AgentRegistrationSecretService {
         newSecret.setActive(true);
 
         AgentRegistrationSecret savedKey = secretRepository.save(newSecret);
+        auditDetails.put("secretIds", List.of(savedKey.getId()));
         log.info("Generated new agent registration secret with ID: {}", savedKey.getId());
 
         secretProcessor.postProcessSecretGenerated(savedKey, newSecretKey);
@@ -67,7 +85,7 @@ public class AgentRegistrationSecretService {
                 .build();
     }
 
-    private void deactivateExisting() {
+    private String deactivateExisting() {
         AgentRegistrationSecret activeSecret = secretRepository.findByActiveTrue()
                 .orElseThrow(() -> new AgentRegistrationSecretNotFoundException(ErrorCode.NO_ACTIVE_SECRET_FOUND, "Not found active agent secret"));
         activeSecret.setActive(false);
@@ -75,6 +93,7 @@ public class AgentRegistrationSecretService {
         log.info("Deactivated previous key with ID: {}", activeSecret.getId());
 
         secretProcessor.postProcessSecretDeactivated(activeSecret);
+        return activeSecret.getId();
     }
 
     private AgentRegistrationSecretResponse toResponse(AgentRegistrationSecret secret) {

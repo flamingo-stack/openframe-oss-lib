@@ -22,6 +22,8 @@ public @interface Audited {
 
     boolean compare() default true;
 
+    boolean storeIfUnchanged() default false;
+
     String condition() default "";
 
     String tenantId() default "";

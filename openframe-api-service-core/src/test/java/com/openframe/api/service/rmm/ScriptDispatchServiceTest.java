@@ -15,6 +15,7 @@ import com.openframe.api.service.rmm.script.ScriptDispatchService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.script.ScriptTimeoutValidator;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.rmm.script.ExecutionSource;
@@ -36,6 +37,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.Answers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -86,6 +88,8 @@ class ScriptDispatchServiceTest {
 
     @Mock
     private ObjectProvider<ScriptSecretSealer> secretSealer;
+    @Mock(answer = Answers.CALLS_REAL_METHODS)
+    private AuditedMethodRunner auditedMethodRunner;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;

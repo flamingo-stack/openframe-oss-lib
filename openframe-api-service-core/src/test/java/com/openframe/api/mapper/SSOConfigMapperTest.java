@@ -73,4 +73,38 @@ class SSOConfigMapperTest {
                 .isEqualTo("client-secret");
         assertThatThrownBy(() -> encryptionService.decrypt(stored, SSO_CONTEXT)).isInstanceOf(EncryptionException.class);
     }
+
+    // Kept from main (#3118): an unchanged secret keeps its ciphertext; an empty or unreadable one is replaced.
+    @Test
+    @DisplayName("updateEntity: the same secret as stored keeps the stored ciphertext")
+    void updateEntity_sameSecretAsStored_keepsTheStoredCiphertext() {
+        SSOConfig existing = mapper.toEntity("google", request("same-secret"), encryptionService);
+        String stored = existing.getClientSecret();
+
+        mapper.updateEntity(existing, request("same-secret"), encryptionService);
+
+        assertThat(existing.getClientSecret()).isEqualTo(stored);
+    }
+
+    @Test
+    @DisplayName("updateEntity: with no stored secret the requested one is encrypted")
+    void updateEntity_noStoredSecret_encryptsTheRequestedSecret() {
+        SSOConfig existing = new SSOConfig();
+
+        mapper.updateEntity(existing, request("new-secret"), encryptionService);
+
+        assertThat(encryptionService.decrypt(existing.getClientSecret(), SSO_CONTEXT)).isEqualTo("new-secret");
+    }
+
+    @Test
+    @DisplayName("updateEntity: a stored secret that does not decrypt is replaced with the requested one")
+    void updateEntity_storedSecretUnreadable_replacesIt() {
+        SSOConfig existing = new SSOConfig();
+        existing.setClientSecret(encryptionService.encrypt("old-secret",
+                EncryptionContext.forTenant("tenant-2", SSO_CLIENT_SECRET)));
+
+        mapper.updateEntity(existing, request("new-secret"), encryptionService);
+
+        assertThat(encryptionService.decrypt(existing.getClientSecret(), SSO_CONTEXT)).isEqualTo("new-secret");
+    }
 }
