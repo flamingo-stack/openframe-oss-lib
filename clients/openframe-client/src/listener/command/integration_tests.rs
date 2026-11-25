@@ -1656,9 +1656,8 @@ async fn an_update_whose_old_binary_is_still_running_fails_and_keeps_the_recorde
     assert_eq!(recorded.version, "0.4.16");
 }
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empty: bool) {
-    use std::io::Write;
-
     const TOOL: &str = "it-asset-tool";
     let Some((mut agent, _gate)) = Agent::start().await else {
         return;
@@ -1679,19 +1678,11 @@ async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empt
     }
 
     let helper = vec![9u8; 150 * 1024];
-    let stored =
-        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-    let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-    for (name, bytes) in [("agent", vec![7u8; 150 * 1024]), ("helper", helper.clone())] {
-        archive.start_file(name, stored).unwrap();
-        archive.write_all(&bytes).unwrap();
-    }
-    let release =
-        crate::test_support::mock_server_with_body(&[200], archive.finish().unwrap().into_inner())
-            .await;
-    let link = format!("{}/release.zip", release.url);
-    let tool_config = |os: &str| json!({"os": os, "fileName": "release.zip", "agentFileName": "agent", "link": link, "installationType": "STANDARD"});
-    let asset_config = |os: &str| json!({"os": os, "fileName": "release.zip", "assetFileName": "helper", "link": link});
+    let (file_name, archive) = release_archive(&[("agent", &agent_bytes()), ("helper", &helper)]);
+    let release = crate::test_support::mock_server_with_body(&[200], archive).await;
+    let link = format!("{}/{}", release.url, file_name);
+    let tool_config = |os: &str| json!({"os": os, "fileName": file_name, "agentFileName": "agent", "link": link, "installationType": "STANDARD"});
+    let asset_config = |os: &str| json!({"os": os, "fileName": file_name, "assetFileName": "helper", "link": link});
 
     let _reports = agent.installed_agents().await;
     let handler = ToolInstallationHandler::new(
@@ -1729,11 +1720,13 @@ async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empt
     assert_eq!(std::fs::read(&asset).unwrap(), helper);
 }
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 #[tokio::test]
 async fn an_install_of_a_present_tool_downloads_its_missing_command_asset() {
     an_install_of_a_present_tool_rewrites_its_command_asset(false).await;
 }
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 #[tokio::test]
 async fn an_install_of_a_present_tool_rewrites_its_empty_command_asset() {
     an_install_of_a_present_tool_rewrites_its_command_asset(true).await;
@@ -2062,33 +2055,37 @@ fn agent_bytes() -> Vec<u8> {
         .collect()
 }
 
-/// A release archive in the format this OS extracts, holding `entry`.
-fn release_archive(entry: &str, bytes: &[u8]) -> (&'static str, Vec<u8>) {
+/// A release archive in the format this OS extracts, holding `entries`.
+fn release_archive(entries: &[(&str, &[u8])]) -> (&'static str, Vec<u8>) {
     #[cfg(windows)]
     {
         use std::io::Write;
         let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-        archive
-            .start_file(
-                entry,
-                zip::write::SimpleFileOptions::default()
-                    .compression_method(zip::CompressionMethod::Stored),
-            )
-            .unwrap();
-        archive.write_all(bytes).unwrap();
+        for (entry, bytes) in entries {
+            archive
+                .start_file(
+                    *entry,
+                    zip::write::SimpleFileOptions::default()
+                        .compression_method(zip::CompressionMethod::Stored),
+                )
+                .unwrap();
+            archive.write_all(bytes).unwrap();
+        }
         ("release.zip", archive.finish().unwrap().into_inner())
     }
     #[cfg(unix)]
     {
-        let mut header = tar::Header::new_gnu();
-        header.set_size(bytes.len() as u64);
-        header.set_mode(0o755);
-        header.set_cksum();
         let mut archive = tar::Builder::new(flate2::write::GzEncoder::new(
             Vec::new(),
             flate2::Compression::fast(),
         ));
-        archive.append_data(&mut header, entry, bytes).unwrap();
+        for (entry, bytes) in entries {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(bytes.len() as u64);
+            header.set_mode(0o755);
+            header.set_cksum();
+            archive.append_data(&mut header, entry, *bytes).unwrap();
+        }
         (
             "release.tar.gz",
             archive.into_inner().unwrap().finish().unwrap(),
@@ -2197,7 +2194,7 @@ async fn a_failed_download_leaves_the_running_tool_untouched(
 
 #[tokio::test]
 async fn an_unreachable_download_leaves_the_running_standard_tool_untouched() {
-    let (file_name, _) = release_archive(agent_file_name(), b"");
+    let (file_name, _) = release_archive(&[(agent_file_name(), b"")]);
     a_failed_download_leaves_the_running_tool_untouched(
         "it-unreachable-standard",
         Installation::Standard {
@@ -2212,7 +2209,7 @@ async fn an_unreachable_download_leaves_the_running_standard_tool_untouched() {
 
 #[tokio::test]
 async fn a_release_without_the_agent_leaves_the_running_standard_tool_untouched() {
-    let (file_name, archive) = release_archive("not-the-agent", &agent_bytes());
+    let (file_name, archive) = release_archive(&[("not-the-agent", &agent_bytes())]);
     a_failed_download_leaves_the_running_tool_untouched(
         "it-agentless-release",
         Installation::Standard {
@@ -2227,7 +2224,7 @@ async fn a_release_without_the_agent_leaves_the_running_standard_tool_untouched(
 
 #[tokio::test]
 async fn an_unreachable_download_leaves_the_running_service_tool_untouched() {
-    let (file_name, _) = release_archive(agent_file_name(), b"");
+    let (file_name, _) = release_archive(&[(agent_file_name(), b"")]);
     a_failed_download_leaves_the_running_tool_untouched(
         "it-unreachable-service",
         Installation::Service {
@@ -2275,7 +2272,7 @@ async fn an_update_stops_the_running_tool_and_replaces_its_binary() {
     let executable = agent.directories.get_tool_executable_path(TOOL, None);
     let exited = run_tool_process(&executable);
     let new_agent = agent_bytes();
-    let (file_name, archive) = release_archive(agent_file_name(), &new_agent);
+    let (file_name, archive) = release_archive(&[(agent_file_name(), &new_agent)]);
     let release = crate::test_support::mock_server_with_body(&[200], archive).await;
     let _reports = agent.installed_agents().await;
     agent.launch_tool_updates().await;
