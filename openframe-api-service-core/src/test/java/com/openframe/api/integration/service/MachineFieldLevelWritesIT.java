@@ -1,5 +1,7 @@
 package com.openframe.api.integration.service;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.mockito.stubbing.Answer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -38,6 +41,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static com.openframe.data.service.machine.MachineFields.COMPUTER_NAME;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_SOURCES;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_IDS;
@@ -105,11 +109,13 @@ class MachineFieldLevelWritesIT {
         machine.setStatus(DeviceStatus.ONLINE);
         template.save(machine);
         interleavingMachines = mock(MachineRepository.class, delegatesTo(storedMachines));
-        doAnswer(invocation -> {
+        Answer<Optional<Machine>> afterMachineRead = invocation -> {
             Optional<Machine> read = storedMachines.findByMachineId(invocation.getArgument(0));
             concurrentDirectoryAndFleetWrite();
             return read;
-        }).when(interleavingMachines).findByMachineId(anyString());
+        };
+        doAnswer(afterMachineRead).when(interleavingMachines).findByMachineId(anyString());
+        doAnswer(afterMachineRead).when(interleavingMachines).findOnPrimaryByMachineId(anyString());
     }
 
     @Test
@@ -118,7 +124,8 @@ class MachineFieldLevelWritesIT {
         DeliveryRouter deliveryRouter = mock(DeliveryRouter.class);
         when(deliveryRouter.dispatch(any())).thenReturn(true);
         ForceClientUninstallService service =
-                new ForceClientUninstallService(interleavingMachines, machineWriter, deliveryRouter);
+                new ForceClientUninstallService(interleavingMachines, machineWriter, deliveryRouter,
+                        mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
         ForceClientUninstallRequest request = new ForceClientUninstallRequest();
         request.setMachineIds(List.of(MACHINE_ID));
 
@@ -133,7 +140,8 @@ class MachineFieldLevelWritesIT {
     void updateStatusByMachineId_concurrentDirectoryAndFleetSetAfterTheRead_survives() {
         // setup
         DeviceService service = new DeviceService(interleavingMachines, mock(DeletedMachineCleanup.class),
-                mock(DeviceSoftwareConnectivitySync.class), machineWriter, mock(TagRepository.class),
+                mock(AuditRecorder.class), mock(DeviceSoftwareConnectivitySync.class), machineWriter,
+                mock(TagRepository.class),
                 mock(TagAssignmentRepository.class),
                 mock(DeviceStatusProcessor.class), mock(DeviceFilterOptionMapper.class),
                 mock(TenantIdProvider.class), mock(ApplicationEventPublisher.class));

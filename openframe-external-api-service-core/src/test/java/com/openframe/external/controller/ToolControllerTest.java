@@ -1,5 +1,6 @@
 package com.openframe.external.controller;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.tool.ToolFilterCriteria;
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.Mockito.mock;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -54,7 +56,7 @@ class ToolControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = ExternalApiMockMvc.standalone(new ToolController(toolService, new ToolMapper()));
+        mockMvc = ExternalApiMockMvc.standalone(new ToolController(toolService, new ToolMapper(), mock(AuditRecorder.class)));
     }
 
     @Test

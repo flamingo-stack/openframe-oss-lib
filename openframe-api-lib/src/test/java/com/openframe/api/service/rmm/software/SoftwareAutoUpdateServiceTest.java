@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareAutoUpdatePolicyResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.service.rmm.software.SoftwareAutoUpdateService.DevicesChanged;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
@@ -266,6 +267,36 @@ class SoftwareAutoUpdateServiceTest {
     }
 
     @Test
+    void turnOn_deviceAlreadyOnAndANewOne_reportsOnlyTheNewOneAsAdded() {
+        when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome")))
+                .thenReturn(List.of(chromePolicy("m1", true)));
+
+        DevicesChanged result = service.turnOn("chrome", CHROME, List.of("m1", "m2"), WAIT, "admin@x");
+
+        assertThat(result.added()).containsExactly("m2");
+    }
+
+    @Test
+    void turnOn_devicesLeftOutOfTheSelection_reportsOnlyThoseThatWereOnAsRemoved() {
+        when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome")))
+                .thenReturn(List.of(chromePolicy("m1", true), chromePolicy("m3", true), chromePolicy("m4", false)));
+
+        DevicesChanged result = service.turnOn("chrome", CHROME, List.of("m1", "m2"), WAIT, "admin@x");
+
+        assertThat(result.removed()).containsExactly("m3");
+    }
+
+    @Test
+    void turnOn_leftOutDeviceOnForTwoPackages_reportsItRemovedOnce() {
+        when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome")))
+                .thenReturn(List.of(chromePolicy("m3", true), onForAnotherChromePackage("m3")));
+
+        DevicesChanged result = service.turnOn("chrome", CHROME, List.of("m1"), WAIT, "admin@x");
+
+        assertThat(result.removed()).containsExactly("m3");
+    }
+
+    @Test
     void turnOff_disablesTheSoftwaresPolicies() {
         service.turnOff("chrome", "admin@x");
 
@@ -284,6 +315,26 @@ class SoftwareAutoUpdateServiceTest {
         order.verify(policyRepository).disableBySoftwareId(TENANT, "chrome", "admin@x");
         order.verify(withdrawal).withdraw(eq(m1), any());
         order.verify(withdrawal).withdraw(eq(m2), any());
+    }
+
+    @Test
+    void turnOff_someDevicesOn_returnsOnlyThoseThatWereOn() {
+        when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome")))
+                .thenReturn(List.of(policy("m1", "chrome", true), policy("m2", "chrome", false)));
+
+        List<String> result = service.turnOff("chrome", "admin@x");
+
+        assertThat(result).containsExactly("m1");
+    }
+
+    @Test
+    void turnOff_deviceOnForTwoPackages_returnedOnce() {
+        when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome")))
+                .thenReturn(List.of(chromePolicy("m1", true), onForAnotherChromePackage("m1")));
+
+        List<String> result = service.turnOff("chrome", "admin@x");
+
+        assertThat(result).containsExactly("m1");
     }
 
     @Test
@@ -328,6 +379,12 @@ class SoftwareAutoUpdateServiceTest {
         return PackageAutoUpdatePolicy.builder()
                 .tenantId(TENANT).machineId(machineId).softwareId("chrome").enabled(enabled)
                 .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome").build();
+    }
+
+    private static PackageAutoUpdatePolicy onForAnotherChromePackage(String machineId) {
+        PackageAutoUpdatePolicy policy = chromePolicy(machineId, true);
+        policy.setPackageName("Google.Chrome.EXE");
+        return policy;
     }
 
     private static SoftwareResponse software(String id) {

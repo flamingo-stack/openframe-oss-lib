@@ -1,5 +1,7 @@
 package com.openframe.data.service.secretretriver;
 
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.InternalException;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
@@ -61,7 +63,7 @@ public class FleetMdmAgentRegistrationSecretRetriever implements ToolAgentRegist
             log.info("Successfully retrieved enroll secret from Fleet MDM");
             return enrollSecret;
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to retrieve Fleet MDM enroll secret", e);
+            throw new InternalException(ErrorCode.INTERNAL_ERROR, "Failed to retrieve Fleet MDM enroll secret", e);
         }
     }
 }

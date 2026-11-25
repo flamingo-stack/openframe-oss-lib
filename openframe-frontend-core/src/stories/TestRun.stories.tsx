@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { TestResultsSkeleton, TestRunResults, TestRunStatusStat, TimingStat } from '../components/ui/test-run';
+import { type ColumnDef, DataTable, useDataTable } from '../components/ui/data-table';
+import { TestRunResults, TestRunStatusStat, TimingStat } from '../components/ui/test-run';
 
 const meta = {
   title: 'UI/TestRun',
@@ -113,7 +114,8 @@ export const TimingAndSkeleton: Story = {
         <TimingStat value="00:00:05" label="Duration" className="flex-1" />
         <TestRunStatusStat status="running" className="flex-1" />
       </div>
-      <TestResultsSkeleton />
+      {/* A run with no rows yet draws the results' loading form. */}
+      <TestRunResults isActive displayRows={[]} firstError={null} />
     </div>
   ),
 };
@@ -133,6 +135,122 @@ export const StatusStates: Story = {
       <TestRunStatusStat status="error" />
       <TestRunStatusStat status="timeout" />
       <TestRunStatusStat status="canceled" />
+    </div>
+  ),
+};
+
+/* ───────────────────────── the grid layout (`layout="grid"`) ───────────────────────── */
+
+/**
+ * Finished run with rows in the grid: one bordered table of 48px one-line rows, a column per key of the result at its
+ * least width, scrolling sideways inside itself. No settings gear: the columns are the query's own.
+ */
+export const GridWithResults: Story = {
+  args: { isActive: false, displayRows: RESULT_ROWS, firstError: null, layout: 'grid' },
+  render: args => (
+    <div className="max-w-[720px] bg-ods-bg p-[var(--spacing-system-mf)]">
+      <TestRunResults {...args} />
+    </div>
+  ),
+};
+
+/** Running in the grid: the grid's own loading form, a header of bars over one 48px row. */
+export const GridRunning: Story = {
+  args: { isActive: true, displayRows: [], firstError: null, layout: 'grid' },
+  render: args => (
+    <div className="max-w-[720px] bg-ods-bg p-[var(--spacing-system-mf)]">
+      <TestRunResults {...args} />
+    </div>
+  ),
+};
+
+/** Finished with zero rows in the grid: the empty state at the height of the grid with one row (98px). */
+export const GridEmptyResult: Story = {
+  args: { isActive: false, displayRows: [], firstError: null, layout: 'grid' },
+  render: args => (
+    <div className="max-w-[720px] bg-ods-bg p-[var(--spacing-system-mf)]">
+      <TestRunResults {...args} />
+    </div>
+  ),
+};
+
+/** Rows that arrived before the run failed: the error banner over the grid. */
+export const GridWithErrorAndRows: Story = {
+  args: {
+    isActive: false,
+    displayRows: RESULT_ROWS.slice(0, 1),
+    firstError: 'distributed query is denylisted',
+    layout: 'grid',
+  },
+  render: args => (
+    <div className="max-w-[720px] bg-ods-bg p-[var(--spacing-system-mf)]">
+      <TestRunResults {...args} />
+    </div>
+  ),
+};
+
+interface HostRow {
+  id: string;
+  name: string;
+  status: string;
+}
+
+const HOSTS: HostRow[] = [
+  { id: 'h-1', name: 'workstation-01', status: 'Passing' },
+  { id: 'h-2', name: 'workstation-02', status: 'Failing' },
+  { id: 'h-3', name: 'build-server-01', status: 'Passing' },
+];
+
+const HOST_COLUMNS: ColumnDef<HostRow>[] = [
+  {
+    id: 'name',
+    accessorKey: 'name',
+    header: 'Device',
+    size: 320,
+    meta: { gridCell: ({ row }) => row.original.name },
+  },
+  {
+    id: 'status',
+    accessorKey: 'status',
+    header: 'Status',
+    size: 200,
+    meta: { gridCell: ({ row }) => row.original.status },
+  },
+];
+
+/** A devices grid whose second row is open on its quick query: the results as a grid inside that row's sub-row. */
+function ResultsInSubRow() {
+  const table = useDataTable<HostRow>({ data: HOSTS, columns: HOST_COLUMNS, getRowId: row => row.id });
+  return (
+    <DataTable table={table} layout="grid">
+      <DataTable.Header />
+      <DataTable.Body<HostRow>
+        renderSubRow={row =>
+          row.id === 'h-2' ? (
+            <div className="flex flex-col gap-[var(--spacing-system-s)] p-[var(--spacing-system-m)]">
+              <div className="flex items-center gap-[var(--spacing-system-m)]">
+                <TimingStat value="02:15 PM" label="Started" className="flex-1" />
+                <TimingStat value="00:00:05" label="Duration" className="flex-1" />
+                <TestRunStatusStat status="success" className="flex-1" />
+              </div>
+              <TestRunResults isActive={false} displayRows={RESULT_ROWS} firstError={null} layout="grid" />
+            </div>
+          ) : null
+        }
+      />
+    </DataTable>
+  );
+}
+
+/**
+ * The quick query of a device's row (the web app's policy and query devices tables): the results grid inside the
+ * sub-row of another grid. The sub-row is as wide as the visible table, so the inner grid scrolls inside it.
+ */
+export const GridInsideASubRow: Story = {
+  args: { isActive: false, displayRows: RESULT_ROWS, firstError: null, layout: 'grid' },
+  render: () => (
+    <div className="max-w-[720px] bg-ods-bg p-[var(--spacing-system-mf)]">
+      <ResultsInSubRow />
     </div>
   ),
 };

@@ -117,6 +117,7 @@ fn update_from(
             installation_type: Default::default(),
             bundle_id: None,
             service_name: None,
+            min_os_version: None,
         }],
     }
 }

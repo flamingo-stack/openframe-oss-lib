@@ -57,6 +57,7 @@ public class Machine implements TenantScoped {
     private String serialNumber;
     private String manufacturer;
     private String model;
+    private Instant fetchedLogKeyCreatedAt;
     private Instant hostFactsCheckedAt;   // last time the Fleet host facts backfill tried this machine; null = never
     @Indexed
     private DeviceType type;
@@ -84,6 +85,8 @@ public class Machine implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
+    private String enrollmentId;
+
     @Version
     private Long version;
 

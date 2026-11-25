@@ -1,6 +1,8 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { cn } from '../../../../utils/cn';
+import { formatRelativeTime } from '../../../../utils/date-utils';
 import { CheckCircleIcon, MonitorIcon, PlusCircleIcon, TrashIcon } from '../../../icons-v2-generated';
 import {
   Button,
@@ -8,6 +10,8 @@ import {
   type ColumnFiltersState,
   DataTable,
   EntityImage,
+  GRID_ACTION_COLUMN_SIZE,
+  GRID_MIN_WIDTH,
   type OnChangeFn,
   type Row,
   type TabItem,
@@ -17,6 +21,7 @@ import {
   useDataTable,
 } from '../../../ui';
 import { DATA_TABLE_SKELETON_ROWS } from '../../../ui/data-table/utils';
+import { FloatingTooltip } from '../../../ui/floating-tooltip';
 import { InertWhileLoading, useLoadingScope } from '../../../ui/loading-scope';
 import { dataTableLayoutProps } from '../../feature-table-layout';
 import { OSTypeBadge } from '../../os-type-badge';
@@ -35,7 +40,7 @@ import {
 } from '../device-statuses';
 import { DeviceTypeTile } from '../device-type-tile';
 import { DevicesFilterToolbar } from '../devices-filter-toolbar';
-import { getDeviceFilterColumns } from '../devices-table-columns';
+import { DeviceNameGridCell, getDeviceFilterColumns, OrganizationGridCell } from '../devices-table-columns';
 import { useDeviceImageUrl } from '../devices-view-config';
 import type { DeviceFilters, DeviceRow } from '../types';
 import { useTagFilterModal } from '../use-tag-filter-modal';
@@ -103,6 +108,86 @@ function InertInScope({ children }: { children: ReactNode }) {
     <InertWhileLoading loading={useLoadingScope()} className="contents">
       {children}
     </InertWhileLoading>
+  );
+}
+
+/* ───────────────────────── grid-layout cells: one 48px line each ───────────────────────── */
+
+/**
+ * The STATUS cell in the grid: the status tag with when the device was last online beside it. A card row prints that
+ * time under the device's name ("Last Online: 5m ago"); a grid row has one line, so it sits with the status, as in the
+ * devices list.
+ */
+function StatusGridCell({ device }: { device: DeviceRow }) {
+  const loading = useLoadingScope();
+  const lastSeen = device.last_seen || device.lastSeen;
+  return (
+    <DataTable.Cell
+      tag={
+        loading ? (
+          <Tag loading label="" />
+        ) : (
+          <DeviceLifecycleTag status={device.status} connectivity={device.connectivity} />
+        )
+      }
+      // While the device is read there is no time to print: the tag's own loading form is the cell.
+      secondary={loading ? undefined : lastSeen ? formatRelativeTime(lastSeen) : 'Never'}
+    />
+  );
+}
+
+/** The add / remove control's icon in the grid: 20px, the size of every icon in a 48px row. */
+const GRID_ACTION_ICON_SIZE = 20;
+
+interface GridRowActionProps {
+  /** The control's name for a screen reader: the grid draws an icon with no text. */
+  label: string;
+  icon: ReactNode;
+  /** `added`: the device is in the selection (the accent check). `remove`: the Selected tab's trash. */
+  tone?: 'default' | 'added' | 'remove';
+  onClick?: () => void;
+  disabled?: boolean;
+  /** Why the device cannot be added: shown on hover and focus, since a 56px cell has no room for the text. */
+  reason?: string;
+}
+
+/**
+ * The add / remove control in the grid: a bare 40px icon button, the action cell being its frame (the design's
+ * `action-button`). A card row draws it outlined, with a fill for "added" and the disabled reason as text beside it;
+ * here "added" is the accent check and the reason is the button's tooltip.
+ */
+function GridRowAction({ label, icon, tone = 'default', onClick, disabled, reason }: GridRowActionProps) {
+  const button = (
+    <Button
+      variant="transparent"
+      size="icon"
+      type="button"
+      aria-label={label}
+      aria-pressed={tone === 'added' ? true : undefined}
+      onClick={onClick}
+      leftIcon={icon}
+      className={cn(
+        'size-10 border-0 md:size-10',
+        tone === 'added' && 'text-ods-accent hover:text-ods-accent',
+        tone === 'remove' && 'text-ods-error hover:opacity-80',
+        tone === 'default' && 'text-ods-text-secondary hover:text-ods-text-primary',
+      )}
+      disabled={disabled}
+    />
+  );
+  return (
+    <div data-no-row-click className="pointer-events-auto flex items-center justify-center">
+      {reason ? (
+        // A disabled button takes no hover or focus: the wrapper is what the tooltip listens on.
+        <FloatingTooltip content={reason} side="left" as="span" triggerClassName="inline-flex">
+          <span tabIndex={0} aria-label={`${label}: ${reason}`} className="inline-flex rounded-md outline-none">
+            {button}
+          </span>
+        </FloatingTooltip>
+      ) : (
+        button
+      )}
+    </div>
   );
 }
 
@@ -548,6 +633,14 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         header: 'DEVICE',
         cell: ({ row }: { row: Row<T> }) => <DeviceCell device={row.original} />,
         enableSorting: false,
+        // The name says which device a row adds: the grid's settings menu cannot hide it.
+        enableHiding: false,
+        size: 280,
+        minSize: GRID_MIN_WIDTH.icon,
+        meta: {
+          label: 'Device',
+          gridCell: ({ row }) => <DeviceNameGridCell device={row.original} unreadMark={false} />,
+        },
       },
       {
         id: 'organization',
@@ -555,7 +648,13 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         header: 'CUSTOMER',
         cell: ({ row }: { row: Row<T> }) => <CustomerCell device={row.original} />,
         enableSorting: false,
+        size: 280,
+        minSize: GRID_MIN_WIDTH.media,
         meta: {
+          label: 'Customer',
+          // The logo and the name, as in the devices list. The contact a card row prints under the name has no line
+          // of its own here, and beside the name it would take the name's width.
+          gridCell: ({ row }) => <OrganizationGridCell device={row.original} />,
           width: 'w-[320px]',
           hideAt: 'lg',
           filter: { options: orgFilterOptions, placement: 'bottom-end' },
@@ -569,7 +668,13 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
           <OSTypeBadge osType={row.original.osType} iconSize="w-4 h-4 content-md:w-6 content-md:h-6" />
         ),
         enableSorting: false,
+        size: 160,
+        minSize: GRID_MIN_WIDTH.icon,
         meta: {
+          label: 'OS',
+          gridCell: ({ row }) => (
+            <OSTypeBadge osType={row.original.osType} iconSize="w-5 h-5" className="min-w-0 truncate" />
+          ),
           width: 'w-[200px] content-md:w-1/6',
           hideAt: 'md',
         },
@@ -580,7 +685,11 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         header: 'STATUS',
         cell: ({ row }: { row: Row<T> }) => <StatusCell device={row.original} />,
         enableSorting: false,
+        // The tag and a relative time beside it ("3d ago").
+        size: 220,
         meta: {
+          label: 'Status',
+          gridCell: ({ row }) => <StatusGridCell device={row.original} />,
           width: 'w-auto shrink-0 content-md:w-[160px]',
           filter: { options: statusFilterOptions, sections: connectivitySections },
         },
@@ -657,7 +766,64 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
           </InertInScope>
         ),
         enableSorting: false,
-        meta: { width: 'w-12 content-md:w-auto content-md:min-w-[130px] shrink-0 flex-none', align: 'right' },
+        enableHiding: false,
+        size: GRID_ACTION_COLUMN_SIZE,
+        meta: {
+          width: 'w-12 content-md:w-auto content-md:min-w-[130px] shrink-0 flex-none',
+          align: 'right',
+          // In the grid the control is an action column: 56px, pinned right, not in the gear menu.
+          gridKind: 'action',
+          gridCell: ({ row }) => (
+            <InertInScope>
+              {((): ReactNode => {
+                const device = row.original;
+                const name = getDeviceName(device);
+                const disabledReason = isDeviceDisabled?.(device);
+                if (disabledReason) {
+                  return (
+                    <GridRowAction
+                      label={`Add ${name}`}
+                      icon={<PlusCircleIcon size={GRID_ACTION_ICON_SIZE} />}
+                      reason={disabledReason}
+                      disabled
+                    />
+                  );
+                }
+
+                const key = getDeviceKey(device);
+                if (key === undefined) return null;
+                if (activeSubTab === 'selected') {
+                  return (
+                    <GridRowAction
+                      label={`Remove ${name}`}
+                      icon={<TrashIcon size={GRID_ACTION_ICON_SIZE} />}
+                      tone="remove"
+                      onClick={() => toggleDevice(device)}
+                      disabled={disabled}
+                    />
+                  );
+                }
+
+                const isSelected = selectedIds.has(key);
+                return (
+                  <GridRowAction
+                    label={isSelected ? `Remove ${name}` : `Add ${name}`}
+                    icon={
+                      isSelected ? (
+                        <CheckCircleIcon size={GRID_ACTION_ICON_SIZE} />
+                      ) : (
+                        <PlusCircleIcon size={GRID_ACTION_ICON_SIZE} />
+                      )
+                    }
+                    tone={isSelected ? 'added' : 'default'}
+                    onClick={() => toggleDevice(device)}
+                    disabled={disabled}
+                  />
+                );
+              })()}
+            </InertInScope>
+          ),
+        },
       },
     ],
     [
@@ -680,6 +846,10 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     if (hidden.size === 0) return columns;
     return columns.filter(c => !c.id || !hidden.has(c.id));
   }, [columns, hideColumns, isCriteria]);
+  // The add / remove column is pinned right at every width, so on a desktop window the device's name stays pinned
+  // beside it even in a narrow content column (the Mingo panel docked): otherwise a sideways scroll leaves a row of OS,
+  // status and a plus with no name. Without that column (criteria mode, `hideColumns`) the table keeps the shared rule.
+  const pinFirstColumn = visibleColumns.some(column => column.id === 'actions') ? 'desktop' : 'wide';
 
   // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
   const loadingRows = useMemo(
@@ -763,7 +933,11 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   );
 
   const deviceTable = (
-    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+    <DataTable
+      table={table}
+      {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}
+      pinFirstColumn={pinFirstColumn}
+    >
       {/* The grid shows the same slot above the table; the card header carries it at its right end. */}
       {showHeader && layout === 'grid' && <DataTable.Meta>{headerSlot}</DataTable.Meta>}
       {showHeader && <DataTable.Header rightSlot={headerSlot} loading={loading} />}

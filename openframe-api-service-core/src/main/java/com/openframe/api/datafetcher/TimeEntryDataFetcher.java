@@ -26,6 +26,9 @@ import com.openframe.api.dto.timetracking.TimeEntryFilterInput;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryCommand;
 import com.openframe.api.dto.timetracking.UpdateTimeEntryInput;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.ParsedRelayId;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -47,9 +50,15 @@ import org.springframework.validation.annotation.Validated;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.data.document.audit.AuditAction.TIME_ENTRY_CREATE;
+import static com.openframe.data.document.audit.AuditAction.TIME_ENTRY_DELETE;
+import static com.openframe.data.document.audit.AuditAction.TIME_ENTRY_TICKET_UNLINK;
+import static com.openframe.data.document.audit.AuditAction.TIME_ENTRY_UPDATE;
 import static com.openframe.graphql.relay.NodeType.ORGANIZATION;
 import static com.openframe.graphql.relay.NodeType.TICKET;
 import static com.openframe.graphql.relay.NodeType.TIME_ENTRY;
@@ -66,6 +75,7 @@ public class TimeEntryDataFetcher {
 
     private final TimeEntryService timeEntryService;
     private final RelayIdCodec relayIdCodec;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     @DgsQuery
     public TimeEntry currentTimer() {
@@ -153,17 +163,28 @@ public class TimeEntryDataFetcher {
     public TimeEntry createTimeEntry(@InputArgument @Valid CreateTimeEntryInput input) {
         String actingUserId = getCurrentUserId();
         CreateTimeEntryCommand cmd = toCreateTimeEntryCommand(input);
-        return timeEntryService.createTimeEntry(actingUserId, cmd);
+        Map<String, Object> details =
+                entryDetails(cmd.getUserId(), cmd.getTicketId(), cmd.getDurationSeconds(), cmd.getStartedAt());
+        AuditCall auditCall = AuditCall.of(TIME_ENTRY_CREATE, null, details)
+                .withTargetIdInResult(true)
+                .withTargetIdFromResult(created -> ((TimeEntry) created).getId())
+                .withOrganizationIdOf(result -> result == null ? cmd.getOrganizationId() : null);
+        return auditedMethodRunner.run(auditCall, () -> timeEntryService.createTimeEntry(actingUserId, cmd));
     }
 
     @DgsMutation
     public TimeEntry updateTimeEntry(@InputArgument @Valid UpdateTimeEntryInput input) {
         String actingUserId = getCurrentUserId();
         UpdateTimeEntryCommand cmd = toUpdateTimeEntryCommand(input);
-        return timeEntryService.updateTimeEntry(actingUserId, cmd);
+        AuditCall auditCall = AuditCall.of(TIME_ENTRY_UPDATE, cmd.getId())
+                .withDetailsFromResult(result -> result == null
+                        ? entryDetails(cmd.getUserId(), cmd.getTicketId(), cmd.getDurationSeconds(), cmd.getStartedAt())
+                        : null);
+        return auditedMethodRunner.run(auditCall, () -> timeEntryService.updateTimeEntry(actingUserId, cmd));
     }
 
     @DgsMutation
+    @Audited(action = TIME_ENTRY_TICKET_UNLINK, targetId = "rawId(#id)")
     public TimeEntry unlinkTicketFromTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
         String rawId = relayIdCodec.decode(id, TIME_ENTRY);
@@ -174,7 +195,25 @@ public class TimeEntryDataFetcher {
     public boolean deleteTimeEntry(@InputArgument @NotBlank String id) {
         String actingUserId = getCurrentUserId();
         String rawId = relayIdCodec.decode(id, TIME_ENTRY);
-        return timeEntryService.deleteTimeEntry(actingUserId, rawId);
+        Map<String, Object> details = auditedMethodRunner.isEnabled()
+                ? timeEntryService.getTimeEntry(rawId).map(TimeEntryDataFetcher::entryDetails).orElse(null)
+                : null;
+        AuditCall auditCall = AuditCall.of(TIME_ENTRY_DELETE, rawId, details).withStoreIf(Boolean.TRUE::equals);
+        return auditedMethodRunner.run(auditCall, () -> timeEntryService.deleteTimeEntry(actingUserId, rawId));
+    }
+
+    private static Map<String, Object> entryDetails(TimeEntry entry) {
+        return entryDetails(entry.getUserId(), entry.getTicketId(), entry.getDurationSeconds(), entry.getStartedAt());
+    }
+
+    private static Map<String, Object> entryDetails(String userId, String ticketId, Long durationSeconds,
+                                                    Instant startedAt) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("userId", userId);
+        details.put("ticketIds", hasText(ticketId) ? List.of(ticketId) : null);
+        details.put("durationSeconds", durationSeconds);
+        details.put("startedAt", startedAt);
+        return details;
     }
 
     @DgsData(parentType = "TimeEntry", field = "state")

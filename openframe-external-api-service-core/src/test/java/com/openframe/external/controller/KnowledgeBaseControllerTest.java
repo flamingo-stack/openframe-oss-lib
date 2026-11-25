@@ -53,7 +53,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
+import static org.mockito.Mockito.doAnswer;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
@@ -1311,49 +1313,56 @@ class KnowledgeBaseControllerTest {
 
     @Test
     void getAttachmentDownloadUrlReturnsASignedUrl() throws Exception {
-        when(knowledgeBaseAttachmentService.generateDownloadUrl("att-1")).thenReturn("https://storage.test/download/att-1");
+        KnowledgeBaseItemAttachment attachment = attachment("att-1", "art-1");
+        when(knowledgeBaseReadService.requireAttachment("att-1")).thenReturn(attachment);
+        when(knowledgeBaseAttachmentService.generateDownloadUrl(eq("att-1"), any()))
+                .thenAnswer(invocation -> {
+                    invocation.<Supplier<KnowledgeBaseItemAttachment>>getArgument(1).get();
+                    return "https://storage.test/download/att-1";
+                });
 
         mockMvc.perform(get(BASE + "/attachments/att-1/download-url"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.downloadUrl").value("https://storage.test/download/att-1"));
 
-        InOrder order = inOrder(knowledgeBaseReadService, knowledgeBaseAttachmentService);
-        order.verify(knowledgeBaseReadService).requireAttachment("att-1");
-        order.verify(knowledgeBaseAttachmentService).generateDownloadUrl("att-1");
+        verify(knowledgeBaseReadService).requireAttachment("att-1");
     }
 
     @Test
     void downloadUrlOfUnknownAttachmentIs404AndNoUrlIsSigned() throws Exception {
         when(knowledgeBaseReadService.requireAttachment("missing")).thenThrow(new KnowledgeBaseAttachmentNotFoundException("missing"));
+        when(knowledgeBaseAttachmentService.generateDownloadUrl(eq("missing"), any()))
+                .thenAnswer(invocation -> invocation.<Supplier<KnowledgeBaseItemAttachment>>getArgument(1).get());
 
         mockMvc.perform(get(BASE + "/attachments/missing/download-url"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("KNOWLEDGE_BASE_ATTACHMENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Knowledge base attachment not found: missing"));
-
-        verifyNoInteractions(knowledgeBaseAttachmentService);
     }
 
     @Test
     void deleteAttachmentIs204() throws Exception {
+        KnowledgeBaseItemAttachment attachment = attachment("att-1", "art-1");
+        when(knowledgeBaseReadService.requireAttachment("att-1")).thenReturn(attachment);
+        doAnswer(invocation -> invocation.<Supplier<KnowledgeBaseItemAttachment>>getArgument(1).get())
+                .when(knowledgeBaseAttachmentService).deleteAttachment(eq("att-1"), any());
+
         mockMvc.perform(delete(BASE + "/attachments/att-1"))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
 
-        InOrder order = inOrder(knowledgeBaseReadService, knowledgeBaseAttachmentService);
-        order.verify(knowledgeBaseReadService).requireAttachment("att-1");
-        order.verify(knowledgeBaseAttachmentService).deleteAttachment("att-1");
+        verify(knowledgeBaseReadService).requireAttachment("att-1");
     }
 
     @Test
     void deleteOfUnknownAttachmentIs404AndNothingIsDeleted() throws Exception {
         when(knowledgeBaseReadService.requireAttachment("missing")).thenThrow(new KnowledgeBaseAttachmentNotFoundException("missing"));
+        doAnswer(invocation -> invocation.<Supplier<KnowledgeBaseItemAttachment>>getArgument(1).get())
+                .when(knowledgeBaseAttachmentService).deleteAttachment(eq("missing"), any());
 
         mockMvc.perform(delete(BASE + "/attachments/missing"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("KNOWLEDGE_BASE_ATTACHMENT_NOT_FOUND"));
-
-        verifyNoInteractions(knowledgeBaseAttachmentService);
     }
 
     // -------------------------------------------------------------- helpers

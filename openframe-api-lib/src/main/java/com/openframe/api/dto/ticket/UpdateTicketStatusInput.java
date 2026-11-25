@@ -1,5 +1,6 @@
 package com.openframe.api.dto.ticket;
 
+import com.openframe.api.validation.ValidationPatterns;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -18,6 +19,7 @@ public class UpdateTicketStatusInput {
     @NotBlank
     private String id;
     @Size(max = 32)
+    @Pattern(regexp = ValidationPatterns.NOT_BLANK, message = "name must not be blank")
     private String name;
     @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "color must be a 6-digit hex like #1A2B3C")
     private String color;

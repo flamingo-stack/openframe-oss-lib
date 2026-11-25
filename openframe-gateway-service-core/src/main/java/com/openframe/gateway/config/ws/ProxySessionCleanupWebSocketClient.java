@@ -1,5 +1,6 @@
 package com.openframe.gateway.config.ws;
 
+import com.openframe.gateway.logging.UriLogFormat;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,18 +56,19 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
             return connection;
         }
         String tnt = tenant == null ? "-" : tenant;
+        String target = UriLogFormat.withoutQuery(url);
         return authenticatedSub().flatMap(sb -> connection
-                .doOnSubscribe(s -> log.debug("Debug ws upstream connecting url={} tenant={} sub={}", url, tnt, sb))
+                .doOnSubscribe(s -> log.debug("Debug ws upstream connecting url={} tenant={} sub={}", target, tnt, sb))
                 .doOnError(e -> {
                     if (relayStarted.get() && isPeerClosed(e)) {
                         log.debug("Debug ws upstream relay ended (peer closed) url={} tenant={} sub={} : {}",
-                                url, tnt, sb, e.toString());
+                                target, tnt, sb, e.toString());
                     } else {
                         log.warn("Debug ws upstream connection FAILED url={} tenant={} sub={} : {}",
-                                url, tnt, sb, e.toString(), e);
+                                target, tnt, sb, e.toString(), e);
                     }
                 })
-                .doOnSuccess(v -> log.debug("Debug ws upstream relay finished url={} tenant={} sub={}", url, tnt, sb)));
+                .doOnSuccess(v -> log.debug("Debug ws upstream relay finished url={} tenant={} sub={}", target, tnt, sb)));
     }
 
     /** Principal name from the request's security context; equals the JWT {@code sub} claim

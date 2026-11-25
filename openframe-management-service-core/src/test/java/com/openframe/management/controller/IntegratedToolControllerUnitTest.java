@@ -1,5 +1,6 @@
 package com.openframe.management.controller;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.apikey.APIKeyType;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolApiKey;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -45,7 +47,8 @@ class IntegratedToolControllerUnitTest {
 
     @BeforeEach
     void setUp() {
-        controller = new IntegratedToolController(toolService, debeziumService, tenantIdProvider, List.of());
+        controller = new IntegratedToolController(toolService, debeziumService, tenantIdProvider, List.of(),
+                mock(AuditRecorder.class));
         when(tenantIdProvider.getTenantId()).thenReturn("tenant-1");
         lenient().when(toolService.saveTool(any())).thenAnswer(inv -> inv.getArgument(0));
     }

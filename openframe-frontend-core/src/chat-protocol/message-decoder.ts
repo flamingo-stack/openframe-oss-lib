@@ -118,11 +118,13 @@ function darkIconOf(icons: unknown): { url: string } | undefined {
 
 function withDarkIcons(groups: unknown): unknown {
   if (!Array.isArray(groups)) return groups;
-  return groups.map(group =>
+  return (groups as unknown[]).map((group): unknown =>
     isRecord(group) && Array.isArray(group.prompts)
       ? {
           ...group,
-          prompts: group.prompts.map(chip => (isRecord(chip) ? { ...chip, icon: darkIconOf(chip.icons) } : chip)),
+          prompts: (group.prompts as unknown[]).map((chip): unknown =>
+            isRecord(chip) ? { ...chip, icon: darkIconOf(chip.icons) } : chip,
+          ),
         }
       : group,
   );
@@ -288,6 +290,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       if (seq <= lastSeq) return { seq, chunks: out };
       lastSeq = seq;
     }
+    const at = typeof raw.streamPublishedAt === 'number' ? raw.streamPublishedAt : undefined;
     const resolvedByName = str(raw.resolvedByName) ?? str(raw.displayName);
 
     switch (raw.type) {
@@ -568,7 +571,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       default:
         break;
     }
-    return { ...(seq !== undefined ? { seq } : {}), chunks: out };
+    return { ...(seq !== undefined ? { seq } : {}), ...(at !== undefined ? { at } : {}), chunks: out };
   }
 
   return { decode };

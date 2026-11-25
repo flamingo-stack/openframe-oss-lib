@@ -29,6 +29,25 @@ A column with no `meta.gridKind` is a data column: it can be resized, hidden and
 takes the free width. An `open` or `actions` column left as a data column is therefore not pinned, shows up in the
 gear menu and stretches.
 
+A data column with `enableHiding: false` stays in the table: its row in the gear menu cannot hide it, and a stored
+layout that hides it is not applied to it. It can still be moved. Only the column's own flag counts (`gridCanHide`):
+the table-level TanStack option does not change the grid.
+
+## Pinning the first column on every desktop window
+
+`pinFirstColumn` on `<DataTable>` says when the left block (the checkbox column and the first data column) is pinned:
+
+| Value | Pinned |
+|---|---|
+| `wide` (default) | On a desktop with room for it: the window at 1280px and the content area at 720px. |
+| `desktop` | On every desktop window (1280px), also in a narrow content column (the Mingo panel docked beside the page). The first data column is then drawn at most 40% of the table's width, never below its `minSize`. A tablet and a phone still scroll it. |
+
+Keep the default. `desktop` is for a table whose pinned action needs the row's name beside it: the device picker, where
+the add button is pinned right and a sideways scroll would otherwise leave a plus with no device name. Pass it on
+`<DataTable>` itself, inside that table's component, not through `FeatureTableLayoutProps`: it is the table's own
+decision, not the host's. The option pins the first data column the viewer SHOWS (the gear menu reorders columns, with
+no lock); give the column that must stay `enableHiding: false` so at least it cannot be hidden.
+
 ## Switching
 
 Through the web app's `LiveTable`:
@@ -90,7 +109,6 @@ needs the checklist above before a host asks it for the grid:
 | Table | Still to do |
 |---|---|
 | `KnowledgeBaseTableBody` | `size` / `minSize`, `gridCell` for the name cell (icon, name, status, summary), `open` and the host's `actionsColumn` as action columns |
-| `DeviceSelector` | `size` / `minSize`, `gridCell` for the device and customer cells, its add / remove column as an action column |
 
 `ScriptsTable`, `ScriptSchedulesTable` and `ScriptExecutionsTable` are ready. Their layout is data
 (`features/scripts/scripts-table-columns.ts`: per column a `size`, a `minSize`, a `label`, and `gridKind: 'action'` on
@@ -102,6 +120,17 @@ own columns on that layout (the web app's live Scripts tables) reads the same tw
 `minSize` and a `gridCell`, its open column is kept by hand, and it adds `selectionColumn()` itself when the host
 passes `selectable` (off by default: the devices list has no bulk action yet).
 
+`DeviceSelector` is ready. Its device and customer cells are the devices list's (`DeviceNameGridCell` without the
+unread mark, `OrganizationGridCell`); the time a card row prints under the name ("Last Online: 5m ago") sits beside
+the status tag, and the customer's contact line is not drawn. Its add / remove column is an action column kept by
+hand, with a grid form of its own: a bare icon button (a plus, the accent check for a device that is in, the trash on
+the Selected tab), each named for a screen reader ("Add <device>"), and the reason a device cannot be added as the
+control's tooltip, since a 56px cell has no room for the text a card row prints beside the button. The picker keeps
+its own card (the tabs and the search row) around the table; "Add All Devices" or the device count sits above the
+table in `DataTable.Meta`. With its add / remove column it passes `pinFirstColumn="desktop"`: the Device column (which
+cannot be hidden) stays pinned beside the add button on every desktop window, also with the Mingo panel docked; in
+criteria mode, with no add column, it keeps the shared rule.
+
 `PoliciesTable` and `LogsTableView` are ready too. Both put a card row's two lines on one with
 `GridTextWithDetailCell` (`features/feature-table-grid-cells.tsx`): the subject (a policy's name, a log's time, a
 device) keeps its width and the detail after it (the description, the log id, the customer) is the part cut. Use it
@@ -111,3 +140,13 @@ form (`<LogCopyIconButton grid />`).
 
 `TenantsTableView` (`features/cloud-tenants`, both variants) is ready too: its one-line cells are in
 `tenant-grid-cells.tsx`, and its open column is kept by hand because the card table hides it below `md` in one variant.
+
+## Tables whose columns are the data's
+
+`TestRunResults` (`ui/test-run.tsx`) and `QueryReportTable` (`ui/query-report-table/`) take `layout` too. Their
+columns are the keys of the rows they are given, so the grid form has no settings gear and keeps no layout: a column
+per key at the card rows' width (176px for a test run, `columnWidth` for a report), resizable for the session, each
+cell the value on one line with a dash for none. While rows are read they draw the grid's own loading form on unnamed
+columns. Both keep their own empty state outside the grid, and the report keeps its title bar and export above it;
+the report's scrollbar track and edge fades are the card rows' only, since the grid scrolls inside itself. A compact
+report (`variant="compact"`) ignores `layout`.

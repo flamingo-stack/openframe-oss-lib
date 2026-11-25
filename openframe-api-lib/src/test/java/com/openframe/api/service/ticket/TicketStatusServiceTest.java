@@ -11,9 +11,13 @@ import com.openframe.api.exception.ticket.InvalidTicketStatusReplacementExceptio
 import com.openframe.api.exception.ticket.SystemTicketStatusModificationException;
 import com.openframe.api.exception.ticket.TicketStatusInUseException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.core.exception.ForbiddenException;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.security.authentication.ActorType;
@@ -22,14 +26,22 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CHANGE;
 import static com.openframe.data.document.ticket.TicketStatusKind.AI_ASSISTANCE;
 import static com.openframe.data.document.ticket.TicketStatusKind.ARCHIVED;
 import static com.openframe.data.document.ticket.TicketStatusKind.CUSTOM;
@@ -37,8 +49,10 @@ import static com.openframe.data.document.ticket.TicketStatusKind.RESOLVED;
 import static com.openframe.data.document.ticket.TicketStatusKind.TECH_REQUIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,6 +73,7 @@ class TicketStatusServiceTest {
     @Mock private TicketStatusDefinitionRepository statusRepository;
     @Mock private TicketRepository ticketRepository;
     @Mock private TicketTransitionPolicyValidator transitionPolicy;
+    @Mock private AuditRecorder auditRecorder;
 
     @InjectMocks private TicketStatusService service;
 
@@ -237,11 +252,36 @@ class TicketStatusServiceTest {
     class Deletion {
 
         @Test
+        void delete_movingAnUntitledTicket_namesItsEventByTheTicketNumber() {
+            Ticket untitled = Ticket.builder().id("t-2").ticketNumber(42).statusId("st-hold").statusKind(CUSTOM).build();
+
+            assertThat(deleteHoldInto(techRequired, untitled)).singleElement()
+                    .returns("42", AuditEntry::getTargetName);
+        }
+
+        @Test
+        void delete_intoAnotherCustomStatus_storesOnlyTheStatusIdChange() {
+            TicketStatusDefinition waiting = status("st-wait", CUSTOM, "Waiting", MIDDLE.between(MIDDLE.genNext()));
+
+            assertThat(deleteHoldInto(waiting, printerTicket())).singleElement()
+                    .returns(Map.of("statusId", new AuditChange("st-hold", "st-wait")), AuditEntry::getChanges);
+        }
+
+        @Test
+        void delete_aPopulatedStatus_readsItsTicketsBeforeMovingThem() {
+            deleteHoldInto(techRequired, printerTicket());
+
+            InOrder order = inOrder(ticketRepository);
+            order.verify(ticketRepository).findAuditFieldsByStatusId("st-hold");
+            order.verify(ticketRepository).reassignTicketsToStatus("st-hold", "st-tech", TECH_REQUIRED);
+        }
+
+        @Test
         void delete_anEmptyCustomStatus_removesItOutright() {
             when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
             when(ticketRepository.countByStatusId("st-hold")).thenReturn(0L);
 
-            assertThat(service.delete(admin, delete("st-hold", null))).isTrue();
+            assertThat(service.delete(admin, delete("st-hold", null))).isZero();
 
             verify(statusRepository).delete(onHold);
             verify(ticketRepository, never()).reassignTicketsToStatus(anyString(), anyString(), any());
@@ -253,11 +293,23 @@ class TicketStatusServiceTest {
             when(statusRepository.findById("st-tech")).thenReturn(Optional.of(techRequired));
             when(ticketRepository.countByStatusId("st-hold")).thenReturn(7L);
             when(transitionPolicy.allowedKinds(CUSTOM)).thenReturn(Set.of(TECH_REQUIRED, RESOLVED));
+            Ticket printer = Ticket.builder().id("t-1").title("Printer offline").organizationId("org-1")
+                    .deviceId("machine-1").statusId("st-hold").statusKind(CUSTOM).build();
+            when(ticketRepository.findAuditFieldsByStatusId("st-hold")).thenReturn(List.of(printer));
 
-            assertThat(service.delete(admin, delete("st-hold", "st-tech"))).isTrue();
+            assertThat(service.delete(admin, delete("st-hold", "st-tech"))).isEqualTo(7L);
 
             verify(ticketRepository).reassignTicketsToStatus("st-hold", "st-tech", TECH_REQUIRED);
             verify(statusRepository).delete(onHold);
+            ArgumentCaptor<List<AuditEntry>> moved = ArgumentCaptor.captor();
+            verify(auditRecorder).recordAllWithoutLoadingTargets(moved.capture());
+            assertThat(moved.getValue()).singleElement()
+                    .returns(TICKET_STATUS_CHANGE, AuditEntry::getAction)
+                    .returns("t-1", AuditEntry::getTargetId)
+                    .returns("org-1", AuditEntry::getOrganizationId)
+                    .returns("machine-1", AuditEntry::getDeviceId)
+                    .returns(Map.of("statusId", new AuditChange("st-hold", "st-tech"),
+                            "statusKind", new AuditChange("CUSTOM", "TECH_REQUIRED")), AuditEntry::getChanges);
         }
 
         @Test
@@ -314,10 +366,49 @@ class TicketStatusServiceTest {
 
             verify(ticketRepository, never()).countByStatusId(any());
         }
+
+        private List<AuditEntry> deleteHoldInto(TicketStatusDefinition replacement, Ticket ticket) {
+            when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
+            when(statusRepository.findById(replacement.getId())).thenReturn(Optional.of(replacement));
+            when(ticketRepository.countByStatusId("st-hold")).thenReturn(1L);
+            when(transitionPolicy.allowedKinds(CUSTOM)).thenReturn(Set.of(TECH_REQUIRED, CUSTOM, RESOLVED));
+            when(ticketRepository.findAuditFieldsByStatusId("st-hold")).thenReturn(List.of(ticket));
+
+            service.delete(admin, delete("st-hold", replacement.getId()));
+
+            ArgumentCaptor<List<AuditEntry>> moved = ArgumentCaptor.captor();
+            verify(auditRecorder).recordAllWithoutLoadingTargets(moved.capture());
+            return moved.getValue();
+        }
+
+        private static Ticket printerTicket() {
+            return Ticket.builder().id("t-1").title("Printer offline").statusId("st-hold").statusKind(CUSTOM).build();
+        }
     }
 
     @Nested
     class Reordering {
+
+        static Stream<Arguments> spotsItAlreadyHolds() {
+            return Stream.of(
+                    arguments(List.of("st-hold", "st-move", "st-wait"), "st-hold", "st-wait"),
+                    arguments(List.of("st-hold", "st-move"), "st-hold", null),
+                    arguments(List.of("st-move", "st-wait"), null, "st-wait"));
+        }
+
+        @ParameterizedTest
+        @MethodSource("spotsItAlreadyHolds")
+        void reorder_toTheSpotItAlreadyHolds_savesNothing(List<String> board, String afterId, String beforeId) {
+            TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", MIDDLE);
+            when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM))
+                    .thenReturn(board.stream().map(id -> status(id, CUSTOM, id, MIDDLE)).toList());
+
+            assertThat(service.reorder(admin, reorder("st-move", afterId, beforeId)))
+                    .isSameAs(moving)
+                    .returns(MIDDLE.format(), TicketStatusDefinition::getPosition);
+            verify(statusRepository, never()).save(moving);
+        }
 
         @Test
         void reorder_betweenTwoCustomStatuses_landsInTheGap() {
@@ -340,7 +431,7 @@ class TicketStatusServiceTest {
             TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", MIDDLE.genPrev());
             when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
             when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
-            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM)).thenReturn(List.of(onHold, moving));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM)).thenReturn(List.of(moving, onHold));
             when(statusRepository.findByKind(RESOLVED)).thenReturn(Optional.of(resolved));
             when(statusRepository.save(moving)).thenReturn(moving);
 
@@ -437,7 +528,7 @@ class TicketStatusServiceTest {
                     LexoRank.parse(onHold.getPosition()).genNext());
             when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
             when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
-            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM)).thenReturn(List.of(onHold, moving));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM)).thenReturn(List.of(moving, onHold));
             when(statusRepository.findByKind(RESOLVED)).thenReturn(Optional.of(resolved));
             when(statusRepository.save(moving)).thenReturn(moving);
 
@@ -458,7 +549,7 @@ class TicketStatusServiceTest {
             TicketStatusDefinition moving = status("st-move", CUSTOM, "Moving", holdRank.genPrev());
             when(statusRepository.findById("st-move")).thenReturn(Optional.of(moving));
             when(statusRepository.findById("st-hold")).thenReturn(Optional.of(onHold));
-            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM)).thenReturn(List.of(moving, onHold));
+            when(statusRepository.findByKindOrderByPositionAsc(CUSTOM)).thenReturn(List.of(onHold, moving));
             when(statusRepository.findByKind(TECH_REQUIRED)).thenReturn(Optional.of(techRequired));
             when(statusRepository.save(moving)).thenReturn(moving);
 

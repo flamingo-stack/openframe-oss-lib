@@ -191,6 +191,8 @@ export interface EvictedReducerState {
    * send in flight (the common case).
    */
   pendingEchoes: readonly PendingEcho[];
+  /** Whether the trailing prompt's replay was already seen (`getTrailingReplayMatched`): it is not delivered again. */
+  trailingReplayMatched: boolean;
 }
 
 /** Shared, frozen "no reducer for this key" snapshot. ONE instance, so
@@ -341,6 +343,7 @@ export function createChatDialogStore(options: CreateChatDialogStoreOptions = {}
           approvalStatuses: dropped?.state.approvalStatuses ?? EMPTY_STATE.approvalStatuses,
           lastAppliedSeq: dropped?.getLastAppliedSeq() ?? Number.NEGATIVE_INFINITY,
           pendingEchoes: dropped?.getPendingEchoes() ?? EMPTY_PENDING_ECHOES,
+          trailingReplayMatched: dropped?.getTrailingReplayMatched() ?? false,
         });
       }
     }
