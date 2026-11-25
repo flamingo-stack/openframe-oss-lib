@@ -11,7 +11,7 @@ import {
   type WheelEvent,
 } from 'react';
 import { cn } from '../../../utils/cn';
-import { GRID_ACTION_COLUMN_SIZE } from './data-table-grid-columns';
+import { GRID_ACTION_COLUMN_SIZE, GRID_MIN_WIDTH } from './data-table-grid-columns';
 import { alignJustify } from './utils';
 
 /**
@@ -30,6 +30,18 @@ export function useDataTableLayout(): DataTableLayout {
 
 export type GridColumnKind = 'select' | 'data' | 'action' | 'filler';
 
+/**
+ * When a grid table's left block (the checkbox column and the first data column) is pinned:
+ * - `wide` (default): on a desktop with room for it, the window at its `lg` step (1280px) AND the content area at its
+ *   `md` step (720px). Every table follows this rule unless it has a reason not to (see `GRID_LEFT_PIN_CLASS`).
+ * - `desktop`: on a desktop window (`lg`, 1280px) whatever the content's width, so also in a narrow content column (the
+ *   Mingo panel docked beside the page). For a table whose pinned action needs the row's name beside it: the device
+ *   picker, where the add button is pinned and the device name would scroll away from it. There the first data column
+ *   is drawn at most `GRID_PINNED_MAX_SHARE` of the table's width (`GridLayoutOptions.pinnedCap`). A tablet and a phone
+ *   never pin the block, in either mode.
+ */
+export type GridPinFirstColumn = 'wide' | 'desktop';
+
 export interface GridColumn {
   id: string;
   /** The column's place in the grid's own order: what its CSS variables are named after (`--dtc<index>-w`). */
@@ -38,6 +50,8 @@ export interface GridColumn {
   /** Width in px (a filler has none: it takes the whole free width). */
   size: number;
   pin?: 'left' | 'right';
+  /** A pinned-left column's rule: at which widths it is pinned (see `GridPinFirstColumn`). */
+  pinAt?: GridPinFirstColumn;
   /** A pinned column's distance from its edge of the scroll viewport, in px. */
   offset: number;
   /** The first column of the pinned-right block: it carries the block's inner divider. */
@@ -82,6 +96,22 @@ export interface GridLayoutOptions {
   hidden?: string[];
   /** The table has settings: its last column's header is the gear. */
   settings?: boolean;
+  /** When the left block is pinned (default `wide`). */
+  pinFirstColumn?: GridPinFirstColumn;
+  /**
+   * The most the first data column is drawn at, in px, where the left block is pinned in a narrow table
+   * (`usePinnedCap`); never below the column's own minimum. Geometry only: the structure the rows render from never
+   * carries a width.
+   */
+  pinnedCap?: number;
+}
+
+/** The share of the table's width a pinned first data column takes at most: in a resize and under `pinnedCap`. */
+export const GRID_PINNED_MAX_SHARE = 0.4;
+
+/** A column's least width in the grid: its own `minSize`, never below a text column's. */
+export function gridMinWidth<T>(column: Column<T, unknown>): number {
+  return Math.max(column.columnDef.minSize ?? 0, GRID_MIN_WIDTH.text);
 }
 
 /**
@@ -118,8 +148,9 @@ export function mergeColumnOrder(designed: string[], saved: string[] | undefined
  */
 export function buildGridLayout<T>(
   visibleColumns: Column<T, unknown>[],
-  { sizing, order, hidden, settings = false }: GridLayoutOptions = {},
+  { sizing, order, hidden, settings = false, pinFirstColumn = 'wide', pinnedCap }: GridLayoutOptions = {},
 ): GridLayout {
+  const minWidths = new Map<string, number>();
   const select: GridColumn[] = [];
   const designed: GridColumn[] = [];
   const action: GridColumn[] = [];
@@ -141,14 +172,19 @@ export function buildGridLayout<T>(
       align: meta?.align,
     };
     (kind === 'select' ? select : kind === 'action' ? action : designed).push(entry);
+    minWidths.set(column.id, gridMinWidth(column));
   }
+  // A column the table says can never be hidden stays, whatever an older stored layout says.
+  const unhideable = new Set(
+    visibleColumns.filter(column => column.columnDef.enableHiding === false).map(column => column.id),
+  );
 
   const byId = new Map(designed.map(column => [column.id, column]));
   const ordered = mergeColumnOrder(
     designed.map(column => column.id),
     order,
   ).map(id => byId.get(id) as GridColumn);
-  const hiddenIds = new Set(hidden);
+  const hiddenIds = new Set(hidden?.filter(id => !unhideable.has(id)));
   const shown = ordered.filter(column => !hiddenIds.has(column.id));
   // A stored layout that hides every column the table now has would leave a table of nothing: it is not applied.
   const data = shown.length > 0 ? shown : ordered;
@@ -170,9 +206,14 @@ export function buildGridLayout<T>(
     action[action.length - 1].settings = true;
   }
 
+  const firstData = data[0];
+  if (firstData && pinnedCap !== undefined) {
+    firstData.size = Math.min(firstData.size, Math.max(minWidths.get(firstData.id) ?? 0, Math.floor(pinnedCap)));
+  }
   let pinnedLeft = 0;
   for (const column of [...select, ...data.slice(0, 1)]) {
     column.pin = 'left';
+    column.pinAt = pinFirstColumn;
     column.offset = pinnedLeft;
     pinnedLeft += column.size;
   }
@@ -219,11 +260,22 @@ export function buildGridLayout<T>(
  */
 const GRID_LEFT_PIN_CLASS = 'lg:content-md:sticky lg:content-md:z-[1]';
 
+/** The left block's pin in a `desktop` table (`GridPinFirstColumn`): on a desktop window, whatever the content's width. */
+const GRID_LEFT_PIN_DESKTOP_CLASS = 'lg:sticky lg:z-[1]';
+
 /**
  * On the grid's root: the left gradient starts at the pinned-left block's edge where that block is pinned (the rule
  * of `GRID_LEFT_PIN_CLASS`), and at the viewport's own edge where it is not.
  */
 export const GRID_ROOT_CLASS = '[--dt-pin-l:0px] lg:content-md:[--dt-pin-l:var(--dt-pin-l-wide)]';
+
+/** `GRID_ROOT_CLASS` for a `desktop` table: the left gradient follows the left block's own rule. */
+const GRID_ROOT_DESKTOP_CLASS = '[--dt-pin-l:0px] lg:[--dt-pin-l:var(--dt-pin-l-wide)]';
+
+/** The grid root's class for a table's pin rule. */
+export function gridRootClass(pinFirstColumn: GridPinFirstColumn = 'wide'): string {
+  return pinFirstColumn === 'desktop' ? GRID_ROOT_DESKTOP_CLASS : GRID_ROOT_CLASS;
+}
 
 /** One grid row, header or body: as wide as its columns, never narrower than the viewport. */
 export const GRID_ROW_CLASS = 'flex w-max min-w-full';
@@ -269,7 +321,7 @@ export function gridCellClass(column: GridColumn, section: 'header' | 'body'): s
     column.kind === 'select' && 'justify-center border-r',
     column.kind === 'action' && 'justify-center',
     column.pin === 'right' && 'sticky z-[1]',
-    column.pin === 'left' && GRID_LEFT_PIN_CLASS,
+    column.pin === 'left' && (column.pinAt === 'desktop' ? GRID_LEFT_PIN_DESKTOP_CLASS : GRID_LEFT_PIN_CLASS),
     // The pinned-right block's inner divider. It overlaps the column before it by its own 1px, so where that column
     // ends in a divider of its own the two read as one line.
     column.startsRightBlock && '-ml-px border-l',

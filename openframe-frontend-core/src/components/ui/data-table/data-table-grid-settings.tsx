@@ -79,8 +79,9 @@ const keepOpen = (event: Event) => event.preventDefault();
 /**
  * The settings menu (the design's `table/settings-menu`): auto-refresh when the page offers it, then the columns the
  * table shows, in order, then the columns the viewer hid. A row switches its column on or off (hiding a column also
- * resets its filter); a shown column moves by its dragger, or with Alt + Arrow Up / Down. Selection and action columns
- * are not listed: they are always there.
+ * resets its filter); a shown column moves by its dragger, or with Alt + Arrow Up / Down. A data column with
+ * `enableHiding: false` is listed and moves, but its row does not hide it. Selection and action columns are not
+ * listed: they are always there.
  */
 function GridSettingsMenu() {
   const table = useDataTableContext();
@@ -106,7 +107,9 @@ function GridSettingsMenu() {
     columns.map(column => column.id),
     prefs.order,
   );
-  const hiddenIds = new Set(prefs.hidden);
+  // A column the table says can never be hidden (`enableHiding: false`) is always shown, and its row cannot hide it.
+  const canHide = (id: string) => table.getColumn(id)?.getCanHide() !== false;
+  const hiddenIds = new Set(prefs.hidden.filter(canHide));
   const anyShown = ordered.some(id => !hiddenIds.has(id));
   // The same rule as the table's own layout: a stored layout that hides everything is not applied.
   const shown = anyShown ? ordered.filter(id => !hiddenIds.has(id)) : ordered;
@@ -117,8 +120,8 @@ function GridSettingsMenu() {
     store.update(current => ({ ...current, order: ordered, hidden: current.hidden.filter(other => other !== id) }));
   };
   const hide = (id: string) => {
-    // The last shown column stays: a table needs one.
-    if (shown.length <= 1) return;
+    // The last shown column stays: a table needs one. So does a column that cannot be hidden.
+    if (shown.length <= 1 || !canHide(id)) return;
     refocusRef.current = id;
     // A hidden column does not go on filtering: its header, the one place that shows and resets its filter, is gone
     // with it, and the list would stay narrowed with nothing on screen to say why.
@@ -247,8 +250,8 @@ function GridSettingsMenu() {
           data-dragging={drag?.id === id || undefined}
           className={cn(ROW_CLASS, drag?.id === id && 'bg-ods-bg-hover')}
           checked
-          // The last shown column cannot be hidden.
-          aria-disabled={shown.length <= 1 || undefined}
+          // The last shown column cannot be hidden, nor can a column the table keeps.
+          aria-disabled={shown.length <= 1 || !canHide(id) || undefined}
           aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
           onCheckedChange={() => hide(id)}
           onSelect={keepOpen}

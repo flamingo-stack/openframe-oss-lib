@@ -15,6 +15,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
+import { breakpoints } from '../../../hooks/ui/use-media-query';
 import { cn } from '../../../utils/cn';
 import { useComposerDockHeight } from '../../navigation/app-layout-context';
 import { useMobileActionBarHeight } from '../mobile-action-bar';
@@ -22,14 +23,17 @@ import {
   DataTableLayoutContext,
   GRID_PIN_LEFT_VAR,
   GRID_PIN_RIGHT_VAR,
-  GRID_ROOT_CLASS,
+  GRID_PINNED_MAX_SHARE,
   GridGradient,
   GridScrollProvider,
   buildGridLayout,
   createGridScrollController,
   gridGeometryVars,
+  gridMinWidth,
+  gridRootClass,
   useGridControllerElements,
   type DataTableLayout,
+  type GridPinFirstColumn,
   type GridScroll,
 } from './data-table-grid';
 import {
@@ -94,6 +98,14 @@ export interface DataTableProps<T> {
    * resized widths included, is kept in the browser. `{}` is settings with nothing kept.
    */
   settings?: DataTableSettings;
+  /**
+   * Grid layout only. When the left block (the checkbox column and the first data column) is pinned. `wide` (default):
+   * the rule above, on a desktop with at least 720px of content. `desktop`: on every desktop window (1280px), also in a
+   * narrow content column (the Mingo panel docked beside the page), with the first data column drawn at most 40% of the
+   * table's width there; a tablet and a phone still scroll it. Only for a table whose pinned action needs the row's
+   * name beside it, as the device picker's add button does. See `docs/DATA_TABLE_GRID.md`.
+   */
+  pinFirstColumn?: GridPinFirstColumn;
 }
 
 export function DataTableRoot<T>({
@@ -104,6 +116,7 @@ export function DataTableRoot<T>({
   maxHeight,
   scrollEndInset,
   settings,
+  pinFirstColumn,
 }: DataTableProps<T>) {
   // One per table: how `<DataTable.InfiniteFooter>` hands its load-more rows to
   // `<DataTable.Body>` — see `data-table-load-more.ts`.
@@ -123,6 +136,7 @@ export function DataTableRoot<T>({
               maxHeight={maxHeight}
               scrollEndInset={scrollEndInset}
               settings={settings}
+              pinFirstColumn={pinFirstColumn}
             >
               {children}
             </DataTableGridRoot>
@@ -212,6 +226,49 @@ function useFillHeight(element: HTMLDivElement | null, enabled: boolean): number
 }
 
 /**
+ * The most a `desktop` table's first data column is drawn at, in px (`GridLayoutOptions.pinnedCap`):
+ * `GRID_PINNED_MAX_SHARE` of the table's width on a desktop window, where that table pins its left block whatever the
+ * content's width; `undefined` on a tablet and a phone, where the column scrolls at its own width. Only the width the
+ * column is actually drawn at is kept (never above `designed`, never below `least`), so the table renders again only
+ * when that width changes, not on every pixel of a window or panel resize. Measured in a layout effect, before the
+ * first paint: a picker opened beside a docked panel never shows the column at its designed width first.
+ */
+function usePinnedCap(
+  element: HTMLElement | null,
+  enabled: boolean,
+  designed: number | undefined,
+  least: number,
+): number | undefined {
+  const [cap, setCap] = useState<number | undefined>(undefined);
+  useIsomorphicLayoutEffect(() => {
+    // An environment without matchMedia (jsdom) is not a desktop: no cap, the column keeps its width.
+    if (!enabled || !element || designed === undefined || typeof window.matchMedia !== 'function') {
+      setCap(undefined);
+      return undefined;
+    }
+    const desktop = window.matchMedia(breakpoints.lg);
+    const measure = () => {
+      if (!desktop.matches) {
+        setCap(undefined);
+        return;
+      }
+      // The same width a resize caps a pinned column against (`resizeLimits`).
+      const width = element.clientWidth;
+      if (width > 0) setCap(Math.min(designed, Math.max(least, Math.floor(width * GRID_PINNED_MAX_SHARE))));
+    };
+    measure();
+    desktop.addEventListener('change', measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(element);
+    return () => {
+      desktop.removeEventListener('change', measure);
+      observer?.disconnect();
+    };
+  }, [element, enabled, designed, least]);
+  return cap;
+}
+
+/**
  * The root of a grid table: it owns the table's scroll state and its geometry (the columns' widths and pins, as CSS
  * variables every cell reads). With `maxHeight` it is also the one scroll viewport that wraps header, body and footers
  * (so an infinite footer's sentinel is inside it), with `<DataTable.Meta>` kept above.
@@ -222,12 +279,14 @@ function DataTableGridRoot({
   maxHeight,
   scrollEndInset,
   settings,
+  pinFirstColumn = 'wide',
 }: {
   children: ReactNode;
   className?: string;
   maxHeight?: number | string;
   scrollEndInset?: string;
   settings?: DataTableSettings;
+  pinFirstColumn?: GridPinFirstColumn;
 }) {
   const fixed = maxHeight !== undefined;
   const fill = maxHeight === 'fill';
@@ -253,8 +312,8 @@ function DataTableGridRoot({
   const settingsEnabled = settings !== undefined;
   const storageKey = settings?.storageKey;
   const prefsContext = useMemo<GridPrefsContextValue>(
-    () => ({ store: createGridPrefsStore(storageKey), settingsEnabled }),
-    [storageKey, settingsEnabled],
+    () => ({ store: createGridPrefsStore(storageKey), settingsEnabled, pinFirstColumn }),
+    [storageKey, settingsEnabled, pinFirstColumn],
   );
   const { store } = prefsContext;
   const prefs = useSyncExternalStore(store.subscribe, store.get, store.getServer);
@@ -263,15 +322,37 @@ function DataTableGridRoot({
   const table = useDataTableContext();
   const visibleColumns = table.getVisibleFlatColumns();
   const resizingColumnId = useSyncExternalStore(controller.resizing.subscribe, controller.resizing.get, getNoColumn);
-  const geometry = useMemo(
-    () => gridGeometryVars(buildGridLayout(visibleColumns, { ...prefs, settings: settingsEnabled }), resizingColumnId),
-    [visibleColumns, prefs, settingsEnabled, resizingColumnId],
+  const layout = useMemo(
+    () => buildGridLayout(visibleColumns, { ...prefs, settings: settingsEnabled, pinFirstColumn }),
+    [visibleColumns, prefs, settingsEnabled, pinFirstColumn],
   );
+  // A `desktop` table caps its pinned first data column in a narrow table. The cap is geometry only: the structure the
+  // header and the rows render from (`useGridStructure`) never carries a width.
+  const [rootElement, setRootElement] = useState<HTMLDivElement | null>(null);
+  const pinnedFirst = layout.columns.find(column => column.kind === 'data' && column.pin === 'left');
+  const pinnedFirstColumn = pinnedFirst && visibleColumns.find(column => column.id === pinnedFirst.id);
+  const pinnedCap = usePinnedCap(
+    rootElement,
+    pinFirstColumn === 'desktop',
+    pinnedFirst?.size,
+    pinnedFirstColumn ? gridMinWidth(pinnedFirstColumn) : 0,
+  );
+  const geometry = useMemo(
+    () =>
+      gridGeometryVars(
+        pinnedCap === undefined
+          ? layout
+          : buildGridLayout(visibleColumns, { ...prefs, settings: settingsEnabled, pinFirstColumn, pinnedCap }),
+        resizingColumnId,
+      ),
+    [layout, pinnedCap, visibleColumns, prefs, settingsEnabled, pinFirstColumn, resizingColumnId],
+  );
+  const rootClass = cn('flex w-full flex-col', gridRootClass(pinFirstColumn), className);
 
   if (!fixed) {
     return (
       <GridProviders scroll={scroll} prefs={prefsContext} settings={settings}>
-        <div data-grid-root className={cn('flex w-full flex-col', GRID_ROOT_CLASS, className)} style={geometry}>
+        <div ref={setRootElement} data-grid-root className={rootClass} style={geometry}>
           {children}
         </div>
       </GridProviders>
@@ -289,7 +370,7 @@ function DataTableGridRoot({
       : maxHeight;
   return (
     <GridProviders scroll={scroll} prefs={prefsContext} settings={settings}>
-      <div data-grid-root className={cn('flex w-full flex-col', GRID_ROOT_CLASS, className)} style={geometry}>
+      <div ref={setRootElement} data-grid-root className={rootClass} style={geometry}>
         {parts.filter(isMeta)}
         <div className="relative overflow-hidden rounded-md border border-ods-border bg-ods-card">
           <div
