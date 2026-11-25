@@ -84,12 +84,14 @@ public class MachineOsUpdatesMessage {
         private Boolean isDownloaded;
         private String rebootBehavior;
         private Boolean browseOnly;
+        private String updateType;
     }
 
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class WindowsUpdateCategory {
 
+        private String id;
         private String name;
     }
 

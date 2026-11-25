@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.ReadPreference;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -18,6 +19,9 @@ public interface SoftwareScheduleRepository extends MongoRepository<SoftwareSche
     Optional<SoftwareSchedule> findByTenantIdAndId(String tenantId, String id);
 
     List<SoftwareSchedule> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
+
+    @ReadPreference("primary")
+    Optional<SoftwareSchedule> findOnPrimaryByTenantIdAndIdAndStatus(String tenantId, String id, ScriptStatus status);
 
     Optional<SoftwareSchedule> findByTenantIdAndName(String tenantId, String name);
 

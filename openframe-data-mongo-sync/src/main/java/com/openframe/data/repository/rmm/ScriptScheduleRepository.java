@@ -1,10 +1,14 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.ReadPreference;
+import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -24,6 +28,13 @@ public interface ScriptScheduleRepository
         extends MongoRepository<ScheduleScript, String>, CustomScriptScheduleRepository {
 
     Optional<ScheduleScript> findByTenantIdAndId(String tenantId, String id);
+
+    @ReadPreference("primary")
+    Optional<ScheduleScript> findOnPrimaryByTenantIdAndId(String tenantId, String id);
+
+    @Query("{ 'tenantId': ?0, '_id': ?1, 'status': { '$ne': ?2 }, 'selectionMode': { '$ne': ?3 } }")
+    @Update(pipeline = "{ '$set': { 'updatedAt': { '$max': ['$$NOW', { '$add': ['$updatedAt', 1] }] } } }")
+    long markSpecificAssignmentChange(String tenantId, String id, ScriptStatus deletedStatus, ScheduleDeviceSelectionMode criteriaMode);
 
     List<ScheduleScript> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 

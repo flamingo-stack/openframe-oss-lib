@@ -14,6 +14,8 @@ import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManageability;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
@@ -53,8 +55,13 @@ public class DeviceOsQueryService {
                 .orElse(null);
     }
 
+    // Updates of a device we cannot manage are not shown as pending: nobody can act on them from here.
+    // The stored ones stay, for the day the device becomes manageable.
     public List<DeviceOsPendingUpdateResponse> listPendingUpdates(String machineId) {
         verifyDeviceExists(machineId);
+        if (isNotManageable(machineId)) {
+            return List.of();
+        }
         List<DeviceOsPendingUpdate> pendingUpdates = deviceOsPendingUpdateRepository
                 .findByTenantIdAndMachineIdOrderByDiscoveredAtDescIdentifierAsc(tenantIdProvider.getTenantId(), machineId);
         Map<String, OsUpdate> osUpdatesByIdentifier = findOsUpdatesByIdentifier(pendingUpdates);
@@ -84,6 +91,16 @@ public class DeviceOsQueryService {
                 .items(pageEntries)
                 .pageInfo(pageInfo)
                 .build();
+    }
+
+    private boolean isNotManageable(String machineId) {
+        Optional<DeviceOsState> deviceOsState =
+                deviceOsStateRepository.findByTenantIdAndMachineId(tenantIdProvider.getTenantId(), machineId);
+        return deviceOsState
+                .map(DeviceOsState::getManageability)
+                .map(OsUpdateManageability::getState)
+                .filter(OsUpdateManageabilityState.NOT_MANAGEABLE::equals)
+                .isPresent();
     }
 
     private void verifyDeviceExists(String machineId) {

@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRebootBehavior;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
+import com.openframe.data.document.rmm.osupdate.OsUpdateType;
 import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,12 +22,15 @@ import java.util.List;
 
 import static org.mockito.Mockito.mock;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @ExtendWith(MockitoExtension.class)
 class OsUpdateParserTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String MACHINE_ID = "machine-1";
+    private static final String SECURITY_UPDATES_CATEGORY_ID = "0fa1201d-4330-4fa8-8ae9-b877473b6441";
+    private static final String WINDOWS_11_CATEGORY_ID = "72e7624a-5b00-45d2-b92f-e561c0a6a160";
     private static final String WINDOWS_IDENTIFIER = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
     private static final Instant RECEIVED_AT = Instant.parse("2026-11-20T09:14:03.120Z");
     private static final Instant PUBLISHED_AT = Instant.parse("2026-11-11T18:00:00Z");
@@ -56,7 +60,9 @@ class OsUpdateParserTest {
         // setup
         windowsUpdate.setKbArticleIds(List.of("5051987"));
         windowsUpdate.setMsrcSeverity("Critical");
-        windowsUpdate.setCategories(List.of(category("Security Updates"), category("Windows 11")));
+        windowsUpdate.setCategories(List.of(
+                category(SECURITY_UPDATES_CATEGORY_ID, "Security Updates"), category(WINDOWS_11_CATEGORY_ID, "Windows 11")));
+        windowsUpdate.setUpdateType("SOFTWARE");
         windowsUpdate.setCveIds(List.of("CVE-2026-21309", "CVE-2026-21311"));
         windowsUpdate.setPublishedAt(PUBLISHED_AT);
         windowsUpdate.setMaxDownloadBytes(764317696L);
@@ -71,6 +77,8 @@ class OsUpdateParserTest {
                 .kbArticleIds(List.of("5051987"))
                 .severity(OsUpdateSeverity.CRITICAL)
                 .categories(List.of("Security Updates", "Windows 11"))
+                .categoryIds(List.of(SECURITY_UPDATES_CATEGORY_ID, WINDOWS_11_CATEGORY_ID))
+                .updateType(OsUpdateType.SOFTWARE)
                 .cveIds(List.of("CVE-2026-21309", "CVE-2026-21311"))
                 .publishedAt(PUBLISHED_AT)
                 .sizeBytes(764317696L)
@@ -122,6 +130,7 @@ class OsUpdateParserTest {
                 .displayName("2026-11 Cumulative Update for Windows 11 Version 24H2 (KB5051987)")
                 .kbArticleIds(List.of())
                 .categories(List.of())
+                .categoryIds(List.of())
                 .cveIds(List.of())
                 .firstSeenAt(RECEIVED_AT)
                 .build();
@@ -157,13 +166,47 @@ class OsUpdateParserTest {
     @Test
     void parse_categoryWithoutANameAndANullCategory_leftOut() {
         // setup
-        windowsUpdate.setCategories(Arrays.asList(category("Security Updates"), category(null), null));
+        windowsUpdate.setCategories(Arrays.asList(
+                category(SECURITY_UPDATES_CATEGORY_ID, "Security Updates"), category(WINDOWS_11_CATEGORY_ID, null), null));
 
         // execution
         List<OsUpdate> osUpdates = parser.parse(windowsDevice, List.of(windowsItem));
 
         // verifications
         assertThat(osUpdates).extracting(OsUpdate::getCategories).containsExactly(List.of("Security Updates"));
+    }
+
+    @Test
+    void parse_categoryWithoutAnId_itsNameKeptAndNoIdForIt() {
+        // setup
+        windowsUpdate.setCategories(Arrays.asList(
+                category(SECURITY_UPDATES_CATEGORY_ID, "Security Updates"), category(null, "Windows 11"), null));
+
+        // execution
+        List<OsUpdate> osUpdates = parser.parse(windowsDevice, List.of(windowsItem));
+
+        // verifications
+        assertThat(osUpdates)
+                .extracting(OsUpdate::getCategories, OsUpdate::getCategoryIds)
+                .containsExactly(tuple(List.of("Security Updates", "Windows 11"), List.of(SECURITY_UPDATES_CATEGORY_ID)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "SOFTWARE, SOFTWARE",
+            "driver,   DRIVER",
+            "FIRMWARE, ",
+            "'',       "
+    })
+    void parse_updateType_mappedWithoutRegardToCaseAndAnUnknownOneIsNoType(String updateType, OsUpdateType expected) {
+        // setup
+        windowsUpdate.setUpdateType(updateType);
+
+        // execution
+        List<OsUpdate> osUpdates = parser.parse(windowsDevice, List.of(windowsItem));
+
+        // verifications
+        assertThat(osUpdates).extracting(OsUpdate::getUpdateType).containsExactly(expected);
     }
 
     @Test
@@ -190,8 +233,9 @@ class OsUpdateParserTest {
         assertThat(osUpdates).isEmpty();
     }
 
-    private static MachineOsUpdatesMessage.WindowsUpdateCategory category(String name) {
+    private static MachineOsUpdatesMessage.WindowsUpdateCategory category(String id, String name) {
         MachineOsUpdatesMessage.WindowsUpdateCategory category = new MachineOsUpdatesMessage.WindowsUpdateCategory();
+        category.setId(id);
         category.setName(name);
         return category;
     }
