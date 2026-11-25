@@ -93,6 +93,12 @@ export interface ChatThreadHydrateOptions {
    * opens on new messages only or has already completed its initial replay.
    */
   tailReplaysHistory?: boolean;
+  /**
+   * Whether a replaying tail will now deliver the backlog it holds after this history's last seq (default false): the
+   * reducer's backlog window (`ChatStreamReducer.setReplayingBacklog`). True only for a first subscribe that resumes
+   * after a history seq; the host closes it when that replay completes.
+   */
+  replayingBacklog?: boolean;
 }
 
 /** One key's handle, curried and memoized: identity-stable until the key is evicted or dropped. */
@@ -270,6 +276,7 @@ export function createChatThreadStore<K extends string>(config: ChatThreadStoreC
         approvalStatuses: parked.approvalStatuses,
         lastAppliedSeq: parked.lastAppliedSeq,
         pendingEchoes: parked.pendingEchoes,
+        trailingReplayMatched: parked.trailingReplayMatched,
       });
     }
     return reducer;
@@ -339,6 +346,7 @@ export function createChatThreadStore<K extends string>(config: ChatThreadStoreC
       const turnOpen = reducer.state.streamingPhase === 'streaming';
       reducer.initializeWithState([...messages]);
       reducer.setTailReplaysHistory(hydrateOptions?.tailReplaysHistory !== false);
+      reducer.setReplayingBacklog(hydrateOptions?.replayingBacklog === true);
       if (turnOpen) {
         armAdopt = false;
         disarmAdopt(key, reducer);

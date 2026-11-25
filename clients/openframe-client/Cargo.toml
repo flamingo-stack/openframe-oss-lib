@@ -49,6 +49,11 @@ name = "test_run_as_admin"
 path = "src/bin/test_run_as_admin.rs"
 required-features = ["bin"]
 
+[[bin]]
+name = "probe_os_updates"
+path = "src/bin/probe_os_updates.rs"
+required-features = ["bin"]
+
 [features]
 default = []
 # Enables building the executables (openframe-client binary + dev helpers).
@@ -124,7 +129,7 @@ winreg = "0.52"
 winapi = { version = "0.3", features = ["winuser", "shellapi", "securitybaseapi", "errhandlingapi", "winerror", "wincon", "consoleapi", "processenv", "winbase"] }
 is_elevated = "0.1"
 windows-service = "0.8"
-windows = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_RemoteDesktop", "Win32_System_JobObjects", "Win32_UI_WindowsAndMessaging", "Win32_System_RestartManager", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Registry", "Win32_System_Environment"] }
+windows = { version = "0.52", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_RemoteDesktop", "Win32_System_JobObjects", "Win32_UI_WindowsAndMessaging", "Win32_System_RestartManager", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Registry", "Win32_System_Environment", "Win32_System_Com", "Win32_System_Ole", "Win32_System_Variant", "Win32_System_UpdateAgent", "Win32_NetworkManagement_NetManagement"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

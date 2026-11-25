@@ -1,0 +1,10 @@
+{
+  "reportedAt": "2026-11-24T12:00:00Z",
+  "platform": "WINDOWS",
+  "architecture": "X86_64",
+  "osVersion": "11 24H2",
+  "osBuild": "26100.4061",
+  "osProductName": "Windows 11 Pro",
+  "osUpdateAuthorization": "NOT_REQUIRED",
+  "manageability": { "state": "NOT_MANAGEABLE", "reasons": ["WSUS", "GROUP_POLICY"] }
+}

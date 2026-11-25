@@ -192,6 +192,10 @@ export default defineConfig([
       // it hangs: the `left-0` / `right-0` class on that box. No `screen`
       // query reaches a role-less element, so the test walks up from Apply.
       'src/components/features/__tests__/filters-dropdown-placement.test.tsx',
+      // The floating panel's vertical fit: what is under test is the role-less panel's inline `top` / `bottom` and its
+      // card's `maxHeight`, and the stubbed layout is keyed on the panel's role-less parts (card, option list). No
+      // `screen` query reaches them, so the test walks up from Apply and into the panel.
+      'src/components/features/__tests__/filters-dropdown-floating.test.tsx',
       // Same shape again: FieldWrapper's wrapper is a role-less <div>, and what
       // is under test is its display mode — `contents` versus a positioned box —
       // which no `screen` query can reach, so the test walks up from the control.

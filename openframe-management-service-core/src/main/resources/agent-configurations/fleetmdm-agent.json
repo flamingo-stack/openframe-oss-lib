@@ -29,7 +29,8 @@
       "os": "macos",
       "linkTemplate": "https://github.com/flamingo-stack/fleet/releases/download/{version}/fleet-macos-universal.tar.gz",
       "fileName": "fleet-macos-universal.tar.gz",
-      "targetFileName": "fleet"
+      "targetFileName": "fleet",
+      "minOsVersion": "13.0"
     }
   ],
   "assets": [

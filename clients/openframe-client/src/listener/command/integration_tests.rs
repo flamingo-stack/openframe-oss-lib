@@ -1594,7 +1594,8 @@ async fn an_update_whose_old_binary_is_still_running_fails_and_keeps_the_recorde
     archive
         .start_file(
             "agent.exe",
-            zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored),
         )
         .unwrap();
     archive.write_all(&new_agent).unwrap();

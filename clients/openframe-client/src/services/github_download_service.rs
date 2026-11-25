@@ -186,7 +186,10 @@ impl GithubDownloadService {
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).context("Failed to read ZIP entry")?;
 
-            let file_name = file.name().to_string();
+            let file_name = file
+                .name()
+                .context("Failed to read ZIP entry name")?
+                .to_string();
 
             // Check if this is the target file (case-insensitive, check basename)
             if file_name

@@ -8,6 +8,7 @@ import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.ToolConnectionService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.device.ClientVersionKey;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
@@ -24,6 +25,7 @@ import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -43,8 +45,10 @@ import static com.openframe.data.service.machine.MachineFields.MANUFACTURER;
 import static com.openframe.data.service.machine.MachineFields.MODEL;
 import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ASSIGNED_AT;
 import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ID;
+import static com.openframe.data.service.machine.MachineFields.OS_BUILD;
 import static com.openframe.data.service.machine.MachineFields.OS_TYPE;
 import static com.openframe.data.service.machine.MachineFields.OS_UUID;
+import static com.openframe.data.service.machine.MachineFields.OS_VERSION;
 import static com.openframe.data.service.machine.MachineFields.SERIAL_NUMBER;
 import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineFields.TIMEZONE;
@@ -53,6 +57,7 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
+/** Registers and restores agent enrollment while keeping the device's identity. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -198,23 +203,31 @@ public class AgentRegistrationService {
     // Field-level: the machine already exists, and a whole-document save would overwrite what other writers set on it
     // (the directory summary, Fleet hardware facts) since it was read
     private Machine updateMachine(String machineId, AgentRegistrationRequest request) {
+        Optional<Machine> existing = machineRepository.findOnPrimaryByMachineId(machineId);
         MachineUpdate update = registrationRequestFields(request).set(STATUS, DeviceStatus.PENDING);
         String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
         update.set(ORGANIZATION_ID, organizationId);
-        if (isNewEnrollment(machineId, organizationId)) {
+        if (isNewEnrollment(existing, organizationId)) {
             update.set(ORGANIZATION_ASSIGNED_AT, Instant.now());
         }
 
-        Machine machine = machineWriter.update(machineId, update)
-                .map(MachineWriteResult::after)
-                .orElseThrow(() -> new IllegalStateException("Machine not found for registered client: " + machineId));
+        Machine machine = existing.filter(value -> value.getStatus() == DeviceStatus.DELETED)
+                .map(value -> deletedMachineCleanup.reenrollDeleted(value, update))
+                .orElseGet(() -> updateRegisteredMachine(machineId, update));
 
         log.info("Updated machine {} on reinstall, organizationId {}", machineId, organizationId);
         return machine;
     }
 
-    private boolean isNewEnrollment(String machineId, String organizationId) {
-        return machineRepository.findByMachineId(machineId)
+    private Machine updateRegisteredMachine(String machineId, MachineUpdate update) {
+        Criteria notDeleted = Criteria.where(STATUS.path()).ne(DeviceStatus.DELETED);
+        return machineWriter.update(machineId, notDeleted, update)
+                .map(MachineWriteResult::after)
+                .orElseThrow(() -> new ConflictException("Device " + machineId + " changed during reinstall. Try again."));
+    }
+
+    private static boolean isNewEnrollment(Optional<Machine> existing, String organizationId) {
+        return existing
                 .map(machine -> !Objects.equals(machine.getOrganizationId(), organizationId))
                 .orElse(false);
     }
@@ -230,6 +243,8 @@ public class AgentRegistrationService {
                 .set(LAST_SEEN, Instant.now());
         // Optional; keep the existing value on reinstall when the agent doesn't send it
         setIfNotBlank(update, USER_ID, request.getUserId());
+        setIfNotBlank(update, OS_VERSION, request.getOsVersion());
+        setIfNotBlank(update, OS_BUILD, request.getOsBuild());
         if (isNotBlank(request.getTimezone()) && isValidZone(request.getTimezone())) {
             update.set(TIMEZONE, request.getTimezone());
         }
