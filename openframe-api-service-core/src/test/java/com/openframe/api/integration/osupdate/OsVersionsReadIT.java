@@ -23,6 +23,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +64,7 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
               osVersions(filter: $filter, first: $first, after: $after) {
                 edges { cursor node {
                   osVersion deviceCount devicesBehindCount currentBuild endOfSupportAt supportEnded
+                  enterpriseEndOfSupportAt enterpriseSupportEnded
                 } }
                 pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
               }
@@ -72,7 +74,8 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
             query($osVersion: String!, $organizationIds: [String!], $first: Int, $after: String) {
               osVersionDevices(osVersion: $osVersion, organizationIds: $organizationIds, first: $first,
                   after: $after) {
-                edges { cursor node { machineId osBuild osProductName upToDate machine { machineId hostname } } }
+                edges { cursor node { machineId osBuild osProductName upToDate endOfSupportAt supportEnded
+                  machine { machineId hostname } } }
                 pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
               }
             }
@@ -106,6 +109,7 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
     void storeTheDevicesOfTheTenant() {
         machines().deleteMany(new Document("machineId", new Document("$regex", "^" + OWN_MACHINES)));
         stateCollection().deleteMany(new Document());
+        buildCollection().deleteMany(new Document());
 
         machines().insertMany(List.of(
                 machine(W11_A, TENANT_ID, ORG_A, "ONLINE"),
@@ -125,10 +129,16 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
                 state(MAC, TENANT_ID, "MACOS", "26.1", "25B78", "macOS"),
                 state(NO_VERSION, TENANT_ID, "WINDOWS", null, null, null),
                 state(OTHER_TENANT_MACHINE, OTHER_TENANT_ID, "WINDOWS", "11 24H2", "26100.1", "Windows 11 Pro")));
+        buildCollection().insertMany(List.of(
+                build(TENANT_ID, "WINDOWS", "11 24H2", "26100.3775"),
+                build(TENANT_ID, "WINDOWS", "10 22H2", "19045.6456"),
+                build(TENANT_ID, "MACOS", "11 25H2", "99999.1"),
+                build(OTHER_TENANT_ID, "WINDOWS", "11 24H2", "26100.99999"),
+                build(OTHER_TENANT_ID, "WINDOWS", "11 25H2", "26200.99999")));
     }
 
     @Test
-    void osVersions_windowsVersionsOfTheTenant_highestFirstWithTheReferenceOfTheHomeAndProRow() {
+    void osVersions_windowsVersionsOfTheTenant_highestFirstWithBothEndsOfSupportAndTheDevicesBehind() {
         // setup
 
         // execution
@@ -138,11 +148,12 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
         assertThat(page.nodes())
                 .extracting(node -> node.get("osVersion"), node -> node.get("deviceCount"),
                         node -> node.get("devicesBehindCount"), node -> node.get("currentBuild"),
-                        node -> node.get("endOfSupportAt"), node -> node.get("supportEnded"))
+                        node -> node.get("endOfSupportAt"), node -> node.get("supportEnded"),
+                        node -> node.get("enterpriseEndOfSupportAt"), node -> node.get("enterpriseSupportEnded"))
                 .containsExactly(
-                        tuple("11 25H2", 1, null, "26200", "2027-10-12", false),
-                        tuple("11 24H2", 3, null, "26100", "2026-10-13", true),
-                        tuple("10 22H2", 1, null, "19045", "2025-10-14", true));
+                        tuple("11 25H2", 1, null, "26200", "2027-10-12", false, "2028-10-10", false),
+                        tuple("11 24H2", 3, 2, "26100.3775", "2026-10-13", true, "2027-10-12", false),
+                        tuple("10 22H2", 1, 0, "19045.6456", "2025-10-14", true, "2025-10-14", true));
         assertThat(page.hasNextPage()).isFalse();
         assertThat(meterRegistry.find("openframe.rmm.os_update.os_versions.source_failed").counter()).isNull();
     }
@@ -159,9 +170,10 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
         // verifications
         assertThat(orgA.nodes()).extracting(node -> node.get("osVersion"), node -> node.get("deviceCount"),
                 node -> node.get("devicesBehindCount"))
-                .containsExactly(tuple("11 25H2", 1, null), tuple("11 24H2", 2, null));
-        assertThat(orgB.nodes()).extracting(node -> node.get("osVersion"), node -> node.get("deviceCount"))
-                .containsExactly(tuple("11 24H2", 1), tuple("10 22H2", 1));
+                .containsExactly(tuple("11 25H2", 1, null), tuple("11 24H2", 2, 1));
+        assertThat(orgB.nodes()).extracting(node -> node.get("osVersion"), node -> node.get("deviceCount"),
+                node -> node.get("devicesBehindCount"))
+                .containsExactly(tuple("11 24H2", 1, 1), tuple("10 22H2", 1, 0));
         assertThat(withoutDevices.nodes()).isEmpty();
     }
 
@@ -183,7 +195,7 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    void osVersionDevices_devicesOfTheVersion_byMachineIdWithBuildAndMachineWithoutFlag() {
+    void osVersionDevices_devicesOfTheVersion_byMachineIdWithTheFlagAndTheEndOfSupportOfTheEdition() {
         // setup
 
         // execution
@@ -193,11 +205,33 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
         assertThat(page.nodes())
                 .extracting(node -> node.get("machineId"), node -> node.get("osBuild"),
                         node -> node.get("osProductName"), node -> node.get("upToDate"),
+                        node -> node.get("endOfSupportAt"), node -> node.get("supportEnded"),
                         node -> map(node.get("machine")).get("hostname"))
                 .containsExactly(
-                        tuple(W11_A, "26100.4061", "Windows 11 Pro", null, "host-" + W11_A),
-                        tuple(W11_B, "26100.2033", "Windows 11 Enterprise", null, "host-" + W11_B),
-                        tuple(W11_OLD_BASE, "22631.4460", "Windows 11 Pro", null, "host-" + W11_OLD_BASE));
+                        tuple(W11_A, "26100.4061", "Windows 11 Pro", true, "2026-10-13", true, "host-" + W11_A),
+                        tuple(W11_B, "26100.2033", "Windows 11 Enterprise", false, "2027-10-12", false,
+                                "host-" + W11_B),
+                        tuple(W11_OLD_BASE, "22631.4460", "Windows 11 Pro", false, "2026-10-13", true,
+                                "host-" + W11_OLD_BASE));
+    }
+
+    @Test
+    void osVersionDevices_versionWithoutAStoredBuildAndVersionWithOneEndOfSupport_noFlagAndTheOnlyDate() {
+        // setup
+
+        // execution
+        Page withoutBuild = devices("11 25H2", null, null, null);
+        Page oneEndOfSupport = devices("10 22H2", null, null, null);
+
+        // verifications
+        assertThat(withoutBuild.nodes())
+                .extracting(node -> node.get("machineId"), node -> node.get("upToDate"),
+                        node -> node.get("endOfSupportAt"), node -> node.get("supportEnded"))
+                .containsExactly(tuple(W11_25H2, null, "2027-10-12", false));
+        assertThat(oneEndOfSupport.nodes())
+                .extracting(node -> node.get("machineId"), node -> node.get("upToDate"),
+                        node -> node.get("endOfSupportAt"), node -> node.get("supportEnded"))
+                .containsExactly(tuple(W10, true, "2025-10-14", true));
     }
 
     @Test
@@ -309,6 +343,19 @@ class OsVersionsReadIT extends BaseMongoIntegrationTest {
                 .append("osBuild", osBuild)
                 .append("osProductName", osProductName)
                 .append("version", 0L);
+    }
+
+    static Document build(String tenantId, String platform, String osVersion, String latestBuild) {
+        return new Document("tenantId", tenantId)
+                .append("platform", platform)
+                .append("osVersion", osVersion)
+                .append("latestBuild", latestBuild)
+                .append("updatedAt", new Date())
+                .append("version", 0L);
+    }
+
+    private MongoCollection<Document> buildCollection() {
+        return mongoTemplate.getCollection("os_version_builds");
     }
 
     private MongoCollection<Document> machines() {

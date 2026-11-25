@@ -25,19 +25,26 @@ type OsVersionEdge {
     cursor: String!
 }
 
-"""The reference fields come from endoflife.date, Home and Pro editions. All of them are null when the source
-is off or cannot be read, or does not know the version."""
+"""The ends of support come from endoflife.date and are null when that source is off or cannot be read, or has no
+date for the version. The latest security build comes from the Microsoft security bulletins (MSRC) and is known
+only after the OS update enrichment has stored it for the version."""
 type OsVersion {
     """As the agent reports it, e.g. "11 24H2"."""
     osVersion: String!
     deviceCount: Int!
-    """Devices whose build is below currentBuild. The reference build has no monthly revision, so only a device on
-    an older base build is counted."""
+    """Devices whose build is below the latest security build of the version. A device that reported no build is
+    not counted. Null = no latest security build is known for the version."""
     devicesBehindCount: Int
-    """Base build of the version, e.g. "26100"."""
+    """The latest security build of the version with its revision, e.g. "26100.9974". When none is known: the base
+    build from endoflife.date, e.g. "26100"."""
     currentBuild: String
+    """End of support of the Home and Pro editions."""
     endOfSupportAt: Date
     supportEnded: Boolean
+    """End of support of the Enterprise and Education editions. A version with one end of support for every
+    edition (Windows 10 22H2) has the same date in both pairs."""
+    enterpriseEndOfSupportAt: Date
+    enterpriseSupportEnded: Boolean
 }
 
 type OsVersionDeviceConnection {
@@ -54,8 +61,14 @@ type OsVersionDevice {
     machineId: String!
     osBuild: String
     osProductName: String
-    """Null = no reference data for the version, or the device reported no build."""
+    """The build of the device is the latest security build of its version or above it (a preview build).
+    Null = no latest security build is known for the version, or the device reported no build."""
     upToDate: Boolean
+    """End of support of the edition of this device, by osProductName: IoT Enterprise LTSC, Enterprise LTSC,
+    Enterprise and Education, otherwise Home and Pro. Null = endoflife.date is off or cannot be read, or has no
+    date for the edition of this version."""
+    endOfSupportAt: Date
+    supportEnded: Boolean
     """Null = the device is no longer in the tenant."""
     machine: Machine
 }

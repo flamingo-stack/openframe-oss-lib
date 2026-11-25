@@ -17,8 +17,36 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 class MsrcCvrfDocument {
 
+    @JsonProperty("ProductTree")
+    private MsrcCvrfProductTree msrcCvrfProductTree;
+
     @JsonProperty("Vulnerability")
     private List<MsrcCvrfVulnerability> msrcCvrfVulnerabilities;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class MsrcCvrfProductTree {
+
+        @JsonProperty("FullProductName")
+        private List<MsrcCvrfProduct> msrcCvrfProducts;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class MsrcCvrfProduct {
+
+        @JsonProperty("ProductID")
+        private String productId;
+
+        @JsonProperty("Value")
+        private String name;
+    }
 
     @Data
     @Builder
@@ -53,6 +81,10 @@ class MsrcCvrfDocument {
 
         @JsonProperty("ProductID")
         private List<String> productIds;
+
+        // Only on a remediation; the version of whatever the fix is for, an OS build only for an OS product.
+        @JsonProperty("FixedBuild")
+        private String fixedBuild;
     }
 
     @Data

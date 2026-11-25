@@ -2,11 +2,15 @@ package com.openframe.management.osupdate;
 
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsVersionBuild;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
+import com.openframe.data.repository.rmm.osupdate.OsVersionBuildRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -15,10 +19,13 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.time.Instant;
+import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -26,6 +33,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,12 +42,19 @@ class OsUpdateEnrichmentServiceTest {
     private static final String TENANT_ID = "tenant-a";
     private static final Instant ENRICHED_BEFORE = Instant.parse("2026-11-24T10:25:00Z");
     private static final int BATCH_SIZE = 500;
+    private static final YearMonth NOVEMBER = YearMonth.of(2026, 11);
+    private static final YearMonth OCTOBER = YearMonth.of(2026, 10);
+    private static final Instant REFRESHED_BEFORE = Instant.parse("2026-11-25T04:25:00Z");
+    private static final Instant STALE = Instant.parse("2026-11-24T10:25:00Z");
 
     @Mock private OsUpdateRepository osUpdateRepository;
     @Mock private ObjectProvider<OsUpdateEnricher> osUpdateEnrichers;
     @Mock private OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private OsUpdateEnricher windowsOsUpdateEnricher;
+    @Mock private OsVersionBuildRepository osVersionBuildRepository;
+    @Mock private MsrcCvrfClient msrcCvrfClient;
+    @Captor private ArgumentCaptor<List<OsVersionBuild>> savedOsVersionBuilds;
 
     @InjectMocks private OsUpdateEnrichmentService service;
 
@@ -178,6 +193,98 @@ class OsUpdateEnrichmentServiceTest {
         // verifications
         verify(osUpdateRepository).save(first);
         verify(osUpdateRepository).save(second);
+    }
+
+    @Test
+    void refreshOsVersionBuilds_bulletinsOfBothMonths_newVersionStoredHigherBuildRaisedAndNoBuildLowered() {
+        // setup
+        OsVersionBuild raised = osVersionBuild("11 24H2", "26100.9711", STALE);
+        OsVersionBuild kept = osVersionBuild("10 22H2", "19045.7900", STALE);
+        when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS))
+                .thenReturn(List.of(raised, kept));
+        when(msrcCvrfClient.getLatestWindowsBuilds(NOVEMBER)).thenReturn(
+                Map.of("11 24H2", "26100.10075", "10 22H2", "19045.7846", "11 23H2", "22631.7711"));
+        when(msrcCvrfClient.getLatestWindowsBuilds(OCTOBER)).thenReturn(
+                Map.of("11 24H2", "26100.9974", "11 23H2", "22631.10001", "11 25H2", "26200.9711"));
+
+        // execution
+        service.refreshOsVersionBuilds(NOVEMBER, REFRESHED_BEFORE);
+
+        // verifications
+        verify(osVersionBuildRepository).saveAll(savedOsVersionBuilds.capture());
+        assertThat(savedOsVersionBuilds.getValue())
+                .extracting(OsVersionBuild::getTenantId, OsVersionBuild::getPlatform, OsVersionBuild::getOsVersion,
+                        OsVersionBuild::getLatestBuild)
+                .containsExactlyInAnyOrder(
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "26100.10075"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "10 22H2", "19045.7900"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 23H2", "22631.10001"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 25H2", "26200.9711"));
+        assertThat(savedOsVersionBuilds.getValue()).contains(raised, kept)
+                .allSatisfy(osVersionBuild -> assertThat(osVersionBuild.getUpdatedAt()).isAfter(REFRESHED_BEFORE));
+    }
+
+    @Test
+    void refreshOsVersionBuilds_currentMonthNotPublishedYet_buildsOfThePreviousMonth() {
+        // setup
+        when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS)).thenReturn(List.of());
+        when(msrcCvrfClient.getLatestWindowsBuilds(NOVEMBER)).thenReturn(Map.of());
+        when(msrcCvrfClient.getLatestWindowsBuilds(OCTOBER)).thenReturn(Map.of("11 24H2", "26100.9711"));
+
+        // execution
+        service.refreshOsVersionBuilds(NOVEMBER, REFRESHED_BEFORE);
+
+        // verifications
+        verify(osVersionBuildRepository).saveAll(savedOsVersionBuilds.capture());
+        assertThat(savedOsVersionBuilds.getValue())
+                .extracting(OsVersionBuild::getOsVersion, OsVersionBuild::getLatestBuild)
+                .containsExactly(tuple("11 24H2", "26100.9711"));
+    }
+
+    @Test
+    void refreshOsVersionBuilds_oneBulletinFailed_storedBuildsLeftAsTheyAre() {
+        // setup
+        OsVersionBuild stored = osVersionBuild("11 24H2", "26100.9711", STALE);
+        when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS))
+                .thenReturn(List.of(stored));
+        lenient().when(msrcCvrfClient.getLatestWindowsBuilds(NOVEMBER)).thenReturn(Map.of("11 24H2", "26100.9974"));
+        when(msrcCvrfClient.getLatestWindowsBuilds(OCTOBER))
+                .thenThrow(new OsUpdateSourceUnavailableException(OsUpdateSource.MSRC_CVRF, "MSRC answered 503"));
+
+        // execution
+        service.refreshOsVersionBuilds(NOVEMBER, REFRESHED_BEFORE);
+
+        // verifications
+        verify(osVersionBuildRepository, never()).saveAll(any());
+        assertThat(stored.getLatestBuild()).isEqualTo("26100.9711");
+        assertThat(stored.getUpdatedAt()).isEqualTo(STALE);
+    }
+
+    @Test
+    void refreshOsVersionBuilds_refreshedWithinTheInterval_bulletinsNotAsked() {
+        // setup
+        OsVersionBuild stale = osVersionBuild("10 22H2", "19045.7846", STALE);
+        OsVersionBuild fresh = osVersionBuild("11 24H2", "26100.9711", REFRESHED_BEFORE.plusSeconds(1));
+        when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS))
+                .thenReturn(List.of(stale, fresh));
+
+        // execution
+        service.refreshOsVersionBuilds(NOVEMBER, REFRESHED_BEFORE);
+
+        // verifications
+        verifyNoInteractions(msrcCvrfClient);
+        verify(osVersionBuildRepository, never()).saveAll(any());
+    }
+
+    private static OsVersionBuild osVersionBuild(String osVersion, String latestBuild, Instant updatedAt) {
+        return OsVersionBuild.builder()
+                .id("id-" + osVersion)
+                .tenantId(TENANT_ID)
+                .platform(OsPlatform.WINDOWS)
+                .osVersion(osVersion)
+                .latestBuild(latestBuild)
+                .updatedAt(updatedAt)
+                .build();
     }
 
     private void givenFirstBatch(OsUpdate... staleOsUpdates) {

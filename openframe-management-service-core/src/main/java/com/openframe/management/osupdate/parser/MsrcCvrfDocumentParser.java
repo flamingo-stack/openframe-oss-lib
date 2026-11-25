@@ -1,6 +1,7 @@
 package com.openframe.management.osupdate.parser;
 
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
+import com.openframe.management.osupdate.MsrcCvrfBulletin;
 import com.openframe.management.osupdate.MsrcKbArticle;
 import com.openframe.management.osupdate.parser.MsrcCvrfDocument.MsrcCvrfEntry;
 import com.openframe.management.osupdate.parser.MsrcCvrfDocument.MsrcCvrfVulnerability;
@@ -34,12 +35,16 @@ public class MsrcCvrfDocumentParser {
     private static final String EXPLOITED_YES = "Exploited:Yes";
 
     private final ObjectMapper objectMapper;
+    private final MsrcWindowsBuildParser msrcWindowsBuildParser;
 
-    public Map<String, MsrcKbArticle> parse(InputStream cvrfDocument) {
+    public MsrcCvrfBulletin parse(InputStream cvrfDocument) {
         MsrcCvrfDocument msrcCvrfDocument = objectMapper.readValue(cvrfDocument, MsrcCvrfDocument.class);
         KbArticles kbArticles = new KbArticles();
         orEmpty(msrcCvrfDocument.getMsrcCvrfVulnerabilities()).forEach(kbArticles::addVulnerability);
-        return kbArticles.build();
+        return MsrcCvrfBulletin.builder()
+                .kbArticles(kbArticles.build())
+                .latestWindowsBuilds(msrcWindowsBuildParser.parseLatestBuilds(msrcCvrfDocument))
+                .build();
     }
 
     // What the document says so far, per fix KB.

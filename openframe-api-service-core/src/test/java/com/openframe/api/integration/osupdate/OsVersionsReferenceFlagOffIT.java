@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static com.openframe.api.integration.osupdate.OsVersionsReadIT.build;
 import static com.openframe.api.integration.osupdate.OsVersionsReadIT.machine;
 import static com.openframe.api.integration.osupdate.OsVersionsReadIT.map;
 import static com.openframe.api.integration.osupdate.OsVersionsReadIT.page;
@@ -55,6 +56,7 @@ class OsVersionsReferenceFlagOffIT extends BaseMongoIntegrationTest {
     void storeOneDevice() {
         mongoTemplate.getCollection("machines").deleteMany(new Document("machineId", MACHINE));
         mongoTemplate.getCollection("device_os_states").deleteMany(new Document());
+        mongoTemplate.getCollection("os_version_builds").deleteMany(new Document());
         mongoTemplate.getCollection("machines").insertOne(machine(MACHINE, TENANT_ID, "org-a", "ONLINE"));
         mongoTemplate.getCollection("device_os_states").insertOne(
                 state(MACHINE, TENANT_ID, "WINDOWS", "11 24H2", "26100.4061", "Windows 11 Pro"));
@@ -93,5 +95,37 @@ class OsVersionsReferenceFlagOffIT extends BaseMongoIntegrationTest {
                         node -> node.get("devicesBehindCount"), node -> node.get("currentBuild"),
                         node -> node.get("endOfSupportAt"), node -> node.get("supportEnded"))
                 .containsExactly(tuple("11 24H2", 1, null, null, null, null));
+    }
+
+    @Test
+    void osVersionsAndDevices_referenceFlagOffWithAStoredBuild_buildFieldsWithoutTheEndOfSupport() {
+        // setup
+        mongoTemplate.getCollection("os_version_builds").insertOne(
+                build(TENANT_ID, "WINDOWS", "11 24H2", "26100.9974"));
+
+        // execution
+        ExecutionResult versions = queryExecutor.execute("""
+                { osVersions { edges { node {
+                  osVersion devicesBehindCount currentBuild endOfSupportAt enterpriseEndOfSupportAt } }
+                  pageInfo { hasNextPage hasPreviousPage endCursor } } }
+                """);
+        ExecutionResult devices = queryExecutor.execute("""
+                { osVersionDevices(osVersion: "11 24H2") { edges { node {
+                  machineId upToDate endOfSupportAt supportEnded } }
+                  pageInfo { hasNextPage hasPreviousPage endCursor } } }
+                """);
+
+        // verifications
+        assertThat(versions.getErrors()).isEmpty();
+        assertThat(page(map(versions.<Map<String, Object>>getData()).get("osVersions")).nodes())
+                .extracting(node -> node.get("osVersion"), node -> node.get("devicesBehindCount"),
+                        node -> node.get("currentBuild"), node -> node.get("endOfSupportAt"),
+                        node -> node.get("enterpriseEndOfSupportAt"))
+                .containsExactly(tuple("11 24H2", 1, "26100.9974", null, null));
+        assertThat(devices.getErrors()).isEmpty();
+        assertThat(page(map(devices.<Map<String, Object>>getData()).get("osVersionDevices")).nodes())
+                .extracting(node -> node.get("machineId"), node -> node.get("upToDate"),
+                        node -> node.get("endOfSupportAt"), node -> node.get("supportEnded"))
+                .containsExactly(tuple(MACHINE, false, null, null));
     }
 }

@@ -15,6 +15,8 @@ public final class EndOfLifeSource {
 
     private static final String WINDOWS_RELEASES = """
             [
+              {"cycle": "11-25h2-e", "releaseLabel": "11 25H2 (E)", "eol": "2028-10-10", "latest": "10.0.26200",
+               "lts": false, "support": "2028-10-10", "extendedSupport": false},
               {"cycle": "11-25h2-w", "releaseLabel": "11 25H2 (W)", "eol": "2027-10-12", "latest": "10.0.26200",
                "lts": false, "support": "2027-10-12", "extendedSupport": false},
               {"cycle": "11-24h2-e", "releaseLabel": "11 24H2 (E)", "eol": "2027-10-12", "latest": "10.0.26100",

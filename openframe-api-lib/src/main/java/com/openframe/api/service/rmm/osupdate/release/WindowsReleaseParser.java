@@ -18,7 +18,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WindowsReleaseParser {
 
-    // WARNING: latest is the base build (10.0.26100) without the monthly revision, so only an older base build is behind
+    // WARNING: latest is the base build (10.0.26100) without the monthly revision: it cannot tell whether a device
+    // is behind. The patch level comes from the stored OsVersionBuild.
     private static final String BUILD_PREFIX = "10.0.";
 
     private final ObjectMapper objectMapper;

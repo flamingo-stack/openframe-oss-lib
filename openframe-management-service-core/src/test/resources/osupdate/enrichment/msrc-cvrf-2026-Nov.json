@@ -2,6 +2,50 @@
  "DocumentTitle": {
   "Value": "November 2026 Security Updates"
  },
+ "ProductTree": {
+  "FullProductName": [
+   {
+    "ProductID": "11952",
+    "CPE": "cpe:2.3:a:microsoft:office_2021:*:*:*:*:long_term_servicing_channel:*:*:*",
+    "Value": "Microsoft Office LTSC 2021 for 64-bit editions"
+   },
+   {
+    "ProductID": "11953",
+    "CPE": "cpe:2.3:a:microsoft:office_2021:*:*:*:*:long_term_servicing_channel:*:*:*",
+    "Value": "Microsoft Office LTSC 2021 for 32-bit editions"
+   },
+   {
+    "ProductID": "12389",
+    "CPE": "cpe:2.3:o:microsoft:windows_11_24H2:10.0.26100.9445:*:*:*:*:*:arm64:*",
+    "Value": "Windows 11 Version 24H2 for ARM64-based Systems"
+   },
+   {
+    "ProductID": "12390",
+    "CPE": "cpe:2.3:o:microsoft:windows_11_24H2:10.0.26100.9445:*:*:*:*:*:x64:*",
+    "Value": "Windows 11 Version 24H2 for x64-based Systems"
+   },
+   {
+    "ProductID": "12420",
+    "CPE": "cpe:2.3:a:microsoft:office_2024:*:*:*:*:long_term_servicing_channel:*:*:*",
+    "Value": "Microsoft Office LTSC 2024 for 32-bit editions"
+   },
+   {
+    "ProductID": "12421",
+    "CPE": "cpe:2.3:a:microsoft:office_2024:*:*:*:*:long_term_servicing_channel:*:*:*",
+    "Value": "Microsoft Office LTSC 2024 for 64-bit editions"
+   },
+   {
+    "ProductID": "20437",
+    "CPE": "cpe:2.3:o:microsoft:windows_11_25H2:10.0.26200.9445:*:*:*:*:*:arm64:*",
+    "Value": "Windows 11 Version 25H2 for ARM64-based Systems"
+   },
+   {
+    "ProductID": "20438",
+    "CPE": "cpe:2.3:o:microsoft:windows_11_25H2:10.0.26200.9445:*:*:*:*:*:x64:*",
+    "Value": "Windows 11 Version 25H2 for x64-based Systems"
+   }
+  ]
+ },
  "Vulnerability": [
   {
    "Title": {

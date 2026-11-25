@@ -68,6 +68,7 @@ class OsVersionsReferenceDownIT extends BaseMongoIntegrationTest {
     void storeOneDevice() {
         mongoTemplate.getCollection("machines").deleteMany(new Document("machineId", MACHINE));
         mongoTemplate.getCollection("device_os_states").deleteMany(new Document());
+        mongoTemplate.getCollection("os_version_builds").deleteMany(new Document());
         mongoTemplate.getCollection("machines").insertOne(machine(MACHINE, TENANT_ID, "org-a", "ONLINE"));
         mongoTemplate.getCollection("device_os_states").insertOne(
                 state(MACHINE, TENANT_ID, "WINDOWS", "11 24H2", "26100.4061", "Windows 11 Pro"));

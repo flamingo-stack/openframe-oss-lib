@@ -80,6 +80,8 @@ class OsVersionSchemaContractTest {
         expected.put("currentBuild", "String");
         expected.put("endOfSupportAt", "Date");
         expected.put("supportEnded", "Boolean");
+        expected.put("enterpriseEndOfSupportAt", "Date");
+        expected.put("enterpriseSupportEnded", "Boolean");
 
         // execution
         Map<String, String> fields = fields("OsVersion");
@@ -89,13 +91,15 @@ class OsVersionSchemaContractTest {
     }
 
     @Test
-    void osVersionDevice_machineBuildAndNullableFlag() {
+    void osVersionDevice_machineBuildAndNullableFlagAndEndOfSupport() {
         // setup
         Map<String, String> expected = new LinkedHashMap<>();
         expected.put("machineId", "String!");
         expected.put("osBuild", "String");
         expected.put("osProductName", "String");
         expected.put("upToDate", "Boolean");
+        expected.put("endOfSupportAt", "Date");
+        expected.put("supportEnded", "Boolean");
         expected.put("machine", "Machine");
 
         // execution

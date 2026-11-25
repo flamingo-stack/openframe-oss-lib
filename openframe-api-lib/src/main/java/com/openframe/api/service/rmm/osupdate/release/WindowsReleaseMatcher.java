@@ -13,19 +13,26 @@ import java.util.stream.Collectors;
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
 public class WindowsReleaseMatcher {
 
-    // WARNING: endoflife splits a Windows 11 release into -w (Home/Pro) and -e (Enterprise/Education) rows with
-    // different end dates, Windows 10 22H2 has one row without a suffix; a version row shows -w
-    private static final String HOME_AND_PRO_SUFFIX = "-w";
+    // WARNING: endoflife has a row per edition group of a Windows release, each with its own end date; a release
+    // with one end date for every edition (Windows 10 22H2) has one row without a suffix
+    private static final Map<WindowsEditionGroup, String> CYCLE_SUFFIXES = Map.of(
+            WindowsEditionGroup.HOME_AND_PRO, "-w",
+            WindowsEditionGroup.ENTERPRISE_AND_EDUCATION, "-e",
+            WindowsEditionGroup.ENTERPRISE_LTSC, "-e-lts",
+            WindowsEditionGroup.IOT_ENTERPRISE_LTSC, "-iot-lts");
 
-    // osVersion as the agent reports it: "11 24H2", "10 22H2". Null = no row for the version.
-    public WindowsRelease findWindowsRelease(List<WindowsRelease> windowsReleases, String osVersion) {
+    // osVersion as the agent reports it: "11 24H2", "10 22H2". The row of the edition group, else the row
+    // without a suffix. Null = neither: the row of another edition group is never taken.
+    public WindowsRelease findWindowsRelease(List<WindowsRelease> windowsReleases, String osVersion,
+                                             WindowsEditionGroup windowsEditionGroup) {
         if (osVersion == null || windowsReleases.isEmpty()) {
             return null;
         }
         String cycle = String.join("-", osVersion.trim().toLowerCase(Locale.ROOT).split("\\s+"));
         Map<String, WindowsRelease> windowsReleasesByCycle = windowsReleases.stream()
                 .collect(Collectors.toMap(WindowsRelease::getCycle, Function.identity(), (first, second) -> first));
-        WindowsRelease homeAndProWindowsRelease = windowsReleasesByCycle.get(cycle + HOME_AND_PRO_SUFFIX);
-        return homeAndProWindowsRelease != null ? homeAndProWindowsRelease : windowsReleasesByCycle.get(cycle);
+        WindowsRelease editionGroupWindowsRelease =
+                windowsReleasesByCycle.get(cycle + CYCLE_SUFFIXES.get(windowsEditionGroup));
+        return editionGroupWindowsRelease != null ? editionGroupWindowsRelease : windowsReleasesByCycle.get(cycle);
     }
 }
