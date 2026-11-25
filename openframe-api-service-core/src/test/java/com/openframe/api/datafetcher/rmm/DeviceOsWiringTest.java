@@ -6,7 +6,7 @@ import com.openframe.api.mapper.DeviceOsResponseMapper;
 import com.openframe.api.mapper.OsUpdateGraphQLMapper;
 import com.openframe.api.mapper.OsUpdateResponseMapper;
 import com.openframe.api.service.device.DeviceService;
-import com.openframe.api.service.rmm.osupdate.CursorPageAssembler;
+import com.openframe.api.service.shared.CursorPageAssembler;
 import com.openframe.api.service.rmm.osupdate.DeviceOsPendingUpdateService;
 import com.openframe.api.service.rmm.osupdate.DeviceOsStateService;
 import com.openframe.api.service.rmm.osupdate.DeviceOsUpdateHistoryService;
@@ -52,7 +52,6 @@ class DeviceOsWiringTest {
                 .doesNotHaveBean(DeviceOsStateService.class)
                 .doesNotHaveBean(DeviceOsPendingUpdateService.class)
                 .doesNotHaveBean(DeviceOsUpdateHistoryService.class)
-                .doesNotHaveBean(CursorPageAssembler.class)
                 .doesNotHaveBean(DeviceOsResponseMapper.class)
                 .doesNotHaveBean(DeviceOsGraphQLMapper.class)
                 .doesNotHaveBean(OsUpdateDataFetcher.class)
@@ -72,7 +71,6 @@ class DeviceOsWiringTest {
                 .doesNotHaveBean(DeviceOsStateService.class)
                 .doesNotHaveBean(DeviceOsPendingUpdateService.class)
                 .doesNotHaveBean(DeviceOsUpdateHistoryService.class)
-                .doesNotHaveBean(CursorPageAssembler.class)
                 .doesNotHaveBean(DeviceOsResponseMapper.class)
                 .doesNotHaveBean(DeviceOsGraphQLMapper.class)
                 .doesNotHaveBean(OsUpdateDataFetcher.class)

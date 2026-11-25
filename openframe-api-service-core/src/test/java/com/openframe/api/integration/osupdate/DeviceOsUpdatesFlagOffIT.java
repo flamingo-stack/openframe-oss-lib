@@ -88,7 +88,7 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
         assertThat(beans).contains("DeviceDataFetcher");
         assertThat(beans)
                 .doesNotContain("DeviceOsDataFetcher", "DeviceOsStateService", "DeviceOsPendingUpdateService",
-                        "DeviceOsUpdateHistoryService", "CursorPageAssembler", "DeviceOsResponseMapper",
+                        "DeviceOsUpdateHistoryService", "DeviceOsResponseMapper",
                         "DeviceOsGraphQLMapper", "OsUpdateDataFetcher", "OsUpdateService", "OsUpdateDeviceService",
                         "OsUpdateResponseMapper", "OsUpdateGraphQLMapper", "OsUpdateDeviceCountsDataLoader");
         assertThat(device.getErrors()).isEmpty();

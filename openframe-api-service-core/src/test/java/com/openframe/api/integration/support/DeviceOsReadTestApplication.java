@@ -16,6 +16,7 @@ import com.openframe.api.service.TagService;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.api.service.shared.CursorPageAssembler;
 import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.config.TenantIsolationAutoConfiguration;
@@ -76,6 +77,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         DeviceDataFetcher.class,
         MachineDataLoader.class,
         DeviceService.class,
+        CursorPageAssembler.class,
         GraphQLExceptionHandler.class,
         InstantScalarConfig.class,
         DateScalarConfig.class,

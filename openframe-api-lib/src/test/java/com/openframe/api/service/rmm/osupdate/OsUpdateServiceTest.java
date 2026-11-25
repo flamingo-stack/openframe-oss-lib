@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.OsUpdateNotFoundException;
 import com.openframe.api.mapper.OsUpdateResponseMapper;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.shared.CursorPageAssembler;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateDeviceCount;

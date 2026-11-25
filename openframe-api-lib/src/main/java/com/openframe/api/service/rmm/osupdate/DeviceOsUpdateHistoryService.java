@@ -8,6 +8,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.DeviceOsResponseMapper;
 import com.openframe.api.mapper.OsUpdateResponseMapper;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.shared.CursorPageAssembler;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.InstalledOsUpdateDevice;

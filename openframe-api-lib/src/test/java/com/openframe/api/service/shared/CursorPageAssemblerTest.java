@@ -1,4 +1,4 @@
-package com.openframe.api.service.rmm.osupdate;
+package com.openframe.api.service.shared;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;

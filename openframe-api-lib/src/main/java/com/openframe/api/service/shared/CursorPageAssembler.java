@@ -1,16 +1,14 @@
-package com.openframe.api.service.rmm.osupdate;
+package com.openframe.api.service.shared;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.function.Function;
 
 @Component
-@ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
 public class CursorPageAssembler {
 
     // The rows were fetched with one over the limit: that one tells whether a next page exists.

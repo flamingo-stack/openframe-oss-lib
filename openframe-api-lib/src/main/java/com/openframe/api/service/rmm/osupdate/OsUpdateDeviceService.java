@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceStatus;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.shared.CursorPageAssembler;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import lombok.RequiredArgsConstructor;
