@@ -1,6 +1,15 @@
 import { act, renderHook } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { ComposerDockHeightContext } from '../../../components/navigation/app-layout-context';
+import { ViewportBreakpoints } from '../use-content-breakpoint';
 import { useViewportCollisionPadding, withViewportPadding } from '../use-viewport-collision-padding';
+
+function underDock(height: number) {
+  return function UnderDock({ children }: { children: ReactNode }) {
+    return <ComposerDockHeightContext.Provider value={height}>{children}</ComposerDockHeightContext.Provider>;
+  };
+}
 
 const root = document.documentElement;
 
@@ -27,6 +36,29 @@ describe('useViewportCollisionPadding', () => {
     root.style.setProperty('--of-keyboard-inset', '300px');
     const { result } = renderHook(() => useViewportCollisionPadding());
     // jsdom has no visual viewport and a 0px layout height: the whole inset is left to reserve.
+    expect(result.current.bottom).toBe(300);
+  });
+
+  it('keeps a list that opens downwards out from under the composer dock', () => {
+    const { result } = renderHook(() => useViewportCollisionPadding(), { wrapper: underDock(120) });
+    expect(result.current).toEqual({ top: 0, bottom: 120 });
+  });
+
+  it('reserves nothing for the dock inside window chrome (a modal lies over the dock)', () => {
+    function InModalUnderDock({ children }: { children: ReactNode }) {
+      return (
+        <ComposerDockHeightContext.Provider value={120}>
+          <ViewportBreakpoints>{children}</ViewportBreakpoints>
+        </ComposerDockHeightContext.Provider>
+      );
+    }
+    const { result } = renderHook(() => useViewportCollisionPadding(), { wrapper: InModalUnderDock });
+    expect(result.current).toEqual({ top: 0, bottom: 0 });
+  });
+
+  it('reserves the keyboard, not the dock, when the keyboard rises higher', () => {
+    root.style.setProperty('--of-keyboard-inset', '300px');
+    const { result } = renderHook(() => useViewportCollisionPadding(), { wrapper: underDock(120) });
     expect(result.current.bottom).toBe(300);
   });
 
