@@ -125,6 +125,20 @@ class DeviceOsUpdateHistoryServiceTest {
     }
 
     @Test
+    void saveMissing_entryInstalledSixtyDaysAgo_saved() {
+        // setup
+        DeviceOsUpdateHistoryEntry sixtyDaysAgo = historyEntry("kb-60d", Instant.now().minus(Duration.ofDays(60)));
+        when(deviceOsUpdateHistoryRepository.findByTenantIdAndMachineIdAndEntryKeyIn(
+                TENANT_ID, MACHINE_ID, List.of(sixtyDaysAgo.getEntryKey()))).thenReturn(List.of());
+
+        // execution
+        service.saveMissing(machine, List.of(sixtyDaysAgo));
+
+        // verifications
+        verify(deviceOsUpdateHistoryRepository).saveAll(List.of(sixtyDaysAgo));
+    }
+
+    @Test
     void saveMissing_oneEntryAlreadyStored_onlyTheMissingOneSavedAndReturned() {
         // setup
         DeviceOsUpdateHistoryEntry storedEarlier = stored(halfRetentionAgo);
