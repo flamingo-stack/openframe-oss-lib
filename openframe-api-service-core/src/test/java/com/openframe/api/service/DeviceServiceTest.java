@@ -54,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
@@ -911,5 +912,47 @@ class DeviceServiceTest {
             m.setId("id-" + i);
             return m;
         }).toList();
+    }
+
+    @Test
+    void verifyExists_knownDevice_passes() {
+        // setup
+        when(machineRepository.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+
+        // execution
+        service().verifyExists("machine-1");
+
+        // verifications
+        verify(machineRepository).findByMachineId("machine-1");
+    }
+
+    @Test
+    void verifyExists_unknownDevice_throwsDeviceNotFound() {
+        // setup
+        when(machineRepository.findByMachineId("machine-1")).thenReturn(Optional.empty());
+
+        // execution
+        DeviceNotFoundException ex =
+                assertThrows(DeviceNotFoundException.class, () -> service().verifyExists("machine-1"));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Device not found: machine-1");
+    }
+
+    @Test
+    void findDeviceIdsOfOrganizations_organizations_machineIdsOfTheTenantInThoseOrganizations() {
+        // setup
+        when(machineRepository.findMachineIdsByCriteria(eq(TENANT_ID),
+                argThat(machineQueryFilter ->
+                        List.of("org-1").equals(machineQueryFilter.getOrganizationIds())
+                                && machineQueryFilter.getStatuses() == null
+                                && machineQueryFilter.getExcludeStatuses() == null),
+                isNull())).thenReturn(List.of("machine-1"));
+
+        // execution
+        List<String> machineIds = service().findDeviceIdsOfOrganizations(List.of("org-1"));
+
+        // verifications
+        assertThat(machineIds).containsExactly("machine-1");
     }
 }

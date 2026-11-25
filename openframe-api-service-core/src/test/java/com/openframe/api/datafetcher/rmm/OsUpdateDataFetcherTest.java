@@ -13,7 +13,8 @@ import com.openframe.api.dto.rmm.osupdate.OsUpdateResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.exception.OsUpdateNotFoundException;
 import com.openframe.api.mapper.OsUpdateGraphQLMapper;
-import com.openframe.api.service.rmm.osupdate.OsUpdateQueryService;
+import com.openframe.api.service.rmm.osupdate.OsUpdateDeviceService;
+import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateFilter;
@@ -46,7 +47,8 @@ class OsUpdateDataFetcherTest {
     private static final String AFTER = "after-cursor";
     private static final String NOT_FOUND = "OS update not found: " + OS_UPDATE_ID;
 
-    @Mock private OsUpdateQueryService osUpdateQueryService;
+    @Mock private OsUpdateService osUpdateService;
+    @Mock private OsUpdateDeviceService osUpdateDeviceService;
     @Mock private OsUpdateGraphQLMapper osUpdateGraphQLMapper;
     @Mock private DgsDataFetchingEnvironment dfe;
     @Mock private DataLoader<OsUpdateDeviceCountsKey, OsUpdateDeviceCounts> deviceCountsDataLoader;
@@ -75,7 +77,7 @@ class OsUpdateDataFetcherTest {
         when(osUpdateGraphQLMapper.toOsUpdateFilter(filterInput)).thenReturn(osUpdateFilter);
         when(osUpdateGraphQLMapper.toCursorPaginationCriteria(5, AFTER)).thenReturn(pagination);
         when(osUpdateGraphQLMapper.toOrganizationIds(filterInput)).thenReturn(ORGANIZATION_IDS);
-        when(osUpdateQueryService.listOsUpdates(osUpdateFilter, ORGANIZATION_IDS, pagination)).thenReturn(osUpdates);
+        when(osUpdateService.listOsUpdates(osUpdateFilter, ORGANIZATION_IDS, pagination)).thenReturn(osUpdates);
         when(osUpdateGraphQLMapper.toOsUpdateConnection(osUpdates)).thenReturn(connection);
 
         // execution
@@ -90,7 +92,7 @@ class OsUpdateDataFetcherTest {
     @Test
     void osUpdate_updateOfTheTenant_updateOfTheService() {
         // setup
-        when(osUpdateQueryService.findOsUpdate(OS_UPDATE_ID)).thenReturn(Optional.of(osUpdate));
+        when(osUpdateService.findOsUpdate(OS_UPDATE_ID)).thenReturn(Optional.of(osUpdate));
 
         // execution
         OsUpdateResponse found = dataFetcher.osUpdate(OS_UPDATE_ID);
@@ -102,7 +104,7 @@ class OsUpdateDataFetcherTest {
     @Test
     void osUpdate_noSuchUpdate_null() {
         // setup
-        when(osUpdateQueryService.findOsUpdate(OS_UPDATE_ID)).thenReturn(Optional.empty());
+        when(osUpdateService.findOsUpdate(OS_UPDATE_ID)).thenReturn(Optional.empty());
 
         // execution
         OsUpdateResponse found = dataFetcher.osUpdate(OS_UPDATE_ID);
@@ -119,7 +121,7 @@ class OsUpdateDataFetcherTest {
         GenericConnection<GenericEdge<OsUpdateDeviceResponse>> connection =
                 GenericConnection.<GenericEdge<OsUpdateDeviceResponse>>builder().edges(List.of()).build();
         when(osUpdateGraphQLMapper.toCursorPaginationCriteria(5, AFTER)).thenReturn(pagination);
-        when(osUpdateQueryService.listDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.INSTALLED, ORGANIZATION_IDS, pagination))
+        when(osUpdateDeviceService.listDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.INSTALLED, ORGANIZATION_IDS, pagination))
                 .thenReturn(devices);
         when(osUpdateGraphQLMapper.toDeviceConnection(devices)).thenReturn(connection);
 
@@ -135,7 +137,7 @@ class OsUpdateDataFetcherTest {
     void osUpdateDevices_noSuchUpdate_osUpdateNotFoundPassedOn() {
         // setup
         when(osUpdateGraphQLMapper.toCursorPaginationCriteria(null, null)).thenReturn(pagination);
-        when(osUpdateQueryService.listDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.PENDING, null, pagination))
+        when(osUpdateDeviceService.listDevices(OS_UPDATE_ID, OsUpdateDeviceStatus.PENDING, null, pagination))
                 .thenThrow(new OsUpdateNotFoundException(NOT_FOUND));
 
         // execution
@@ -156,7 +158,7 @@ class OsUpdateDataFetcherTest {
 
         // verifications
         assertThat(pendingDeviceCount).isCompletedWithValue(7);
-        verifyNoInteractions(osUpdateQueryService);
+        verifyNoInteractions(osUpdateService);
     }
 
     @Test
@@ -169,7 +171,7 @@ class OsUpdateDataFetcherTest {
 
         // verifications
         assertThat(installedDeviceCount).isCompletedWithValue(3);
-        verifyNoInteractions(osUpdateQueryService);
+        verifyNoInteractions(osUpdateService);
     }
 
     @Test

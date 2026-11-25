@@ -1,7 +1,7 @@
 package com.openframe.api.dataloader;
 
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
-import com.openframe.api.service.rmm.osupdate.OsUpdateQueryService;
+import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class OsUpdateDeviceCountsDataLoaderTest {
 
-    @Mock private OsUpdateQueryService osUpdateQueryService;
+    @Mock private OsUpdateService osUpdateService;
 
     @InjectMocks private OsUpdateDeviceCountsDataLoader dataLoader;
 
@@ -28,7 +28,7 @@ class OsUpdateDeviceCountsDataLoaderTest {
         List<String> osUpdateIds = List.of("id-2", "unknown", "id-1");
         OsUpdateDeviceCounts countsOfOne = OsUpdateDeviceCounts.builder().pendingDeviceCount(7).build();
         OsUpdateDeviceCounts countsOfTwo = OsUpdateDeviceCounts.builder().installedDeviceCount(3).build();
-        when(osUpdateQueryService.countDevices(osUpdateIds, List.of()))
+        when(osUpdateService.countDevices(osUpdateIds, List.of()))
                 .thenReturn(Map.of("id-1", countsOfOne, "id-2", countsOfTwo));
 
         // execution
@@ -45,8 +45,8 @@ class OsUpdateDeviceCountsDataLoaderTest {
         List<String> organizationIds = List.of("org-1");
         OsUpdateDeviceCounts allCounts = OsUpdateDeviceCounts.builder().pendingDeviceCount(5).build();
         OsUpdateDeviceCounts organizationCounts = OsUpdateDeviceCounts.builder().pendingDeviceCount(1).build();
-        when(osUpdateQueryService.countDevices(List.of("id-1"), List.of())).thenReturn(Map.of("id-1", allCounts));
-        when(osUpdateQueryService.countDevices(List.of("id-1"), organizationIds))
+        when(osUpdateService.countDevices(List.of("id-1"), List.of())).thenReturn(Map.of("id-1", allCounts));
+        when(osUpdateService.countDevices(List.of("id-1"), organizationIds))
                 .thenReturn(Map.of("id-1", organizationCounts));
 
         // execution

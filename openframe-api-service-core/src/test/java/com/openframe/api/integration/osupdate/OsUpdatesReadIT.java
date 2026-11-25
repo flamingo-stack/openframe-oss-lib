@@ -4,7 +4,7 @@ import com.mongodb.client.MongoCollection;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
 import com.openframe.api.integration.BaseMongoIntegrationTest;
 import com.openframe.api.integration.support.DeviceOsReadTestApplication;
-import com.openframe.api.service.rmm.osupdate.OsUpdateQueryService;
+import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import graphql.ExecutionResult;
 import graphql.GraphQLError;
@@ -119,7 +119,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
     private ApplicationContext context;
 
     @MockitoSpyBean
-    private OsUpdateQueryService osUpdateQueryService;
+    private OsUpdateService osUpdateService;
 
     private String cumulativeId;
     private String driverId;
@@ -166,7 +166,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 historyEntry(WIN_NOT_MANAGEABLE, TENANT_ID, CUMULATIVE, LATER_INSTALL, "UNINSTALL", "SUCCEEDED"),
                 historyEntry(GONE, TENANT_ID, CUMULATIVE, EARLIEST_INSTALL, "INSTALL", "SUCCEEDED"),
                 historyEntry(OTHER_TENANT_MACHINE, OTHER_TENANT_ID, CUMULATIVE, LATER_INSTALL, "INSTALL", "SUCCEEDED")));
-        clearInvocations(osUpdateQueryService);
+        clearInvocations(osUpdateService);
     }
 
     @Test
@@ -179,7 +179,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .map(ClassUtils::getUserClass).map(Class::getSimpleName).toList();
 
         // verifications
-        assertThat(beans).contains("OsUpdateDataFetcher", "OsUpdateQueryService", "OsUpdateResponseMapper",
+        assertThat(beans).contains("OsUpdateDataFetcher", "OsUpdateService", "OsUpdateDeviceService", "OsUpdateResponseMapper",
                 "OsUpdateGraphQLMapper", "OsUpdateDeviceCountsDataLoader");
     }
 
@@ -196,7 +196,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                         node -> node.get("installedDeviceCount"))
                 .containsExactly(tuple(CUMULATIVE, 2, 3), tuple(DRIVER, 1, 0), tuple(SAFARI, 1, 0));
         assertThat(page.hasNextPage()).isFalse();
-        verify(osUpdateQueryService).countDevices(List.of(cumulativeId, driverId, safariId), List.of());
+        verify(osUpdateService).countDevices(List.of(cumulativeId, driverId, safariId), List.of());
     }
 
     @Test
@@ -293,8 +293,8 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         assertThat(identifiers(secondPage)).containsExactly(SAFARI);
         assertThat(secondPage.hasNextPage()).isFalse();
         assertThat(secondPage.hasPreviousPage()).isTrue();
-        verify(osUpdateQueryService).countDevices(List.of(cumulativeId, driverId), List.of());
-        verify(osUpdateQueryService).countDevices(List.of(safariId), List.of());
+        verify(osUpdateService).countDevices(List.of(cumulativeId, driverId), List.of());
+        verify(osUpdateService).countDevices(List.of(safariId), List.of());
     }
 
     @Test

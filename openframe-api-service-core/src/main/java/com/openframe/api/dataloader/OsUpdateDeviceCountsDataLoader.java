@@ -2,7 +2,7 @@ package com.openframe.api.dataloader;
 
 import com.netflix.graphql.dgs.DgsDataLoader;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
-import com.openframe.api.service.rmm.osupdate.OsUpdateQueryService;
+import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import lombok.RequiredArgsConstructor;
 import org.dataloader.BatchLoader;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OsUpdateDeviceCountsDataLoader implements BatchLoader<OsUpdateDeviceCountsKey, OsUpdateDeviceCounts> {
 
-    private final OsUpdateQueryService osUpdateQueryService;
+    private final OsUpdateService osUpdateService;
 
     @Override
     public CompletionStage<List<OsUpdateDeviceCounts>> load(List<OsUpdateDeviceCountsKey> osUpdateDeviceCountsKeys) {
@@ -31,7 +31,7 @@ public class OsUpdateDeviceCountsDataLoader implements BatchLoader<OsUpdateDevic
         Map<OsUpdateDeviceCountsKey, OsUpdateDeviceCounts> deviceCountsByKey = new HashMap<>();
         osUpdateIdsByOrganizationIds.forEach((organizationIds, osUpdateIds) -> {
             Map<String, OsUpdateDeviceCounts> deviceCountsByOsUpdateId =
-                    osUpdateQueryService.countDevices(osUpdateIds, organizationIds);
+                    osUpdateService.countDevices(osUpdateIds, organizationIds);
             osUpdateIds.forEach(osUpdateId -> deviceCountsByKey.put(
                     OsUpdateDeviceCountsKey.builder().osUpdateId(osUpdateId).organizationIds(organizationIds).build(),
                     deviceCountsByOsUpdateId.getOrDefault(osUpdateId, OsUpdateDeviceCounts.NONE)));

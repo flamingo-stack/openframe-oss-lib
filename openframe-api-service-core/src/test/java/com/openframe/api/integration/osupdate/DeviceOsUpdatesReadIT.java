@@ -145,7 +145,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    void osUpdateFlagOn_dataFetcherQueryServiceAndMappersRun() {
+    void osUpdateFlagOn_dataFetcherServicesAndMappersRun() {
         // setup
 
         // execution
@@ -154,7 +154,8 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .map(ClassUtils::getUserClass).map(Class::getSimpleName).toList();
 
         // verifications
-        assertThat(beans).contains("DeviceOsDataFetcher", "DeviceOsQueryService", "DeviceOsResponseMapper",
+        assertThat(beans).contains("DeviceOsDataFetcher", "DeviceOsStateService", "DeviceOsPendingUpdateService",
+                "DeviceOsUpdateHistoryService", "DeviceOsResponseMapper",
                 "DeviceOsGraphQLMapper");
     }
 

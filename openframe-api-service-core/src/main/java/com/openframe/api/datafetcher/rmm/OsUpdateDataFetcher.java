@@ -16,7 +16,8 @@ import com.openframe.api.dto.rmm.osupdate.OsUpdateFilterInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.OsUpdateGraphQLMapper;
-import com.openframe.api.service.rmm.osupdate.OsUpdateQueryService;
+import com.openframe.api.service.rmm.osupdate.OsUpdateDeviceService;
+import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateFilter;
 import graphql.execution.DataFetcherResult;
@@ -37,7 +38,8 @@ public class OsUpdateDataFetcher {
     private static final String DEVICE_COUNTS_DATA_LOADER = "osUpdateDeviceCountsDataLoader";
     private static final String MACHINE_DATA_LOADER = "machineDataLoader";
 
-    private final OsUpdateQueryService osUpdateQueryService;
+    private final OsUpdateService osUpdateService;
+    private final OsUpdateDeviceService osUpdateDeviceService;
     private final OsUpdateGraphQLMapper osUpdateGraphQLMapper;
 
     @DgsQuery
@@ -48,7 +50,7 @@ public class OsUpdateDataFetcher {
         List<String> organizationIds = osUpdateGraphQLMapper.toOrganizationIds(filter);
         CursorPaginationCriteria pagination = osUpdateGraphQLMapper.toCursorPaginationCriteria(first, after);
         GenericQueryResult<OsUpdateResponse> osUpdates =
-                osUpdateQueryService.listOsUpdates(osUpdateFilter, organizationIds, pagination);
+                osUpdateService.listOsUpdates(osUpdateFilter, organizationIds, pagination);
         return DataFetcherResult.<GenericConnection<GenericEdge<OsUpdateResponse>>>newResult()
                 .data(osUpdateGraphQLMapper.toOsUpdateConnection(osUpdates))
                 .localContext(organizationIds)
@@ -57,7 +59,7 @@ public class OsUpdateDataFetcher {
 
     @DgsQuery
     public OsUpdateResponse osUpdate(@InputArgument String id) {
-        Optional<OsUpdateResponse> osUpdate = osUpdateQueryService.findOsUpdate(id);
+        Optional<OsUpdateResponse> osUpdate = osUpdateService.findOsUpdate(id);
         return osUpdate.orElse(null);
     }
 
@@ -67,7 +69,7 @@ public class OsUpdateDataFetcher {
             @InputArgument List<String> organizationIds, @InputArgument Integer first, @InputArgument String after) {
         CursorPaginationCriteria pagination = osUpdateGraphQLMapper.toCursorPaginationCriteria(first, after);
         GenericQueryResult<OsUpdateDeviceResponse> devices =
-                osUpdateQueryService.listDevices(osUpdateId, status, organizationIds, pagination);
+                osUpdateDeviceService.listDevices(osUpdateId, status, organizationIds, pagination);
         return osUpdateGraphQLMapper.toDeviceConnection(devices);
     }
 

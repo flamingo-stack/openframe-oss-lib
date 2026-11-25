@@ -72,7 +72,7 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    void osUpdateFlagAbsent_apiStartsWithoutTheDataFetcherTheQueryServiceAndTheMappers_deviceReadStillAnswers() {
+    void osUpdateFlagAbsent_apiStartsWithoutTheDataFetcherTheServicesAndTheMappers_deviceReadStillAnswers() {
         // setup
         machines().insertOne(machine(READ).append("osVersion", "Windows 11 Pro"));
 
@@ -87,8 +87,9 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
         // verifications
         assertThat(beans).contains("DeviceDataFetcher");
         assertThat(beans)
-                .doesNotContain("DeviceOsDataFetcher", "DeviceOsQueryService", "DeviceOsResponseMapper",
-                        "DeviceOsGraphQLMapper", "OsUpdateDataFetcher", "OsUpdateQueryService",
+                .doesNotContain("DeviceOsDataFetcher", "DeviceOsStateService", "DeviceOsPendingUpdateService",
+                        "DeviceOsUpdateHistoryService", "CursorPageAssembler", "DeviceOsResponseMapper",
+                        "DeviceOsGraphQLMapper", "OsUpdateDataFetcher", "OsUpdateService", "OsUpdateDeviceService",
                         "OsUpdateResponseMapper", "OsUpdateGraphQLMapper", "OsUpdateDeviceCountsDataLoader");
         assertThat(device.getErrors()).isEmpty();
         assertThat(device.<Map<String, Object>>getData())
