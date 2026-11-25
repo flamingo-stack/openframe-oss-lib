@@ -1925,6 +1925,7 @@ async fn a_tool_uninstall_removes_the_folder_the_record_and_the_connection_and_a
         })
         .await
         .unwrap();
+    agent.tool_run_manager.supervise(TOOL).await;
     let handler = agent.tool_uninstall_handler();
     agent.launch_command(handler).await;
 
@@ -1946,6 +1947,10 @@ async fn a_tool_uninstall_removes_the_folder_the_record_and_the_connection_and_a
         .unwrap();
     assert!(record.is_none(), "{record:?}");
     assert!(connections.get_all().await.unwrap().is_empty());
+    assert!(
+        !agent.tool_run_manager.supervises(TOOL).await,
+        "an uninstalled tool must not stay supervised"
+    );
 
     agent
         .send_to(
@@ -1970,6 +1975,7 @@ async fn a_tool_uninstall_that_fails_keeps_the_record_and_the_folder() {
             ..installed_tool(TOOL, "1.0.0", ToolRecordState::Installed, Vec::new())
         })
         .await;
+    agent.tool_run_manager.supervise(TOOL).await;
     let handler = agent.tool_uninstall_handler();
     agent.launch_command(handler).await;
 
@@ -1990,4 +1996,8 @@ async fn a_tool_uninstall_that_fails_keeps_the_record_and_the_folder() {
         .await
         .unwrap();
     assert!(record.is_some());
+    assert!(
+        agent.tool_run_manager.supervises(TOOL).await,
+        "a tool whose uninstall failed stays supervised"
+    );
 }

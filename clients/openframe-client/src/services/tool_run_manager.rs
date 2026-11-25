@@ -745,6 +745,17 @@ impl ToolRunManager {
     }
 }
 
+#[cfg(test)]
+impl ToolRunManager {
+    pub(crate) async fn supervise(&self, tool_id: &str) {
+        self.try_mark_running(tool_id).await;
+    }
+
+    pub(crate) async fn supervises(&self, tool_id: &str) -> bool {
+        self.running_tools.read().await.contains(tool_id)
+    }
+}
+
 // Only a fully installed GuiApp record is launched; an install still in progress launches itself when it completes.
 pub(crate) fn launchable_gui_app(tool: Option<InstalledTool>) -> Option<InstalledTool> {
     tool.filter(|t| t.installation.is_gui_app() && t.state == ToolRecordState::Installed)
