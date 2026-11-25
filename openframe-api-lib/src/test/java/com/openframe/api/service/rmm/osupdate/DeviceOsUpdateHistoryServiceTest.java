@@ -163,10 +163,10 @@ class DeviceOsUpdateHistoryServiceTest {
         List<OsUpdateDeviceCount> ofAll = List.of(new OsUpdateDeviceCount(IDENTIFIER, 3));
         List<OsUpdateDeviceCount> ofScope = List.of(new OsUpdateDeviceCount(IDENTIFIER, 1));
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifier(TENANT_ID, List.of(IDENTIFIER)))
+        when(deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifier(List.of(IDENTIFIER), TENANT_ID))
                 .thenReturn(ofAll);
         when(deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifierOnMachines(
-                TENANT_ID, List.of(IDENTIFIER), List.of(MACHINE_ID))).thenReturn(ofScope);
+                List.of(IDENTIFIER), List.of(MACHINE_ID), TENANT_ID)).thenReturn(ofScope);
 
         // execution
         List<OsUpdateDeviceCount> everyDevice =
@@ -183,7 +183,7 @@ class DeviceOsUpdateHistoryServiceTest {
     void listInstalledIdentifiers_machines_identifiersTheyInstalled() {
         // setup
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        when(deviceOsUpdateHistoryRepository.findInstalledIdentifiersOnMachines(TENANT_ID, List.of(MACHINE_ID)))
+        when(deviceOsUpdateHistoryRepository.findInstalledIdentifiersOnMachines(List.of(MACHINE_ID), TENANT_ID))
                 .thenReturn(List.of(IDENTIFIER));
 
         // execution
