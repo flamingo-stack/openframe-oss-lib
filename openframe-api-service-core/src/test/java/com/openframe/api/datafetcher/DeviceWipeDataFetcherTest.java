@@ -1,8 +1,8 @@
 package com.openframe.api.datafetcher;
 
-import com.openframe.api.dto.device.DeviceWipe;
-import com.openframe.api.dto.device.DeviceWipeStatus;
+import com.openframe.api.dto.device.WipeWindowsDeviceInput;
 import com.openframe.api.service.device.DeviceWipeService;
+import com.openframe.data.document.device.Machine;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 class DeviceWipeDataFetcherTest {
 
     private static final String MACHINE_ID = "machine-1";
+    private static final String CONFIRMATION = "DESKTOP-7Q2K9";
 
     @Mock private DeviceWipeService deviceWipeService;
 
@@ -24,36 +25,23 @@ class DeviceWipeDataFetcherTest {
     private DeviceWipeDataFetcher dataFetcher;
 
     @Test
-    void deviceWipe_returnsTheServiceAnswer() {
+    void wipeWindowsDevice_passesMachineAndConfirmationAndReturnsTheDevice() {
         // setup
-        DeviceWipe wipe = new DeviceWipe(true, DeviceWipeStatus.NOT_REQUESTED);
-        when(deviceWipeService.getWipe(MACHINE_ID)).thenReturn(wipe);
+        Machine machine = new Machine();
+        when(deviceWipeService.wipeWindowsDevice(MACHINE_ID, CONFIRMATION)).thenReturn(machine);
 
         // execution
-        DeviceWipe result = dataFetcher.deviceWipe(MACHINE_ID);
+        Machine result = dataFetcher.wipeWindowsDevice(new WipeWindowsDeviceInput(MACHINE_ID, CONFIRMATION));
 
         // verifications
-        assertThat(result).isSameAs(wipe);
+        assertThat(result).isSameAs(machine);
     }
 
     @Test
-    void wipeDevice_requestsTheWipe() {
-        // setup
-        DeviceWipe pending = new DeviceWipe(false, DeviceWipeStatus.PENDING);
-        when(deviceWipeService.wipe(MACHINE_ID)).thenReturn(pending);
-
-        // execution
-        DeviceWipe result = dataFetcher.wipeDevice(MACHINE_ID);
-
-        // verifications
-        assertThat(result).isSameAs(pending);
-    }
-
-    @Test
-    void wipeDevice_isAdminOnly() throws Exception {
+    void wipeWindowsDevice_isAdminOnly() throws Exception {
         // execution
         PreAuthorize preAuthorize = DeviceWipeDataFetcher.class
-                .getMethod("wipeDevice", String.class)
+                .getMethod("wipeWindowsDevice", WipeWindowsDeviceInput.class)
                 .getAnnotation(PreAuthorize.class);
 
         // verifications

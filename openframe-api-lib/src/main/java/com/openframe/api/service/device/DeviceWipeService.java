@@ -1,7 +1,5 @@
 package com.openframe.api.service.device;
 
-import com.openframe.api.dto.device.DeviceWipe;
-import com.openframe.api.dto.device.DeviceWipeStatus;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.rmm.fleet.FleetMdmClientProvider;
 import com.openframe.audit.Audited;
@@ -14,11 +12,6 @@ import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
-import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
-import com.openframe.sdk.fleetmdm.model.Host;
-import com.openframe.sdk.fleetmdm.model.HostDeviceStatus;
-import com.openframe.sdk.fleetmdm.model.HostMdm;
-import com.openframe.sdk.fleetmdm.model.HostPendingAction;
 import com.openframe.sdk.fleetmdm.model.WindowsWipeType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -27,10 +20,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
-import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static com.openframe.data.document.audit.AuditAction.DEVICE_WIPE;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.commons.lang3.StringUtils.isNumeric;
 
 @Slf4j
@@ -43,31 +37,16 @@ public class DeviceWipeService {
     private final ToolConnectionRepository toolConnectionRepository;
     private final FleetMdmClientProvider fleetMdmClientProvider;
 
-    public DeviceWipe getWipe(@NotBlank String machineId) {
-        Machine machine = requireMachine(machineId);
-        if (!isManagedWindows(machine)) {
-            return DeviceWipe.unavailable();
-        }
-        return fleetHostId(machine)
-                .flatMap(hostId -> fleetHost(machineId, hostId))
-                .map(DeviceWipeService::wipeOf)
-                .orElseGet(DeviceWipe::unavailable);
-    }
-
-    private Optional<Host> fleetHost(String machineId, long hostId) {
-        try {
-            return Optional.ofNullable(fleetMdmClientProvider.client().getHostById(hostId));
-        } catch (FleetMdmException e) {
-            log.warn("Could not read Fleet host {} of machineId={}, wipe reported unavailable", hostId, machineId, e);
-            return Optional.empty();
-        }
-    }
-
+    // TODO(CU-17tkuw6a582): keep the wipe on the device (mdm.wipe, WIPE in mdm.availableActions) and take its result from Fleet's wiped_host and failed_wipe activities through CDC
     @Audited(action = DEVICE_WIPE, targetId = "#machineId", storeIfUnchanged = true)
-    public DeviceWipe wipe(@NotBlank String machineId) {
-        Machine machine = requireMachine(machineId);
+    public Machine wipeWindowsDevice(@NotBlank String machineId, @NotBlank String confirmation) {
+        Machine machine = deviceService.findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         if (!isManagedWindows(machine)) {
             throw new BadRequestException("Only a managed Windows device can be wiped");
+        }
+        if (!isNameOf(machine, confirmation.strip())) {
+            throw new BadRequestException("The confirmation does not match the device's name");
         }
         long hostId = fleetHostId(machine)
                 .orElseThrow(() -> new BadRequestException("The device is not connected to Fleet"));
@@ -77,17 +56,17 @@ public class DeviceWipeService {
             throw refusalOf(e);
         }
         log.info("Wipe requested for machineId={}, Fleet host {}", machineId, hostId);
-        // TODO(CU-17tkuw6a582): keep the wipe request on the device and take its result from Fleet's wiped_host and failed_wipe activities through CDC
-        return new DeviceWipe(false, DeviceWipeStatus.PENDING);
-    }
-
-    private Machine requireMachine(String machineId) {
-        return deviceService.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        return machine;
     }
 
     private static boolean isManagedWindows(Machine machine) {
         return DeviceStatus.CONNECTED.contains(machine.getStatus()) && machine.getOsType() == OsType.WINDOWS;
+    }
+
+    private static boolean isNameOf(Machine machine, String confirmation) {
+        return Stream.of(machine.getNickname(), machine.getDisplayName(), machine.getHostname())
+                .filter(name -> isNotBlank(name))
+                .anyMatch(name -> name.strip().equals(confirmation));
     }
 
     private Optional<Long> fleetHostId(Machine machine) {
@@ -95,29 +74,6 @@ public class DeviceWipeService {
                 .map(ToolConnection::getAgentToolId)
                 .filter(agentToolId -> isNumeric(agentToolId))
                 .map(Long::valueOf);
-    }
-
-    private static DeviceWipe wipeOf(Host host) {
-        HostMdm mdm = host.getMdm();
-        if (mdm == null) {
-            return DeviceWipe.unavailable();
-        }
-        HostPendingAction pendingAction = Objects.requireNonNullElse(mdm.getPendingAction(), HostPendingAction.NONE);
-        DeviceWipeStatus status = statusOf(mdm.getDeviceStatus(), pendingAction);
-        boolean available = Boolean.TRUE.equals(mdm.getConnectedToFleet())
-                && mdm.getDeviceStatus() == HostDeviceStatus.UNLOCKED
-                && pendingAction == HostPendingAction.NONE;
-        return new DeviceWipe(available, status);
-    }
-
-    private static DeviceWipeStatus statusOf(HostDeviceStatus deviceStatus, HostPendingAction pendingAction) {
-        if (deviceStatus == HostDeviceStatus.WIPED) {
-            return DeviceWipeStatus.WIPED;
-        }
-        if (pendingAction == HostPendingAction.WIPE) {
-            return DeviceWipeStatus.PENDING;
-        }
-        return DeviceWipeStatus.NOT_REQUESTED;
     }
 
     private static RuntimeException refusalOf(FleetMdmApiException e) {

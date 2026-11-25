@@ -2,10 +2,6 @@ package com.openframe.sdk.fleetmdm;
 
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmNotFoundException;
-import com.openframe.sdk.fleetmdm.model.Host;
-import com.openframe.sdk.fleetmdm.model.HostDeviceStatus;
-import com.openframe.sdk.fleetmdm.model.HostMdm;
-import com.openframe.sdk.fleetmdm.model.HostPendingAction;
 import com.openframe.sdk.fleetmdm.model.WindowsWipeType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,43 +72,6 @@ class FleetMdmClientWipeTest {
                     assertThat(e.getStatusCode()).isEqualTo(422);
                     assertThat(e.getResponseBody()).isEqualTo(body);
                 });
-    }
-
-    @Test
-    void getHostById_readsMdmLockWipeState() throws Exception {
-        // setup
-        stubResponse(200, """
-                {"host": {"id": 42, "platform": "windows",
-                          "mdm": {"enrollment_status": "On (manual)", "connected_to_fleet": true,
-                                  "device_status": "unlocked", "pending_action": "wipe"}}}
-                """);
-        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
-
-        // execution
-        Host host = client.getHostById(42L);
-
-        // verifications
-        HostMdm mdm = host.getMdm();
-        assertThat(mdm.getEnrollmentStatus()).isEqualTo("On (manual)");
-        assertThat(mdm.getConnectedToFleet()).isTrue();
-        assertThat(mdm.getDeviceStatus()).isEqualTo(HostDeviceStatus.UNLOCKED);
-        assertThat(mdm.getPendingAction()).isEqualTo(HostPendingAction.WIPE);
-    }
-
-    @Test
-    void getHostById_noPendingActionAndUnknownStatus_readAsNoneAndUnknown() throws Exception {
-        // setup
-        stubResponse(200, """
-                {"host": {"id": 42, "mdm": {"device_status": "locking", "pending_action": ""}}}
-                """);
-        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
-
-        // execution
-        HostMdm mdm = client.getHostById(42L).getMdm();
-
-        // verifications
-        assertThat(mdm.getDeviceStatus()).isEqualTo(HostDeviceStatus.UNKNOWN);
-        assertThat(mdm.getPendingAction()).isEqualTo(HostPendingAction.NONE);
     }
 
     private void stubResponse(int status, String body) throws Exception {

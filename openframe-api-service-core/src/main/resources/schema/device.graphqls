@@ -16,9 +16,6 @@ extend type Query {
 
     # Get single device by machineId
     device(machineId: String!): Machine
-
-    """Whether the device can be wiped now and where its wipe stands, read from Fleet."""
-    deviceWipe(machineId: String!): DeviceWipe!
 }
 
 type DeviceFilters {
@@ -235,22 +232,6 @@ type InstalledAgent implements Node {
 extend type Mutation {
 
     updateDeviceNickname(machineId: String!, nickname: String): Machine!
-
-    """Factory-resets a Windows device through Fleet MDM. Admins only; it cannot be undone."""
-    wipeDevice(machineId: String!): DeviceWipe!
-}
-
-type DeviceWipe {
-    """True for a managed Windows device enrolled in Fleet MDM with no lock, unlock or wipe pending."""
-    available: Boolean!
-    status: DeviceWipeStatus!
-}
-
-enum DeviceWipeStatus {
-    NOT_REQUESTED
-    """Requested; the device runs it the next time it reaches Fleet."""
-    PENDING
-    WIPED
 }
 
 """An integrated agent that does not run on the device's OS version."""
