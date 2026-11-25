@@ -67,10 +67,11 @@ A skipped test prints ``skipping: `nats-server` is not installed (brew install n
 
 ### CI
 
-CI does not install `nats-server` yet, so there the suite skips and nothing
-fails. To make it run: add an install step before `make test` in the Rust job
-(`brew install nats-server` on macOS, a release download or `choco install nats-server`
-on Windows) and set `REQUIRE_NATS_SERVER: "1"` on that step.
+The `Build Rust` jobs in `.github/workflows/build.yml` download a pinned
+`nats-server` release (checksum-verified) before `make test` and run it with
+`REQUIRE_NATS_SERVER: "1"`, so the suite runs on macOS and Windows and a missing
+server fails the job. To move to a newer server, change `NATS_SERVER_VERSION` and
+both checksums from the release's `SHA256SUMS`.
 
 ## Writing a test
 

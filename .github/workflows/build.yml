@@ -207,7 +207,31 @@ jobs:
       - name: Build client binary
         run: make -C clients/openframe-client build-bin
 
+      - name: Install nats-server
+        env:
+          NATS_SERVER_VERSION: v2.15.2
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/nats-io/nats-server/releases/download/$NATS_SERVER_VERSION"
+          case "$RUNNER_OS" in
+            macOS)
+              dir="nats-server-$NATS_SERVER_VERSION-darwin-arm64"
+              curl -fsSLo "$dir.tar.gz" "$base/$dir.tar.gz"
+              echo "cbd2219d01502c38733485ac684269da585ee479fa3b1377264beecdefdf9e9d  $dir.tar.gz" | shasum -a 256 -c -
+              tar -xzf "$dir.tar.gz"
+              ;;
+            Windows)
+              dir="nats-server-$NATS_SERVER_VERSION-windows-amd64"
+              curl -fsSLo "$dir.zip" "$base/$dir.zip"
+              echo "f6398d5d11093778f870db70242cb50d20a58134c937c805ba8d114e7e398766  $dir.zip" | sha256sum -c -
+              unzip -q "$dir.zip"
+              ;;
+          esac
+          echo "$RUNNER_TEMP/$dir" >> "$GITHUB_PATH"
+
       - name: Test
+        env:
+          REQUIRE_NATS_SERVER: "1"
         run: make -C clients/openframe-client test
 
   build-rust-common:

@@ -1656,6 +1656,7 @@ async fn an_update_whose_old_binary_is_still_running_fails_and_keeps_the_recorde
     assert_eq!(recorded.version, "0.4.16");
 }
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empty: bool) {
     use std::io::Write;
 
@@ -1679,19 +1680,42 @@ async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empt
     }
 
     let helper = vec![9u8; 150 * 1024];
-    let stored =
-        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-    let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-    for (name, bytes) in [("agent", vec![7u8; 150 * 1024]), ("helper", helper.clone())] {
-        archive.start_file(name, stored).unwrap();
-        archive.write_all(&bytes).unwrap();
-    }
-    let release =
-        crate::test_support::mock_server_with_body(&[200], archive.finish().unwrap().into_inner())
-            .await;
-    let link = format!("{}/release.zip", release.url);
-    let tool_config = |os: &str| json!({"os": os, "fileName": "release.zip", "agentFileName": "agent", "link": link, "installationType": "STANDARD"});
-    let asset_config = |os: &str| json!({"os": os, "fileName": "release.zip", "assetFileName": "helper", "link": link});
+    let entries = [("agent", vec![7u8; 150 * 1024]), ("helper", helper.clone())];
+    let archive = if cfg!(target_os = "windows") {
+        let stored = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for (name, bytes) in &entries {
+            archive.start_file(*name, stored).unwrap();
+            archive.write_all(bytes).unwrap();
+        }
+        archive.finish().unwrap().into_inner()
+    } else {
+        let mut archive = tar::Builder::new(flate2::write::GzEncoder::new(
+            Vec::new(),
+            flate2::Compression::none(),
+        ));
+        for (name, bytes) in &entries {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(bytes.len() as u64);
+            header.set_mode(0o755);
+            archive
+                .append_data(&mut header, name, bytes.as_slice())
+                .unwrap();
+        }
+        archive.into_inner().unwrap().finish().unwrap()
+    };
+    let release = crate::test_support::mock_server_with_body(&[200], archive).await;
+    let file_name = |os: &str| {
+        if os == "windows" {
+            "release.zip"
+        } else {
+            "release.tar.gz"
+        }
+    };
+    let link = |os: &str| format!("{}/{}", release.url, file_name(os));
+    let tool_config = |os: &str| json!({"os": os, "fileName": file_name(os), "agentFileName": "agent", "link": link(os), "installationType": "STANDARD"});
+    let asset_config = |os: &str| json!({"os": os, "fileName": file_name(os), "assetFileName": "helper", "link": link(os)});
 
     let _reports = agent.installed_agents().await;
     let handler = ToolInstallationHandler::new(
@@ -1729,11 +1753,13 @@ async fn an_install_of_a_present_tool_rewrites_its_command_asset(asset_left_empt
     assert_eq!(std::fs::read(&asset).unwrap(), helper);
 }
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 #[tokio::test]
 async fn an_install_of_a_present_tool_downloads_its_missing_command_asset() {
     an_install_of_a_present_tool_rewrites_its_command_asset(false).await;
 }
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 #[tokio::test]
 async fn an_install_of_a_present_tool_rewrites_its_empty_command_asset() {
     an_install_of_a_present_tool_rewrites_its_command_asset(true).await;
