@@ -29,6 +29,25 @@ A column with no `meta.gridKind` is a data column: it can be resized, hidden and
 takes the free width. An `open` or `actions` column left as a data column is therefore not pinned, shows up in the
 gear menu and stretches.
 
+A data column with `enableHiding: false` stays in the table: its row in the gear menu cannot hide it, and a stored
+layout that hides it is not applied to it. It can still be moved. Only the column's own flag counts (`gridCanHide`):
+the table-level TanStack option does not change the grid.
+
+## Pinning the first column on every desktop window
+
+`pinFirstColumn` on `<DataTable>` says when the left block (the checkbox column and the first data column) is pinned:
+
+| Value | Pinned |
+|---|---|
+| `wide` (default) | On a desktop with room for it: the window at 1280px and the content area at 720px. |
+| `desktop` | On every desktop window (1280px), also in a narrow content column (the Mingo panel docked beside the page). The first data column is then drawn at most 40% of the table's width, never below its `minSize`. A tablet and a phone still scroll it. |
+
+Keep the default. `desktop` is for a table whose pinned action needs the row's name beside it: the device picker, where
+the add button is pinned right and a sideways scroll would otherwise leave a plus with no device name. Pass it on
+`<DataTable>` itself, inside that table's component, not through `FeatureTableLayoutProps`: it is the table's own
+decision, not the host's. The option pins the first data column the viewer SHOWS (the gear menu reorders columns, with
+no lock); give the column that must stay `enableHiding: false` so at least it cannot be hidden.
+
 ## Switching
 
 Through the web app's `LiveTable`:
@@ -108,7 +127,9 @@ hand, with a grid form of its own: a bare icon button (a plus, the accent check 
 the Selected tab), each named for a screen reader ("Add <device>"), and the reason a device cannot be added as the
 control's tooltip, since a 56px cell has no room for the text a card row prints beside the button. The picker keeps
 its own card (the tabs and the search row) around the table; "Add All Devices" or the device count sits above the
-table in `DataTable.Meta`.
+table in `DataTable.Meta`. With its add / remove column it passes `pinFirstColumn="desktop"`: the Device column (which
+cannot be hidden) stays pinned beside the add button on every desktop window, also with the Mingo panel docked; in
+criteria mode, with no add column, it keeps the shared rule.
 
 `PoliciesTable` and `LogsTableView` are ready too. Both put a card row's two lines on one with
 `GridTextWithDetailCell` (`features/feature-table-grid-cells.tsx`): the subject (a policy's name, a log's time, a
