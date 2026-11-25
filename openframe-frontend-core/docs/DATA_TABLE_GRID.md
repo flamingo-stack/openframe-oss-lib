@@ -30,7 +30,8 @@ takes the free width. An `open` or `actions` column left as a data column is the
 gear menu and stretches.
 
 A data column with `enableHiding: false` stays in the table: its row in the gear menu cannot hide it, and a stored
-layout that hides it is not applied to it. It can still be moved.
+layout that hides it is not applied to it. It can still be moved. Only the column's own flag counts (`gridCanHide`):
+the table-level TanStack option does not change the grid.
 
 ## Pinning the first column on every desktop window
 

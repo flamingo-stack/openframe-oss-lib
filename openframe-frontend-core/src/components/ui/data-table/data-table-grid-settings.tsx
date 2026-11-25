@@ -8,7 +8,7 @@ import { cn } from '../../../utils/cn';
 import { CheckboxCheckmarkIcon, CheckFillIcon, DraggerIcon, Settings02Icon } from '../../icons-v2-generated';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../dropdown-menu';
 import { useDataTableContext } from './data-table';
-import { gridCellClass, gridCellStyle, mergeColumnOrder, type GridColumn } from './data-table-grid';
+import { gridCanHide, gridCellClass, gridCellStyle, mergeColumnOrder, type GridColumn } from './data-table-grid';
 import { GridPrefsContext, GridSettingsContext, useGridPrefs } from './data-table-grid-prefs';
 
 /** A column's name in the settings menu: its `meta.label`, else its header when that is plain text, else its id. */
@@ -108,7 +108,10 @@ function GridSettingsMenu() {
     prefs.order,
   );
   // A column the table says can never be hidden (`enableHiding: false`) is always shown, and its row cannot hide it.
-  const canHide = (id: string) => table.getColumn(id)?.getCanHide() !== false;
+  const canHide = (id: string) => {
+    const column = table.getColumn(id);
+    return column ? gridCanHide(column) : true;
+  };
   const hiddenIds = new Set(prefs.hidden.filter(canHide));
   const anyShown = ordered.some(id => !hiddenIds.has(id));
   // The same rule as the table's own layout: a stored layout that hides everything is not applied.

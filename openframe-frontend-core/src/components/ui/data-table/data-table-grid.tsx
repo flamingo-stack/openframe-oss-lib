@@ -109,6 +109,14 @@ export interface GridLayoutOptions {
 /** The share of the table's width a pinned first data column takes at most: in a resize and under `pinnedCap`. */
 export const GRID_PINNED_MAX_SHARE = 0.4;
 
+/**
+ * Whether the viewer can hide a data column (the settings menu, a stored layout): not when the column says
+ * `enableHiding: false`. Only the column's own flag counts, so the menu and the layout always agree.
+ */
+export function gridCanHide<T>(column: Column<T, unknown>): boolean {
+  return column.columnDef.enableHiding !== false;
+}
+
 /** A column's least width in the grid: its own `minSize`, never below a text column's. */
 export function gridMinWidth<T>(column: Column<T, unknown>): number {
   return Math.max(column.columnDef.minSize ?? 0, GRID_MIN_WIDTH.text);
@@ -175,9 +183,7 @@ export function buildGridLayout<T>(
     minWidths.set(column.id, gridMinWidth(column));
   }
   // A column the table says can never be hidden stays, whatever an older stored layout says.
-  const unhideable = new Set(
-    visibleColumns.filter(column => column.columnDef.enableHiding === false).map(column => column.id),
-  );
+  const unhideable = new Set(visibleColumns.filter(column => !gridCanHide(column)).map(column => column.id));
 
   const byId = new Map(designed.map(column => [column.id, column]));
   const ordered = mergeColumnOrder(
