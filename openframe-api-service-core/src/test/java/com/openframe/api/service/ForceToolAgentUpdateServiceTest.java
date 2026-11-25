@@ -1,5 +1,8 @@
 package com.openframe.api.service;
 
+import com.openframe.data.nats.delivery.route.DeviceCommandSender;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceToolAgentUpdateResponseItem;
 import com.openframe.api.dto.update.ForceToolAgentUpdateRequest;
@@ -18,13 +21,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,13 +49,15 @@ class ForceToolAgentUpdateServiceTest {
     @Mock private MachineRepository machineRepository;
     @Mock private DeliveryRouter deliveryRouter;
     @Captor private ArgumentCaptor<ToolUpdateDeliverySeed> seedCaptor;
-    @InjectMocks private ForceToolAgentUpdateService service;
+    private ForceToolAgentUpdateService service;
 
     private IntegratedToolAgent toolAgent;
     private ForceToolAgentUpdateRequest request;
 
     @BeforeEach
     void setUp() {
+        service = new ForceToolAgentUpdateService(toolAgentRepository, machineRepository,
+                new DeviceCommandSender(deliveryRouter, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class)));
         toolAgent = new IntegratedToolAgent();
         toolAgent.setKey(TOOL_AGENT_KEY);
         toolAgent.setVersion("1.2.3");

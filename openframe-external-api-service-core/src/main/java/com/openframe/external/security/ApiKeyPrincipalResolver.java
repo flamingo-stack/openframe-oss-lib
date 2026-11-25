@@ -1,5 +1,6 @@
 package com.openframe.external.security;
 
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.ForbiddenException;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.user.User;
@@ -11,9 +12,12 @@ import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 
+import static com.openframe.data.document.audit.AuditAction.API_KEY_AUTH_FAIL;
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -28,6 +32,8 @@ public class ApiKeyPrincipalResolver {
     private final UserRepository userRepository;
     private final TenantIdProvider tenantIdProvider;
 
+    @Audited(action = API_KEY_AUTH_FAIL, condition = "false",
+            details = "path=T(com.openframe.external.security.ApiKeyPrincipalResolver).requestPath()")
     public AuthPrincipal resolve(String userId) {
         if (!hasText(userId)) {
             throw new UnauthorizedException("API key is not bound to a user");
@@ -47,5 +53,11 @@ public class ApiKeyPrincipalResolver {
                 .tenantId(tenantIdProvider.getTenantId())
                 .actorType(ActorType.ADMIN)
                 .build();
+    }
+
+    public static String requestPath() {
+        return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+                ? attributes.getRequest().getMethod() + " " + attributes.getRequest().getRequestURI()
+                : null;
     }
 }

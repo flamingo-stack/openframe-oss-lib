@@ -80,14 +80,14 @@ export type { DataTableInfiniteFooterProps } from './data-table-infinite-footer'
 export type { DataTableCursorFooterProps } from './data-table-cursor-footer';
 export type { DataTableRowCountProps } from './data-table-row-count';
 export type { DataTableMetaProps } from './data-table-meta';
-export type { DataTableLayout } from './data-table-grid';
+export type { DataTableLayout, GridPinFirstColumn } from './data-table-grid';
 export {
   actionColumn,
   selectionColumn,
   GRID_ACTION_COLUMN_SIZE,
+  GRID_MIN_WIDTH,
   GRID_UTILITY_COLUMN_SIZE,
 } from './data-table-grid-columns';
-export { GRID_MIN_WIDTH } from './data-table-grid-resize';
 export { gridPrefsStorageKey } from './data-table-grid-prefs';
 export type { DataTableSettings } from './data-table-grid-prefs';
 export type { UseDataTableOptions } from './use-data-table';

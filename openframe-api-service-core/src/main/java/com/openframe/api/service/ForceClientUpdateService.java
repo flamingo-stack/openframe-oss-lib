@@ -7,15 +7,18 @@ import com.openframe.api.dto.update.ForceClientUpdateRequest;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.delivery.ClientUpdateDeliverySeed;
-import com.openframe.data.nats.delivery.route.DeliveryRouter;
+import com.openframe.data.nats.delivery.route.DeviceCommandSender;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_CLIENT_UPDATE;
 import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Service
@@ -25,7 +28,7 @@ public class ForceClientUpdateService {
 
     private final OpenFrameClientConfigurationRepository clientConfigurationRepository;
     private final MachineRepository machineRepository;
-    private final DeliveryRouter deliveryRouter;
+    private final DeviceCommandSender deviceCommandSender;
 
     public ForceClientUpdateResponse process(ForceClientUpdateRequest request) {
         List<String> machineIds = request.getMachineId();
@@ -65,8 +68,9 @@ public class ForceClientUpdateService {
     private ForceAgentStatus sendToEveryMachine() {
         try {
             OpenFrameClientConfiguration configuration = loadConfiguration();
-            ClientUpdateDeliverySeed seed = ClientUpdateDeliverySeed.forEveryMachine(configuration);
-            boolean carried = deliveryRouter.dispatch(seed);
+            Map<String, Object> details = detailsOf(configuration);
+            boolean carried = deviceCommandSender.send(DEVICE_CLIENT_UPDATE, null, details,
+                    () -> ClientUpdateDeliverySeed.forEveryMachine(configuration));
             return outcomeOf(carried);
         } catch (Exception e) {
             log.error("Failed to send the client update to every machine", e);
@@ -83,8 +87,9 @@ public class ForceClientUpdateService {
     private ForceClientUpdateResponseItem processMachine(String machineId) {
         try {
             OpenFrameClientConfiguration configuration = loadConfiguration();
-            ClientUpdateDeliverySeed seed = ClientUpdateDeliverySeed.forMachine(machineId, configuration);
-            boolean carried = deliveryRouter.dispatch(seed);
+            Map<String, Object> details = detailsOf(configuration);
+            boolean carried = deviceCommandSender.send(DEVICE_CLIENT_UPDATE, machineId, details,
+                    () -> ClientUpdateDeliverySeed.forMachine(machineId, configuration));
             ForceAgentStatus outcome = outcomeOf(carried);
             return buildResponseItem(machineId, outcome);
         } catch (Exception e) {
@@ -96,6 +101,12 @@ public class ForceClientUpdateService {
     private OpenFrameClientConfiguration loadConfiguration() {
         return clientConfigurationRepository.findFirstByOrderByCreatedAtDesc()
                 .orElseThrow(() -> new IllegalStateException("Not found client configuration"));
+    }
+
+    private static Map<String, Object> detailsOf(OpenFrameClientConfiguration configuration) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("version", configuration.getVersion());
+        return details;
     }
 
     private static ForceAgentStatus outcomeOf(boolean carried) {

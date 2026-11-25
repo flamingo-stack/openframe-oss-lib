@@ -1,6 +1,9 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
@@ -11,7 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
+import java.util.Optional;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,15 +34,17 @@ class KnowledgeBaseTagServiceReplaceTest {
     private final TagAssignmentRepository assignments = mock(TagAssignmentRepository.class);
     private final KnowledgeBaseItemRepository items = mock(KnowledgeBaseItemRepository.class);
     private final KnowledgeBaseTagService service = new KnowledgeBaseTagService(
-            tags, assignments, items);
+            tags, assignments, items, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
 
     @Test
     @DisplayName("replacing tags adds the missing ones, removes the rest and leaves the kept ones alone")
     void replaceAppliesOnlyTheDifference() {
-        when(items.existsById("a1")).thenReturn(true);
+        when(items.findById("a1")).thenReturn(Optional.of(KnowledgeBaseItem.builder().id("a1").build()));
         when(tags.existsById("t2")).thenReturn(true);
         when(tags.existsById("t3")).thenReturn(true);
+        when(tags.findById("t3")).thenReturn(Optional.of(Tag.builder().id("t3").key("k3").build()));
         when(assignments.findByEntityIdAndEntityType("a1", TYPE)).thenReturn(List.of(tagged("t1"), tagged("t2")));
+        when(assignments.findByEntityIdAndTagIdAndEntityType("a1", "t1", TYPE)).thenReturn(Optional.of(tagged("t1")));
 
         service.replaceItemTags("a1", List.of("t2", "t3"));
 
@@ -54,6 +61,7 @@ class KnowledgeBaseTagServiceReplaceTest {
     @DisplayName("an empty list removes every tag and adds none")
     void emptyListClears() {
         when(assignments.findByEntityIdAndEntityType("a1", TYPE)).thenReturn(List.of(tagged("t1")));
+        when(assignments.findByEntityIdAndTagIdAndEntityType("a1", "t1", TYPE)).thenReturn(Optional.of(tagged("t1")));
 
         service.replaceItemTags("a1", List.of());
 

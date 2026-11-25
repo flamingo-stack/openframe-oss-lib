@@ -56,7 +56,8 @@ type OsUpdate {
     displayName: String
     displayVersion: String
     kbArticleIds: [String!]!
-    """The vendor's own severity. Null = the vendor gave none; always null on macOS for now."""
+    """The vendor's own severity, as the device reported it or else from Microsoft's bulletin. Null = the vendor
+    gave none; always null on macOS for now."""
     severity: OsUpdateSeverity
     """The vendor's category names, verbatim, in the language of the reporting device."""
     categories: [String!]!
@@ -66,12 +67,18 @@ type OsUpdate {
     updateType: OsUpdateType
     """Our class of the update. Null = stored before classification existed."""
     classification: OsUpdateClassification
+    """As the device reported them, or else from Microsoft's bulletin."""
     cveIds: [String!]!
     publishedAt: Instant
     sizeBytes: Long
     rebootBehavior: OsUpdateRebootBehavior
     """An optional or preview update."""
     browseOnly: Boolean
+    """A CVE of the update is known to be exploited, by Microsoft's bulletin or the CISA KEV catalog. Null = no CVE
+    of the update is known."""
+    exploited: Boolean
+    """When the update was last checked against the vendor's bulletin, with or without data. Null = not checked yet."""
+    enrichedAt: Instant
     """When a device of the tenant first reported the update."""
     firstSeenAt: Instant!
 
@@ -214,7 +221,8 @@ type DeviceOsPendingUpdate {
     displayName: String
     displayVersion: String
     kbArticleIds: [String!]!
-    """The vendor's own severity. Null = the vendor gave none; always null on macOS for now."""
+    """The vendor's own severity, as the device reported it or else from Microsoft's bulletin. Null = the vendor
+    gave none; always null on macOS for now."""
     severity: OsUpdateSeverity
     """The vendor's category names, verbatim."""
     categories: [String!]!
@@ -224,12 +232,18 @@ type DeviceOsPendingUpdate {
     updateType: OsUpdateType
     """Our class of the update. Null = stored before classification existed."""
     classification: OsUpdateClassification
+    """As the device reported them, or else from Microsoft's bulletin."""
     cveIds: [String!]!
     publishedAt: Instant
     sizeBytes: Long
     rebootBehavior: OsUpdateRebootBehavior
     """An optional or preview update."""
     browseOnly: Boolean
+    """A CVE of the update is known to be exploited, by Microsoft's bulletin or the CISA KEV catalog. Null = no CVE
+    of the update is known."""
+    exploited: Boolean
+    """When the update was last checked against the vendor's bulletin, with or without data. Null = not checked yet."""
+    enrichedAt: Instant
 
     """When this device first reported the update. Does not move while the update stays pending."""
     discoveredAt: Instant!

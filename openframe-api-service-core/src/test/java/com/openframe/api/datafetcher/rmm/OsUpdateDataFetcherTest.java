@@ -6,6 +6,7 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceStatus;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateFilterInput;
@@ -35,12 +36,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OsUpdateDataFetcherTest {
 
     private static final List<String> ORGANIZATION_IDS = List.of("org-1");
+    private static final OsUpdateDeviceScope ORGANIZATION_DEVICES =
+            new OsUpdateDeviceScope(List.of("machine-1"));
 
     private static final String OS_UPDATE_ID = "6aff19c07ce86a3f0386ff82";
     private static final String MACHINE_ID = "machine-1";
@@ -77,7 +81,8 @@ class OsUpdateDataFetcherTest {
         when(osUpdateGraphQLMapper.toOsUpdateFilter(filterInput)).thenReturn(osUpdateFilter);
         when(osUpdateGraphQLMapper.toCursorPaginationCriteria(5, AFTER)).thenReturn(pagination);
         when(osUpdateGraphQLMapper.toOrganizationIds(filterInput)).thenReturn(ORGANIZATION_IDS);
-        when(osUpdateService.listOsUpdates(osUpdateFilter, ORGANIZATION_IDS, pagination)).thenReturn(osUpdates);
+        when(osUpdateService.findDeviceScope(ORGANIZATION_IDS)).thenReturn(ORGANIZATION_DEVICES);
+        when(osUpdateService.listOsUpdates(osUpdateFilter, ORGANIZATION_DEVICES, pagination)).thenReturn(osUpdates);
         when(osUpdateGraphQLMapper.toOsUpdateConnection(osUpdates)).thenReturn(connection);
 
         // execution
@@ -86,7 +91,8 @@ class OsUpdateDataFetcherTest {
 
         // verifications
         assertThat(found.getData()).isSameAs(connection);
-        assertThat(found.getLocalContext()).isEqualTo(ORGANIZATION_IDS);
+        assertThat(found.getLocalContext()).isSameAs(ORGANIZATION_DEVICES);
+        verify(osUpdateService).findDeviceScope(ORGANIZATION_IDS);
     }
 
     @Test
@@ -175,13 +181,13 @@ class OsUpdateDataFetcherTest {
     }
 
     @Test
-    void pendingDeviceCount_updateListedForOrganizations_countsLoadedForThoseOrganizations() {
+    void pendingDeviceCount_updateListedForOrganizations_countsLoadedForTheirDevices() {
         // setup
         OsUpdateDeviceCounts deviceCounts = OsUpdateDeviceCounts.builder().pendingDeviceCount(2).build();
         OsUpdateDeviceCountsKey osUpdateDeviceCountsKey =
-                OsUpdateDeviceCountsKey.builder().osUpdateId(OS_UPDATE_ID).organizationIds(ORGANIZATION_IDS).build();
+                OsUpdateDeviceCountsKey.builder().osUpdateId(OS_UPDATE_ID).osUpdateDeviceScope(ORGANIZATION_DEVICES).build();
         doReturn(osUpdate).when(dfe).getSource();
-        doReturn(ORGANIZATION_IDS).when(dfe).getLocalContext();
+        doReturn(ORGANIZATION_DEVICES).when(dfe).getLocalContext();
         doReturn(deviceCountsDataLoader).when(dfe).getDataLoader("osUpdateDeviceCountsDataLoader");
         when(deviceCountsDataLoader.load(osUpdateDeviceCountsKey))
                 .thenReturn(CompletableFuture.completedFuture(deviceCounts));
@@ -215,7 +221,8 @@ class OsUpdateDataFetcherTest {
         doReturn(osUpdate).when(dfe).getSource();
         doReturn(deviceCountsDataLoader).when(dfe).getDataLoader("osUpdateDeviceCountsDataLoader");
         OsUpdateDeviceCountsKey osUpdateDeviceCountsKey =
-                OsUpdateDeviceCountsKey.builder().osUpdateId(OS_UPDATE_ID).organizationIds(List.of()).build();
+                OsUpdateDeviceCountsKey.builder().osUpdateId(OS_UPDATE_ID)
+                        .osUpdateDeviceScope(OsUpdateDeviceScope.EVERY_DEVICE).build();
         when(deviceCountsDataLoader.load(osUpdateDeviceCountsKey))
                 .thenReturn(CompletableFuture.completedFuture(deviceCounts));
     }

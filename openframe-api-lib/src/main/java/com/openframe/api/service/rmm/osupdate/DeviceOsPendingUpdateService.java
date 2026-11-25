@@ -64,19 +64,19 @@ public class DeviceOsPendingUpdateService {
         List<String> notManageableMachineIds = deviceOsStateService.listNotManageableMachineIds();
         if (scopeMachineIds == null) {
             return deviceOsPendingUpdateRepository.countDevicesByIdentifier(
-                    tenantId, platform, identifiers, notManageableMachineIds);
+                    platform, identifiers, notManageableMachineIds, tenantId);
         }
         Set<String> notManageable = new HashSet<>(notManageableMachineIds);
         List<String> manageableScopeMachineIds = scopeMachineIds.stream()
                 .filter(machineId -> !notManageable.contains(machineId))
                 .toList();
         return deviceOsPendingUpdateRepository.countDevicesByIdentifierOnMachines(
-                tenantId, platform, identifiers, manageableScopeMachineIds);
+                platform, identifiers, manageableScopeMachineIds, tenantId);
     }
 
     public List<OsUpdateIdentifiersOfPlatform> listIdentifiersByPlatform(List<String> machineIds) {
         return deviceOsPendingUpdateRepository.findIdentifiersByPlatformOnMachines(
-                tenantIdProvider.getTenantId(), machineIds);
+                machineIds, tenantIdProvider.getTenantId());
     }
 
     // Devices we cannot manage are not listed. scopeMachineIds null = every device.

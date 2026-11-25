@@ -35,6 +35,8 @@ public class OsUpdateResponse {
     private Long sizeBytes;
     private OsUpdateRebootBehavior rebootBehavior;
     private Boolean browseOnly;
+    private Boolean exploited;
+    private Instant enrichedAt;
     private Instant firstSeenAt;
     private String cursor;
 }

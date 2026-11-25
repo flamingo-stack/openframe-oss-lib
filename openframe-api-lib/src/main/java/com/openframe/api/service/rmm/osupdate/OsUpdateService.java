@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm.osupdate;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -45,14 +46,22 @@ public class OsUpdateService {
     private final OsUpdateResponseMapper osUpdateResponseMapper;
     private final TenantIdProvider tenantIdProvider;
 
-    // Organizations: only the updates pending on or installed by their devices. Empty = every organization.
+    // Empty organizations = every device.
+    public OsUpdateDeviceScope findDeviceScope(List<String> organizationIds) {
+        return isEmpty(organizationIds)
+                ? OsUpdateDeviceScope.EVERY_DEVICE
+                : new OsUpdateDeviceScope(deviceService.findDeviceIdsOfOrganizations(organizationIds));
+    }
+
+    // A scope of some devices: only the updates pending on or installed by them.
     public GenericQueryResult<OsUpdateResponse> listOsUpdates(OsUpdateFilter osUpdateFilter,
-                                                              List<String> organizationIds,
+                                                              OsUpdateDeviceScope osUpdateDeviceScope,
                                                               CursorPaginationCriteria pagination) {
         CursorPaginationCriteria normalizedPagination = pagination.normalize();
-        OsUpdateFilter scopedOsUpdateFilter = isEmpty(organizationIds)
+        List<String> scopeMachineIds = osUpdateDeviceScope.getMachineIds();
+        OsUpdateFilter scopedOsUpdateFilter = scopeMachineIds == null
                 ? osUpdateFilter
-                : osUpdateFilter.toBuilder().osUpdateIds(findOsUpdateIdsOfOrganizations(organizationIds)).build();
+                : osUpdateFilter.toBuilder().osUpdateIds(findOsUpdateIdsOfMachines(scopeMachineIds)).build();
         List<OsUpdate> fetchedOsUpdates = osUpdateRepository.findPage(tenantIdProvider.getTenantId(),
                 scopedOsUpdateFilter, normalizedPagination.getCursor(), normalizedPagination.getLimit() + 1);
         return cursorPageAssembler.toPage(
@@ -70,17 +79,15 @@ public class OsUpdateService {
     }
 
     // Pending: devices that list the update now, without the devices we cannot manage. Installed: devices whose
-    // stored history has a successful install of it. Only Windows reports a history. Organizations: only their
-    // devices are counted. Empty = every organization.
+    // stored history has a successful install of it. Only Windows reports a history. Only the devices of the scope
+    // are counted.
     public Map<String, OsUpdateDeviceCounts> countDevices(Collection<String> osUpdateIds,
-                                                          List<String> organizationIds) {
+                                                          OsUpdateDeviceScope osUpdateDeviceScope) {
         List<OsUpdate> osUpdates = osUpdateRepository.findByTenantIdAndIdIn(tenantIdProvider.getTenantId(), osUpdateIds);
         if (osUpdates.isEmpty()) {
             return Map.of();
         }
-        List<String> scopeMachineIds = isEmpty(organizationIds)
-                ? null
-                : deviceService.findDeviceIdsOfOrganizations(organizationIds);
+        List<String> scopeMachineIds = osUpdateDeviceScope.getMachineIds();
         Map<OsPlatform, List<OsUpdate>> osUpdatesByPlatform = osUpdates.stream()
                 .collect(Collectors.groupingBy(OsUpdate::getPlatform));
         Map<String, OsUpdateDeviceCounts> deviceCountsByOsUpdateId = new HashMap<>();
@@ -90,9 +97,8 @@ public class OsUpdateService {
     }
 
     // An identifier names one update within one platform; only Windows reports a history.
-    private List<String> findOsUpdateIdsOfOrganizations(List<String> organizationIds) {
+    private List<String> findOsUpdateIdsOfMachines(List<String> machineIds) {
         String tenantId = tenantIdProvider.getTenantId();
-        List<String> machineIds = deviceService.findDeviceIdsOfOrganizations(organizationIds);
         Map<OsPlatform, Set<String>> identifiersByPlatform = new EnumMap<>(OsPlatform.class);
         deviceOsPendingUpdateService.listIdentifiersByPlatform(machineIds)
                 .forEach(identifiersOfPlatform -> identifiersByPlatform

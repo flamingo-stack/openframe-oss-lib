@@ -62,6 +62,11 @@ public class MachineWriter {
         Supplier<Machine> write = () -> mongoTemplate.findAndModify(query, mongoUpdate, returnOld, Machine.class);
         Machine before = runPublishingIfEventFields(machineId, update, write);
 
+        if (before == null && guard != null) {
+            log.debug("Machine not updated, the condition did not match or the machine does not exist: "
+                    + "machineId={}, fields={}", machineId, update.paths());
+            return Optional.empty();
+        }
         if (before == null) {
             log.info("Machine update matched nothing, skipping: machineId={}, fields={}",
                     machineId, update.paths());

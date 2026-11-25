@@ -56,6 +56,8 @@ public class DeviceOsResponseMapper {
                 .sizeBytes(osUpdate.getSizeBytes())
                 .rebootBehavior(osUpdate.getRebootBehavior())
                 .browseOnly(osUpdate.getBrowseOnly())
+                .exploited(osUpdate.getExploited())
+                .enrichedAt(osUpdate.getEnrichedAt())
                 .build();
     }
 

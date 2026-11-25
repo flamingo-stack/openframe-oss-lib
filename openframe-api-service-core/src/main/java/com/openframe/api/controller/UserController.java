@@ -48,7 +48,11 @@ public class UserController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(@PathVariable String id,
                            @AuthenticationPrincipal AuthPrincipal principal) {
-        userService.softDeleteUser(id, principal.getId());
+        if (principal.getId().equals(id)) {
+            userService.deleteOwnAccount(id);
+            return;
+        }
+        userService.deleteUser(id);
     }
 
     @PostMapping("/{id}/transfer-ownership")

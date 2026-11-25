@@ -4,9 +4,12 @@ import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.tenant.Tenant;
+import com.openframe.data.document.tenant.TenantStatus;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.reactive.repository.device.ReactiveMachineRepository;
+import com.openframe.data.reactive.repository.tenant.ReactiveTenantRepository;
 import com.openframe.data.reactive.repository.user.ReactiveUserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,8 +34,12 @@ import static org.springframework.util.StringUtils.hasText;
  * <ul>
  *   <li>the user is no longer {@link UserStatus#ACTIVE}, or the token was issued before the user's
  *       {@link User#getTokensRevokedAt() tokensRevokedAt};</li>
- *   <li>the device is {@link DeviceStatus#DELETED}. A device pending deletion stays allowed: the
- *       uninstall is the one command it is still waiting for.</li>
+ *   <li>the device is {@link DeviceStatus#DELETED}, or the token was issued before the device's
+ *       {@link Machine#getTokensRevokedAt() tokensRevokedAt}. A device pending deletion stays
+ *       allowed: the uninstall is the one command it is still waiting for;</li>
+ *   <li>the subject's tenant is {@link TenantStatus#BLOCKED} or {@link TenantStatus#DELETED}. A
+ *       user's tenant comes from the token, a device's from its machine record, as device tokens
+ *       name no tenant. An unblock lets the tenant's tokens through again within {@code cache-ttl}.</li>
  * </ul>
  * Lookups are cached per subject, so a revocation lands within {@code cache-ttl}. A subject that is
  * not found, or a lookup that fails, lets the token through: only positive evidence rejects, so an
@@ -48,16 +55,19 @@ public class TokenRevocationChecker {
 
     private final ReactiveUserRepository userRepository;
     private final ReactiveMachineRepository machineRepository;
+    private final ReactiveTenantRepository tenantRepository;
     private final boolean enabled;
     private final AsyncCache<String, SubjectState> states;
 
     public TokenRevocationChecker(ReactiveUserRepository userRepository,
                                   ReactiveMachineRepository machineRepository,
+                                  ReactiveTenantRepository tenantRepository,
                                   @Value("${openframe.gateway.token-revocation.enabled:false}") boolean enabled,
                                   @Value("${openframe.gateway.token-revocation.cache-ttl:10s}") Duration cacheTtl,
                                   @Value("${openframe.gateway.token-revocation.cache-max-size:100000}") long cacheMaxSize) {
         this.userRepository = userRepository;
         this.machineRepository = machineRepository;
+        this.tenantRepository = tenantRepository;
         this.enabled = enabled;
         this.states = Caffeine.newBuilder()
                 .expireAfterWrite(cacheTtl)
@@ -88,12 +98,22 @@ public class TokenRevocationChecker {
     private Mono<Void> verifyUser(Jwt jwt, String userId) {
         String tenantId = jwt.getClaimAsString(TENANT_ID_CLAIM);
         return state("user:" + tenantId + ":" + userId, () -> findUser(tenantId, userId).map(SubjectState::of))
-                .flatMap(state -> rejectIfRevoked(state, jwt, "user " + userId));
+                .flatMap(state -> rejectIfRevoked(state, jwt, "user " + userId))
+                .then(verifyTenant(jwt, tenantId, "user " + userId));
     }
 
     private Mono<Void> verifyMachine(Jwt jwt, String machineId) {
+        String subject = "machine " + machineId;
         return state("machine:" + machineId, () -> machineRepository.findByMachineId(machineId).map(SubjectState::of))
-                .flatMap(state -> rejectIfRevoked(state, jwt, "machine " + machineId));
+                .flatMap(state -> rejectIfRevoked(state, jwt, subject).then(verifyTenant(jwt, state.tenantId(), subject)));
+    }
+
+    private Mono<Void> verifyTenant(Jwt jwt, String tenantId, String subject) {
+        if (!hasText(tenantId)) {
+            return Mono.empty();
+        }
+        return state("tenant:" + tenantId, () -> tenantRepository.findById(tenantId).map(SubjectState::of))
+                .flatMap(state -> rejectIfRevoked(state, jwt, subject + " of tenant " + tenantId));
     }
 
     /**
@@ -136,17 +156,24 @@ public class TokenRevocationChecker {
      *
      * @param removed       the subject may not use any token
      * @param revokedBefore tokens issued before this instant are rejected; null when none are
+     * @param tenantId      the tenant a device belongs to, whose status is checked next; null otherwise
      */
-    record SubjectState(boolean removed, Instant revokedBefore) {
+    record SubjectState(boolean removed, Instant revokedBefore, String tenantId) {
 
-        static final SubjectState UNKNOWN = new SubjectState(false, null);
+        static final SubjectState UNKNOWN = new SubjectState(false, null, null);
 
         static SubjectState of(User user) {
-            return new SubjectState(user.getStatus() != UserStatus.ACTIVE, user.getTokensRevokedAt());
+            return new SubjectState(user.getStatus() != UserStatus.ACTIVE, user.getTokensRevokedAt(), null);
         }
 
         static SubjectState of(Machine machine) {
-            return new SubjectState(machine.getStatus() == DeviceStatus.DELETED, null);
+            return new SubjectState(machine.getStatus() == DeviceStatus.DELETED, machine.getTokensRevokedAt(),
+                    machine.getTenantId());
+        }
+
+        static SubjectState of(Tenant tenant) {
+            TenantStatus status = tenant.getStatus();
+            return new SubjectState(status == TenantStatus.BLOCKED || status == TenantStatus.DELETED, null, null);
         }
 
         /**

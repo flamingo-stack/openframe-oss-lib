@@ -462,8 +462,9 @@ public class KnowledgeBaseController {
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.debug("Generating KB attachment download URL for {} - userId: {}, apiKeyId: {}", attachmentId, caller.userId(), caller.apiKeyId());
-        knowledgeBaseReadService.requireAttachment(attachmentId);
-        return new KnowledgeBaseAttachmentDownloadResponse(knowledgeBaseAttachmentService.generateDownloadUrl(attachmentId));
+        String downloadUrl = knowledgeBaseAttachmentService.generateDownloadUrl(attachmentId,
+                () -> knowledgeBaseReadService.requireAttachment(attachmentId));
+        return new KnowledgeBaseAttachmentDownloadResponse(downloadUrl);
     }
 
     @Operation(summary = "Delete an attachment", description = "Removes the file from storage and the metadata from the article")
@@ -479,8 +480,8 @@ public class KnowledgeBaseController {
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.info("Deleting KB attachment {} - userId: {}, apiKeyId: {}", attachmentId, caller.userId(), caller.apiKeyId());
-        knowledgeBaseReadService.requireAttachment(attachmentId);
-        knowledgeBaseAttachmentService.deleteAttachment(attachmentId);
+        knowledgeBaseAttachmentService.deleteAttachment(attachmentId,
+                () -> knowledgeBaseReadService.requireAttachment(attachmentId));
     }
 
     // -------------------------------------------------------------- helpers
