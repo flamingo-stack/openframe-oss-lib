@@ -29,8 +29,8 @@ public class IntegrationController {
         description = """
             Proxies the request to the integrated tool's own API.
 
-            **Fleet MDM (`fleetmdm-server`)** on multi-tenant deployments answers the same Fleet endpoints \
-            as the dashboard, scoped to your own devices and objects; any other method or Fleet endpoint \
+            **Fleet MDM (`fleetmdm-server`)** answers the same Fleet endpoints as the dashboard, scoped to \
+            your own devices and objects; any other method or Fleet endpoint \
             answers 403 `ENDPOINT_NOT_ALLOWED`. Paths start with `/tools/fleetmdm-server/api/latest/fleet`:
             - hosts: `GET .../hosts`, `GET .../hosts/{id}`, `GET .../hosts/identifier/{identifier}`, \
             `GET .../hosts/{id}/software`, `GET .../hosts/{id}/queries`, `POST .../hosts/{id}/refetch`
@@ -41,7 +41,7 @@ public class IntegrationController {
             - labels: `GET`/`POST .../labels`, `DELETE .../labels/id/{id}`
 
             Writes need `Content-Type: application/json`. `POST .../queries/run` starts a live query; its \
-            results are streamed over Fleet's websocket and cannot be read through this API.
+            results cannot be read through this API.
 
             To find a device's Fleet host, call `hosts/identifier/{osUuid}` with the `osUuid` (or the \
             `serialNumber`) from `GET /api/v1/devices/{machineId}`; a hostname can match more than one host. \
