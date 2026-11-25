@@ -176,13 +176,35 @@ class FleetProxyGuardTest {
 
     @ParameterizedTest
     @CsvSource({
+            "GET, /api/v1/fleet/policies",
             "POST, /api/v1/fleet/policies",
-            "PATCH, /api/v1/fleet/policies/7",
+            "PATCH, /api/latest/fleet/policies/7",
             "PUT, /api/v1/fleet/policies/7/hosts",
             "DELETE, /api/v1/fleet/labels/id/7",
             "POST, /api/v1/fleet/queries/run"
     })
-    void requireAllowed_listedNonGetEndpoint_throwsEndpointNotAllowed(String method, String toolPath) {
+    void requireAllowed_listedEndpointOfAnyMethod_passes(String method, String toolPath) {
+        // setup
+        FleetProxyGuard guard = guard(true, READS_AND_WRITES);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> guard.requireAllowed(method, toolPath));
+
+        // verifications
+        assertThat(thrown).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "DELETE, /api/v1/fleet/policies",
+            "PUT, /api/v1/fleet/policies",
+            "POST, /api/v1/fleet/policies/7",
+            "GET, /api/v1/fleet/labels/id/7",
+            "PATCH, /api/v1/fleet/policies/abc",
+            "DELETE, /api/v1/fleet/labels/id/../7",
+            "POST, /api/v1/fleet/queries/run;x=1"
+    })
+    void requireAllowed_writeNotListedForThatMethodOrPath_throwsEndpointNotAllowed(String method, String toolPath) {
         // setup
         FleetProxyGuard guard = guard(true, READS_AND_WRITES);
 
@@ -191,18 +213,6 @@ class FleetProxyGuardTest {
 
         // verifications
         assertEndpointNotAllowed(thrown);
-    }
-
-    @Test
-    void requireAllowed_listedGetBesideWrites_passes() {
-        // setup
-        FleetProxyGuard guard = guard(true, READS_AND_WRITES);
-
-        // execution
-        Throwable thrown = catchThrowable(() -> guard.requireAllowed("GET", "/api/v1/fleet/policies"));
-
-        // verifications
-        assertThat(thrown).isNull();
     }
 
     @Test

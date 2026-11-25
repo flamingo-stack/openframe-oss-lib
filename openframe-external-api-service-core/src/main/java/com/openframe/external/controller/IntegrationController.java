@@ -29,18 +29,21 @@ public class IntegrationController {
         description = """
             Proxies the request to the integrated tool's own API.
 
-            **Fleet MDM (`fleetmdm-server`)** on multi-tenant deployments answers only `GET` requests on the \
-            platform's Fleet endpoint list, scoped to your own devices; any other method or Fleet endpoint \
-            answers 403 `ENDPOINT_NOT_ALLOWED`. The reads are:
-            - hosts: `GET /tools/fleetmdm-server/api/v1/fleet/hosts`, `.../hosts/{id}`, \
-            `.../hosts/identifier/{identifier}`, `.../hosts/{id}/software`, `.../hosts/{id}/queries`
-            - policies: `.../policies`, `.../policies/{id}`, `.../policies/count`, `.../policies/{id}/hosts`
-            - queries: `.../queries`, `.../queries/{id}`, `.../queries/{id}/report`, `.../queries/{id}/hosts`
-            - labels: `.../labels`
+            **Fleet MDM (`fleetmdm-server`)** on multi-tenant deployments answers the same Fleet endpoints \
+            as the dashboard, scoped to your own devices and objects; any other method or Fleet endpoint \
+            answers 403 `ENDPOINT_NOT_ALLOWED`. Paths start with `/tools/fleetmdm-server/api/latest/fleet`:
+            - hosts: `GET .../hosts`, `GET .../hosts/{id}`, `GET .../hosts/identifier/{identifier}`, \
+            `GET .../hosts/{id}/software`, `GET .../hosts/{id}/queries`, `POST .../hosts/{id}/refetch`
+            - policies: `GET`/`POST .../policies`, `GET`/`PATCH .../policies/{id}`, `GET .../policies/count`, \
+            `POST .../policies/delete`, `GET`/`PUT .../policies/{id}/hosts`
+            - queries: `GET`/`POST .../queries`, `GET`/`PATCH .../queries/{id}`, `DELETE .../queries/id/{id}`, \
+            `POST .../queries/run`, `GET .../queries/{id}/report`, `GET`/`PUT .../queries/{id}/hosts`
+            - labels: `GET`/`POST .../labels`, `DELETE .../labels/id/{id}`
 
             To find a device's Fleet host, call `hosts/identifier/{osUuid}` with the `osUuid` (or the \
             `serialNumber`) from `GET /api/v1/devices/{machineId}`; a hostname can match more than one host. \
-            A host that is not one of your devices answers 404.
+            A host, policy, query or label that is not yours answers 404, and another tenant's host ids in \
+            a request body are never applied.
             """
     )
     @ApiResponses({

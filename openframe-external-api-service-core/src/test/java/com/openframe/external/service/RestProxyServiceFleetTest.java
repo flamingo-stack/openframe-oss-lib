@@ -124,21 +124,34 @@ class RestProxyServiceFleetTest {
     }
 
     @Test
-    void proxy_listedWriteEndpoint_throws403WithoutToolLookup() {
+    void proxy_listedWriteEndpoint_forwardedWithBodyAndTenantHeader() throws IOException {
         // setup
-        FleetProxyProperties properties = new FleetProxyProperties();
-        properties.setEnabled(true);
-        properties.setAllowedEndpoints(List.of("GET /api/{v}/fleet/policies", "POST /api/{v}/fleet/policies"));
-        FleetProxyGuard guard = new FleetProxyGuard(properties, tenantIdProvider);
-        CloseableHttpClient httpClient = new ToolProxyHttpClientConfig().toolProxyHttpClient();
-        MockEnvironment environment = new MockEnvironment();
-        environment.setActiveProfiles("test");
-        ProxyUrlResolver resolver = new ProxyUrlResolver(environment);
-        RestProxyService service = new RestProxyService(toolRepository, resolver, new ToolUrlService(), guard, httpClient);
+        startUpstream(200, "{\"policy\":{\"id\":7}}", null);
+        stubFleetTool();
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        RestProxyService service = service(true, List.of("GET /api/{v}/fleet/policies", "POST /api/{v}/fleet/policies"));
+        String body = "{\"name\":\"disk encryption\",\"query\":\"select 1\"}";
+
+        // execution
+        ResponseEntity<String> response = service.proxyApiRequest(FLEET,
+                request("POST", "/tools/fleetmdm-server/api/latest/fleet/policies"), body);
+
+        // verifications
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(received.get().method()).isEqualTo("POST");
+        assertThat(received.get().uri()).isEqualTo("/api/latest/fleet/policies");
+        assertThat(received.get().body()).isEqualTo(body);
+        assertThat(received.get().headers().get(TENANT_HEADER)).containsExactly(TENANT_ID);
+    }
+
+    @Test
+    void proxy_writeOnPathListedOnlyForGet_throws403WithoutToolLookup() {
+        // setup
+        RestProxyService service = service(true, List.of("GET /api/{v}/fleet/policies"));
 
         // execution
         Throwable thrown = catchThrowable(() -> service.proxyApiRequest(FLEET,
-                request("POST", "/tools/fleetmdm-server/api/v1/fleet/policies"), null));
+                request("POST", "/tools/fleetmdm-server/api/v1/fleet/policies"), "{}"));
 
         // verifications
         assertEndpointNotAllowed(thrown);
@@ -299,9 +312,13 @@ class RestProxyServiceFleetTest {
     }
 
     private RestProxyService service(boolean multiTenancy) {
+        return service(multiTenancy, ALLOWED);
+    }
+
+    private RestProxyService service(boolean multiTenancy, List<String> allowed) {
         FleetProxyProperties properties = new FleetProxyProperties();
         properties.setEnabled(multiTenancy);
-        properties.setAllowedEndpoints(ALLOWED);
+        properties.setAllowedEndpoints(allowed);
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("test");
         ProxyUrlResolver resolver = new ProxyUrlResolver(environment);
@@ -329,7 +346,9 @@ class RestProxyServiceFleetTest {
     private void startUpstream(int status, String body, String contentType) throws IOException {
         upstream = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         upstream.createContext("/", exchange -> {
-            received.set(new Received(exchange.getRequestURI().toString(), exchange.getRequestHeaders()));
+            String requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            received.set(new Received(exchange.getRequestMethod(), exchange.getRequestURI().toString(),
+                    exchange.getRequestHeaders(), requestBody));
             if (contentType != null) {
                 exchange.getResponseHeaders().set("Content-Type", contentType);
             }
@@ -354,6 +373,6 @@ class RestProxyServiceFleetTest {
         assertThat(((BaseException) thrown).getErrorCode()).isEqualTo(ErrorCode.ENDPOINT_NOT_ALLOWED);
     }
 
-    private record Received(String uri, Headers headers) {
+    private record Received(String method, String uri, Headers headers, String body) {
     }
 }
