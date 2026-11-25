@@ -1,9 +1,14 @@
 package com.openframe.data.document.device;
 
+import java.util.Collection;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toCollection;
 
 public enum DeviceStatus {
     PENDING,
@@ -28,6 +33,21 @@ public enum DeviceStatus {
     public static DeviceStatus fromStored(String name) {
         return Optional.ofNullable(RETIRED_NAMES.get(name))
                 .orElseGet(() -> valueOf(name));
+    }
+
+    public static Set<String> storedNames(DeviceStatus status) {
+        Stream<String> retired = RETIRED_NAMES.entrySet().stream()
+                .filter(entry -> entry.getValue() == status)
+                .map(Map.Entry::getKey)
+                .sorted();
+        return Stream.concat(Stream.of(status.name()), retired)
+                .collect(toCollection(LinkedHashSet::new));
+    }
+
+    public static Set<String> storedNames(Collection<DeviceStatus> statuses) {
+        return statuses.stream()
+                .flatMap(status -> storedNames(status).stream())
+                .collect(toCollection(LinkedHashSet::new));
     }
 
     public boolean isConnected() {

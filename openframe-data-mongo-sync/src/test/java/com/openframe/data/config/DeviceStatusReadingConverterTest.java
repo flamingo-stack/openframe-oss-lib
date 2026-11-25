@@ -14,8 +14,13 @@ import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
 import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.data.mongodb.core.convert.NoOpDbRefResolver;
+import org.springframework.data.mongodb.core.convert.QueryMapper;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
+import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 
+import java.util.Collection;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -105,6 +110,21 @@ class DeviceStatusReadingConverterTest {
 
         // verifications
         assertThat(document).containsEntry(STATUS, "MANAGED");
+    }
+
+    @Test
+    void queryMapping_storedNamesGuard_keptAsRawStrings() {
+        // setup
+        Query guard = Query.query(Criteria.where(STATUS).in(DeviceStatus.storedNames(DeviceStatus.MANAGED)));
+        QueryMapper queryMapper = new QueryMapper(converter);
+        MongoPersistentEntity<?> entity = converter.getMappingContext().getRequiredPersistentEntity(Machine.class);
+
+        // execution
+        Document mapped = queryMapper.getMappedObject(guard.getQueryObject(), entity);
+
+        // verifications
+        assertThat(mapped.get(STATUS, Document.class).get("$in", Collection.class))
+                .containsExactly("MANAGED", "ACTIVE", "OFFLINE", "ONLINE");
     }
 
     private static Document machineDocument(String status) {

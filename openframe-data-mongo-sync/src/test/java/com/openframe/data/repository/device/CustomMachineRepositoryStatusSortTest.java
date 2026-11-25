@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -35,7 +36,7 @@ import static org.mockito.Mockito.when;
 class CustomMachineRepositoryStatusSortTest {
 
     private static final String TENANT_ID = "tenant-1";
-    private static final List<String> DESC_ORDER = List.of("MANAGED", "PENDING", "PENDING_DELETION");
+    private static final List<String> MANAGED_STORED_NAMES = List.of("MANAGED", "ACTIVE", "OFFLINE", "ONLINE");
     private static final int UNKNOWN_RANK = 0;
 
     @Mock private MongoTemplate mongoTemplate;
@@ -56,12 +57,12 @@ class CustomMachineRepositoryStatusSortTest {
         List<Document> stages = capturedStages();
         assertThat(stages).hasSize(4);
         assertThat(stages.get(0).get("$match", Document.class)).containsEntry("tenantId", TENANT_ID);
-        Document rank = stages.get(1).get("$addFields", Document.class).get("_statusRank", Document.class);
-        List<?> cond = rank.getList("$cond", Object.class);
-        Document index = new Document("$indexOfArray", List.of(DESC_ORDER, "$status"));
-        assertThat(cond.get(0)).isEqualTo(new Document("$in", List.of("$status", DESC_ORDER)));
-        assertThat(cond.get(1)).isEqualTo(new Document("$subtract", List.of(3, index)));
-        assertThat(cond.get(2)).isEqualTo(UNKNOWN_RANK);
+        assertThat(statusSwitch(stages))
+                .containsEntry("branches", List.of(
+                        rankBranch(MANAGED_STORED_NAMES, 3),
+                        rankBranch(List.of("PENDING"), 2),
+                        rankBranch(List.of("PENDING_DELETION"), 1)))
+                .containsEntry("default", UNKNOWN_RANK);
         assertThat(stages.get(2).get("$sort", Document.class))
                 .containsExactly(entry("_statusRank", 1), entry("_id", 1));
         assertThat(stages.get(3)).containsEntry("$limit", 10L);
@@ -197,6 +198,77 @@ class CustomMachineRepositoryStatusSortTest {
     @DisplayName("statusRank: every status outside the explicit order ranks below PENDING_DELETION")
     void statusRank_otherStatusesRankLast(DeviceStatus status) {
         assertThat(CustomMachineRepositoryImpl.statusRank(status)).isEqualTo(UNKNOWN_RANK);
+    }
+
+    @Test
+    @DisplayName("status DESC cursor on a device stored as ONLINE: the cursor's rank is the rank Mongo gives the stored name")
+    void statusDescCursor_storedOnlineReadAsManaged_cursorRankMatchesStageRank() {
+        // setup
+        ObjectId cursorId = new ObjectId();
+        stubCursorDocument(cursorId, DeviceStatus.fromStored("ONLINE"));
+        stubAggregate(List.of());
+
+        // execution
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, cursorId.toHexString(), 10, "status", "DESC");
+
+        // verifications
+        List<Document> stages = capturedStages();
+        assertThat(branchRanksOf(stages, "ONLINE")).containsExactly(3);
+        assertThat(stages.get(2).get("$match", Document.class).getList("$or", Document.class)).containsExactly(
+                new Document("_statusRank", new Document("$lt", 3)),
+                new Document("_statusRank", 3).append("_id", new Document("$lt", cursorId)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MANAGED", "ONLINE", "OFFLINE", "ACTIVE", "PENDING", "PENDING_DELETION"})
+    @DisplayName("statusRank stage: a ranked stored name gets the rank of the status it reads as")
+    void statusRankStage_rankedStoredName_rankOfTheStatusItReadsAs(String storedName) {
+        // setup
+        stubAggregate(List.of());
+        int expected = CustomMachineRepositoryImpl.statusRank(DeviceStatus.fromStored(storedName));
+
+        // execution
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, null, 10, "status", "DESC");
+
+        // verifications
+        assertThat(branchRanksOf(capturedStages(), storedName)).containsExactly(expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DELETED", "ARCHIVED", "INACTIVE", "MAINTENANCE", "DECOMMISSIONED"})
+    @DisplayName("statusRank stage: an unranked stored name falls to the default rank, like its status in Java")
+    void statusRankStage_unrankedStoredName_defaultRank(String storedName) {
+        // setup
+        stubAggregate(List.of());
+        int expected = CustomMachineRepositoryImpl.statusRank(DeviceStatus.fromStored(storedName));
+
+        // execution
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, null, 10, "status", "DESC");
+
+        // verifications
+        assertThat(branchRanksOf(capturedStages(), storedName)).isEmpty();
+        assertThat(expected).isEqualTo(UNKNOWN_RANK);
+    }
+
+    private static Document statusSwitch(List<Document> stages) {
+        return stages.get(1).get("$addFields", Document.class)
+                .get("_statusRank", Document.class)
+                .get("$switch", Document.class);
+    }
+
+    private static List<Object> branchRanksOf(List<Document> stages, String storedName) {
+        return statusSwitch(stages).getList("branches", Document.class).stream()
+                .filter(branch -> caseNames(branch).contains(storedName))
+                .map(branch -> branch.get("then"))
+                .toList();
+    }
+
+    private static List<?> caseNames(Document branch) {
+        return (List<?>) branch.get("case", Document.class).getList("$in", Object.class).get(1);
+    }
+
+    private static Document rankBranch(List<String> storedNames, int rank) {
+        return new Document("case", new Document("$in", List.of("$status", storedNames))).append("then", rank);
     }
 
     private static MachineQueryFilter filter() {

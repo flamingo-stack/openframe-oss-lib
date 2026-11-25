@@ -6,6 +6,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -97,6 +99,68 @@ class DeviceStatusTest {
 
         // verifications
         assertThat(ex.getMessage()).contains("online");
+    }
+
+    @Test
+    void storedNames_managed_currentNameThenRetiredNames() {
+        // execution
+        Set<String> names = DeviceStatus.storedNames(DeviceStatus.MANAGED);
+
+        // verifications
+        assertThat(names).containsExactly("MANAGED", "ACTIVE", "OFFLINE", "ONLINE");
+    }
+
+    @Test
+    void storedNames_archived_currentNameThenRetiredNames() {
+        // execution
+        Set<String> names = DeviceStatus.storedNames(DeviceStatus.ARCHIVED);
+
+        // verifications
+        assertThat(names).containsExactly("ARCHIVED", "DECOMMISSIONED", "INACTIVE", "MAINTENANCE");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "PENDING_DELETION", "DELETED"})
+    void storedNames_statusWithoutRetiredNames_currentNameOnly(DeviceStatus status) {
+        // execution
+        Set<String> names = DeviceStatus.storedNames(status);
+
+        // verifications
+        assertThat(names).containsExactly(status.name());
+    }
+
+    @ParameterizedTest
+    @EnumSource(DeviceStatus.class)
+    void storedNames_everyName_readsBackAsThatStatus(DeviceStatus status) {
+        // execution
+        Set<String> names = DeviceStatus.storedNames(status);
+
+        // verifications
+        assertThat(names).allSatisfy(name -> assertThat(DeviceStatus.fromStored(name)).isEqualTo(status));
+    }
+
+    @Test
+    void storedNames_statuses_unionInGivenOrder() {
+        // setup
+        List<DeviceStatus> statuses = List.of(DeviceStatus.PENDING, DeviceStatus.MANAGED);
+
+        // execution
+        Set<String> names = DeviceStatus.storedNames(statuses);
+
+        // verifications
+        assertThat(names).containsExactly("PENDING", "MANAGED", "ACTIVE", "OFFLINE", "ONLINE");
+    }
+
+    @Test
+    void storedNames_everyStatus_coversEveryRetiredName() {
+        // setup
+        List<DeviceStatus> statuses = List.of(DeviceStatus.values());
+
+        // execution
+        Set<String> names = DeviceStatus.storedNames(statuses);
+
+        // verifications
+        assertThat(names).hasSize(11).contains("ONLINE", "OFFLINE", "ACTIVE", "INACTIVE", "MAINTENANCE", "DECOMMISSIONED");
     }
 
     private static Stream<Arguments> retiredNames() {

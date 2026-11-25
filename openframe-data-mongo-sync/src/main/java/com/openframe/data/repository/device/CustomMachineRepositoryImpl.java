@@ -94,7 +94,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     );
     private static final String DEFAULT_SORT_FIELD = "_id";
     // The order a DESC status sort returns (the frontends send DESC meaning "online first"); ASC is its exact reverse.
-    static final List<String> STATUS_DESC_ORDER = List.of("MANAGED", "PENDING", "PENDING_DELETION");
+    static final List<DeviceStatus> STATUS_DESC_ORDER =
+            List.of(DeviceStatus.MANAGED, DeviceStatus.PENDING, DeviceStatus.PENDING_DELETION);
     private static final String STATUS_RANK_FIELD = "_statusRank";
     private static final int UNKNOWN_STATUS_RANK = 0;
     // "connectivity" sorts on telemetryStatus; DESC means online first, like the status sort.
@@ -314,14 +315,18 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     private static AggregationOperation statusRankAddFieldsStage() {
-        String statusRef = "$" + STATUS_FIELD;
-        Document known = new Document("$in", List.of(statusRef, STATUS_DESC_ORDER));
-        Document index = new Document("$indexOfArray", List.of(STATUS_DESC_ORDER, statusRef));
-        int topRank = STATUS_DESC_ORDER.size();
-        Document knownRank = new Document("$subtract", List.of(topRank, index));
-        Document rank = new Document("$cond", List.of(known, knownRank, UNKNOWN_STATUS_RANK));
+        List<Document> branches = STATUS_DESC_ORDER.stream()
+                .map(CustomMachineRepositoryImpl::statusRankBranch)
+                .toList();
+        Document rank = new Document("$switch", new Document("branches", branches).append("default", UNKNOWN_STATUS_RANK));
         Document addFields = new Document("$addFields", new Document(STATUS_RANK_FIELD, rank));
         return ctx -> addFields;
+    }
+
+    private static Document statusRankBranch(DeviceStatus status) {
+        List<String> storedNames = List.copyOf(DeviceStatus.storedNames(status));
+        Document storedAsStatus = new Document("$in", List.of("$" + STATUS_FIELD, storedNames));
+        return new Document("case", storedAsStatus).append("then", statusRank(status));
     }
 
     private static AggregationOperation connectivityRankAddFieldsStage() {
@@ -379,7 +384,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         if (status == null) {
             return UNKNOWN_STATUS_RANK;
         }
-        int index = STATUS_DESC_ORDER.indexOf(status.name());
+        int index = STATUS_DESC_ORDER.indexOf(status);
         return index < 0 ? UNKNOWN_STATUS_RANK : STATUS_DESC_ORDER.size() - index;
     }
 
@@ -856,7 +861,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         Query query = Query.query(Criteria.where(TENANT_ID_FIELD).is(tenantId)
                 .and(MACHINE_ID_FIELD).is(machineId)
                 .and(VERSION_FIELD).is(version)
-                .and(STATUS_FIELD).in(managedStatuses));
+                .and(STATUS_FIELD).in(DeviceStatus.storedNames(managedStatuses)));
         return mongoTemplate.updateMulti(query, incrementReservationVersion(), Machine.class).getModifiedCount();
     }
 
@@ -865,7 +870,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                                               Collection<DeviceStatus> managedStatuses) {
         Query query = Query.query(Criteria.where(TENANT_ID_FIELD).is(tenantId)
                 .and(MACHINE_ID_FIELD).in(machineIds)
-                .and(STATUS_FIELD).in(managedStatuses));
+                .and(STATUS_FIELD).in(DeviceStatus.storedNames(managedStatuses)));
         return mongoTemplate.updateMulti(query, incrementReservationVersion(), Machine.class).getModifiedCount();
     }
 
