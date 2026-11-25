@@ -107,6 +107,7 @@ class DeviceOsWiringTest {
                 .hasBean("apiDeviceOsStateService")
                 .hasBean("apiDeviceOsPendingUpdateService")
                 .hasBean("apiDeviceOsUpdateHistoryService")
-                .hasBean("apiOsUpdateService"));
+                .hasBean("apiOsUpdateService")
+                .hasBean("apiCursorPageAssembler"));
     }
 }
