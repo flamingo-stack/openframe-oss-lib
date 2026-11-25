@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 @Data
@@ -59,6 +60,7 @@ public class Machine implements TenantScoped {
     private OsType osType;
     private String osVersion;
     private String osBuild;
+    private Set<String> withheldToolAgents;
     private String timezone;
     private Map<PackageManagerType, PackageManagerState> packageManagers;
     private SecurityState securityState;
@@ -78,6 +80,8 @@ public class Machine implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
+    private String enrollmentId;
+
     @Version
     private Long version;
 

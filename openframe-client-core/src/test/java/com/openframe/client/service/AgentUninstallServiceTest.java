@@ -5,6 +5,7 @@ import com.openframe.audit.AuditRecorder;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.client.event.DeviceUninstalledEvent;
 import com.openframe.client.exception.InvalidClientSecretException;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.device.DeviceStatus;
@@ -14,16 +15,15 @@ import com.openframe.data.model.audit.AuditActor;
 import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
-import com.openframe.data.service.machine.MachineUpdate;
-import com.openframe.data.service.machine.MachineWriteResult;
-import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.DeletedMachineCleanup.LifecycleChange;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,10 +38,10 @@ import static com.openframe.data.document.audit.AuditActorType.DEVICE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,7 +58,6 @@ class AgentUninstallServiceTest {
     @Mock private OAuthClientRepository oauthClientRepository;
     @Mock private ClientSecretValidator clientSecretValidator;
     @Mock private MachineRepository machineRepository;
-    @Mock private MachineWriter machineWriter;
     @Mock private ToolConnectionService toolConnectionService;
     @Mock private InstalledAgentService installedAgentService;
     @Mock private DeletedMachineCleanup deletedMachineCleanup;
@@ -76,14 +75,13 @@ class AgentUninstallServiceTest {
         OAuthClient client = new OAuthClient();
         client.setRoles(new String[]{AGENT_ROLE});
         when(oauthClientRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(client));
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId(MACHINE)).thenReturn(Optional.of(m));
         return m;
     }
 
-    private void activeMachineIsDeleted() {
+    private void activeMachineIsDeleted(List<AuditEntry> scheduleRemovals) {
         Machine machine = machineIs(DeviceStatus.ONLINE);
-        when(machineWriter.update(eq(MACHINE), any(MachineUpdate.class)))
-                .thenReturn(Optional.of(new MachineWriteResult(machine, machine)));
+        when(deletedMachineCleanup.markDeleted(machine)).thenReturn(new LifecycleChange(machine, scheduleRemovals));
     }
 
     @Test
@@ -95,12 +93,12 @@ class AgentUninstallServiceTest {
         doThrow(refused).when(clientSecretValidator).validate(client, "wrong", "uninstall");
 
         assertThatThrownBy(() -> service.uninstall(MACHINE, "wrong")).isSameAs(refused);
-        verifyNoInteractions(machineRepository, machineWriter, auditedMethodRunner);
+        verifyNoInteractions(machineRepository, deletedMachineCleanup, auditedMethodRunner);
     }
 
     @Test
     void uninstall_activeMachine_runsAsTheDeviceWithItsLoginClientRoles() {
-        machineIs(DeviceStatus.ONLINE);
+        activeMachineIsDeleted(List.of());
 
         service.uninstall(MACHINE, SECRET);
 
@@ -113,13 +111,12 @@ class AgentUninstallServiceTest {
 
     @Test
     void uninstall_deviceRemovedFromSchedules_recordsTheRemovalsInsideTheAuditedUninstall() {
-        activeMachineIsDeleted();
         List<AuditEntry> removals = List.of(AuditEntry.builder()
                 .action(SCRIPT_SCHEDULE_DEVICES_REMOVE)
                 .outcome(AuditOutcome.SUCCESS)
                 .targetId("schedule-1")
                 .build());
-        when(deletedMachineCleanup.cleanUpDeletedMachine(TENANT, MACHINE)).thenReturn(removals);
+        activeMachineIsDeleted(removals);
         doNothing().when(auditedMethodRunner).run(eq(DEVICE_UNINSTALL), eq(MACHINE), any(Runnable.class));
         service.uninstall(MACHINE, SECRET);
         ArgumentCaptor<Runnable> work = ArgumentCaptor.forClass(Runnable.class);
@@ -138,37 +135,37 @@ class AgentUninstallServiceTest {
         deleted.setMachineId(MACHINE);
         deleted.setTenantId(TENANT);
         deleted.setStatus(DeviceStatus.DELETED);
-        when(machineWriter.update(eq(MACHINE), any(MachineUpdate.class)))
-                .thenReturn(Optional.of(new MachineWriteResult(machine, deleted)));
+        when(deletedMachineCleanup.markDeleted(machine)).thenReturn(new LifecycleChange(deleted, List.of()));
 
         service.uninstall(MACHINE, SECRET);
 
-        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
-        verify(machineWriter).update(eq(MACHINE), update.capture());
-        assertThat(update.getValue().paths()).containsExactly("status");
+        InOrder order = inOrder(deletedMachineCleanup, toolConnectionService, installedAgentService);
+        order.verify(deletedMachineCleanup).markDeleted(machine);
+        order.verify(toolConnectionService).disconnectAll(MACHINE);
+        order.verify(installedAgentService).disconnectAll(MACHINE);
         verify(machineRepository, never()).save(any());
-        verify(deletedMachineCleanup).cleanUpDeletedMachine(TENANT, MACHINE);
         ArgumentCaptor<DeviceUninstalledEvent> event = ArgumentCaptor.forClass(DeviceUninstalledEvent.class);
         verify(eventPublisher).publishEvent(event.capture());
-        assertThat(event.getValue().getMachine().getMachineId()).isEqualTo(MACHINE);
+        assertThat(event.getValue().getMachine()).isSameAs(deleted);
     }
 
     @Test
-    @DisplayName("an already DELETED machine is a no-op and publishes nothing")
-    void alreadyDeletedIsNoOp() {
-        machineIs(DeviceStatus.DELETED);
+    @DisplayName("an already DELETED machine repeats schedule cleanup without republishing or an uninstall event")
+    void alreadyDeletedRetriesScheduleCleanup() {
+        Machine machine = machineIs(DeviceStatus.DELETED);
+        when(deletedMachineCleanup.markDeleted(machine)).thenReturn(new LifecycleChange(machine, List.of()));
 
         service.uninstall(MACHINE, SECRET);
 
-        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
-        verifyNoInteractions(deletedMachineCleanup, eventPublisher);
+        verify(deletedMachineCleanup).markDeleted(machine);
+        verifyNoInteractions(eventPublisher, auditedMethodRunner);
     }
 
     @Test
     @DisplayName("a machine without a document publishes nothing")
     void missingMachinePublishesNothing() {
         when(oauthClientRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(new OAuthClient()));
-        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.empty());
+        when(machineRepository.findOnPrimaryByMachineId(MACHINE)).thenReturn(Optional.empty());
 
         service.uninstall(MACHINE, SECRET);
 
@@ -178,11 +175,22 @@ class AgentUninstallServiceTest {
     @Test
     @DisplayName("a machine document removed between the read and the write publishes nothing")
     void machineGoneBeforeTheWrite_publishesNothing() {
-        machineIs(DeviceStatus.ONLINE);
-        when(machineWriter.update(eq(MACHINE), any(MachineUpdate.class))).thenReturn(Optional.empty());
+        Machine machine = machineIs(DeviceStatus.ONLINE);
+        when(deletedMachineCleanup.markDeleted(machine)).thenThrow(new ConflictException("device changed"));
+        when(machineRepository.findOnPrimaryByMachineId(MACHINE)).thenReturn(Optional.of(machine), Optional.empty());
 
         service.uninstall(MACHINE, SECRET);
 
-        verifyNoInteractions(deletedMachineCleanup, eventPublisher);
+        verifyNoInteractions(toolConnectionService, installedAgentService, eventPublisher);
+    }
+
+    @Test
+    void uninstall_machineChangedByAnotherWriterAndStillThere_throwsTheConflict() {
+        Machine machine = machineIs(DeviceStatus.ONLINE);
+        ConflictException conflict = new ConflictException("device changed");
+        when(deletedMachineCleanup.markDeleted(machine)).thenThrow(conflict);
+
+        assertThatThrownBy(() -> service.uninstall(MACHINE, SECRET)).isSameAs(conflict);
+        verifyNoInteractions(toolConnectionService, installedAgentService, eventPublisher);
     }
 }

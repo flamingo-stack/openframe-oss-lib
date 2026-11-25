@@ -16,6 +16,7 @@ import com.openframe.client.service.agentregistration.*;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -35,6 +36,7 @@ import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -364,6 +366,29 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
+    void reinstall_FromDeletedStateClearsLegacyMembershipBeforeRestoring() {
+        // setup
+        OAuthClient existingClient = new OAuthClient();
+        existingClient.setMachineId(MACHINE_ID);
+        Machine deleted = new Machine();
+        deleted.setMachineId(MACHINE_ID);
+        deleted.setStatus(DeviceStatus.DELETED);
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
+        when(machineRepository.findOnPrimaryByMachineId(MACHINE_ID)).thenReturn(Optional.of(deleted));
+        when(organizationIdResolver.resolve("org-1")).thenReturn("same-org");
+        when(deletedMachineCleanup.reenrollDeleted(eq(deleted), any())).thenAnswer(invocation ->
+                writeResult(deleted, invocation.getArgument(1, MachineUpdate.class)).orElseThrow().after());
+
+        // execution
+        AgentRegistrationResponse response = agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertEquals(MACHINE_ID, response.getMachineId());
+        verify(deletedMachineCleanup).reenrollDeleted(eq(deleted), any(MachineUpdate.class));
+        verifyNoInteractions(machineWriter);
+    }
+
+    @Test
     void reinstall_WithInvalidInitialKey_FailsBeforeClientSecretCheck() {
         doThrow(new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key"))
                 .when(agentRegistrationSecretValidator).validate(INITIAL_KEY);
@@ -375,7 +400,7 @@ class AgentRegistrationServiceTest {
 
         verify(oauthClientRepository, never()).findByMachineId(any());
         verify(clientSecretValidator, never()).validate(any(), any(), any());
-        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).findOnPrimaryByMachineId(any());
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(machineWriter);
         verify(oauthClientRepository, never()).save(any());
@@ -400,7 +425,7 @@ class AgentRegistrationServiceTest {
         assertEquals("Invalid client secret", ex.getMessage());
 
         verify(clientSecretValidator, never()).validate(any(), any(), any());
-        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).findOnPrimaryByMachineId(any());
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(machineWriter);
         assertThat(refused())
@@ -422,7 +447,7 @@ class AgentRegistrationServiceTest {
         );
 
         verify(agentRegistrationSecretValidator).validate(INITIAL_KEY);
-        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).findOnPrimaryByMachineId(any());
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(machineWriter);
         verify(oauthClientRepository, never()).save(any());
@@ -590,7 +615,10 @@ class AgentRegistrationServiceTest {
                 () -> agentRegistrationService.register(INITIAL_KEY, request));
 
         assertSame(failure, thrown);
-        Machine discarded = writtenOver(new Machine());
+        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(eq(MACHINE_ID), update.capture());
+        Machine discarded = new Machine();
+        update.getValue().applyTo(discarded);
         assertEquals(DeviceStatus.DELETED, discarded.getStatus());
         verify(installedAgentService).disconnectAll(MACHINE_ID);
     }
@@ -601,7 +629,7 @@ class AgentRegistrationServiceTest {
         stubNewMachineRegistration();
         doThrow(new IllegalStateException("post-processing failed"))
                 .when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
-        stubWriterOver(savedMachineOf("tenant-1"));
+        stubFailedRegistrationWriterOver(savedMachineOf("tenant-1"));
 
         // execution
         assertThrows(IllegalStateException.class, () -> agentRegistrationService.register(INITIAL_KEY, request));
@@ -631,7 +659,7 @@ class AgentRegistrationServiceTest {
         stubNewMachineRegistration();
         IllegalStateException failure = new IllegalStateException("post-processing failed");
         doThrow(failure).when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
-        stubWriterOver(savedMachineOf("tenant-1"));
+        stubFailedRegistrationWriterOver(savedMachineOf("tenant-1"));
         doThrow(new IllegalStateException("mongo is down"))
                 .when(deletedMachineCleanup).cleanUpDeletedMachine("tenant-1", MACHINE_ID);
 
@@ -679,6 +707,72 @@ class AgentRegistrationServiceTest {
         assertSame(failure, thrown);
     }
 
+    @Test
+    void registerAgent_WithOsVersionAndBuild_CopiesThemOntoTheNewMachine() {
+        // setup
+        stubNewMachineRegistration();
+        request.setOsVersion("11.7.10");
+        request.setOsBuild("20G1427");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("11.7.10", "20G1427");
+    }
+
+    @Test
+    void registerAgent_WithBlankOsVersionAndBuild_LeavesThemUnset() {
+        // setup
+        stubNewMachineRegistration();
+        request.setOsVersion(" ");
+        request.setOsBuild("");
+
+        // execution
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        // verifications
+        verify(machineRepository).save(machineCaptor.capture());
+        assertThat(machineCaptor.getValue())
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly(null, null);
+    }
+
+    @Test
+    void reinstall_WithOsVersionAndBuild_OverwritesTheStoredOnes() {
+        // setup
+        stubReinstallOf(machineWithOsInfo());
+        request.setOsVersion("14.2.1");
+        request.setOsBuild("23C71");
+
+        // execution
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertThat(writtenOver(machineWithOsInfo()))
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("14.2.1", "23C71");
+    }
+
+    @Test
+    void reinstall_WithBlankOsVersionAndBuild_KeepsTheStoredOnes() {
+        // setup
+        stubReinstallOf(machineWithOsInfo());
+        request.setOsVersion(" ");
+        request.setOsBuild(null);
+
+        // execution
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        // verifications
+        assertThat(writtenOver(machineWithOsInfo()))
+                .extracting(Machine::getOsVersion, Machine::getOsBuild)
+                .containsExactly("13.6.1", "22G313");
+    }
+
     private void stubNewMachineRegistration() {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
@@ -699,17 +793,25 @@ class AgentRegistrationServiceTest {
     }
 
     private void stubWriterOver(Machine existingMachine) {
-        lenient().when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingMachine));
-        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenAnswer(invocation -> {
-            Machine after = copyOf(existingMachine);
-            invocation.getArgument(1, MachineUpdate.class).applyTo(after);
-            return Optional.of(new MachineWriteResult(existingMachine, after));
-        });
+        when(machineRepository.findOnPrimaryByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingMachine));
+        when(machineWriter.update(eq(MACHINE_ID), any(Criteria.class), any(MachineUpdate.class))).thenAnswer(invocation ->
+                writeResult(existingMachine, invocation.getArgument(2, MachineUpdate.class)));
+    }
+
+    private void stubFailedRegistrationWriterOver(Machine existingMachine) {
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenAnswer(invocation ->
+                writeResult(existingMachine, invocation.getArgument(1, MachineUpdate.class)));
+    }
+
+    private static Optional<MachineWriteResult> writeResult(Machine before, MachineUpdate update) {
+        Machine after = copyOf(before);
+        update.applyTo(after);
+        return Optional.of(new MachineWriteResult(before, after));
     }
 
     private Machine writtenOver(Machine existingMachine) {
         ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
-        verify(machineWriter).update(eq(MACHINE_ID), update.capture());
+        verify(machineWriter).update(eq(MACHINE_ID), any(Criteria.class), update.capture());
         assertFalse(update.getValue().paths().stream().anyMatch(path -> path.startsWith("directory")),
                 "a reinstall never writes the directory summary");
         Machine after = copyOf(existingMachine);
@@ -867,13 +969,12 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
-    void reinstall_machineGone_failsWithMachineNotFound() {
+    void reinstall_machineGone_refusesWithAConflict() {
         stubRegisteredClient();
-        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Machine not found for registered client: test-machine-id");
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Device test-machine-id changed during reinstall. Try again.");
     }
 
     private void stubNewRegistration() {
@@ -891,8 +992,7 @@ class AgentRegistrationServiceTest {
         stubRegisteredClient();
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
-        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class)))
-                .thenReturn(Optional.of(new MachineWriteResult(machine, machine)));
+        stubWriterOver(machine);
     }
 
     private Map<String, Object> registrationDetails() {
@@ -919,5 +1019,13 @@ class AgentRegistrationServiceTest {
         ArgumentCaptor<AuditEntry> entry = ArgumentCaptor.forClass(AuditEntry.class);
         verify(auditRecorder).recordOnce(entry.capture(), anyString());
         return entry.getValue();
+    }
+
+    private static Machine machineWithOsInfo() {
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE_ID);
+        machine.setOsVersion("13.6.1");
+        machine.setOsBuild("22G313");
+        return machine;
     }
 }

@@ -428,9 +428,13 @@ function DeviceTypeGridIcon({ type }: { type: string | null | undefined }) {
   );
 }
 
-/** The device's connectivity icon (its type icon in the legacy display), its name, and its unread mark at the end. */
-function DeviceNameGridCell({ device }: { device: DeviceRow }) {
-  const unread = (device.unreadNotificationCount ?? 0) > 0;
+/**
+ * The device's connectivity icon (its type icon in the legacy display), its name, and its unread mark at the end.
+ * `unreadMark={false}` leaves the mark out: a list a device is picked from (`DeviceSelector`) is not where its
+ * notifications are read.
+ */
+export function DeviceNameGridCell({ device, unreadMark = true }: { device: DeviceRow; unreadMark?: boolean }) {
+  const unread = unreadMark && (device.unreadNotificationCount ?? 0) > 0;
   return (
     <DataTable.Cell
       leading={{
@@ -472,7 +476,7 @@ function DeviceStatusGridCell({ device }: { device: DeviceRow }) {
 }
 
 /** The customer's logo and name. */
-function OrganizationGridCell({ device }: { device: DeviceRow }) {
+export function OrganizationGridCell({ device }: { device: DeviceRow }) {
   const fullImageUrl = useDeviceImageUrl(device.organizationImageUrl, device.organizationImageHash);
   return (
     <DataTable.Cell

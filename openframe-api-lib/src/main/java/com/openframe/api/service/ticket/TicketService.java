@@ -7,6 +7,7 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.ticket.CreateTicketInput;
 import com.openframe.api.dto.ticket.ReorderTicketInput;
+import com.openframe.api.dto.ticket.SystemTicketCommand;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.UpdateTicketInput;
 import com.openframe.api.exception.DeviceNotFoundException;
@@ -28,6 +29,7 @@ import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.ticket.AdminTicketOwner;
 import com.openframe.data.document.ticket.ClientTicketOwner;
 import com.openframe.data.document.ticket.Ticket;
@@ -35,6 +37,7 @@ import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.document.user.User;
+import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -199,9 +202,7 @@ public class TicketService {
             applyManualStatusIfLifecycle(ticket, input.getStatusId());
         }
 
-        ticket.setOrder(computeTopOrder(ticket));
-
-        Ticket savedTicket = ticketRepository.save(ticket);
+        Ticket savedTicket = saveAtTopOfStatusColumn(ticket);
         log.info("Created ticket #{} with ID: {}", savedTicket.getTicketNumber(), savedTicket.getId());
 
         if (isAdmin(principal)) {
@@ -235,11 +236,31 @@ public class TicketService {
         populateClientOrigin(ticket, principal);
         applyInitialStatus(ticket, TicketStatusKind.AI_ASSISTANCE);
 
-        ticket.setOrder(computeTopOrder(ticket));
-
-        Ticket savedTicket = ticketRepository.save(ticket);
+        Ticket savedTicket = saveAtTopOfStatusColumn(ticket);
         log.info("Created ticket #{} from dialog", savedTicket.getTicketNumber());
 
+        return savedTicket;
+    }
+
+    @Transactional
+    public Ticket createSystemTicket(SystemTicketCommand command) {
+        Integer ticketNumber = ticketNumberService.getNextTicketNumber();
+        Ticket ticket = SystemTicketFields.newTicket(command, ticketNumber);
+
+        String statusId = command.getStatusId();
+        String assigneeId = command.getAssigneeId();
+        String organizationId = command.getOrganizationId();
+        String deviceId = command.getDeviceId();
+        ticketLifecycleService.applySystemInitialStatus(ticket, statusId);
+        activeAssignee(assigneeId).ifPresent(user -> setAssignee(ticket, user));
+        activeOrganization(organizationId).ifPresent(organization -> setOrganization(ticket, organization));
+        existingDevice(deviceId).ifPresent(device -> setDevice(ticket, device));
+
+        Ticket savedTicket = saveAtTopOfStatusColumn(ticket);
+        log.info("Created {} ticket #{} with ID: {}", savedTicket.getCreationSource(), savedTicket.getTicketNumber(),
+                savedTicket.getId());
+
+        listeners.forEach(listener -> listener.onTicketCreatedBySystem(savedTicket));
         return savedTicket;
     }
 
@@ -263,9 +284,7 @@ public class TicketService {
         populateClientOrigin(ticket, principal);
         applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
 
-        ticket.setOrder(computeTopOrder(ticket));
-
-        Ticket savedTicket = ticketRepository.save(ticket);
+        Ticket savedTicket = saveAtTopOfStatusColumn(ticket);
         log.info("Created escalation ticket #{}", savedTicket.getTicketNumber());
 
         return savedTicket;
@@ -294,8 +313,8 @@ public class TicketService {
         }
         Ticket transitioned = ticketLifecycleService.transitionToKind(
                 principal, ticket.getId(), TicketStatusKind.TECH_REQUIRED, reason);
-        transitioned.setOrder(computeTopOrder(transitioned));
-        return Optional.of(ticketRepository.save(transitioned));
+        Ticket savedTicket = saveAtTopOfStatusColumn(transitioned);
+        return Optional.of(savedTicket);
     }
 
     @Transactional
@@ -473,6 +492,12 @@ public class TicketService {
         return ticketLifecycleService.computeRankAtTop(ticket.getStatusId());
     }
 
+    private Ticket saveAtTopOfStatusColumn(Ticket ticket) {
+        String topOrder = computeTopOrder(ticket);
+        ticket.setOrder(topOrder);
+        return ticketRepository.save(ticket);
+    }
+
     private void applyInitialStatus(Ticket ticket, TicketStatusKind kind) {
         ticketLifecycleService.applyInitialStatus(ticket, kind);
     }
@@ -545,13 +570,11 @@ public class TicketService {
 
         Machine device = requireMachine(machineId);
         ticket.setOwner(new ClientTicketOwner(device.getMachineId(), device.getOrganizationId()));
-        ticket.setDeviceId(device.getMachineId());
-        ticket.setDeviceHostname(device.preferredName());
+        setDevice(ticket, device);
 
         if (device.getOrganizationId() != null) {
             Organization org = requireOrganization(device.getOrganizationId());
-            ticket.setOrganizationId(org.getOrganizationId());
-            ticket.setOrganizationName(org.getName());
+            setOrganization(ticket, org);
         }
         log.debug("Auto-populated device {} and org {} for AGENT ticket",
                 device.preferredName(), ticket.getOrganizationName());
@@ -569,8 +592,7 @@ public class TicketService {
         String resolvedOrgId = organizationId;
         if (deviceId != null) {
             Machine device = requireMachine(deviceId);
-            ticket.setDeviceId(device.getMachineId());
-            ticket.setDeviceHostname(device.preferredName());
+            setDevice(ticket, device);
             if (resolvedOrgId == null) {
                 resolvedOrgId = device.getOrganizationId();
             } else if (!resolvedOrgId.equals(device.getOrganizationId())) {
@@ -580,15 +602,51 @@ public class TicketService {
 
         if (resolvedOrgId != null) {
             Organization org = requireOrganization(resolvedOrgId);
-            ticket.setOrganizationId(org.getOrganizationId());
-            ticket.setOrganizationName(org.getName());
+            setOrganization(ticket, org);
         }
     }
 
     private void populateAssignee(Ticket ticket, String assigneeId) {
         User user = requireAssignee(assigneeId);
-        ticket.setAssignedTo(user.getId());
-        ticket.setAssignedName(TicketUserNames.displayName(user));
+        setAssignee(ticket, user);
+    }
+
+    private static void setAssignee(Ticket ticket, User assignee) {
+        String assigneeId = assignee.getId();
+        String assigneeName = TicketUserNames.displayName(assignee);
+        ticket.setAssignedTo(assigneeId);
+        ticket.setAssignedName(assigneeName);
+    }
+
+    private static void setDevice(Ticket ticket, Machine device) {
+        String deviceId = device.getMachineId();
+        String deviceHostname = device.preferredName();
+        ticket.setDeviceId(deviceId);
+        ticket.setDeviceHostname(deviceHostname);
+    }
+
+    private static void setOrganization(Ticket ticket, Organization organization) {
+        String organizationId = organization.getOrganizationId();
+        String organizationName = organization.getName();
+        ticket.setOrganizationId(organizationId);
+        ticket.setOrganizationName(organizationName);
+    }
+
+    private Optional<User> activeAssignee(String assigneeId) {
+        return Optional.ofNullable(assigneeId)
+                .flatMap(userRepository::findById)
+                .filter(user -> user.getStatus() == UserStatus.ACTIVE);
+    }
+
+    private Optional<Organization> activeOrganization(String organizationId) {
+        return Optional.ofNullable(organizationId)
+                .flatMap(organizationRepository::findByOrganizationId)
+                .filter(organization -> organization.getStatus() == OrganizationStatus.ACTIVE);
+    }
+
+    private Optional<Machine> existingDevice(String deviceId) {
+        return Optional.ofNullable(deviceId)
+                .flatMap(machineRepository::findByMachineId);
     }
 
     private boolean hasAssignee(Ticket ticket) {

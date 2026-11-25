@@ -41,6 +41,7 @@ public class DeliveryMetrics {
     private static final String ROLLOUT_DURATION_TIMER = "openframe.delivery.rollout.duration";
     private static final String ROLLOUT_RUNNING_GAUGE = "openframe.delivery.rollout.running";
     private static final String ROLLOUT_BELOW_FLOOR_COUNTER = "openframe.delivery.rollout.below_floor";
+    private static final String ROLLOUT_NOT_ADMITTED_COUNTER = "openframe.delivery.rollout.not_admitted";
     private static final String ROUTE_UNREACHABLE_COUNTER = "openframe.delivery.route.unreachable";
     private static final String TAG_TYPE = "type";
     private static final String TAG_REASON = "reason";
@@ -134,6 +135,11 @@ public class DeliveryMetrics {
     public void recordRolloutBelowFloor(DeliveryType type, int machines) {
         String typeTag = tagValue(type.name());
         meterRegistry.counter(ROLLOUT_BELOW_FLOOR_COUNTER, TAG_TYPE, typeTag).increment(machines);
+    }
+
+    public void recordRolloutNotAdmitted(DeliveryType type, int machines) {
+        String typeTag = tagValue(type.name());
+        meterRegistry.counter(ROLLOUT_NOT_ADMITTED_COUNTER, TAG_TYPE, typeTag).increment(machines);
     }
 
     // a command no route carried: an agent below the floor on a type without a per-machine legacy subject, or a

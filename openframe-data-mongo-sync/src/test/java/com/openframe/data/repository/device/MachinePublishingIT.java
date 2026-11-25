@@ -1,7 +1,10 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.data.config.ClientVersionThreshold;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.publishing.MachineAggregateSpec;
+import com.openframe.data.repository.device.publishing.MachineOnClientTicketsProjection;
 import com.openframe.data.repository.device.publishing.MachineOnTicketsProjection;
 import com.openframe.data.repository.ticket.TicketProjectionRepository;
 import com.openframe.data.service.machine.MachineWriter;
@@ -10,6 +13,7 @@ import com.openframe.publishing.config.EventsAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.config.OutboxIndexAutoConfiguration;
 import com.openframe.publishing.persistence.OutboxEvent;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -97,6 +101,37 @@ class MachinePublishingIT {
         assertThat(readVersion(written)).isEqualTo(storedVersion);
     }
 
+    @Test
+    void scheduleReservations_bumpTheVersionWithoutPublishing() {
+        // setup
+        Machine device = buildMachine();
+        device.setStatus(DeviceStatus.MANAGED);
+        Machine saved = machineRepository.save(device);
+        String legacyMachineId = "legacy-machine";
+        mongoTemplate.getCollection(mongoTemplate.getCollectionName(Machine.class))
+                .insertOne(new Document("tenantId", saved.getTenantId()).append("machineId", legacyMachineId)
+                        .append("status", DeviceStatus.MANAGED.name()).append("version", null));
+        Set<String> targets = Set.of(saved.getMachineId(), legacyMachineId);
+
+        // execution
+        long reconnect = machineRepository.reserveForSoftwareReconnect(
+                saved.getTenantId(), saved.getMachineId(), saved.getVersion(), DeviceStatus.CONNECTED);
+        long staleReconnect = machineRepository.reserveForSoftwareReconnect(
+                saved.getTenantId(), saved.getMachineId(), saved.getVersion(), DeviceStatus.CONNECTED);
+        long assignments = machineRepository.reserveForSoftwareAssignments(
+                saved.getTenantId(), targets, DeviceStatus.CONNECTED);
+
+        // verifications
+        assertThat(reconnect).isEqualTo(1);
+        assertThat(staleReconnect).isZero();
+        assertThat(assignments).isEqualTo(2);
+        assertThat(machineRepository.findById(saved.getId())).get().extracting(Machine::getVersion)
+                .isEqualTo(saved.getVersion() + 2);
+        assertThat(machineRepository.findOnPrimaryByTenantIdAndMachineId(saved.getTenantId(), legacyMachineId))
+                .get().extracting(Machine::getVersion).isEqualTo(1L);
+        assertThat(mongoTemplate.findAll(OutboxEvent.class)).hasSize(1);
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> readEvent(OutboxEvent row) {
         return (Map<String, Object>) row.getPayload().get("event");
@@ -136,7 +171,8 @@ class MachinePublishingIT {
     @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class,
             OutboxAutoConfiguration.class, OutboxIndexAutoConfiguration.class})
     @EnableMongoRepositories(basePackageClasses = MachineRepository.class)
-    @Import({MachineAggregateSpec.class, MachineOnTicketsProjection.class, TicketProjectionRepository.class, MachineWriter.class})
+    @Import({MachineAggregateSpec.class, MachineOnTicketsProjection.class, MachineOnClientTicketsProjection.class,
+            TicketProjectionRepository.class, ClientVersionThreshold.class, MachineWriter.class})
     static class TestApplication {
     }
 }

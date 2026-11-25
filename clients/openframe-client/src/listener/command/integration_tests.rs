@@ -11,14 +11,14 @@ use tokio::time::{timeout, Duration};
 use super::{
     Begin, ClientUpdateHandler, CommandContext, CommandHandler, CommandListener,
     FeatureFlagsHandler, Outcome, PackageAdoptHandler, PackageUpdateHandler, RestartGate,
-    ToolInstallationHandler, ToolUpdateHandler,
+    ToolInstallationHandler, ToolUninstallHandler, ToolUpdateHandler,
 };
 use crate::clients::ToolApiClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{
     DeliveryRef, DeliveryResult, DeliveryResultMessage, FailReason, Feature, FeatureFlagsState,
-    InstalledAsset, InstalledTool, OpenFrameClientUpdateMessage, PackageRef,
-    PackageUpdateStatusMessage, ToolRecordState, UpdateStatus,
+    Installation, InstalledAsset, InstalledTool, OpenFrameClientUpdateMessage, PackageRef,
+    PackageUpdateStatusMessage, ToolConnection, ToolRecordState, UpdateStatus,
 };
 use crate::platform::{DirectoryManager, DmgExtractor};
 use crate::services::delivery_results::DeliveryResults;
@@ -47,7 +47,7 @@ use crate::services::{
     AgentConfigurationService, GithubDownloadService, InitialConfigurationService,
     InstalledToolsService, ToolCommandParamsResolver, ToolConnectionMessagePublisher,
     ToolConnectionProcessingManager, ToolConnectionService, ToolInstallationService,
-    ToolKillService, ToolOps, ToolUrlParamsResolver,
+    ToolKillService, ToolOps, ToolUninstallService, ToolUrlParamsResolver,
 };
 use crate::test_support::{connection_manager, NatsServer};
 use crate::utils::in_progress::InProgress;
@@ -386,6 +386,25 @@ impl Agent {
             self.config.clone(),
             InstalledAgentMessagePublisher::new(self.publisher.clone()),
             connections,
+        )
+    }
+
+    fn tool_uninstall_handler(&self) -> ToolUninstallHandler {
+        let initial = InitialConfigurationService::new(self.directories.clone()).unwrap();
+        ToolUninstallHandler::new(
+            ToolUninstallService::new(
+                InstalledToolsService::new(self.directories.clone()).unwrap(),
+                ToolCommandParamsResolver::new(
+                    self.directories.clone(),
+                    initial,
+                    self.config.clone(),
+                ),
+                ToolKillService::new(),
+                self.directories.clone(),
+                ToolConnectionService::new(self.directories.clone()).unwrap(),
+            ),
+            self.tool_run_manager.clone(),
+            self.tool_ops.clone(),
         )
     }
 
@@ -1594,7 +1613,8 @@ async fn an_update_whose_old_binary_is_still_running_fails_and_keeps_the_recorde
     archive
         .start_file(
             "agent.exe",
-            zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored),
         )
         .unwrap();
     archive.write_all(&new_agent).unwrap();
@@ -1717,4 +1737,570 @@ async fn an_install_of_a_present_tool_downloads_its_missing_command_asset() {
 #[tokio::test]
 async fn an_install_of_a_present_tool_rewrites_its_empty_command_asset() {
     an_install_of_a_present_tool_rewrites_its_command_asset(true).await;
+}
+
+fn below_any_os(link: &str) -> serde_json::Value {
+    json!([{
+        "os": std::env::consts::OS,
+        "fileName": "agent.zip",
+        "agentFileName": "agent",
+        "link": link,
+        "installationType": "STANDARD",
+        "minOsVersion": "999.0",
+    }])
+}
+
+fn assert_not_supported(result: &DeliveryResultMessage) {
+    let error = result.error.as_deref().unwrap_or_default();
+    assert!(
+        error.starts_with("NOT_SUPPORTED: needs ")
+            && error.contains(" 999.0 or later, this device runs "),
+        "{result:?}"
+    );
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[tokio::test]
+async fn a_reinstall_below_the_minimum_os_is_done_not_supported_and_keeps_the_tool() {
+    const TOOL: &str = "it-min-os-tool";
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            TOOL,
+            "1.0.0",
+            ToolRecordState::Installed,
+            Vec::new(),
+        ))
+        .await;
+    let binary = agent.directories.get_tool_executable_path(TOOL, None);
+    std::fs::write(&binary, b"old agent").unwrap();
+    let release = crate::test_support::mock_server(&[200]).await;
+
+    let handler = ToolInstallationHandler::new(
+        agent.tool_installation_service(),
+        ToolOps::default(),
+        agent.tool_run_manager.client_update_pending(),
+    );
+    agent.launch_command(handler).await;
+    agent
+        .send_to(
+            ToolInstallationHandler::subject(MACHINE),
+            json!({
+                "delivery": {"type": "TOOL_INSTALLATION", "targetId": TOOL, "dispatchId": "i1", "sequence": 1},
+                "toolAgentId": TOOL,
+                "toolId": "it-min-os-tool-server",
+                "toolType": "",
+                "version": "2.0.0",
+                "reinstall": true,
+                "downloadConfigurations": below_any_os(&format!("{}/agent.zip", release.url)),
+                "runCommandArgs": [],
+            }),
+        )
+        .await;
+
+    agent.expect("i1", DeliveryResult::Acked).await;
+    let done = agent.expect("i1", DeliveryResult::Done).await;
+    assert_not_supported(&done);
+    assert!(release.requests().is_empty(), "the tool was downloaded");
+    assert_eq!(std::fs::read(&binary).unwrap(), b"old agent");
+    let recorded = InstalledToolsService::new(agent.directories.clone())
+        .unwrap()
+        .get_by_tool_agent_id(TOOL)
+        .await
+        .unwrap()
+        .expect("record kept");
+    assert_eq!(recorded.version, "1.0.0");
+    assert_eq!(recorded.state, ToolRecordState::Installed);
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[tokio::test]
+async fn an_update_below_the_minimum_os_is_done_not_supported_and_keeps_the_version() {
+    const TOOL: &str = "it-min-os-update";
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            TOOL,
+            "1.0.0",
+            ToolRecordState::Installed,
+            Vec::new(),
+        ))
+        .await;
+    let release = crate::test_support::mock_server(&[200]).await;
+    let handler = ToolUpdateHandler::new(
+        agent.tool_update_service(),
+        ToolOps::default(),
+        agent.tool_run_manager.client_update_pending(),
+    );
+    agent.launch_command(handler).await;
+    let mut update = tool_update("t1", 1, TOOL, "2.0.0");
+    update["downloadConfigurations"] = below_any_os(&format!("{}/agent.zip", release.url));
+    agent
+        .send_to(ToolUpdateHandler::subject(MACHINE), update)
+        .await;
+
+    agent.expect("t1", DeliveryResult::Acked).await;
+    let done = agent.expect("t1", DeliveryResult::Done).await;
+    assert_not_supported(&done);
+    assert!(release.requests().is_empty(), "the update was downloaded");
+    let recorded = InstalledToolsService::new(agent.directories.clone())
+        .unwrap()
+        .get_by_tool_agent_id(TOOL)
+        .await
+        .unwrap()
+        .expect("record kept");
+    assert_eq!(recorded.version, "1.0.0");
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[tokio::test]
+async fn an_update_at_or_above_the_minimum_os_runs_as_before() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            "openframe-chat",
+            "1.6.10",
+            ToolRecordState::Installed,
+            Vec::new(),
+        ))
+        .await;
+    let _reports = agent.installed_agents().await;
+    let handler = ToolUpdateHandler::new(
+        agent.tool_update_service(),
+        ToolOps::default(),
+        agent.tool_run_manager.client_update_pending(),
+    );
+    agent.launch_command(handler).await;
+    let mut update = tool_update("t1", 1, "openframe-chat", "1.6.10");
+    update["downloadConfigurations"] = json!([{
+        "os": std::env::consts::OS,
+        "fileName": "chat.zip",
+        "agentFileName": "chat",
+        "link": "http://127.0.0.1:9/chat.zip",
+        "minOsVersion": "1.0",
+    }]);
+    agent
+        .send_to(ToolUpdateHandler::subject(MACHINE), update)
+        .await;
+
+    agent.expect("t1", DeliveryResult::Acked).await;
+    let done = agent.expect("t1", DeliveryResult::Done).await;
+    assert_eq!(done.error, None, "{done:?}");
+}
+
+fn tool_uninstall(dispatch_id: &str, tool_agent_id: &str) -> serde_json::Value {
+    json!({
+        "delivery": {"type": "TOOL_UNINSTALL", "targetId": tool_agent_id, "dispatchId": dispatch_id},
+        "toolAgentId": tool_agent_id,
+        "toolType": "IT_TOOL",
+    })
+}
+
+#[tokio::test]
+async fn a_tool_uninstall_removes_the_folder_the_record_and_the_connection_and_a_repeat_is_done() {
+    const TOOL: &str = "it-uninstall-tool";
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            TOOL,
+            "1.0.0",
+            ToolRecordState::Installed,
+            Vec::new(),
+        ))
+        .await;
+    let connections = ToolConnectionService::new(agent.directories.clone()).unwrap();
+    connections
+        .save(ToolConnection {
+            tool_agent_id: TOOL.into(),
+            agent_tool_id: "node-1".into(),
+            published: true,
+        })
+        .await
+        .unwrap();
+    agent.tool_run_manager.supervise(TOOL).await;
+    let handler = agent.tool_uninstall_handler();
+    agent.launch_command(handler).await;
+
+    agent
+        .send_to(
+            ToolUninstallHandler::subject(MACHINE),
+            tool_uninstall("u1", TOOL),
+        )
+        .await;
+    agent.expect("u1", DeliveryResult::Acked).await;
+    let done = agent.expect("u1", DeliveryResult::Done).await;
+    assert_eq!(done.error, None, "{done:?}");
+
+    assert!(!agent.directories.get_tool_folder(TOOL).exists());
+    let record = InstalledToolsService::new(agent.directories.clone())
+        .unwrap()
+        .get_by_tool_agent_id(TOOL)
+        .await
+        .unwrap();
+    assert!(record.is_none(), "{record:?}");
+    assert!(connections.get_all().await.unwrap().is_empty());
+    assert!(
+        !agent.tool_run_manager.supervises(TOOL).await,
+        "an uninstalled tool must not stay supervised"
+    );
+
+    agent
+        .send_to(
+            ToolUninstallHandler::subject(MACHINE),
+            tool_uninstall("u2", TOOL),
+        )
+        .await;
+    agent.expect("u2", DeliveryResult::Acked).await;
+    let repeat = agent.expect("u2", DeliveryResult::Done).await;
+    assert_eq!(repeat.error, None, "{repeat:?}");
+}
+
+#[tokio::test]
+async fn a_tool_uninstall_that_fails_keeps_the_record_and_the_folder() {
+    const TOOL: &str = "it-uninstall-broken";
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(InstalledTool {
+            uninstallation_command_args: Some(vec!["uninstall".into()]),
+            ..installed_tool(TOOL, "1.0.0", ToolRecordState::Installed, Vec::new())
+        })
+        .await;
+    agent.tool_run_manager.supervise(TOOL).await;
+    let handler = agent.tool_uninstall_handler();
+    agent.launch_command(handler).await;
+
+    agent
+        .send_to(
+            ToolUninstallHandler::subject(MACHINE),
+            tool_uninstall("u1", TOOL),
+        )
+        .await;
+    agent.expect("u1", DeliveryResult::Acked).await;
+    let failed = agent.expect("u1", DeliveryResult::Failed).await;
+    assert!(failed.error.is_some(), "{failed:?}");
+
+    assert!(agent.directories.get_tool_folder(TOOL).exists());
+    let record = InstalledToolsService::new(agent.directories.clone())
+        .unwrap()
+        .get_by_tool_agent_id(TOOL)
+        .await
+        .unwrap();
+    assert!(record.is_some());
+    assert!(
+        agent.tool_run_manager.supervises(TOOL).await,
+        "a tool whose uninstall failed stays supervised"
+    );
+}
+
+const CURRENT_OS: &str = if cfg!(target_os = "windows") {
+    "windows"
+} else if cfg!(target_os = "macos") {
+    "macos"
+} else {
+    "linux"
+};
+
+type ToolExit = tokio::sync::oneshot::Receiver<String>;
+
+/// Starts a long-running process from `path`; the receiver gets how it exited.
+fn run_tool_process(path: &std::path::Path) -> ToolExit {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let _ = std::fs::remove_file(path);
+    #[cfg(windows)]
+    let args = {
+        std::fs::copy(r"C:\Windows\System32\PING.EXE", path).unwrap();
+        ["-n", "300", "127.0.0.1"].as_slice()
+    };
+    // A script, not a copied system binary: macOS may SIGKILL a copied signed binary at any time.
+    #[cfg(unix)]
+    let args = {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(path, "#!/bin/sh\nwhile :; do sleep 1; done\n").unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        <&[&str]>::default()
+    };
+    let mut child = tokio::process::Command::new(path)
+        .args(args)
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let (exited, on_exit) = tokio::sync::oneshot::channel();
+    tokio::spawn(async move {
+        let _ = exited.send(format!("{:?}", child.wait().await));
+    });
+    on_exit
+}
+
+fn agent_file_name() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "agent.exe"
+    } else {
+        "agent"
+    }
+}
+
+/// Bytes that do not compress, so the archive stays above the minimum download size.
+fn agent_bytes() -> Vec<u8> {
+    let mut state = 0x2545_f491_u32;
+    (0..150 * 1024)
+        .map(|_| {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state as u8
+        })
+        .collect()
+}
+
+/// A release archive in the format this OS extracts, holding `entry`.
+fn release_archive(entry: &str, bytes: &[u8]) -> (&'static str, Vec<u8>) {
+    #[cfg(windows)]
+    {
+        use std::io::Write;
+        let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        archive
+            .start_file(
+                entry,
+                zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Stored),
+            )
+            .unwrap();
+        archive.write_all(bytes).unwrap();
+        ("release.zip", archive.finish().unwrap().into_inner())
+    }
+    #[cfg(unix)]
+    {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(bytes.len() as u64);
+        header.set_mode(0o755);
+        header.set_cksum();
+        let mut archive = tar::Builder::new(flate2::write::GzEncoder::new(
+            Vec::new(),
+            flate2::Compression::fast(),
+        ));
+        archive.append_data(&mut header, entry, bytes).unwrap();
+        (
+            "release.tar.gz",
+            archive.into_inner().unwrap().finish().unwrap(),
+        )
+    }
+}
+
+impl Agent {
+    async fn launch_tool_updates(&mut self) {
+        let handler = ToolUpdateHandler::new(
+            self.tool_update_service(),
+            ToolOps::default(),
+            self.tool_run_manager.client_update_pending(),
+        );
+        self.launch_command(handler).await;
+    }
+
+    async fn send_tool_update(
+        &self,
+        tool_agent_id: &str,
+        download_configuration: serde_json::Value,
+    ) {
+        let mut update = tool_update("u1", 1, tool_agent_id, "2.0.0");
+        update["downloadConfigurations"] = json!([download_configuration]);
+        self.send_to(ToolUpdateHandler::subject(MACHINE), update)
+            .await;
+    }
+
+    async fn recorded_version(&self, tool_agent_id: &str) -> String {
+        InstalledToolsService::new(self.directories.clone())
+            .unwrap()
+            .get_by_tool_agent_id(tool_agent_id)
+            .await
+            .unwrap()
+            .expect("record kept")
+            .version
+    }
+}
+
+async fn a_failed_download_leaves_the_running_tool_untouched(
+    tool_agent_id: &str,
+    installation: Installation,
+    target_file_name: &str,
+    release: crate::test_support::MockServer,
+    file_name: &str,
+) {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let executable = agent
+        .directories
+        .get_tool_executable_path(tool_agent_id, installation.executable_path());
+    let installation_type = match installation {
+        Installation::Service { .. } => "SERVICE",
+        _ => "STANDARD",
+    };
+    agent
+        .install_tool(InstalledTool {
+            installation,
+            ..installed_tool(
+                tool_agent_id,
+                "1.0.0",
+                ToolRecordState::Installed,
+                Vec::new(),
+            )
+        })
+        .await;
+    let mut exited = run_tool_process(&executable);
+    let running_image = std::fs::read(&executable).unwrap();
+    agent.launch_tool_updates().await;
+
+    agent
+        .send_tool_update(
+            tool_agent_id,
+            json!({
+                "os": CURRENT_OS,
+                "fileName": file_name,
+                "agentFileName": target_file_name,
+                "link": format!("{}/{file_name}", release.url),
+                "installationType": installation_type,
+                "serviceName": "it-no-such-service",
+            }),
+        )
+        .await;
+
+    agent.expect("u1", DeliveryResult::Acked).await;
+    let failed = agent.expect("u1", DeliveryResult::Failed).await;
+    assert!(
+        failed
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("the running tool was not touched"),
+        "{failed:?}"
+    );
+    let exit = exited.try_recv();
+    assert_eq!(
+        exit,
+        Err(tokio::sync::oneshot::error::TryRecvError::Empty),
+        "the running tool exited: {exit:?}"
+    );
+    assert_eq!(std::fs::read(&executable).unwrap(), running_image);
+    assert!(!executable.with_extension("backup").exists());
+    assert_eq!(agent.recorded_version(tool_agent_id).await, "1.0.0");
+}
+
+#[tokio::test]
+async fn an_unreachable_download_leaves_the_running_standard_tool_untouched() {
+    let (file_name, _) = release_archive(agent_file_name(), b"");
+    a_failed_download_leaves_the_running_tool_untouched(
+        "it-unreachable-standard",
+        Installation::Standard {
+            executable_path: None,
+        },
+        agent_file_name(),
+        crate::test_support::mock_server(&[404]).await,
+        file_name,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn a_release_without_the_agent_leaves_the_running_standard_tool_untouched() {
+    let (file_name, archive) = release_archive("not-the-agent", &agent_bytes());
+    a_failed_download_leaves_the_running_tool_untouched(
+        "it-agentless-release",
+        Installation::Standard {
+            executable_path: None,
+        },
+        agent_file_name(),
+        crate::test_support::mock_server_with_body(&[200], archive).await,
+        file_name,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn an_unreachable_download_leaves_the_running_service_tool_untouched() {
+    let (file_name, _) = release_archive(agent_file_name(), b"");
+    a_failed_download_leaves_the_running_tool_untouched(
+        "it-unreachable-service",
+        Installation::Service {
+            service_name: "it-no-such-service".into(),
+            executable_path: None,
+        },
+        agent_file_name(),
+        crate::test_support::mock_server(&[404]).await,
+        file_name,
+    )
+    .await;
+}
+
+#[cfg(target_os = "macos")]
+#[tokio::test]
+async fn an_unreachable_app_bundle_download_leaves_the_running_bundle_untouched() {
+    const BUNDLE_EXECUTABLE: &str = "Test.app/Contents/MacOS/test";
+    a_failed_download_leaves_the_running_tool_untouched(
+        "it-unreachable-bundle",
+        Installation::Service {
+            service_name: "it-no-such-service".into(),
+            executable_path: Some(BUNDLE_EXECUTABLE.into()),
+        },
+        BUNDLE_EXECUTABLE,
+        crate::test_support::mock_server(&[404]).await,
+        "release.tar.gz",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn an_update_stops_the_running_tool_and_replaces_its_binary() {
+    const TOOL: &str = "it-replaced-tool";
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            TOOL,
+            "1.0.0",
+            ToolRecordState::Installed,
+            Vec::new(),
+        ))
+        .await;
+    let executable = agent.directories.get_tool_executable_path(TOOL, None);
+    let exited = run_tool_process(&executable);
+    let new_agent = agent_bytes();
+    let (file_name, archive) = release_archive(agent_file_name(), &new_agent);
+    let release = crate::test_support::mock_server_with_body(&[200], archive).await;
+    let _reports = agent.installed_agents().await;
+    agent.launch_tool_updates().await;
+
+    agent
+        .send_tool_update(
+            TOOL,
+            json!({
+                "os": CURRENT_OS,
+                "fileName": file_name,
+                "agentFileName": agent_file_name(),
+                "link": format!("{}/{file_name}", release.url),
+                "installationType": "STANDARD",
+            }),
+        )
+        .await;
+
+    agent.expect("u1", DeliveryResult::Acked).await;
+    agent.expect("u1", DeliveryResult::Done).await;
+    timeout(BOUND, exited)
+        .await
+        .expect("the running tool was never stopped")
+        .unwrap();
+    assert_eq!(std::fs::read(&executable).unwrap(), new_agent);
+    assert!(!executable.with_extension("backup").exists());
+    assert_eq!(agent.recorded_version(TOOL).await, "2.0.0");
+    assert_eq!(release.requests().len(), 1);
 }

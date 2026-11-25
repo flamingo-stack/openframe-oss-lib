@@ -6,6 +6,7 @@ import com.openframe.api.dto.update.ForceToolAgentUpdateRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateResponse;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.ToolOsSupport;
 import com.openframe.data.nats.delivery.ToolUpdateDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeviceCommandSender;
 import com.openframe.data.repository.device.MachineRepository;
@@ -97,6 +98,9 @@ public class ForceToolAgentUpdateService {
     private ForceToolAgentUpdateResponseItem processMachine(String machineId, String toolAgentId) {
         try {
             IntegratedToolAgent toolAgent = loadToolAgent(toolAgentId);
+            if (isUnsupported(machineId, toolAgent)) {
+                return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.NOT_SUPPORTED);
+            }
             boolean carried = deviceCommandSender.send(DEVICE_TOOL_AGENT_UPDATE, machineId, details(toolAgent),
                     () -> ToolUpdateDeliverySeed.forMachine(machineId, toolAgent));
             ForceAgentStatus outcome = outcomeOf(carried);
@@ -105,6 +109,12 @@ public class ForceToolAgentUpdateService {
             log.error("Failed to process force tool agent {} update message for machine {}", toolAgentId, machineId, e);
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.FAILED);
         }
+    }
+
+    private boolean isUnsupported(String machineId, IntegratedToolAgent toolAgent) {
+        return machineRepository.findByMachineId(machineId)
+                .map(machine -> ToolOsSupport.isUnsupported(machine, toolAgent))
+                .orElse(false);
     }
 
     private IntegratedToolAgent loadToolAgent(String toolAgentId) {

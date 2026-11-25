@@ -5,15 +5,20 @@ import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
 import com.openframe.api.service.rmm.schedule.ScheduleDeviceChange;
 import com.openframe.audit.AuditRecorder;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
+import com.openframe.publishing.transaction.MongoTransactionRunner.Transaction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,6 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_SET;
 import static com.openframe.data.document.audit.AuditOutcome.SUCCESS;
@@ -59,6 +65,8 @@ class SoftwareScheduleServiceDevicesTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private PackageManagerAvailability packageManagerAvailability;
     @Mock private SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
+    @Mock private MachineRepository machineRepository;
+    @Mock private ScheduleMutationTransaction scheduleTransaction;
     @Mock private AuditRecorder auditRecorder;
     @InjectMocks private SoftwareScheduleService service;
     @Captor private ArgumentCaptor<SoftwareSchedule> scheduleCaptor;
@@ -68,6 +76,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void setDevices_specificSchedule_reportsTheDevicesAddedAndRemovedAgainstTheAssignedOnes() {
         storedSchedule();
+        devicesManaged("m2", "m3");
         assigned("m1", "m2");
 
         ScheduleDeviceChange change = service.setDevices(SCHEDULE_ID, List.of("m2", "m3"), ACTOR);
@@ -79,6 +88,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void setDevices_criteriaSchedule_switchesToSpecificAndReportsTheSwitch() {
         storedCriteriaSchedule();
+        devicesManaged("m1");
         assigned();
 
         ScheduleDeviceChange change = service.setDevices(SCHEDULE_ID, List.of("m1"), ACTOR);
@@ -103,6 +113,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void setDevices_deviceWithoutPackageManager_keepsTheRuleAndTheDevices() {
         SoftwareSchedule schedule = storedCriteriaSchedule();
+        transactionRuns();
         m9HasNoPackageManager();
 
         assertThatThrownBy(() -> service.setDevices(SCHEDULE_ID, List.of("m9"), ACTOR))
@@ -115,6 +126,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void addDevices_someAlreadyAssignedOrRepeated_savesAndReportsOnlyTheNewOnes() {
         storedSchedule();
+        devicesManaged("m1", "m2");
         assigned("m1");
 
         ScheduleDeviceChange change = service.addDevices(SCHEDULE_ID, List.of("m1", "m2", "m2"), ACTOR);
@@ -128,6 +140,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void addDevices_allAlreadyAssigned_savesNothingAndReportsNoChange() {
         storedSchedule();
+        devicesManaged("m1");
         assigned("m1");
 
         ScheduleDeviceChange change = service.addDevices(SCHEDULE_ID, List.of("m1"), ACTOR);
@@ -139,6 +152,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void addDevices_criteriaScheduleWithTheDeviceStillAssigned_reportsTheSwitch() {
         storedCriteriaSchedule();
+        devicesManaged("m1");
         assigned("m1");
 
         ScheduleDeviceChange change = service.addDevices(SCHEDULE_ID, List.of("m1"), ACTOR);
@@ -159,6 +173,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void addDevices_deviceWithoutPackageManager_addsNothing() {
         storedSchedule();
+        transactionRuns();
         m9HasNoPackageManager();
 
         assertThatThrownBy(() -> service.addDevices(SCHEDULE_ID, List.of("m9"), ACTOR))
@@ -182,6 +197,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void update_devicesChanged_recordsTheAddedAndRemovedDevices() {
         storedScheduleSavedAsIs();
+        devicesManaged("m2", "m3");
         assigned("m1", "m2");
 
         service.update(updateInput(List.of("m2", "m3")), ACTOR);
@@ -198,6 +214,7 @@ class SoftwareScheduleServiceDevicesTest {
     @Test
     void update_devicesUnchanged_recordsNoDeviceEvent() {
         storedScheduleSavedAsIs();
+        devicesManaged("m1", "m2");
         assigned("m1", "m2");
 
         service.update(updateInput(List.of("m1", "m2")), ACTOR);
@@ -231,8 +248,27 @@ class SoftwareScheduleServiceDevicesTest {
                         .packageManager(WINGET).packageName("SlackTechnologies.Slack").build()));
     }
 
+    private void transactionRuns() {
+        when(scheduleTransaction.run(any())).thenAnswer(invocation -> invocation.<Transaction<?>>getArgument(0).execute());
+    }
+
+    private void devicesManaged(String... machineIds) {
+        transactionRuns();
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(TENANT_ID, Set.of(machineIds)))
+                .thenReturn(Arrays.stream(machineIds).map(SoftwareScheduleServiceDevicesTest::managedMachine).toList());
+        when(machineRepository.reserveForSoftwareAssignments(TENANT_ID, Set.of(machineIds), DeviceStatus.CONNECTED))
+                .thenReturn((long) machineIds.length);
+    }
+
+    private static Machine managedMachine(String machineId) {
+        Machine machine = new Machine();
+        machine.setMachineId(machineId);
+        machine.setStatus(DeviceStatus.MANAGED);
+        return machine;
+    }
+
     private void assigned(String... machineIds) {
-        when(assignedRepository.findByTenantIdAndSoftwareScheduleId(TENANT_ID, SCHEDULE_ID))
+        when(assignedRepository.findOnPrimaryByTenantIdAndSoftwareScheduleId(TENANT_ID, SCHEDULE_ID))
                 .thenReturn(Arrays.stream(machineIds)
                         .map(machineId -> SoftwareScheduleMachineAssigned.builder()
                                 .tenantId(TENANT_ID).softwareScheduleId(SCHEDULE_ID).machineId(machineId).build())
@@ -246,7 +282,7 @@ class SoftwareScheduleServiceDevicesTest {
 
     private void assignedReadBeforeTheReplace() {
         InOrder inOrder = inOrder(assignedRepository);
-        inOrder.verify(assignedRepository).findByTenantIdAndSoftwareScheduleId(TENANT_ID, SCHEDULE_ID);
+        inOrder.verify(assignedRepository).findOnPrimaryByTenantIdAndSoftwareScheduleId(TENANT_ID, SCHEDULE_ID);
         inOrder.verify(assignedRepository).deleteByTenantIdAndSoftwareScheduleId(TENANT_ID, SCHEDULE_ID);
     }
 

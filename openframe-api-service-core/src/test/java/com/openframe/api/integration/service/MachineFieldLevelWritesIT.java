@@ -29,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.mockito.stubbing.Answer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -108,11 +109,13 @@ class MachineFieldLevelWritesIT {
         machine.setStatus(DeviceStatus.ONLINE);
         template.save(machine);
         interleavingMachines = mock(MachineRepository.class, delegatesTo(storedMachines));
-        doAnswer(invocation -> {
+        Answer<Optional<Machine>> afterMachineRead = invocation -> {
             Optional<Machine> read = storedMachines.findByMachineId(invocation.getArgument(0));
             concurrentDirectoryAndFleetWrite();
             return read;
-        }).when(interleavingMachines).findByMachineId(anyString());
+        };
+        doAnswer(afterMachineRead).when(interleavingMachines).findByMachineId(anyString());
+        doAnswer(afterMachineRead).when(interleavingMachines).findOnPrimaryByMachineId(anyString());
     }
 
     @Test

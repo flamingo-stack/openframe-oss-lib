@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { DataTableLayout } from '../data-table';
 import type { NoDataProps } from '../no-data';
 
 export type QueryResultRow = Record<string, string | number | null>;
@@ -37,6 +38,12 @@ export interface QueryReportTableProps {
   headerActions?: ReactNode;
   /** Visual variant: 'default' (card rows) or 'compact' (flat rows with border separators) */
   variant?: QueryReportTableVariant;
+  /**
+   * The default variant's layout: `'cards'` (card rows, the default) or `'grid'` (the grid table: one bordered table of
+   * one-line rows that scrolls inside itself, each column `columnWidth` wide to start with and resizable). The title
+   * bar, the export and the empty state are the same in both. A compact report ignores it.
+   */
+  layout?: DataTableLayout;
   className?: string;
   tableClassName?: string;
 }

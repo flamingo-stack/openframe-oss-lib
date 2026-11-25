@@ -4,6 +4,7 @@ use tracing::{info, warn};
 
 use crate::platform::DirectoryManager;
 use crate::service_adapter::{CrossPlatformServiceManager, ServiceConfig};
+use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::{
     AgentConfigurationService, DeregistrationService, InitialConfigurationService,
     InstalledToolsService, ToolCommandParamsResolver, ToolKillService, ToolUninstallService,
@@ -386,11 +387,15 @@ pub async fn uninstall_integrated_tools(dir_manager: &DirectoryManager) -> Resul
 
     let tool_kill_service = ToolKillService::new();
 
+    let tool_connection_service = ToolConnectionService::new(dir_manager.clone())
+        .context("Failed to initialize ToolConnectionService")?;
+
     let tool_uninstall_service = ToolUninstallService::new(
         installed_tools_service,
         command_params_resolver,
         tool_kill_service,
         dir_manager.clone(),
+        tool_connection_service,
     );
 
     // Run tool uninstallation
