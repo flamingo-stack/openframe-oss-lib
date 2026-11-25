@@ -215,9 +215,9 @@ class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
 
         // execution
         List<OsUpdateDeviceCount> deviceCounts = deviceOsPendingUpdateRepository.countDevicesByIdentifier(
-                TENANT_ID, OsPlatform.WINDOWS, identifiers, excludedMachineIds);
+                OsPlatform.WINDOWS, identifiers, excludedMachineIds, TENANT_ID);
         List<OsUpdateDeviceCount> deviceCountsOfAll = deviceOsPendingUpdateRepository.countDevicesByIdentifier(
-                TENANT_ID, OsPlatform.WINDOWS, identifiers, NO_MACHINES);
+                OsPlatform.WINDOWS, identifiers, NO_MACHINES, TENANT_ID);
 
         // verifications
         assertThat(deviceCounts)
@@ -273,7 +273,7 @@ class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
 
         // execution
         List<OsUpdateDeviceCount> deviceCounts =
-                deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifier(TENANT_ID, identifiers);
+                deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifier(identifiers, TENANT_ID);
 
         // verifications
         assertThat(deviceCounts)
@@ -331,13 +331,13 @@ class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
 
         // execution
         List<OsUpdateDeviceCount> pendingCounts = deviceOsPendingUpdateRepository.countDevicesByIdentifierOnMachines(
-                TENANT_ID, OsPlatform.WINDOWS, identifiers, machine1);
+                OsPlatform.WINDOWS, identifiers, machine1, TENANT_ID);
         List<OsUpdateIdentifiersOfPlatform> pendingIdentifiers =
-                deviceOsPendingUpdateRepository.findIdentifiersByPlatformOnMachines(TENANT_ID, List.of("machine-1", "machine-3"));
+                deviceOsPendingUpdateRepository.findIdentifiersByPlatformOnMachines(List.of("machine-1", "machine-3"), TENANT_ID);
         List<OsUpdateDeviceCount> installedCounts = deviceOsUpdateHistoryRepository
-                .countInstalledDevicesByIdentifierOnMachines(TENANT_ID, identifiers, machine1);
+                .countInstalledDevicesByIdentifierOnMachines(identifiers, machine1, TENANT_ID);
         List<String> installedIdentifiers =
-                deviceOsUpdateHistoryRepository.findInstalledIdentifiersOnMachines(TENANT_ID, machine1);
+                deviceOsUpdateHistoryRepository.findInstalledIdentifiersOnMachines(machine1, TENANT_ID);
         List<DeviceOsPendingUpdate> pendingPage = deviceOsPendingUpdateRepository.findDevicePage(
                 TENANT_ID, OsPlatform.WINDOWS, CUMULATIVE, NO_MACHINES, List.of("machine-2"), null, 10);
         List<InstalledOsUpdateDevice> installedPage = deviceOsUpdateHistoryRepository.findInstalledDevicePage(
