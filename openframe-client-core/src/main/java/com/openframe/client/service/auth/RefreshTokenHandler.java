@@ -27,7 +27,7 @@ public class RefreshTokenHandler {
     private final AccessTokenGenerator accessTokenGenerator;
     private final RefreshTokenGenerator refreshTokenGenerator;
     private final AgentAuthAudit agentAuthAudit;
-    private final DeletedMachineTokenGuard deletedMachineTokenGuard;
+    private final MachineTokenGuard machineTokenGuard;
 
     public AgentTokenResponse handle(String refreshToken) {
         Jwt jwt = null;
@@ -65,7 +65,7 @@ public class RefreshTokenHandler {
                     log.error("Client not found: {}", clientId);
                     return new IllegalArgumentException("Client not found");
                 });
-        deletedMachineTokenGuard.requireNotDeleted(client.getMachineId());
+        machineTokenGuard.requireTokenAllowed(client.getMachineId());
 
         String accessToken = accessTokenGenerator.generate(client, REFRESH_TOKEN_GRANT_TYPE);
         String newRefreshToken = refreshTokenGenerator.generateNext(clientId, refreshCount);

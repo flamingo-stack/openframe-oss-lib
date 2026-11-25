@@ -21,7 +21,7 @@ public class ClientCredentialsHandler {
     private final AccessTokenGenerator accessTokenGenerator;
     private final RefreshTokenGenerator refreshTokenGenerator;
     private final AgentAuthAudit agentAuthAudit;
-    private final DeletedMachineTokenGuard deletedMachineTokenGuard;
+    private final MachineTokenGuard machineTokenGuard;
 
     public AgentTokenResponse handle(String clientId, String clientSecret) {
         try {
@@ -40,7 +40,7 @@ public class ClientCredentialsHandler {
                 });
 
         validateClientSecret(client, clientSecret);
-        deletedMachineTokenGuard.requireNotDeleted(client.getMachineId());
+        machineTokenGuard.requireTokenAllowed(client.getMachineId());
 
         String accessToken = accessTokenGenerator.generate(client, CLIENT_CREDENTIALS_GRANT_TYPE);
         String refreshToken = refreshTokenGenerator.generate(client.getClientId());
