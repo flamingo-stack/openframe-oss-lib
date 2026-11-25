@@ -77,27 +77,29 @@ public class OsVersionService {
                         tenantId, OsPlatform.WINDOWS, osVersion, afterMachineId, limit)
                 : deviceOsStateRepository.findOsVersionDevicePageOnMachines(
                         tenantId, OsPlatform.WINDOWS, osVersion, afterMachineId, scopeMachineIds, limit);
-        String currentBuild = windowsReleaseMatcher
-                .findWindowsRelease(listWindowsReleases(), osVersion)
-                .map(WindowsRelease::getLatestBuild)
-                .orElse(null);
+        WindowsRelease windowsRelease = windowsReleaseMatcher.findWindowsRelease(listWindowsReleases(), osVersion);
+        String currentBuild = windowsRelease == null ? null : windowsRelease.getLatestBuild();
         return cursorPageAssembler.toPage(fetchedDevices, normalizedPagination,
-                deviceOsState -> osVersionResponseMapper.toDeviceResponse(deviceOsState,
-                        isUpToDate(deviceOsState.getOsBuild(), currentBuild),
-                        CursorCodec.encode(deviceOsState.getMachineId())),
+                deviceOsState -> toDeviceResponse(deviceOsState, currentBuild),
                 OsVersionDeviceResponse::getCursor);
+    }
+
+    private OsVersionDeviceResponse toDeviceResponse(DeviceOsState deviceOsState, String currentBuild) {
+        Boolean upToDate = isUpToDate(deviceOsState.getOsBuild(), currentBuild);
+        String cursor = CursorCodec.encode(deviceOsState.getMachineId());
+        return osVersionResponseMapper.toDeviceResponse(deviceOsState, upToDate, cursor);
     }
 
     private OsVersionResponse toResponse(OsVersionDeviceCounts osVersionDeviceCounts,
                                          List<WindowsRelease> windowsReleases, LocalDate today) {
         WindowsRelease windowsRelease = windowsReleaseMatcher
-                .findWindowsRelease(windowsReleases, osVersionDeviceCounts.getOsVersion())
-                .orElse(null);
+                .findWindowsRelease(windowsReleases, osVersionDeviceCounts.getOsVersion());
         Integer devicesBehindCount = windowsRelease == null || windowsRelease.getLatestBuild() == null
                 ? null
                 : countDevicesBehind(osVersionDeviceCounts, windowsRelease.getLatestBuild());
+        String cursor = CursorCodec.encode(osVersionDeviceCounts.getOsVersion());
         return osVersionResponseMapper.toResponse(osVersionDeviceCounts, windowsRelease, devicesBehindCount, today,
-                CursorCodec.encode(osVersionDeviceCounts.getOsVersion()));
+                cursor);
     }
 
     private static int countDevicesBehind(OsVersionDeviceCounts osVersionDeviceCounts, String currentBuild) {

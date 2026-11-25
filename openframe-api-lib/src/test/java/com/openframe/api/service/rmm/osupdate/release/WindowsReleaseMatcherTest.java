@@ -7,7 +7,6 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,10 +24,10 @@ class WindowsReleaseMatcherTest {
         // setup
 
         // execution
-        Optional<WindowsRelease> windowsRelease = windowsReleaseMatcher.findWindowsRelease(WINDOWS_RELEASES, osVersion);
+        WindowsRelease windowsRelease = windowsReleaseMatcher.findWindowsRelease(WINDOWS_RELEASES, osVersion);
 
         // verifications
-        assertThat(windowsRelease).map(WindowsRelease::getCycle).contains(expectedCycle);
+        assertThat(windowsRelease.getCycle()).isEqualTo(expectedCycle);
     }
 
     @ParameterizedTest
@@ -38,10 +37,10 @@ class WindowsReleaseMatcherTest {
         // setup
 
         // execution
-        Optional<WindowsRelease> windowsRelease = windowsReleaseMatcher.findWindowsRelease(WINDOWS_RELEASES, osVersion);
+        WindowsRelease windowsRelease = windowsReleaseMatcher.findWindowsRelease(WINDOWS_RELEASES, osVersion);
 
         // verifications
-        assertThat(windowsRelease).isEmpty();
+        assertThat(windowsRelease).isNull();
     }
 
     @Test
@@ -49,10 +48,10 @@ class WindowsReleaseMatcherTest {
         // setup
 
         // execution
-        Optional<WindowsRelease> windowsRelease = windowsReleaseMatcher.findWindowsRelease(List.of(), "11 24H2");
+        WindowsRelease windowsRelease = windowsReleaseMatcher.findWindowsRelease(List.of(), "11 24H2");
 
         // verifications
-        assertThat(windowsRelease).isEmpty();
+        assertThat(windowsRelease).isNull();
     }
 
     private static WindowsRelease release(String cycle) {

@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -18,15 +17,15 @@ public class WindowsReleaseMatcher {
     // different end dates, Windows 10 22H2 has one row without a suffix; a version row shows -w
     private static final String HOME_AND_PRO_SUFFIX = "-w";
 
-    // osVersion as the agent reports it: "11 24H2", "10 22H2".
-    public Optional<WindowsRelease> findWindowsRelease(List<WindowsRelease> windowsReleases, String osVersion) {
+    // osVersion as the agent reports it: "11 24H2", "10 22H2". Null = no row for the version.
+    public WindowsRelease findWindowsRelease(List<WindowsRelease> windowsReleases, String osVersion) {
         if (osVersion == null || windowsReleases.isEmpty()) {
-            return Optional.empty();
+            return null;
         }
         String cycle = String.join("-", osVersion.trim().toLowerCase(Locale.ROOT).split("\\s+"));
         Map<String, WindowsRelease> windowsReleasesByCycle = windowsReleases.stream()
                 .collect(Collectors.toMap(WindowsRelease::getCycle, Function.identity(), (first, second) -> first));
-        return Optional.ofNullable(windowsReleasesByCycle.get(cycle + HOME_AND_PRO_SUFFIX))
-                .or(() -> Optional.ofNullable(windowsReleasesByCycle.get(cycle)));
+        WindowsRelease homeAndProWindowsRelease = windowsReleasesByCycle.get(cycle + HOME_AND_PRO_SUFFIX);
+        return homeAndProWindowsRelease != null ? homeAndProWindowsRelease : windowsReleasesByCycle.get(cycle);
     }
 }
