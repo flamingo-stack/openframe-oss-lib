@@ -1,5 +1,6 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -49,6 +50,12 @@ public interface CustomMachineRepository {
 
     // Live machines missing a Fleet host fact, never checked or checked before checkedBefore: never checked first
     List<Machine> findDueForFleetHostFacts(String tenantId, Instant checkedBefore, int limit);
+
+    /** Reserves the observed device version for pending software dispatch without publishing an inventory change. */
+    long reserveForSoftwareReconnect(String tenantId, String machineId, Long version, Collection<DeviceStatus> managedStatuses);
+
+    /** Reserves the eligible devices for a software assignment without publishing inventory changes. */
+    long reserveForSoftwareAssignments(String tenantId, Collection<String> machineIds, Collection<DeviceStatus> managedStatuses);
 
     boolean isSortableField(String field);
 

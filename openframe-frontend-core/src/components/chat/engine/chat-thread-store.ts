@@ -276,6 +276,7 @@ export function createChatThreadStore<K extends string>(config: ChatThreadStoreC
         approvalStatuses: parked.approvalStatuses,
         lastAppliedSeq: parked.lastAppliedSeq,
         pendingEchoes: parked.pendingEchoes,
+        trailingReplayMatched: parked.trailingReplayMatched,
       });
     }
     return reducer;
