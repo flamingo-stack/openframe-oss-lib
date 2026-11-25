@@ -25,6 +25,8 @@ public interface TenantRepository extends MongoRepository<Tenant, String>, BaseT
     @Override
     Boolean existsByDomain(String domain);
 
+    boolean existsByDisplayId(String displayId);
+
     interface DomainView { String getDomain(); }
 
     List<DomainView> findByDomainIn(List<String> domains);

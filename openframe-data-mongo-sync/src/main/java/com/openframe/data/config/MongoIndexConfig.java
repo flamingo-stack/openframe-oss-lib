@@ -3,6 +3,7 @@ package com.openframe.data.config;
 import com.openframe.data.document.audit.AuditEvent;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
@@ -87,6 +88,15 @@ public class MongoIndexConfig implements SmartLifecycle {
             .ensureIndex(new Index().on("retiredRefreshTokens.value", Sort.Direction.ASC)
                                     .sparse()
                                     .named("oauth2_authorizations_retired_refresh_token"));
+
+        // A tenant's display id stands in for its id wherever the id must not show, so two tenants must never share
+        // one. Sparse: tenants created before the field have none until the backfill. Same name and options as the
+        // @Indexed on Tenant.displayId.
+        mongoTemplate.indexOps(Tenant.class)
+            .ensureIndex(new Index().on("displayId", Sort.Direction.ASC)
+                                    .unique()
+                                    .sparse()
+                                    .named(Tenant.DISPLAY_ID_INDEX));
 
         mongoTemplate.indexOps("application_events")
             .ensureIndex(new Index().on("userId", Sort.Direction.ASC)
