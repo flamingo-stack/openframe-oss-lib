@@ -62,7 +62,8 @@ class FleetMdmClientWipeTest {
     @Test
     void wipeHost_refusedByFleet_keepsStatusAndBody() throws Exception {
         // setup
-        String body = "{\"message\":\"Can't wipe the host because it doesn't have MDM turned on.\"}";
+        String body = "{\"message\":\"Validation Failed\",\"errors\":[{\"name\":\"host_id\","
+                + "\"reason\":\"Can't wipe the host because it doesn't have MDM turned on.\"}]}";
         stubResponse(422, body);
         FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
 
@@ -71,6 +72,7 @@ class FleetMdmClientWipeTest {
                 .isInstanceOfSatisfying(FleetMdmApiException.class, e -> {
                     assertThat(e.getStatusCode()).isEqualTo(422);
                     assertThat(e.getResponseBody()).isEqualTo(body);
+                    assertThat(e.getReason()).isEqualTo("Can't wipe the host because it doesn't have MDM turned on.");
                 });
     }
 

@@ -3,7 +3,6 @@ package com.openframe.api.service.device;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.rmm.fleet.FleetMdmClientProvider;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.OsType;
@@ -15,8 +14,6 @@ import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.model.WindowsWipeType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -161,32 +158,10 @@ class DeviceWipeServiceTest {
         verifyNoInteractions(fleetMdmClientProvider);
     }
 
-    @ParameterizedTest
-    @ValueSource(ints = {402, 404, 422})
-    void wipeWindowsDevice_fleetRefusesRequest_badRequest(int status) {
-        // setup
-        givenFleetAnswersWipe(status);
-
-        // execution / verifications
-        assertThatThrownBy(() -> service.wipeWindowsDevice(MACHINE_ID, HOSTNAME))
-                .isInstanceOf(BadRequestException.class);
-    }
-
     @Test
-    void wipeWindowsDevice_hostAlreadyWiped_conflict() {
+    void wipeWindowsDevice_fleetRefuses_propagatesTheFleetFailure() {
         // setup
-        givenFleetAnswersWipe(409);
-
-        // execution / verifications
-        assertThatThrownBy(() -> service.wipeWindowsDevice(MACHINE_ID, HOSTNAME))
-                .isInstanceOf(ConflictException.class);
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = {500, 599})
-    void wipeWindowsDevice_fleetServerError_propagatesFleetException(int status) {
-        // setup
-        FleetMdmApiException failure = givenFleetAnswersWipe(status);
+        FleetMdmApiException failure = givenFleetAnswersWipe(422);
 
         // execution / verifications
         assertThatThrownBy(() -> service.wipeWindowsDevice(MACHINE_ID, HOSTNAME)).isSameAs(failure);

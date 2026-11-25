@@ -4,19 +4,16 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.rmm.fleet.FleetMdmClientProvider;
 import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.core.exception.ConflictException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.repository.tool.ToolConnectionRepository;
-import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.model.WindowsWipeType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -50,11 +47,7 @@ public class DeviceWipeService {
         }
         long hostId = fleetHostId(machine)
                 .orElseThrow(() -> new BadRequestException("The device is not connected to Fleet"));
-        try {
-            fleetMdmClientProvider.client().wipeHost(hostId, WindowsWipeType.DO_WIPE_PROTECTED);
-        } catch (FleetMdmApiException e) {
-            throw refusalOf(e);
-        }
+        fleetMdmClientProvider.client().wipeHost(hostId, WindowsWipeType.DO_WIPE_PROTECTED);
         log.info("Wipe requested for machineId={}, Fleet host {}", machineId, hostId);
         return machine;
     }
@@ -74,20 +67,5 @@ public class DeviceWipeService {
                 .map(ToolConnection::getAgentToolId)
                 .filter(agentToolId -> isNumeric(agentToolId))
                 .map(Long::valueOf);
-    }
-
-    private static RuntimeException refusalOf(FleetMdmApiException e) {
-        HttpStatus status = HttpStatus.resolve(e.getStatusCode());
-        if (status == null) {
-            return e;
-        }
-        return switch (status) {
-            case UNPROCESSABLE_CONTENT -> new BadRequestException(
-                    "Fleet cannot wipe the device now: it has no MDM turned on, or a lock, unlock or wipe is pending");
-            case NOT_FOUND -> new BadRequestException("The device is not connected to Fleet");
-            case CONFLICT -> new ConflictException("The device is already wiped");
-            case PAYMENT_REQUIRED -> new BadRequestException("This Fleet server cannot wipe Windows devices yet");
-            default -> e;
-        };
     }
 }

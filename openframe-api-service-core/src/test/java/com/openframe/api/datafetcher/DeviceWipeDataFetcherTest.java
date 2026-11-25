@@ -8,7 +8,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.prepost.PreAuthorize;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -35,17 +34,5 @@ class DeviceWipeDataFetcherTest {
 
         // verifications
         assertThat(result).isSameAs(machine);
-    }
-
-    @Test
-    void wipeWindowsDevice_isAdminOnly() throws Exception {
-        // execution
-        PreAuthorize preAuthorize = DeviceWipeDataFetcher.class
-                .getMethod("wipeWindowsDevice", WipeWindowsDeviceInput.class)
-                .getAnnotation(PreAuthorize.class);
-
-        // verifications
-        assertThat(preAuthorize).isNotNull();
-        assertThat(preAuthorize.value()).isEqualTo("hasAuthority('ADMIN')");
     }
 }

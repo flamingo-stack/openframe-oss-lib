@@ -1145,7 +1145,17 @@ public class FleetMdmClient {
         }
         String body = response.body() == null ? "" : response.body().trim();
         throw new FleetMdmApiException(action + " failed with HTTP " + response.statusCode()
-                + (body.isEmpty() ? "" : ": " + body), response.statusCode(), body);
+                + (body.isEmpty() ? "" : ": " + body), response.statusCode(), body, reasonOf(body));
+    }
+
+    private static String reasonOf(String body) {
+        try {
+            JsonNode root = MAPPER.readTree(body);
+            String reason = root.path("errors").path(0).path("reason").asString("");
+            return reason.isBlank() ? root.path("message").asString(null) : reason;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static JsonNode listNodeOrEmpty(String responseBody, String fieldName) throws IOException {

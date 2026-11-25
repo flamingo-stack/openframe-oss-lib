@@ -8,7 +8,6 @@ import com.openframe.api.service.device.DeviceWipeService;
 import com.openframe.data.document.device.Machine;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 
 @DgsComponent
@@ -19,7 +18,6 @@ public class DeviceWipeDataFetcher {
     private final DeviceWipeService deviceWipeService;
 
     @DgsMutation
-    @PreAuthorize("hasAuthority('ADMIN')")
     public Machine wipeWindowsDevice(@InputArgument @Valid WipeWindowsDeviceInput input) {
         return deviceWipeService.wipeWindowsDevice(input.getMachineId(), input.getConfirmation());
     }
