@@ -1,10 +1,10 @@
 package com.openframe.client.scheduler;
 
 import com.openframe.client.service.rmm.osupdate.OsUpdateService;
-import com.openframe.client.service.rmm.osupdate.enrichment.ConditionalOnOsUpdateEnrichment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,8 @@ import java.time.Instant;
 // Enriches the OS update catalogue from the vendors' bulletins, never from the report ingest: a new update waits for
 // the next run, and an outage of a vendor only delays it.
 @Component
-@ConditionalOnOsUpdateEnrichment
+@ConditionalOnProperty(name = {"openframe.rmm.os-update.enabled", "openframe.rmm.os-update.enrichment.enabled"},
+        havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class OsUpdateEnrichmentScheduler {

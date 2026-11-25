@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.client.service.rmm.osupdate.enrichment.parser.MsrcCvrfDocumentParser;
 import com.openframe.core.rest.PackageSearchRestClientFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -20,7 +21,8 @@ import java.util.Map;
 
 // MSRC CVRF API v3.0, no authentication. One document per Patch Tuesday month, keyed like 2026-Nov.
 @Component
-@ConditionalOnOsUpdateEnrichment
+@ConditionalOnProperty(name = {"openframe.rmm.os-update.enabled", "openframe.rmm.os-update.enrichment.enabled"},
+        havingValue = "true")
 public class MsrcCvrfClient {
 
     private static final DateTimeFormatter MONTH_ID = DateTimeFormatter.ofPattern("yyyy-MMM", Locale.ENGLISH);

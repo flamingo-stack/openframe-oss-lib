@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.client.service.rmm.osupdate.enrichment.parser.CisaKevCatalogParser;
 import com.openframe.core.rest.PackageSearchRestClientFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -16,7 +17,8 @@ import java.util.Set;
 
 // CISA Known Exploited Vulnerabilities catalog, no authentication.
 @Component
-@ConditionalOnOsUpdateEnrichment
+@ConditionalOnProperty(name = {"openframe.rmm.os-update.enabled", "openframe.rmm.os-update.enrichment.enabled"},
+        havingValue = "true")
 public class CisaKevClient {
 
     private static final String CATALOG = "catalog";

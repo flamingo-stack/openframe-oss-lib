@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -24,7 +25,8 @@ import java.util.regex.Pattern;
 // MSRC bulletin of the update's month by KB, plus the CISA KEV catalog. Only security updates are in MSRC: a preview,
 // a driver or an update without a month is checked and stays without data.
 @Component
-@ConditionalOnOsUpdateEnrichment
+@ConditionalOnProperty(name = {"openframe.rmm.os-update.enabled", "openframe.rmm.os-update.enrichment.enabled"},
+        havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
