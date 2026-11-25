@@ -45,7 +45,7 @@ class DualWriteKafkaProducerTest {
     private final MachinePinotMessage row = MachinePinotMessage.builder()
             .tenantId("tenant-1")
             .machineId("machine-42")
-            .status("ONLINE")
+            .status("MANAGED")
             .build();
 
     private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();

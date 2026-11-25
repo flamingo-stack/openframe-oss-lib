@@ -106,7 +106,7 @@ class PackageManagerBootstrapServiceTest {
     @Test
     @DisplayName("a stored secret env var reaches the agent in the clear")
     void storedSecret_sentInTheClear() {
-        givenMachine(DeviceStatus.ONLINE);
+        givenMachine(DeviceStatus.MANAGED);
         Script script = givenSeededScript();
         ScriptEnvVar secret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build();
         ScriptEnvVar sealed = secret.sealed(TestEncryption.SERVICE::encrypt);
@@ -126,7 +126,7 @@ class PackageManagerBootstrapServiceTest {
     @Test
     @DisplayName("first report: persists a RUNNING SYSTEM_BOOTSTRAP row and publishes the script with ITS privilege level")
     void dispatchesOnFirstReport() {
-        givenMachine(DeviceStatus.ONLINE);
+        givenMachine(DeviceStatus.MANAGED);
         givenSeededScript();
         when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
                 any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -154,7 +154,7 @@ class PackageManagerBootstrapServiceTest {
     @Test
     @DisplayName("a manager dependency: its own system script goes out under the manager's name")
     void dispatchesDependencyScriptUnderItsManager() {
-        givenMachine(DeviceStatus.ONLINE);
+        givenMachine(DeviceStatus.MANAGED);
         givenSeededScript(SystemScriptCode.INSTALL_WINGET_CLIENT_MODULE, PrivilegeLevel.ADMIN);
         when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
                 any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -176,7 +176,7 @@ class PackageManagerBootstrapServiceTest {
     @Test
     @DisplayName("an in-flight bootstrap run suppresses re-dispatch regardless of its age")
     void skipsWhenInFlight() {
-        givenMachine(DeviceStatus.ONLINE);
+        givenMachine(DeviceStatus.MANAGED);
         givenSeededScript();
         givenLastExecution(ExecutionStatus.RUNNING, Instant.now().minusSeconds(COOLDOWN_SECONDS * 10));
 
@@ -189,7 +189,7 @@ class PackageManagerBootstrapServiceTest {
     @Test
     @DisplayName("a finished run inside the cooldown window suppresses re-dispatch — the agent's next report retries")
     void skipsWithinCooldown() {
-        givenMachine(DeviceStatus.ONLINE);
+        givenMachine(DeviceStatus.MANAGED);
         givenSeededScript();
         givenLastExecution(ExecutionStatus.FAILED, Instant.now().minusSeconds(60));
 
@@ -201,7 +201,7 @@ class PackageManagerBootstrapServiceTest {
     @Test
     @DisplayName("a failed run past the cooldown is retried")
     void redispatchesAfterCooldown() {
-        givenMachine(DeviceStatus.ONLINE);
+        givenMachine(DeviceStatus.MANAGED);
         givenSeededScript();
         givenLastExecution(ExecutionStatus.FAILED, Instant.now().minusSeconds(COOLDOWN_SECONDS + 60));
 
@@ -243,7 +243,7 @@ class PackageManagerBootstrapServiceTest {
     @Test
     @DisplayName("system script not seeded yet: report is ignored, the agent re-reports later")
     void ignoresWhenScriptNotSeeded() {
-        givenMachine(DeviceStatus.ONLINE);
+        givenMachine(DeviceStatus.MANAGED);
         when(scriptRepository.findByTenantIdAndNameAndType(
                 TENANT_ID, SystemScriptCode.INSTALL_BREW.canonicalName(), ScriptType.SYSTEM))
                 .thenReturn(Optional.empty());

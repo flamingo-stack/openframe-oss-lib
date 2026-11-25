@@ -219,7 +219,7 @@ public class DevicesTest extends BaseTest {
         // replaced the old archive-an-OFFLINE-device / delete-an-ARCHIVED-device pair: with a client
         // that deregisters, neither of those states ever appears.
         List<Machine> devices = DeviceApi.getDevices(
-                pipelineScoped(statusDevicesFilter(DeviceStatus.ONLINE, DeviceStatus.OFFLINE)));
+                pipelineScoped(statusDevicesFilter(DeviceStatus.MANAGED)));
         assertThat(devices)
                 .as("Expected at least one enrolled device to delete%s", orgSuffix())
                 .isNotEmpty();

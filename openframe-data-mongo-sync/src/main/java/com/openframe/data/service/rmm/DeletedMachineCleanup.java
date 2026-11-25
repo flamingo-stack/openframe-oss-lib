@@ -24,8 +24,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.mongodb.core.query.Criteria;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -105,7 +108,7 @@ public class DeletedMachineCleanup {
         String tenantId = expected.getTenantId();
         String machineId = expected.getMachineId();
         Criteria lifecycle = Criteria.where("tenantId").is(tenantId)
-                .and(STATUS.path()).is(expected.getStatus())
+                .and(STATUS.path()).in(storedStatusNames(expected.getStatus()))
                 .and(ENROLLMENT_ID.path()).is(expected.getEnrollmentId());
         Machine updated = machineWriter.update(machineId, lifecycle, update)
                 .map(MachineWriteResult::after)
@@ -115,6 +118,12 @@ public class DeletedMachineCleanup {
             removeSoftwareSchedules(tenantId, machineId);
         }
         return updated;
+    }
+
+    private static Collection<String> storedStatusNames(DeviceStatus status) {
+        return Optional.ofNullable(status)
+                .<Collection<String>>map(DeviceStatus::storedNames)
+                .orElseGet(() -> Collections.singleton(null));
     }
 
     private static ConflictException statusChanged(Machine expected) {

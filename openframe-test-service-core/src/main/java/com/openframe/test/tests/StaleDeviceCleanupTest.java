@@ -2,7 +2,7 @@ package com.openframe.test.tests;
 
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.config.MachineConfig;
-import com.openframe.test.data.dto.device.DeviceStatus;
+import com.openframe.test.data.dto.device.DeviceConnectivity;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.generator.DeviceGenerator;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +57,7 @@ public class StaleDeviceCleanupTest extends BaseTest {
         log.info("{} device row(s) carry the hostname {}", sameHostname.size(), hostname);
 
         List<Machine> stale = sameHostname.stream()
-                .filter(machine -> DeviceStatus.ONLINE != machine.getStatus())
+                .filter(machine -> DeviceConnectivity.ONLINE != machine.getConnectivity())
                 .toList();
         for (Machine machine : stale) {
             log.info("Retiring earlier enrolment {} ({}, last seen {})",
@@ -70,6 +70,6 @@ public class StaleDeviceCleanupTest extends BaseTest {
                 .toList();
         assertThat(remaining)
                 .as("Only live enrolments of %s should remain; %d were retired", hostname, stale.size())
-                .allMatch(machine -> DeviceStatus.ONLINE == machine.getStatus());
+                .allMatch(machine -> DeviceConnectivity.ONLINE == machine.getConnectivity());
     }
 }

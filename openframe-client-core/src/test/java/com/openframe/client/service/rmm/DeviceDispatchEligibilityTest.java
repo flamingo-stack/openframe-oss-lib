@@ -51,21 +51,9 @@ class DeviceDispatchEligibilityTest {
     }
 
     @Test
-    void isDispatchable_onlineAndOnline_true() {
+    void isDispatchable_managedAndOnline_true() {
         // setup
-        Machine machine = machine(DeviceStatus.ONLINE, TelemetryStatus.ONLINE);
-
-        // execution
-        boolean result = DeviceDispatchEligibility.isDispatchable(machine);
-
-        // verifications
-        assertThat(result).isTrue();
-    }
-
-    @Test
-    void isDispatchable_offlineStatusButTelemetryOnline_true() {
-        // setup
-        Machine machine = machine(DeviceStatus.OFFLINE, TelemetryStatus.ONLINE);
+        Machine machine = machine(DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
 
         // execution
         boolean result = DeviceDispatchEligibility.isDispatchable(machine);
@@ -77,7 +65,7 @@ class DeviceDispatchEligibilityTest {
     @Test
     void isDispatchable_connectedButNullTelemetry_false() {
         // setup
-        Machine machine = machine(DeviceStatus.ONLINE, null);
+        Machine machine = machine(DeviceStatus.MANAGED, null);
 
         // execution
         boolean result = DeviceDispatchEligibility.isDispatchable(machine);
@@ -106,9 +94,8 @@ class DeviceDispatchEligibilityTest {
                                 isManaged(status) && telemetry == TelemetryStatus.ONLINE)));
     }
 
-    // independent oracle: MANAGED, plus ONLINE/OFFLINE until migration 031 rewrites them
     private static boolean isManaged(DeviceStatus status) {
-        return status == DeviceStatus.MANAGED || status == DeviceStatus.ONLINE || status == DeviceStatus.OFFLINE;
+        return status == DeviceStatus.MANAGED;
     }
 
     private static Machine machine(DeviceStatus status, TelemetryStatus telemetry) {

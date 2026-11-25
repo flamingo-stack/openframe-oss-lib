@@ -1340,10 +1340,10 @@ class SoftwareInventoryServiceTest {
     void listDevices_filters() {
         Machine acme = device("m-1", "1.0");
         acme.setOrganizationId("org-acme");
-        acme.setStatus(DeviceStatus.ONLINE);
+        acme.setStatus(DeviceStatus.MANAGED);
         Machine globex = device("m-2", "1.0");
         globex.setOrganizationId("org-globex");
-        globex.setStatus(DeviceStatus.OFFLINE);
+        globex.setStatus(DeviceStatus.PENDING);
         stubDevices("homebrew_packages", acme, globex);
         autoUpdateOn("m-1");
 
@@ -1352,7 +1352,7 @@ class SoftwareInventoryServiceTest {
         assertThat(machineIds(byCustomer)).containsExactly("m-2");
 
         SoftwareOnDeviceFilterInput byDeviceStatus = new SoftwareOnDeviceFilterInput();
-        byDeviceStatus.setDeviceStatuses(List.of(DeviceStatus.ONLINE));
+        byDeviceStatus.setDeviceStatuses(List.of(DeviceStatus.MANAGED));
         assertThat(machineIds(byDeviceStatus)).containsExactly("m-1");
 
         SoftwareOnDeviceFilterInput byAutoUpdate = new SoftwareOnDeviceFilterInput();
@@ -1389,13 +1389,13 @@ class SoftwareInventoryServiceTest {
     void softwareDeviceFilters_allFacets() {
         Machine acme = device("m-1", "1.0");
         acme.setOrganizationId("org-acme");
-        acme.setStatus(DeviceStatus.ONLINE);
+        acme.setStatus(DeviceStatus.MANAGED);
         Machine alsoAcme = device("m-2", "1.0");
         alsoAcme.setOrganizationId("org-acme");
-        alsoAcme.setStatus(DeviceStatus.OFFLINE);
+        alsoAcme.setStatus(DeviceStatus.PENDING);
         Machine lost = device("m-3", "1.0");
         lost.setOrganizationId("org-gone");
-        lost.setStatus(DeviceStatus.ONLINE);
+        lost.setStatus(DeviceStatus.MANAGED);
         stubDevices("homebrew_packages", acme, alsoAcme, lost);
         autoUpdateOn("m-1");
         Organization organization = new Organization();
@@ -1410,7 +1410,7 @@ class SoftwareInventoryServiceTest {
         assertThat(filters.getAutoUpdateStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
                 .containsExactly(tuple("ON", 1), tuple("OFF", 2));
         assertThat(filters.getDeviceStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
-                .containsExactlyInAnyOrder(tuple("ONLINE", 2), tuple("OFFLINE", 1));
+                .containsExactlyInAnyOrder(tuple("MANAGED", 2), tuple("PENDING", 1));
         // a customer without a record still shows, by its id
         assertThat(filters.getOrganizations()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getLabel, SoftwareFilterOption::getCount)
                 .containsExactly(tuple("org-acme", "Acme", 2), tuple("org-gone", "org-gone", 1));
@@ -1515,13 +1515,13 @@ class SoftwareInventoryServiceTest {
         // setup
         Machine acme = device("m-1", "1.0");
         acme.setOrganizationId("org-acme");
-        acme.setStatus(DeviceStatus.ONLINE);
+        acme.setStatus(DeviceStatus.MANAGED);
         Machine globex = device("m-2", "1.0");
         globex.setOrganizationId("org-globex");
-        globex.setStatus(DeviceStatus.OFFLINE);
+        globex.setStatus(DeviceStatus.PENDING);
         Machine alsoGlobex = device("m-3", "1.0");
         alsoGlobex.setOrganizationId("org-globex");
-        alsoGlobex.setStatus(DeviceStatus.ONLINE);
+        alsoGlobex.setStatus(DeviceStatus.MANAGED);
         stubDevices("homebrew_packages", acme, globex, alsoGlobex);
         autoUpdateOn("m-3");
         when(organizationRepository.findByOrganizationIdIn(Set.of("org-globex"))).thenReturn(List.of());
@@ -1533,7 +1533,7 @@ class SoftwareInventoryServiceTest {
 
         // verifications
         assertThat(filters.getDeviceStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
-                .containsExactlyInAnyOrder(tuple("ONLINE", 1), tuple("OFFLINE", 1));
+                .containsExactlyInAnyOrder(tuple("MANAGED", 1), tuple("PENDING", 1));
         assertThat(filters.getAutoUpdateStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
                 .containsExactly(tuple("ON", 1), tuple("OFF", 1));
         assertThat(filters.getOrganizations()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)

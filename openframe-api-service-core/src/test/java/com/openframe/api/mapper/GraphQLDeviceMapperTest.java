@@ -67,7 +67,7 @@ class GraphQLDeviceMapperTest {
     void toDeviceFilterCriteria_carriesConnectivity() {
         // setup
         DeviceFilterInput input = DeviceFilterInput.builder()
-                .statuses(List.of(DeviceStatus.ONLINE))
+                .statuses(List.of(DeviceStatus.MANAGED))
                 .connectivity(List.of(TelemetryStatus.OFFLINE))
                 .build();
 
@@ -75,22 +75,22 @@ class GraphQLDeviceMapperTest {
         DeviceFilterCriteria criteria = mapper.toDeviceFilterCriteria(input);
 
         // verifications
-        assertThat(criteria.getStatuses()).containsExactly(DeviceStatus.ONLINE);
+        assertThat(criteria.getStatuses()).containsExactly(DeviceStatus.MANAGED);
         assertThat(criteria.getConnectivity()).containsExactly(TelemetryStatus.OFFLINE);
     }
 
     @Test
-    @DisplayName("available-device cursor buckets by telemetryStatus: status ONLINE with telemetry OFFLINE is the not-online bucket")
+    @DisplayName("available-device cursor buckets by telemetryStatus: status MANAGED with telemetry OFFLINE is the not-online bucket")
     void toAvailableDeviceConnection_bucketReadsTelemetryStatus() {
         // setup
         Machine staleStatus = machine(CONNECTED);
         staleStatus.setId("64f000000000000000000001");
-        staleStatus.setStatus(DeviceStatus.ONLINE);
+        staleStatus.setStatus(DeviceStatus.MANAGED);
         staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
         Machine online = machine(CONNECTED);
         online.setId("64f000000000000000000002");
         online.setMachineId("m-2");
-        online.setStatus(DeviceStatus.OFFLINE);
+        online.setStatus(DeviceStatus.MANAGED);
         online.setTelemetryStatus(TelemetryStatus.ONLINE);
         CountedGenericQueryResult<Machine> result = CountedGenericQueryResult.<Machine>builder()
                 .items(List.of(staleStatus, online)).build();

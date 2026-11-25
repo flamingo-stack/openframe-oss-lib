@@ -68,7 +68,7 @@ class SoftwareBundleOnlineDispatchServiceTest {
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
                 .thenReturn(List.of(online, offline));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-online", DeviceStatus.ONLINE), machine("m-offline", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machine("m-online", DeviceStatus.MANAGED, TelemetryStatus.ONLINE), machine("m-offline", DeviceStatus.MANAGED, TelemetryStatus.OFFLINE)));
         SoftwareBundle bundle = SoftwareBundle.builder().id(BUNDLE_ID).tenantId(TENANT).build();
         when(bundleRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(bundle));
 
@@ -90,11 +90,11 @@ class SoftwareBundleOnlineDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE is left NEW, nothing dispatched")
+    @DisplayName("online is decided by telemetryStatus: status MANAGED with telemetry OFFLINE is left NEW, nothing dispatched")
     void statusOnlineTelemetryOffline_leftNew() {
         // setup
         SoftwareBundleOnlineDispatch row = sentinel("m-stale");
-        Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
+        Machine staleStatus = machine("m-stale", DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
         staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
                 .thenReturn(List.of(row));
@@ -115,7 +115,7 @@ class SoftwareBundleOnlineDispatchServiceTest {
     void pendingMachineOnline_leftNew() {
         // setup
         SoftwareBundleOnlineDispatch row = sentinel("m-pending");
-        Machine pending = machine("m-pending", DeviceStatus.PENDING);
+        Machine pending = machine("m-pending", DeviceStatus.PENDING, TelemetryStatus.OFFLINE);
         pending.setTelemetryStatus(TelemetryStatus.ONLINE);
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
                 .thenReturn(List.of(row));
@@ -137,11 +137,11 @@ class SoftwareBundleOnlineDispatchServiceTest {
                 .status(DeviceOnlineDispatchStatus.NEW).build();
     }
 
-    private static Machine machine(String machineId, DeviceStatus status) {
+    private static Machine machine(String machineId, DeviceStatus status, TelemetryStatus connectivity) {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setStatus(status);
-        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
+        m.setTelemetryStatus(connectivity);
         return m;
     }
 }

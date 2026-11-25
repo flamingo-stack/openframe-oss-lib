@@ -4,7 +4,7 @@ import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.SoftwareInventoryApi;
 import com.openframe.test.data.dto.device.DeviceConnection;
 import com.openframe.test.data.dto.device.DeviceEdge;
-import com.openframe.test.data.dto.device.DeviceStatus;
+import com.openframe.test.data.dto.device.DeviceConnectivity;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.shared.FilterOption;
 import com.openframe.test.data.dto.shared.GraphqlError;
@@ -73,7 +73,7 @@ public class SoftwareInventoryTest extends BaseTest {
     public static void pickDevice() {
         device = DeviceApi.getDevices(DeviceGenerator.osDevicesFilter(WINDOWS)).stream()
                 .filter(d -> HOSTNAME.equals(d.getHostname()))
-                .min(Comparator.comparing((Machine d) -> d.getStatus() != DeviceStatus.ONLINE))
+                .min(Comparator.comparing((Machine d) -> d.getConnectivity() != DeviceConnectivity.ONLINE))
                 .orElse(null);
     }
 

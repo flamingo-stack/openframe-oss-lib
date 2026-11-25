@@ -4,6 +4,7 @@ import com.openframe.client.exception.InvalidAgentIdException;
 import com.openframe.client.exception.InvalidToolTypeException;
 import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.client.service.agentregistration.transformer.ToolAgentIdTransformerService;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -195,6 +197,40 @@ class ToolConnectionServiceTest {
         // verifications
         assertThat(ex.getMessage()).contains(MACHINE_ID);
         verifyNoInteractions(toolConnectionRepository, deviceLifecycleService);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING_DELETION", "DELETED", "ARCHIVED"})
+    void addToolConnection_frozenMachine_throwsMachineNoLongerManaged(DeviceStatus status) {
+        // setup
+        machine.setStatus(status);
+        stubMachineExists();
+
+        // execution
+        MachineNotFoundException ex = assertThrows(MachineNotFoundException.class,
+                () -> service.addToolConnection(MACHINE_ID, "FLEET_MDM", RAW_AGENT_TOOL_ID, false));
+
+        // verifications
+        assertThat(ex.getMessage()).contains("no longer managed", MACHINE_ID);
+        verifyNoInteractions(toolConnectionRepository, deviceLifecycleService);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "MANAGED"})
+    void addToolConnection_liveMachine_connectionSavedAndPromotionChecked(DeviceStatus status) {
+        // setup
+        machine.setStatus(status);
+        stubMachineExists();
+        stubTransform();
+        when(toolConnectionRepository.findByMachineIdAndToolType(MACHINE_ID, ToolType.FLEET_MDM)).thenReturn(Optional.empty());
+
+        // execution
+        service.addToolConnection(MACHINE_ID, "FLEET_MDM", RAW_AGENT_TOOL_ID, false);
+
+        // verifications
+        verify(toolConnectionRepository).insert(connectionCaptor.capture());
+        assertThat(connectionCaptor.getValue().getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
+        verify(deviceLifecycleService).promoteIfReady(MACHINE_ID);
     }
 
     @Test

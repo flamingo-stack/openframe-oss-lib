@@ -106,7 +106,7 @@ class DeviceFilterServiceTest {
     @Test
     void dashboardCounterSelection_runsOnlyItsTwoQueries() {
         when(pinotDeviceRepository.getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(Map.of("ONLINE", 3));
+                .thenReturn(Map.of("MANAGED", 3));
         when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(3);
 

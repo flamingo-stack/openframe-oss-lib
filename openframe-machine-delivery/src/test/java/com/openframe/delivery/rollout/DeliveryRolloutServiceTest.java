@@ -60,7 +60,7 @@ class DeliveryRolloutServiceTest {
     private static final String TARGET_ID = "openframe-client";
     private static final int SEQUENCE = 7;
     private static final int BATCH_SIZE = 2;
-    private static final Set<DeviceStatus> DELIVERABLE = EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
+    private static final Set<DeviceStatus> DELIVERABLE = EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.PENDING);
 
     @Mock private MachineDeliveryRolloutRepository repository;
     @Mock private MachineRepository machineRepository;

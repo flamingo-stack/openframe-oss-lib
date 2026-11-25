@@ -4,7 +4,7 @@ import com.openframe.test.api.AgentAuthApi;
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.RemoteAccessApi;
 import com.openframe.test.api.RemoteAccessMachineApi;
-import com.openframe.test.data.dto.device.DeviceStatus;
+import com.openframe.test.data.dto.device.DeviceConnectivity;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.remoteaccess.RemoteAccessRequest;
 import com.openframe.test.data.dto.remoteaccess.RemoteAccessRequestAudit;
@@ -76,7 +76,7 @@ public class RemoteAccessSessionTest extends BaseTest {
     public static void pickDevice() {
         device = DeviceApi.getDevices(DeviceGenerator.osDevicesFilter(WINDOWS)).stream()
                 .filter(d -> HOSTNAME.equals(d.getHostname()))
-                .min(Comparator.comparing((Machine d) -> d.getStatus() != DeviceStatus.ONLINE))
+                .min(Comparator.comparing((Machine d) -> d.getConnectivity() != DeviceConnectivity.ONLINE))
                 .orElse(null);
     }
 

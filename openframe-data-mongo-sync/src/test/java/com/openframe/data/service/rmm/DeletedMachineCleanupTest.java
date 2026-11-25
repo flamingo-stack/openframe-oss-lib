@@ -17,18 +17,26 @@ import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import com.openframe.publishing.transaction.MongoTransactionRunner;
+import com.openframe.core.exception.ConflictException;
+import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.query.Criteria;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -49,6 +57,8 @@ class DeletedMachineCleanupTest {
     @Mock private DeviceOsStateRepository deviceOsStateRepository;
     @Mock private DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
     @Mock private DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
+
+    @Captor private ArgumentCaptor<Criteria> guardCaptor;
 
     @InjectMocks private DeletedMachineCleanup cleanup;
 
@@ -145,5 +155,122 @@ class DeletedMachineCleanupTest {
         verify(deviceOsStateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
         verify(deviceOsPendingUpdateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
         verify(deviceOsUpdateHistoryRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+    }
+
+    @Test
+    void markDeleted_managedDevice_guardAcceptsEveryStoredNameOfManaged() {
+        // setup
+        Machine machine = machine(DeviceStatus.MANAGED);
+        stubLifecycleWrite(machine);
+
+        // execution
+        cleanup.markDeleted(machine);
+
+        // verifications
+        Document guard = capturedGuard();
+        assertThat(guard)
+                .containsEntry("tenantId", "t-1")
+                .containsEntry("enrollmentId", "enrollment-1");
+        assertThat(statusIn(guard)).containsExactly("MANAGED", "ACTIVE", "OFFLINE", "ONLINE");
+    }
+
+    @Test
+    void markDeleted_archivedDevice_guardAcceptsEveryStoredNameOfArchived() {
+        // setup
+        Machine machine = machine(DeviceStatus.ARCHIVED);
+        stubLifecycleWrite(machine);
+
+        // execution
+        cleanup.markDeleted(machine);
+
+        // verifications
+        assertThat(statusIn(capturedGuard())).containsExactly("ARCHIVED", "DECOMMISSIONED", "INACTIVE", "MAINTENANCE");
+    }
+
+    @Test
+    void markDeleted_pendingDevice_guardOnPendingOnly() {
+        // setup
+        Machine machine = machine(DeviceStatus.PENDING);
+        stubLifecycleWrite(machine);
+
+        // execution
+        cleanup.markDeleted(machine);
+
+        // verifications
+        assertThat(statusIn(capturedGuard())).containsExactly("PENDING");
+    }
+
+    @Test
+    void markDeleted_deviceWithoutStatus_guardMatchesAMissingStatus() {
+        // setup
+        Machine machine = machine(null);
+        stubLifecycleWrite(machine);
+
+        // execution
+        cleanup.markDeleted(machine);
+
+        // verifications
+        assertThat(statusIn(capturedGuard())).containsExactly((Object) null);
+    }
+
+    @Test
+    void reenrollDeleted_deletedDevice_guardOnDeletedOnly() {
+        // setup
+        Machine machine = machine(DeviceStatus.DELETED);
+        stubLifecycleWrite(machine);
+        MachineUpdate update = MachineUpdate.machineUpdate();
+
+        // execution
+        cleanup.reenrollDeleted(machine, update);
+
+        // verifications
+        assertThat(statusIn(capturedGuard())).containsExactly("DELETED");
+    }
+
+    @Test
+    void markDeleted_statusChangedSinceTheRead_throwsConflict() {
+        // setup
+        Machine machine = machine(DeviceStatus.MANAGED);
+        stubTransaction();
+        when(machineWriter.update(eq("m-1"), any(Criteria.class), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        // execution
+        ConflictException ex = assertThrows(ConflictException.class, () -> cleanup.markDeleted(machine));
+
+        // verifications
+        assertThat(ex.getMessage()).contains("m-1");
+        verifyNoInteractions(assignedRepository, deviceOsStateRepository);
+    }
+
+    private static Machine machine(DeviceStatus status) {
+        Machine machine = new Machine();
+        machine.setTenantId("t-1");
+        machine.setMachineId("m-1");
+        machine.setEnrollmentId("enrollment-1");
+        machine.setStatus(status);
+        return machine;
+    }
+
+    private void stubTransaction() {
+        when(scheduleTransaction.run(any())).thenAnswer(invocation -> {
+            MongoTransactionRunner.Transaction<Machine> mutation = invocation.getArgument(0);
+            return mutation.execute();
+        });
+    }
+
+    private void stubLifecycleWrite(Machine machine) {
+        stubTransaction();
+        when(machineWriter.update(eq("m-1"), any(Criteria.class), any(MachineUpdate.class)))
+                .thenReturn(Optional.of(new MachineWriteResult(machine, machine)));
+    }
+
+    private Document capturedGuard() {
+        verify(machineWriter).update(eq("m-1"), guardCaptor.capture(), any(MachineUpdate.class));
+        return guardCaptor.getValue().getCriteriaObject();
+    }
+
+    private static List<Object> statusIn(Document guard) {
+        Collection<?> names = guard.get("status", Document.class).get("$in", Collection.class);
+        return new ArrayList<>(names);
     }
 }

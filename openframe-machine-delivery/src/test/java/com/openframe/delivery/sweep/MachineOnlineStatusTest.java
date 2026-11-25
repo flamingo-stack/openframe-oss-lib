@@ -46,7 +46,7 @@ class MachineOnlineStatusTest {
     void isOnline_machineTalkingToUs_true() {
         // setup
         when(machineRepository.findByMachineIdInAndTelemetryStatus(Set.of(ONLINE_ID), TelemetryStatus.ONLINE))
-                .thenReturn(List.of(machine(ONLINE_ID, DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine(ONLINE_ID, DeviceStatus.MANAGED)));
 
         // execution + verifications
         assertThat(status.isOnline(ONLINE_ID)).isTrue();
@@ -65,13 +65,13 @@ class MachineOnlineStatusTest {
     @Test
     void statuses_knownMachines_mappedUnknownAbsent() {
         // setup
-        when(machineRepository.findByMachineIdIn(ALL)).thenReturn(List.of(machine(ONLINE_ID, DeviceStatus.ONLINE), machine(LEAVING_ID, DeviceStatus.PENDING_DELETION)));
+        when(machineRepository.findByMachineIdIn(ALL)).thenReturn(List.of(machine(ONLINE_ID, DeviceStatus.MANAGED), machine(LEAVING_ID, DeviceStatus.PENDING_DELETION)));
 
         // execution
         Map<String, DeviceStatus> statuses = status.statuses(ALL);
 
         // verifications
-        assertThat(statuses).containsOnly(Map.entry(ONLINE_ID, DeviceStatus.ONLINE), Map.entry(LEAVING_ID, DeviceStatus.PENDING_DELETION));
+        assertThat(statuses).containsOnly(Map.entry(ONLINE_ID, DeviceStatus.MANAGED), Map.entry(LEAVING_ID, DeviceStatus.PENDING_DELETION));
     }
 
     private static Machine machine(String machineId, DeviceStatus deviceStatus) {

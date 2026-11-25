@@ -68,13 +68,13 @@ class CustomMachineRepositoryImplUpdateLastSeenIT extends BaseMongoIntegrationTe
     @Test
     @DisplayName("T12: updateLastSeen writes lastSeen and leaves every Pinot-payload field untouched")
     void updatesOnlyLastSeenField() {
-        save(MACHINE, DeviceStatus.ONLINE, SEEN);
+        save(MACHINE, DeviceStatus.MANAGED, SEEN);
 
         repository.updateLastSeen(MACHINE, LATER);
 
         Machine stored = reload(MACHINE);
         assertThat(stored.getLastSeen()).isEqualTo(LATER);
-        assertThat(stored.getStatus()).isEqualTo(DeviceStatus.ONLINE);
+        assertThat(stored.getStatus()).isEqualTo(DeviceStatus.MANAGED);
         assertThat(stored.getOrganizationId()).isEqualTo("org-1");
         assertThat(stored.getType()).isEqualTo(DeviceType.LAPTOP);
         assertThat(stored.getOsType()).isEqualTo(OsType.WINDOWS);
@@ -85,7 +85,7 @@ class CustomMachineRepositoryImplUpdateLastSeenIT extends BaseMongoIntegrationTe
     @Test
     @DisplayName("T13: updateLastSeen for an unknown machineId changes nothing and creates nothing")
     void unknownMachineId_changesNothing() {
-        save(MACHINE, DeviceStatus.ONLINE, SEEN);
+        save(MACHINE, DeviceStatus.MANAGED, SEEN);
 
         repository.updateLastSeen("does-not-exist", LATER);
 
@@ -96,20 +96,20 @@ class CustomMachineRepositoryImplUpdateLastSeenIT extends BaseMongoIntegrationTe
     @Test
     @DisplayName("T14: updateLastSeen touches only the targeted machine")
     void updatesOnlyTargetMachine() {
-        save(MACHINE, DeviceStatus.ONLINE, SEEN);
-        save(OTHER_MACHINE, DeviceStatus.OFFLINE, SEEN);
+        save(MACHINE, DeviceStatus.MANAGED, SEEN);
+        save(OTHER_MACHINE, DeviceStatus.PENDING, SEEN);
 
         repository.updateLastSeen(MACHINE, LATER);
 
         assertThat(reload(MACHINE).getLastSeen()).isEqualTo(LATER);
         assertThat(reload(OTHER_MACHINE).getLastSeen()).isEqualTo(SEEN);
-        assertThat(reload(OTHER_MACHINE).getStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        assertThat(reload(OTHER_MACHINE).getStatus()).isEqualTo(DeviceStatus.PENDING);
     }
 
     @Test
     @DisplayName("T15: updateLastSeen leaves the version unchanged, so a user edit never conflicts with a heartbeat")
     void keepsVersion() {
-        Long savedVersion = save(MACHINE, DeviceStatus.ONLINE, SEEN).getVersion();
+        Long savedVersion = save(MACHINE, DeviceStatus.MANAGED, SEEN).getVersion();
 
         repository.updateLastSeen(MACHINE, LATER);
 

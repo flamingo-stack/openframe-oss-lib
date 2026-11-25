@@ -147,12 +147,6 @@ type MachinePackageManagers {
 enum DeviceStatus {
     PENDING,
     MANAGED,
-    ACTIVE
-    INACTIVE
-    MAINTENANCE
-    DECOMMISSIONED,
-    ONLINE,
-    OFFLINE,
     PENDING_DELETION,
     DELETED,
     ARCHIVED

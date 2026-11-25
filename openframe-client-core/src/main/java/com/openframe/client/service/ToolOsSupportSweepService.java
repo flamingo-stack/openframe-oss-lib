@@ -22,7 +22,7 @@ public class ToolOsSupportSweepService {
     static final String BEFORE_FIRST_MACHINE = "000000000000000000000000";
     static final int PAGE_SIZE = 500;
     private static final Set<DeviceStatus> SWEPT_STATUSES =
-            EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);
+            EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.PENDING);
 
     private final ToolOsSupportService toolOsSupportService;
     private final ToolOsSupportReconciler toolOsSupportReconciler;

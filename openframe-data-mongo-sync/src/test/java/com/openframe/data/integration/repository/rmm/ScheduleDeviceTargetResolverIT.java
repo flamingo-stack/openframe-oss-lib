@@ -225,7 +225,7 @@ class ScheduleDeviceTargetResolverIT extends BaseMongoIntegrationTest {
         m.setOrganizationId(orgId);
         m.setType(type);
         m.setOsType(osType);
-        m.setStatus(DeviceStatus.ONLINE);
+        m.setStatus(DeviceStatus.MANAGED);
         machineRepository.save(m);
     }
 

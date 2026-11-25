@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -60,14 +61,13 @@ class DeviceLifecycleServiceTest {
     @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
     @Captor private ArgumentCaptor<DeviceFirstConnectedEvent> eventCaptor;
 
-    private DeviceLifecycleService service;
+    @InjectMocks private DeviceLifecycleService service;
 
     private Machine machine;
     private Machine promoted;
 
     @BeforeEach
     void setUp() {
-        service = new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, toolOsSupportService, true);
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setStatus(DeviceStatus.PENDING);
@@ -100,7 +100,7 @@ class DeviceLifecycleServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "ONLINE", "OFFLINE", "PENDING_DELETION", "DELETED", "ARCHIVED"})
+    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "PENDING_DELETION", "DELETED", "ARCHIVED"})
     void promoteIfReady_notPending_noop(DeviceStatus status) {
         // setup
         machine.setStatus(status);
@@ -235,19 +235,6 @@ class DeviceLifecycleServiceTest {
         verify(toolConnectionRepository).findByMachineIdAndToolTypeInAndStatus(
                 MACHINE_ID, RequiredTools.REQUIRED_TOOL_TYPES, ConnectionStatus.CONNECTED);
         verify(machineWriter, never()).update(anyString(), any(Criteria.class), any(MachineUpdate.class));
-    }
-
-    @Test
-    void promoteIfReady_flagOffSeenAndBothToolsConnected_noop() {
-        // setup
-        DeviceLifecycleService managedStatusOff =
-                new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, toolOsSupportService, false);
-
-        // execution
-        managedStatusOff.promoteIfReady(MACHINE_ID);
-
-        // verifications
-        verifyNoInteractions(machineRepository, toolConnectionRepository, machineWriter, eventPublisher);
     }
 
     @Test

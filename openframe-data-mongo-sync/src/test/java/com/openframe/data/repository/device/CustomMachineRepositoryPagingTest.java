@@ -185,7 +185,7 @@ class CustomMachineRepositoryPagingTest {
     void findMatchingNames_filteredNames_appliesTenantStatusOsOrganizationAndTags() {
         // setup
         MachineQueryFilter filter = MachineQueryFilter.builder().hostnames(List.of("host-1"))
-                .statuses(List.of("ONLINE")).osTypes(List.of(WINDOWS))
+                .statuses(List.of("MANAGED")).osTypes(List.of(WINDOWS))
                 .organizationIds(List.of("organization-1")).tagValues(List.of("production")).build();
         TagAssignment assignment = TagAssignment.builder().entityId("machine-1").build();
         when(mongoTemplate.find(any(Query.class), eq(TagAssignment.class))).thenReturn(List.of(assignment));
@@ -202,7 +202,7 @@ class CustomMachineRepositoryPagingTest {
         assertThat(predicate).containsEntry("tenantId", TENANT_ID)
                 .containsEntry("machineId", new Document("$in", List.of("machine-1")));
         assertThat(predicate.getList("$and", Document.class))
-                .contains(new Document("status", new Document("$in", List.of("ONLINE"))),
+                .contains(new Document("status", new Document("$in", List.of("MANAGED"))),
                         new Document("organizationId", new Document("$in", List.of("organization-1"))));
         verify(mongoTemplate).find(queryCaptor.capture(), eq(TagAssignment.class));
         assertThat(queryCaptor.getValue().getQueryObject()).containsEntry("tenantId", TENANT_ID);

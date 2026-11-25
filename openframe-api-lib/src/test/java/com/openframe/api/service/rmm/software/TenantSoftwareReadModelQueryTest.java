@@ -528,7 +528,7 @@ class TenantSoftwareReadModelQueryTest {
                 machine("m3", "archived", DeviceStatus.ARCHIVED),
                 machine("m4", "leaving", DeviceStatus.PENDING_DELETION),
                 machine("m5", "reinstalled", DeviceStatus.PENDING),
-                machine("m6", "offline", DeviceStatus.OFFLINE)));
+                machine("m6", "offline", DeviceStatus.MANAGED)));
 
         // execution
         List<SoftwareOnDeviceResponse> rows = query.devicesForSoftwareRows(TENANT, "42", null, "1.0");

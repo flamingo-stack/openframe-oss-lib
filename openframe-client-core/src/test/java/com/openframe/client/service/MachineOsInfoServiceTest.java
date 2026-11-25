@@ -53,7 +53,7 @@ class MachineOsInfoServiceTest {
     void setUp() {
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         machine.setOsVersion(OLD_VERSION);
         machine.setOsBuild(OLD_BUILD);
     }

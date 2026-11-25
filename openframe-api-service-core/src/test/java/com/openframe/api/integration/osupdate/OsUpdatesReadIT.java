@@ -679,7 +679,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         return new Document("machineId", machineId)
                 .append("tenantId", tenantId)
                 .append("organizationId", organizationId)
-                .append("status", "ONLINE")
+                .append("status", "MANAGED")
                 .append("hostname", "host-" + machineId)
                 .append("osType", "WINDOWS");
     }

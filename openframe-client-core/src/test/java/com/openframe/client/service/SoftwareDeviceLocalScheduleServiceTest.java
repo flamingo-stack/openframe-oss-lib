@@ -58,7 +58,7 @@ class SoftwareDeviceLocalScheduleServiceTest {
     void online_dueWithinWindow_fires() {
         Instant now = Instant.now();
         SoftwareSchedule schedule = deviceLocalSchedule(now.minusSeconds(60));
-        given(schedule, machine("m-1", DeviceStatus.ONLINE, "UTC"));
+        given(schedule, machine("m-1", DeviceStatus.MANAGED, TelemetryStatus.ONLINE, "UTC"));
 
         service.runDueDeviceLocalSchedules(now);
 
@@ -73,7 +73,7 @@ class SoftwareDeviceLocalScheduleServiceTest {
         // setup
         Instant now = Instant.now();
         SoftwareSchedule schedule = deviceLocalSchedule(now.minusSeconds(60));
-        Machine reenrolled = machine("reenrolled", DeviceStatus.ONLINE, "UTC");
+        Machine reenrolled = machine("reenrolled", DeviceStatus.MANAGED, TelemetryStatus.ONLINE, "UTC");
         reenrolled.setStatus(DeviceStatus.MANAGED);
         given(schedule, reenrolled);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("reenrolled"), List.of());
@@ -94,7 +94,7 @@ class SoftwareDeviceLocalScheduleServiceTest {
     @DisplayName("online device with no reported timezone yet → skips this tick (no fire, no sentinel)")
     void online_noTimezone_defers() {
         Instant now = Instant.now();
-        given(deviceLocalSchedule(now.minusSeconds(60)), machine("m-1", DeviceStatus.ONLINE, null));
+        given(deviceLocalSchedule(now.minusSeconds(60)), machine("m-1", DeviceStatus.MANAGED, TelemetryStatus.ONLINE, null));
 
         service.runDueDeviceLocalSchedules(now);
 
@@ -106,7 +106,7 @@ class SoftwareDeviceLocalScheduleServiceTest {
     @DisplayName("offline device whose local fire window has passed → MISSED, nothing dispatched")
     void offline_pastWindow_missed() {
         Instant now = Instant.now();
-        given(deviceLocalSchedule(now.minusSeconds(3000)), machine("m-1", DeviceStatus.OFFLINE, "UTC"));
+        given(deviceLocalSchedule(now.minusSeconds(3000)), machine("m-1", DeviceStatus.MANAGED, TelemetryStatus.OFFLINE, "UTC"));
 
         service.runDueDeviceLocalSchedules(now);
 
@@ -117,11 +117,11 @@ class SoftwareDeviceLocalScheduleServiceTest {
     }
 
     @Test
-    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE past the window is MISSED, not fired")
+    @DisplayName("online is decided by telemetryStatus: status MANAGED with telemetry OFFLINE past the window is MISSED, not fired")
     void statusOnlineTelemetryOffline_pastWindow_missed() {
         // setup
         Instant now = Instant.now();
-        Machine staleStatus = machine("m-1", DeviceStatus.ONLINE, "UTC");
+        Machine staleStatus = machine("m-1", DeviceStatus.MANAGED, TelemetryStatus.ONLINE, "UTC");
         staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
         given(deviceLocalSchedule(now.minusSeconds(3000)), staleStatus);
 
@@ -153,11 +153,11 @@ class SoftwareDeviceLocalScheduleServiceTest {
                 .build();
     }
 
-    private static Machine machine(String machineId, DeviceStatus status, String timezone) {
+    private static Machine machine(String machineId, DeviceStatus status, TelemetryStatus connectivity, String timezone) {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setStatus(status);
-        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
+        m.setTelemetryStatus(connectivity);
         m.setTimezone(timezone);
         return m;
     }

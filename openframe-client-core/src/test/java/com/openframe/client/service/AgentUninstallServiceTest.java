@@ -106,7 +106,7 @@ class AgentUninstallServiceTest {
     @Test
     @DisplayName("a machine document removed between the read and the write publishes nothing")
     void machineGoneBeforeTheWrite_publishesNothing() {
-        Machine machine = machineIs(DeviceStatus.ONLINE);
+        Machine machine = machineIs(DeviceStatus.MANAGED);
         when(deletedMachineCleanup.markDeleted(machine)).thenThrow(new ConflictException("device changed"));
         when(machineRepository.findOnPrimaryByMachineId(MACHINE)).thenReturn(Optional.of(machine), Optional.empty());
 

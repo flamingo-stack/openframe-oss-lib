@@ -7,8 +7,9 @@ import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.data.mongodb.core.convert.MongoCustomConversions.BigDecimalRepresentation;
 
 /**
- * The one and only {@link MongoCustomConversions} definition in this library — Spring Data accepts a single
- * conversions bean, so a second one anywhere fails the context with an ambiguity error.
+ * The {@link MongoCustomConversions} definition for every app on this library — Spring Data accepts a single
+ * conversions bean, so a second one anywhere fails the context with an ambiguity error. The reactive library's
+ * {@code MongoReactiveConversionsConfig} defines one only when this class is not on the classpath.
  * <p>
  * Always pins the UTC {@link LocalDateUtcMongoConverters} and writes {@link java.math.BigDecimal} as Decimal128, the
  * Mongo decimal type (Spring Data MongoDB 4 wrote a string; both read back into {@code BigDecimal}). The shared
@@ -26,6 +27,7 @@ public class MongoCustomConversionsConfig {
         return MongoCustomConversions.create(adapter -> {
             adapter.bigDecimal(BigDecimalRepresentation.DECIMAL128);
             adapter.registerConverters(LocalDateUtcMongoConverters.converters());
+            adapter.registerConverter(DeviceStatusReadingConverter.INSTANCE);
             contributors.orderedStream().forEach(contributor -> contributor.configure(adapter));
         });
     }

@@ -173,7 +173,7 @@ class DeviceOsUpdatesFlagOffIT extends BaseMongoIntegrationTest {
     }
 
     private static Document machine(String machineId) {
-        return new Document("machineId", machineId).append("tenantId", TENANT_ID).append("status", "ONLINE");
+        return new Document("machineId", machineId).append("tenantId", TENANT_ID).append("status", "MANAGED");
     }
 
     private static Document stateDocument(String machineId) {

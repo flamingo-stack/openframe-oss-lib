@@ -64,7 +64,7 @@ class DeviceOsReportFacadeTest {
         machine = new Machine();
         machine.setTenantId(TENANT_ID);
         machine.setMachineId(MACHINE_ID);
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         deviceOsState = DeviceOsState.builder().tenantId(TENANT_ID).machineId(MACHINE_ID).receivedAt(RECEIVED_AT).build();
         osUpdates = List.of(OsUpdate.builder().identifier("kb-1").build());
         pendingUpdates = List.of(DeviceOsPendingUpdate.builder().identifier("kb-1").build());

@@ -198,7 +198,7 @@ class DeviceServiceMachineSearchTest {
     @Test
     void legacyConstructor_existingSevenArguments_keepsNameFiltersAbsent() {
         // setup
-        List<DeviceStatus> statuses = List.of(DeviceStatus.ONLINE);
+        List<DeviceStatus> statuses = List.of(DeviceStatus.MANAGED);
         List<DeviceType> types = List.of(DeviceType.LAPTOP);
         List<OsType> osTypes = List.of(OsType.MAC_OS);
         List<String> organizations = List.of("organization-1");
@@ -222,7 +222,7 @@ class DeviceServiceMachineSearchTest {
 
     private DeviceFilterCriteria exactFilter() {
         return DeviceFilterCriteria.builder()
-                .statuses(List.of(DeviceStatus.ONLINE)).deviceTypes(List.of(DeviceType.LAPTOP))
+                .statuses(List.of(DeviceStatus.MANAGED)).deviceTypes(List.of(DeviceType.LAPTOP))
                 .osTypes(List.of(OsType.MAC_OS)).organizationIds(List.of("organization-1"))
                 .tagKeys(List.of("environment")).tagValues(List.of("production"))
                 .manageableByPackageManagers(List.of(PackageManagerType.BREW))
@@ -231,7 +231,7 @@ class DeviceServiceMachineSearchTest {
 
     private MachineQueryFilter exactMachineFilter() {
         return MachineQueryFilter.builder()
-                .statuses(List.of("ONLINE")).deviceTypes(List.of("LAPTOP"))
+                .statuses(List.of("MANAGED")).deviceTypes(List.of("LAPTOP"))
                 .osTypes(List.of(OsType.MAC_OS)).organizationIds(List.of("organization-1"))
                 .tagKeys(List.of("environment")).tagValues(List.of("production"))
                 .manageableByPackageManagers(List.of(PackageManagerType.BREW))
