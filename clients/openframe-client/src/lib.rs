@@ -78,6 +78,8 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::os_updates::report_publisher::OsUpdatesReportPublisher;
+use crate::services::os_updates::report_run_manager::OsUpdatesReportRunManager;
 use crate::services::package_manager::adopt::PackageAdoptRunner;
 use crate::services::package_manager::brew::BrewLock;
 use crate::services::package_manager::package_update::{
@@ -205,6 +207,7 @@ pub struct Client {
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
     package_manager_report_run_manager: PackageManagerReportRunManager,
+    os_updates_report_run_manager: Option<OsUpdatesReportRunManager>,
     hostname_report_publisher: HostnameReportPublisher,
     machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
@@ -401,6 +404,9 @@ impl Client {
         let package_auto_update_enabled = feature_flags_service
             .flags()
             .is_enabled(Feature::PackageAutoUpdate);
+        let os_update_report_enabled = feature_flags_service
+            .flags()
+            .is_enabled(Feature::OsUpdateReport);
 
         // Initialize tool run manager
         let tool_run_manager = ToolRunManager::new(
@@ -654,6 +660,12 @@ impl Client {
                 config_service.clone(),
                 package_auto_update_enabled,
             ));
+        let os_updates_report_run_manager = os_update_report_enabled.then(|| {
+            OsUpdatesReportRunManager::new(OsUpdatesReportPublisher::new(
+                nats_message_publisher.clone(),
+                config_service.clone(),
+            ))
+        });
 
         let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(
             nats_connection_manager.clone(),
@@ -726,6 +738,7 @@ impl Client {
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
             package_manager_report_run_manager,
+            os_updates_report_run_manager,
             hostname_report_publisher,
             machine_timezone_run_manager,
             result_outbox_run_manager,
@@ -904,6 +917,9 @@ impl Client {
         info!("Script schedule execution listener started");
 
         self.package_manager_report_run_manager.start();
+        if let Some(os_updates_report) = &self.os_updates_report_run_manager {
+            os_updates_report.start();
+        }
         if let Some(package_update) = &self.package_update {
             package_update.manager.start();
         }

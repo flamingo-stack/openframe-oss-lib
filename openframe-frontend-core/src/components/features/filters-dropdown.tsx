@@ -136,6 +136,8 @@ function floatingVerticalBounds(boundary: HTMLElement | null): { top: number; bo
 /** Where a floating panel goes: inline styles for the panel (`left`, `top`, `bottom`) and its card (`maxHeight`). */
 interface FloatingLayout {
   side: FloatingSide;
+  /** Its header is out of the box its table shows (scrolled out sideways, or left only under a pinned column). */
+  detached: boolean;
   left: string;
   top: string;
   bottom: string;
@@ -145,7 +147,9 @@ interface FloatingLayout {
 /**
  * Where a floating panel (`fixed`, in a portal) goes at its trigger.
  *
- * Horizontally: hung from the edge its placement names, kept inside the window. Vertically: below its trigger when it
+ * Horizontally: hung from the edge its placement names, kept inside the box its table shows (see
+ * `floatingHorizontalRoom`), so a column scrolled partly out of a narrow table keeps its panel by the table, not at
+ * the window's edge over whatever stands beside it. Vertically: below its trigger when it
  * fits there; otherwise on the side with more room, and capped to that room when neither side holds all of it (the
  * option list shrinks and scrolls, Reset / Apply stay on screen). A panel that opened above is placed by `bottom`, so
  * a change in its height never opens a gap between it and its trigger.
@@ -170,7 +174,10 @@ function floatingPanelLayout(
       : placement === 'bottom'
         ? (rect.left + rect.right) / 2 - width / 2
         : rect.left;
-  const max = Math.max(FLOATING_GAP, window.innerWidth - width - FLOATING_GAP);
+  const sideways = floatingHorizontalRoom(trigger, boundary);
+  // A room narrower than the panel: the panel starts at its left edge and runs past the right one.
+  const min = sideways.left + FLOATING_GAP;
+  const max = Math.max(min, sideways.right - width - FLOATING_GAP);
 
   const size = floatingPanelSize(card);
   const bounds = floatingVerticalBounds(boundary);
@@ -189,7 +196,8 @@ function floatingPanelLayout(
 
   return {
     side,
-    left: `${Math.min(Math.max(wanted, FLOATING_GAP), max)}px`,
+    detached: sideways.headerVisible <= 0,
+    left: `${Math.min(Math.max(wanted, min), max)}px`,
     top: side === 'below' ? `${rect.bottom + FLOATING_GAP}px` : '',
     bottom: side === 'above' ? `${window.innerHeight - rect.top + FLOATING_GAP}px` : '',
     maxHeight: size.natural > room ? `${Math.max(room, 0)}px` : '',
@@ -203,17 +211,76 @@ function floatingPanelLayout(
  */
 const CLIPPING_OVERFLOW = new Set(['hidden', 'clip', 'auto', 'scroll', 'overlay']);
 
+/** The ancestors of `element` that clip their overflow sideways, innermost first, below `<body>`. */
+function clippingAncestors(element: Element): HTMLElement[] {
+  const found: HTMLElement[] = [];
+  for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+    if (CLIPPING_OVERFLOW.has(window.getComputedStyle(node).overflowX)) found.push(node);
+  }
+  return found;
+}
+
 function horizontalBounds(element: Element): { left: number; right: number } {
   let left = 0;
   let right = window.innerWidth;
-  for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
-    if (!CLIPPING_OVERFLOW.has(window.getComputedStyle(node).overflowX)) continue;
-    // Every clipping ancestor cuts the panel, so the room is what is left inside all of them.
+  // Every clipping ancestor cuts the panel, so the room is what is left inside all of them.
+  for (const node of clippingAncestors(element)) {
     const rect = node.getBoundingClientRect();
     left = Math.max(left, rect.left);
     right = Math.min(right, rect.right);
   }
   return { left, right };
+}
+
+/** The pinned blocks' widths a grid table publishes on its root (`--dt-pin-l` / `--dt-pin-r`), 0 when unset. */
+function pinnedInsets(cell: Element): { left: number; right: number } {
+  const style = window.getComputedStyle(cell);
+  return {
+    left: Number.parseFloat(style.getPropertyValue('--dt-pin-l')) || 0,
+    right: Number.parseFloat(style.getPropertyValue('--dt-pin-r')) || 0,
+  };
+}
+
+/**
+ * The horizontal room a floating panel (`fixed`, in a portal) has, and how much of its header shows in it.
+ *
+ * The room is the box the trigger's table shows: every clipping ancestor ABOVE the trigger's own header cell
+ * (`data-grid-header-cell`), within the collision boundary when one is set, else the window. The cell is skipped by
+ * identity, not by size: it clips its own label, and a grown or resized column can be as wide as the panel. The panel
+ * is not clipped by any of them (it is portalled), but placed outside that box it reads as belonging to whatever stands
+ * beside the table (the navigation rail, the chat).
+ *
+ * The grid's pinned blocks cover the scroll box's edges, so a header under them is out of view though inside the box:
+ * the innermost box is inset by their widths, unless the trigger's cell is pinned itself.
+ *
+ * `headerVisible` is the trigger's width in view (cell and room); 0 or less is a header scrolled out. A trigger with no
+ * size has not been laid out (a hidden tab, a panel still animating in): it reports as visible, never as scrolled out.
+ */
+function floatingHorizontalRoom(
+  trigger: Element,
+  boundary: HTMLElement | null,
+): { left: number; right: number; headerVisible: number } {
+  const cell = trigger.closest('[data-grid-header-cell]');
+  let left = 0;
+  let right = window.innerWidth;
+  if (boundary) {
+    const rect = boundary.getBoundingClientRect();
+    left = Math.max(left, rect.left);
+    right = Math.min(right, rect.right);
+  }
+  const insets = cell && window.getComputedStyle(cell).position !== 'sticky' ? pinnedInsets(cell) : null;
+  clippingAncestors(cell ?? trigger).forEach((node, index) => {
+    const rect = node.getBoundingClientRect();
+    const inset = index === 0 && insets ? insets : { left: 0, right: 0 };
+    left = Math.max(left, rect.left + inset.left);
+    right = Math.min(right, rect.right - inset.right);
+  });
+
+  const header = trigger.getBoundingClientRect();
+  if (header.width === 0 && header.height === 0) return { left, right, headerVisible: Number.POSITIVE_INFINITY };
+  const shown = cell ? cell.getBoundingClientRect() : header;
+  const headerVisible = Math.min(header.right, shown.right, right) - Math.max(header.left, shown.left, left);
+  return { left, right, headerVisible };
 }
 
 // Animation timings (ms). Must stay in sync with the `duration-200` Tailwind
@@ -385,6 +452,9 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
         if (card) card.style.maxHeight = layout.maxHeight;
         floatingSideRef.current = layout.side;
         if (layout.side !== floatingSide) setFloatingSide(layout.side);
+        // Its header scrolled out of the table: the panel would filter a column nobody can see. Closed like Escape;
+        // the unapplied picks stay for the next open. The mobile panel spans the screen, so it stays.
+        if (floating && !isMobile && layout.detached) setIsOpen(false);
       }
       return;
     }
@@ -488,6 +558,7 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
         if (card) card.style.maxHeight = layout.maxHeight;
         floatingSideRef.current = layout.side;
         setFloatingSide(layout.side);
+        if (floating && !isMobile && layout.detached) setIsOpen(false);
       }
     };
     window.addEventListener('scroll', reposition, true);
