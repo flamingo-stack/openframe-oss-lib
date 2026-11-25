@@ -20,16 +20,12 @@ impl RecordingUpdater {
 
 #[async_trait]
 impl ToolUpdater for RecordingUpdater {
-    async fn fetch(
-        &self,
-        _tool: &InstalledTool,
-        _config: &DownloadConfiguration,
-    ) -> Result<Staged> {
+    async fn fetch(&self, _tool: &InstalledTool, _config: &DownloadConfiguration) -> Result<Bytes> {
         self.record("fetch");
         if self.fail_fetch {
             anyhow::bail!("network down");
         }
-        Ok(Staged::Binary(Bytes::from_static(b"new")))
+        Ok(Bytes::from_static(b"new"))
     }
 
     async fn prepare(&self, _tool: &InstalledTool) -> Result<UpdateContext> {
@@ -41,7 +37,7 @@ impl ToolUpdater for RecordingUpdater {
         &self,
         _tool: &InstalledTool,
         _config: &DownloadConfiguration,
-        _staged: &Staged,
+        _fetched: Bytes,
     ) -> Result<Option<Installation>> {
         self.record("apply");
         if self.fail_apply {
@@ -113,38 +109,4 @@ async fn update_downloads_before_it_stops_the_tool() {
     run(&updater).await.unwrap();
 
     assert_eq!(updater.calls(), ["fetch", "prepare", "apply", "finalize"]);
-}
-
-#[cfg(target_os = "macos")]
-#[tokio::test]
-async fn staged_tree_replaces_target_entries_and_removes_itself() {
-    let target = tempfile::tempdir().unwrap();
-    let staging = StagingDir::new(target.path(), "tool");
-    std::fs::create_dir_all(staging.root.join("App.app/Contents")).unwrap();
-    std::fs::write(staging.root.join("App.app/Contents/new"), b"new").unwrap();
-    std::fs::write(staging.root.join("readme"), b"new").unwrap();
-    std::fs::create_dir_all(target.path().join("App.app/Contents")).unwrap();
-    std::fs::write(target.path().join("App.app/Contents/old"), b"old").unwrap();
-    std::fs::write(target.path().join("readme"), b"old").unwrap();
-
-    staging.move_into().await.unwrap();
-
-    assert!(target.path().join("App.app/Contents/new").exists());
-    assert!(!target.path().join("App.app/Contents/old").exists());
-    assert_eq!(std::fs::read(target.path().join("readme")).unwrap(), b"new");
-    assert!(!staging.root.exists());
-}
-
-#[cfg(target_os = "macos")]
-#[tokio::test]
-async fn removing_update_staging_is_idempotent() {
-    let target = tempfile::tempdir().unwrap();
-    let staging = target.path().join(".tool.update-staging");
-    std::fs::create_dir_all(staging.join("App.app")).unwrap();
-
-    let staging_dir = StagingDir::new(target.path(), "tool");
-    staging_dir.discard("tool").await;
-    staging_dir.discard("tool").await;
-
-    assert!(!staging.exists());
 }

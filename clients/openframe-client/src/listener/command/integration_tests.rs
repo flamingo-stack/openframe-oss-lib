@@ -1910,12 +1910,6 @@ async fn a_failed_download_leaves_the_running_tool_untouched(
     );
     assert_eq!(std::fs::read(&executable).unwrap(), running_image);
     assert!(!executable.with_extension("backup").exists());
-    let leftovers: Vec<_> = std::fs::read_dir(agent.directories.get_tool_folder(tool_agent_id))
-        .unwrap()
-        .map(|entry| entry.unwrap().file_name())
-        .filter(|name| name.to_string_lossy().ends_with(".update-staging"))
-        .collect();
-    assert!(leftovers.is_empty(), "staging left behind: {leftovers:?}");
     assert_eq!(agent.recorded_version(tool_agent_id).await, "1.0.0");
 }
 
@@ -1967,16 +1961,16 @@ async fn an_unreachable_download_leaves_the_running_service_tool_untouched() {
 
 #[cfg(target_os = "macos")]
 #[tokio::test]
-async fn a_broken_app_bundle_release_leaves_the_running_bundle_and_no_staging() {
+async fn an_unreachable_app_bundle_download_leaves_the_running_bundle_untouched() {
     const BUNDLE_EXECUTABLE: &str = "Test.app/Contents/MacOS/test";
     a_failed_download_leaves_the_running_tool_untouched(
-        "it-broken-bundle",
+        "it-unreachable-bundle",
         Installation::Service {
             service_name: "it-no-such-service".into(),
             executable_path: Some(BUNDLE_EXECUTABLE.into()),
         },
         BUNDLE_EXECUTABLE,
-        crate::test_support::mock_server_with_body(&[200], agent_bytes()).await,
+        crate::test_support::mock_server(&[404]).await,
         "release.tar.gz",
     )
     .await;

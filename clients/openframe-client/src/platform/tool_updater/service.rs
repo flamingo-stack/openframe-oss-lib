@@ -1,22 +1,19 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::path::PathBuf;
 use tracing::{info, warn};
 
-#[cfg(target_os = "macos")]
-use super::stage_tree;
 use super::{
-    backup_binary, cleanup_backup, clear_aside_binary, fetch_binary, log_update_survivors,
-    restore_from_backup, write_binary, Staged, ToolUpdater, ToolUpdaterDeps, UpdateContext,
+    backup_binary, cleanup_backup, clear_aside_binary, log_update_survivors, restore_from_backup,
+    ToolUpdater, ToolUpdaterDeps, UpdateContext,
 };
 #[cfg(target_os = "windows")]
 use crate::config::service_stop::EXEC_UNLOCK_WAIT_SECS;
 use crate::models::{DownloadConfiguration, Installation, InstalledTool};
-#[cfg(target_os = "windows")]
-use crate::platform::binary_writer;
 #[cfg(target_os = "macos")]
-use crate::platform::{binary_writer, remove_app_bundle_path};
-use crate::platform::{system_service, DirectoryManager};
+use crate::platform::remove_app_bundle_path;
+use crate::platform::{binary_writer, system_service, DirectoryManager};
 
 pub struct ServiceToolUpdater {
     deps: ToolUpdaterDeps,
@@ -110,17 +107,16 @@ impl ServiceToolUpdater {
 
 #[async_trait]
 impl ToolUpdater for ServiceToolUpdater {
-    async fn fetch(&self, tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Staged> {
-        let tool_agent_id = &tool.tool_agent_id;
+    async fn fetch(&self, _tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Bytes> {
+        let downloads = &self.deps.github_download_service;
 
+        // A bundle is extracted whole in apply, so keep its archive.
         #[cfg(target_os = "macos")]
         if Self::is_app_bundle_download(config) {
-            // A bundle cannot be held in memory as one file: stage it in the tool folder.
-            let tool_folder = self.deps.directory_manager.get_tool_folder(tool_agent_id);
-            return stage_tree(&self.deps, config, &tool_folder, tool_agent_id).await;
+            return downloads.download_archive(config).await;
         }
 
-        fetch_binary(&self.deps, config, tool_agent_id).await
+        downloads.download_and_extract(config).await
     }
 
     async fn prepare(&self, tool: &InstalledTool) -> Result<UpdateContext> {
@@ -164,39 +160,49 @@ impl ToolUpdater for ServiceToolUpdater {
         })
     }
 
+    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
     async fn apply(
         &self,
         tool: &InstalledTool,
-        _config: &DownloadConfiguration,
-        staged: &Staged,
+        config: &DownloadConfiguration,
+        fetched: Bytes,
     ) -> Result<Option<Installation>> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying Service tool update");
 
         let exec_path = self.resolve_executable_path(tool);
 
+        // For .app bundles: remove old bundle, extract entire archive
         #[cfg(target_os = "macos")]
-        if let Staged::Tree(staging) = staged {
-            info!(tool_id = %tool_agent_id, "Detected .app bundle - replacing the whole bundle");
+        if Self::is_app_bundle_download(config) {
+            info!(tool_id = %tool_agent_id, "Detected .app bundle - using full extraction");
 
+            // Remove old .app bundle if exists
             remove_app_bundle_path(&exec_path).await?;
-            staging.move_into().await.with_context(|| {
-                format!(
-                    "Failed to move the new app bundle into place: {}",
-                    tool_agent_id
-                )
-            })?;
+
+            // Extract entire archive to tool folder
+            let tool_folder = self.deps.directory_manager.get_tool_folder(tool_agent_id);
+            info!(tool_id = %tool_agent_id, "Extracting to: {}", tool_folder.display());
+
+            self.deps
+                .github_download_service
+                .extract_archive(fetched, config, &tool_folder)
+                .await
+                .with_context(|| format!("Failed to extract: {}", tool_agent_id))?;
 
             // Set executable permissions on the binary
             if exec_path.exists() {
                 binary_writer::set_executable_permissions(&exec_path).await?;
             }
 
-            info!(tool_id = %tool_agent_id, "App bundle replaced successfully");
+            info!(tool_id = %tool_agent_id, "App bundle extracted successfully");
             return Ok(None);
         }
 
-        write_binary(staged, &exec_path, tool_agent_id).await?;
+        // Standard single binary update
+        binary_writer::write_executable(&fetched, &exec_path)
+            .await
+            .with_context(|| format!("Failed to write binary for: {}", tool_agent_id))?;
         Ok(None)
     }
 

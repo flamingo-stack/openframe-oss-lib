@@ -6,26 +6,24 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use super::{Staged, ToolUpdaterDeps};
+use super::ToolUpdaterDeps;
 use crate::models::{DownloadConfiguration, Installation, InstallationType, InstalledTool};
 
 #[cfg(any(target_os = "macos", windows))]
 use standard_to_gui_app::StandardToGuiAppMigrator;
 
 #[derive(Debug, Clone, Default)]
-pub(super) struct MigrationContext {
+pub struct MigrationContext {
+    pub old_cleaned: bool,
     pub needs_start: bool,
 }
 
 #[async_trait]
-pub(super) trait ToolMigrator: Send + Sync {
+pub trait ToolMigrator: Send + Sync {
     #[allow(clippy::wrong_self_convention)] // returns the source type, not a constructor
     fn from_type(&self) -> InstallationType;
 
     fn to_type(&self) -> InstallationType;
-
-    /// Downloads the new version without touching the running tool.
-    async fn fetch(&self, tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Staged>;
 
     async fn prepare(&self, tool: &InstalledTool) -> Result<MigrationContext>;
 
@@ -33,7 +31,6 @@ pub(super) trait ToolMigrator: Send + Sync {
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
-        staged: &Staged,
         ctx: &MigrationContext,
     ) -> Result<Installation>;
 
@@ -55,7 +52,7 @@ pub(super) trait ToolMigrator: Send + Sync {
     }
 }
 
-pub(super) fn create_migrator(
+pub fn create_migrator(
     from: &Installation,
     to: InstallationType,
     deps: ToolUpdaterDeps,
