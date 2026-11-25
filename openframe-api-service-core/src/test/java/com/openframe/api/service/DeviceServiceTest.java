@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -240,6 +241,20 @@ class DeviceServiceTest {
 
         // verifications
         assertThat(capturedFilter().getConnectivity()).isNull();
+    }
+
+    @Test
+    @DisplayName("getAvailableDeviceFilters: MDM and disk encryption options are empty lists, never null")
+    void getAvailableDeviceFilters_mdmAndDiskEncryptionOptions_emptyListsNotNull() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        DeviceFilters result = s.getAvailableDeviceFilters(List.of(MAC_OS), null, null);
+
+        // verifications
+        assertThat(result.getMdmStates()).isEmpty();
+        assertThat(result.getDiskEncryptionStates()).isEmpty();
     }
 
     @Test
