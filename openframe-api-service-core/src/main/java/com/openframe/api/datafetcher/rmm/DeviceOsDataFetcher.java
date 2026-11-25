@@ -11,7 +11,9 @@ import com.openframe.api.dto.rmm.osupdate.DeviceOsStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateHistoryEntryResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.DeviceOsGraphQLMapper;
-import com.openframe.api.service.rmm.osupdate.DeviceOsQueryService;
+import com.openframe.api.service.rmm.osupdate.DeviceOsPendingUpdateService;
+import com.openframe.api.service.rmm.osupdate.DeviceOsStateService;
+import com.openframe.api.service.rmm.osupdate.DeviceOsUpdateHistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
@@ -22,17 +24,19 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DeviceOsDataFetcher {
 
-    private final DeviceOsQueryService deviceOsQueryService;
+    private final DeviceOsStateService deviceOsStateService;
+    private final DeviceOsPendingUpdateService deviceOsPendingUpdateService;
+    private final DeviceOsUpdateHistoryService deviceOsUpdateHistoryService;
     private final DeviceOsGraphQLMapper deviceOsGraphQLMapper;
 
     @DgsQuery
     public DeviceOsStateResponse deviceOsState(@InputArgument String machineId) {
-        return deviceOsQueryService.findOsState(machineId);
+        return deviceOsStateService.findOsState(machineId);
     }
 
     @DgsQuery
     public List<DeviceOsPendingUpdateResponse> deviceOsPendingUpdates(@InputArgument String machineId) {
-        return deviceOsQueryService.listPendingUpdates(machineId);
+        return deviceOsPendingUpdateService.listPendingUpdates(machineId);
     }
 
     @DgsQuery
@@ -40,7 +44,7 @@ public class DeviceOsDataFetcher {
             @InputArgument String machineId, @InputArgument Integer first, @InputArgument String after) {
         CursorPaginationCriteria pagination = deviceOsGraphQLMapper.toCursorPaginationCriteria(first, after);
         GenericQueryResult<DeviceOsUpdateHistoryEntryResponse> updateHistory =
-                deviceOsQueryService.listUpdateHistory(machineId, pagination);
+                deviceOsUpdateHistoryService.listUpdateHistory(machineId, pagination);
         return deviceOsGraphQLMapper.toConnection(updateHistory);
     }
 }

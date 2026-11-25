@@ -94,7 +94,8 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
             query($machineId: String!) {
               deviceOsPendingUpdates(machineId: $machineId) {
                 identifier displayName displayVersion kbArticleIds severity categories categoryIds updateType
-                cveIds publishedAt sizeBytes rebootBehavior browseOnly discoveredAt downloaded macosPresence
+                classification cveIds publishedAt sizeBytes rebootBehavior browseOnly discoveredAt downloaded
+                macosPresence
               }
             }
             """;
@@ -144,7 +145,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    void osUpdateFlagOn_dataFetcherQueryServiceAndMappersRun() {
+    void osUpdateFlagOn_dataFetcherServicesAndMappersRun() {
         // setup
 
         // execution
@@ -153,7 +154,8 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .map(ClassUtils::getUserClass).map(Class::getSimpleName).toList();
 
         // verifications
-        assertThat(beans).contains("DeviceOsDataFetcher", "DeviceOsQueryService", "DeviceOsResponseMapper",
+        assertThat(beans).contains("DeviceOsDataFetcher", "DeviceOsStateService", "DeviceOsPendingUpdateService",
+                "DeviceOsUpdateHistoryService", "DeviceOsResponseMapper",
                 "DeviceOsGraphQLMapper");
     }
 
@@ -276,6 +278,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
         expected.put("categories", List.of("Security Updates"));
         expected.put("categoryIds", List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"));
         expected.put("updateType", "SOFTWARE");
+        expected.put("classification", "SECURITY");
         expected.put("cveIds", List.of("CVE-2026-21309", "CVE-2026-21311"));
         expected.put("publishedAt", "2026-11-11T18:00:00Z");
         expected.put("sizeBytes", 764317696L);
@@ -330,6 +333,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
         expected.put("categories", List.of());
         expected.put("categoryIds", List.of());
         expected.put("updateType", null);
+        expected.put("classification", null);
         expected.put("cveIds", List.of());
         expected.put("publishedAt", null);
         expected.put("sizeBytes", null);
@@ -792,6 +796,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("categories", List.of("Security Updates"))
                 .append("categoryIds", List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
                 .append("updateType", "SOFTWARE")
+                .append("classification", "SECURITY")
                 .append("cveIds", List.of("CVE-2026-21309", "CVE-2026-21311"))
                 .append("publishedAt", date("2026-11-11T18:00:00Z"))
                 .append("sizeBytes", 764317696L)
