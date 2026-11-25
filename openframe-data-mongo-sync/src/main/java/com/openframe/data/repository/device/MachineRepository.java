@@ -17,9 +17,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+/** Stores registered devices and provides their enrollment and lifecycle lookups. */
 @Repository
 public interface MachineRepository extends MongoRepository<Machine, String>, CustomMachineRepository{
     Optional<Machine> findByMachineId(String machineId);
+
+    @ReadPreference("primary")
+    Optional<Machine> findOnPrimaryByMachineId(String machineId);
 
     // primary on purpose: registration checks the machine milliseconds after it saved it
     @ReadPreference("primary")
@@ -35,6 +39,9 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     List<Machine> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
 
+    @ReadPreference("primary")
+    List<Machine> findOnPrimaryByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
+
     Page<Machine> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds, Pageable pageable);
 
     Page<Machine> findByTenantIdAndMachineIdInAndHostnameContainingIgnoreCase(
@@ -47,6 +54,9 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     List<Machine> findByTenantIdAndHostnameIn(String tenantId, Collection<String> hostnames);
 
     Optional<Machine> findByTenantIdAndMachineId(String tenantId, String machineId);
+
+    @ReadPreference("primary")
+    Optional<Machine> findOnPrimaryByTenantIdAndMachineId(String tenantId, String machineId);
 
     List<Machine> findByMachineIdInAndStatus(Collection<String> machineIds, DeviceStatus status);
 

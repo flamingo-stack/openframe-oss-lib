@@ -117,7 +117,7 @@ class SoftwareScheduleTargetResolverTest {
                 .map(machineId -> SoftwareScheduleMachineAssigned.builder()
                         .tenantId(TENANT).softwareScheduleId(scheduleId).machineId(machineId).build())
                 .toList();
-        when(assignedRepository.findByTenantIdAndSoftwareScheduleId(TENANT, scheduleId)).thenReturn(assigned);
+        when(assignedRepository.findOnPrimaryByTenantIdAndSoftwareScheduleId(TENANT, scheduleId)).thenReturn(assigned);
     }
 
     private static SoftwareSchedule schedule(String id, Long repeat) {
