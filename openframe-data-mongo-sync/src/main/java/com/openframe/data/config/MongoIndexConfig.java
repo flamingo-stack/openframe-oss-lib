@@ -5,16 +5,19 @@ import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
+import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.core.index.PartialIndexFilter;
 import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.time.Duration;
+import java.util.Optional;
 
 @Slf4j
 @Configuration
@@ -98,10 +101,7 @@ public class MongoIndexConfig implements SmartLifecycle {
                                     .expire(AUDIT_EVENTS_RETENTION)
                                     .named("audit_events_ttl"));
 
-        mongoTemplate.indexOps(DeviceOsUpdateHistoryEntry.class)
-            .createIndex(new Index().on("installedAt", Sort.Direction.ASC)
-                                    .expire(DeviceOsUpdateHistoryEntry.RETENTION)
-                                    .named("device_os_update_history_ttl"));
+        ensureTtlIndex(DeviceOsUpdateHistoryEntry.class, "device_os_update_history_ttl", "installedAt", DeviceOsUpdateHistoryEntry.RETENTION);
 
         // Drop stale 'name' unique index from tags collection (legacy schema)
         dropStaleIndex("tags", "name");
@@ -176,6 +176,24 @@ public class MongoIndexConfig implements SmartLifecycle {
                         .on("_id", Sort.Direction.DESC)
                         .named("knowledge_base_items_type_name_collated")
                         .collation(CustomKnowledgeBaseItemRepositoryImpl.FOLDER_NAME_COLLATION));
+    }
+
+    private void ensureTtlIndex(Class<?> documentClass, String indexName, String field, Duration retention) {
+        Optional<IndexInfo> existingIndex = mongoTemplate.indexOps(documentClass).getIndexInfo().stream()
+                .filter(indexInfo -> indexName.equals(indexInfo.getName()))
+                .findFirst();
+        if (existingIndex.isEmpty()) {
+            mongoTemplate.indexOps(documentClass).createIndex(new Index().on(field, Sort.Direction.ASC)
+                                                                         .expire(retention)
+                                                                         .named(indexName));
+        } else if (!existingIndex.get().getExpireAfter().equals(Optional.of(retention))) {
+            // createIndex with a new expireAfterSeconds fails with IndexOptionsConflict (85); collMod changes it in place.
+            String collection = mongoTemplate.getCollectionName(documentClass);
+            mongoTemplate.getDb().runCommand(new Document("collMod", collection)
+                    .append("index", new Document("name", indexName)
+                            .append("expireAfterSeconds", retention.toSeconds())));
+            log.info("Changed the TTL of index '{}' on collection '{}' to {}", indexName, collection, retention);
+        }
     }
 
     private void dropStaleIndex(String collection, String indexName) {
