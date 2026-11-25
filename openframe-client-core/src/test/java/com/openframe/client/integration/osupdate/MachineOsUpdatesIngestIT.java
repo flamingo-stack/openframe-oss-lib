@@ -241,6 +241,7 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
                     .containsEntry("categories", List.of("Security Updates"))
                     .containsEntry("categoryIds", List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
                     .containsEntry("updateType", "SOFTWARE")
+                    .containsEntry("classification", "SECURITY")
                     .containsEntry("cveIds", List.of("CVE-2026-21309", "CVE-2026-21311"))
                     .containsEntry("sizeBytes", 764317696L)
                     .containsEntry("rebootBehavior", "ALWAYS")
@@ -625,6 +626,33 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         });
         assertThat(pendingByIdentifier(machineId)).containsOnlyKeys(WINDOWS_PENDING);
         assertThat(pendingByIdentifier(otherMachineId)).containsOnlyKeys(WINDOWS_PENDING);
+    }
+
+    @Test
+    void updateFirstReportedByAnOldAgentWithoutCategoryIds_otherUntilADeviceReportsThem_thenSecurity() {
+        // setup
+        String oldAgentMachineId = newMachine();
+        String machineId = newMachine();
+        ObjectNode oldAgentReport = windowsReport();
+        ObjectNode windowsOfTheItem = (ObjectNode) items(oldAgentReport).get(0).get("windows");
+        windowsOfTheItem.remove("updateType");
+        ((ObjectNode) windowsOfTheItem.get("categories").get(0)).remove("id");
+        publish(oldAgentMachineId, oldAgentReport.toString());
+        awaitProcessed();
+        assertThat(osUpdates()).singleElement().satisfies(osUpdate -> assertThat(osUpdate)
+                .containsEntry("classification", "OTHER")
+                .doesNotContainKey("updateType"));
+
+        // execution
+        publish(machineId, windowsReport().toString());
+        awaitProcessed();
+
+        // verifications
+        assertThat(osUpdates()).singleElement().satisfies(osUpdate -> assertThat(osUpdate)
+                .containsEntry("identifier", WINDOWS_PENDING)
+                .containsEntry("categoryIds", List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
+                .containsEntry("updateType", "SOFTWARE")
+                .containsEntry("classification", "SECURITY"));
     }
 
     @Test

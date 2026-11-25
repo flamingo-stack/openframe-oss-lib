@@ -66,6 +66,7 @@ fn config() -> DownloadConfiguration {
         installation_type: InstallationType::Standard,
         bundle_id: None,
         service_name: None,
+        min_os_version: None,
     }
 }
 

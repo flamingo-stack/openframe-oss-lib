@@ -56,7 +56,7 @@ public class DeviceOsReportFacade {
         }
 
         if (deviceOsReport.isPendingUpdatesReadable()) {
-            osUpdateService.saveMissing(deviceOsReport.getOsUpdates());
+            osUpdateService.saveReported(deviceOsReport.getOsUpdates());
             deviceOsPendingUpdateService.replacePendingUpdates(machine, deviceOsReport.getPendingUpdates());
         }
 

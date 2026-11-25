@@ -7,7 +7,7 @@
  * heights (the list shrinks when the card is capped, as `flex-1 min-h-0` does in a browser), and the window.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CollisionBoundaryContext } from '../../ui/portal-container';
@@ -46,6 +46,8 @@ interface Rect {
 
 let triggerRect: Rect = { top: 0, bottom: 48, left: 400, right: 600 };
 let boundary: { element: HTMLElement; rect: Rect } | null = null;
+/** Rects of the elements a test names by `data-testid` (a table's box, a header cell); every other element is the trigger. */
+let rectsByTestId: Record<string, Rect> = {};
 
 function domRect({ top, bottom, left, right }: Rect): DOMRect {
   return {
@@ -79,6 +81,8 @@ function listHeight(list: HTMLElement): number {
 function stubLayout() {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     if (boundary && this === boundary.element) return domRect(boundary.rect);
+    const named = this.dataset.testid ? rectsByTestId[this.dataset.testid] : undefined;
+    if (named) return domRect(named);
     return domRect(triggerRect);
   });
   vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
@@ -303,5 +307,142 @@ describe('FiltersDropdown on mobile: the fixed panel fits vertically too', () =>
     expect(panel.style.top).toBe(`${248 + GAP}px`);
     expect(panel.style.bottom).toBe('');
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true, writable: true });
+  });
+});
+
+/**
+ * Pins where a floating panel goes SIDEWAYS: inside the box its table shows, not the window. A grid column scrolled
+ * partly out of a narrow table (a page in the side panel next to the Mingo chat) used to hang its panel at the window
+ * clamp, over the navigation rail or the chat, away from the column it filters; scrolled fully out, the panel stayed
+ * open with no header in view (CU-17tkuw69g8m).
+ *
+ * The tree is the grid's: the table's scroll box (clips sideways) › the header cell (`data-grid-header-cell`, clips its
+ * own label) › the trigger.
+ */
+describe('FiltersDropdown floating panel: attached to its column sideways', () => {
+  /** The table's visible box: a side panel's table, 963px wide, in a 2560px window. */
+  const TABLE: Rect = { top: 300, bottom: 1200, left: 1372, right: 2335 };
+  const WINDOW_WIDTH = 2560;
+
+  function renderInTable({ cellStyle = {} }: { cellStyle?: Record<string, string> } = {}) {
+    return renderDropdown(node => (
+      <div data-testid="table" style={{ overflowX: 'auto' }}>
+        <div data-testid="cell" data-grid-header-cell="" style={{ overflowX: 'hidden', ...cellStyle }}>
+          {node}
+        </div>
+      </div>
+    ));
+  }
+
+  /** The header cell and the trigger in it share one box (the trigger is `w-full` of its cell). */
+  function placeHeader(left: number, right: number) {
+    triggerRect = { top: 349, bottom: 397, left, right };
+    rectsByTestId.cell = triggerRect;
+  }
+
+  function panelLeft(panel: HTMLElement): number {
+    return Number.parseFloat(panel.style.left);
+  }
+
+  function isOpen(): boolean {
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    return screen.queryByRole('button', { name: 'Apply' }) !== null;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, 'innerWidth', { value: WINDOW_WIDTH, configurable: true, writable: true });
+    setWindowHeight(1323);
+    boundary = null;
+    rectsByTestId = { table: TABLE };
+    placeHeader(1972, 2147);
+    stubLayout();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    rectsByTestId = {};
+  });
+
+  it('hangs from its header when the panel fits in the table', () => {
+    expect(panelLeft(renderInTable())).toBe(1972);
+  });
+
+  it('opens inside the table for a header partly visible at its right edge, not at the window clamp (the ticket case)', () => {
+    // AUTO-UPDATE scrolled mostly past the table's right edge: 2274–2449 against a box ending at 2335.
+    placeHeader(2274, 2449);
+    const panel = renderInTable();
+    expect(panelLeft(panel)).toBe(TABLE.right - 320 - GAP);
+    expect(panelLeft(panel) + 320).toBeLessThanOrEqual(TABLE.right);
+    expect(isOpen()).toBe(true);
+  });
+
+  it('stays inside the table while the open panel follows a header scrolled partly out on the left', () => {
+    const panel = renderInTable();
+    placeHeader(1300, 1475);
+    fireEvent.scroll(window);
+    expect(panelLeft(panel)).toBe(TABLE.left + GAP);
+    expect(isOpen()).toBe(true);
+  });
+
+  it('closes when its header is scrolled fully out of the table on the right', () => {
+    renderInTable();
+    placeHeader(2400, 2575);
+    fireEvent.scroll(window);
+    expect(isOpen()).toBe(false);
+  });
+
+  it('closes when its header is scrolled fully out of the table on the left', () => {
+    renderInTable();
+    placeHeader(1100, 1275);
+    fireEvent.scroll(window);
+    expect(isOpen()).toBe(false);
+  });
+
+  it('closes when what is left of its header is under the right-pinned columns', () => {
+    // The pinned actions column covers the box's last 45px; the header shows only 2300–2335, under it. The table's root
+    // publishes the width and the cell inherits it; jsdom does not inherit custom properties, so it is set on the cell.
+    renderInTable({ cellStyle: { '--dt-pin-r': '45px' } });
+    placeHeader(2300, 2475);
+    fireEvent.scroll(window);
+    expect(isOpen()).toBe(false);
+  });
+
+  it('does not count its own pinned block against a header that is pinned itself', () => {
+    // A left-pinned column at the box's left edge, inside the 300px block it is part of.
+    placeHeader(TABLE.left, TABLE.left + 200);
+    const panel = renderInTable({ cellStyle: { '--dt-pin-l': '300px', position: 'sticky' } });
+    expect(panelLeft(panel)).toBe(TABLE.left + GAP);
+    expect(isOpen()).toBe(true);
+  });
+
+  it('keeps a panel inside the table when its column is wide: the header cell is not the room, even past the panel width', () => {
+    // A grown or resized column, 400px, starting 300px left of the box: only its last 100px are in view.
+    placeHeader(TABLE.left - 300, TABLE.left + 100);
+    const panel = renderInTable();
+    expect(panelLeft(panel)).toBeGreaterThanOrEqual(TABLE.left + GAP);
+    expect(isOpen()).toBe(true);
+  });
+
+  it('keeps inside the collision boundary when it is narrower than the window', () => {
+    const element = document.createElement('div');
+    document.body.appendChild(element);
+    boundary = { element, rect: { top: 0, bottom: 1323, left: 0, right: 2200 } };
+    placeHeader(2100, 2275);
+    const panel = renderDropdown(node => (
+      <CollisionBoundaryContext.Provider value={element}>{node}</CollisionBoundaryContext.Provider>
+    ));
+    expect(panelLeft(panel)).toBe(2200 - 320 - GAP);
+    element.remove();
+  });
+
+  it('does not close a panel whose trigger has no size yet (not laid out, a hidden tab)', () => {
+    vi.restoreAllMocks();
+    const panel = renderInTable();
+    expect(panel).toBeTruthy();
+    expect(isOpen()).toBe(true);
   });
 });
