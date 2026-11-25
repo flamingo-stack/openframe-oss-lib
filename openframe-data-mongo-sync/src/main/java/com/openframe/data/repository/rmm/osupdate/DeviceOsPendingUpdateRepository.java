@@ -20,22 +20,21 @@ public interface DeviceOsPendingUpdateRepository
 
     // A device has one pending row per update, so the rows of an identifier are its devices.
     @Aggregation(pipeline = {
-            "{ '$match': { 'tenantId': ?0, 'platform': ?1, 'identifier': { '$in': ?2 }, 'machineId': { '$nin': ?3 } } }",
+            "{ '$match': { 'tenantId': ?3, 'platform': ?0, 'identifier': { '$in': ?1 }, 'machineId': { '$nin': ?2 } } }",
             "{ '$group': { '_id': '$identifier', 'deviceCount': { '$sum': 1 } } }"})
-    List<OsUpdateDeviceCount> countDevicesByIdentifier(String tenantId, OsPlatform platform,
-                                                       Collection<String> identifiers,
-                                                       Collection<String> excludedMachineIds);
+    List<OsUpdateDeviceCount> countDevicesByIdentifier(OsPlatform platform, Collection<String> identifiers,
+                                                       Collection<String> excludedMachineIds, String tenantId);
 
     @Aggregation(pipeline = {
-            "{ '$match': { 'tenantId': ?0, 'platform': ?1, 'identifier': { '$in': ?2 }, 'machineId': { '$in': ?3 } } }",
+            "{ '$match': { 'tenantId': ?3, 'platform': ?0, 'identifier': { '$in': ?1 }, 'machineId': { '$in': ?2 } } }",
             "{ '$group': { '_id': '$identifier', 'deviceCount': { '$sum': 1 } } }"})
-    List<OsUpdateDeviceCount> countDevicesByIdentifierOnMachines(String tenantId, OsPlatform platform,
+    List<OsUpdateDeviceCount> countDevicesByIdentifierOnMachines(OsPlatform platform,
                                                                  Collection<String> identifiers,
-                                                                 Collection<String> machineIds);
+                                                                 Collection<String> machineIds, String tenantId);
 
     @Aggregation(pipeline = {
-            "{ '$match': { 'tenantId': ?0, 'machineId': { '$in': ?1 } } }",
+            "{ '$match': { 'tenantId': ?1, 'machineId': { '$in': ?0 } } }",
             "{ '$group': { '_id': '$platform', 'identifiers': { '$addToSet': '$identifier' } } }"})
-    List<OsUpdateIdentifiersOfPlatform> findIdentifiersByPlatformOnMachines(String tenantId,
-                                                                            Collection<String> machineIds);
+    List<OsUpdateIdentifiersOfPlatform> findIdentifiersByPlatformOnMachines(Collection<String> machineIds,
+                                                                            String tenantId);
 }
