@@ -12,6 +12,7 @@ pub mod installation_detector;
 pub mod lock_recovery;
 pub mod machine_info_persistence;
 pub mod orphan_reaper;
+pub mod os_updates;
 pub mod os_version;
 pub mod permissions;
 pub mod process_kill;
