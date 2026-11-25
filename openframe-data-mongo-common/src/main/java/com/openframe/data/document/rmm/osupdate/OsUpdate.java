@@ -81,6 +81,9 @@ public class OsUpdate implements TenantScoped, Persistable<String> {
     // Null = never checked against the vendor's bulletin. Set also when the bulletin has no data for the update.
     private Instant enrichedAt;
 
+    // Set on every enrichment run that took the update, also when its source failed: the run takes the oldest first.
+    private Instant enrichmentAttemptedAt;
+
     @Override
     @Transient
     public boolean isNew() {

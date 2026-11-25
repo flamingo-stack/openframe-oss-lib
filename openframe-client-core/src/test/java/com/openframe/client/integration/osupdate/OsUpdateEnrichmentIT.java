@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.mongodb.MongoDBContainer;
@@ -226,6 +227,28 @@ class OsUpdateEnrichmentIT {
         // verifications
         assertThat(stored(outlook).getExploited()).isTrue();
         assertThat(stored(outlook).getEnrichedAt()).isAfter(Instant.now().minus(1, ChronoUnit.HOURS));
+    }
+
+    @Test
+    void run_monthThatKeepsFailingAndBatchOfOne_healthyEntryStillEnriched() {
+        // setup
+        osUpdateRepository.save(windows("nov-1", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061"));
+        osUpdateRepository.save(windows("nov-2", "2026-11 Cumulative Update for Windows 10 (KB5132061)", "5132061"));
+        OsUpdate october = osUpdateRepository.save(windows("oct", "2026-10 Cumulative Update for Windows 11 (KB5126868)", "5126868"));
+        FAILING_PATHS.put("/cvrf/2026-Nov", 503);
+        ReflectionTestUtils.setField(osUpdateEnrichmentScheduler, "batchSize", 1);
+
+        // execution
+        try {
+            for (int run = 0; run < 3; run++) {
+                osUpdateEnrichmentScheduler.run();
+            }
+        } finally {
+            ReflectionTestUtils.setField(osUpdateEnrichmentScheduler, "batchSize", 500);
+        }
+
+        // verifications
+        assertThat(stored(october).getCvssScore()).isEqualTo(8.8);
     }
 
     @Test

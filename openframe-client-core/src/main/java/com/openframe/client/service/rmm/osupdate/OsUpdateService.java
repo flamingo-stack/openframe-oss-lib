@@ -89,8 +89,9 @@ public class OsUpdateService {
         }
     }
 
-    // Updates never enriched or enriched before the given time, at most limit of them, the oldest first. An update
-    // no enricher applies to is only marked as checked; one whose source failed stays for the next run.
+    // Updates never enriched or enriched before the given time, at most limit of them, the least recently attempted
+    // first. An update no enricher applies to is only marked as checked; one whose source failed is retried after
+    // the others.
     public void enrichNotEnrichedSince(Instant enrichedBefore, int limit) {
         Timer.Sample runStarted = osUpdateEnrichmentMetrics.startRun();
         List<OsUpdate> staleOsUpdates = osUpdateRepository.findEnrichedBefore(
@@ -108,9 +109,10 @@ public class OsUpdateService {
             unclaimedOsUpdate.setEnrichedAt(enrichedAt);
             osUpdateEnrichmentMetrics.recordNoData(unclaimedOsUpdate.getPlatform());
         });
-        staleOsUpdates.stream()
-                .filter(staleOsUpdate -> enrichedAt.equals(staleOsUpdate.getEnrichedAt()))
-                .forEach(this::saveEnrichedUnlessChangedMeanwhile);
+        staleOsUpdates.forEach(staleOsUpdate -> {
+            staleOsUpdate.setEnrichmentAttemptedAt(enrichedAt);
+            saveEnrichedUnlessChangedMeanwhile(staleOsUpdate);
+        });
         osUpdateEnrichmentMetrics.recordRun(runStarted);
     }
 

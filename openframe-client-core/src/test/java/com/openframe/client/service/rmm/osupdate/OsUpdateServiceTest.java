@@ -305,7 +305,7 @@ class OsUpdateServiceTest {
     }
 
     @Test
-    void enrichNotEnrichedSince_sourceDown_uncheckedUpdatesNotSaved() {
+    void enrichNotEnrichedSince_sourceDown_savedAsAttemptedNotEnriched() {
         // setup
         OsUpdate windows = osUpdate("kb-1", "2026-11 Cumulative Update");
         givenStale(windows);
@@ -315,8 +315,9 @@ class OsUpdateServiceTest {
         service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
 
         // verifications
-        verify(osUpdateRepository, never()).save(any());
+        verify(osUpdateRepository).save(windows);
         assertThat(windows.getEnrichedAt()).isNull();
+        assertThat(windows.getEnrichmentAttemptedAt()).isNotNull();
     }
 
     @Test
@@ -338,8 +339,9 @@ class OsUpdateServiceTest {
 
         // verifications
         verify(osUpdateRepository).save(mac);
-        verify(osUpdateRepository, never()).save(windows);
+        verify(osUpdateRepository).save(windows);
         assertThat(windows.getEnrichedAt()).isNull();
+        assertThat(windows.getEnrichmentAttemptedAt()).isNotNull();
     }
 
     @Test

@@ -22,8 +22,8 @@ public interface OsUpdateRepository extends MongoRepository<OsUpdate, String>, C
 
     List<OsUpdate> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 
-    // Never enriched first: null sorts before every date.
+    // Never attempted first: null sorts before every date.
     @Query(value = "{ 'tenantId': ?0, $or: [ { 'enrichedAt': null }, { 'enrichedAt': { $lt: ?1 } } ] }",
-            sort = "{ 'enrichedAt': 1 }")
+            sort = "{ 'enrichmentAttemptedAt': 1 }")
     List<OsUpdate> findEnrichedBefore(String tenantId, Instant enrichedBefore, Pageable pageable);
 }
