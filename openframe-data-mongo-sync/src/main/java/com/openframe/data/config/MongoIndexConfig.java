@@ -183,15 +183,20 @@ public class MongoIndexConfig implements SmartLifecycle {
                 .filter(indexInfo -> indexName.equals(indexInfo.getName()))
                 .findFirst();
         if (existingIndex.isEmpty()) {
-            mongoTemplate.indexOps(documentClass).createIndex(new Index().on(field, Sort.Direction.ASC)
-                                                                         .expire(retention)
-                                                                         .named(indexName));
-        } else if (!existingIndex.get().getExpireAfter().equals(Optional.of(retention))) {
+            Index ttlIndex = new Index().on(field, Sort.Direction.ASC).expire(retention).named(indexName);
+            mongoTemplate.indexOps(documentClass).createIndex(ttlIndex);
+            return;
+        }
+        boolean retentionChanged = existingIndex.map(IndexInfo::getExpireAfter)
+                .filter(expireAfter -> !expireAfter.equals(Optional.of(retention)))
+                .isPresent();
+        if (retentionChanged) {
             // createIndex with a new expireAfterSeconds fails with IndexOptionsConflict (85); collMod changes it in place.
             String collection = mongoTemplate.getCollectionName(documentClass);
-            mongoTemplate.getDb().runCommand(new Document("collMod", collection)
-                    .append("index", new Document("name", indexName)
-                            .append("expireAfterSeconds", retention.toSeconds())));
+            long expireAfterSeconds = retention.toSeconds();
+            Document indexChange = new Document("name", indexName).append("expireAfterSeconds", expireAfterSeconds);
+            Document collMod = new Document("collMod", collection).append("index", indexChange);
+            mongoTemplate.getDb().runCommand(collMod);
             log.info("Changed the TTL of index '{}' on collection '{}' to {}", indexName, collection, retention);
         }
     }
