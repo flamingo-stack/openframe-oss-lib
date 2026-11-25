@@ -41,7 +41,8 @@ const RESULT_COLUMN_WIDTH_CLASS = 'flex-1 min-w-[176px]';
 /** A result set's columns are read with its rows and have no fixed count: a loading run draws a typical six (the count
  * this skeleton has always drawn), as header bars and as its one row's cells. */
 const TEST_RESULTS_SKELETON_COLUMNS = 6;
-/** The grid's loading rows: one, as the cards skeleton draws (a run streams its rows in). */
+/** A loading run draws one row, as the cards skeleton does: a run streams its rows in, and the block under it should not
+ * jump. */
 const TEST_RESULTS_SKELETON_ROWS = 1;
 
 /** Column-bar skeleton (header cells + one card row): columns `RESULT_COLUMN_MIN_WIDTH` wide (the loaded columns' least
@@ -156,7 +157,6 @@ export function TestResultsTable({
     return (
       <DataTable table={table} layout="grid">
         <DataTable.Header loading={loading} />
-        {/* One row, as the cards skeleton draws: a run streams its rows in, and the block under it should not jump. */}
         <DataTable.Body loading={loading} skeletonRows={TEST_RESULTS_SKELETON_ROWS} />
       </DataTable>
     );

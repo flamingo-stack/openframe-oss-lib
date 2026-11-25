@@ -20,6 +20,9 @@ public interface TicketEventListener {
     default void onTicketCreated(Ticket ticket, CreateTicketInput input, AuthPrincipal principal) {
     }
 
+    default void onTicketCreatedBySystem(Ticket ticket) {
+    }
+
     /** Title/description/links/assignee/tags were updated and saved. */
     default void onTicketUpdated(Ticket ticket, UpdateTicketInput input, AuthPrincipal principal) {
     }
