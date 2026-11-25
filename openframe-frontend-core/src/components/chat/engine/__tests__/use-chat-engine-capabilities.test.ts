@@ -662,3 +662,238 @@ describe('useChatEngine: a send across a reconnect catch-up', () => {
     ]);
   });
 });
+
+/**
+ * The wait for the live tail is the send's too (CU-17tkuw69v1k): Stop cancels a send still waiting for it, a send
+ * queued behind an unsent one keeps its place, and a send into a dialog the tail would open on new messages only waits
+ * for it. A send that can be delivered from where the tail resumes goes out at once.
+ */
+describe('useChatEngine: a send waiting for the live tail', () => {
+  const withSeq: HistoricalMessage[] = persisted;
+  const noSeq: HistoricalMessage[] = [
+    {
+      id: 'g1',
+      createdAt: '2026-11-25T09:00:00Z',
+      owner: { type: 'ASSISTANT' },
+      parts: [{ type: 'TEXT', text: 'Hi' }],
+    },
+  ];
+  const midTurn: HistoricalMessage[] = [
+    {
+      id: 'a1',
+      createdAt: '2026-11-25T09:00:00Z',
+      owner: { type: 'ASSISTANT' },
+      lastChunkStreamSeq: 7,
+      parts: [
+        {
+          type: 'EXECUTING_TOOL',
+          integratedToolType: 'TACTICAL_RMM',
+          toolFunction: 'run_script',
+          title: 'Run cleanup script',
+          parameters: { script: 'cleanup.sh' },
+          toolExecutionRequestId: 'exec-1',
+        },
+      ],
+    },
+  ];
+
+  function deferred<T>() {
+    let resolve: (value: T) => void = () => {};
+    const promise = new Promise<T>(settle => {
+      resolve = settle;
+    });
+    return { promise, resolve };
+  }
+
+  /** A dialog whose first page is still being read, with a send held for it. */
+  async function heldSend(dialogId: string, messages: HistoricalMessage[], text = 'first') {
+    const page = deferred<FetchDialogMessagesResult>();
+    const publish = vi.fn<(text: string) => void>();
+    const stop = vi.fn(() => Promise.resolve());
+    const hook = setup({
+      dialogId,
+      history: { fetchDialogMessages: () => page.promise },
+      transport: { publish, stop },
+    });
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = hook.result.current.sendMessage(text);
+    });
+    await act(async () => {
+      page.resolve({ messages, nextCursor: null });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(hook.tail.current?.fromSeq).toBe(messages === noSeq ? null : 7));
+    return { ...hook, publish, stop, sent: () => sent };
+  }
+
+  it('Stop after the page lands and before the tail subscribes: nothing is published, no turn is stopped', async () => {
+    const { result, tail, publish, stop, sent } = await heldSend('w1', withSeq);
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent()).toBe(false);
+    });
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+    expect(result.current.streamingPhase).toBe('idle');
+    expect(texts(result.current.messages)).toContainEqual(['user', 'first']);
+  });
+
+  it('a second send while the held one waits for the tail goes out after it, in order', async () => {
+    const { result, tail, publish, sent } = await heldSend('w2', withSeq);
+    let second: Promise<boolean | void> | undefined;
+    act(() => {
+      second = result.current.sendMessage('second');
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      expect(await sent()).toBe(true);
+      expect(await second).toBe(true);
+    });
+    expect(publish.mock.calls.map(([text]) => text)).toEqual(['first', 'second']);
+  });
+
+  it('Stop with two unsent sends: neither is published', async () => {
+    const { result, tail, publish, stop, sent } = await heldSend('w3', withSeq);
+    let second: Promise<boolean | void> | undefined;
+    act(() => {
+      second = result.current.sendMessage('second');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent()).toBe(false);
+      expect(await second).toBe(false);
+    });
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('a history that ends mid-turn: Stop cancels the held send and still stops the running turn', async () => {
+    const { result, tail, publish, stop, sent } = await heldSend('w4', midTurn);
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent()).toBe(false);
+    });
+    act(() => tail.current?.onSubscribed?.());
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).toHaveBeenCalledWith('w4');
+  });
+
+  it('another turn the tail is delivering: Stop cancels the queued send and stops that turn', async () => {
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const { result, tail } = setup({
+      dialogId: 'w5',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: noSeq, nextCursor: null }) },
+      transport: { publish, stop },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    act(() => tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 3 }, 'message'));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('queued');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).toHaveBeenCalledWith('w5');
+  });
+
+  it('a send into a dialog with no seq to resume after waits for the tail', async () => {
+    const publish = vi.fn();
+    const { result, tail } = setup({
+      dialogId: 'w6',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: noSeq, nextCursor: null }) },
+      transport: { publish },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('hello');
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      expect(await sent).toBe(true);
+    });
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('a send into a dialog with a seq goes out before the tail subscribes: the tail resumes after that seq', async () => {
+    const publish = vi.fn();
+    const { result, tail } = setup({ dialogId: 'w7', transport: { publish } });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    await act(async () => {
+      expect(await result.current.sendMessage('now')).toBe(true);
+    });
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('Stop during the wait a transport that awaits subscription asks for: nothing is published, no turn is stopped', async () => {
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const { result, tail } = setup({ dialogId: 'w8', transport: { awaitsSubscription: true, publish, stop } });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('go');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+  });
+});
+
+describe('useChatEngine: a direct message before the tail subscribes', () => {
+  it('goes out at once with no seq to resume after: there is no answer to lose', async () => {
+    const publish = vi.fn();
+    const { result, tail } = setup({
+      dialogId: 'x1',
+      directMode: true,
+      history: {
+        fetchDialogMessages: () =>
+          Promise.resolve({
+            messages: [
+              {
+                id: 'm1',
+                createdAt: '2026-11-25T09:00:00Z',
+                owner: { type: 'CLIENT' },
+                parts: [{ type: 'TEXT', text: 'hi' }],
+              },
+            ],
+            nextCursor: null,
+          }),
+      },
+      transport: { publish },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    await act(async () => {
+      expect(await result.current.sendMessage('on it')).toBe(true);
+    });
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+});

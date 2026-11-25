@@ -118,11 +118,13 @@ function darkIconOf(icons: unknown): { url: string } | undefined {
 
 function withDarkIcons(groups: unknown): unknown {
   if (!Array.isArray(groups)) return groups;
-  return groups.map(group =>
+  return (groups as unknown[]).map((group): unknown =>
     isRecord(group) && Array.isArray(group.prompts)
       ? {
           ...group,
-          prompts: group.prompts.map(chip => (isRecord(chip) ? { ...chip, icon: darkIconOf(chip.icons) } : chip)),
+          prompts: (group.prompts as unknown[]).map((chip): unknown =>
+            isRecord(chip) ? { ...chip, icon: darkIconOf(chip.icons) } : chip,
+          ),
         }
       : group,
   );
