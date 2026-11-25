@@ -843,6 +843,43 @@ describe('useChatEngine: a send waiting for the live tail', () => {
     expect(stop).toHaveBeenCalledWith('w5');
   });
 
+  it('a STREAMING record that answers after the tail ended the turn does not mark it running', async () => {
+    let answer: (record: { dialog: DialogItem; streamState: 'STREAMING' }) => void = () => {};
+    const fetchDialog = vi.fn(
+      () =>
+        new Promise<{ dialog: DialogItem; streamState: 'STREAMING' }>(resolve => {
+          answer = resolve;
+        }),
+    );
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const { result, tail } = setup({
+      dialogId: 'w10',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: noSeq, nextCursor: null }), fetchDialog },
+      transport: { publish, stop },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 3 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 4 }, 'message');
+    });
+    await act(async () => {
+      answer({ dialog: { id: 'w10', title: 'Late' }, streamState: 'STREAMING' });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.activeDialog?.title).toBe('Late'));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('queued');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+  });
+
   it('a send into a dialog with no seq to resume after waits for the tail', async () => {
     const publish = vi.fn();
     const { result, tail } = setup({

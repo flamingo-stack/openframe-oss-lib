@@ -715,6 +715,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   // history ends with an unfinished turn, or the tail started a turn and has not ended it. Stop stops it on the server
   // even while it cancels unsent sends.
   const serverTurnForRef = useRef<string | null>(null);
+  // When the tail last delivered: a record that says the backend is idle is believed only if nothing came after it was asked.
+  const lastEventAtRef = useRef(0);
   /** How many times the open record was asked for again (the refresh timer): each one reads it once more. */
   const [recordReads, setRecordReads] = useState(0);
   // The host's model changed (its settings): the open dialog's budget is the new model's, which only its record says
@@ -735,12 +737,16 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     let current = true;
     const key = keyOfDialogRef.current(dialogId);
     const replacesUsage = usageReread?.dialogId === dialogId && usageReread.read === recordReads;
+    const askedAt = Date.now();
     fetchDialog(dialogId)
       .then(record => {
         if (!current) return;
         setRecordEntry({ dialogId, record, error: record ? null : 'This conversation could not be found.' });
-        if (record?.streamState === 'STREAMING' && currentDialogIdRef.current === dialogId) {
-          serverTurnForRef.current = dialogId;
+        // Whether an answer is being written, believed only when the tail delivered nothing after the record was asked:
+        // a turn's start and end on the tail are newer than a record read before them.
+        if (record?.streamState && currentDialogIdRef.current === dialogId && lastEventAtRef.current < askedAt) {
+          if (record.streamState === 'STREAMING') serverTurnForRef.current = dialogId;
+          else if (serverTurnForRef.current === dialogId) serverTurnForRef.current = null;
         }
         // A title the list does not have yet (generated since the list was read).
         if (record) patchDialog(dialogId, { title: record.dialog.title });
@@ -1145,8 +1151,6 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     [],
   );
 
-  // When the tail last delivered: a record that says the backend is idle is believed only if nothing came after it was asked.
-  const lastEventAtRef = useRef(0);
   const tailPort = liveTail ?? NO_TAIL_PORT;
   tailPort.useLiveTail({
     enabled: active && dialogId != null,
