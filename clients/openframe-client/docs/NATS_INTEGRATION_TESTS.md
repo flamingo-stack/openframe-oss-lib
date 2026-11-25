@@ -70,8 +70,9 @@ A skipped test prints ``skipping: `nats-server` is not installed (brew install n
 The `Build Rust` jobs in `.github/workflows/build.yml` download a pinned
 `nats-server` release (checksum-verified) before `make test` and run it with
 `REQUIRE_NATS_SERVER: "1"`, so the suite runs on macOS and Windows and a missing
-server fails the job. To move to a newer server, change `NATS_SERVER_VERSION` and
-both checksums from the release's `SHA256SUMS`.
+server fails the job. The pin follows the 2.10 line the platform runs (`nats` image
+`2.10-alpine` in the tenant chart); when the platform moves, change
+`NATS_SERVER_VERSION` and both checksums from the release's `SHA256SUMS`.
 
 ## Writing a test
 

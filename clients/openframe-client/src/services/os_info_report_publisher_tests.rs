@@ -24,8 +24,9 @@ async fn startup_report_carries_the_running_os_on_the_machine_subject() {
     backend.flush().await.unwrap();
 
     OsInfoReportPublisher::new(NatsMessagePublisher::new(manager), config)
-        .publish()
-        .await;
+        .try_publish()
+        .await
+        .expect("the OS info report is published");
 
     let report = timeout(BOUND, reports.next())
         .await

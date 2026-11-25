@@ -209,7 +209,7 @@ jobs:
 
       - name: Install nats-server
         env:
-          NATS_SERVER_VERSION: v2.15.2
+          NATS_SERVER_VERSION: v2.10.29
         run: |
           cd "$RUNNER_TEMP"
           base="https://github.com/nats-io/nats-server/releases/download/$NATS_SERVER_VERSION"
@@ -217,13 +217,13 @@ jobs:
             macOS)
               dir="nats-server-$NATS_SERVER_VERSION-darwin-arm64"
               curl -fsSLo "$dir.tar.gz" "$base/$dir.tar.gz"
-              echo "cbd2219d01502c38733485ac684269da585ee479fa3b1377264beecdefdf9e9d  $dir.tar.gz" | shasum -a 256 -c -
+              echo "d7d8277882679d072c12f200c7b7006ee19aece00d2a0d75c3fbf2bf7fbd08ba  $dir.tar.gz" | shasum -a 256 -c -
               tar -xzf "$dir.tar.gz"
               ;;
             Windows)
               dir="nats-server-$NATS_SERVER_VERSION-windows-amd64"
               curl -fsSLo "$dir.zip" "$base/$dir.zip"
-              echo "f6398d5d11093778f870db70242cb50d20a58134c937c805ba8d114e7e398766  $dir.zip" | sha256sum -c -
+              echo "98657bf4d5a9ce44168c019ba6894cda8e22e6adc8798edc05c168db7262de29  $dir.zip" | sha256sum -c -
               unzip -q "$dir.zip"
               ;;
           esac
