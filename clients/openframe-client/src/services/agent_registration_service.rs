@@ -6,6 +6,7 @@ use tracing::{error, info, warn};
 use crate::clients::{RegistrationClient, RegistrationError};
 use crate::models::{AgentRegistrationRequest, AgentRegistrationResponse};
 use crate::platform::machine_info_persistence::{self, PersistedMachineInfo};
+use crate::platform::os_version;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::InitialConfigurationService;
@@ -179,6 +180,7 @@ impl AgentRegistrationService {
             .get_agent_version()
             .unwrap_or_default();
         let os_type = self.device_data_fetcher.get_os_type();
+        let os = os_version::current();
         let organization_id = self
             .initial_configuration_service
             .get_org_id()
@@ -194,6 +196,8 @@ impl AgentRegistrationService {
             organization_id,
             user_id: user_id.to_string(),
             os_type,
+            os_version: os.version.clone(),
+            os_build: os.build.clone(),
             tags,
         };
 
