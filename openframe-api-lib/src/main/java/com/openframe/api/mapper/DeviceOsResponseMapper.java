@@ -48,6 +48,8 @@ public class DeviceOsResponseMapper {
                 .kbArticleIds(orEmpty(osUpdate.getKbArticleIds()))
                 .severity(osUpdate.getSeverity())
                 .categories(orEmpty(osUpdate.getCategories()))
+                .categoryIds(orEmpty(osUpdate.getCategoryIds()))
+                .updateType(osUpdate.getUpdateType())
                 .cveIds(orEmpty(osUpdate.getCveIds()))
                 .publishedAt(osUpdate.getPublishedAt())
                 .sizeBytes(osUpdate.getSizeBytes())

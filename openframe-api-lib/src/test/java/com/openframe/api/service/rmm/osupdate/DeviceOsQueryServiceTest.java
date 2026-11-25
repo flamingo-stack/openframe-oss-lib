@@ -15,6 +15,8 @@ import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManageability;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
@@ -26,6 +28,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,6 +37,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -187,6 +192,46 @@ class DeviceOsQueryServiceTest {
     }
 
     @Test
+    void listPendingUpdates_deviceThatIsNotManageable_emptyAndItsStoredPendingUpdatesNotRead() {
+        // setup
+        DeviceOsState notManageable = state(OsUpdateManageabilityState.NOT_MANAGEABLE);
+        stubKnownDevice();
+        when(deviceOsStateRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .thenReturn(Optional.of(notManageable));
+
+        // execution
+        List<DeviceOsPendingUpdateResponse> found = service.listPendingUpdates(MACHINE_ID);
+
+        // verifications
+        assertThat(found).isEmpty();
+        verifyNoInteractions(deviceOsPendingUpdateRepository, osUpdateRepository, deviceOsResponseMapper);
+    }
+
+    @ParameterizedTest
+    @MethodSource("statesThatDoNotHideThePendingUpdates")
+    void listPendingUpdates_deviceThatIsNotKnownToBeNotManageable_pendingUpdatesReturned(DeviceOsState state) {
+        // setup
+        DeviceOsPendingUpdate pending = pendingUpdate("kb-1", NEWEST);
+        OsUpdate osUpdate = osUpdate("kb-1");
+        DeviceOsPendingUpdateResponse response = DeviceOsPendingUpdateResponse.builder().identifier("kb-1").build();
+        stubKnownDevice();
+        when(deviceOsStateRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .thenReturn(Optional.ofNullable(state));
+        when(deviceOsPendingUpdateRepository
+                .findByTenantIdAndMachineIdOrderByDiscoveredAtDescIdentifierAsc(TENANT_ID, MACHINE_ID))
+                .thenReturn(List.of(pending));
+        when(osUpdateRepository.findByTenantIdAndPlatformAndIdentifierIn(TENANT_ID, OsPlatform.WINDOWS, List.of("kb-1")))
+                .thenReturn(List.of(osUpdate));
+        when(deviceOsResponseMapper.toResponse(pending, osUpdate)).thenReturn(response);
+
+        // execution
+        List<DeviceOsPendingUpdateResponse> found = service.listPendingUpdates(MACHINE_ID);
+
+        // verifications
+        assertThat(found).containsExactly(response);
+    }
+
+    @Test
     void listPendingUpdates_unknownDevice_throwsDeviceNotFound() {
         // setup
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
@@ -311,6 +356,27 @@ class DeviceOsQueryServiceTest {
         when(deviceOsUpdateHistoryRepository.encodeCursor(olderEntry)).thenReturn("raw-2");
         when(deviceOsResponseMapper.toResponse(newestEntry, CursorCodec.encode("raw-3"))).thenReturn(newestResponse);
         when(deviceOsResponseMapper.toResponse(olderEntry, CursorCodec.encode("raw-2"))).thenReturn(olderResponse);
+    }
+
+    private static Stream<Arguments> statesThatDoNotHideThePendingUpdates() {
+        DeviceOsState withoutManageability = DeviceOsState.builder().tenantId(TENANT_ID).machineId(MACHINE_ID).build();
+        return Stream.of(
+                Arguments.of((DeviceOsState) null),
+                Arguments.of(withoutManageability),
+                Arguments.of(state(null)),
+                Arguments.of(state(OsUpdateManageabilityState.MANAGEABLE)));
+    }
+
+    private static DeviceOsState state(OsUpdateManageabilityState manageabilityState) {
+        OsUpdateManageability manageability = OsUpdateManageability.builder()
+                .state(manageabilityState)
+                .reasons(List.of())
+                .build();
+        return DeviceOsState.builder()
+                .tenantId(TENANT_ID)
+                .machineId(MACHINE_ID)
+                .manageability(manageability)
+                .build();
     }
 
     private static DeviceOsPendingUpdate pendingUpdate(String identifier, Instant discoveredAt) {

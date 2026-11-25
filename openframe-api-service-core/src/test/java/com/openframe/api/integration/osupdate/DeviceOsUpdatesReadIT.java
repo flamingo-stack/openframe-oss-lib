@@ -93,8 +93,8 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     private static final String PENDING = """
             query($machineId: String!) {
               deviceOsPendingUpdates(machineId: $machineId) {
-                identifier displayName displayVersion kbArticleIds severity categories cveIds publishedAt sizeBytes
-                rebootBehavior browseOnly discoveredAt downloaded macosPresence
+                identifier displayName displayVersion kbArticleIds severity categories categoryIds updateType
+                cveIds publishedAt sizeBytes rebootBehavior browseOnly discoveredAt downloaded macosPresence
               }
             }
             """;
@@ -171,12 +171,13 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
         expected.put("patchState", "UPDATES_AVAILABLE");
         expected.put("rebootPending", "YES");
         expected.put("rebootPendingSince", EARLIER_REPORT);
-        expected.put("manageability", Map.of("state", "NOT_MANAGEABLE", "reasons", List.of("WSUS", "GROUP_POLICY")));
+        expected.put("manageability", Map.of("state", "NOT_MANAGEABLE",
+                "reasons", List.of("WSUS", "GROUP_POLICY", "REASON_OF_A_NEWER_AGENT")));
         expected.put("osUpdateAuthorization", "NOT_REQUIRED");
         expected.put("lastOsInstall", lastOsInstall(WINDOWS_INSTALLED, WINDOWS_INSTALLED_TITLE, null, EARLIER_INSTALL));
         expected.put("reportedAt", REPORTED);
         expected.put("receivedAt", RECEIVED);
-        saveReportedDevice(windowsState(MACHINE_ID));
+        saveReportedDevice(windowsState(MACHINE_ID).append("manageability", notManageable()));
 
         // execution
         Map<String, Object> state = state(MACHINE_ID);
@@ -199,8 +200,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("pendingUpdatesConfidence", "UNREADABLE")
                 .append("patchState", "UNKNOWN")
                 .append("rebootPending", "UNKNOWN")
-                .append("manageability", new Document("state", "NOT_MANAGEABLE")
-                        .append("reasons", List.of("NO_SERVICE_ACCOUNT", "REASON_OF_A_NEWER_AGENT")))
+                .append("manageability", new Document("state", "MANAGEABLE").append("reasons", List.of()))
                 .append("osUpdateAuthorization", "NOT_REQUIRED")
                 .append("receivedAt", date(RECEIVED));
         saveReportedDevice(state);
@@ -222,8 +222,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .containsEntry("rebootPendingSince", null)
                 .containsEntry("lastOsInstall", null)
                 .containsEntry("reportedAt", null)
-                .containsEntry("manageability", Map.of("state", "NOT_MANAGEABLE",
-                        "reasons", List.of("NO_SERVICE_ACCOUNT", "REASON_OF_A_NEWER_AGENT")));
+                .containsEntry("manageability", Map.of("state", "MANAGEABLE", "reasons", List.of()));
         assertThat(pending).extracting(update -> update.get("identifier"), update -> update.get("macosPresence"))
                 .containsExactly(tuple(MAC_SAFARI, "HELD_OVER"));
     }
@@ -275,6 +274,8 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
         expected.put("kbArticleIds", List.of("5051987"));
         expected.put("severity", "CRITICAL");
         expected.put("categories", List.of("Security Updates"));
+        expected.put("categoryIds", List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"));
+        expected.put("updateType", "SOFTWARE");
         expected.put("cveIds", List.of("CVE-2026-21309", "CVE-2026-21311"));
         expected.put("publishedAt", "2026-11-11T18:00:00Z");
         expected.put("sizeBytes", 764317696L);
@@ -297,6 +298,27 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    void deviceThatIsNotManageable_pendingUpdatesReadEmpty_storedRowsStayAndAreReturnedOnceItIsManageable() {
+        // setup
+        saveReportedDevice(windowsState(MACHINE_ID).append("manageability", notManageable()));
+        savePending(pendingUpdate(MACHINE_ID, TENANT_ID, "WINDOWS", WINDOWS_PENDING, RECEIVED));
+        saveOsUpdate(windowsOsUpdate(TENANT_ID));
+
+        // execution
+        List<Map<String, Object>> pendingWhileNotManageable = pending(MACHINE_ID);
+        long storedWhileNotManageable = pendingCollection().countDocuments(Filters.eq("machineId", MACHINE_ID));
+        stateCollection().updateOne(Filters.eq("machineId", MACHINE_ID),
+                new Document("$set", new Document("manageability.state", "MANAGEABLE")));
+        List<Map<String, Object>> pendingOnceManageable = pending(MACHINE_ID);
+
+        // verifications
+        assertThat(pendingWhileNotManageable).isEmpty();
+        assertThat(storedWhileNotManageable).isEqualTo(1);
+        assertThat(pendingOnceManageable).extracting(update -> update.get("identifier"))
+                .containsExactly(WINDOWS_PENDING);
+    }
+
+    @Test
     void macPendingUpdate_nameAndVersionReturned_listsEmptyAndTheWindowsFieldsNull() {
         // setup
         Map<String, Object> expected = new HashMap<>();
@@ -306,6 +328,8 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
         expected.put("kbArticleIds", List.of());
         expected.put("severity", null);
         expected.put("categories", List.of());
+        expected.put("categoryIds", List.of());
+        expected.put("updateType", null);
         expected.put("cveIds", List.of());
         expected.put("publishedAt", null);
         expected.put("sizeBytes", null);
@@ -719,8 +743,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("patchState", "UPDATES_AVAILABLE")
                 .append("rebootPending", "YES")
                 .append("rebootPendingSince", date(EARLIER_REPORT))
-                .append("manageability", new Document("state", "NOT_MANAGEABLE")
-                        .append("reasons", List.of("WSUS", "GROUP_POLICY")))
+                .append("manageability", new Document("state", "MANAGEABLE").append("reasons", List.of()))
                 .append("osUpdateAuthorization", "NOT_REQUIRED")
                 .append("lastOsInstall", new Document("identifier", WINDOWS_INSTALLED)
                         .append("displayName", WINDOWS_INSTALLED_TITLE)
@@ -728,6 +751,11 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("version", 3L)
                 .append("reportedAt", date(REPORTED))
                 .append("receivedAt", date(RECEIVED));
+    }
+
+    private static Document notManageable() {
+        return new Document("state", "NOT_MANAGEABLE")
+                .append("reasons", List.of("WSUS", "GROUP_POLICY", "REASON_OF_A_NEWER_AGENT"));
     }
 
     private static Map<String, Object> lastOsInstall(String identifier, String displayName, String displayVersion,
@@ -762,6 +790,8 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("kbArticleIds", List.of("5051987"))
                 .append("severity", "CRITICAL")
                 .append("categories", List.of("Security Updates"))
+                .append("categoryIds", List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
+                .append("updateType", "SOFTWARE")
                 .append("cveIds", List.of("CVE-2026-21309", "CVE-2026-21311"))
                 .append("publishedAt", date("2026-11-11T18:00:00Z"))
                 .append("sizeBytes", 764317696L)

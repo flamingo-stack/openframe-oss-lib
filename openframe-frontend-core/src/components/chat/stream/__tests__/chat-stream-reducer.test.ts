@@ -15,7 +15,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { approvalStatusOf, isToolPart, type ChatMessage, type ChatPart } from '../../../../chat-protocol/chat-message';
 import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
 import type { ChatStreamEntry, UiChunk } from '../../../../chat-protocol/ui-chunks';
-import { createChatStreamReducer, OWN_ECHO_AUTHOR_TTL_MS, OWN_ECHO_TTL_MS } from '../chat-stream-reducer';
+import {
+  createChatStreamReducer,
+  OWN_ECHO_AUTHOR_TTL_MS,
+  OWN_ECHO_TTL_MS,
+  REPLAY_PUBLISH_TOLERANCE_MS,
+} from '../chat-stream-reducer';
 import type { ChatStreamReducerOptions } from '../chat-stream-reducer';
 
 const chunks = (...list: UiChunk[]): ChatStreamEntry => ({ chunks: list });
@@ -980,17 +985,15 @@ describe('createChatStreamReducer — participant dedup', () => {
   });
 
   /**
-   * DOCUMENTED LIMIT, not an aspiration: when a reconnect / resync catch-up (a
-   * NEW consumer, so the hydration-time backlog window is closed) delivers
-   * BOTH a pre-disconnect `start` and its `finish` after the
-   * user has sent, the replayed `start` restamps the arrival-time
-   * boundary and the `finish` purges the still-live entry — the echo then
-   * renders a SECOND bubble. The chunk union carries no event-own
-   * timestamp (only `seq`), so at this layer the interleaving is identical to
-   * "send queued mid-turn, own turn opened and closed before the echo", which
-   * the module deliberately resolves toward duplicating rather than risk
-   * swallowing a real message. Pins the behavior so a future transport-level
-   * fix (event-own time) has to update this test consciously.
+   * DOCUMENTED LIMIT with no backlog window open: when a catch-up delivers
+   * BOTH a pre-disconnect `start` and its `finish` after the user has sent,
+   * the replayed `start` restamps the arrival-time boundary and the `finish`
+   * purges the still-live entry — the echo then renders a SECOND bubble. At
+   * this layer the interleaving is identical to "send queued mid-turn, own
+   * turn opened and closed before the echo", which the module deliberately
+   * resolves toward duplicating rather than risk swallowing a real message.
+   * A host covers it by opening the backlog window for the catch-up (the
+   * engine does on the JetStream tail's `onCatchUpStart`, CU-17tkuw691j4).
    */
   it('a replayed turn boundary after a send duplicates the bubble (known limit)', () => {
     const realNow = Date.now;
@@ -1926,5 +1929,112 @@ describe('createChatStreamReducer: the replaying backlog window', () => {
       // Two: the optimistic bubble and the un-deduped echo, the closed-window behaviour.
       expect(users(r)).toHaveLength(2);
     });
+  });
+});
+
+/**
+ * A stopped prompt saved before the backend stamped requests with their seq (CU-17tkuw68art, CU-17tkuw691j4): the
+ * history row has no seq, so the tail may replay its request. The stream's publish time tells the replay (published as
+ * the row was written) from a new send of the same text (published later).
+ */
+describe('createChatStreamReducer: a seq-less stopped prompt and the stream publish time', () => {
+  const PROMPT = 'Same prompt';
+  const WRITTEN = Date.parse('2026-11-24T10:00:00Z');
+  const echo = (seq: number, at?: number): ChatStreamEntry => ({
+    ...participant({ kind: 'message-request', text: PROMPT, ownerType: 'ADMIN', userId: 'me', seq }),
+    ...(at !== undefined ? { at } : {}),
+  });
+  const startOf = (seq: number): ChatStreamEntry => ({ seq, chunks: [{ type: 'start', messageId: `turn-${seq}` }] });
+  function reloaded() {
+    const r = createChatStreamReducer({ ownEchoIncludesAdmin: true, selfUserId: 'me' });
+    r.initializeWithState([
+      { id: 'a0', role: 'assistant', parts: [{ type: 'text', text: 'Older answer' }], metadata: { streamSeq: 7 } },
+      {
+        id: 'm1',
+        role: 'user',
+        parts: [{ type: 'text', text: PROMPT }],
+        metadata: { createdAt: new Date(WRITTEN).toISOString(), author: { authorType: 'admin' } },
+      },
+    ]);
+    r.setTailReplaysHistory(true);
+    r.setReplayingBacklog(true);
+    return r;
+  }
+  const users = (r: ReturnType<typeof reloaded>) => r.state.messages.filter(m => m.role === 'user');
+  const replayDone = (r: ReturnType<typeof reloaded>) => {
+    r.setReplayingBacklog(false);
+    r.setTailReplaysHistory(false);
+  };
+
+  it("receiving tab: the stopped prompt's replay is hidden, a repeat from another tab in the same backlog shows", () => {
+    const r = reloaded();
+    r.apply(echo(8, WRITTEN + 40));
+    r.apply(startOf(9));
+    r.apply(end(10));
+    expect(users(r)).toHaveLength(1);
+    r.apply(echo(11, WRITTEN + 15_000));
+    replayDone(r);
+    expect(users(r)).toHaveLength(2);
+  });
+
+  it('receiving tab: a repeat in the backlog after the stopped turn left the stream shows', () => {
+    const r = reloaded();
+    r.apply(echo(11, WRITTEN + 11 * 60_000));
+    replayDone(r);
+    expect(users(r)).toHaveLength(2);
+  });
+
+  it('receiving tab: a repeat published just past the tolerance shows, one within it is the replay', () => {
+    const past = reloaded();
+    past.apply(echo(8, WRITTEN + REPLAY_PUBLISH_TOLERANCE_MS + 1));
+    expect(users(past)).toHaveLength(2);
+    const within = reloaded();
+    within.apply(echo(8, WRITTEN - REPLAY_PUBLISH_TOLERANCE_MS));
+    expect(users(within)).toHaveLength(1);
+  });
+
+  it('receiving tab: the replay is matched once, a second dated echo inside the window is a send', () => {
+    const r = reloaded();
+    r.apply(echo(8, WRITTEN + 40));
+    r.apply(echo(9, WRITTEN + 900));
+    expect(users(r)).toHaveLength(2);
+  });
+
+  it('sending tab: a send before the tail subscribed draws one bubble, the stopped prompt replayed in the backlog', () => {
+    const r = reloaded();
+    r.pushOptimisticSend(PROMPT);
+    r.apply(echo(8, WRITTEN + 40));
+    r.apply(startOf(9));
+    r.apply(end(10));
+    r.apply(echo(11, WRITTEN + 15_000));
+    replayDone(r);
+    expect(users(r)).toHaveLength(2);
+    expect(r.getPendingEchoes()).toHaveLength(0);
+  });
+
+  it("sending tab: after the stopped turn left the stream, the send's own echo spends its entry", () => {
+    const r = reloaded();
+    r.pushOptimisticSend(PROMPT);
+    r.apply(echo(11, WRITTEN + 11 * 60_000));
+    replayDone(r);
+    expect(users(r)).toHaveLength(2);
+    expect(r.getPendingEchoes()).toHaveLength(0);
+  });
+
+  it('an undated transport keeps the old order: the echo entry first, then the trailing-prompt check', () => {
+    const r = reloaded();
+    r.apply(echo(8));
+    expect(users(r)).toHaveLength(1);
+  });
+
+  it('a new history clears the match, an evicted reducer restores it', () => {
+    const r = reloaded();
+    r.apply(echo(8, WRITTEN + 40));
+    expect(r.getTrailingReplayMatched()).toBe(true);
+    const restored = createChatStreamReducer({ ownEchoIncludesAdmin: true, selfUserId: 'me' });
+    restored.initializeWithState(r.state.messages, { trailingReplayMatched: r.getTrailingReplayMatched() });
+    expect(restored.getTrailingReplayMatched()).toBe(true);
+    restored.initializeWithState([...r.state.messages]);
+    expect(restored.getTrailingReplayMatched()).toBe(false);
   });
 });
