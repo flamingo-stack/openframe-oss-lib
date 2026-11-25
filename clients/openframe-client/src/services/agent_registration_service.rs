@@ -6,9 +6,11 @@ use tracing::{error, info, warn};
 use crate::clients::{RegistrationClient, RegistrationError};
 use crate::models::{AgentRegistrationRequest, AgentRegistrationResponse};
 use crate::platform::machine_info_persistence::{self, PersistedMachineInfo};
+use crate::platform::os_version;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::InitialConfigurationService;
+use crate::services::MachineIdService;
 
 /// Backoff between persisted-read retries before falling back to a fresh install.
 const READ_RETRY_DELAYS: [Duration; 3] = [
@@ -23,6 +25,7 @@ pub struct AgentRegistrationService {
     device_data_fetcher: DeviceDataFetcher,
     config_service: AgentConfigurationService,
     initial_configuration_service: InitialConfigurationService,
+    machine_id_service: MachineIdService,
 }
 
 impl AgentRegistrationService {
@@ -31,12 +34,14 @@ impl AgentRegistrationService {
         device_data_fetcher: DeviceDataFetcher,
         config_service: AgentConfigurationService,
         initial_configuration_service: InitialConfigurationService,
+        machine_id_service: MachineIdService,
     ) -> Self {
         Self {
             registration_client,
             device_data_fetcher,
             config_service,
             initial_configuration_service,
+            machine_id_service,
         }
     }
 
@@ -69,6 +74,7 @@ impl AgentRegistrationService {
             machine_id: response.machine_id.clone(),
             client_secret: response.client_secret.clone(),
             user_id: (!user_id.is_empty()).then(|| user_id.clone()),
+            local_machine_id: self.local_machine_id(),
         };
         if let Err(e) = machine_info_persistence::write(&machine_info) {
             error!("Failed to persist machine info: {}", e);
@@ -83,6 +89,11 @@ impl AgentRegistrationService {
             .await?;
 
         Ok(response)
+    }
+
+    fn local_machine_id(&self) -> Option<String> {
+        let id = self.machine_id_service.get();
+        (!id.is_empty()).then_some(id)
     }
 
     pub async fn read_persisted_credentials() -> Result<Option<PersistedMachineInfo>> {
@@ -151,6 +162,7 @@ impl AgentRegistrationService {
         user_id: &str,
     ) -> Result<AgentRegistrationResponse> {
         let request = self.build_registration_request(user_id)?;
+        let restored_local_machine_id = machine_info.local_machine_id.clone();
 
         match self
             .registration_client
@@ -162,6 +174,8 @@ impl AgentRegistrationService {
                 warn!(
                     "Server rejected the saved machine credentials; registering as a new machine"
                 );
+                self.machine_id_service
+                    .renew_if_restored(restored_local_machine_id.as_deref())?;
                 self.fresh_install(initial_key, user_id).await
             }
             Err(RegistrationError::Other(e)) => Err(e).context("Failed to reinstall agent"),
@@ -179,6 +193,7 @@ impl AgentRegistrationService {
             .get_agent_version()
             .unwrap_or_default();
         let os_type = self.device_data_fetcher.get_os_type();
+        let os = os_version::current();
         let organization_id = self
             .initial_configuration_service
             .get_org_id()
@@ -194,6 +209,8 @@ impl AgentRegistrationService {
             organization_id,
             user_id: user_id.to_string(),
             os_type,
+            os_version: os.version.clone(),
+            os_build: os.build.clone(),
             tags,
         };
 

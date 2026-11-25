@@ -6,6 +6,7 @@ import com.openframe.api.config.InstantScalarConfig;
 import com.openframe.api.config.JsonScalarConfig;
 import com.openframe.api.config.LongScalarConfig;
 import com.openframe.api.datafetcher.DeviceDataFetcher;
+import com.openframe.api.dataloader.MachineDataLoader;
 import com.openframe.api.exception.GraphQLExceptionHandler;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
@@ -15,6 +16,7 @@ import com.openframe.api.service.TagService;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.api.service.shared.CursorPageAssembler;
 import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.config.TenantIsolationAutoConfiguration;
@@ -24,6 +26,8 @@ import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
+import com.openframe.publishing.transaction.MongoTransactionRunner;
 import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
@@ -59,6 +63,8 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = {
                 ".*\\.MachineRepository",
                 ".*\\.ScriptScheduleMachineAssignedRepository",
+                ".*\\.SoftwareScheduleMachineAssignedRepository",
+                ".*\\.SoftwareScheduleOnlineDispatchRepository",
                 ".*\\.DeviceOnlineDispatchRepository",
                 ".*\\.DeviceSoftwareRepository",
                 ".*\\.osupdate\\..*"
@@ -69,7 +75,9 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         includeFilters = @ComponentScan.Filter(type = FilterType.CUSTOM, classes = OsUpdateComponentFilter.class))
 @Import({
         DeviceDataFetcher.class,
+        MachineDataLoader.class,
         DeviceService.class,
+        CursorPageAssembler.class,
         GraphQLExceptionHandler.class,
         InstantScalarConfig.class,
         DateScalarConfig.class,
@@ -88,6 +96,15 @@ public class DeviceOsReadTestApplication {
     @Bean
     TenantIdProvider tenantIdProvider() {
         return () -> TENANT_ID;
+    }
+
+    // The container is no replica set, so no transactions: the mutation runs as is
+    @Bean
+    ScheduleMutationTransaction scheduleMutationTransaction() throws Throwable {
+        ScheduleMutationTransaction scheduleMutationTransaction = Mockito.mock(ScheduleMutationTransaction.class);
+        Mockito.when(scheduleMutationTransaction.run(Mockito.any())).thenAnswer(invocation ->
+                invocation.<MongoTransactionRunner.Transaction<Object>>getArgument(0).execute());
+        return scheduleMutationTransaction;
     }
 
     @Bean

@@ -67,10 +67,12 @@ A skipped test prints ``skipping: `nats-server` is not installed (brew install n
 
 ### CI
 
-CI does not install `nats-server` yet, so there the suite skips and nothing
-fails. To make it run: add an install step before `make test` in the Rust job
-(`brew install nats-server` on macOS, a release download or `choco install nats-server`
-on Windows) and set `REQUIRE_NATS_SERVER: "1"` on that step.
+The `Build Rust` jobs in `.github/workflows/build.yml` download a pinned
+`nats-server` release (checksum-verified) before `make test` and run it with
+`REQUIRE_NATS_SERVER: "1"`, so the suite runs on macOS and Windows and a missing
+server fails the job. The pin follows the 2.10 line the platform runs (`nats` image
+`2.10-alpine` in the tenant chart); when the platform moves, change
+`NATS_SERVER_VERSION` and both checksums from the release's `SHA256SUMS`.
 
 ## Writing a test
 
@@ -145,6 +147,13 @@ tester.flush().await.unwrap();
 
 Core NATS has no backlog: anything published before the subscription exists is
 lost. The same applies to the agent's listener — see the next step.
+
+`flush()` only writes to the socket; it does not wait for the server to process
+the `SUB`, and nats-server keeps no order between connections. Here that is
+safe: the agent publishes only in reply to a command the tester sends after the
+`SUB` on the same connection. When the agent publishes on its own (a startup
+report), subscribe on the connection the agent publishes on, as
+`os_info_report_publisher_tests.rs` does.
 
 ### 5. Wait until the listener is subscribed
 

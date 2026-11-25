@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+use crate::services::agent_session;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MachineHeartbeatMessage {
-    // Empty object - machineId comes from topic name, timestamp generated at service side
+    pub session_id: String,
 }
 
 impl Default for MachineHeartbeatMessage {
@@ -14,6 +16,12 @@ impl Default for MachineHeartbeatMessage {
 
 impl MachineHeartbeatMessage {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            session_id: agent_session::session_id().to_string(),
+        }
     }
 }
+
+#[cfg(test)]
+#[path = "machine_heartbeat_message_tests.rs"]
+mod tests;
