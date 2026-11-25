@@ -114,6 +114,11 @@ public class PinotConfigInitializer {
             deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
             deployWithRetry(() -> deployTableConfig(realtimeTableConfig, config.getName()), "realtime table config for " + config.getName());
 
+            if (config.hasOfflineTable()) {
+                String offlineTableConfig = resolvePlaceholders(loadResource(config.getOfflineTableConfigFile()));
+                deployWithRetry(() -> deployTableConfig(offlineTableConfig, config.getName()), "offline table config for " + config.getName());
+            }
+
             deployWithRetry(() -> reloadSegments(realtimeTableConfig), "segment reload for " + config.getName());
             if (schemaChanged.get()) {
                 forceCommitConsumingSegments(realtimeTableConfig);
