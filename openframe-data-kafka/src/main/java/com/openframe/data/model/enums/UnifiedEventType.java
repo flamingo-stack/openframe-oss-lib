@@ -135,6 +135,12 @@ public enum UnifiedEventType {
     SOFTWARE_DELETED(Severity.INFO, "Software deleted"),
     SOFTWARE_INSTALLATION_CANCELED(Severity.INFO, "Software installation canceled"),
 
+    // OS update events
+    OS_UPDATE_INSTALLED(Severity.INFO, "OS update installed"),
+    OS_UPDATE_INSTALL_FAILED(Severity.ERROR, "OS update installation failed"),
+    OS_UPDATE_UNINSTALLED(Severity.INFO, "OS update uninstalled"),
+    OS_UPDATE_UNINSTALL_FAILED(Severity.ERROR, "OS update uninstallation failed"),
+
     // Disk encryption events
     DISK_ENCRYPTION_ENABLED(Severity.INFO, "Disk encryption enabled"),
     DISK_ENCRYPTION_DISABLED(Severity.INFO, "Disk encryption disabled"),

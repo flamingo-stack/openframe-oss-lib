@@ -15,9 +15,13 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
+import com.openframe.publishing.transaction.MongoTransactionRunner;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.time.Instant;
 import java.util.List;
@@ -28,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,10 +47,11 @@ class SoftwareScheduleExecutionServiceTest {
     private final SoftwareDeviceLocalScheduleService deviceLocalScheduleService = mock(SoftwareDeviceLocalScheduleService.class);
     private final MachineRepository machineRepository = mock(MachineRepository.class);
     private final SoftwareScheduleOnlineDispatchRepository onlineDispatchRepository = mock(SoftwareScheduleOnlineDispatchRepository.class);
+    private final ScheduleMutationTransaction scheduleTransaction = mock(ScheduleMutationTransaction.class);
 
     private final SoftwareScheduleExecutionService service = new SoftwareScheduleExecutionService(
             scheduleRepository, targetResolver, fireDispatcher, deviceLocalScheduleService,
-            machineRepository, onlineDispatchRepository);
+            machineRepository, onlineDispatchRepository, scheduleTransaction);
 
     @Test
     @DisplayName("a due repeating schedule fires to its ONLINE targets and advances nextRunAt into the future")
@@ -56,7 +62,7 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-1", "m-2"));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(machine("m-1", DeviceStatus.ONLINE), machine("m-2", DeviceStatus.ONLINE)));
 
         service.runDueSchedules();
@@ -77,7 +83,7 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-1"));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(machine("m-1", DeviceStatus.ONLINE)));
 
         service.runDueSchedules();
@@ -89,6 +95,57 @@ class SoftwareScheduleExecutionServiceTest {
     }
 
     @Test
+    void runDue_deletedTargetsNeitherDispatchNorArmReconnect() {
+        // setup
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).nextRunAt(Instant.now().minusSeconds(30))
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
+                .build();
+        due(schedule);
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
+        Machine online = machine("m-online", DeviceStatus.DELETED);
+        online.setTelemetryStatus(TelemetryStatus.ONLINE);
+        Machine offline = machine("m-offline", DeviceStatus.DELETED);
+        offline.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(online, offline));
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        verify(fireDispatcher, never()).dispatch(any(), any(), any());
+        verify(onlineDispatchRepository, never()).insert(any(SoftwareScheduleOnlineDispatch.class));
+    }
+
+    @Test
+    void runDue_refreshesAssignmentsAfterReadingManagedDevices() {
+        // setup
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).nextRunAt(Instant.now().minusSeconds(30)).build();
+        due(schedule);
+        when(targetResolver.resolveMachineIds(schedule))
+                .thenReturn(List.of("retained-first", "reenrolled", "retained-last"),
+                        List.of("retained-last", "retained-first", "new-assignment"));
+        Machine reenrolled = machine("reenrolled", DeviceStatus.ONLINE);
+        reenrolled.setStatus(DeviceStatus.MANAGED);
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(
+                machine("retained-first", DeviceStatus.ONLINE), reenrolled,
+                machine("retained-last", DeviceStatus.ONLINE)));
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("retained-first", "retained-last")), any());
+        InOrder readsAndDispatch = inOrder(targetResolver, machineRepository, fireDispatcher);
+        readsAndDispatch.verify(targetResolver).resolveMachineIds(schedule);
+        readsAndDispatch.verify(machineRepository).findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any());
+        readsAndDispatch.verify(targetResolver).resolveMachineIds(schedule);
+        readsAndDispatch.verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("retained-first", "retained-last")), any());
+    }
+
+    @Test
     @DisplayName("RETRY_ON_RECONNECT: an offline target is not dispatched but armed for reconnect with an expiry")
     void runDue_offlineRetry_armsSentinel() {
         SoftwareSchedule schedule = SoftwareSchedule.builder()
@@ -96,22 +153,135 @@ class SoftwareScheduleExecutionServiceTest {
                 .repeat(null).nextRunAt(Instant.now().minusSeconds(30))
                 .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
                 .build();
-        due(schedule);
-        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-off"));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-off", DeviceStatus.OFFLINE)));
-        when(onlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(eq(TENANT), anyString(), eq("ss-1")))
-                .thenReturn(Optional.empty());
+        dueOfflineTarget(schedule);
+        when(machineRepository.reserveForSoftwareReconnect(TENANT, "m-off", null, DeviceStatus.CONNECTED))
+                .thenReturn(1L);
 
         service.runDueSchedules();
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any());
         ArgumentCaptor<SoftwareScheduleOnlineDispatch> sentinel = ArgumentCaptor.forClass(SoftwareScheduleOnlineDispatch.class);
-        verify(onlineDispatchRepository).save(sentinel.capture());
+        verify(onlineDispatchRepository).insert(sentinel.capture());
         assertThat(sentinel.getValue().getMachineId()).isEqualTo("m-off");
         assertThat(sentinel.getValue().getScheduleId()).isEqualTo("ss-1");
         assertThat(sentinel.getValue().getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
         assertThat(sentinel.getValue().getExpiresAt()).isNotNull();
+    }
+
+    @Test
+    void runDue_armsReconnectAfterAnOfflineTargetIsRenamed() {
+        // setup
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE)
+                .nextRunAt(Instant.now().minusSeconds(30))
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
+                .build();
+        dueOfflineTarget(schedule);
+        Machine renamed = machine("m-off", DeviceStatus.OFFLINE);
+        renamed.setVersion(2L);
+        Machine changedAgain = machine("m-off", DeviceStatus.OFFLINE);
+        changedAgain.setVersion(3L);
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineId(TENANT, "m-off"))
+                .thenReturn(Optional.of(renamed), Optional.of(changedAgain));
+        when(targetResolver.isCurrentTarget(schedule, renamed)).thenReturn(true);
+        when(targetResolver.isCurrentTarget(schedule, changedAgain)).thenReturn(true);
+        when(machineRepository.reserveForSoftwareReconnect(TENANT, "m-off", 2L, DeviceStatus.CONNECTED))
+                .thenThrow(new OptimisticLockingFailureException("device changed while arming reconnect"));
+        when(machineRepository.reserveForSoftwareReconnect(TENANT, "m-off", 3L, DeviceStatus.CONNECTED)).thenReturn(1L);
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        ArgumentCaptor<SoftwareScheduleOnlineDispatch> pending = ArgumentCaptor.forClass(SoftwareScheduleOnlineDispatch.class);
+        verify(onlineDispatchRepository).insert(pending.capture());
+        assertThat(pending.getValue().getMachineId()).isEqualTo("m-off");
+        assertThat(pending.getValue().getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
+    }
+
+    @Test
+    void runDue_retriesOneShotAfterRepeatedReconnectWriteConflicts() {
+        // setup
+        Instant scheduledFor = Instant.now().minusSeconds(7200);
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE).nextRunAt(scheduledFor)
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
+                .build();
+        dueOfflineTarget(schedule);
+        Machine offline = machine("m-off", DeviceStatus.OFFLINE);
+        Machine online = machine("m-on", DeviceStatus.ONLINE);
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-on", "m-off"));
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(online, offline));
+        when(machineRepository.reserveForSoftwareReconnect(TENANT, "m-off", null, DeviceStatus.CONNECTED))
+                .thenThrow(new OptimisticLockingFailureException("first write conflict"))
+                .thenThrow(new OptimisticLockingFailureException("second write conflict"))
+                .thenReturn(1L);
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        assertThat(schedule.getNextRunAt()).isEqualTo(scheduledFor);
+        assertThat(schedule.getLastRunAt()).isNull();
+        verify(scheduleRepository, never()).save(any());
+        verify(fireDispatcher, never()).dispatch(any(), any(), any());
+        verify(onlineDispatchRepository, never()).insert(any(SoftwareScheduleOnlineDispatch.class));
+
+        service.runDueSchedules();
+
+        ArgumentCaptor<SoftwareScheduleOnlineDispatch> pending = ArgumentCaptor.forClass(SoftwareScheduleOnlineDispatch.class);
+        verify(onlineDispatchRepository).insert(pending.capture());
+        assertThat(pending.getValue().getScheduledFor()).isEqualTo(scheduledFor);
+        assertThat(pending.getValue().getExpiresAt()).isEqualTo(pending.getValue().getFirstSeenAt().plusSeconds(3600L));
+        verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("m-on")), any());
+        verify(scheduleRepository).save(schedule);
+        assertThat(schedule.getNextRunAt()).isNull();
+    }
+
+    @Test
+    void runDue_skipsDirectDispatchForDevicesAlreadyHandledByReconnect() {
+        // setup
+        Instant scheduledFor = Instant.now().minusSeconds(30);
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE).nextRunAt(scheduledFor)
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
+                .build();
+        due(schedule);
+        List<String> candidates = List.of("m-on", "m-reconnected");
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(candidates);
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-on", DeviceStatus.ONLINE), machine("m-reconnected", DeviceStatus.ONLINE)));
+        SoftwareScheduleOnlineDispatch dispatchedOnReconnect = SoftwareScheduleOnlineDispatch.builder()
+                .tenantId(TENANT).scheduleId(schedule.getId()).machineId("m-reconnected")
+                .scheduledFor(scheduledFor).status(DeviceOnlineDispatchStatus.DISPATCHED).build();
+        when(onlineDispatchRepository.findByTenantIdAndMachineIdInAndScheduleIdAndScheduledFor(
+                TENANT, candidates, schedule.getId(), scheduledFor)).thenReturn(List.of(dispatchedOnReconnect));
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        verify(fireDispatcher).dispatch(eq(schedule), eq(List.of("m-on")), any());
+        assertThat(schedule.getNextRunAt()).isNull();
+    }
+
+    @Test
+    void runDue_doesNotArmFromStaleMachineSnapshot() {
+        // setup
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE)
+                .nextRunAt(Instant.now().minusSeconds(30))
+                .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
+                .build();
+        dueOfflineTarget(schedule);
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        verify(machineRepository).reserveForSoftwareReconnect(TENANT, "m-off", null, DeviceStatus.CONNECTED);
+        verify(onlineDispatchRepository, never()).insert(any(SoftwareScheduleOnlineDispatch.class));
     }
 
     @Test
@@ -124,13 +294,13 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-off"));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(machine("m-off", DeviceStatus.OFFLINE)));
 
         service.runDueSchedules();
 
         verify(fireDispatcher, never()).dispatch(any(), any(), any());
-        verify(onlineDispatchRepository, never()).save(any());
+        verify(onlineDispatchRepository, never()).insert(any(SoftwareScheduleOnlineDispatch.class));
     }
 
     @Test
@@ -146,14 +316,14 @@ class SoftwareScheduleExecutionServiceTest {
         Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
         staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-stale"));
-        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
 
         // execution
         service.runDueSchedules();
 
         // verifications
         verify(fireDispatcher, never()).dispatch(any(), any(), any());
-        verify(onlineDispatchRepository, never()).save(any());
+        verify(onlineDispatchRepository, never()).insert(any(SoftwareScheduleOnlineDispatch.class));
     }
 
     @Test
@@ -171,6 +341,22 @@ class SoftwareScheduleExecutionServiceTest {
     private void due(SoftwareSchedule schedule) {
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of(schedule));
+    }
+
+    private void dueOfflineTarget(SoftwareSchedule schedule) {
+        due(schedule);
+        Machine machine = machine("m-off", DeviceStatus.OFFLINE);
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of(machine.getMachineId()));
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(machine));
+        when(scheduleRepository.findOnPrimaryByTenantIdAndIdAndStatus(TENANT, schedule.getId(), ScriptStatus.ACTIVE))
+                .thenReturn(Optional.of(schedule));
+        when(machineRepository.findOnPrimaryByTenantIdAndMachineId(TENANT, machine.getMachineId()))
+                .thenReturn(Optional.of(machine));
+        when(targetResolver.isCurrentTarget(schedule, machine)).thenReturn(true);
+        when(scheduleTransaction.run(any())).thenAnswer(invocation -> {
+            MongoTransactionRunner.Transaction<Boolean> mutation = invocation.getArgument(0);
+            return mutation.execute();
+        });
     }
 
     private static Machine machine(String machineId, DeviceStatus status) {
