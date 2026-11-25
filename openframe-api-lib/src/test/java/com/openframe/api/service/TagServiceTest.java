@@ -1,39 +1,74 @@
 package com.openframe.api.service;
 
+import org.mockito.Answers;
+import com.openframe.audit.AuditAspect;
+import com.openframe.audit.AuditExpressions;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemRepository;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.device.MachineTag;
+import com.openframe.api.service.TagService.DeletedTag;
+import com.openframe.audit.AuditCall;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.core.exception.ConflictException;
+import com.openframe.data.document.audit.AuditTargetType;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
+import static com.openframe.data.document.audit.AuditAction.KB_ITEM_TAG_REMOVE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_TAG_REMOVE;
+import static com.openframe.data.document.audit.AuditAction.TAG_DELETE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_TAG_REMOVE;
+import static com.openframe.data.document.audit.AuditOutcome.SUCCESS;
+import static com.openframe.data.document.knowledgebase.KnowledgeBaseItemType.FOLDER;
 import static com.openframe.data.document.tag.TagEntityType.DEVICE;
 import static com.openframe.data.document.tag.TagEntityType.KNOWLEDGE_ARTICLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class TagServiceTest {
 
+    private static final Map<String, Object> REMOVED_TAG_DETAILS =
+            Map.of("tagIds", List.of("tag-9"), "tagKeys", List.of("urgent"));
+
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
+    @Mock private AuditRecorder auditRecorder;
+    @Mock private KnowledgeBaseItemRepository knowledgeBaseItemRepository;
+    @Captor private ArgumentCaptor<AuditCall> callCaptor;
+    @Captor private ArgumentCaptor<List<AuditEntry>> removalsCaptor;
 
     private TagService tagService;
 
@@ -45,7 +80,8 @@ class TagServiceTest {
 
     @BeforeEach
     void setUp() {
-        tagService = new TagService(tagRepository, tagAssignmentRepository);
+        tagService = new TagService(tagRepository, tagAssignmentRepository, auditedMethodRunner, auditRecorder,
+                knowledgeBaseItemRepository);
     }
 
     @Test
@@ -56,6 +92,7 @@ class TagServiceTest {
 
         assertThat(result).isSameAs(newTag);
         verify(tagRepository, never()).save(any());
+        verifyNoInteractions(auditedMethodRunner);
     }
 
     @Test
@@ -118,6 +155,144 @@ class TagServiceTest {
 
         assertThat(result.getKey()).isEqualTo("NEWTAG");
         verify(tagRepository).save(newTag);
+    }
+
+    @Test
+    void createTag_caseVariantExists_refusalNamedByTheAskedKey() {
+        when(tagRepository.findByKeyAndEntityType("Printers", KNOWLEDGE_ARTICLE)).thenReturn(null);
+        when(tagRepository.existsByKeyIgnoreCaseAndEntityType("Printers", KNOWLEDGE_ARTICLE)).thenReturn(true);
+
+        assertThatThrownBy(() -> tagService.createTag("Printers", KNOWLEDGE_ARTICLE, "Office printers", "#FF8800"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Tag with key 'Printers' already exists");
+
+        assertThat(capturedCall().targetNameOf().apply(null)).isEqualTo("Printers");
+    }
+
+    @Test
+    void updateTag_keyTakenByAnotherTag_refusalKeepsTheEntityTypeAndTheAskedValues() {
+        when(tagRepository.findById("tag-1")).thenReturn(Optional.of(newTag));
+        when(tagRepository.existsByKeyIgnoreCaseAndEntityTypeAndIdNot("Printers", KNOWLEDGE_ARTICLE, "tag-1"))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> tagService.updateTag("tag-1", "Printers", "Office printers", "#FF8800"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Tag with key 'Printers' already exists");
+
+        assertThat(capturedCall().detailsFromResult().apply(null)).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "entityType", KNOWLEDGE_ARTICLE, "key", "Printers", "description", "Office printers",
+                "color", "#FF8800"));
+    }
+
+    @Test
+    void updateTag_saved_detailsHoldOnlyTheEntityType() {
+        when(tagRepository.findById("tag-1")).thenReturn(Optional.of(newTag));
+        when(tagRepository.save(newTag)).thenReturn(newTag);
+
+        Tag updated = tagService.updateTag("tag-1", null, "Office printers", "#FF8800");
+
+        assertThat(capturedCall().detailsFromResult().apply(updated))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("entityType", KNOWLEDGE_ARTICLE));
+    }
+
+    @Test
+    void deleteTag_ticketHeldTheTagTwice_oneRemovalEventPerTicket() {
+        givenTagOn(TagEntityType.TICKET, "ticket-1", "ticket-1", "ticket-2");
+
+        tagService.deleteTag("tag-9");
+
+        assertThat(recordedRemovals())
+                .extracting(AuditEntry::getAction, AuditEntry::getOutcome, AuditEntry::getTargetType,
+                        AuditEntry::getTargetId, AuditEntry::getDetails)
+                .containsExactly(
+                        tuple(TICKET_TAG_REMOVE, SUCCESS, AuditTargetType.TICKET, "ticket-1", REMOVED_TAG_DETAILS),
+                        tuple(TICKET_TAG_REMOVE, SUCCESS, AuditTargetType.TICKET, "ticket-2", REMOVED_TAG_DETAILS));
+    }
+
+    @Test
+    void deleteTag_ticketHeldTheTagTwice_countsEachTicketOnce() {
+        givenTagOn(TagEntityType.TICKET, "ticket-1", "ticket-1", "ticket-2");
+
+        DeletedTag deleted = tagService.deleteTag("tag-9");
+
+        assertThat(deleted).isEqualTo(new DeletedTag(TagEntityType.TICKET, 2));
+    }
+
+    @Test
+    void deleteTag_deleted_storesTheEntityTypeAndTheRemovedCount() {
+        assertThat(deleteCall().detailsFromResult().apply(new DeletedTag(TagEntityType.TICKET, 2)))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        "entityType", TagEntityType.TICKET, "removedAssignments", 2));
+    }
+
+    @Test
+    void deleteTag_refused_storesNoDetails() {
+        AuditCall deleteCall = deleteCall();
+
+        assertThat(deleteCall.action()).isEqualTo(TAG_DELETE);
+        assertThat(deleteCall.targetIdBeforeCall().get()).isEqualTo("tag-9");
+        assertThat(deleteCall.detailsFromResult().apply(null)).isEmpty();
+    }
+
+    @Test
+    void deleteTag_scriptTag_scriptRemovalEvents() {
+        givenTagOn(TagEntityType.SCRIPT, "script-1");
+
+        tagService.deleteTag("tag-9");
+
+        assertThat(recordedRemovals())
+                .extracting(AuditEntry::getAction, AuditEntry::getTargetType, AuditEntry::getTargetId)
+                .containsExactly(tuple(SCRIPT_TAG_REMOVE, AuditTargetType.SCRIPT, "script-1"));
+    }
+
+    @Test
+    void deleteTag_knowledgeBaseItemGone_removalEventOnlyForTheRemainingItem() {
+        givenTagOn(KNOWLEDGE_ARTICLE, "folder-1", "folder-gone");
+        KnowledgeBaseItem folder = KnowledgeBaseItem.builder().id("folder-1").type(FOLDER).build();
+        when(knowledgeBaseItemRepository.findAllById(List.of("folder-1", "folder-gone"))).thenReturn(List.of(folder));
+
+        tagService.deleteTag("tag-9");
+
+        assertThat(recordedRemovals())
+                .extracting(AuditEntry::getAction, AuditEntry::getTargetType, AuditEntry::getTargetId)
+                .containsExactly(tuple(KB_ITEM_TAG_REMOVE, AuditTargetType.KB_FOLDER, "folder-1"));
+    }
+
+    @Test
+    void deleteTag_deviceTag_noChildEvents() {
+        givenTagOn(DEVICE, "m-1");
+
+        tagService.deleteTag("tag-9");
+
+        verify(auditRecorder).recordAll(List.of());
+    }
+
+    private AuditCall capturedCall() {
+        verify(auditedMethodRunner).run(callCaptor.capture(), any());
+        return callCaptor.getValue();
+    }
+
+    private AuditCall deleteCall() {
+        AuditedMethodRunner annotationRunner = mock(AuditedMethodRunner.class);
+        AspectJProxyFactory proxyFactory = new AspectJProxyFactory(tagService);
+        proxyFactory.addAspect(new AuditAspect(annotationRunner, new AuditExpressions(new RelayIdCodec())));
+        TagService audited = proxyFactory.getProxy();
+        audited.deleteTag("tag-9");
+        verify(annotationRunner).run(callCaptor.capture(), any());
+        return callCaptor.getValue();
+    }
+
+    private void givenTagOn(TagEntityType entityType, String... entityIds) {
+        Tag tag = Tag.builder().id("tag-9").key("urgent").entityType(entityType).build();
+        when(tagRepository.findById("tag-9")).thenReturn(Optional.of(tag));
+        when(tagAssignmentRepository.findByTagId("tag-9")).thenReturn(Stream.of(entityIds)
+                .map(entityId -> TagAssignment.builder().entityId(entityId).build())
+                .toList());
+    }
+
+    private List<AuditEntry> recordedRemovals() {
+        verify(auditRecorder).recordAll(removalsCaptor.capture());
+        return removalsCaptor.getValue();
     }
 
     private static final Instant TAG_CREATED_AT = Instant.parse("2026-01-10T08:00:00Z");

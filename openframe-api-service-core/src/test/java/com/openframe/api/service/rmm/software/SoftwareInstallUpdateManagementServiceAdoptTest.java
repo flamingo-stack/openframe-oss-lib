@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.AdoptSoftwareInput;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -25,6 +26,7 @@ import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -72,6 +74,7 @@ class SoftwareInstallUpdateManagementServiceAdoptTest {
     @Mock private PackageUpdateDispatchService packageUpdateDispatchService;
     @Mock private SoftwareActionResultRepository softwareActionResultRepository;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) private AuditedMethodRunner auditedMethodRunner;
 
     @Captor private ArgumentCaptor<RunningExecutionRows> rowsCaptor;
     @Captor private ArgumentCaptor<SoftwareActionResult> actionResultCaptor;

@@ -21,7 +21,7 @@ public class AgentRegistrationSecretValidator {
     private final AgentRegistrationSecretRepository secretRepository;
     private final EncryptionService encryptionService;
 
-    public void validate(String initialKey) {
+    public String validate(String initialKey) {
         if (isBlank(initialKey)) {
             throw new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_EMPTY, "Initial key is empty");
         }
@@ -36,6 +36,7 @@ public class AgentRegistrationSecretValidator {
         if (!matches) {
             throw new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key");
         }
+        return secret.getId();
     }
 
 }

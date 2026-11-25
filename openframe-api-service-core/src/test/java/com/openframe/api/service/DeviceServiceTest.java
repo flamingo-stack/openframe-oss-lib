@@ -11,6 +11,7 @@ import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
@@ -70,6 +71,7 @@ class DeviceServiceTest {
 
     @Mock private MachineRepository machineRepository;
     @Mock private DeletedMachineCleanup deletedMachineCleanup;
+    @Mock private AuditRecorder auditRecorder;
     @Mock private DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     @Mock private MachineWriter machineWriter;
     @Mock private TagRepository tagRepository;
@@ -84,7 +86,8 @@ class DeviceServiceTest {
     @Captor private ArgumentCaptor<MachineQueryFilter> machineQueryFilterCaptor;
 
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, deviceSoftwareConnectivitySync,
+        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, auditRecorder,
+                deviceSoftwareConnectivitySync,
                 machineWriter, tagRepository, tagAssignmentRepository,
                 deviceStatusProcessor, deviceFilterOptionMapper, tenantIdProvider,
                 eventPublisher);

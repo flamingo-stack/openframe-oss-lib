@@ -8,6 +8,8 @@ import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
@@ -39,10 +41,13 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_ADOPT;
 
 @Slf4j
 @Service
@@ -63,6 +68,7 @@ public class SoftwareInstallUpdateManagementService {
     private final PackageAdoptReach packageAdoptReach;
     private final SoftwareInventoryService softwareInventoryService;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -73,15 +79,27 @@ public class SoftwareInstallUpdateManagementService {
     }
 
     public List<String> adopt(AdoptSoftwareInput input, String initiatedBy) {
-        String softwareId = input.getSoftwareId();
+        List<String> machineIds = input.getMachineIds().stream().distinct().toList();
+        Map<String, Object> details = new HashMap<>();
+        details.put("softwareIds", List.of(input.getSoftwareId()));
+        details.put("machineIds", machineIds);
+        AuditCall auditCall = AuditCall.of(SOFTWARE_ADOPT, onlyMachineOf(machineIds), details)
+                .withCompare(false)
+                .withTargetIdFromResult(targets -> onlyMachineOf((List<?>) targets));
+        return auditedMethodRunner.run(auditCall,
+                () -> sendAdoptOrder(input.getSoftwareId(), machineIds, initiatedBy, details));
+    }
+
+    private List<String> sendAdoptOrder(String softwareId, List<String> machineIds, String initiatedBy,
+                                        Map<String, Object> auditDetails) {
         SoftwareResponse software = softwareInventoryService.getAdoptableSoftware(softwareId);
         SoftwareBundlePackage adoptionPackage = software.getAdoptionPackage();
         PackageManagerType packageManager = adoptionPackage.getPackageManager();
         String packageName = adoptionPackage.getPackageName();
+        auditDetails.put("packages", List.of(packageName));
         if (packageManager == PackageManagerType.WINGET) {
             throw new BadRequestException("A program is not adopted into WINGET: winget updates it as it is installed");
         }
-        List<String> machineIds = input.getMachineIds().stream().distinct().toList();
         List<String> adoptable = adoptableMachines(softwareId, adoptionPackage, machineIds);
         if (adoptable.isEmpty()) {
             throw new BadRequestException("None of the given devices can adopt " + packageName + " with " + packageManager);
@@ -109,6 +127,8 @@ public class SoftwareInstallUpdateManagementService {
                 .packageName(packageName)
                 .softwareAction(SoftwareAction.ADOPT)
                 .build(), brewPackageType, softwareId, software.getBundleIdentifier());
+        auditDetails.put("machineIds", targets);
+        auditDetails.put("executionIds", List.of(executionId));
         SoftwarePackageInput pkg = new SoftwarePackageInput();
         pkg.setPackageManager(packageManager);
         pkg.setPackageName(packageName);
@@ -117,6 +137,10 @@ public class SoftwareInstallUpdateManagementService {
         log.info("Software adopt order sent: requestId={} executionId={} softwareId={} package={}/{} machines={}/{}",
                 requestId, executionId, softwareId, packageManager, packageName, targets.size(), machineIds.size());
         return targets;
+    }
+
+    private static String onlyMachineOf(List<?> targets) {
+        return targets.size() == 1 ? (String) targets.getFirst() : null;
     }
 
     private List<String> adoptableMachines(String softwareId, SoftwareBundlePackage adoptionPackage,

@@ -18,7 +18,7 @@ import static com.openframe.data.document.audit.AuditActorType.STAFF;
 import static com.openframe.data.document.audit.AuditActorType.SYSTEM;
 import static com.openframe.data.document.audit.AuditActorType.USER;
 
-public record AuditActor(AuditActorType type, String id, String name, String email, List<String> roles,
+public record AuditActor(AuditActorType type, String id, @With String name, @With String email, List<String> roles,
                          String tokenTenantId, String onBehalfOfId, @With AuditActor approver) {
 
     public static AuditActor system() {

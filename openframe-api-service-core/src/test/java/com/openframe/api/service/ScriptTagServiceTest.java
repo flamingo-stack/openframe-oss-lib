@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.service.rmm.script.ScriptTagService;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -40,7 +42,8 @@ class ScriptTagServiceTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        service = new ScriptTagService(tagRepository, tagAssignmentRepository, scriptRepository);
+        service = new ScriptTagService(tagRepository, tagAssignmentRepository, scriptRepository,
+                mock(AuditRecorder.class));
     }
 
     @Test

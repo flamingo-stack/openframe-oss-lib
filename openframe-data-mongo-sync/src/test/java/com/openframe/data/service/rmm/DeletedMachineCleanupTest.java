@@ -1,8 +1,15 @@
 package com.openframe.data.service.rmm;
 
+import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
+import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import org.junit.jupiter.api.DisplayName;
@@ -13,8 +20,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_DEVICES_REMOVE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -23,6 +34,7 @@ import static org.mockito.Mockito.when;
 class DeletedMachineCleanupTest {
 
     @Mock private ScriptScheduleMachineAssignedRepository assignedRepository;
+    @Mock private ScriptScheduleRepository scheduleRepository;
     @Mock private DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjectionTrigger projectionTrigger;
@@ -73,5 +85,42 @@ class DeletedMachineCleanupTest {
 
         verify(deviceSoftwareRepository).findByTenantIdAndMachineId("t-1", "m-1");
         verifyNoInteractions(projectionTrigger);
+    }
+
+    @Test
+    void cleanUpDeletedMachine_deviceOnAScheduleThatListsDevices_reportsItsRemovalFromThatSchedule() {
+        deviceIsOn(schedule(ScriptStatus.ARCHIVED, ScheduleDeviceSelectionMode.SPECIFIC));
+
+        List<AuditEntry> removals = cleanup.cleanUpDeletedMachine("t-1", "m-1");
+
+        assertThat(removals)
+                .extracting(AuditEntry::getAction, AuditEntry::getOutcome, AuditEntry::getTargetId,
+                        AuditEntry::getDetails)
+                .containsExactly(tuple(SCRIPT_SCHEDULE_DEVICES_REMOVE, AuditOutcome.SUCCESS, "sch-1",
+                        Map.of("machineIds", List.of("m-1"))));
+    }
+
+    @Test
+    void cleanUpDeletedMachine_deviceOnADeletedSchedule_reportsNoRemoval() {
+        deviceIsOn(schedule(ScriptStatus.DELETED, ScheduleDeviceSelectionMode.SPECIFIC));
+
+        assertThat(cleanup.cleanUpDeletedMachine("t-1", "m-1")).isEmpty();
+    }
+
+    @Test
+    void cleanUpDeletedMachine_scheduleSelectsDevicesByCriteria_reportsNoRemoval() {
+        deviceIsOn(schedule(ScriptStatus.ACTIVE, ScheduleDeviceSelectionMode.CRITERIA));
+
+        assertThat(cleanup.cleanUpDeletedMachine("t-1", "m-1")).isEmpty();
+    }
+
+    private void deviceIsOn(ScheduleScript schedule) {
+        when(assignedRepository.findByTenantIdAndMachineId("t-1", "m-1")).thenReturn(List.of(
+                ScheduleScriptMachineAssigned.builder().scriptScheduleId("sch-1").machineId("m-1").build()));
+        when(scheduleRepository.findByTenantIdAndIdIn("t-1", List.of("sch-1"))).thenReturn(List.of(schedule));
+    }
+
+    private static ScheduleScript schedule(ScriptStatus status, ScheduleDeviceSelectionMode selectionMode) {
+        return ScheduleScript.builder().id("sch-1").status(status).selectionMode(selectionMode).build();
     }
 }

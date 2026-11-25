@@ -119,9 +119,9 @@ public class ForceToolInstallationService {
         try {
             IntegratedToolAgent toolAgent = integratedToolAgentService.findByKey(toolAgentId)
                     .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
-            toolInstallationService.process(machineId, toolAgent, reinstall);
-
-            return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.PROCESSED);
+            boolean sent = toolInstallationService.process(machineId, toolAgent, reinstall);
+            ForceAgentStatus status = sent ? ForceAgentStatus.PROCESSED : ForceAgentStatus.FAILED;
+            return buildResponseItem(machineId, toolAgentId, status);
         } catch (Exception e) {
             log.error("Failed to process force tool {} installation message for machine {}", toolAgentId, machineId, e);
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.FAILED);

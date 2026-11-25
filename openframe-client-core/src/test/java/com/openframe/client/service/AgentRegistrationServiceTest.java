@@ -1,5 +1,12 @@
 package com.openframe.client.service;
 
+import java.util.Map;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.dto.agent.AgentRegistrationTagInput;
@@ -34,10 +41,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.function.Supplier;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_REGISTER;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_REGISTER_FAIL;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_ORGANIZATION_CHANGE;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_AUTH_FAIL;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
@@ -109,6 +125,15 @@ class AgentRegistrationServiceTest {
     private static final String CLIENT_SECRET = "01234567890123456789012345678912";
     private static final String ORGANIZATION_ID = "custom-uuid";
 
+    private final AuditRecorder auditRecorder = mock(AuditRecorder.class, CALLS_REAL_METHODS);
+    private final AuditedMethodRunner auditedMethodRunner = mock(AuditedMethodRunner.class, CALLS_REAL_METHODS);
+
+    @Captor
+    private ArgumentCaptor<Map<String, Object>> detailsCaptor;
+
+    @Captor
+    private ArgumentCaptor<AuditCall> callCaptor;
+
     @BeforeEach
     void setUp() {
         agentRegistrationService = new AgentRegistrationService(
@@ -128,6 +153,7 @@ class AgentRegistrationServiceTest {
                 toolConnectionService,
                 agentRegistrationClientFeatureFlagsService,
                 agentRegistrationClientUpdateService,
+                auditedMethodRunner, auditRecorder,
                 deletedMachineCleanup
         );
         request = createTestRequest();
@@ -262,7 +288,7 @@ class AgentRegistrationServiceTest {
         // initial key is validated before the client secret
         InOrder inOrder = inOrder(agentRegistrationSecretValidator, clientSecretValidator);
         inOrder.verify(agentRegistrationSecretValidator).validate(INITIAL_KEY);
-        inOrder.verify(clientSecretValidator).validate(existingClient, CLIENT_SECRET);
+        inOrder.verify(clientSecretValidator).validate(existingClient, CLIENT_SECRET, "reinstall");
 
         // existing machine row is overwritten with request data (same id), field by field, not recreated or saved whole
         verify(machineRepository, never()).save(any());
@@ -283,7 +309,7 @@ class AgentRegistrationServiceTest {
 
         // setup is re-run
         verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), any());
-        verify(agentRegistrationToolInstallationService).process(MACHINE_ID);
+        verify(agentRegistrationToolInstallationService).process(eq(MACHINE_ID), any());
         verify(agentRegistrationProcessor).postProcessAgentRegistration(machineCaptor.capture(), eq(request));
         assertEquals("new-org", machineCaptor.getValue().getOrganizationId());
         verify(installedAgentService).addInstalledAgent(MACHINE_ID, "openframe-client", "1.0.0", false);
@@ -310,6 +336,11 @@ class AgentRegistrationServiceTest {
         Machine savedMachine = writtenOver(existingMachine);
         assertEquals("new-org", savedMachine.getOrganizationId());
         assertNotNull(savedMachine.getOrganizationAssignedAt());
+        assertThat(recorded())
+                .extracting(AuditEntry::getAction, AuditEntry::getTargetId, AuditEntry::getOrganizationId,
+                        AuditEntry::getChanges)
+                .containsExactly(DEVICE_ORGANIZATION_CHANGE, MACHINE_ID, "new-org",
+                        Map.of("organizationId", new AuditChange("old-org", "new-org")));
     }
 
     @Test
@@ -329,6 +360,7 @@ class AgentRegistrationServiceTest {
 
         Machine savedMachine = writtenOver(existingMachine);
         assertEquals(assignedAt, savedMachine.getOrganizationAssignedAt());
+        verify(auditRecorder, never()).record(any());
     }
 
     @Test
@@ -342,11 +374,17 @@ class AgentRegistrationServiceTest {
         );
 
         verify(oauthClientRepository, never()).findByMachineId(any());
-        verify(clientSecretValidator, never()).validate(any(), any());
+        verify(clientSecretValidator, never()).validate(any(), any(), any());
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(machineWriter);
         verify(oauthClientRepository, never()).save(any());
+        assertThat(refused())
+                .extracting(AuditEntry::getAction, AuditEntry::getOutcome, AuditEntry::getReason,
+                        AuditEntry::getTargetId, AuditEntry::getDetails)
+                .containsExactly(DEVICE_REGISTER_FAIL, AuditOutcome.REFUSED, "Invalid initial key", MACHINE_ID,
+                        Map.of("request", "reinstall", "claimedHostname", "test-hostname",
+                                "claimedOrganizationId", "org-1"));
     }
 
     @Test
@@ -361,10 +399,13 @@ class AgentRegistrationServiceTest {
         assertEquals(ErrorCode.CLIENT_SECRET_INVALID, ex.getErrorCode());
         assertEquals("Invalid client secret", ex.getMessage());
 
-        verify(clientSecretValidator, never()).validate(any(), any());
+        verify(clientSecretValidator, never()).validate(any(), any(), any());
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(machineWriter);
+        assertThat(refused())
+                .extracting(AuditEntry::getAction, AuditEntry::getOutcome, AuditEntry::getReason, AuditEntry::getTargetId)
+                .containsExactly(DEVICE_AUTH_FAIL, AuditOutcome.REFUSED, "Unknown machine", MACHINE_ID);
     }
 
     @Test
@@ -373,7 +414,7 @@ class AgentRegistrationServiceTest {
         existingClient.setMachineId(MACHINE_ID);
         when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
         doThrow(new InvalidClientSecretException(ErrorCode.CLIENT_SECRET_INVALID, "Invalid client secret"))
-                .when(clientSecretValidator).validate(existingClient, CLIENT_SECRET);
+                .when(clientSecretValidator).validate(existingClient, CLIENT_SECRET, "reinstall");
 
         assertThrows(
                 InvalidClientSecretException.class,
@@ -699,5 +740,184 @@ class AgentRegistrationServiceTest {
         machine.setOsUuid("old-os-uuid");
         machine.setUserId("old-user");
         return machine;
+    }
+
+    @Test
+    void register_invalidInitialKey_recordsTheRefusalBeforeAnyMachineExists() {
+        doThrow(new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key"))
+                .when(agentRegistrationSecretValidator).validate(INITIAL_KEY);
+
+        assertThatThrownBy(() -> agentRegistrationService.register(INITIAL_KEY, request))
+                .isInstanceOf(AgentRegistrationSecretValidationException.class)
+                .hasMessage("Invalid initial key");
+
+        assertThat(refused())
+                .extracting(AuditEntry::getAction, AuditEntry::getTargetId)
+                .containsExactly(DEVICE_REGISTER_FAIL, null);
+    }
+
+    @Test
+    void register_invalidInitialKey_refusesOncePerClaimedHost() {
+        doThrow(new AgentRegistrationSecretValidationException(ErrorCode.INITIAL_KEY_INVALID, "Invalid initial key"))
+                .when(agentRegistrationSecretValidator).validate(INITIAL_KEY);
+
+        assertThatThrownBy(() -> agentRegistrationService.register(INITIAL_KEY, request))
+                .isInstanceOf(AgentRegistrationSecretValidationException.class)
+                .hasMessage("Invalid initial key");
+
+        verify(auditRecorder).recordOnce(any(AuditEntry.class), eq("register:org-1:test-hostname"));
+    }
+
+    @Test
+    void reinstall_unknownMachine_refusesOncePerDevice() {
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request))
+                .isInstanceOf(InvalidClientSecretException.class)
+                .hasMessage("Invalid client secret");
+
+        verify(auditRecorder).recordOnce(any(AuditEntry.class), eq("reinstall:" + MACHINE_ID));
+    }
+
+    @Test
+    void register_someTagValuesRefused_storesOnlyTheAssignedTags() {
+        stubNewRegistration();
+        List<AgentRegistrationTagInput> tags = List.of(
+                AgentRegistrationTagInput.builder().key("env").values(List.of("prod")).build(),
+                AgentRegistrationTagInput.builder().key("site").values(List.of("New York")).build());
+        request.setTags(tags);
+        when(registrationTagAssignmentService.assignTags(MACHINE_ID, tags)).thenReturn(List.of("env"));
+
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertThat(registrationDetails()).containsEntry("tags", List.of("env"));
+    }
+
+    @Test
+    void register_everyTagValueRefused_storesNoTags() {
+        stubNewRegistration();
+        List<AgentRegistrationTagInput> tags =
+                List.of(AgentRegistrationTagInput.builder().key("site").values(List.of("New York")).build());
+        request.setTags(tags);
+        when(registrationTagAssignmentService.assignTags(MACHINE_ID, tags)).thenReturn(List.of());
+
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertThat(registrationDetails()).doesNotContainKey("tags");
+    }
+
+    @Test
+    void register_withUserId_storesTheClaimedUser() {
+        stubNewRegistration();
+        request.setUserId("installer-1");
+
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertThat(registrationDetails()).containsEntry("claimedUserId", "installer-1");
+    }
+
+    @Test
+    void register_blankUserId_storesNoClaimedUser() {
+        stubNewRegistration();
+        request.setUserId(" ");
+
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertThat(registrationDetails()).doesNotContainKey("claimedUserId");
+    }
+
+    @Test
+    void register_unknownOrganization_storesTheClaimedOne() {
+        stubNewRegistration();
+        when(organizationIdResolver.resolve("org-1")).thenReturn("default-org");
+
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertThat(registrationDetails()).containsEntry("claimedOrganizationId", "org-1");
+    }
+
+    @Test
+    void register_knownOrganization_storesNoClaimedOne() {
+        stubNewRegistration();
+        when(organizationIdResolver.resolve("org-1")).thenReturn("org-1");
+
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertThat(registrationDetails()).doesNotContainKey("claimedOrganizationId");
+    }
+
+    @Test
+    void reinstall_unknownOrganization_storesTheClaimedOne() {
+        stubReinstall();
+        when(organizationIdResolver.resolve("org-1")).thenReturn("default-org");
+
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        assertThat(reinstallDetails()).containsEntry("claimedOrganizationId", "org-1");
+    }
+
+    @Test
+    void reinstall_deviceRecordUnchanged_isStillRecorded() {
+        stubReinstall();
+
+        AgentRegistrationResponse response =
+                agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        assertThat(reinstallCall().storeIfUnchanged().test(response)).isTrue();
+    }
+
+    @Test
+    void reinstall_machineGone_failsWithMachineNotFound() {
+        stubRegisteredClient();
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Machine not found for registered client: test-machine-id");
+    }
+
+    private void stubNewRegistration() {
+        when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
+        when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+    }
+
+    private void stubRegisteredClient() {
+        OAuthClient client = new OAuthClient();
+        client.setMachineId(MACHINE_ID);
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(client));
+    }
+
+    private void stubReinstall() {
+        stubRegisteredClient();
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE_ID);
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class)))
+                .thenReturn(Optional.of(new MachineWriteResult(machine, machine)));
+    }
+
+    private Map<String, Object> registrationDetails() {
+        verify(auditedMethodRunner).run(eq(DEVICE_REGISTER), eq(MACHINE_ID), detailsCaptor.capture(), any(Supplier.class));
+        return detailsCaptor.getValue();
+    }
+
+    private AuditCall reinstallCall() {
+        verify(auditedMethodRunner).run(callCaptor.capture(), any());
+        return callCaptor.getValue();
+    }
+
+    private Map<String, Object> reinstallDetails() {
+        return reinstallCall().detailsFromResult().apply(null);
+    }
+
+    private AuditEntry recorded() {
+        ArgumentCaptor<AuditEntry> entry = ArgumentCaptor.forClass(AuditEntry.class);
+        verify(auditRecorder).record(entry.capture());
+        return entry.getValue();
+    }
+
+    private AuditEntry refused() {
+        ArgumentCaptor<AuditEntry> entry = ArgumentCaptor.forClass(AuditEntry.class);
+        verify(auditRecorder).recordOnce(entry.capture(), anyString());
+        return entry.getValue();
     }
 }
