@@ -9,6 +9,7 @@ import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.bson.Document;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -33,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.openframe.client.integration.support.OsUpdateEnrichmentTestApplication.TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,11 +61,13 @@ class OsUpdateEnrichmentIT {
     private static final MongoDBContainer MONGO = new MongoDBContainer(DockerImageName.parse("mongo:7"));
     private static final Map<String, Integer> FAILING_PATHS = new ConcurrentHashMap<>();
     private static final Map<String, AtomicInteger> REQUESTS = new ConcurrentHashMap<>();
+    private static final AtomicReference<Runnable> BEFORE_KEV_ANSWER = new AtomicReference<>();
     private static HttpServer sources;
 
     @Autowired private OsUpdateEnrichmentScheduler osUpdateEnrichmentScheduler;
     @Autowired private OsUpdateRepository osUpdateRepository;
     @Autowired private MeterRegistry meterRegistry;
+    @Autowired private MongoTemplate mongoTemplate;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) throws IOException {
@@ -94,6 +99,7 @@ class OsUpdateEnrichmentIT {
         FAILING_PATHS.clear();
         REQUESTS.clear();
         meterRegistry.clear();
+        BEFORE_KEV_ANSWER.set(null);
     }
 
     @Test
@@ -154,6 +160,54 @@ class OsUpdateEnrichmentIT {
     }
 
     @Test
+    void run_entryStoredBeforeItHadAVersion_enrichedInPlace() {
+        // setup
+        mongoTemplate.getCollection("os_updates").insertOne(new Document("tenantId", TENANT_ID)
+                .append("platform", "WINDOWS")
+                .append("identifier", "legacy")
+                .append("displayName", "2026-11 Cumulative Update for Windows 11 (KB5132061)")
+                .append("kbArticleIds", List.of("5132061"))
+                .append("cveIds", List.of()));
+
+        // execution
+        osUpdateEnrichmentScheduler.run();
+
+        // verifications
+        List<OsUpdate> stored = osUpdateRepository.findAll();
+        assertThat(stored).singleElement().satisfies(osUpdate -> {
+            assertThat(osUpdate.getCvssScore()).isEqualTo(9.8);
+            assertThat(osUpdate.getVersion()).isNotNull();
+        });
+    }
+
+    @Test
+    void run_entryChangedByIngestMeanwhile_skippedAndPickedUpNextRun() {
+        // setup
+        OsUpdate november = osUpdateRepository.save(windows("nov", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061"));
+        OsUpdate october = osUpdateRepository.save(windows("oct", "2026-10 Cumulative Update for Windows 11 (KB5126868)", "5126868"));
+        BEFORE_KEV_ANSWER.set(() -> {
+            OsUpdate changedByIngest = osUpdateRepository.findById(november.getId()).orElseThrow();
+            changedByIngest.setBrowseOnly(true);
+            osUpdateRepository.save(changedByIngest);
+        });
+
+        // execution
+        osUpdateEnrichmentScheduler.run();
+
+        // verifications
+        assertThat(stored(november).getEnrichedAt()).isNull();
+        assertThat(stored(november).getBrowseOnly()).isTrue();
+        assertThat(stored(october).getEnrichedAt()).isNotNull();
+
+        // execution
+        osUpdateEnrichmentScheduler.run();
+
+        // verifications
+        assertThat(stored(november).getCvssScore()).isEqualTo(9.8);
+        assertThat(stored(november).getBrowseOnly()).isTrue();
+    }
+
+    @Test
     void run_enrichedWithinTheTtl_notAskedAgain() {
         // setup
         OsUpdate november = windows("nov", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061");
@@ -207,6 +261,10 @@ class OsUpdateEnrichmentIT {
     private static void answer(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
         REQUESTS.computeIfAbsent(path, key -> new AtomicInteger()).incrementAndGet();
+        Runnable beforeKevAnswer = BEFORE_KEV_ANSWER.getAndSet(null);
+        if (beforeKevAnswer != null && path.equals("/kev.json")) {
+            beforeKevAnswer.run();
+        }
         String fixture = switch (path) {
             case "/cvrf/2026-Nov" -> "msrc-cvrf-2026-Nov.json";
             case "/cvrf/2026-Oct" -> "msrc-cvrf-2026-Oct.json";

@@ -6,6 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.annotation.Version;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -27,10 +30,14 @@ import java.util.List;
 @CompoundIndex(
         name = "tenant_enriched_at",
         def = "{'tenantId': 1, 'enrichedAt': 1}")
-public class OsUpdate implements TenantScoped {
+public class OsUpdate implements TenantScoped, Persistable<String> {
 
     @Id
     private String id;
+
+    // WARNING: entries stored before the version existed have none; isNew() keeps them from being inserted again
+    @Version
+    private Long version;
 
     private String tenantId;
 
@@ -73,4 +80,10 @@ public class OsUpdate implements TenantScoped {
 
     // Null = never checked against the vendor's bulletin. Set also when the bulletin has no data for the update.
     private Instant enrichedAt;
+
+    @Override
+    @Transient
+    public boolean isNew() {
+        return id == null;
+    }
 }

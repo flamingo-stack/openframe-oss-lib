@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -107,13 +108,20 @@ public class OsUpdateService {
             unclaimedOsUpdate.setEnrichedAt(enrichedAt);
             osUpdateEnrichmentMetrics.recordNoData(unclaimedOsUpdate.getPlatform());
         });
-        List<OsUpdate> checkedOsUpdates = staleOsUpdates.stream()
+        staleOsUpdates.stream()
                 .filter(staleOsUpdate -> enrichedAt.equals(staleOsUpdate.getEnrichedAt()))
-                .toList();
-        if (!checkedOsUpdates.isEmpty()) {
-            osUpdateRepository.saveAll(checkedOsUpdates);
-        }
+                .forEach(this::saveEnrichedUnlessChangedMeanwhile);
         osUpdateEnrichmentMetrics.recordRun(runStarted);
+    }
+
+    // One by one: an entry a report changed meanwhile is skipped and enriched on the next run.
+    private void saveEnrichedUnlessChangedMeanwhile(OsUpdate enrichedOsUpdate) {
+        try {
+            osUpdateRepository.save(enrichedOsUpdate);
+        } catch (OptimisticLockingFailureException changedMeanwhile) {
+            log.debug("OS update {} of tenantId={} was changed meanwhile, enriched on the next run",
+                    enrichedOsUpdate.getIdentifier(), enrichedOsUpdate.getTenantId());
+        }
     }
 
     // One broken enricher must not keep the other platforms from being enriched.

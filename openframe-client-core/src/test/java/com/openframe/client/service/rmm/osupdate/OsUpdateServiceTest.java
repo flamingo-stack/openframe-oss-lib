@@ -20,6 +20,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.time.Instant;
 import java.util.List;
@@ -53,7 +54,6 @@ class OsUpdateServiceTest {
     @Mock private OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private OsUpdateEnricher windowsOsUpdateEnricher;
-    @Captor private ArgumentCaptor<List<OsUpdate>> osUpdatesCaptor;
 
     @Captor private ArgumentCaptor<OsUpdate> osUpdateCaptor;
 
@@ -297,8 +297,8 @@ class OsUpdateServiceTest {
 
         // verifications
         verify(windowsOsUpdateEnricher).enrich(eq(List.of(windows)), any());
-        verify(osUpdateRepository).saveAll(osUpdatesCaptor.capture());
-        assertThat(osUpdatesCaptor.getValue()).containsExactlyInAnyOrder(windows, mac);
+        verify(osUpdateRepository).save(windows);
+        verify(osUpdateRepository).save(mac);
         assertThat(windows.getCvssScore()).isEqualTo(9.8);
         assertThat(mac.getEnrichedAt()).isNotNull().isEqualTo(windows.getEnrichedAt());
         verify(osUpdateEnrichmentMetrics).recordNoData(OsPlatform.MACOS);
@@ -315,7 +315,7 @@ class OsUpdateServiceTest {
         service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
 
         // verifications
-        verify(osUpdateRepository, never()).saveAll(anyList());
+        verify(osUpdateRepository, never()).save(any());
         assertThat(windows.getEnrichedAt()).isNull();
     }
 
@@ -337,8 +337,8 @@ class OsUpdateServiceTest {
         service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
 
         // verifications
-        verify(osUpdateRepository).saveAll(osUpdatesCaptor.capture());
-        assertThat(osUpdatesCaptor.getValue()).containsExactly(mac);
+        verify(osUpdateRepository).save(mac);
+        verify(osUpdateRepository, never()).save(windows);
         assertThat(windows.getEnrichedAt()).isNull();
     }
 
@@ -351,8 +351,25 @@ class OsUpdateServiceTest {
         service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
 
         // verifications
-        verify(osUpdateRepository, never()).saveAll(anyList());
+        verify(osUpdateRepository, never()).save(any());
         verify(osUpdateEnrichmentMetrics).recordRun(any());
+    }
+
+    @Test
+    void enrichNotEnrichedSince_entryChangedMeanwhile_skippedOthersSaved() {
+        // setup
+        OsUpdate changed = osUpdate("kb-1", "Changed by a report");
+        changed.setPlatform(OsPlatform.MACOS);
+        OsUpdate unchanged = osUpdate("kb-2", "Unchanged");
+        unchanged.setPlatform(OsPlatform.MACOS);
+        givenStale(changed, unchanged);
+        when(osUpdateRepository.save(changed)).thenThrow(new OptimisticLockingFailureException("changed"));
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
+
+        // verifications
+        verify(osUpdateRepository).save(unchanged);
     }
 
     private void givenStale(OsUpdate... staleOsUpdates) {
