@@ -24,6 +24,9 @@ import java.util.List;
 @CompoundIndex(
         name = "tenant_first_seen",
         def = "{'tenantId': 1, 'firstSeenAt': -1, '_id': -1}")
+@CompoundIndex(
+        name = "tenant_enriched_at",
+        def = "{'tenantId': 1, 'enrichedAt': 1}")
 public class OsUpdate implements TenantScoped {
 
     @Id
@@ -61,4 +64,13 @@ public class OsUpdate implements TenantScoped {
     private Boolean browseOnly;
 
     private Instant firstSeenAt;
+
+    // Highest CVSS base score of the update's CVEs, from the vendor's security bulletin.
+    private Double cvssScore;
+
+    // A CVE of the update is known to be exploited: by the vendor's bulletin or the CISA KEV catalog.
+    private Boolean exploited;
+
+    // Null = never checked against the vendor's bulletin. Set also when the bulletin has no data for the update.
+    private Instant enrichedAt;
 }

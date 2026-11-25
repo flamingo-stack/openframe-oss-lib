@@ -1,10 +1,13 @@
 package com.openframe.client.service.rmm.osupdate;
 
 import com.openframe.client.metrics.DeviceOsReportMetrics;
+import com.openframe.client.metrics.OsUpdateEnrichmentMetrics;
+import com.openframe.client.service.rmm.osupdate.enrichment.OsUpdateEnricher;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
+import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,17 +16,23 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -40,6 +49,11 @@ class OsUpdateServiceTest {
     @Mock private OsUpdateClassifier osUpdateClassifier;
     @Mock private StoredOsUpdateRefresher storedOsUpdateRefresher;
     @Mock private DeviceOsReportMetrics deviceOsReportMetrics;
+    @Mock private ObjectProvider<OsUpdateEnricher> osUpdateEnrichers;
+    @Mock private OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
+    @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private OsUpdateEnricher windowsOsUpdateEnricher;
+    @Captor private ArgumentCaptor<List<OsUpdate>> osUpdatesCaptor;
 
     @Captor private ArgumentCaptor<OsUpdate> osUpdateCaptor;
 
@@ -257,6 +271,95 @@ class OsUpdateServiceTest {
 
         // verifications
         verifyNoInteractions(deviceOsReportMetrics);
+    }
+
+    private static final Instant ENRICHED_BEFORE = Instant.parse("2026-11-24T10:25:00Z");
+
+    @Test
+    void enrichNotEnrichedSince_windowsAndMac_windowsEnrichedMacCheckedBothSaved() {
+        // setup
+        OsUpdate windows = osUpdate("kb-1", "2026-11 Cumulative Update");
+        OsUpdate mac = osUpdate("mac-1", "macOS Tahoe 26.2");
+        mac.setPlatform(OsPlatform.MACOS);
+        givenStale(windows, mac);
+        when(windowsOsUpdateEnricher.applicableTo(any())).thenAnswer(invocation ->
+                invocation.<OsUpdate>getArgument(0).getPlatform() == OsPlatform.WINDOWS);
+        doAnswer(invocation -> {
+            invocation.<List<OsUpdate>>getArgument(0).forEach(osUpdate -> {
+                osUpdate.setCvssScore(9.8);
+                osUpdate.setEnrichedAt(invocation.getArgument(1));
+            });
+            return null;
+        }).when(windowsOsUpdateEnricher).enrich(anyList(), any());
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
+
+        // verifications
+        verify(windowsOsUpdateEnricher).enrich(eq(List.of(windows)), any());
+        verify(osUpdateRepository).saveAll(osUpdatesCaptor.capture());
+        assertThat(osUpdatesCaptor.getValue()).containsExactlyInAnyOrder(windows, mac);
+        assertThat(windows.getCvssScore()).isEqualTo(9.8);
+        assertThat(mac.getEnrichedAt()).isNotNull().isEqualTo(windows.getEnrichedAt());
+        verify(osUpdateEnrichmentMetrics).recordNoData(OsPlatform.MACOS);
+    }
+
+    @Test
+    void enrichNotEnrichedSince_sourceDown_uncheckedUpdatesNotSaved() {
+        // setup
+        OsUpdate windows = osUpdate("kb-1", "2026-11 Cumulative Update");
+        givenStale(windows);
+        when(windowsOsUpdateEnricher.applicableTo(windows)).thenReturn(true);
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
+
+        // verifications
+        verify(osUpdateRepository, never()).saveAll(anyList());
+        assertThat(windows.getEnrichedAt()).isNull();
+    }
+
+    @Test
+    void enrichNotEnrichedSince_enricherThrows_updatesLeftForTheNextRun() {
+        // setup
+        OsUpdate windows = osUpdate("kb-1", "2026-11 Cumulative Update");
+        OsUpdate mac = osUpdate("mac-1", "macOS Tahoe 26.2");
+        mac.setPlatform(OsPlatform.MACOS);
+        givenStale(windows, mac);
+        when(windowsOsUpdateEnricher.applicableTo(any())).thenAnswer(invocation ->
+                invocation.<OsUpdate>getArgument(0).getPlatform() == OsPlatform.WINDOWS);
+        doAnswer(invocation -> {
+            invocation.<List<OsUpdate>>getArgument(0).forEach(osUpdate -> osUpdate.setEnrichedAt(invocation.getArgument(1)));
+            throw new IllegalStateException("bug");
+        }).when(windowsOsUpdateEnricher).enrich(anyList(), any());
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
+
+        // verifications
+        verify(osUpdateRepository).saveAll(osUpdatesCaptor.capture());
+        assertThat(osUpdatesCaptor.getValue()).containsExactly(mac);
+        assertThat(windows.getEnrichedAt()).isNull();
+    }
+
+    @Test
+    void enrichNotEnrichedSince_nothingStale_nothingSaved() {
+        // setup
+        givenStale();
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, 500);
+
+        // verifications
+        verify(osUpdateRepository, never()).saveAll(anyList());
+        verify(osUpdateEnrichmentMetrics).recordRun(any());
+    }
+
+    private void givenStale(OsUpdate... staleOsUpdates) {
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(osUpdateRepository.findEnrichedBefore(TENANT_ID, ENRICHED_BEFORE, PageRequest.of(0, 500)))
+                .thenReturn(List.of(staleOsUpdates));
+        when(osUpdateEnrichers.orderedStream()).thenAnswer(invocation -> Stream.of(windowsOsUpdateEnricher));
     }
 
     private static OsUpdate osUpdate(String identifier, String displayName) {

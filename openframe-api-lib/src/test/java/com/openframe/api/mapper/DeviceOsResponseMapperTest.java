@@ -143,6 +143,9 @@ class DeviceOsResponseMapperTest {
                 .sizeBytes(764317696L)
                 .rebootBehavior(OsUpdateRebootBehavior.ALWAYS)
                 .browseOnly(false)
+                .cvssScore(9.8)
+                .exploited(true)
+                .enrichedAt(INSTALLED_AT)
                 .firstSeenAt(INSTALLED_AT)
                 .build();
         DeviceOsPendingUpdateResponse expected = DeviceOsPendingUpdateResponse.builder()
@@ -160,6 +163,9 @@ class DeviceOsResponseMapperTest {
                 .sizeBytes(764317696L)
                 .rebootBehavior(OsUpdateRebootBehavior.ALWAYS)
                 .browseOnly(false)
+                .cvssScore(9.8)
+                .exploited(true)
+                .enrichedAt(INSTALLED_AT)
                 .discoveredAt(RECEIVED_AT)
                 .downloaded(true)
                 .build();

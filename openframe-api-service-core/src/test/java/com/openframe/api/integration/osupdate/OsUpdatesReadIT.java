@@ -75,6 +75,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
     private static final String NEWEST_SEEN = "2026-11-20T09:14:03.120Z";
     private static final String MIDDLE_SEEN = "2026-11-19T07:02:11Z";
     private static final String OLDEST_SEEN = "2026-11-18T07:02:11Z";
+    private static final String ENRICHED_AT = "2026-11-21T08:25:00Z";
     // WARNING: history rows older than the retention are deleted by the TTL monitor where the collection has its
     // TTL index, so every install time of this class is counted from now
     private static final String LATER_INSTALL = stepsAgo(3);
@@ -87,6 +88,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 edges { cursor node {
                   id platform identifier displayName displayVersion kbArticleIds severity categories categoryIds
                   updateType classification cveIds publishedAt sizeBytes rebootBehavior browseOnly firstSeenAt
+                  cvssScore exploited enrichedAt
                   pendingDeviceCount installedDeviceCount
                 } }
                 pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
@@ -220,6 +222,9 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         expected.put("rebootBehavior", "ALWAYS");
         expected.put("browseOnly", false);
         expected.put("firstSeenAt", NEWEST_SEEN);
+        expected.put("cvssScore", 9.8);
+        expected.put("exploited", true);
+        expected.put("enrichedAt", ENRICHED_AT);
         expected.put("pendingDeviceCount", 2);
         expected.put("installedDeviceCount", 3);
 
@@ -248,6 +253,9 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .containsEntry("categoryIds", List.of())
                 .containsEntry("classification", null)
                 .containsEntry("updateType", null)
+                .containsEntry("cvssScore", null)
+                .containsEntry("exploited", null)
+                .containsEntry("enrichedAt", null)
                 .containsEntry("pendingDeviceCount", 0)
                 .containsEntry("installedDeviceCount", 0));
     }
@@ -714,7 +722,10 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("publishedAt", date("2026-11-11T18:00:00Z"))
                 .append("sizeBytes", 764317696L)
                 .append("rebootBehavior", "ALWAYS")
-                .append("browseOnly", false);
+                .append("browseOnly", false)
+                .append("cvssScore", 9.8)
+                .append("exploited", true)
+                .append("enrichedAt", date(ENRICHED_AT));
     }
 
     private static Document pendingUpdate(String machineId, String tenantId, String platform, String identifier,

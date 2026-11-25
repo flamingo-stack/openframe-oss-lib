@@ -1,14 +1,21 @@
 package com.openframe.client.service.rmm.osupdate;
 
 import com.openframe.client.metrics.DeviceOsReportMetrics;
+import com.openframe.client.metrics.OsUpdateEnrichmentMetrics;
+import com.openframe.client.service.rmm.osupdate.enrichment.OsUpdateEnricher;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
+import com.openframe.data.service.TenantIdProvider;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +31,9 @@ public class OsUpdateService {
     private final OsUpdateClassifier osUpdateClassifier;
     private final StoredOsUpdateRefresher storedOsUpdateRefresher;
     private final DeviceOsReportMetrics deviceOsReportMetrics;
+    private final ObjectProvider<OsUpdateEnricher> osUpdateEnrichers;
+    private final OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
+    private final TenantIdProvider tenantIdProvider;
 
     // An update is described by the first device that reports it. Later reports only fill in what it lacks for
     // its classification, and every report classifies it again by the current rule.
@@ -75,6 +85,51 @@ public class OsUpdateService {
         } catch (DuplicateKeyException storedMeanwhile) {
             log.debug("OS update {} of tenantId={} was stored by another report meanwhile",
                     missingOsUpdate.getIdentifier(), missingOsUpdate.getTenantId());
+        }
+    }
+
+    // Updates never enriched or enriched before the given time, at most limit of them, the oldest first. An update
+    // no enricher applies to is only marked as checked; one whose source failed stays for the next run.
+    public void enrichNotEnrichedSince(Instant enrichedBefore, int limit) {
+        Timer.Sample runStarted = osUpdateEnrichmentMetrics.startRun();
+        List<OsUpdate> staleOsUpdates = osUpdateRepository.findEnrichedBefore(
+                tenantIdProvider.getTenantId(), enrichedBefore, PageRequest.of(0, limit));
+        Instant enrichedAt = Instant.now();
+        List<OsUpdate> unclaimedOsUpdates = new ArrayList<>(staleOsUpdates);
+        osUpdateEnrichers.orderedStream().forEach(osUpdateEnricher -> {
+            List<OsUpdate> applicableOsUpdates = unclaimedOsUpdates.stream()
+                    .filter(osUpdateEnricher::applicableTo)
+                    .toList();
+            unclaimedOsUpdates.removeAll(applicableOsUpdates);
+            enrichSafely(osUpdateEnricher, applicableOsUpdates, enrichedAt);
+        });
+        unclaimedOsUpdates.forEach(unclaimedOsUpdate -> {
+            unclaimedOsUpdate.setEnrichedAt(enrichedAt);
+            osUpdateEnrichmentMetrics.recordNoData(unclaimedOsUpdate.getPlatform());
+        });
+        List<OsUpdate> checkedOsUpdates = staleOsUpdates.stream()
+                .filter(staleOsUpdate -> enrichedAt.equals(staleOsUpdate.getEnrichedAt()))
+                .toList();
+        if (!checkedOsUpdates.isEmpty()) {
+            osUpdateRepository.saveAll(checkedOsUpdates);
+        }
+        osUpdateEnrichmentMetrics.recordRun(runStarted);
+    }
+
+    // One broken enricher must not keep the other platforms from being enriched.
+    private void enrichSafely(OsUpdateEnricher osUpdateEnricher, List<OsUpdate> osUpdates, Instant enrichedAt) {
+        if (osUpdates.isEmpty()) {
+            return;
+        }
+        try {
+            osUpdateEnricher.enrich(osUpdates, enrichedAt);
+        } catch (RuntimeException failure) {
+            log.error("OS update enricher {} failed", osUpdateEnricher.getClass().getSimpleName(), failure);
+            osUpdates.forEach(osUpdate -> {
+                if (enrichedAt.equals(osUpdate.getEnrichedAt())) {
+                    osUpdate.setEnrichedAt(null);
+                }
+            });
         }
     }
 }
