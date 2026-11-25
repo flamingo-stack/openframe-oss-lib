@@ -306,11 +306,11 @@ class OsUpdateEnrichmentIT {
         List<OsVersionBuild> storedOsVersionBuilds = osVersionBuildRepository.findAll();
         assertThat(storedOsVersionBuilds)
                 .extracting(OsVersionBuild::getTenantId, OsVersionBuild::getPlatform, OsVersionBuild::getOsVersion,
-                        OsVersionBuild::getLatestBuild)
+                        OsVersionBuild::getLatestBuild, OsVersionBuild::getHotpatchBuild)
                 .containsExactlyInAnyOrder(
-                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "26100.9974"),
-                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 25H2", "26200.9974"),
-                        tuple(TENANT_ID, OsPlatform.WINDOWS, "10 1607", "14393.9612"));
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "26100.9974", "26100.9911"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 25H2", "26200.9974", "26200.9911"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "10 1607", "14393.9612", null));
         assertThat(storedOsVersionBuilds).allSatisfy(osVersionBuild -> {
             assertThat(osVersionBuild.getUpdatedAt()).isNotNull();
             assertThat(osVersionBuild.getVersion()).isNotNull();
@@ -343,11 +343,12 @@ class OsUpdateEnrichmentIT {
     }
 
     @Test
-    void refreshOsVersionBuilds_msrcDownThenBack_storedBuildsKeptThenRaisedButNeverLowered() {
+    void refreshOsVersionBuilds_msrcDownThenBack_storedBuildsKeptThenRaisedWithTheirHotpatchButNeverLowered() {
         // setup
         Instant refreshedYesterday = Instant.now().minus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MILLIS);
-        osVersionBuildRepository.save(osVersionBuild("11 24H2", "26100.9711", refreshedYesterday));
-        osVersionBuildRepository.save(osVersionBuild("11 25H2", "26200.10075", refreshedYesterday));
+        osVersionBuildRepository.save(osVersionBuild("11 24H2", "26100.9711", null, refreshedYesterday));
+        osVersionBuildRepository.save(osVersionBuild("11 25H2", "26200.10075", "26200.10001", refreshedYesterday));
+        osVersionBuildRepository.save(osVersionBuild("10 1607", "14393.9512", "14393.9400", refreshedYesterday));
         FAILING_PATHS.put("/cvrf/2026-Oct", 503);
 
         // execution
@@ -356,9 +357,10 @@ class OsUpdateEnrichmentIT {
         // verifications
         assertThat(osVersionBuildRepository.findAll())
                 .extracting(OsVersionBuild::getOsVersion, OsVersionBuild::getLatestBuild,
-                        OsVersionBuild::getUpdatedAt)
-                .containsExactlyInAnyOrder(tuple("11 24H2", "26100.9711", refreshedYesterday),
-                        tuple("11 25H2", "26200.10075", refreshedYesterday));
+                        OsVersionBuild::getHotpatchBuild, OsVersionBuild::getUpdatedAt)
+                .containsExactlyInAnyOrder(tuple("11 24H2", "26100.9711", null, refreshedYesterday),
+                        tuple("11 25H2", "26200.10075", "26200.10001", refreshedYesterday),
+                        tuple("10 1607", "14393.9512", "14393.9400", refreshedYesterday));
         assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_fetch")
                 .tags("source", "msrc_cvrf", "result", "failure").counter().count()).isEqualTo(1);
 
@@ -368,9 +370,11 @@ class OsUpdateEnrichmentIT {
 
         // verifications
         assertThat(osVersionBuildRepository.findAll())
-                .extracting(OsVersionBuild::getOsVersion, OsVersionBuild::getLatestBuild)
-                .containsExactlyInAnyOrder(tuple("11 24H2", "26100.9974"), tuple("11 25H2", "26200.10075"),
-                        tuple("10 1607", "14393.9612"));
+                .extracting(OsVersionBuild::getOsVersion, OsVersionBuild::getLatestBuild,
+                        OsVersionBuild::getHotpatchBuild)
+                .containsExactlyInAnyOrder(tuple("11 24H2", "26100.9974", "26100.9911"),
+                        tuple("11 25H2", "26200.10075", "26200.10001"),
+                        tuple("10 1607", "14393.9612", null));
         assertThat(osVersionBuildRepository.findAll())
                 .allSatisfy(osVersionBuild -> assertThat(osVersionBuild.getUpdatedAt()).isAfter(refreshedYesterday));
     }
@@ -404,12 +408,14 @@ class OsUpdateEnrichmentIT {
         return "/cvrf/" + DateTimeFormatter.ofPattern("yyyy-MMM", Locale.ENGLISH).format(month);
     }
 
-    private static OsVersionBuild osVersionBuild(String osVersion, String latestBuild, Instant updatedAt) {
+    private static OsVersionBuild osVersionBuild(String osVersion, String latestBuild, String hotpatchBuild,
+                                                 Instant updatedAt) {
         return OsVersionBuild.builder()
                 .tenantId(TENANT_ID)
                 .platform(OsPlatform.WINDOWS)
                 .osVersion(osVersion)
                 .latestBuild(latestBuild)
+                .hotpatchBuild(hotpatchBuild)
                 .updatedAt(updatedAt)
                 .build();
     }

@@ -85,6 +85,10 @@ class MsrcCvrfDocument {
         // Only on a remediation; the version of whatever the fix is for, an OS build only for an OS product.
         @JsonProperty("FixedBuild")
         private String fixedBuild;
+
+        // Only on a remediation: the kind of the fix.
+        @JsonProperty("SubType")
+        private String subType;
     }
 
     @Data

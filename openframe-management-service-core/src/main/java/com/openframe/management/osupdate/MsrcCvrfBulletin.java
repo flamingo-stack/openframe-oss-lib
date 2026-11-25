@@ -11,6 +11,6 @@ import java.util.Map;
 public class MsrcCvrfBulletin {
 
     Map<String, MsrcKbArticle> kbArticles;
-    // Windows version as the agent reports it ("11 24H2") to its highest fixed build ("26100.9974").
-    Map<String, String> latestWindowsBuilds;
+    // By the Windows version as the agent reports it: "11 24H2".
+    Map<String, MsrcWindowsBuild> windowsBuilds;
 }

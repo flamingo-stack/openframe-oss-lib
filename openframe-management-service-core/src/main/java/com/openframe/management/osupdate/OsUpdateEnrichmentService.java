@@ -55,10 +55,10 @@ public class OsUpdateEnrichmentService {
         osUpdateEnrichmentMetrics.recordRun(runStarted);
     }
 
-    // The latest security build per Windows version, from the MSRC bulletins of the month and of the one before:
-    // the bulletin of the month does not exist before its Patch Tuesday. Nothing is asked while the stored builds
-    // were refreshed after refreshedBefore. A stored build is never lowered, and a bulletin that cannot be read
-    // leaves every stored build as it is until the next run.
+    // The latest cumulative security update per Windows version, with its hotpatch, from the MSRC bulletins of the
+    // month and of the one before: the bulletin of the month does not exist before its Patch Tuesday. Nothing is
+    // asked while the stored builds were refreshed after refreshedBefore. A stored latest build is never lowered,
+    // and a bulletin that cannot be read leaves every stored build as it is until the next run.
     public void refreshOsVersionBuilds(YearMonth month, Instant refreshedBefore) {
         String tenantId = tenantIdProvider.getTenantId();
         List<OsVersionBuild> storedOsVersionBuilds =
@@ -69,24 +69,26 @@ public class OsUpdateEnrichmentService {
             return;
         }
         try {
-            Map<String, String> latestWindowsBuilds = findLatestWindowsBuilds(month);
+            Map<String, MsrcWindowsBuild> msrcWindowsBuilds = findWindowsBuilds(month);
             osVersionBuildRepository.saveAll(
-                    raiseToLatestBuilds(storedOsVersionBuilds, latestWindowsBuilds, tenantId));
+                    raiseToLatestBuilds(storedOsVersionBuilds, msrcWindowsBuilds, tenantId));
         } catch (OsUpdateSourceUnavailableException failure) {
             log.warn("OS version builds of tenantId={} are not refreshed, source {} failed: {}",
                     tenantId, failure.getOsUpdateSource(), failure.getMessage());
         }
     }
 
-    // Every version the bulletins name gets the refresh time, also when its build stays.
+    // Every version the bulletins name gets the refresh time, also when its build stays. The hotpatch build
+    // follows the latest build: a new latest build without a hotpatch clears it.
     private static List<OsVersionBuild> raiseToLatestBuilds(List<OsVersionBuild> storedOsVersionBuilds,
-                                                            Map<String, String> latestWindowsBuilds,
+                                                            Map<String, MsrcWindowsBuild> msrcWindowsBuilds,
                                                             String tenantId) {
         Map<String, OsVersionBuild> osVersionBuildsByOsVersion = storedOsVersionBuilds.stream()
                 .collect(Collectors.toMap(OsVersionBuild::getOsVersion, Function.identity()));
         Instant updatedAt = Instant.now();
         List<OsVersionBuild> refreshedOsVersionBuilds = new ArrayList<>();
-        latestWindowsBuilds.forEach((osVersion, latestBuild) -> {
+        msrcWindowsBuilds.forEach((osVersion, msrcWindowsBuild) -> {
+            String latestBuild = msrcWindowsBuild.getLatestBuild();
             OsVersionBuild osVersionBuild = osVersionBuildsByOsVersion.computeIfAbsent(osVersion, newOsVersion ->
                     OsVersionBuild.builder()
                             .tenantId(tenantId)
@@ -94,8 +96,9 @@ public class OsUpdateEnrichmentService {
                             .osVersion(newOsVersion)
                             .latestBuild(latestBuild)
                             .build());
-            if (SoftwareVersions.compare(latestBuild, osVersionBuild.getLatestBuild()) > 0) {
+            if (SoftwareVersions.compare(latestBuild, osVersionBuild.getLatestBuild()) >= 0) {
                 osVersionBuild.setLatestBuild(latestBuild);
+                osVersionBuild.setHotpatchBuild(msrcWindowsBuild.getHotpatchBuild());
             }
             osVersionBuild.setUpdatedAt(updatedAt);
             refreshedOsVersionBuilds.add(osVersionBuild);
@@ -103,12 +106,24 @@ public class OsUpdateEnrichmentService {
         return refreshedOsVersionBuilds;
     }
 
-    private Map<String, String> findLatestWindowsBuilds(YearMonth month) {
-        Map<String, String> latestWindowsBuilds = new HashMap<>(msrcCvrfClient.getLatestWindowsBuilds(month));
-        msrcCvrfClient.getLatestWindowsBuilds(month.minusMonths(1)).forEach((osVersion, latestBuild) ->
-                latestWindowsBuilds.merge(osVersion, latestBuild, (first, second) ->
-                        SoftwareVersions.compare(first, second) >= 0 ? first : second));
-        return latestWindowsBuilds;
+    private Map<String, MsrcWindowsBuild> findWindowsBuilds(YearMonth month) {
+        Map<String, MsrcWindowsBuild> msrcWindowsBuilds = new HashMap<>(msrcCvrfClient.getWindowsBuilds(month));
+        msrcCvrfClient.getWindowsBuilds(month.minusMonths(1)).forEach((osVersion, msrcWindowsBuild) ->
+                msrcWindowsBuilds.merge(osVersion, msrcWindowsBuild, OsUpdateEnrichmentService::newerOf));
+        return msrcWindowsBuilds;
+    }
+
+    // The hotpatch is taken from the bulletin the latest build is taken from. The same latest build in both: one
+    // of them may not name its hotpatch.
+    private static MsrcWindowsBuild newerOf(MsrcWindowsBuild first, MsrcWindowsBuild second) {
+        int latestBuildOrder = SoftwareVersions.compare(first.getLatestBuild(), second.getLatestBuild());
+        if (latestBuildOrder != 0) {
+            return latestBuildOrder > 0 ? first : second;
+        }
+        if (first.getHotpatchBuild() == null || second.getHotpatchBuild() == null) {
+            return first.getHotpatchBuild() == null ? second : first;
+        }
+        return SoftwareVersions.compare(first.getHotpatchBuild(), second.getHotpatchBuild()) >= 0 ? first : second;
     }
 
     // WARNING: a broken batch must not end the run, or the batches after it are never reached

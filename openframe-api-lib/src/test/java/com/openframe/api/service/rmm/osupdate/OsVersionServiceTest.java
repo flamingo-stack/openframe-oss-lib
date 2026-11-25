@@ -50,7 +50,8 @@ class OsVersionServiceTest {
             .cycle("11-24h2-e").latestBuild("26100").endOfSupportAt(LocalDate.parse("2999-10-12")).build();
     private static final List<OsVersionBuild> OS_VERSION_BUILDS = List.of(
             OsVersionBuild.builder().osVersion("11 25H2").latestBuild("26200.9974").build(),
-            OsVersionBuild.builder().osVersion("11 24H2").latestBuild("26100.4061").build());
+            OsVersionBuild.builder().osVersion("11 24H2").latestBuild("26100.4061").hotpatchBuild("26099.10")
+                    .build());
 
     @Mock private DeviceOsStateRepository deviceOsStateRepository;
     @Mock private OsVersionBuildRepository osVersionBuildRepository;
@@ -70,12 +71,12 @@ class OsVersionServiceTest {
     }
 
     @Test
-    void listOsVersions_releasesAndAStoredBuild_bothEndsOfSupportTheDevicesBehindAndANextPage() {
+    void listOsVersions_releasesAndAStoredBuild_bothEndsOfSupportTheDevicesBehindTheHotpatchAndANextPage() {
         // setup
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(1).build();
         OsVersionDeviceCounts windows11 = new OsVersionDeviceCounts("11 24H2", List.of(
                 new OsVersionBuildCount("26100.4061", 3), new OsVersionBuildCount("26099.10", 2),
-                new OsVersionBuildCount(null, 1)));
+                new OsVersionBuildCount("26099.9", 4), new OsVersionBuildCount(null, 1)));
         OsVersionDeviceCounts windows10 = new OsVersionDeviceCounts("10 22H2", List.of(
                 new OsVersionBuildCount("19045.1", 1)));
         when(deviceOsStateRepository.findOsVersionPage(OsPlatform.WINDOWS, null, null, 2, TENANT_ID))
@@ -92,8 +93,8 @@ class OsVersionServiceTest {
         // verifications
         assertThat(osVersions.getItems()).singleElement().isEqualTo(OsVersionResponse.builder()
                 .osVersion("11 24H2")
-                .deviceCount(6)
-                .devicesBehindCount(2)
+                .deviceCount(10)
+                .devicesBehindCount(4)
                 .currentBuild("26100.4061")
                 .endOfSupportAt(LocalDate.parse("2026-10-13"))
                 .supportEnded(true)
@@ -138,7 +139,8 @@ class OsVersionServiceTest {
                 TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "", Limit.of(6)))
                 .thenReturn(List.of(state("machine-1", "26100.4061", "Windows 11 Pro"),
                         state("machine-2", "26099.1", "Windows 11 Enterprise"),
-                        state("machine-3", null, "Windows 11 Enterprise LTSC 2024")));
+                        state("machine-3", null, "Windows 11 Enterprise LTSC 2024"),
+                        state("machine-4", "26099.10", "Windows 11 Enterprise")));
         when(windowsReleaseClientProvider.getIfAvailable()).thenReturn(windowsReleaseClient);
         when(windowsReleaseClient.listWindowsReleases())
                 .thenReturn(List.of(WINDOWS_11_24H2_ENTERPRISE, WINDOWS_11_24H2));
@@ -159,7 +161,9 @@ class OsVersionServiceTest {
                                 CursorCodec.encode("machine-1")),
                         tuple("machine-2", false, LocalDate.parse("2999-10-12"), false,
                                 CursorCodec.encode("machine-2")),
-                        tuple("machine-3", null, null, null, CursorCodec.encode("machine-3")));
+                        tuple("machine-3", null, null, null, CursorCodec.encode("machine-3")),
+                        tuple("machine-4", true, LocalDate.parse("2999-10-12"), false,
+                                CursorCodec.encode("machine-4")));
         assertThat(devices.getPageInfo().isHasNextPage()).isFalse();
         verify(osVersionBuildRepository).findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS);
         verifyNoMoreInteractions(osVersionBuildRepository);

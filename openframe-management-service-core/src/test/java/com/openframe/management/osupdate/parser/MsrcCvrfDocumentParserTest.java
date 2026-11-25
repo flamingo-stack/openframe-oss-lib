@@ -22,7 +22,7 @@ class MsrcCvrfDocumentParserTest {
             new MsrcCvrfDocumentParser(new JsonMapper(), new MsrcWindowsBuildParser());
 
     @Test
-    void parse_novemberBulletin_kbWithItsCvesAndRatingNotExploited() throws IOException {
+    void parse_novemberBulletin_kbAndItsHotpatchKbWithTheirCvesAndRatingNotExploited() throws IOException {
         // execution
         Map<String, MsrcKbArticle> kbArticles;
         try (InputStream cvrfDocument = fixture("msrc-cvrf-2026-Nov.json")) {
@@ -30,7 +30,8 @@ class MsrcCvrfDocumentParserTest {
         }
 
         // verifications
-        assertThat(kbArticles).containsOnlyKeys("5132061");
+        assertThat(kbArticles).containsOnlyKeys("5132061", "5132043");
+        assertThat(kbArticles.get("5132043").getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
         MsrcKbArticle kbArticle = kbArticles.get("5132061");
         assertThat(kbArticle.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
         assertThat(kbArticle.getSeverity()).isEqualTo(OsUpdateSeverity.IMPORTANT);

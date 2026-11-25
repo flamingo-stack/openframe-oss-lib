@@ -198,14 +198,18 @@ class OsUpdateEnrichmentServiceTest {
     @Test
     void refreshOsVersionBuilds_bulletinsOfBothMonths_newVersionStoredHigherBuildRaisedAndNoBuildLowered() {
         // setup
-        OsVersionBuild raised = osVersionBuild("11 24H2", "26100.9711", STALE);
-        OsVersionBuild kept = osVersionBuild("10 22H2", "19045.7900", STALE);
+        OsVersionBuild raised = osVersionBuild("11 24H2", "26100.9711", null, STALE);
+        OsVersionBuild kept = osVersionBuild("10 22H2", "19045.7900", "19045.7890", STALE);
         when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS))
                 .thenReturn(List.of(raised, kept));
-        when(msrcCvrfClient.getLatestWindowsBuilds(NOVEMBER)).thenReturn(
-                Map.of("11 24H2", "26100.10075", "10 22H2", "19045.7846", "11 23H2", "22631.7711"));
-        when(msrcCvrfClient.getLatestWindowsBuilds(OCTOBER)).thenReturn(
-                Map.of("11 24H2", "26100.9974", "11 23H2", "22631.10001", "11 25H2", "26200.9711"));
+        when(msrcCvrfClient.getWindowsBuilds(NOVEMBER)).thenReturn(Map.of(
+                "11 24H2", msrcWindowsBuild("26100.10075", "26100.10001"),
+                "10 22H2", msrcWindowsBuild("19045.7846", "19045.7800"),
+                "11 23H2", msrcWindowsBuild("22631.7711", "22631.7700")));
+        when(msrcCvrfClient.getWindowsBuilds(OCTOBER)).thenReturn(Map.of(
+                "11 24H2", msrcWindowsBuild("26100.9974", "26100.9911"),
+                "11 23H2", msrcWindowsBuild("22631.10001", null),
+                "11 25H2", msrcWindowsBuild("26200.9711", null)));
 
         // execution
         service.refreshOsVersionBuilds(NOVEMBER, REFRESHED_BEFORE);
@@ -214,12 +218,12 @@ class OsUpdateEnrichmentServiceTest {
         verify(osVersionBuildRepository).saveAll(savedOsVersionBuilds.capture());
         assertThat(savedOsVersionBuilds.getValue())
                 .extracting(OsVersionBuild::getTenantId, OsVersionBuild::getPlatform, OsVersionBuild::getOsVersion,
-                        OsVersionBuild::getLatestBuild)
+                        OsVersionBuild::getLatestBuild, OsVersionBuild::getHotpatchBuild)
                 .containsExactlyInAnyOrder(
-                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "26100.10075"),
-                        tuple(TENANT_ID, OsPlatform.WINDOWS, "10 22H2", "19045.7900"),
-                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 23H2", "22631.10001"),
-                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 25H2", "26200.9711"));
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "26100.10075", "26100.10001"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "10 22H2", "19045.7900", "19045.7890"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 23H2", "22631.10001", null),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 25H2", "26200.9711", null));
         assertThat(savedOsVersionBuilds.getValue()).contains(raised, kept)
                 .allSatisfy(osVersionBuild -> assertThat(osVersionBuild.getUpdatedAt()).isAfter(REFRESHED_BEFORE));
     }
@@ -228,8 +232,9 @@ class OsUpdateEnrichmentServiceTest {
     void refreshOsVersionBuilds_currentMonthNotPublishedYet_buildsOfThePreviousMonth() {
         // setup
         when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS)).thenReturn(List.of());
-        when(msrcCvrfClient.getLatestWindowsBuilds(NOVEMBER)).thenReturn(Map.of());
-        when(msrcCvrfClient.getLatestWindowsBuilds(OCTOBER)).thenReturn(Map.of("11 24H2", "26100.9711"));
+        when(msrcCvrfClient.getWindowsBuilds(NOVEMBER)).thenReturn(Map.of());
+        when(msrcCvrfClient.getWindowsBuilds(OCTOBER))
+                .thenReturn(Map.of("11 24H2", msrcWindowsBuild("26100.9711", null)));
 
         // execution
         service.refreshOsVersionBuilds(NOVEMBER, REFRESHED_BEFORE);
@@ -244,11 +249,12 @@ class OsUpdateEnrichmentServiceTest {
     @Test
     void refreshOsVersionBuilds_oneBulletinFailed_storedBuildsLeftAsTheyAre() {
         // setup
-        OsVersionBuild stored = osVersionBuild("11 24H2", "26100.9711", STALE);
+        OsVersionBuild stored = osVersionBuild("11 24H2", "26100.9711", null, STALE);
         when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS))
                 .thenReturn(List.of(stored));
-        lenient().when(msrcCvrfClient.getLatestWindowsBuilds(NOVEMBER)).thenReturn(Map.of("11 24H2", "26100.9974"));
-        when(msrcCvrfClient.getLatestWindowsBuilds(OCTOBER))
+        lenient().when(msrcCvrfClient.getWindowsBuilds(NOVEMBER))
+                .thenReturn(Map.of("11 24H2", msrcWindowsBuild("26100.9974", "26100.9911")));
+        when(msrcCvrfClient.getWindowsBuilds(OCTOBER))
                 .thenThrow(new OsUpdateSourceUnavailableException(OsUpdateSource.MSRC_CVRF, "MSRC answered 503"));
 
         // execution
@@ -257,14 +263,15 @@ class OsUpdateEnrichmentServiceTest {
         // verifications
         verify(osVersionBuildRepository, never()).saveAll(any());
         assertThat(stored.getLatestBuild()).isEqualTo("26100.9711");
+        assertThat(stored.getHotpatchBuild()).isNull();
         assertThat(stored.getUpdatedAt()).isEqualTo(STALE);
     }
 
     @Test
     void refreshOsVersionBuilds_refreshedWithinTheInterval_bulletinsNotAsked() {
         // setup
-        OsVersionBuild stale = osVersionBuild("10 22H2", "19045.7846", STALE);
-        OsVersionBuild fresh = osVersionBuild("11 24H2", "26100.9711", REFRESHED_BEFORE.plusSeconds(1));
+        OsVersionBuild stale = osVersionBuild("10 22H2", "19045.7846", null, STALE);
+        OsVersionBuild fresh = osVersionBuild("11 24H2", "26100.9711", null, REFRESHED_BEFORE.plusSeconds(1));
         when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS))
                 .thenReturn(List.of(stale, fresh));
 
@@ -276,13 +283,60 @@ class OsUpdateEnrichmentServiceTest {
         verify(osVersionBuildRepository, never()).saveAll(any());
     }
 
-    private static OsVersionBuild osVersionBuild(String osVersion, String latestBuild, Instant updatedAt) {
+    @Test
+    void refreshOsVersionBuilds_latestBuildMovesToAMonthWithoutHotpatch_hotpatchBuildCleared() {
+        // setup
+        OsVersionBuild hotpatched = osVersionBuild("11 24H2", "26100.9974", "26100.9911", STALE);
+        when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS))
+                .thenReturn(List.of(hotpatched));
+        when(msrcCvrfClient.getWindowsBuilds(NOVEMBER))
+                .thenReturn(Map.of("11 24H2", msrcWindowsBuild("26100.10200", null)));
+        when(msrcCvrfClient.getWindowsBuilds(OCTOBER))
+                .thenReturn(Map.of("11 24H2", msrcWindowsBuild("26100.9974", "26100.9911")));
+
+        // execution
+        service.refreshOsVersionBuilds(NOVEMBER, REFRESHED_BEFORE);
+
+        // verifications
+        assertThat(hotpatched.getLatestBuild()).isEqualTo("26100.10200");
+        assertThat(hotpatched.getHotpatchBuild()).isNull();
+    }
+
+    @Test
+    void refreshOsVersionBuilds_sameLatestBuildInBothMonthsOneWithItsHotpatch_hotpatchBuildOfThatLatestBuild() {
+        // setup
+        OsVersionBuild withoutHotpatch = osVersionBuild("11 24H2", "26100.9974", null, STALE);
+        OsVersionBuild withStaleHotpatch = osVersionBuild("11 25H2", "26200.9974", "26200.9000", STALE);
+        when(osVersionBuildRepository.findByTenantIdAndPlatform(TENANT_ID, OsPlatform.WINDOWS))
+                .thenReturn(List.of(withoutHotpatch, withStaleHotpatch));
+        when(msrcCvrfClient.getWindowsBuilds(NOVEMBER)).thenReturn(Map.of(
+                "11 24H2", msrcWindowsBuild("26100.9974", null),
+                "11 25H2", msrcWindowsBuild("26200.9974", "26200.9911")));
+        when(msrcCvrfClient.getWindowsBuilds(OCTOBER)).thenReturn(Map.of(
+                "11 24H2", msrcWindowsBuild("26100.9974", "26100.9911"),
+                "11 25H2", msrcWindowsBuild("26200.9974", null)));
+
+        // execution
+        service.refreshOsVersionBuilds(NOVEMBER, REFRESHED_BEFORE);
+
+        // verifications
+        assertThat(withoutHotpatch.getHotpatchBuild()).isEqualTo("26100.9911");
+        assertThat(withStaleHotpatch.getHotpatchBuild()).isEqualTo("26200.9911");
+    }
+
+    private static MsrcWindowsBuild msrcWindowsBuild(String latestBuild, String hotpatchBuild) {
+        return MsrcWindowsBuild.builder().latestBuild(latestBuild).hotpatchBuild(hotpatchBuild).build();
+    }
+
+    private static OsVersionBuild osVersionBuild(String osVersion, String latestBuild, String hotpatchBuild,
+                                                 Instant updatedAt) {
         return OsVersionBuild.builder()
                 .id("id-" + osVersion)
                 .tenantId(TENANT_ID)
                 .platform(OsPlatform.WINDOWS)
                 .osVersion(osVersion)
                 .latestBuild(latestBuild)
+                .hotpatchBuild(hotpatchBuild)
                 .updatedAt(updatedAt)
                 .build();
     }

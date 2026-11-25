@@ -232,6 +232,46 @@
      },
      "SubType": "Security Update",
      "FixedBuild": "10.0.26200.9974"
+    },
+    {
+     "Description": {
+      "Value": "5132043"
+     },
+     "URL": "",
+     "Supercedence": "5127648",
+     "ProductID": [
+      "12389",
+      "12390"
+     ],
+     "Type": 2,
+     "Date": "0001-01-01T00:00:00",
+     "DateSpecified": false,
+     "AffectedFiles": [],
+     "RestartRequired": {
+      "Value": "No"
+     },
+     "SubType": "Security Hotpatch Update",
+     "FixedBuild": "10.0.26100.9911"
+    },
+    {
+     "Description": {
+      "Value": "5132043"
+     },
+     "URL": "",
+     "Supercedence": "5127648",
+     "ProductID": [
+      "20437",
+      "20438"
+     ],
+     "Type": 2,
+     "Date": "0001-01-01T00:00:00",
+     "DateSpecified": false,
+     "AffectedFiles": [],
+     "RestartRequired": {
+      "Value": "No"
+     },
+     "SubType": "Security Hotpatch Update",
+     "FixedBuild": "10.0.26200.9911"
     }
    ]
   },
@@ -420,6 +460,46 @@
      },
      "SubType": "Security Update",
      "FixedBuild": "10.0.26200.9974"
+    },
+    {
+     "Description": {
+      "Value": "5132043"
+     },
+     "URL": "",
+     "Supercedence": "5127648",
+     "ProductID": [
+      "12389",
+      "12390"
+     ],
+     "Type": 2,
+     "Date": "0001-01-01T00:00:00",
+     "DateSpecified": false,
+     "AffectedFiles": [],
+     "RestartRequired": {
+      "Value": "No"
+     },
+     "SubType": "Security Hotpatch Update",
+     "FixedBuild": "10.0.26100.9911"
+    },
+    {
+     "Description": {
+      "Value": "5132043"
+     },
+     "URL": "",
+     "Supercedence": "5127648",
+     "ProductID": [
+      "20437",
+      "20438"
+     ],
+     "Type": 2,
+     "Date": "0001-01-01T00:00:00",
+     "DateSpecified": false,
+     "AffectedFiles": [],
+     "RestartRequired": {
+      "Value": "No"
+     },
+     "SubType": "Security Hotpatch Update",
+     "FixedBuild": "10.0.26200.9911"
     }
    ]
   },

@@ -54,10 +54,9 @@ public class MsrcCvrfClient {
         return getBulletin(month).getKbArticles();
     }
 
-    // Windows version as the agent reports it ("11 24H2") to its highest fixed build of the month. A month MSRC
-    // has no document for has no build.
-    public Map<String, String> getLatestWindowsBuilds(YearMonth month) {
-        return getBulletin(month).getLatestWindowsBuilds();
+    // By the Windows version as the agent reports it ("11 24H2"). A month MSRC has no document for has no build.
+    public Map<String, MsrcWindowsBuild> getWindowsBuilds(YearMonth month) {
+        return getBulletin(month).getWindowsBuilds();
     }
 
     private MsrcCvrfBulletin getBulletin(YearMonth month) {
@@ -85,7 +84,7 @@ public class MsrcCvrfClient {
                         if (response.getStatusCode().isSameCodeAs(HttpStatus.NOT_FOUND)) {
                             return MsrcCvrfBulletin.builder()
                                     .kbArticles(Map.of())
-                                    .latestWindowsBuilds(Map.of())
+                                    .windowsBuilds(Map.of())
                                     .build();
                         }
                         if (!response.getStatusCode().is2xxSuccessful()) {

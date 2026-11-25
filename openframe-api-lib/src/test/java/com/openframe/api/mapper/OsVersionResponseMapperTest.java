@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.osupdate.OsVersionDeviceResponse;
 import com.openframe.api.dto.rmm.osupdate.OsVersionResponse;
 import com.openframe.api.service.rmm.osupdate.release.WindowsRelease;
 import com.openframe.data.document.rmm.osupdate.DeviceOsState;
+import com.openframe.data.document.rmm.osupdate.OsVersionBuild;
 import com.openframe.data.repository.rmm.osupdate.OsVersionBuildCount;
 import com.openframe.data.repository.rmm.osupdate.OsVersionDeviceCounts;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OsVersionResponseMapperTest {
 
     private static final LocalDate TODAY = LocalDate.parse("2026-11-25");
-    private static final String LATEST_BUILD = "26100.9974";
+    private static final OsVersionBuild OS_VERSION_BUILD =
+            OsVersionBuild.builder().osVersion("11 24H2").latestBuild("26100.9974").build();
+    private static final OsVersionBuild HOTPATCHED_OS_VERSION_BUILD = OsVersionBuild.builder()
+            .osVersion("11 24H2").latestBuild("26100.9974").hotpatchBuild("26100.9911").build();
     private static final WindowsRelease HOME_AND_PRO = WindowsRelease.builder()
             .cycle("11-24h2-w").latestBuild("26100").endOfSupportAt(LocalDate.parse("2026-10-13")).build();
     private static final WindowsRelease ENTERPRISE = WindowsRelease.builder()
@@ -48,7 +52,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionResponse response = osVersionResponseMapper.toResponse(
-                osVersionDeviceCounts, HOME_AND_PRO, ENTERPRISE, LATEST_BUILD, TODAY, "cursor-1");
+                osVersionDeviceCounts, HOME_AND_PRO, ENTERPRISE, OS_VERSION_BUILD, TODAY, "cursor-1");
 
         // verifications
         assertThat(response).isEqualTo(expected);
@@ -118,7 +122,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionResponse response =
-                osVersionResponseMapper.toResponse(osVersionDeviceCounts, null, null, LATEST_BUILD, TODAY, "cursor-1");
+                osVersionResponseMapper.toResponse(osVersionDeviceCounts, null, null, OS_VERSION_BUILD, TODAY, "cursor-1");
 
         // verifications
         assertThat(response.getCurrentBuild()).isEqualTo("26100.9974");
@@ -138,7 +142,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionResponse response =
-                osVersionResponseMapper.toResponse(oneBuild, HOME_AND_PRO, ENTERPRISE, LATEST_BUILD, TODAY, "c");
+                osVersionResponseMapper.toResponse(oneBuild, HOME_AND_PRO, ENTERPRISE, OS_VERSION_BUILD, TODAY, "c");
 
         // verifications
         assertThat(response.getDevicesBehindCount()).isEqualTo(expectedBehind);
@@ -151,7 +155,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionDeviceResponse response =
-                osVersionResponseMapper.toDeviceResponse(deviceOsState, ENTERPRISE, LATEST_BUILD, TODAY, "cursor-1");
+                osVersionResponseMapper.toDeviceResponse(deviceOsState, ENTERPRISE, OS_VERSION_BUILD, TODAY, "cursor-1");
 
         // verifications
         assertThat(response).isEqualTo(OsVersionDeviceResponse.builder()
@@ -172,7 +176,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionDeviceResponse response =
-                osVersionResponseMapper.toDeviceResponse(state(osBuild), HOME_AND_PRO, LATEST_BUILD, TODAY, "c");
+                osVersionResponseMapper.toDeviceResponse(state(osBuild), HOME_AND_PRO, OS_VERSION_BUILD, TODAY, "c");
 
         // verifications
         assertThat(response.getUpToDate()).isEqualTo(expected);
@@ -182,14 +186,49 @@ class OsVersionResponseMapperTest {
     @CsvSource(value = {"26100.4061, NULL", "NULL, 26100.9974", "'', 26100.9974"}, nullValues = "NULL")
     void toDeviceResponse_noLatestBuildOrNoBuildOfTheDevice_noFlag(String osBuild, String latestBuild) {
         // setup
+        OsVersionBuild osVersionBuild = latestBuild == null
+                ? null
+                : OsVersionBuild.builder().latestBuild(latestBuild).hotpatchBuild("26100.9911").build();
 
         // execution
         OsVersionDeviceResponse response =
-                osVersionResponseMapper.toDeviceResponse(state(osBuild), HOME_AND_PRO, latestBuild, TODAY, "c");
+                osVersionResponseMapper.toDeviceResponse(state(osBuild), HOME_AND_PRO, osVersionBuild, TODAY, "c");
 
         // verifications
         assertThat(response.getUpToDate()).isNull();
         assertThat(response.getSupportEnded()).isTrue();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "26100.9911, true", "26100.9912, true", "26100.9974, true", "26100.10075, true",
+            "26100.9910, false", "26100.9711, false", "22631.99999, false"})
+    void toDeviceResponse_versionWithAHotpatch_upToDateFromTheHotpatchBuildUp(String osBuild, boolean expected) {
+        // setup
+
+        // execution
+        OsVersionDeviceResponse response = osVersionResponseMapper
+                .toDeviceResponse(state(osBuild), HOME_AND_PRO, HOTPATCHED_OS_VERSION_BUILD, TODAY, "c");
+
+        // verifications
+        assertThat(response.getUpToDate()).isEqualTo(expected);
+    }
+
+    @Test
+    void toResponse_versionWithAHotpatch_hotpatchedDevicesNotBehindAndTheCurrentBuildStaysTheLatest() {
+        // setup
+        OsVersionDeviceCounts hotpatchedAndNot = new OsVersionDeviceCounts("11 24H2", List.of(
+                new OsVersionBuildCount("26100.9974", 1), new OsVersionBuildCount("26100.9911", 2),
+                new OsVersionBuildCount("26100.9711", 3), new OsVersionBuildCount(null, 1)));
+
+        // execution
+        OsVersionResponse response = osVersionResponseMapper.toResponse(
+                hotpatchedAndNot, HOME_AND_PRO, ENTERPRISE, HOTPATCHED_OS_VERSION_BUILD, TODAY, "c");
+
+        // verifications
+        assertThat(response.getDevicesBehindCount()).isEqualTo(3);
+        assertThat(response.getCurrentBuild()).isEqualTo("26100.9974");
+        assertThat(response.getDeviceCount()).isEqualTo(7);
     }
 
     @Test
@@ -198,7 +237,7 @@ class OsVersionResponseMapperTest {
 
         // execution
         OsVersionDeviceResponse response =
-                osVersionResponseMapper.toDeviceResponse(state("26100.9974"), null, LATEST_BUILD, TODAY, "c");
+                osVersionResponseMapper.toDeviceResponse(state("26100.9974"), null, OS_VERSION_BUILD, TODAY, "c");
 
         // verifications
         assertThat(response.getUpToDate()).isTrue();

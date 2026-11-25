@@ -43,7 +43,7 @@ public class MsrcCvrfDocumentParser {
         orEmpty(msrcCvrfDocument.getMsrcCvrfVulnerabilities()).forEach(kbArticles::addVulnerability);
         return MsrcCvrfBulletin.builder()
                 .kbArticles(kbArticles.build())
-                .latestWindowsBuilds(msrcWindowsBuildParser.parseLatestBuilds(msrcCvrfDocument))
+                .windowsBuilds(msrcWindowsBuildParser.parse(msrcCvrfDocument))
                 .build();
     }
 

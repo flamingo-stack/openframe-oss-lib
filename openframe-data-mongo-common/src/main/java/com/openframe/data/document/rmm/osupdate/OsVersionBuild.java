@@ -37,8 +37,12 @@ public class OsVersionBuild implements TenantScoped {
     // As the agent reports it: "11 24H2".
     private String osVersion;
 
-    // Build with its revision, as the agent reports osBuild: "26100.9974".
+    // Of the latest cumulative security update, with its revision, as the agent reports osBuild: "26100.9974".
     private String latestBuild;
+
+    // WARNING: belongs to latestBuild, the hotpatch that fixes the same vulnerabilities without a restart; it is
+    // replaced together with latestBuild, by null when the new cumulative update has no hotpatch
+    private String hotpatchBuild;
 
     // WARNING: the last refresh from the bulletins, also when the build stayed the same; the refresh interval
     // is counted from it

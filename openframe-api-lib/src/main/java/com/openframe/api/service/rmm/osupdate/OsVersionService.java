@@ -31,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.springframework.util.CollectionUtils.isEmpty;
@@ -65,11 +66,11 @@ public class OsVersionService {
                 OsPlatform.WINDOWS, scopeMachineIds, normalizedPagination.getCursor(),
                 normalizedPagination.getLimit() + 1, tenantId);
         List<WindowsRelease> windowsReleases = listWindowsReleases();
-        Map<String, String> latestBuildsByOsVersion = findLatestBuildsByOsVersion(tenantId);
+        Map<String, OsVersionBuild> osVersionBuildsByOsVersion = findOsVersionBuildsByOsVersion(tenantId);
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         return cursorPageAssembler.toPage(fetchedOsVersions, normalizedPagination,
                 osVersionDeviceCounts -> toResponse(osVersionDeviceCounts, windowsReleases,
-                        latestBuildsByOsVersion.get(osVersionDeviceCounts.getOsVersion()), today),
+                        osVersionBuildsByOsVersion.get(osVersionDeviceCounts.getOsVersion()), today),
                 OsVersionResponse::getCursor);
     }
 
@@ -88,27 +89,27 @@ public class OsVersionService {
                 : deviceOsStateRepository.findOsVersionDevicePageOnMachines(
                         tenantId, OsPlatform.WINDOWS, osVersion, afterMachineId, scopeMachineIds, limit);
         List<WindowsRelease> windowsReleases = listWindowsReleases();
-        String latestBuild = findLatestBuildsByOsVersion(tenantId).get(osVersion);
+        OsVersionBuild osVersionBuild = findOsVersionBuildsByOsVersion(tenantId).get(osVersion);
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         return cursorPageAssembler.toPage(fetchedDevices, normalizedPagination,
-                deviceOsState -> toDeviceResponse(deviceOsState, osVersion, windowsReleases, latestBuild, today),
+                deviceOsState -> toDeviceResponse(deviceOsState, osVersion, windowsReleases, osVersionBuild, today),
                 OsVersionDeviceResponse::getCursor);
     }
 
     // The end of support of a device is the one of its edition group.
     private OsVersionDeviceResponse toDeviceResponse(DeviceOsState deviceOsState, String osVersion,
-                                                     List<WindowsRelease> windowsReleases, String latestBuild,
-                                                     LocalDate today) {
+                                                     List<WindowsRelease> windowsReleases,
+                                                     OsVersionBuild osVersionBuild, LocalDate today) {
         WindowsEditionGroup windowsEditionGroup =
                 windowsEditionGroupResolver.resolve(deviceOsState.getOsProductName());
         WindowsRelease windowsRelease =
                 windowsReleaseMatcher.findWindowsRelease(windowsReleases, osVersion, windowsEditionGroup);
         String cursor = CursorCodec.encode(deviceOsState.getMachineId());
-        return osVersionResponseMapper.toDeviceResponse(deviceOsState, windowsRelease, latestBuild, today, cursor);
+        return osVersionResponseMapper.toDeviceResponse(deviceOsState, windowsRelease, osVersionBuild, today, cursor);
     }
 
     private OsVersionResponse toResponse(OsVersionDeviceCounts osVersionDeviceCounts,
-                                         List<WindowsRelease> windowsReleases, String latestBuild,
+                                         List<WindowsRelease> windowsReleases, OsVersionBuild osVersionBuild,
                                          LocalDate today) {
         String osVersion = osVersionDeviceCounts.getOsVersion();
         WindowsRelease homeAndProWindowsRelease = windowsReleaseMatcher
@@ -117,13 +118,13 @@ public class OsVersionService {
                 .findWindowsRelease(windowsReleases, osVersion, WindowsEditionGroup.ENTERPRISE_AND_EDUCATION);
         String cursor = CursorCodec.encode(osVersion);
         return osVersionResponseMapper.toResponse(osVersionDeviceCounts, homeAndProWindowsRelease,
-                enterpriseWindowsRelease, latestBuild, today, cursor);
+                enterpriseWindowsRelease, osVersionBuild, today, cursor);
     }
 
     // One query: the collection has one entry per Windows version the vendor's bulletins name.
-    private Map<String, String> findLatestBuildsByOsVersion(String tenantId) {
+    private Map<String, OsVersionBuild> findOsVersionBuildsByOsVersion(String tenantId) {
         return osVersionBuildRepository.findByTenantIdAndPlatform(tenantId, OsPlatform.WINDOWS).stream()
-                .collect(Collectors.toMap(OsVersionBuild::getOsVersion, OsVersionBuild::getLatestBuild,
+                .collect(Collectors.toMap(OsVersionBuild::getOsVersion, Function.identity(),
                         (first, second) -> first));
     }
 

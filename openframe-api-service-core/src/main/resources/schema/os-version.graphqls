@@ -32,8 +32,9 @@ type OsVersion {
     """As the agent reports it, e.g. "11 24H2"."""
     osVersion: String!
     deviceCount: Int!
-    """Devices whose build is below the latest security build of the version. A device that reported no build is
-    not counted. Null = no latest security build is known for the version."""
+    """Devices whose build is below the latest security build of the version and, when that update has a hotpatch,
+    below the hotpatch build too. A device that reported no build is not counted. Null = no latest security build
+    is known for the version."""
     devicesBehindCount: Int
     """The latest security build of the version with its revision, e.g. "26100.9974". When none is known: the base
     build from endoflife.date, e.g. "26100"."""
@@ -61,8 +62,9 @@ type OsVersionDevice {
     machineId: String!
     osBuild: String
     osProductName: String
-    """The build of the device is the latest security build of its version or above it (a preview build).
-    Null = no latest security build is known for the version, or the device reported no build."""
+    """The build of the device is the latest security build of its version or above it (a preview build), or the
+    hotpatch build of that update. Null = no latest security build is known for the version, or the device
+    reported no build."""
     upToDate: Boolean
     """End of support of the edition of this device, by osProductName: IoT Enterprise LTSC, Enterprise LTSC,
     Enterprise and Education, otherwise Home and Pro. Null = endoflife.date is off or cannot be read, or has no
