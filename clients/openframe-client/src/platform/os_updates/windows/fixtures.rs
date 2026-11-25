@@ -1,8 +1,16 @@
 use std::collections::BTreeMap;
+#[cfg(target_os = "windows")]
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use chrono::{DateTime, Utc};
 
 use super::model::*;
+
+#[cfg(target_os = "windows")]
+pub(crate) fn lock_wua_reader() -> MutexGuard<'static, ()> {
+    static WUA_READER: Mutex<()> = Mutex::new(());
+    WUA_READER.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 pub(crate) fn at(text: &str) -> DateTime<Utc> {
     text.parse().unwrap()

@@ -3,7 +3,7 @@ use std::mem::ManuallyDrop;
 use windows::Win32::System::Variant::{VARIANT_0, VARIANT_0_0, VARIANT_0_0_0, VT_R8};
 
 use super::*;
-use crate::platform::os_updates::windows::fixtures::at;
+use crate::platform::os_updates::windows::fixtures::{at, lock_wua_reader};
 
 fn variant(vt: windows::Win32::System::Variant::VARENUM, date: f64) -> VARIANT {
     VARIANT {
@@ -88,6 +88,7 @@ fn decimals_become_whole_bytes() {
 
 #[test]
 fn a_read_is_refused_while_the_previous_one_hangs() {
+    let _reader = lock_wua_reader();
     let hanging = READER.begin();
     let started = Instant::now();
 
@@ -113,6 +114,7 @@ fn a_read_is_refused_while_the_previous_one_hangs() {
 #[test]
 #[ignore = "reads the live Windows Update agent; run explicitly with --ignored"]
 fn the_live_agent_answers_every_reading() {
+    let _reader = lock_wua_reader();
     let readings = read();
 
     readings.applicable.expect("search");
