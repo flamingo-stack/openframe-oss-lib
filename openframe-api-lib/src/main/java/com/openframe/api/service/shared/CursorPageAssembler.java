@@ -8,7 +8,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.function.Function;
 
-@Component
+// saas-lib has its own cursorPageAssembler bean: the same default name stops the service from starting.
+@Component("apiCursorPageAssembler")
 public class CursorPageAssembler {
 
     // The rows were fetched with one over the limit: that one tells whether a next page exists.
