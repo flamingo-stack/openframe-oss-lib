@@ -12,11 +12,13 @@ extend enum OsType {
 }
 
 extend type Query {
-    """Apple and Android MDM for this workspace. The push certificate and the Android enterprise are set up once per
-    environment by OpenFrame, so this is read-only. Lists both platforms, connected or not."""
+    """Apple, Android and Windows MDM for this workspace. The push certificate and the Android enterprise are set up
+    once per environment by OpenFrame; Windows is turned on per workspace with updateWindowsMdmSettings. Lists every
+    platform, connected or not."""
     mdmPlatforms: [MdmPlatformStatus!]!
 
-    """Enrollment links, newest first. One active link per organization and platform."""
+    """Enrollment links, newest first. One active link per organization and platform. Apple and Android only: the
+    OpenFrame agent enrolls Windows PCs, so there are no WINDOWS links."""
     mdmEnrollmentLinks(organizationId: String, platform: MdmPlatform): [MdmEnrollmentLink!]!
 
     """Commands sent to one device over MDM, newest first: predefined, custom and the ones OpenFrame sends itself."""
@@ -24,6 +26,25 @@ extend type Query {
 
     """Custom commands the team saved, sorted by name."""
     mdmCustomCommands(platform: MdmPlatform): [MdmCustomCommand!]!
+
+    """Which organizations' Windows PCs are in MDM and which must encrypt their system drive."""
+    windowsMdmSettings: WindowsMdmSettings!
+
+    """The PCs that would leave MDM, or stop being required to encrypt, if these settings were saved. Show them in the
+    confirmation before updateWindowsMdmSettings; empty when nothing leaves."""
+    windowsMdmSettingsImpact(input: UpdateWindowsMdmSettingsInput!): WindowsMdmSettingsImpact!
+
+    """Configuration profiles, sorted by name. Windows only for now."""
+    mdmProfiles(platform: MdmPlatform): [MdmProfile!]!
+
+    mdmProfile(id: ID!): MdmProfile
+
+    """The devices a profile goes to, with each device's status, failed first."""
+    mdmProfileDevices(profileId: ID!, statuses: [MdmProfileStatus!], first: Int, after: String): MdmProfileDeviceConnection!
+
+    """What happened to one device in MDM, newest first: enrollment, removal, encryption, recovery key views, lock,
+    unlock and wipe. Windows only for now."""
+    mdmDeviceEvents(machineId: String!, first: Int, after: String): MdmDeviceEventConnection!
 }
 
 extend type Mutation {
@@ -49,8 +70,46 @@ extend type Mutation {
     runMdmCustomCommand(input: RunMdmCustomCommandInput!): MdmCommandDispatch!
 
     """Takes OpenFrame's profiles off the device and stops managing it. An iPhone or iPad keeps everything else; an
-    Android work profile is deleted with its apps and data. The device stays listed with mdm.state UNENROLLED."""
+    Android work profile is deleted with its apps and data. The device stays listed with mdm.state UNENROLLED.
+    A Windows PC turns LEAVING, unenrolls at its next check-in and then stays REMOVED although its organization is in
+    MDM; the agent keeps working, BitLocker stays on and the recovery key stays in OpenFrame."""
     removeDeviceFromMdm(machineId: String!): Machine!
+
+    """Windows only: brings back a PC that removeDeviceFromMdm took out. It turns PENDING and enrolls once it is online
+    and someone signs in to Windows."""
+    addDeviceToMdm(machineId: String!): Machine!
+
+    """Turns Windows MDM on or off for the workspace's organizations and sets which of them must encrypt. PCs of an
+    organization taken out turn LEAVING and unenroll at their next check-in."""
+    updateWindowsMdmSettings(input: UpdateWindowsMdmSettingsInput!): WindowsMdmSettings!
+
+    """Windows only. The agent signs everyone out, turns off sign-in for the PC's local accounts and shuts it down 15
+    seconds later. Runs the next time the PC is online when it is offline. Works on Windows Home too: it does not need
+    MDM. Only in the device's mdm.availableActions."""
+    lockWindowsDevice(input: LockWindowsDeviceInput!): Machine!
+
+    """Windows only. Turns sign-in back on for the local accounts the lock turned off and removes the message; accounts
+    that were off before the lock stay off. Runs when the PC is on and online."""
+    unlockWindowsDevice(machineId: String!): Machine!
+
+    """Windows only. Resets the PC to factory settings over MDM: every file, app and account is erased, the agent
+    too. Cannot be cancelled or undone. Rejected unless confirmation matches the device's name."""
+    wipeWindowsDevice(input: WipeWindowsDeviceInput!): Machine!
+
+    """Returns the BitLocker recovery key of the PC's system drive. Every call is recorded in the audit log and in
+    mdmDeviceEvents with the caller's name. The key is not kept anywhere else in OpenFrame and is never part of
+    Machine."""
+    revealRecoveryKey(machineId: String!): RecoveryKey!
+
+    """Rejected when the payload breaks the rules of CreateMdmProfileInput."""
+    createMdmProfile(input: CreateMdmProfileInput!): MdmProfile!
+
+    """Changes who the profile goes to. The payload cannot change: delete the profile and add a new one."""
+    updateMdmProfile(input: UpdateMdmProfileInput!): MdmProfile!
+
+    """Takes the profile off every device it went to. Windows removes what it added; some settings keep their last
+    value."""
+    deleteMdmProfile(input: MutationDeleteInput!): MutationDeletePayload!
 
     createMdmCustomCommand(input: CreateMdmCustomCommandInput!): MdmCustomCommand!
     updateMdmCustomCommand(input: UpdateMdmCustomCommandInput!): MdmCustomCommand!
@@ -59,17 +118,34 @@ extend type Mutation {
 }
 
 extend type Machine {
-    """Null for a device MDM has never managed."""
+    """Null for a device MDM has never managed, except Windows PCs, which always have it: their state says why one is
+    not managed."""
     mdm: DeviceMdm
+}
+
+extend type DeviceFilters {
+    """MDM column filter options, by MdmEnrollmentState name."""
+    mdmStates: [DeviceFilterOption!]!
+    """Disk encryption column filter options, by DiskEncryptionState name."""
+    diskEncryptionStates: [DeviceFilterOption!]!
+}
+
+extend input DeviceFilterInput {
+    """Only devices whose mdm.state is one of these."""
+    mdmStates: [MdmEnrollmentState!]
+    """Only devices whose mdm.diskEncryption.state is one of these."""
+    diskEncryptionStates: [DiskEncryptionState!]
 }
 
 enum MdmPlatform {
     APPLE
     ANDROID
+    WINDOWS
 }
 
 type MdmPlatformStatus {
     platform: MdmPlatform!
+    """WINDOWS: true when Windows MDM is on for at least one organization of the workspace."""
     connected: Boolean!
     """Apple only: when the push certificate expires. Every Apple device stops taking commands on that day."""
     expiresAt: Instant
@@ -96,6 +172,7 @@ type MdmEnrollmentLink {
     createdBy: String!
 }
 
+"""WINDOWS is rejected: the OpenFrame agent enrolls Windows PCs."""
 input CreateMdmEnrollmentLinkInput {
     organizationId: String!
     platform: MdmPlatform!
@@ -110,12 +187,36 @@ enum MdmEnrollmentState {
     MANAGED
     """Removed from management by a technician or by the device itself (profile deleted, factory reset)."""
     UNENROLLED
+    """Windows only: its organization is in MDM; the agent enrolls the PC once it is online and someone signs in to
+    Windows."""
+    PENDING
+    """Windows only: taken out of MDM, by a technician or with its organization. Unenrolls at its next check-in;
+    nothing new is sent until then."""
+    LEAVING
+    """Windows only: a technician took it out with removeDeviceFromMdm. It stays out although its organization is in
+    MDM; addDeviceToMdm brings it back."""
+    REMOVED
+    """Windows only: its organization is not in Windows MDM."""
+    NOT_IN_SCOPE
+    """Windows only: this PC can never enroll; notSupportedReason says why."""
+    NOT_SUPPORTED
+    """Windows only: another MDM manages it (otherMdmName); OpenFrame does not enroll it."""
+    OTHER_MDM
+    """Windows only: wiped. It reset itself and will not check in again; delete it from the list when done."""
+    WIPED
+}
+
+enum MdmNotSupportedReason {
+    """Windows Home cannot enroll in MDM. Lock still works through the agent."""
+    WINDOWS_HOME
+    """Windows Server is never enrolled."""
+    WINDOWS_SERVER
 }
 
 enum MdmEnrollmentMethod {
     """Enrolled through an organization's enrollment link."""
     LINK
-    """A Mac whose OpenFrame agent turned MDM on."""
+    """A Mac whose OpenFrame agent turned MDM on, or a Windows PC the agent enrolled."""
     AGENT
 }
 
@@ -124,15 +225,31 @@ type DeviceMdm {
     method: MdmEnrollmentMethod!
     platform: MdmPlatform!
     """Restart and Shut Down need a supervised iPhone or iPad; one enrolled through a link is not. Always false on
-    Android, which has no supervision: show it for Apple devices only."""
+    Android and Windows, which have no supervision: show it for Apple devices only."""
     supervised: Boolean!
+    """Set when state is NOT_SUPPORTED."""
+    notSupportedReason: MdmNotSupportedReason
+    """The other MDM's name as the PC reports it, e.g. Microsoft Intune; set when state is OTHER_MDM."""
+    otherMdmName: String
+    """Windows only: when and by whom removeDeviceFromMdm took the PC out."""
+    removedAt: Instant
+    removedBy: String
+    """Windows only: what the device menu offers now, decided by state, edition, lock and wipe. Show these and no
+    others."""
+    availableActions: [MdmDeviceAction!]!
+    """Windows only: BitLocker on the system drive. Null on other platforms."""
+    diskEncryption: DiskEncryption
+    """Windows only: the last lock or unlock while it is pending or in force; null when the PC is not locked."""
+    lock: DeviceLock
+    """Windows only: set once a wipe is sent."""
+    wipe: DeviceWipe
     enrolledAt: Instant
     unenrolledAt: Instant
     lastCheckInAt: Instant
     """The link the device enrolled through; null for AGENT."""
     enrollmentLinkId: ID
     """The predefined commands this device accepts now, decided by platform, supervision and state. Show these and
-    no others; empty when the device is UNENROLLED."""
+    no others; empty when the device is UNENROLLED, and always empty on Windows, which uses availableActions."""
     availableCommands: [MdmPredefinedCommand!]!
     """Profiles delivered to the device, with the device's own status."""
     profiles: [DeviceMdmProfile!]!
@@ -146,6 +263,8 @@ enum MdmProfileStatus {
 }
 
 type DeviceMdmProfile {
+    """The workspace's profile (mdmProfile); null for a profile OpenFrame sends itself."""
+    profileId: ID
     name: String!
     status: MdmProfileStatus!
     """The device's reason when status is FAILED."""
@@ -250,4 +369,228 @@ input UpdateMdmCustomCommandInput {
     name: String!
     description: String
     payload: String!
+}
+
+enum MdmScope {
+    OFF
+    """Every organization of the workspace, including ones added later."""
+    ALL_ORGANIZATIONS
+    """Only the organizations in organizationIds."""
+    SELECTED_ORGANIZATIONS
+}
+
+type WindowsMdmSettings {
+    """Whose Windows PCs the agent enrolls."""
+    enrollment: MdmScope!
+    """Set for SELECTED_ORGANIZATIONS, empty otherwise."""
+    enrollmentOrganizationIds: [String!]!
+    """Whose enrolled PCs must encrypt their system drive with BitLocker. Never wider than enrollment."""
+    diskEncryption: MdmScope!
+    """Set for SELECTED_ORGANIZATIONS, empty otherwise; each one is also in MDM."""
+    diskEncryptionOrganizationIds: [String!]!
+    updatedAt: Instant
+    updatedBy: String
+}
+
+"""Rejected when diskEncryption is wider than enrollment, or an id is not an organization of the workspace."""
+input UpdateWindowsMdmSettingsInput {
+    enrollment: MdmScope!
+    enrollmentOrganizationIds: [String!]
+    diskEncryption: MdmScope!
+    diskEncryptionOrganizationIds: [String!]
+}
+
+type WindowsMdmSettingsImpact {
+    """Enrolled or pending PCs that would turn LEAVING."""
+    leavingDevices: [Machine!]!
+    """Enrolled PCs that would no longer be required to encrypt. BitLocker stays on; OpenFrame stops checking it."""
+    encryptionNoLongerRequired: [Machine!]!
+}
+
+enum MdmDeviceAction {
+    LOCK
+    UNLOCK
+    WIPE
+    REMOVE_FROM_MDM
+    ADD_TO_MDM
+    VIEW_RECOVERY_KEY
+}
+
+enum DiskEncryptionState {
+    """BitLocker protects the system drive and its recovery key is in OpenFrame."""
+    ENCRYPTED
+    """BitLocker is encrypting; the recovery key arrives when it finishes."""
+    ENCRYPTING
+    """Encryption finished on the PC; OpenFrame is checking it and storing the recovery key."""
+    VERIFYING
+    """Required; BitLocker starts the next time the PC is online."""
+    PENDING
+    """BitLocker could not start; error says why."""
+    FAILED
+    """The PC's organization does not require encryption; OpenFrame does not change BitLocker on it."""
+    NOT_REQUIRED
+    """The PC is not in MDM, so OpenFrame does not manage its encryption."""
+    NOT_MANAGED
+}
+
+type DiskEncryption {
+    state: DiskEncryptionState!
+    """The PC's reason when state is FAILED, e.g. no TPM found."""
+    error: String
+    """True when OpenFrame holds a recovery key for the system drive: revealRecoveryKey returns it."""
+    recoveryKeyStored: Boolean!
+    """When the agent sent the current recovery key."""
+    recoveryKeyStoredAt: Instant
+    updatedAt: Instant
+}
+
+type RecoveryKey {
+    machineId: String!
+    """48 digits in eight groups of six, as the BitLocker recovery screen asks for them."""
+    key: String!
+    storedAt: Instant!
+}
+
+enum DeviceLockState {
+    """Runs the next time the PC is online."""
+    LOCK_PENDING
+    """Local sign-in is off; only OpenFrame can unlock it."""
+    LOCKED
+    """Runs when the PC is on and online."""
+    UNLOCK_PENDING
+}
+
+type DeviceLock {
+    state: DeviceLockState!
+    """Shown by Windows before sign-in while the PC is locked."""
+    message: String
+    requestedBy: String!
+    requestedAt: Instant!
+    """When the PC ran the lock; null while LOCK_PENDING."""
+    lockedAt: Instant
+}
+
+enum DeviceWipeState {
+    """Starts the next time the PC is online; cannot be cancelled."""
+    WIPE_PENDING
+    """The PC accepted the wipe and is resetting."""
+    WIPED
+    """The PC refused the wipe; error says why."""
+    FAILED
+}
+
+type DeviceWipe {
+    state: DeviceWipeState!
+    error: String
+    requestedBy: String!
+    requestedAt: Instant!
+    """When the PC accepted the wipe."""
+    wipedAt: Instant
+}
+
+input LockWindowsDeviceInput {
+    machineId: String!
+    """Optional, up to 240 characters: shown by Windows before sign-in while the PC is locked, e.g. who owns it and
+    whom to call."""
+    message: String
+}
+
+input WipeWindowsDeviceInput {
+    machineId: String!
+    """The device's name typed in full by the technician; the wipe is rejected when it does not match."""
+    confirmation: String!
+}
+
+type MdmProfile {
+    id: ID!
+    name: String!
+    platform: MdmPlatform!
+    """Sent to the devices as written: Windows SyncML."""
+    payload: String!
+    """The LocURIs the payload sets, in order."""
+    locUris: [String!]!
+    """Whose devices get it: ALL_ORGANIZATIONS means every organization in MDM. Never OFF."""
+    scope: MdmScope!
+    """Set for SELECTED_ORGANIZATIONS, empty otherwise."""
+    organizationIds: [String!]!
+    """Device counts by status."""
+    verified: Int!
+    verifying: Int!
+    pending: Int!
+    failed: Int!
+    createdAt: Instant!
+    createdBy: String!
+}
+
+"""The payload must be Windows SyncML with only Replace or Add items, each with a Target LocURI and Data. It may not
+set BitLocker (./Device/Vendor/MSFT/BitLocker): disk encryption is set in windowsMdmSettings. Broken XML and any other
+top-level element are rejected, and so is a name the workspace already has."""
+input CreateMdmProfileInput {
+    name: String!
+    platform: MdmPlatform!
+    payload: String!
+    """ALL_ORGANIZATIONS or SELECTED_ORGANIZATIONS."""
+    scope: MdmScope!
+    organizationIds: [String!]
+}
+
+input UpdateMdmProfileInput {
+    id: ID!
+    scope: MdmScope!
+    organizationIds: [String!]
+}
+
+type MdmProfileDeviceStatus {
+    machine: Machine!
+    status: MdmProfileStatus!
+    """The device's reason when status is FAILED."""
+    detail: String
+    updatedAt: Instant
+}
+
+type MdmProfileDeviceConnection {
+    edges: [MdmProfileDeviceEdge!]!
+    pageInfo: PageInfo!
+}
+
+type MdmProfileDeviceEdge {
+    node: MdmProfileDeviceStatus!
+    cursor: String!
+}
+
+enum MdmDeviceEventType {
+    ENROLLED
+    UNENROLLED
+    REMOVED_FROM_MDM
+    ADDED_TO_MDM
+    RECOVERY_KEY_STORED
+    RECOVERY_KEY_VIEWED
+    ENCRYPTION_FAILED
+    LOCK_SENT
+    LOCKED
+    UNLOCK_SENT
+    UNLOCKED
+    WIPE_SENT
+    WIPED
+    WIPE_FAILED
+}
+
+type MdmDeviceEvent {
+    id: ID!
+    type: MdmDeviceEventType!
+    at: Instant!
+    """The technician's name; null for what the PC or OpenFrame did."""
+    by: String
+    """Extra facts, e.g. the BitLocker error or that the lock carried a message."""
+    detail: String
+}
+
+type MdmDeviceEventConnection {
+    edges: [MdmDeviceEventEdge!]!
+    pageInfo: PageInfo!
+}
+
+type MdmDeviceEventEdge {
+    node: MdmDeviceEvent!
+    cursor: String!
 }
