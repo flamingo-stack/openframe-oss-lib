@@ -15,6 +15,8 @@ pub struct PersistedMachineInfo {
     pub client_secret: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_machine_id: Option<String>,
 }
 
 // Manual Debug so `{:?}` never leaks the live client secret.
@@ -24,6 +26,7 @@ impl std::fmt::Debug for PersistedMachineInfo {
             .field("machine_id", &self.machine_id)
             .field("client_secret", &"<redacted>")
             .field("user_id", &self.user_id)
+            .field("local_machine_id", &self.local_machine_id)
             .finish()
     }
 }

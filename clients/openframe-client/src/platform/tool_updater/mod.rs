@@ -12,6 +12,7 @@ pub use standard::StandardToolUpdater;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
@@ -38,13 +39,16 @@ impl Default for UpdateContext {
 
 #[async_trait]
 pub trait ToolUpdater: Send + Sync {
+    /// Downloads the new version (the binary, or the archive of a macOS bundle) without touching the running tool.
+    async fn fetch(&self, tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Bytes>;
+
     async fn prepare(&self, tool: &InstalledTool) -> Result<UpdateContext>;
 
     async fn apply(
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
-        ctx: &UpdateContext,
+        fetched: Bytes,
     ) -> Result<Option<Installation>>;
 
     async fn finalize(&self, tool: &InstalledTool, ctx: &UpdateContext) -> Result<()>;
@@ -84,17 +88,34 @@ pub async fn run_update(
     config: &DownloadConfiguration,
     deps: ToolUpdaterDeps,
 ) -> Result<Option<Installation>> {
-    let tool_id = &tool.tool_agent_id;
     let updater = create_updater(&tool.installation, deps);
+    run_updater(updater.as_ref(), tool, config).await
+}
 
-    info!(tool_id = %tool_id, "Phase 1: Preparing update");
+/// fetch -> prepare (stop) -> apply -> finalize: a failed download leaves the running tool untouched.
+async fn run_updater(
+    updater: &dyn ToolUpdater,
+    tool: &InstalledTool,
+    config: &DownloadConfiguration,
+) -> Result<Option<Installation>> {
+    let tool_id = &tool.tool_agent_id;
+
+    info!(tool_id = %tool_id, "Phase 1: Downloading update");
+    let fetched = updater.fetch(tool, config).await.with_context(|| {
+        format!(
+            "Failed to download update for: {}, the running tool was not touched",
+            tool_id
+        )
+    })?;
+
+    info!(tool_id = %tool_id, "Phase 2: Preparing update");
     let ctx = updater
         .prepare(tool)
         .await
         .with_context(|| format!("Failed to prepare update for: {}", tool_id))?;
 
-    info!(tool_id = %tool_id, "Phase 2: Applying update");
-    let new_installation = match updater.apply(tool, config, &ctx).await {
+    info!(tool_id = %tool_id, "Phase 3: Applying update");
+    let new_installation = match updater.apply(tool, config, fetched).await {
         Ok(new_installation) => new_installation,
         Err(e) => {
             error!(tool_id = %tool_id, error = %e, "Update failed, rolling back");
@@ -105,7 +126,7 @@ pub async fn run_update(
         }
     };
 
-    info!(tool_id = %tool_id, "Phase 3: Finalizing update");
+    info!(tool_id = %tool_id, "Phase 4: Finalizing update");
     let finalize_tool = match &new_installation {
         Some(installation) => {
             let mut updated = tool.clone();
@@ -215,6 +236,7 @@ pub(crate) async fn backup_binary(
     Ok(Some(backup_path))
 }
 
+#[cfg(windows)]
 pub(crate) async fn download_and_write_binary(
     deps: &ToolUpdaterDeps,
     config: &DownloadConfiguration,
@@ -277,41 +299,6 @@ pub(crate) async fn restore_from_backup(
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
-pub struct UnsupportedToolUpdater {
-    message: String,
-}
-
-#[cfg(not(target_os = "macos"))]
-impl UnsupportedToolUpdater {
-    pub fn new(message: &str) -> Self {
-        Self {
-            message: message.to_string(),
-        }
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-#[async_trait]
-impl ToolUpdater for UnsupportedToolUpdater {
-    async fn prepare(&self, _tool: &InstalledTool) -> Result<UpdateContext> {
-        anyhow::bail!("{}", self.message)
-    }
-
-    async fn apply(
-        &self,
-        _tool: &InstalledTool,
-        _config: &DownloadConfiguration,
-        _ctx: &UpdateContext,
-    ) -> Result<Option<Installation>> {
-        anyhow::bail!("{}", self.message)
-    }
-
-    async fn finalize(&self, _tool: &InstalledTool, _ctx: &UpdateContext) -> Result<()> {
-        Ok(())
-    }
-
-    async fn rollback(&self, _tool: &InstalledTool, _ctx: &UpdateContext) -> Result<()> {
-        Ok(())
-    }
-}
+#[cfg(test)]
+#[path = "mod_tests.rs"]
+mod tests;
