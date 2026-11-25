@@ -94,6 +94,20 @@ public class DeviceService {
         return result;
     }
 
+    public void verifyExists(String machineId) {
+        if (findByMachineId(machineId).isEmpty()) {
+            throw new DeviceNotFoundException("Device not found: " + machineId);
+        }
+    }
+
+    // The devices of these organizations in the tenant, whatever their status but DELETED.
+    public List<String> findDeviceIdsOfOrganizations(Collection<String> organizationIds) {
+        MachineQueryFilter machineQueryFilter = MachineQueryFilter.builder()
+                .organizationIds(List.copyOf(organizationIds))
+                .build();
+        return machineRepository.findMachineIdsByCriteria(tenantIdProvider.getTenantId(), machineQueryFilter, null);
+    }
+
     public void verifyDispatchable(List<String> machineIds) {
         machineIds.forEach(this::verifyDispatchable);
     }

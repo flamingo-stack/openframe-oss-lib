@@ -20,6 +20,9 @@ import java.time.Instant;
         name = "tenant_machine_identifier",
         def = "{'tenantId': 1, 'machineId': 1, 'identifier': 1}",
         unique = true)
+@CompoundIndex(
+        name = "tenant_identifier_discovered",
+        def = "{'tenantId': 1, 'identifier': 1, 'discoveredAt': -1, 'machineId': -1}")
 public class DeviceOsPendingUpdate implements TenantScoped {
 
     @Id
