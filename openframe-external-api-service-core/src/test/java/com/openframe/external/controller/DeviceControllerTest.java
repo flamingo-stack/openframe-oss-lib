@@ -31,10 +31,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.Instant;
@@ -45,6 +47,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -73,6 +76,9 @@ class DeviceControllerTest {
     private DeviceFilterService deviceFilterService;
     @Mock
     private TagService tagService;
+
+    @Captor
+    private ArgumentCaptor<DeviceFilterCriteria> filterCaptor;
 
     private MockMvc mockMvc;
 
@@ -352,35 +358,49 @@ class DeviceControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"ONLINE", "OFFLINE", "ACTIVE", "INACTIVE", "MAINTENANCE", "DECOMMISSIONED"})
-    void listWithRemovedStatusIs400TypeMismatch(String status) throws Exception {
-        mockMvc.perform(get(BASE).param("statuses", status))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
+    void getDevices_removedStatus_badRequestTypeMismatch(String status) throws Exception {
+        // setup
+        MockHttpServletRequestBuilder request = get(BASE).param("statuses", status);
 
+        // execution
+        ResultActions result = mockMvc.perform(request);
+
+        // verifications
+        result.andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
         verifyNoInteractions(deviceService);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"ONLINE", "OFFLINE", "ACTIVE", "INACTIVE", "MAINTENANCE", "DECOMMISSIONED"})
-    void filtersWithRemovedStatusAre400TypeMismatch(String status) throws Exception {
-        mockMvc.perform(get(BASE + "/filters").param("statuses", status))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
+    void getDeviceFilters_removedStatus_badRequestTypeMismatch(String status) throws Exception {
+        // setup
+        MockHttpServletRequestBuilder request = get(BASE + "/filters").param("statuses", status);
 
+        // execution
+        ResultActions result = mockMvc.perform(request);
+
+        // verifications
+        result.andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
         verifyNoInteractions(deviceFilterService);
     }
 
     @Test
-    void listWithManagedStatusAndOnlineConnectivityPassesBothToTheDomain() throws Exception {
+    void getDevices_managedStatusAndOnlineConnectivity_bothPassedToTheDomain() throws Exception {
+        // setup
         when(deviceService.queryDevices(any(), any(), any(), any())).thenReturn(page());
+        MockHttpServletRequestBuilder request = get(BASE).param("statuses", "MANAGED").param("connectivity", "ONLINE");
 
-        mockMvc.perform(get(BASE).param("statuses", "MANAGED").param("connectivity", "ONLINE"))
-                .andExpect(status().isOk());
+        // execution
+        ResultActions result = mockMvc.perform(request);
 
-        ArgumentCaptor<DeviceFilterCriteria> filter = ArgumentCaptor.forClass(DeviceFilterCriteria.class);
-        verify(deviceService).queryDevices(filter.capture(), any(), isNull(), isNull());
-        assertEquals(List.of(DeviceStatus.MANAGED), filter.getValue().getStatuses());
-        assertEquals(List.of(TelemetryStatus.ONLINE), filter.getValue().getConnectivity());
+        // verifications
+        result.andExpect(status().isOk());
+        verify(deviceService).queryDevices(filterCaptor.capture(), any(), isNull(), isNull());
+        assertThat(filterCaptor.getValue())
+                .extracting(DeviceFilterCriteria::getStatuses, DeviceFilterCriteria::getConnectivity)
+                .containsExactly(List.of(DeviceStatus.MANAGED), List.of(TelemetryStatus.ONLINE));
     }
 
     @Test
