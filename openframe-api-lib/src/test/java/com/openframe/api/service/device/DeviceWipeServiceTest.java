@@ -115,7 +115,8 @@ class DeviceWipeServiceTest {
 
         // execution / verifications
         assertThatThrownBy(() -> service.wipeWindowsDevice(MACHINE_ID, HOSTNAME))
-                .isInstanceOf(BadRequestException.class);
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Only a managed Windows device can be wiped");
         verifyNoInteractions(fleetMdmClientProvider);
     }
 
@@ -128,7 +129,8 @@ class DeviceWipeServiceTest {
 
         // execution / verifications
         assertThatThrownBy(() -> service.wipeWindowsDevice(MACHINE_ID, HOSTNAME))
-                .isInstanceOf(BadRequestException.class);
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Only a managed Windows device can be wiped");
         verifyNoInteractions(fleetMdmClientProvider);
     }
 

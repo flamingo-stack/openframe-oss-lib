@@ -76,6 +76,29 @@ class FleetMdmClientWipeTest {
                 });
     }
 
+    @Test
+    void wipeHost_refusalWithANonJsonBody_hasNoReason() throws Exception {
+        // setup
+        stubResponse(422, "<html>Bad Gateway</html>");
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+
+        // execution / verifications
+        assertThatThrownBy(() -> client.wipeHost(42L, WindowsWipeType.DO_WIPE_PROTECTED))
+                .isInstanceOfSatisfying(FleetMdmApiException.class, e -> assertThat(e.getReason()).isNull());
+    }
+
+    @Test
+    void wipeHost_refusalWithAnEmptyBody_namesOnlyTheStatus() throws Exception {
+        // setup
+        stubResponse(422, "");
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+
+        // execution / verifications
+        assertThatThrownBy(() -> client.wipeHost(42L, WindowsWipeType.DO_WIPE_PROTECTED))
+                .isInstanceOf(FleetMdmApiException.class)
+                .hasMessage("wipe Fleet host 42 failed with HTTP 422");
+    }
+
     private void stubResponse(int status, String body) throws Exception {
         when(httpResponse.body()).thenReturn(body);
         stubStatus(status);
