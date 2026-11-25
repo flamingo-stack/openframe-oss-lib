@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.OsUpdateNotFoundException;
 import com.openframe.api.mapper.OsUpdateResponseMapper;
 import com.openframe.data.document.rmm.osupdate.DeviceOsPendingUpdate;
+import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
@@ -198,8 +199,8 @@ class OsUpdateQueryServiceTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(osUpdateRepository.findByTenantIdAndIdIn(TENANT_ID, osUpdateIds))
                 .thenReturn(List.of(windowsUpdate, otherWindowsUpdate));
-        when(deviceOsStateRepository.findMachineIds(TENANT_ID, OsUpdateManageabilityState.NOT_MANAGEABLE))
-                .thenReturn(NOT_MANAGEABLE_MACHINE_IDS);
+        when(deviceOsStateRepository.findByTenantIdAndManageabilityState(
+                TENANT_ID, OsUpdateManageabilityState.NOT_MANAGEABLE)).thenReturn(notManageableStates());
         when(deviceOsPendingUpdateRepository.countDevicesByIdentifier(
                 TENANT_ID, OsPlatform.WINDOWS, identifiers, NOT_MANAGEABLE_MACHINE_IDS))
                 .thenReturn(List.of(new OsUpdateDeviceCount(WINDOWS_IDENTIFIER, 7)));
@@ -228,8 +229,8 @@ class OsUpdateQueryServiceTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(osUpdateRepository.findByTenantIdAndIdIn(TENANT_ID, osUpdateIds))
                 .thenReturn(List.of(windowsUpdate, macUpdate));
-        when(deviceOsStateRepository.findMachineIds(TENANT_ID, OsUpdateManageabilityState.NOT_MANAGEABLE))
-                .thenReturn(NOT_MANAGEABLE_MACHINE_IDS);
+        when(deviceOsStateRepository.findByTenantIdAndManageabilityState(
+                TENANT_ID, OsUpdateManageabilityState.NOT_MANAGEABLE)).thenReturn(notManageableStates());
         when(deviceOsPendingUpdateRepository.countDevicesByIdentifier(
                 TENANT_ID, OsPlatform.WINDOWS, List.of(WINDOWS_IDENTIFIER), NOT_MANAGEABLE_MACHINE_IDS))
                 .thenReturn(List.of(new OsUpdateDeviceCount(WINDOWS_IDENTIFIER, 1)));
@@ -278,8 +279,8 @@ class OsUpdateQueryServiceTest {
                 .machineId("machine-1").status(OsUpdateDeviceStatus.PENDING).cursor(CursorCodec.encode("raw-1")).build();
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(osUpdateRepository.findByTenantIdAndId(TENANT_ID, WINDOWS_ID)).thenReturn(Optional.of(windowsUpdate));
-        when(deviceOsStateRepository.findMachineIds(TENANT_ID, OsUpdateManageabilityState.NOT_MANAGEABLE))
-                .thenReturn(NOT_MANAGEABLE_MACHINE_IDS);
+        when(deviceOsStateRepository.findByTenantIdAndManageabilityState(
+                TENANT_ID, OsUpdateManageabilityState.NOT_MANAGEABLE)).thenReturn(notManageableStates());
         when(deviceOsPendingUpdateRepository.findDevicePage(
                 TENANT_ID, OsPlatform.WINDOWS, WINDOWS_IDENTIFIER, NOT_MANAGEABLE_MACHINE_IDS, "raw-0", 2))
                 .thenReturn(List.of(newerPending, olderPending));
@@ -391,5 +392,11 @@ class OsUpdateQueryServiceTest {
                 .identifier(WINDOWS_IDENTIFIER)
                 .discoveredAt(discoveredAt)
                 .build();
+    }
+
+    private static List<DeviceOsState> notManageableStates() {
+        return NOT_MANAGEABLE_MACHINE_IDS.stream()
+                .map(machineId -> DeviceOsState.builder().machineId(machineId).build())
+                .toList();
     }
 }

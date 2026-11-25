@@ -16,8 +16,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
@@ -34,7 +32,6 @@ class CustomDeviceOsPendingUpdateRepositoryImplTest {
     private static final String TENANT_ID = "tenant-1";
     private static final String MACHINE_ID = "machine-1";
     private static final String IDENTIFIER = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
-    private static final String OTHER_IDENTIFIER = "ffeeddcc-1111-2222-3333-445566778899:198";
     private static final List<String> EXCLUDED_MACHINE_IDS = List.of("machine-9");
     private static final Instant DISCOVERED_AT = Instant.parse("2026-11-20T09:14:02Z");
     private static final String CURSOR = DISCOVERED_AT.toEpochMilli() + "|" + MACHINE_ID;
@@ -42,7 +39,6 @@ class CustomDeviceOsPendingUpdateRepositoryImplTest {
     @Mock private MongoTemplate mongoTemplate;
 
     @Captor private ArgumentCaptor<Query> queryCaptor;
-    @Captor private ArgumentCaptor<Aggregation> aggregationCaptor;
 
     @InjectMocks private CustomDeviceOsPendingUpdateRepositoryImpl repository;
 
@@ -57,31 +53,6 @@ class CustomDeviceOsPendingUpdateRepositoryImplTest {
                 .identifier(IDENTIFIER)
                 .discoveredAt(DISCOVERED_AT)
                 .build();
-    }
-
-    @Test
-    void countDevicesByIdentifier_identifiersAndExcludedMachines_countsThePendingRowsPerIdentifier() {
-        // setup
-        List<String> identifiers = List.of(IDENTIFIER, OTHER_IDENTIFIER);
-        List<OsUpdateDeviceCount> counted = List.of(new OsUpdateDeviceCount(IDENTIFIER, 3));
-        AggregationResults<OsUpdateDeviceCount> aggregationResults = new AggregationResults<>(counted, new Document());
-        when(mongoTemplate.aggregate(aggregationCaptor.capture(), eq(DeviceOsPendingUpdate.class),
-                eq(OsUpdateDeviceCount.class))).thenReturn(aggregationResults);
-        Document pendingOnCountedDevices = new Document("tenantId", TENANT_ID)
-                .append("platform", OsPlatform.WINDOWS)
-                .append("identifier", new Document("$in", identifiers))
-                .append("machineId", new Document("$nin", EXCLUDED_MACHINE_IDS));
-        Document countByIdentifier = new Document("_id", "$identifier")
-                .append("deviceCount", new Document("$sum", 1));
-
-        // execution
-        List<OsUpdateDeviceCount> deviceCounts = repository.countDevicesByIdentifier(
-                TENANT_ID, OsPlatform.WINDOWS, identifiers, EXCLUDED_MACHINE_IDS);
-
-        // verifications
-        assertThat(deviceCounts).containsExactly(new OsUpdateDeviceCount(IDENTIFIER, 3));
-        assertThat(aggregationCaptor.getValue().toPipeline(Aggregation.DEFAULT_CONTEXT)).containsExactly(
-                new Document("$match", pendingOnCountedDevices), new Document("$group", countByIdentifier));
     }
 
     @ParameterizedTest

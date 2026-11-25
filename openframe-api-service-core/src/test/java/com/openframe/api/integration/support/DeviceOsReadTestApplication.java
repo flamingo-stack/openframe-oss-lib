@@ -25,6 +25,8 @@ import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
+import com.openframe.publishing.transaction.MongoTransactionRunner;
 import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
@@ -60,6 +62,8 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = {
                 ".*\\.MachineRepository",
                 ".*\\.ScriptScheduleMachineAssignedRepository",
+                ".*\\.SoftwareScheduleMachineAssignedRepository",
+                ".*\\.SoftwareScheduleOnlineDispatchRepository",
                 ".*\\.DeviceOnlineDispatchRepository",
                 ".*\\.DeviceSoftwareRepository",
                 ".*\\.osupdate\\..*"
@@ -90,6 +94,15 @@ public class DeviceOsReadTestApplication {
     @Bean
     TenantIdProvider tenantIdProvider() {
         return () -> TENANT_ID;
+    }
+
+    // The container is no replica set, so no transactions: the mutation runs as is
+    @Bean
+    ScheduleMutationTransaction scheduleMutationTransaction() throws Throwable {
+        ScheduleMutationTransaction scheduleMutationTransaction = Mockito.mock(ScheduleMutationTransaction.class);
+        Mockito.when(scheduleMutationTransaction.run(Mockito.any())).thenAnswer(invocation ->
+                invocation.<MongoTransactionRunner.Transaction<Object>>getArgument(0).execute());
+        return scheduleMutationTransaction;
     }
 
     @Bean

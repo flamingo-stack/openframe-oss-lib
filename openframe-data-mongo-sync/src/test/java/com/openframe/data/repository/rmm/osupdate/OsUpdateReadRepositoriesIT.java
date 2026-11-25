@@ -182,7 +182,7 @@ class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    void findMachineIds_notManageable_onlyTheTenantsDevicesInThatState() {
+    void findByTenantIdAndManageabilityState_notManageable_onlyTheTenantsDevicesInThatState() {
         // setup
         deviceOsStateRepository.save(state(TENANT_ID, "machine-1", OsUpdateManageabilityState.NOT_MANAGEABLE));
         deviceOsStateRepository.save(state(TENANT_ID, "machine-2", OsUpdateManageabilityState.MANAGEABLE));
@@ -190,11 +190,11 @@ class OsUpdateReadRepositoriesIT extends BaseMongoIntegrationTest {
         deviceOsStateRepository.save(state(OTHER_TENANT_ID, "machine-4", OsUpdateManageabilityState.NOT_MANAGEABLE));
 
         // execution
-        List<String> machineIds =
-                deviceOsStateRepository.findMachineIds(TENANT_ID, OsUpdateManageabilityState.NOT_MANAGEABLE);
+        List<DeviceOsState> states = deviceOsStateRepository.findByTenantIdAndManageabilityState(
+                TENANT_ID, OsUpdateManageabilityState.NOT_MANAGEABLE);
 
         // verifications
-        assertThat(machineIds).containsExactly("machine-1");
+        assertThat(states).extracting(DeviceOsState::getMachineId).containsExactly("machine-1");
     }
 
     @Test

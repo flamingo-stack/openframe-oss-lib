@@ -8,10 +8,6 @@ import java.util.List;
 
 public interface CustomDeviceOsPendingUpdateRepository {
 
-    List<OsUpdateDeviceCount> countDevicesByIdentifier(String tenantId, OsPlatform platform,
-                                                       Collection<String> identifiers,
-                                                       Collection<String> excludedMachineIds);
-
     List<DeviceOsPendingUpdate> findDevicePage(String tenantId, OsPlatform platform, String identifier,
                                                Collection<String> excludedMachineIds, String cursor, int limit);
 

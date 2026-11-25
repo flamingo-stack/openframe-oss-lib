@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.exception.OsUpdateNotFoundException;
 import com.openframe.api.mapper.OsUpdateResponseMapper;
 import com.openframe.data.document.rmm.osupdate.DeviceOsPendingUpdate;
+import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
@@ -108,8 +109,11 @@ public class OsUpdateQueryService {
     }
 
     private List<String> findNotManageableMachineIds() {
-        return deviceOsStateRepository.findMachineIds(
+        List<DeviceOsState> notManageableStates = deviceOsStateRepository.findByTenantIdAndManageabilityState(
                 tenantIdProvider.getTenantId(), OsUpdateManageabilityState.NOT_MANAGEABLE);
+        return notManageableStates.stream()
+                .map(DeviceOsState::getMachineId)
+                .toList();
     }
 
     // An identifier names one update within one platform.

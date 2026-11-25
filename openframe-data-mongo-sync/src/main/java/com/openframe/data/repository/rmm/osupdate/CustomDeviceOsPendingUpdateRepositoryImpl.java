@@ -5,10 +5,6 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
-import org.springframework.data.mongodb.core.aggregation.GroupOperation;
-import org.springframework.data.mongodb.core.aggregation.MatchOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -28,28 +24,10 @@ public class CustomDeviceOsPendingUpdateRepositoryImpl implements CustomDeviceOs
     private static final String FIELD_PLATFORM = "platform";
     private static final String FIELD_IDENTIFIER = "identifier";
     private static final String FIELD_DISCOVERED_AT = "discoveredAt";
-    private static final String FIELD_DEVICE_COUNT = "deviceCount";
     private static final Sort NEWEST_DISCOVERED_FIRST =
             Sort.by(Sort.Direction.DESC, FIELD_DISCOVERED_AT, FIELD_MACHINE_ID);
 
     private final MongoTemplate mongoTemplate;
-
-    // A device has one pending row per update, so the rows of an identifier are its devices.
-    @Override
-    public List<OsUpdateDeviceCount> countDevicesByIdentifier(String tenantId, OsPlatform platform,
-                                                              Collection<String> identifiers,
-                                                              Collection<String> excludedMachineIds) {
-        Criteria pendingOnCountedDevices = Criteria.where(FIELD_TENANT_ID).is(tenantId)
-                .and(FIELD_PLATFORM).is(platform)
-                .and(FIELD_IDENTIFIER).in(identifiers)
-                .and(FIELD_MACHINE_ID).nin(excludedMachineIds);
-        MatchOperation matchPending = Aggregation.match(pendingOnCountedDevices);
-        GroupOperation countByIdentifier = Aggregation.group(FIELD_IDENTIFIER).count().as(FIELD_DEVICE_COUNT);
-        Aggregation deviceCountByIdentifier = Aggregation.newAggregation(matchPending, countByIdentifier);
-        AggregationResults<OsUpdateDeviceCount> deviceCounts = mongoTemplate.aggregate(
-                deviceCountByIdentifier, DeviceOsPendingUpdate.class, OsUpdateDeviceCount.class);
-        return deviceCounts.getMappedResults();
-    }
 
     @Override
     public List<DeviceOsPendingUpdate> findDevicePage(String tenantId, OsPlatform platform, String identifier,

@@ -131,31 +131,6 @@ class CustomDeviceOsUpdateHistoryRepositoryImplTest {
         assertThat(cursor).isEqualTo(CURSOR);
     }
 
-    @Test
-    void countInstalledDevicesByIdentifier_identifiers_countsEachDeviceOncePerIdentifierAmongSuccessfulInstalls() {
-        // setup
-        List<String> identifiers = List.of(IDENTIFIER);
-        List<OsUpdateDeviceCount> counted = List.of(new OsUpdateDeviceCount(IDENTIFIER, 2));
-        AggregationResults<OsUpdateDeviceCount> aggregationResults = new AggregationResults<>(counted, new Document());
-        when(mongoTemplate.aggregate(aggregationCaptor.capture(), eq(DeviceOsUpdateHistoryEntry.class),
-                eq(OsUpdateDeviceCount.class))).thenReturn(aggregationResults);
-        Document installs = successfulInstalls().append("identifier", new Document("$in", identifiers));
-        Document oncePerDevice = new Document("_id",
-                new Document("identifier", "$identifier").append("machineId", "$machineId"));
-        Document countByIdentifier = new Document("_id", "$_id.identifier")
-                .append("deviceCount", new Document("$sum", 1));
-
-        // execution
-        List<OsUpdateDeviceCount> deviceCounts = repository.countInstalledDevicesByIdentifier(TENANT_ID, identifiers);
-
-        // verifications
-        assertThat(deviceCounts).containsExactly(new OsUpdateDeviceCount(IDENTIFIER, 2));
-        assertThat(aggregationCaptor.getValue().toPipeline(Aggregation.DEFAULT_CONTEXT)).containsExactly(
-                new Document("$match", installs),
-                new Document("$group", oncePerDevice),
-                new Document("$group", countByIdentifier));
-    }
-
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", " "})

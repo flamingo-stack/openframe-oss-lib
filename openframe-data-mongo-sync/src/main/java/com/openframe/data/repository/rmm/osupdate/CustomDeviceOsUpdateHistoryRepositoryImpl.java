@@ -21,7 +21,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -37,7 +36,6 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
     private static final String FIELD_IDENTIFIER = "identifier";
     private static final String FIELD_OPERATION = "operation";
     private static final String FIELD_RESULT = "result";
-    private static final String FIELD_DEVICE_COUNT = "deviceCount";
     private static final List<OsUpdateInstallResult> INSTALLED_RESULTS =
             List.of(OsUpdateInstallResult.SUCCEEDED, OsUpdateInstallResult.SUCCEEDED_WITH_ERRORS);
     private static final String CURSOR_SEPARATOR = "|";
@@ -56,21 +54,6 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
     @Override
     public String encodeCursor(DeviceOsUpdateHistoryEntry historyEntry) {
         return historyEntry.getInstalledAt().toEpochMilli() + CURSOR_SEPARATOR + historyEntry.getId();
-    }
-
-    // A device may install one update more than once: it is counted once.
-    @Override
-    public List<OsUpdateDeviceCount> countInstalledDevicesByIdentifier(String tenantId,
-                                                                       Collection<String> identifiers) {
-        Criteria installs = installs(tenantId).and(FIELD_IDENTIFIER).in(identifiers);
-        MatchOperation matchInstalls = Aggregation.match(installs);
-        GroupOperation oncePerDevice = Aggregation.group(FIELD_IDENTIFIER, FIELD_MACHINE_ID);
-        GroupOperation countByIdentifier = Aggregation.group(FIELD_IDENTIFIER).count().as(FIELD_DEVICE_COUNT);
-        Aggregation deviceCountByIdentifier =
-                Aggregation.newAggregation(matchInstalls, oncePerDevice, countByIdentifier);
-        AggregationResults<OsUpdateDeviceCount> deviceCounts = mongoTemplate.aggregate(
-                deviceCountByIdentifier, DeviceOsUpdateHistoryEntry.class, OsUpdateDeviceCount.class);
-        return deviceCounts.getMappedResults();
     }
 
     // One row per device: its latest successful install of the update.
