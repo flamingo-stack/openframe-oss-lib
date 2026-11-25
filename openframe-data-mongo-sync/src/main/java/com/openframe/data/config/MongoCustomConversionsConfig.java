@@ -26,6 +26,7 @@ public class MongoCustomConversionsConfig {
         return MongoCustomConversions.create(adapter -> {
             adapter.bigDecimal(BigDecimalRepresentation.DECIMAL128);
             adapter.registerConverters(LocalDateUtcMongoConverters.converters());
+            adapter.registerConverter(DeviceStatusReadingConverter.INSTANCE);
             contributors.orderedStream().forEach(contributor -> contributor.configure(adapter));
         });
     }
