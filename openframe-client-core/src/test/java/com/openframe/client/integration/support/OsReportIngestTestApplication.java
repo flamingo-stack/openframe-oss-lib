@@ -12,6 +12,7 @@ import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
 import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -45,6 +46,8 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
                 ".*\\.MachineRepository",
                 ".*\\.ScriptScheduleMachineAssignedRepository",
                 ".*\\.DeviceOnlineDispatchRepository",
+                ".*\\.SoftwareScheduleMachineAssignedRepository",
+                ".*\\.SoftwareScheduleOnlineDispatchRepository",
                 ".*\\.DeviceSoftwareRepository",
                 ".*\\.osupdate\\..*"
         }))
@@ -58,6 +61,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         CustomMachineRepositoryImpl.class,
         MachineWriter.class,
         DeletedMachineCleanup.class,
+        ScheduleMutationTransaction.class,
         NatsTopicMachineIdExtractor.class,
         MachinePackageManagersListener.class,
         MachinePackageManagersService.class

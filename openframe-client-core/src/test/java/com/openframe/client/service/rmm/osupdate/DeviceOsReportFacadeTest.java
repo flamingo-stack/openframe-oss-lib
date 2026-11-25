@@ -88,7 +88,7 @@ class DeviceOsReportFacadeTest {
 
         // verifications
         inOrder.verify(deviceOsStateService).saveIfNotOlder(deviceOsState);
-        inOrder.verify(osUpdateService).saveMissing(osUpdates);
+        inOrder.verify(osUpdateService).saveReported(osUpdates);
         inOrder.verify(deviceOsPendingUpdateService).replacePendingUpdates(machine, pendingUpdates);
         inOrder.verify(deviceOsUpdateHistoryService).saveMissing(machine, historyEntries);
         inOrder.verify(deviceOsUpdateHistoryLogService).logNewEntries(newHistoryEntries);

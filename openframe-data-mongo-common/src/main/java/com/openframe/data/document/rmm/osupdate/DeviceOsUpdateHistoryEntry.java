@@ -24,6 +24,9 @@ import java.time.Instant;
 @CompoundIndex(
         name = "tenant_machine_installed",
         def = "{'tenantId': 1, 'machineId': 1, 'installedAt': -1, '_id': -1}")
+@CompoundIndex(
+        name = "tenant_identifier_installed",
+        def = "{'tenantId': 1, 'identifier': 1, 'installedAt': -1}")
 public class DeviceOsUpdateHistoryEntry implements TenantScoped {
 
     // Counted from installedAt. The TTL index of the collection is created with this value, and an index that
