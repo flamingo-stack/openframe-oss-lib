@@ -197,6 +197,23 @@ class WindowsOsUpdateEnricherTest {
         verify(osUpdateEnrichmentMetrics).recordSourceFailed(OsUpdateSource.CISA_KEV);
     }
 
+    @Test
+    void enrich_kevFailsForAnUpdateKevHadFlagged_staysExploited() {
+        // setup
+        OsUpdate cumulative = osUpdate(OsPlatform.WINDOWS, "2026-11 Cumulative Update (KB5132061)", List.of("5132061"));
+        cumulative.setCveIds(List.of("CVE-2026-96157"));
+        cumulative.setExploited(true);
+        when(cisaKevClient.getKnownExploitedCveIds())
+                .thenThrow(new OsUpdateSourceUnavailableException(OsUpdateSource.CISA_KEV, "503"));
+        when(msrcCvrfClient.getKbArticles(NOVEMBER)).thenReturn(Map.of("5132061", NOVEMBER_CUMULATIVE));
+
+        // execution
+        enricher.enrich(List.of(cumulative), ENRICHED_AT);
+
+        // verifications
+        assertThat(cumulative.getExploited()).isTrue();
+    }
+
     private static OsUpdate osUpdate(OsPlatform platform, String displayName, List<String> kbArticleIds) {
         return OsUpdate.builder()
                 .platform(platform)

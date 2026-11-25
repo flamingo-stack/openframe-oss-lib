@@ -44,7 +44,7 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
 
     @Override
     public void enrich(List<OsUpdate> osUpdates, Instant enrichedAt) {
-        Set<String> knownExploitedCveIds = findKnownExploitedCveIds();
+        Optional<Set<String>> knownExploitedCveIds = findKnownExploitedCveIds();
         Map<Optional<YearMonth>, List<OsUpdate>> osUpdatesByMonth = new LinkedHashMap<>();
         osUpdates.forEach(osUpdate -> osUpdatesByMonth
                 .computeIfAbsent(bulletinMonth(osUpdate), month -> new ArrayList<>())
@@ -58,13 +58,13 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         });
     }
 
-    // Without KEV only MSRC's own exploited flag counts; KEV is asked again when the entry's TTL runs out.
-    private Set<String> findKnownExploitedCveIds() {
+    // Empty = KEV unavailable this run; it is asked again when the entry's TTL runs out.
+    private Optional<Set<String>> findKnownExploitedCveIds() {
         try {
-            return cisaKevClient.getKnownExploitedCveIds();
+            return Optional.of(cisaKevClient.getKnownExploitedCveIds());
         } catch (OsUpdateSourceUnavailableException failure) {
             recordSourceFailed(failure);
-            return Set.of();
+            return Optional.empty();
         }
     }
 
@@ -85,7 +85,7 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
 
     // The bulletin's own CVEs and rating fill only what the device did not report; its score is always taken.
     private void enrich(OsUpdate osUpdate, Map<String, MsrcKbArticle> kbArticles,
-                        Set<String> knownExploitedCveIds, Instant enrichedAt) {
+                        Optional<Set<String>> knownExploitedCveIds, Instant enrichedAt) {
         List<MsrcKbArticle> matchedKbArticles = Objects.requireNonNullElse(osUpdate.getKbArticleIds(), List.<String>of())
                 .stream()
                 .map(WindowsOsUpdateEnricher::toKbNumber)
@@ -114,7 +114,11 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         boolean exploitedByMsrc = matchedKbArticles.stream().anyMatch(MsrcKbArticle::isExploited);
         List<String> cveIds = Objects.requireNonNullElse(osUpdate.getCveIds(), List.of());
         if (exploitedByMsrc || !cveIds.isEmpty()) {
-            osUpdate.setExploited(exploitedByMsrc || cveIds.stream().anyMatch(knownExploitedCveIds::contains));
+            // Without KEV a flag KEV set earlier must not drop
+            boolean exploitedByKev = knownExploitedCveIds
+                    .map(kevCveIds -> cveIds.stream().anyMatch(kevCveIds::contains))
+                    .orElse(Boolean.TRUE.equals(osUpdate.getExploited()));
+            osUpdate.setExploited(exploitedByMsrc || exploitedByKev);
         }
         osUpdate.setEnrichedAt(enrichedAt);
         if (matchedKbArticles.isEmpty()) {

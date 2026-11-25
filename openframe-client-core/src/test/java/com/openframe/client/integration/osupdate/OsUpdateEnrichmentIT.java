@@ -208,6 +208,27 @@ class OsUpdateEnrichmentIT {
     }
 
     @Test
+    void run_kevDownAfterItFlaggedTheUpdate_staysExploited() {
+        // setup
+        OsUpdate outlook = windows("outlook", "2026-11 Security Update for Outlook (KB5132061)", "5132061");
+        outlook.setCveIds(List.of("CVE-2026-124194"));
+        outlook = osUpdateRepository.save(outlook);
+        osUpdateEnrichmentScheduler.run();
+        assertThat(stored(outlook).getExploited()).isTrue();
+        OsUpdate expired = stored(outlook);
+        expired.setEnrichedAt(Instant.now().minus(2, ChronoUnit.DAYS));
+        osUpdateRepository.save(expired);
+        FAILING_PATHS.put("/kev.json", 503);
+
+        // execution
+        osUpdateEnrichmentScheduler.run();
+
+        // verifications
+        assertThat(stored(outlook).getExploited()).isTrue();
+        assertThat(stored(outlook).getEnrichedAt()).isAfter(Instant.now().minus(1, ChronoUnit.HOURS));
+    }
+
+    @Test
     void run_enrichedWithinTheTtl_notAskedAgain() {
         // setup
         OsUpdate november = windows("nov", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061");
