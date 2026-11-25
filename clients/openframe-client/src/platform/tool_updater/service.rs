@@ -160,6 +160,7 @@ impl ToolUpdater for ServiceToolUpdater {
         })
     }
 
+    // config is read only by the macOS .app bundle branch
     #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
     async fn apply(
         &self,
