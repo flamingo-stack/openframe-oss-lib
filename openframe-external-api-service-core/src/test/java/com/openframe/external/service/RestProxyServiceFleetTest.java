@@ -141,7 +141,9 @@ class RestProxyServiceFleetTest {
         assertThat(received.get().method()).isEqualTo("POST");
         assertThat(received.get().uri()).isEqualTo("/api/latest/fleet/policies");
         assertThat(received.get().body()).isEqualTo(body);
-        assertThat(received.get().headers().get(TENANT_HEADER)).containsExactly(TENANT_ID);
+        assertThat(received.get().headers().getFirst(TENANT_HEADER)).isEqualTo(TENANT_ID);
+        assertThat(received.get().headers().getFirst("Content-Type")).startsWith(MediaType.APPLICATION_JSON_VALUE);
+        assertThat(received.get().headers().getFirst("Authorization")).isEqualTo("Bearer " + FLEET_TOKEN);
     }
 
     @Test

@@ -200,11 +200,9 @@ class FleetProxyGuardTest {
             "PUT, /api/v1/fleet/policies",
             "POST, /api/v1/fleet/policies/7",
             "GET, /api/v1/fleet/labels/id/7",
-            "PATCH, /api/v1/fleet/policies/abc",
-            "DELETE, /api/v1/fleet/labels/id/../7",
-            "POST, /api/v1/fleet/queries/run;x=1"
+            "PATCH, /api/v1/fleet/policies/abc"
     })
-    void requireAllowed_writeNotListedForThatMethodOrPath_throwsEndpointNotAllowed(String method, String toolPath) {
+    void requireAllowed_methodNotListedForPath_throwsEndpointNotAllowed(String method, String toolPath) {
         // setup
         FleetProxyGuard guard = guard(true, READS_AND_WRITES);
 

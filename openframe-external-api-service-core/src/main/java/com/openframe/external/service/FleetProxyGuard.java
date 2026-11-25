@@ -59,7 +59,8 @@ public class FleetProxyGuard {
         if (!hasPlainSegmentsOnly(toolPath)) {
             return false;
         }
-        return allowedEndpoints.matches(HttpMethod.valueOf(method), toolPath);
+        HttpMethod httpMethod = HttpMethod.valueOf(method);
+        return allowedEndpoints.matches(httpMethod, toolPath);
     }
 
     private static boolean isFleet(String toolId) {

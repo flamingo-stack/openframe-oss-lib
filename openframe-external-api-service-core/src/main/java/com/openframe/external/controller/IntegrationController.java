@@ -40,10 +40,12 @@ public class IntegrationController {
             `POST .../queries/run`, `GET .../queries/{id}/report`, `GET`/`PUT .../queries/{id}/hosts`
             - labels: `GET`/`POST .../labels`, `DELETE .../labels/id/{id}`
 
+            Writes need `Content-Type: application/json`. `POST .../queries/run` starts a live query; its \
+            results are streamed over Fleet's websocket and cannot be read through this API.
+
             To find a device's Fleet host, call `hosts/identifier/{osUuid}` with the `osUuid` (or the \
             `serialNumber`) from `GET /api/v1/devices/{machineId}`; a hostname can match more than one host. \
-            A host, policy, query or label that is not yours answers 404, and another tenant's host ids in \
-            a request body are never applied.
+            A host, policy, query or label that is not yours answers 404.
             """
     )
     @ApiResponses({
