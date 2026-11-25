@@ -295,6 +295,7 @@ impl Client {
             device_data_fetcher.clone(),
             config_service.clone(),
             initial_configuration_service.clone(),
+            machine_id_service.clone(),
         );
 
         // Initialize registration processor

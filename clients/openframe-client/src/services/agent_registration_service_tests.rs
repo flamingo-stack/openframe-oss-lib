@@ -19,8 +19,9 @@ async fn an_empty_initial_key_is_refused_before_any_request() {
     let service = AgentRegistrationService::new(
         RegistrationClient::new(server.url.clone(), reqwest::Client::new()).unwrap(),
         DeviceDataFetcher::new(),
-        AgentConfigurationService::new(dm).unwrap(),
+        AgentConfigurationService::new(dm.clone()).unwrap(),
         initial,
+        MachineIdService::new(&dm),
     );
 
     let err = service.register_agent().await.unwrap_err();
