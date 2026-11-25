@@ -34,6 +34,8 @@ public class SoftwareScheduleOnlineDispatch implements TenantScoped {
 
     private String scheduleId;
 
+    private Instant scheduledFor;
+
     private Instant firstSeenAt;
 
     private Instant dispatchedAt;

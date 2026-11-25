@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm.schedule;
 
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -19,10 +20,12 @@ import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
+import com.openframe.data.service.rmm.ScheduleMutationTransaction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -35,6 +38,7 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
 
+/** Manages the devices and rules that determine where a script schedule runs. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -47,6 +51,7 @@ public class ScheduleScriptDeviceService {
     private final TenantIdProvider tenantIdProvider;
     private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     private final ScheduleDeliveryRefresher deliveryRefresher;
+    private final ScheduleMutationTransaction scheduleTransaction;
 
     private static final String DEVICE_REMOVED = "device removed from the schedule";
 
@@ -130,19 +135,51 @@ public class ScheduleScriptDeviceService {
         log.info("Added {} device(s) to script schedule id={} tenantId={}", rows.size(), scheduleId, tenantId);
     }
 
-    /** Incrementally unassign devices from a schedule (missing ids are simply no-ops). */
-    @Transactional
+    /** Removes selected devices from a script schedule that uses an explicit device list. */
     public void removeDevices(String scheduleId, List<String> machineIds, String actorUserId) {
+        removeAssignedDevices(scheduleId, machineIds, actorUserId);
+    }
+
+    public void requireSpecificSelection(String scheduleId) {
+        requireSpecificSelection(tenantIdProvider.getTenantId(), scheduleId);
+    }
+
+    public long removeAssignedDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
-        requireVisibleSchedule(tenantId, scheduleId);
         if (machineIds == null || machineIds.isEmpty()) {
-            return;
+            requireVisibleSchedule(tenantId, scheduleId);
+            return 0;
         }
         Set<String> ids = new LinkedHashSet<>(machineIds);
+        try {
+            return scheduleTransaction.run(() -> removeSpecificAssignments(tenantId, scheduleId, ids));
+        } catch (OptimisticLockingFailureException conflict) {
+            requireSpecificSelection(tenantId, scheduleId);
+            throw new ConflictException("The schedule changed while removing devices. Try again.");
+        }
+    }
+
+    private long removeSpecificAssignments(String tenantId, String scheduleId, Set<String> ids) {
+        if (scheduleRepository.markSpecificAssignmentChange(tenantId, scheduleId, ScriptStatus.DELETED,
+                ScheduleDeviceSelectionMode.CRITERIA) == 0) {
+            requireSpecificSelection(tenantId, scheduleId);
+            throw new ConflictException("The schedule changed while removing devices. Try again.");
+        }
         long removed = assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(tenantId, scheduleId, ids);
         disarmDeviceOnline(tenantId, scheduleId, ids);
         deliveryRefresher.cancelForMachines(scheduleId, ids, DEVICE_REMOVED);
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
+        return removed;
+    }
+
+    private void requireSpecificSelection(String tenantId, String scheduleId) {
+        ScheduleScript schedule = scheduleRepository.findOnPrimaryByTenantIdAndId(tenantId, scheduleId)
+                .filter(value -> value.getStatus() != ScriptStatus.DELETED)
+                .orElseThrow(() -> new NotFoundException("Script schedule not found: " + scheduleId));
+        if (schedule.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA) {
+            throw new ConflictException("This schedule selects devices by criteria. "
+                    + "Change the criteria or switch to a device list in the dashboard to remove individual devices.");
+        }
     }
 
     public void requireExistingDevices(Collection<String> machineIds) {

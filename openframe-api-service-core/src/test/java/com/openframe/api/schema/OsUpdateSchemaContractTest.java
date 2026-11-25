@@ -12,6 +12,7 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRebootBehavior;
 import com.openframe.data.document.rmm.osupdate.OsUpdateScanState;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
+import com.openframe.data.document.rmm.osupdate.OsUpdateType;
 import graphql.language.AstPrinter;
 import graphql.language.EnumTypeDefinition;
 import graphql.language.EnumValueDefinition;
@@ -167,6 +168,8 @@ class OsUpdateSchemaContractTest {
         expected.put("kbArticleIds", "[String!]!");
         expected.put("severity", "OsUpdateSeverity");
         expected.put("categories", "[String!]!");
+        expected.put("categoryIds", "[String!]!");
+        expected.put("updateType", "OsUpdateType");
         expected.put("cveIds", "[String!]!");
         expected.put("publishedAt", "Instant");
         expected.put("sizeBytes", "Long");
@@ -227,7 +230,8 @@ class OsUpdateSchemaContractTest {
                 Arguments.of("OsUpdateRebootBehavior", OsUpdateRebootBehavior.class),
                 Arguments.of("MacosUpdatePresence", MacosUpdatePresence.class),
                 Arguments.of("OsUpdateOperation", OsUpdateOperation.class),
-                Arguments.of("OsUpdateInstallResult", OsUpdateInstallResult.class));
+                Arguments.of("OsUpdateInstallResult", OsUpdateInstallResult.class),
+                Arguments.of("OsUpdateType", OsUpdateType.class));
     }
 
     private static Map<String, String> fields(String typeName) {
