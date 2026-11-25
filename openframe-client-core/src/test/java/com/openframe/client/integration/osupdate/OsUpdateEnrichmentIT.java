@@ -136,6 +136,20 @@ class OsUpdateEnrichmentIT {
     }
 
     @Test
+    void run_laterBulletinOfTheRunSupersedesTheKb_supersededByStored() {
+        // setup
+        OsUpdate november = osUpdateRepository.save(windows("nov", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061"));
+        OsUpdate october = osUpdateRepository.save(windows("oct", "2026-10 Cumulative Update for Windows 11 (KB5127648)", "KB5127648"));
+
+        // execution
+        osUpdateEnrichmentScheduler.run();
+
+        // verifications
+        assertThat(stored(october).getSupersededBy()).containsExactly("5132061");
+        assertThat(stored(november).getSupersededBy()).isNull();
+    }
+
+    @Test
     void run_msrcDownThenBack_entriesWaitThenEnrichedOnTheNextRun() {
         // setup
         OsUpdate november = osUpdateRepository.save(windows("nov", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061"));

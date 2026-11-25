@@ -32,6 +32,8 @@ public class MsrcCvrfDocumentParser {
     private static final int REMEDIATION_VENDOR_FIX = 2;
     private static final String EXPLOITED_YES = "Exploited:Yes";
     private static final Pattern KB_NUMBER = Pattern.compile("\\d+");
+    // MSRC spells the field this way.
+    private static final String SUPERSEDENCE = "Supercedence";
 
     private final ObjectMapper objectMapper;
 
@@ -40,6 +42,7 @@ public class MsrcCvrfDocumentParser {
         Map<String, Double> cvssScoreByKb = new HashMap<>();
         Map<String, OsUpdateSeverity> severityByKb = new HashMap<>();
         Set<String> exploitedKbs = new HashSet<>();
+        Map<String, Set<String>> supersededKbsByKb = new HashMap<>();
         try (JsonParser jsonParser = objectMapper.createParser(cvrfDocument)) {
             expect(jsonParser.nextToken(), JsonToken.START_OBJECT);
             while (jsonParser.nextToken() == JsonToken.PROPERTY_NAME) {
@@ -48,7 +51,8 @@ public class MsrcCvrfDocumentParser {
                 if (VULNERABILITY.equals(propertyName) && valueToken == JsonToken.START_ARRAY) {
                     while (jsonParser.nextToken() == JsonToken.START_OBJECT) {
                         JsonNode vulnerability = jsonParser.readValueAsTree();
-                        addVulnerability(vulnerability, cveIdsByKb, cvssScoreByKb, severityByKb, exploitedKbs);
+                        addVulnerability(vulnerability, cveIdsByKb, cvssScoreByKb, severityByKb, exploitedKbs,
+                                supersededKbsByKb);
                     }
                 } else {
                     jsonParser.skipChildren();
@@ -62,6 +66,7 @@ public class MsrcCvrfDocumentParser {
                 .severity(severityByKb.get(kb))
                 .cvssScore(cvssScoreByKb.get(kb))
                 .exploited(exploitedKbs.contains(kb))
+                .supersededKbArticleIds(List.copyOf(supersededKbsByKb.getOrDefault(kb, Set.of())))
                 .build()));
         return kbArticles;
     }
@@ -75,7 +80,8 @@ public class MsrcCvrfDocumentParser {
     // The scores and ratings of a CVE differ per product: only those of the products the KB fixes count.
     private static void addVulnerability(JsonNode vulnerability, Map<String, Set<String>> cveIdsByKb,
                                          Map<String, Double> cvssScoreByKb,
-                                         Map<String, OsUpdateSeverity> severityByKb, Set<String> exploitedKbs) {
+                                         Map<String, OsUpdateSeverity> severityByKb, Set<String> exploitedKbs,
+                                         Map<String, Set<String>> supersededKbsByKb) {
         String cveId = vulnerability.path("CVE").asString("");
         if (cveId.isBlank()) {
             return;
@@ -92,6 +98,9 @@ public class MsrcCvrfDocumentParser {
             }
             Set<String> productIds = productIds(remediation);
             cveIdsByKb.computeIfAbsent(kb, key -> new TreeSet<>()).add(cveId);
+            Set<String> supersededKbs = supersededKbsByKb.computeIfAbsent(kb, key -> new TreeSet<>());
+            KB_NUMBER.matcher(remediation.path(SUPERSEDENCE).asString("")).results()
+                    .forEach(supersededKb -> supersededKbs.add(supersededKb.group()));
             maxCvssScore(vulnerability, productIds)
                     .ifPresent(score -> cvssScoreByKb.merge(kb, score, Math::max));
             maxSeverity(vulnerability, productIds)

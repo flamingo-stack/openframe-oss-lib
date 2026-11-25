@@ -37,6 +37,7 @@ public class OsUpdateResponseMapper {
                 .browseOnly(osUpdate.getBrowseOnly())
                 .cvssScore(osUpdate.getCvssScore())
                 .exploited(osUpdate.getExploited())
+                .supersededBy(osUpdate.getSupersededBy())
                 .enrichedAt(osUpdate.getEnrichedAt())
                 .firstSeenAt(osUpdate.getFirstSeenAt())
                 .cursor(cursor)

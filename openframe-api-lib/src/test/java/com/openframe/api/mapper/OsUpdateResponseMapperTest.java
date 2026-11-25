@@ -58,6 +58,7 @@ class OsUpdateResponseMapperTest {
                 .browseOnly(false)
                 .cvssScore(9.8)
                 .exploited(true)
+                .supersededBy(List.of("5132061"))
                 .enrichedAt(FIRST_SEEN_AT)
                 .firstSeenAt(FIRST_SEEN_AT)
                 .build();
@@ -80,6 +81,7 @@ class OsUpdateResponseMapperTest {
                 .browseOnly(false)
                 .cvssScore(9.8)
                 .exploited(true)
+                .supersededBy(List.of("5132061"))
                 .enrichedAt(FIRST_SEEN_AT)
                 .firstSeenAt(FIRST_SEEN_AT)
                 .cursor(CURSOR)

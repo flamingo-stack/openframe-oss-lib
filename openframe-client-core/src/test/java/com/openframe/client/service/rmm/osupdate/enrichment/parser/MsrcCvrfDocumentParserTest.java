@@ -53,6 +53,38 @@ class MsrcCvrfDocumentParserTest {
     }
 
     @Test
+    void parse_realBulletins_kbCarriesTheKbItSupersedes() throws IOException {
+        // execution
+        Map<String, MsrcKbArticle> november;
+        Map<String, MsrcKbArticle> october;
+        try (InputStream novemberDocument = fixture("msrc-cvrf-2026-Nov.json");
+             InputStream octoberDocument = fixture("msrc-cvrf-2026-Oct.json")) {
+            november = parser.parse(novemberDocument);
+            october = parser.parse(octoberDocument);
+        }
+
+        // verifications
+        assertThat(november.get("5132061").getSupersededKbArticleIds()).containsExactly("5127648");
+        assertThat(october.get("5126868").getSupersededKbArticleIds()).containsExactly("5123099");
+    }
+
+    @Test
+    void parse_remediationWithoutSupersedence_kbSupersedesNothing() {
+        // setup
+        String cvrfDocument = """
+                {"Vulnerability":[{"CVE":"CVE-2026-1",
+                  "Remediations":[{"Type":2,"Description":{"Value":"5000001"},"Supercedence":""},
+                                  {"Type":2,"Description":{"Value":"5000002"}}]}]}""";
+
+        // execution
+        Map<String, MsrcKbArticle> kbArticles = parser.parse(stream(cvrfDocument));
+
+        // verifications
+        assertThat(kbArticles.get("5000001").getSupersededKbArticleIds()).isEmpty();
+        assertThat(kbArticles.get("5000002").getSupersededKbArticleIds()).isEmpty();
+    }
+
+    @Test
     void parse_scoresAndRatingsOfOtherProducts_notCountedForTheKb() {
         // setup
         String cvrfDocument = """

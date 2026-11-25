@@ -78,6 +78,9 @@ public class OsUpdate implements TenantScoped, Persistable<String> {
     // A CVE of the update is known to be exploited: by the vendor's bulletin or the CISA KEV catalog.
     private Boolean exploited;
 
+    // KB numbers of the updates that replace this one, from the vendor's bulletin. Null = no bulletin read names one.
+    private List<String> supersededBy;
+
     // Null = never checked against the vendor's bulletin. Set also when the bulletin has no data for the update.
     private Instant enrichedAt;
 

@@ -187,6 +187,7 @@ class OsUpdateSchemaContractTest {
         expected.put("browseOnly", "Boolean");
         expected.put("cvssScore", "Float");
         expected.put("exploited", "Boolean");
+        expected.put("supersededBy", "[String!]");
         expected.put("enrichedAt", "Instant");
         expected.put("firstSeenAt", "Instant!");
         expected.put("pendingDeviceCount", "Int!");
@@ -276,6 +277,7 @@ class OsUpdateSchemaContractTest {
         expected.put("browseOnly", "Boolean");
         expected.put("cvssScore", "Float");
         expected.put("exploited", "Boolean");
+        expected.put("supersededBy", "[String!]");
         expected.put("enrichedAt", "Instant");
         expected.put("discoveredAt", "Instant!");
         expected.put("downloaded", "Boolean");

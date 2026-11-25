@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,18 +53,23 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         osUpdates.forEach(osUpdate -> osUpdatesByMonth
                 .computeIfAbsent(bulletinMonth(osUpdate), month -> new ArrayList<>())
                 .add(osUpdate));
-        osUpdatesByMonth.forEach((month, monthOsUpdates) ->
-                enrichMonth(month.orElse(null), monthOsUpdates, knownExploitedCveIds, enrichedAt));
+        Map<Optional<YearMonth>, Map<String, MsrcKbArticle>> kbArticlesByMonth = new LinkedHashMap<>();
+        osUpdatesByMonth.keySet().forEach(month ->
+                findKbArticles(month.orElse(null)).ifPresent(kbArticles -> kbArticlesByMonth.put(month, kbArticles)));
+        Map<String, Set<String>> supersedingKbsByKb = findSupersedingKbsByKb(kbArticlesByMonth.values());
+        kbArticlesByMonth.forEach((month, kbArticles) -> osUpdatesByMonth.get(month).forEach(osUpdate ->
+                enrich(osUpdate, kbArticles, supersedingKbsByKb, knownExploitedCveIds, enrichedAt)));
     }
 
-    // month is null for an update without a bulletin month: checked, no MSRC data.
-    private void enrichMonth(YearMonth month, List<OsUpdate> monthOsUpdates,
-                             Set<String> knownExploitedCveIds, Instant enrichedAt) {
-        Optional<Map<String, MsrcKbArticle>> kbArticles = month == null
-                ? Optional.of(Map.of())
-                : findKbArticles(month);
-        kbArticles.ifPresent(monthKbArticles -> monthOsUpdates.forEach(osUpdate ->
-                enrich(osUpdate, monthKbArticles, knownExploitedCveIds, enrichedAt)));
+    // Only the months of this run: a KB is shown superseded once an update of a later month is enriched with it.
+    private static Map<String, Set<String>> findSupersedingKbsByKb(Collection<Map<String, MsrcKbArticle>> months) {
+        Map<String, Set<String>> supersedingKbsByKb = new HashMap<>();
+        months.forEach(kbArticles -> kbArticles.values().forEach(kbArticle ->
+                Objects.requireNonNullElse(kbArticle.getSupersededKbArticleIds(), List.<String>of())
+                        .forEach(supersededKb -> supersedingKbsByKb
+                                .computeIfAbsent(supersededKb, key -> new TreeSet<>())
+                                .add(kbArticle.getKbArticleId()))));
+        return supersedingKbsByKb;
     }
 
     // Empty = KEV unavailable this run; it is asked again when the entry's TTL runs out.
@@ -75,7 +82,11 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         }
     }
 
+    // month is null for an update without a bulletin month: checked, no MSRC data.
     private Optional<Map<String, MsrcKbArticle>> findKbArticles(YearMonth month) {
+        if (month == null) {
+            return Optional.of(Map.of());
+        }
         try {
             return Optional.of(msrcCvrfClient.getKbArticles(month));
         } catch (OsUpdateSourceUnavailableException failure) {
@@ -93,10 +104,18 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
     // MSRC is authoritative for the CVEs, rating and score of a KB it lists; without MSRC data the stored ones stay.
     // knownExploitedCveIds is null when KEV was unavailable this run.
     private void enrich(OsUpdate osUpdate, Map<String, MsrcKbArticle> kbArticles,
+                        Map<String, Set<String>> supersedingKbsByKb,
                         Set<String> knownExploitedCveIds, Instant enrichedAt) {
-        List<MsrcKbArticle> matchedKbArticles = Objects.requireNonNullElse(osUpdate.getKbArticleIds(), List.<String>of())
+        List<String> kbNumbers = Objects.requireNonNullElse(osUpdate.getKbArticleIds(), List.<String>of())
                 .stream()
                 .map(WindowsOsUpdateEnricher::toKbNumber)
+                .toList();
+        Set<String> supersedingKbs = new TreeSet<>();
+        kbNumbers.forEach(kbNumber -> supersedingKbs.addAll(supersedingKbsByKb.getOrDefault(kbNumber, Set.of())));
+        if (!supersedingKbs.isEmpty()) {
+            osUpdate.setSupersededBy(List.copyOf(supersedingKbs));
+        }
+        List<MsrcKbArticle> matchedKbArticles = kbNumbers.stream()
                 .map(kbArticles::get)
                 .filter(Objects::nonNull)
                 .toList();

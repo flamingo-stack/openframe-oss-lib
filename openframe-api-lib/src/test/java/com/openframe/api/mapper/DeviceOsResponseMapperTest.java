@@ -145,6 +145,7 @@ class DeviceOsResponseMapperTest {
                 .browseOnly(false)
                 .cvssScore(9.8)
                 .exploited(true)
+                .supersededBy(List.of("5132061"))
                 .enrichedAt(INSTALLED_AT)
                 .firstSeenAt(INSTALLED_AT)
                 .build();
@@ -165,6 +166,7 @@ class DeviceOsResponseMapperTest {
                 .browseOnly(false)
                 .cvssScore(9.8)
                 .exploited(true)
+                .supersededBy(List.of("5132061"))
                 .enrichedAt(INSTALLED_AT)
                 .discoveredAt(RECEIVED_AT)
                 .downloaded(true)

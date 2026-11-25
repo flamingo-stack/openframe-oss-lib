@@ -17,4 +17,6 @@ public class MsrcKbArticle {
     OsUpdateSeverity severity;
     Double cvssScore;
     boolean exploited;
+    // KB numbers this KB replaces.
+    List<String> supersededKbArticleIds;
 }

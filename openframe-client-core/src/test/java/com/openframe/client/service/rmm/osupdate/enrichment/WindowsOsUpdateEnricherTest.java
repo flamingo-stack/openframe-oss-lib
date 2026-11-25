@@ -43,6 +43,12 @@ class WindowsOsUpdateEnricherTest {
             .exploited(true)
             .build();
 
+    private static final MsrcKbArticle NOVEMBER_SUPERSEDING_OCTOBER = MsrcKbArticle.builder()
+            .kbArticleId("5132061")
+            .cveIds(List.of("CVE-2026-113766"))
+            .supersededKbArticleIds(List.of("5126868"))
+            .build();
+
     @Mock private MsrcCvrfClient msrcCvrfClient;
     @Mock private CisaKevClient cisaKevClient;
     @Mock private OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
@@ -229,6 +235,56 @@ class WindowsOsUpdateEnricherTest {
 
         // verifications
         assertThat(cumulative.getExploited()).isTrue();
+    }
+
+    @Test
+    void enrich_laterMonthOfTheRunSupersedesTheKb_supersededByStored() {
+        // setup
+        OsUpdate october = osUpdate(OsPlatform.WINDOWS, "2026-10 Cumulative Update (KB5126868)", List.of("KB5126868"));
+        OsUpdate november = osUpdate(OsPlatform.WINDOWS, "2026-11 Cumulative Update (KB5132061)", List.of("5132061"));
+        when(cisaKevClient.getKnownExploitedCveIds()).thenReturn(Set.of());
+        when(msrcCvrfClient.getKbArticles(OCTOBER)).thenReturn(Map.of("5126868", OCTOBER_CUMULATIVE));
+        when(msrcCvrfClient.getKbArticles(NOVEMBER)).thenReturn(Map.of("5132061", NOVEMBER_SUPERSEDING_OCTOBER));
+
+        // execution
+        enricher.enrich(List.of(october, november), ENRICHED_AT);
+
+        // verifications
+        assertThat(october.getSupersededBy()).containsExactly("5132061");
+        assertThat(november.getSupersededBy()).isNull();
+    }
+
+    @Test
+    void enrich_storedSupersededByDiffersFromMsrc_replaced() {
+        // setup
+        OsUpdate october = osUpdate(OsPlatform.WINDOWS, "2026-10 Cumulative Update (KB5126868)", List.of("5126868"));
+        october.setSupersededBy(List.of("5000000"));
+        OsUpdate november = osUpdate(OsPlatform.WINDOWS, "2026-11 Cumulative Update (KB5132061)", List.of("5132061"));
+        when(cisaKevClient.getKnownExploitedCveIds()).thenReturn(Set.of());
+        when(msrcCvrfClient.getKbArticles(OCTOBER)).thenReturn(Map.of("5126868", OCTOBER_CUMULATIVE));
+        when(msrcCvrfClient.getKbArticles(NOVEMBER)).thenReturn(Map.of("5132061", NOVEMBER_SUPERSEDING_OCTOBER));
+
+        // execution
+        enricher.enrich(List.of(october, november), ENRICHED_AT);
+
+        // verifications
+        assertThat(october.getSupersededBy()).containsExactly("5132061");
+    }
+
+    @Test
+    void enrich_noMonthOfTheRunSupersedesTheKb_storedSupersededByKept() {
+        // setup
+        OsUpdate october = osUpdate(OsPlatform.WINDOWS, "2026-10 Cumulative Update (KB5126868)", List.of("5126868"));
+        october.setSupersededBy(List.of("5132061"));
+        when(cisaKevClient.getKnownExploitedCveIds()).thenReturn(Set.of());
+        when(msrcCvrfClient.getKbArticles(OCTOBER)).thenReturn(Map.of("5126868", OCTOBER_CUMULATIVE));
+
+        // execution
+        enricher.enrich(List.of(october), ENRICHED_AT);
+
+        // verifications
+        assertThat(october.getSupersededBy()).containsExactly("5132061");
+        assertThat(october.getEnrichedAt()).isEqualTo(ENRICHED_AT);
     }
 
     private static OsUpdate osUpdate(OsPlatform platform, String displayName, List<String> kbArticleIds) {
