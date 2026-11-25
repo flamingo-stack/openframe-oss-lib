@@ -1,6 +1,7 @@
 package com.openframe.api.dataloader;
 
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,36 +29,37 @@ class OsUpdateDeviceCountsDataLoaderTest {
         List<String> osUpdateIds = List.of("id-2", "unknown", "id-1");
         OsUpdateDeviceCounts countsOfOne = OsUpdateDeviceCounts.builder().pendingDeviceCount(7).build();
         OsUpdateDeviceCounts countsOfTwo = OsUpdateDeviceCounts.builder().installedDeviceCount(3).build();
-        when(osUpdateService.countDevices(osUpdateIds, List.of()))
+        when(osUpdateService.countDevices(osUpdateIds, OsUpdateDeviceScope.EVERY_DEVICE))
                 .thenReturn(Map.of("id-1", countsOfOne, "id-2", countsOfTwo));
 
         // execution
         CompletionStage<List<OsUpdateDeviceCounts>> loaded = dataLoader.load(List.of(
-                key("id-2", List.of()), key("unknown", List.of()), key("id-1", List.of())));
+                key("id-2", OsUpdateDeviceScope.EVERY_DEVICE), key("unknown", OsUpdateDeviceScope.EVERY_DEVICE),
+                key("id-1", OsUpdateDeviceScope.EVERY_DEVICE)));
 
         // verifications
         assertThat(loaded).isCompletedWithValue(List.of(countsOfTwo, OsUpdateDeviceCounts.NONE, countsOfOne));
     }
 
     @Test
-    void load_keysOfTwoOrganizationScopes_onceCountedPerScope() {
+    void load_keysOfTwoDeviceScopes_onceCountedPerScope() {
         // setup
-        List<String> organizationIds = List.of("org-1");
+        OsUpdateDeviceScope organizationDevices = new OsUpdateDeviceScope(List.of("machine-1"));
         OsUpdateDeviceCounts allCounts = OsUpdateDeviceCounts.builder().pendingDeviceCount(5).build();
         OsUpdateDeviceCounts organizationCounts = OsUpdateDeviceCounts.builder().pendingDeviceCount(1).build();
-        when(osUpdateService.countDevices(List.of("id-1"), List.of())).thenReturn(Map.of("id-1", allCounts));
-        when(osUpdateService.countDevices(List.of("id-1"), organizationIds))
+        when(osUpdateService.countDevices(List.of("id-1"), OsUpdateDeviceScope.EVERY_DEVICE)).thenReturn(Map.of("id-1", allCounts));
+        when(osUpdateService.countDevices(List.of("id-1"), organizationDevices))
                 .thenReturn(Map.of("id-1", organizationCounts));
 
         // execution
         CompletionStage<List<OsUpdateDeviceCounts>> loaded =
-                dataLoader.load(List.of(key("id-1", organizationIds), key("id-1", List.of())));
+                dataLoader.load(List.of(key("id-1", organizationDevices), key("id-1", OsUpdateDeviceScope.EVERY_DEVICE)));
 
         // verifications
         assertThat(loaded).isCompletedWithValue(List.of(organizationCounts, allCounts));
     }
 
-    private static OsUpdateDeviceCountsKey key(String osUpdateId, List<String> organizationIds) {
-        return OsUpdateDeviceCountsKey.builder().osUpdateId(osUpdateId).organizationIds(organizationIds).build();
+    private static OsUpdateDeviceCountsKey key(String osUpdateId, OsUpdateDeviceScope osUpdateDeviceScope) {
+        return OsUpdateDeviceCountsKey.builder().osUpdateId(osUpdateId).osUpdateDeviceScope(osUpdateDeviceScope).build();
     }
 }
