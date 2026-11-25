@@ -211,7 +211,7 @@ class OsUpdateEnrichmentIT {
     @Test
     void run_kevDownAfterItFlaggedTheUpdate_staysExploited() {
         // setup
-        OsUpdate outlook = windows("outlook", "2026-11 Security Update for Outlook (KB5132061)", "5132061");
+        OsUpdate outlook = windows("outlook", "2026-11 Security Update for Outlook (KB5132099)", "5132099");
         outlook.setCveIds(List.of("CVE-2026-124194"));
         outlook = osUpdateRepository.save(outlook);
         osUpdateEnrichmentScheduler.run();

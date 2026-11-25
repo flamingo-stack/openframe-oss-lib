@@ -78,7 +78,7 @@ class WindowsOsUpdateEnricherTest {
     }
 
     @Test
-    void enrich_deviceReportedCvesAndRating_keptAndCheckedInKev() {
+    void enrich_deviceReportedOtherCvesAndRating_replacedByMsrc() {
         // setup
         OsUpdate cumulative = osUpdate(OsPlatform.WINDOWS, "2026-11 Cumulative Update (KB5132061)", List.of("5132061"));
         cumulative.setCveIds(List.of("CVE-2026-124194"));
@@ -90,10 +90,27 @@ class WindowsOsUpdateEnricherTest {
         enricher.enrich(List.of(cumulative), ENRICHED_AT);
 
         // verifications
-        assertThat(cumulative.getCveIds()).containsExactly("CVE-2026-124194");
-        assertThat(cumulative.getSeverity()).isEqualTo(OsUpdateSeverity.CRITICAL);
-        assertThat(cumulative.getCvssScore()).isEqualTo(9.8);
-        assertThat(cumulative.getExploited()).isTrue();
+        assertThat(cumulative.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
+        assertThat(cumulative.getSeverity()).isEqualTo(OsUpdateSeverity.IMPORTANT);
+        assertThat(cumulative.getExploited()).isFalse();
+    }
+
+    @Test
+    void enrich_noMsrcDataForTheKb_deviceReportedCvesAndRatingKept() {
+        // setup
+        OsUpdate preview = osUpdate(OsPlatform.WINDOWS, "2026-11 Cumulative Update Preview (KB5132057)", List.of("5132057"));
+        preview.setCveIds(List.of("CVE-2026-124194"));
+        preview.setSeverity(OsUpdateSeverity.CRITICAL);
+        when(cisaKevClient.getKnownExploitedCveIds()).thenReturn(Set.of("CVE-2026-124194"));
+        when(msrcCvrfClient.getKbArticles(NOVEMBER)).thenReturn(Map.of("5132061", NOVEMBER_CUMULATIVE));
+
+        // execution
+        enricher.enrich(List.of(preview), ENRICHED_AT);
+
+        // verifications
+        assertThat(preview.getCveIds()).containsExactly("CVE-2026-124194");
+        assertThat(preview.getSeverity()).isEqualTo(OsUpdateSeverity.CRITICAL);
+        assertThat(preview.getExploited()).isTrue();
     }
 
     @Test

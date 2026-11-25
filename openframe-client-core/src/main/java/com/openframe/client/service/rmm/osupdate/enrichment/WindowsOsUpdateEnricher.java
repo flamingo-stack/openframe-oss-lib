@@ -83,7 +83,7 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         osUpdateEnrichmentMetrics.recordSourceFailed(failure.getOsUpdateSource());
     }
 
-    // The bulletin's own CVEs and rating fill only what the device did not report; its score is always taken.
+    // MSRC is authoritative for the CVEs, rating and score of a KB it lists; without MSRC data the stored ones stay.
     private void enrich(OsUpdate osUpdate, Map<String, MsrcKbArticle> kbArticles,
                         Optional<Set<String>> knownExploitedCveIds, Instant enrichedAt) {
         List<MsrcKbArticle> matchedKbArticles = Objects.requireNonNullElse(osUpdate.getKbArticleIds(), List.<String>of())
@@ -93,18 +93,14 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
                 .filter(Objects::nonNull)
                 .toList();
         if (!matchedKbArticles.isEmpty()) {
-            if (osUpdate.getCveIds() == null || osUpdate.getCveIds().isEmpty()) {
-                Set<String> cveIds = new TreeSet<>();
-                matchedKbArticles.forEach(kbArticle -> cveIds.addAll(kbArticle.getCveIds()));
-                osUpdate.setCveIds(List.copyOf(cveIds));
-            }
-            if (osUpdate.getSeverity() == null) {
-                matchedKbArticles.stream()
-                        .map(MsrcKbArticle::getSeverity)
-                        .filter(Objects::nonNull)
-                        .min(Enum::compareTo)
-                        .ifPresent(osUpdate::setSeverity);
-            }
+            Set<String> cveIds = new TreeSet<>();
+            matchedKbArticles.forEach(kbArticle -> cveIds.addAll(kbArticle.getCveIds()));
+            osUpdate.setCveIds(List.copyOf(cveIds));
+            matchedKbArticles.stream()
+                    .map(MsrcKbArticle::getSeverity)
+                    .filter(Objects::nonNull)
+                    .min(Enum::compareTo)
+                    .ifPresent(osUpdate::setSeverity);
             matchedKbArticles.stream()
                     .map(MsrcKbArticle::getCvssScore)
                     .filter(Objects::nonNull)
