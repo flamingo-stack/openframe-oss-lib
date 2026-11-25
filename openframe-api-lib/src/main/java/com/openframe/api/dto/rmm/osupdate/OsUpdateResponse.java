@@ -5,14 +5,18 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRebootBehavior;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
 import com.openframe.data.document.rmm.osupdate.OsUpdateType;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.List;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OsUpdateResponse {
 
     private String id;
