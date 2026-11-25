@@ -128,6 +128,8 @@ describe("a ticket's client chat on the engine", () => {
       directMessages: { ownDirectOwnerType: 'ADMIN', ownUserId: () => 'u-me' },
     });
     await waitFor(() => expect(client.tail.current?.fromSeq).toBeNull());
+    // A tail with no seq to resume after opens on new messages only: the send waits until it is subscribed.
+    act(() => client.tail.current?.onSubscribed?.());
     await act(async () => {
       await client.result.current.sendMessage('restarting it now');
     });

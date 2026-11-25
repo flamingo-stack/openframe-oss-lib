@@ -24,6 +24,9 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.AggregationUpdate;
+import org.springframework.data.mongodb.core.aggregation.ArithmeticOperators;
+import org.springframework.data.mongodb.core.aggregation.ConditionalOperators;
 import org.springframework.data.mongodb.core.aggregation.MatchOperation;
 import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -51,6 +54,7 @@ import static java.util.stream.Collectors.toMap;
 import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.StringUtils.hasText;
 
+/** Queries machines and performs field-level writes for inventory and software scheduling. */
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     private static final String SORT_DESC = "DESC";
@@ -908,6 +912,30 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             return "^" + regex + "$";
         }
         return Pattern.quote(trimmed);
+    }
+
+    @Override
+    public long reserveForSoftwareReconnect(String tenantId, String machineId, Long version,
+                                            Collection<DeviceStatus> managedStatuses) {
+        Query query = Query.query(Criteria.where(TENANT_ID_FIELD).is(tenantId)
+                .and(MACHINE_ID_FIELD).is(machineId)
+                .and(VERSION_FIELD).is(version)
+                .and(STATUS_FIELD).in(managedStatuses));
+        return mongoTemplate.updateMulti(query, incrementReservationVersion(), Machine.class).getModifiedCount();
+    }
+
+    @Override
+    public long reserveForSoftwareAssignments(String tenantId, Collection<String> machineIds,
+                                              Collection<DeviceStatus> managedStatuses) {
+        Query query = Query.query(Criteria.where(TENANT_ID_FIELD).is(tenantId)
+                .and(MACHINE_ID_FIELD).in(machineIds)
+                .and(STATUS_FIELD).in(managedStatuses));
+        return mongoTemplate.updateMulti(query, incrementReservationVersion(), Machine.class).getModifiedCount();
+    }
+
+    private static AggregationUpdate incrementReservationVersion() {
+        var currentVersion = ConditionalOperators.ifNull(VERSION_FIELD).then(0);
+        return AggregationUpdate.update().set(VERSION_FIELD).toValue(ArithmeticOperators.Add.valueOf(currentVersion).add(1));
     }
 
     @Override

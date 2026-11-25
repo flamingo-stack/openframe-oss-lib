@@ -7,7 +7,7 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { textOfParts } from '../../../../chat-protocol/chat-message';
+import { approvalStatusOf, isToolPart, textOfParts } from '../../../../chat-protocol/chat-message';
 import type { DialogItem, HistoricalMessage } from '../../types';
 import type { FetchDialogsParams } from '../../types/unified-chat-state.types';
 import {
@@ -322,5 +322,645 @@ describe('useChatEngine: sending', () => {
       .flatMap(message => message.parts)
       .find(p => p.type === 'data-escalation-offer');
     expect(offer?.data.status).toBe('pending');
+  });
+});
+
+/**
+ * A send typed while its dialog's first history page is still read (CU-17tkuw6924d): the bubble shows at once, the
+ * publish waits for the final page and the tail, and the page goes before the send instead of replacing it.
+ */
+describe('useChatEngine: a send while the first page is read', () => {
+  const GREETING: HistoricalMessage[] = [
+    {
+      id: 'g1',
+      createdAt: '2026-11-23T12:00:00Z',
+      owner: { type: 'ASSISTANT' },
+      parts: [{ type: 'TEXT', text: 'What do you want to monitor?' }],
+    },
+  ];
+
+  function deferred<T>() {
+    let resolve: (value: T) => void = () => {};
+    const promise = new Promise<T>(settle => {
+      resolve = settle;
+    });
+    return { promise, resolve };
+  }
+
+  it('a fresh intent dialog read again: the send waits for the re-read and the tail, and stays under the greeting', async () => {
+    const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'intent5' }));
+    const fetchDialogMessages = vi
+      .fn((): Promise<FetchDialogMessagesResult> => Promise.resolve({ messages: GREETING, nextCursor: null }))
+      .mockResolvedValueOnce({ messages: [], nextCursor: null, missing: true });
+    const publish = vi.fn();
+    const { result, tail } = setup({ history: { createDialog, fetchDialogMessages }, transport: { publish } });
+    await act(async () => {
+      await result.current.startNewDialog({ intent: 'CREATE_POLICY' });
+    });
+    await waitFor(() => expect(fetchDialogMessages).toHaveBeenCalledTimes(1));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('disk above 90%');
+    });
+    expect(texts(result.current.messages)).toContainEqual(['user', 'disk above 90%']);
+    await waitFor(() => expect(fetchDialogMessages).toHaveBeenCalledTimes(2), { timeout: 3000 });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    expect(publish).not.toHaveBeenCalled();
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      expect(await sent).toBe(true);
+    });
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(
+      texts(result.current.messages)
+        .filter(([role]) => role !== 'assistant' || true)
+        .slice(0, 2),
+    ).toEqual([
+      ['assistant', 'What do you want to monitor?'],
+      ['user', 'disk above 90%'],
+    ]);
+  });
+
+  it('a send while the first read is in flight: the page goes before it, the echo spends its entry, one bubble', async () => {
+    const page = deferred<FetchDialogMessagesResult>();
+    const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'intent6' }));
+    const fetchDialogMessages = vi.fn(() => page.promise);
+    const publish = vi.fn();
+    const { result, tail } = setup({ history: { createDialog, fetchDialogMessages }, transport: { publish } });
+    await act(async () => {
+      await result.current.startNewDialog({ intent: 'CREATE_POLICY' });
+    });
+    await waitFor(() => expect(fetchDialogMessages).toHaveBeenCalledTimes(1));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('disk above 90%');
+    });
+    await act(async () => {
+      page.resolve({ messages: GREETING, nextCursor: null });
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await sent;
+    });
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_REQUEST', text: 'disk above 90%', streamSeq: 3 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 4 }, 'message');
+      tail.current?.onEvent({ type: 'TEXT', text: 'On it', streamSeq: 5 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 6 }, 'message');
+    });
+    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    expect(texts(result.current.messages)).toEqual([
+      ['assistant', 'What do you want to monitor?'],
+      ['user', 'disk above 90%'],
+      ['assistant', 'On it'],
+    ]);
+  });
+
+  it('a repeat of an earlier text sent while an existing dialog loads shows as its own bubble', async () => {
+    const page = deferred<FetchDialogMessagesResult>();
+    const yes: HistoricalMessage[] = [
+      { id: 'u1', createdAt: '2026-11-24T09:00:00Z', owner: { type: 'ADMIN' }, parts: [{ type: 'TEXT', text: 'yes' }] },
+      {
+        id: 'a1',
+        createdAt: '2026-11-24T09:00:01Z',
+        owner: { type: 'ASSISTANT' },
+        lastChunkStreamSeq: 7,
+        parts: [{ type: 'TEXT', text: 'Done' }],
+      },
+    ];
+    const publish = vi.fn();
+    const { result, tail } = setup({
+      dialogId: 'd1',
+      history: { fetchDialogMessages: () => page.promise },
+      transport: { publish },
+    });
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('yes');
+    });
+    await act(async () => {
+      page.resolve({ messages: yes, nextCursor: null });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await sent;
+    });
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_REQUEST', text: 'yes', streamSeq: 8 }, 'message');
+    });
+    expect(texts(result.current.messages).filter(([role]) => role === 'user')).toEqual([
+      ['user', 'yes'],
+      ['user', 'yes'],
+    ]);
+  });
+
+  it('the publish waits for the tail: the echo of a history with no seq is not published before it subscribes', async () => {
+    const page = deferred<FetchDialogMessagesResult>();
+    const publish = vi.fn();
+    const { result, tail } = setup({
+      dialogId: 'd2',
+      history: { fetchDialogMessages: () => page.promise },
+      transport: { publish },
+    });
+    act(() => {
+      void result.current.sendMessage('hello');
+    });
+    await act(async () => {
+      page.resolve({ messages: GREETING, nextCursor: null });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    expect(publish).not.toHaveBeenCalled();
+    act(() => tail.current?.onSubscribed?.());
+    await waitFor(() => expect(publish).toHaveBeenCalledTimes(1));
+  });
+
+  it('a dialog still missing after the re-read takes no send: it fails where it was typed', async () => {
+    const createDialog = vi.fn(() => Promise.resolve({ dialogId: 'intent7' }));
+    const fetchDialogMessages = vi.fn((): Promise<FetchDialogMessagesResult> =>
+      Promise.resolve({ messages: [], nextCursor: null, missing: true }),
+    );
+    const publish = vi.fn();
+    const { result } = setup({
+      history: { createDialog, fetchDialogMessages },
+      transport: { publish },
+      sendFailureText: () => 'Could not send.',
+    });
+    await act(async () => {
+      await result.current.startNewDialog({ intent: 'CREATE_POLICY' });
+    });
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('anything');
+    });
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(result.current.streamingPhase).toBe('idle');
+    expect(JSON.stringify(result.current.messages)).toContain('Could not send.');
+  });
+
+  it('Stop before the page lands cancels the send: nothing is published, and no turn is stopped on the server', async () => {
+    const page = deferred<FetchDialogMessagesResult>();
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const { result, tail } = setup({
+      dialogId: 'd3',
+      history: { fetchDialogMessages: () => page.promise },
+      transport: { publish, stop },
+    });
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('wait');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    await act(async () => {
+      page.resolve({ messages: GREETING, nextCursor: null });
+      await Promise.resolve();
+    });
+    act(() => tail.current?.onSubscribed?.());
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+    expect(result.current.streamingPhase).toBe('idle');
+    expect(texts(result.current.messages)).toContainEqual(['user', 'wait']);
+  });
+
+  it('leaving the dialog before its page lands fails the send instead of publishing it', async () => {
+    const page = deferred<FetchDialogMessagesResult>();
+    const publish = vi.fn();
+    const { result } = setup({
+      history: { fetchDialogMessages: () => page.promise },
+      transport: { publish },
+    });
+    act(() => result.current.selectDialog('d4'));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('going');
+    });
+    act(() => result.current.selectDialog('d5'));
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('a pending approval the page brings is resolved when the held send goes out', async () => {
+    const page = deferred<FetchDialogMessagesResult>();
+    const pendingApproval: HistoricalMessage[] = [
+      {
+        id: 'a1',
+        createdAt: '2026-11-24T09:00:00Z',
+        owner: { type: 'ASSISTANT' },
+        lastChunkStreamSeq: 7,
+        parts: [
+          {
+            type: 'APPROVAL_REQUEST',
+            approvalRequestId: 'ar-1',
+            approvalType: 'ADMIN',
+            toolCalls: [{ toolExecutionRequestId: 'ar-1', toolName: 'run_script', requiresApproval: true }],
+          },
+        ],
+      },
+    ];
+    const { result, tail } = setup({
+      dialogId: 'd6',
+      sendSupersedesPending: true,
+      history: { fetchDialogMessages: () => page.promise },
+    });
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('never mind');
+    });
+    await act(async () => {
+      page.resolve({ messages: pendingApproval, nextCursor: null });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await sent;
+    });
+    const card = result.current.messages.flatMap(message => message.parts).find(isToolPart);
+    expect(card && approvalStatusOf(card)).not.toBe('pending');
+  });
+});
+
+/**
+ * A replaying tail back from a gap (CU-17tkuw691j4): its catch-up replays turns that began before a send made since.
+ * The engine opens the backlog window for it, so their boundaries do not spend the send's echo entry.
+ */
+describe('useChatEngine: a send across a reconnect catch-up', () => {
+  const withSend = (text: string): HistoricalMessage[] => [
+    ...persisted,
+    { id: 'u-sent', createdAt: '2026-11-04T10:00:05Z', owner: { type: 'CLIENT' }, parts: [{ type: 'TEXT', text }] },
+  ];
+
+  async function opened(fetchDialogMessages: ChatHistoryBackend['fetchDialogMessages']) {
+    const hook = setup({ dialogId: 'd1', history: { fetchDialogMessages } });
+    await waitFor(() => expect(hook.tail.current?.fromSeq).toBe(7));
+    act(() => {
+      hook.tail.current?.onSubscribed?.();
+      hook.tail.current?.onReplayComplete?.();
+    });
+    return hook;
+  }
+  const users = (messages: Parameters<typeof texts>[0]) => texts(messages).filter(([role]) => role === 'user');
+
+  it("the catch-up's replayed turn does not spend the send's echo: one bubble after the resync refetch", async () => {
+    const fetchDialogMessages = vi
+      .fn((): Promise<FetchDialogMessagesResult> => Promise.resolve({ messages: withSend('again'), nextCursor: null }))
+      .mockResolvedValueOnce({ messages: persisted, nextCursor: null });
+    const { result, tail } = await opened(fetchDialogMessages);
+    await act(async () => {
+      await result.current.sendMessage('again');
+    });
+    act(() => {
+      tail.current?.onCatchUpStart?.();
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 8 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 9 }, 'message');
+      tail.current?.onResync();
+    });
+    await waitFor(() => expect(fetchDialogMessages).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(users(result.current.messages)).toEqual([['user', 'again']]));
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_REQUEST', text: 'again', streamSeq: 10 }, 'message');
+    });
+    expect(users(result.current.messages)).toEqual([['user', 'again']]);
+  });
+
+  it('a catch-up that never reports closes its window on the cap: boundaries purge again', async () => {
+    const { result, tail } = await opened(() => Promise.resolve({ messages: persisted, nextCursor: null }));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      act(() => tail.current?.onCatchUpStart?.());
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    await act(async () => {
+      await result.current.sendMessage('later');
+    });
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 8 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 9 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_REQUEST', text: 'later', streamSeq: 10 }, 'message');
+    });
+    // The documented limit outside a window: the replayed end purged the entry, so the echo draws its own row.
+    expect(users(result.current.messages)).toEqual([
+      ['user', 'later'],
+      ['user', 'later'],
+    ]);
+  });
+});
+
+/**
+ * The wait for the live tail is the send's too (CU-17tkuw69v1k): Stop cancels a send still waiting for it, a send
+ * queued behind an unsent one keeps its place, and a send into a dialog the tail would open on new messages only waits
+ * for it. A send that can be delivered from where the tail resumes goes out at once.
+ */
+describe('useChatEngine: a send waiting for the live tail', () => {
+  const withSeq: HistoricalMessage[] = persisted;
+  const noSeq: HistoricalMessage[] = [
+    {
+      id: 'g1',
+      createdAt: '2026-11-25T09:00:00Z',
+      owner: { type: 'ASSISTANT' },
+      parts: [{ type: 'TEXT', text: 'Hi' }],
+    },
+  ];
+  const midTurn: HistoricalMessage[] = [
+    {
+      id: 'a1',
+      createdAt: '2026-11-25T09:00:00Z',
+      owner: { type: 'ASSISTANT' },
+      lastChunkStreamSeq: 7,
+      parts: [
+        {
+          type: 'EXECUTING_TOOL',
+          integratedToolType: 'TACTICAL_RMM',
+          toolFunction: 'run_script',
+          title: 'Run cleanup script',
+          parameters: { script: 'cleanup.sh' },
+          toolExecutionRequestId: 'exec-1',
+        },
+      ],
+    },
+  ];
+
+  function deferred<T>() {
+    let resolve: (value: T) => void = () => {};
+    const promise = new Promise<T>(settle => {
+      resolve = settle;
+    });
+    return { promise, resolve };
+  }
+
+  /** A dialog whose first page is still being read, with a send held for it. */
+  async function heldSend(dialogId: string, messages: HistoricalMessage[], text = 'first') {
+    const page = deferred<FetchDialogMessagesResult>();
+    const publish = vi.fn<(text: string) => void>();
+    const stop = vi.fn(() => Promise.resolve());
+    const hook = setup({
+      dialogId,
+      history: { fetchDialogMessages: () => page.promise },
+      transport: { publish, stop },
+    });
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = hook.result.current.sendMessage(text);
+    });
+    await act(async () => {
+      page.resolve({ messages, nextCursor: null });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(hook.tail.current?.fromSeq).toBe(messages === noSeq ? null : 7));
+    return { ...hook, publish, stop, sent: () => sent };
+  }
+
+  it('Stop after the page lands and before the tail subscribes: nothing is published, no turn is stopped', async () => {
+    const { result, tail, publish, stop, sent } = await heldSend('w1', withSeq);
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent()).toBe(false);
+    });
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+    expect(result.current.streamingPhase).toBe('idle');
+    expect(texts(result.current.messages)).toContainEqual(['user', 'first']);
+  });
+
+  it('a second send while the held one waits for the tail goes out after it, in order', async () => {
+    const { result, tail, publish, sent } = await heldSend('w2', withSeq);
+    let second: Promise<boolean | void> | undefined;
+    act(() => {
+      second = result.current.sendMessage('second');
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      expect(await sent()).toBe(true);
+      expect(await second).toBe(true);
+    });
+    expect(publish.mock.calls.map(([text]) => text)).toEqual(['first', 'second']);
+  });
+
+  it('Stop with two unsent sends: neither is published', async () => {
+    const { result, tail, publish, stop, sent } = await heldSend('w3', withSeq);
+    let second: Promise<boolean | void> | undefined;
+    act(() => {
+      second = result.current.sendMessage('second');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent()).toBe(false);
+      expect(await second).toBe(false);
+    });
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('a history that ends mid-turn: Stop cancels the held send and still stops the running turn', async () => {
+    const { result, tail, publish, stop, sent } = await heldSend('w4', midTurn);
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent()).toBe(false);
+    });
+    act(() => tail.current?.onSubscribed?.());
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).toHaveBeenCalledWith('w4');
+  });
+
+  it('an answer the record says is being written: Stop cancels the held send and still stops it', async () => {
+    const page = deferred<FetchDialogMessagesResult>();
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const fetchDialog = vi.fn((id: string) =>
+      Promise.resolve({ dialog: { id, title: 'Writing' }, streamState: 'STREAMING' as const }),
+    );
+    const { result, tail } = setup({
+      dialogId: 'w9',
+      history: { fetchDialogMessages: () => page.promise, fetchDialog },
+      transport: { publish, stop },
+    });
+    await waitFor(() => expect(result.current.activeDialog?.title).toBe('Writing'));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('first');
+    });
+    await act(async () => {
+      page.resolve({ messages: withSeq, nextCursor: null });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).toHaveBeenCalledWith('w9');
+  });
+
+  it('another turn the tail is delivering: Stop cancels the queued send and stops that turn', async () => {
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const { result, tail } = setup({
+      dialogId: 'w5',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: noSeq, nextCursor: null }) },
+      transport: { publish, stop },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    act(() => tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 3 }, 'message'));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('queued');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).toHaveBeenCalledWith('w5');
+  });
+
+  it('a STREAMING record that answers after the tail ended the turn does not mark it running', async () => {
+    let answer: (record: { dialog: DialogItem; streamState: 'STREAMING' }) => void = () => {};
+    const fetchDialog = vi.fn(
+      () =>
+        new Promise<{ dialog: DialogItem; streamState: 'STREAMING' }>(resolve => {
+          answer = resolve;
+        }),
+    );
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const { result, tail } = setup({
+      dialogId: 'w10',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: noSeq, nextCursor: null }), fetchDialog },
+      transport: { publish, stop },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    act(() => {
+      tail.current?.onEvent({ type: 'MESSAGE_START', streamSeq: 3 }, 'message');
+      tail.current?.onEvent({ type: 'MESSAGE_END', streamSeq: 4 }, 'message');
+    });
+    await act(async () => {
+      answer({ dialog: { id: 'w10', title: 'Late' }, streamState: 'STREAMING' });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.activeDialog?.title).toBe('Late'));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('queued');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('a send into a dialog with no seq to resume after waits for the tail', async () => {
+    const publish = vi.fn();
+    const { result, tail } = setup({
+      dialogId: 'w6',
+      history: { fetchDialogMessages: () => Promise.resolve({ messages: noSeq, nextCursor: null }) },
+      transport: { publish },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('hello');
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      expect(await sent).toBe(true);
+    });
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('a send into a dialog with a seq goes out before the tail subscribes: the tail resumes after that seq', async () => {
+    const publish = vi.fn();
+    const { result, tail } = setup({ dialogId: 'w7', transport: { publish } });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    await act(async () => {
+      expect(await result.current.sendMessage('now')).toBe(true);
+    });
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('Stop during the wait a transport that awaits subscription asks for: nothing is published, no turn is stopped', async () => {
+    const publish = vi.fn();
+    const stop = vi.fn(() => Promise.resolve());
+    const { result, tail } = setup({ dialogId: 'w8', transport: { awaitsSubscription: true, publish, stop } });
+    await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
+    let sent: Promise<boolean | void> | undefined;
+    act(() => {
+      sent = result.current.sendMessage('go');
+    });
+    act(() => result.current.stopMessage());
+    await act(async () => {
+      expect(await sent).toBe(false);
+    });
+    act(() => tail.current?.onSubscribed?.());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(publish).not.toHaveBeenCalled();
+    expect(stop).not.toHaveBeenCalled();
+  });
+});
+
+describe('useChatEngine: a direct message before the tail subscribes', () => {
+  it('goes out at once with no seq to resume after: there is no answer to lose', async () => {
+    const publish = vi.fn();
+    const { result, tail } = setup({
+      dialogId: 'x1',
+      directMode: true,
+      history: {
+        fetchDialogMessages: () =>
+          Promise.resolve({
+            messages: [
+              {
+                id: 'm1',
+                createdAt: '2026-11-25T09:00:00Z',
+                owner: { type: 'CLIENT' },
+                parts: [{ type: 'TEXT', text: 'hi' }],
+              },
+            ],
+            nextCursor: null,
+          }),
+      },
+      transport: { publish },
+    });
+    await waitFor(() => expect(tail.current?.fromSeq).toBeNull());
+    await act(async () => {
+      expect(await result.current.sendMessage('on it')).toBe(true);
+    });
+    expect(publish).toHaveBeenCalledTimes(1);
   });
 });

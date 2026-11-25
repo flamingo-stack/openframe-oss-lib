@@ -9,6 +9,7 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,16 +19,16 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
+/** Runs still-eligible deferred software work when a target device reconnects. */
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ public class SoftwareScheduleOnlineDispatchService {
     private final SoftwareScheduleOnlineDispatchRepository dispatchRepository;
     private final MachineRepository machineRepository;
     private final SoftwareScheduleRepository scheduleRepository;
+    private final SoftwareScheduleTargetResolver targetResolver;
     private final SoftwareScheduleFireDispatcher fireDispatcher;
 
     @Value("${openframe.rmm.software.schedule.online-dispatch.batch-size:500}")
@@ -56,65 +58,66 @@ public class SoftwareScheduleOnlineDispatchService {
         Map<String, List<SoftwareScheduleOnlineDispatch>> rowsByTenant =
                 batch.stream().collect(groupingBy(SoftwareScheduleOnlineDispatch::getTenantId));
 
-        List<SoftwareScheduleOnlineDispatch> changed = new ArrayList<>();
-        for (Map.Entry<String, List<SoftwareScheduleOnlineDispatch>> e : rowsByTenant.entrySet()) {
-            changed.addAll(processTenant(e.getKey(), e.getValue(), now));
-        }
-
-        if (!changed.isEmpty()) {
-            dispatchRepository.saveAll(changed);
-        }
+        rowsByTenant.forEach((tenantId, rows) -> processTenant(tenantId, rows, now));
     }
 
-    private List<SoftwareScheduleOnlineDispatch> processTenant(String tenantId,
-                                                               List<SoftwareScheduleOnlineDispatch> tenantRows, Instant now) {
+    private void processTenant(String tenantId, List<SoftwareScheduleOnlineDispatch> tenantRows, Instant now) {
         Set<String> machineIds = tenantRows.stream()
                 .map(SoftwareScheduleOnlineDispatch::getMachineId).collect(toSet());
         Map<String, Machine> machinesById = machineRepository
-                .findByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
+                .findOnPrimaryByTenantIdAndMachineIdIn(tenantId, machineIds).stream()
                 .collect(toMap(Machine::getMachineId, m -> m));
 
-        Set<String> scheduleIds = tenantRows.stream()
-                .map(SoftwareScheduleOnlineDispatch::getScheduleId).filter(Objects::nonNull).collect(toSet());
-        Map<String, SoftwareSchedule> activeSchedulesById = scheduleIds.isEmpty() ? Map.of()
-                : scheduleRepository.findByTenantIdAndIdIn(tenantId, scheduleIds).stream()
-                .filter(s -> s.getStatus() == ScriptStatus.ACTIVE)
-                .collect(toMap(SoftwareSchedule::getId, s -> s));
+        tenantRows.forEach(row -> processReconnectSafely(row, machinesById.get(row.getMachineId()), now));
+    }
 
-        List<SoftwareScheduleOnlineDispatch> changed = new ArrayList<>(tenantRows.size());
-        for (SoftwareScheduleOnlineDispatch row : tenantRows) {
-            try {
-                if (row.getExpiresAt() != null && row.getExpiresAt().isBefore(now)) {
-                    row.setStatus(DeviceOnlineDispatchStatus.EXPIRED);
-                    changed.add(row);
-                    log.info("Software schedule reconnect expired (device never reconnected in window): machineId={} scheduleId={} tenantId={}",
-                            row.getMachineId(), row.getScheduleId(), tenantId);
-                    continue;
-                }
-
-                Machine machine = machinesById.get(row.getMachineId());
-                if (!DeviceDispatchEligibility.isDispatchable(machine)) {
-                    continue;   // still offline -> leave NEW until it reconnects or expires
-                }
-
-                SoftwareSchedule schedule = activeSchedulesById.get(row.getScheduleId());
-                if (schedule != null) {
-                    fireDispatcher.dispatch(schedule, List.of(row.getMachineId()), now);
-                    log.info("Software schedule reconnect dispatched: machineId={} scheduleId={} tenantId={}",
-                            row.getMachineId(), row.getScheduleId(), tenantId);
-                } else {
-                    log.warn("Software schedule reconnect: schedule missing/inactive scheduleId={} machineId={} tenantId={} — draining",
-                            row.getScheduleId(), row.getMachineId(), tenantId);
-                }
-                row.setStatus(DeviceOnlineDispatchStatus.DISPATCHED);
-                row.setDispatchedAt(now);
-                changed.add(row);
-            } catch (Exception ex) {
-                log.error("Software schedule reconnect dispatch failed: tenantId={} machineId={} scheduleId={} (will retry next tick)",
-                        row.getTenantId(), row.getMachineId(), row.getScheduleId(), ex);
-            }
+    private void processReconnectSafely(SoftwareScheduleOnlineDispatch row, Machine machine, Instant now) {
+        try {
+            processReconnect(row, machine, now);
+        } catch (Exception ex) {
+            log.error("Software schedule reconnect dispatch failed: tenantId={} machineId={} scheduleId={} (will retry next tick): {}",
+                    row.getTenantId(), row.getMachineId(), row.getScheduleId(), ex.getMessage(), ex);
         }
-        return changed;
+    }
+
+    private void processReconnect(SoftwareScheduleOnlineDispatch row, Machine machine, Instant now) {
+        String tenantId = row.getTenantId();
+        String machineId = row.getMachineId();
+        String scheduleId = row.getScheduleId();
+        if (row.getExpiresAt() != null && row.getExpiresAt().isBefore(now)) {
+            dispatchRepository.transitionIfNew(tenantId, row.getId(), DeviceOnlineDispatchStatus.EXPIRED, null);
+            log.info("Software schedule reconnect expired: machineId={} scheduleId={} tenantId={}", machineId, scheduleId, tenantId);
+            return;
+        }
+        if (!DeviceDispatchEligibility.isDispatchable(machine)) {
+            return;
+        }
+        Optional<Machine> currentMachine = machineRepository.findOnPrimaryByTenantIdAndMachineId(tenantId, machineId)
+                .filter(DeviceDispatchEligibility::isDispatchable);
+        if (currentMachine.isEmpty()) {
+            return;
+        }
+        Optional<SoftwareSchedule> activeSchedule = Optional.ofNullable(scheduleId)
+                .flatMap(id -> scheduleRepository.findOnPrimaryByTenantIdAndIdAndStatus(tenantId, id, ScriptStatus.ACTIVE));
+        if (activeSchedule.isEmpty()) {
+            dispatchRepository.transitionIfNew(tenantId, row.getId(), DeviceOnlineDispatchStatus.DISPATCHED, now);
+            log.warn("Software schedule reconnect: schedule missing/inactive scheduleId={} machineId={} tenantId={} — draining",
+                    scheduleId, machineId, tenantId);
+            return;
+        }
+        SoftwareSchedule schedule = activeSchedule.orElseThrow();
+        if (!targetResolver.isCurrentTarget(schedule, currentMachine.orElseThrow())) {
+            dispatchRepository.transitionIfNew(tenantId, row.getId(), DeviceOnlineDispatchStatus.EXPIRED, null);
+            log.info("Software schedule reconnect dropped for removed device: machineId={} scheduleId={} tenantId={}",
+                    machineId, scheduleId, tenantId);
+            return;
+        }
+        if (!dispatchRepository.existsOnPrimaryByTenantIdAndIdAndStatus(tenantId, row.getId(), DeviceOnlineDispatchStatus.NEW)) {
+            return;
+        }
+        fireDispatcher.dispatch(schedule, List.of(machineId), now);
+        dispatchRepository.transitionIfNew(tenantId, row.getId(), DeviceOnlineDispatchStatus.DISPATCHED, now);
+        log.info("Software schedule reconnect dispatched: machineId={} scheduleId={} tenantId={}", machineId, scheduleId, tenantId);
     }
 
 }

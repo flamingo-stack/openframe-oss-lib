@@ -29,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
@@ -188,6 +189,17 @@ public class TicketLifecycleService {
         ticket.setStatusId(target.getId());
         ticket.setStatusKind(target.getKind());
         log.debug("Applied manual initial status {} (id={}) to new ticket", target.getName(), target.getId());
+    }
+
+    public void applySystemInitialStatus(Ticket ticket, String statusId) {
+        TicketStatusDefinition target = Optional.ofNullable(statusId)
+                .filter(StringUtils::hasText)
+                .flatMap(statusRepository::findById)
+                .filter(status -> MANUALLY_CREATABLE_KINDS.contains(status.getKind()))
+                .orElseGet(() -> requireByKind(TicketStatusKind.TECH_REQUIRED));
+        ticket.setStatusId(target.getId());
+        ticket.setStatusKind(target.getKind());
+        log.debug("Applied system initial status {} (id={}) to new ticket", target.getName(), target.getId());
     }
 
     private TicketStatusDefinition requireManuallyCreatableStatus(String statusId) {

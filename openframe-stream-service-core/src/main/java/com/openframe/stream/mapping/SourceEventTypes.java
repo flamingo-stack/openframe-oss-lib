@@ -14,6 +14,10 @@ public interface SourceEventTypes {
         String CMD_RUN_FINISHED = "cmd_run.finished";
         String SCRIPT_RUN_FINISHED = "script_run.finished";
         String SCRIPT_RUN_FAILED = "script_run.failed";
+        String OS_UPDATE_INSTALLED = "os_update.installed";
+        String OS_UPDATE_INSTALL_FAILED = "os_update.install_failed";
+        String OS_UPDATE_UNINSTALLED = "os_update.uninstalled";
+        String OS_UPDATE_UNINSTALL_FAILED = "os_update.uninstall_failed";
     }
 
     /**

@@ -55,6 +55,7 @@ import static com.openframe.data.service.machine.MachineFields.NICKNAME;
 import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
+/** Resolves and manages devices for dashboard and API operations. */
 @Service
 @Slf4j
 @Validated
@@ -400,25 +401,16 @@ public class DeviceService {
         if (!API_SETTABLE_STATUSES.contains(status)) {
             throw new BadRequestException("Device status can only be set to DELETED or ARCHIVED, got " + status);
         }
-        Machine machine = machineRepository.findByMachineId(machineId)
+        Machine machine = machineRepository.findOnPrimaryByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         if (machine.getStatus() == status) {
+            if (status == DeviceStatus.DELETED) {
+                deletedMachineCleanup.markDeleted(machine);
+            }
             log.info("Device {} already has status {}", machineId, status);
             return;
         }
-        DeviceStatus previousStatus = machine.getStatus();
-        boolean inFleet = !DeviceStatus.FROZEN.contains(status);
-        boolean wasInFleet = !DeviceStatus.FROZEN.contains(previousStatus);
-        if (status == DeviceStatus.DELETED) {
-            deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
-        } else if (wasInFleet != inFleet) {
-            deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, inFleet);
-        }
-
-        // Field-level: a whole-document save would overwrite what other writers set on the machine since the read
-        Machine updated = machineWriter.update(machineId, machineUpdate().set(STATUS, status))
-                .map(MachineWriteResult::after)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        Machine updated = writeDeviceStatus(machine, status);
         log.info("Device {} status updated to {}", machineId, status);
 
         try {
@@ -426,6 +418,22 @@ public class DeviceService {
         } catch (Exception e) {
             log.error("Post-processor failed for machineId={}: {}", machineId, e.getMessage(), e);
         }
+    }
+
+    private Machine writeDeviceStatus(Machine machine, DeviceStatus status) {
+        String machineId = machine.getMachineId();
+        if (status == DeviceStatus.DELETED) {
+            return deletedMachineCleanup.markDeleted(machine);
+        }
+
+        boolean inFleet = !DeviceStatus.FROZEN.contains(status);
+        boolean wasInFleet = !DeviceStatus.FROZEN.contains(machine.getStatus());
+        if (wasInFleet != inFleet) {
+            deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, inFleet);
+        }
+        return machineWriter.update(machineId, machineUpdate().set(STATUS, status))
+                .map(MachineWriteResult::after)
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
     }
 
     public Machine updateNickname(@NotBlank String machineId, String nickname) {

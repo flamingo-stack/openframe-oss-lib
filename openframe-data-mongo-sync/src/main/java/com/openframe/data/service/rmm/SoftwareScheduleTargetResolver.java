@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm;
 
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
@@ -22,6 +23,7 @@ import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
+/** Resolves the devices targeted by each software schedule's list or matching rule. */
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -37,13 +39,21 @@ public class SoftwareScheduleTargetResolver {
             List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
             return criteriaResolver.resolveMachineIds(schedule.getTenantId(), schedule.getDeviceCriteria(), null, enabledManagers);
         }
-        return assignedRepository.findByTenantIdAndSoftwareScheduleId(schedule.getTenantId(), schedule.getId()).stream()
+        return assignedRepository.findOnPrimaryByTenantIdAndSoftwareScheduleId(schedule.getTenantId(), schedule.getId()).stream()
                 .map(SoftwareScheduleMachineAssigned::getMachineId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
     }
 
+    public boolean isCurrentTarget(SoftwareSchedule schedule, Machine machine) {
+        if (schedule.getSelectionMode() == ScheduleDeviceSelectionMode.CRITERIA) {
+            return criteriaResolver.matches(machine, schedule.getDeviceCriteria(), null)
+                    && packageManagerAvailability.isSoftwareManageable(machine);
+        }
+        return assignedRepository.existsOnPrimaryByTenantIdAndSoftwareScheduleIdAndMachineId(
+                schedule.getTenantId(), schedule.getId(), machine.getMachineId());
+    }
     // a device-time schedule keeps no nextRunAt: its one-off run is ahead on a device until that device's run is recorded
     public Map<String, List<String>> resolveMachineIdsAwaitingDeviceTime(List<SoftwareSchedule> schedules) {
         Map<String, Set<String>> ranMachineIds = ranMachineIdsByScheduleId(schedules);
