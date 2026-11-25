@@ -38,37 +38,27 @@ public class MsrcCvrfDocumentParser {
     private final ObjectMapper objectMapper;
 
     public Map<String, MsrcKbArticle> parse(InputStream cvrfDocument) {
-        Map<String, Set<String>> cveIdsByKb = new HashMap<>();
-        Map<String, Double> cvssScoreByKb = new HashMap<>();
-        Map<String, OsUpdateSeverity> severityByKb = new HashMap<>();
-        Set<String> exploitedKbs = new HashSet<>();
-        Map<String, Set<String>> supersededKbsByKb = new HashMap<>();
+        KbArticles kbArticles = new KbArticles();
         try (JsonParser jsonParser = objectMapper.createParser(cvrfDocument)) {
             expect(jsonParser.nextToken(), JsonToken.START_OBJECT);
             while (jsonParser.nextToken() == JsonToken.PROPERTY_NAME) {
                 String propertyName = jsonParser.currentName();
                 JsonToken valueToken = jsonParser.nextToken();
-                if (VULNERABILITY.equals(propertyName) && valueToken == JsonToken.START_ARRAY) {
-                    while (jsonParser.nextToken() == JsonToken.START_OBJECT) {
-                        JsonNode vulnerability = jsonParser.readValueAsTree();
-                        addVulnerability(vulnerability, cveIdsByKb, cvssScoreByKb, severityByKb, exploitedKbs,
-                                supersededKbsByKb);
-                    }
+                boolean vulnerabilityArray = VULNERABILITY.equals(propertyName) && valueToken == JsonToken.START_ARRAY;
+                if (vulnerabilityArray) {
+                    readVulnerabilities(jsonParser, kbArticles);
                 } else {
                     jsonParser.skipChildren();
                 }
             }
         }
-        Map<String, MsrcKbArticle> kbArticles = new HashMap<>();
-        cveIdsByKb.forEach((kb, cveIds) -> kbArticles.put(kb, MsrcKbArticle.builder()
-                .kbArticleId(kb)
-                .cveIds(List.copyOf(cveIds))
-                .severity(severityByKb.get(kb))
-                .cvssScore(cvssScoreByKb.get(kb))
-                .exploited(exploitedKbs.contains(kb))
-                .supersededKbArticleIds(List.copyOf(supersededKbsByKb.getOrDefault(kb, Set.of())))
-                .build()));
-        return kbArticles;
+        return kbArticles.build();
+    }
+
+    private static void readVulnerabilities(JsonParser jsonParser, KbArticles kbArticles) {
+        while (jsonParser.nextToken() == JsonToken.START_OBJECT) {
+            kbArticles.addVulnerability(jsonParser.readValueAsTree());
+        }
     }
 
     private static void expect(JsonToken actual, JsonToken expected) {
@@ -77,37 +67,57 @@ public class MsrcCvrfDocumentParser {
         }
     }
 
-    // The scores and ratings of a CVE differ per product: only those of the products the KB fixes count.
-    private static void addVulnerability(JsonNode vulnerability, Map<String, Set<String>> cveIdsByKb,
-                                         Map<String, Double> cvssScoreByKb,
-                                         Map<String, OsUpdateSeverity> severityByKb, Set<String> exploitedKbs,
-                                         Map<String, Set<String>> supersededKbsByKb) {
-        String cveId = vulnerability.path("CVE").asString("");
-        if (cveId.isBlank()) {
-            return;
+    // What the document says so far, per fix KB.
+    private static final class KbArticles {
+
+        private final Map<String, Set<String>> cveIdsByKb = new HashMap<>();
+        private final Map<String, Double> cvssScoreByKb = new HashMap<>();
+        private final Map<String, OsUpdateSeverity> severityByKb = new HashMap<>();
+        private final Set<String> exploitedKbs = new HashSet<>();
+        private final Map<String, Set<String>> supersededKbsByKb = new HashMap<>();
+
+        // The scores and ratings of a CVE differ per product: only those of the products the KB fixes count.
+        private void addVulnerability(JsonNode vulnerability) {
+            String cveId = vulnerability.path("CVE").asString("");
+            if (cveId.isBlank()) {
+                return;
+            }
+            JsonNode threats = vulnerability.path("Threats");
+            boolean exploited = elements(threats).stream()
+                    .filter(threat -> threat.path("Type").asInt(-1) == THREAT_EXPLOIT_STATUS)
+                    .anyMatch(threat -> threat.path("Description").path("Value").asString("").contains(EXPLOITED_YES));
+            JsonNode remediations = vulnerability.path("Remediations");
+            for (JsonNode remediation : elements(remediations)) {
+                String kb = remediation.path("Description").path("Value").asString("").trim();
+                if (remediation.path("Type").asInt(-1) != REMEDIATION_VENDOR_FIX || !KB_NUMBER.matcher(kb).matches()) {
+                    continue;
+                }
+                Set<String> productIds = productIds(remediation);
+                cveIdsByKb.computeIfAbsent(kb, key -> new TreeSet<>()).add(cveId);
+                Set<String> supersededKbs = supersededKbsByKb.computeIfAbsent(kb, key -> new TreeSet<>());
+                KB_NUMBER.matcher(remediation.path(SUPERSEDENCE).asString("")).results()
+                        .forEach(supersededKb -> supersededKbs.add(supersededKb.group()));
+                maxCvssScore(vulnerability, productIds)
+                        .ifPresent(score -> cvssScoreByKb.merge(kb, score, Math::max));
+                maxSeverity(vulnerability, productIds)
+                        .ifPresent(severity -> severityByKb.merge(kb, severity, MsrcCvrfDocumentParser::moreSevere));
+                if (exploited) {
+                    exploitedKbs.add(kb);
+                }
+            }
         }
-        JsonNode threats = vulnerability.path("Threats");
-        boolean exploited = elements(threats).stream()
-                .filter(threat -> threat.path("Type").asInt(-1) == THREAT_EXPLOIT_STATUS)
-                .anyMatch(threat -> threat.path("Description").path("Value").asString("").contains(EXPLOITED_YES));
-        JsonNode remediations = vulnerability.path("Remediations");
-        for (JsonNode remediation : elements(remediations)) {
-            String kb = remediation.path("Description").path("Value").asString("").trim();
-            if (remediation.path("Type").asInt(-1) != REMEDIATION_VENDOR_FIX || !KB_NUMBER.matcher(kb).matches()) {
-                continue;
-            }
-            Set<String> productIds = productIds(remediation);
-            cveIdsByKb.computeIfAbsent(kb, key -> new TreeSet<>()).add(cveId);
-            Set<String> supersededKbs = supersededKbsByKb.computeIfAbsent(kb, key -> new TreeSet<>());
-            KB_NUMBER.matcher(remediation.path(SUPERSEDENCE).asString("")).results()
-                    .forEach(supersededKb -> supersededKbs.add(supersededKb.group()));
-            maxCvssScore(vulnerability, productIds)
-                    .ifPresent(score -> cvssScoreByKb.merge(kb, score, Math::max));
-            maxSeverity(vulnerability, productIds)
-                    .ifPresent(severity -> severityByKb.merge(kb, severity, MsrcCvrfDocumentParser::moreSevere));
-            if (exploited) {
-                exploitedKbs.add(kb);
-            }
+
+        private Map<String, MsrcKbArticle> build() {
+            Map<String, MsrcKbArticle> kbArticles = new HashMap<>();
+            cveIdsByKb.forEach((kb, cveIds) -> kbArticles.put(kb, MsrcKbArticle.builder()
+                    .kbArticleId(kb)
+                    .cveIds(List.copyOf(cveIds))
+                    .severity(severityByKb.get(kb))
+                    .cvssScore(cvssScoreByKb.get(kb))
+                    .exploited(exploitedKbs.contains(kb))
+                    .supersededKbArticleIds(List.copyOf(supersededKbsByKb.getOrDefault(kb, Set.of())))
+                    .build()));
+            return kbArticles;
         }
     }
 

@@ -136,7 +136,8 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         }
         boolean exploitedByMsrc = matchedKbArticles.stream().anyMatch(MsrcKbArticle::isExploited);
         List<String> cveIds = Objects.requireNonNullElse(osUpdate.getCveIds(), List.of());
-        if (exploitedByMsrc || !cveIds.isEmpty()) {
+        boolean exploitationKnowable = exploitedByMsrc || !cveIds.isEmpty();
+        if (exploitationKnowable) {
             // Without KEV a flag KEV set earlier must not drop
             boolean exploitedByKev = knownExploitedCveIds == null
                     ? Boolean.TRUE.equals(osUpdate.getExploited())
