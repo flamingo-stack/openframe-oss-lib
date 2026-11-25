@@ -36,6 +36,9 @@ public class GraphQLDeviceMapper {
         if (input == null) {
             return DeviceFilterCriteria.builder().build();
         }
+        if (hasValues(input.getMdmStates()) || hasValues(input.getDiskEncryptionStates())) {
+            throw new IllegalArgumentException("Filtering devices by MDM or disk encryption state is not available yet");
+        }
 
         return DeviceFilterCriteria.builder()
                 .statuses(input.getStatuses())
@@ -49,6 +52,10 @@ public class GraphQLDeviceMapper {
                 .directorySources(input.getDirectorySources())
                 .userLinks(input.getUserLinks())
                 .build();
+    }
+
+    private static boolean hasValues(List<String> values) {
+        return values != null && !values.isEmpty();
     }
 
     public DeviceFilterCriteria toDeviceFilterCriteria(DeviceFilterInput input,

@@ -124,16 +124,16 @@ extend type Machine {
 }
 
 extend type DeviceFilters {
-    """MDM column filter options, by MdmEnrollmentState name."""
+    """MDM column filter options, by MdmEnrollmentState name. Empty until the MDM filter is available."""
     mdmStates: [DeviceFilterOption!]!
-    """Disk encryption column filter options, by DiskEncryptionState name."""
+    """Disk encryption column filter options, by DiskEncryptionState name. Empty until the filter is available."""
     diskEncryptionStates: [DeviceFilterOption!]!
 }
 
 extend input DeviceFilterInput {
-    """Only devices whose mdm.state is one of these."""
+    """Only devices whose mdm.state is one of these. Not available yet: a non-empty list is rejected."""
     mdmStates: [MdmEnrollmentState!]
-    """Only devices whose mdm.diskEncryption.state is one of these."""
+    """Only devices whose mdm.diskEncryption.state is one of these. Not available yet: a non-empty list is rejected."""
     diskEncryptionStates: [DiskEncryptionState!]
 }
 
