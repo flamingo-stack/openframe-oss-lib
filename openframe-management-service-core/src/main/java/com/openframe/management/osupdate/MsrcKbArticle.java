@@ -1,4 +1,4 @@
-package com.openframe.client.service.rmm.osupdate.enrichment;
+package com.openframe.management.osupdate;
 
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
 import lombok.Builder;
@@ -13,10 +13,7 @@ public class MsrcKbArticle {
 
     String kbArticleId;
     List<String> cveIds;
-    // Null = no CVE of the KB has a rating or a score.
+    // Null = no CVE of the KB has a rating.
     OsUpdateSeverity severity;
-    Double cvssScore;
     boolean exploited;
-    // KB numbers this KB replaces.
-    List<String> supersededKbArticleIds;
 }

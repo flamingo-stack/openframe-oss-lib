@@ -29,9 +29,7 @@ public class DeviceOsPendingUpdateResponse {
     private Long sizeBytes;
     private OsUpdateRebootBehavior rebootBehavior;
     private Boolean browseOnly;
-    private Double cvssScore;
     private Boolean exploited;
-    private List<String> supersededBy;
     private Instant enrichedAt;
     private Instant discoveredAt;
     private Boolean downloaded;

@@ -74,15 +74,9 @@ type OsUpdate {
     rebootBehavior: OsUpdateRebootBehavior
     """An optional or preview update."""
     browseOnly: Boolean
-    """Highest CVSS base score of the update's CVEs, from Microsoft's security bulletin. Null = not enriched yet, or
-    the bulletin has no data on the update (previews, drivers, macOS)."""
-    cvssScore: Float
     """A CVE of the update is known to be exploited, by Microsoft's bulletin or the CISA KEV catalog. Null = no CVE
     of the update is known."""
     exploited: Boolean
-    """KB numbers of the updates that replace this one, from Microsoft's security bulletin. Null = no bulletin read
-    so far names one."""
-    supersededBy: [String!]
     """When the update was last checked against the vendor's bulletin, with or without data. Null = not checked yet."""
     enrichedAt: Instant
     """When a device of the tenant first reported the update."""
@@ -245,15 +239,9 @@ type DeviceOsPendingUpdate {
     rebootBehavior: OsUpdateRebootBehavior
     """An optional or preview update."""
     browseOnly: Boolean
-    """Highest CVSS base score of the update's CVEs, from Microsoft's security bulletin. Null = not enriched yet, or
-    the bulletin has no data on the update (previews, drivers, macOS)."""
-    cvssScore: Float
     """A CVE of the update is known to be exploited, by Microsoft's bulletin or the CISA KEV catalog. Null = no CVE
     of the update is known."""
     exploited: Boolean
-    """KB numbers of the updates that replace this one, from Microsoft's security bulletin. Null = no bulletin read
-    so far names one."""
-    supersededBy: [String!]
     """When the update was last checked against the vendor's bulletin, with or without data. Null = not checked yet."""
     enrichedAt: Instant
 

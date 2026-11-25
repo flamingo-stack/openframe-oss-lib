@@ -1,10 +1,11 @@
-package com.openframe.client.integration.osupdate;
+package com.openframe.management.integration.osupdate;
 
-import com.openframe.client.integration.support.OsUpdateEnrichmentTestApplication;
-import com.openframe.client.scheduler.OsUpdateEnrichmentScheduler;
-import com.openframe.client.service.rmm.osupdate.enrichment.CisaKevClient;
-import com.openframe.client.service.rmm.osupdate.enrichment.MsrcCvrfClient;
-import com.openframe.client.service.rmm.osupdate.enrichment.WindowsOsUpdateEnricher;
+import com.openframe.management.integration.support.OsUpdateEnrichmentTestApplication;
+import com.openframe.management.osupdate.OsUpdateEnrichmentScheduler;
+import com.openframe.management.osupdate.CisaKevClient;
+import com.openframe.management.osupdate.MsrcCvrfClient;
+import com.openframe.management.osupdate.OsUpdateEnrichmentService;
+import com.openframe.management.osupdate.WindowsOsUpdateEnricher;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -43,6 +44,7 @@ class OsUpdateEnrichmentFlagOffIT {
     void enrichmentFlagMissing_noEnrichmentBean() {
         // verifications
         assertThat(context.getBeanNamesForType(OsUpdateEnrichmentScheduler.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OsUpdateEnrichmentService.class)).isEmpty();
         assertThat(context.getBeanNamesForType(WindowsOsUpdateEnricher.class)).isEmpty();
         assertThat(context.getBeanNamesForType(MsrcCvrfClient.class)).isEmpty();
         assertThat(context.getBeanNamesForType(CisaKevClient.class)).isEmpty();

@@ -1,4 +1,4 @@
-package com.openframe.client.service.rmm.osupdate.enrichment;
+package com.openframe.management.osupdate;
 
 import lombok.Getter;
 

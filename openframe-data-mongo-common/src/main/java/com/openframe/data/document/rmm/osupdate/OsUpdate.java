@@ -28,8 +28,8 @@ import java.util.List;
         name = "tenant_first_seen",
         def = "{'tenantId': 1, 'firstSeenAt': -1, '_id': -1}")
 @CompoundIndex(
-        name = "tenant_enriched_at",
-        def = "{'tenantId': 1, 'enrichedAt': 1}")
+        name = "tenant_id",
+        def = "{'tenantId': 1, '_id': 1}")
 public class OsUpdate implements TenantScoped, Persistable<String> {
 
     @Id
@@ -72,20 +72,11 @@ public class OsUpdate implements TenantScoped, Persistable<String> {
 
     private Instant firstSeenAt;
 
-    // Highest CVSS base score of the update's CVEs, from the vendor's security bulletin.
-    private Double cvssScore;
-
     // A CVE of the update is known to be exploited: by the vendor's bulletin or the CISA KEV catalog.
     private Boolean exploited;
 
-    // KB numbers of the updates that replace this one, from the vendor's bulletin. Null = no bulletin read names one.
-    private List<String> supersededBy;
-
     // Null = never checked against the vendor's bulletin. Set also when the bulletin has no data for the update.
     private Instant enrichedAt;
-
-    // Set on every enrichment run that took the update, also when its source failed: the run takes the oldest first.
-    private Instant enrichmentAttemptedAt;
 
     @Override
     @Transient

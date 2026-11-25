@@ -1,6 +1,6 @@
-package com.openframe.client.service.rmm.osupdate.enrichment.parser;
+package com.openframe.management.osupdate.parser;
 
-import com.openframe.client.service.rmm.osupdate.enrichment.MsrcKbArticle;
+import com.openframe.management.osupdate.MsrcKbArticle;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.JacksonException;
@@ -21,7 +21,7 @@ class MsrcCvrfDocumentParserTest {
     private final MsrcCvrfDocumentParser parser = new MsrcCvrfDocumentParser(new JsonMapper());
 
     @Test
-    void parse_novemberBulletin_kbWithItsCvesHighestScoreAndRatingNotExploited() throws IOException {
+    void parse_novemberBulletin_kbWithItsCvesAndRatingNotExploited() throws IOException {
         // execution
         Map<String, MsrcKbArticle> kbArticles;
         try (InputStream cvrfDocument = fixture("msrc-cvrf-2026-Nov.json")) {
@@ -32,7 +32,6 @@ class MsrcCvrfDocumentParserTest {
         assertThat(kbArticles).containsOnlyKeys("5132061");
         MsrcKbArticle kbArticle = kbArticles.get("5132061");
         assertThat(kbArticle.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
-        assertThat(kbArticle.getCvssScore()).isEqualTo(9.8);
         assertThat(kbArticle.getSeverity()).isEqualTo(OsUpdateSeverity.IMPORTANT);
         assertThat(kbArticle.isExploited()).isFalse();
     }
@@ -48,50 +47,16 @@ class MsrcCvrfDocumentParserTest {
         // verifications
         MsrcKbArticle kbArticle = kbArticles.get("5126868");
         assertThat(kbArticle.getCveIds()).containsExactly("CVE-2026-96951");
-        assertThat(kbArticle.getCvssScore()).isEqualTo(8.8);
         assertThat(kbArticle.isExploited()).isTrue();
     }
 
     @Test
-    void parse_realBulletins_kbCarriesTheKbItSupersedes() throws IOException {
-        // execution
-        Map<String, MsrcKbArticle> november;
-        Map<String, MsrcKbArticle> october;
-        try (InputStream novemberDocument = fixture("msrc-cvrf-2026-Nov.json");
-             InputStream octoberDocument = fixture("msrc-cvrf-2026-Oct.json")) {
-            november = parser.parse(novemberDocument);
-            october = parser.parse(octoberDocument);
-        }
-
-        // verifications
-        assertThat(november.get("5132061").getSupersededKbArticleIds()).containsExactly("5127648");
-        assertThat(october.get("5126868").getSupersededKbArticleIds()).containsExactly("5123099");
-    }
-
-    @Test
-    void parse_remediationWithoutSupersedence_kbSupersedesNothing() {
-        // setup
-        String cvrfDocument = """
-                {"Vulnerability":[{"CVE":"CVE-2026-1",
-                  "Remediations":[{"Type":2,"Description":{"Value":"5000001"},"Supercedence":""},
-                                  {"Type":2,"Description":{"Value":"5000002"}}]}]}""";
-
-        // execution
-        Map<String, MsrcKbArticle> kbArticles = parser.parse(stream(cvrfDocument));
-
-        // verifications
-        assertThat(kbArticles.get("5000001").getSupersededKbArticleIds()).isEmpty();
-        assertThat(kbArticles.get("5000002").getSupersededKbArticleIds()).isEmpty();
-    }
-
-    @Test
-    void parse_scoresAndRatingsOfOtherProducts_notCountedForTheKb() {
+    void parse_ratingsOfOtherProducts_notCountedForTheKb() {
         // setup
         String cvrfDocument = """
                 {"Vulnerability":[{"CVE":"CVE-2026-1",
                   "Threats":[{"Type":3,"Description":{"Value":"Critical"},"ProductID":["other"]},
                              {"Type":3,"Description":{"Value":"Moderate"},"ProductID":["fixed"]}],
-                  "CVSSScoreSets":[{"BaseScore":9.9,"ProductID":["other"]},{"BaseScore":5.0,"ProductID":["fixed"]}],
                   "Remediations":[{"Type":2,"Description":{"Value":"5000001"},"ProductID":["fixed"]},
                                   {"Type":2,"Description":{"Value":"Release Notes"},"ProductID":["other"]},
                                   {"Type":3}]}]}""";
@@ -101,7 +66,6 @@ class MsrcCvrfDocumentParserTest {
 
         // verifications
         assertThat(kbArticles).containsOnlyKeys("5000001");
-        assertThat(kbArticles.get("5000001").getCvssScore()).isEqualTo(5.0);
         assertThat(kbArticles.get("5000001").getSeverity()).isEqualTo(OsUpdateSeverity.MODERATE);
     }
 
@@ -130,7 +94,23 @@ class MsrcCvrfDocumentParserTest {
     @Test
     void parse_notAnObject_fails() {
         // execution / verifications
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(stream("[]")));
+        assertThrows(JacksonException.class, () -> parser.parse(stream("[]")));
+    }
+
+    @Test
+    void parse_exploitStatusThreat_kbExploited() {
+        // setup
+        String cvrfDocument = """
+                {"Vulnerability":[{"CVE":"CVE-2026-1",
+                  "Threats":[{"Type":1,"Description":{"Value":"Publicly Disclosed:No;Exploited:Yes"}}],
+                  "Remediations":[{"Type":2,"Description":{"Value":"5000001"}}]}]}""";
+
+        // execution
+        Map<String, MsrcKbArticle> kbArticles = parser.parse(stream(cvrfDocument));
+
+        // verifications
+        assertThat(kbArticles.get("5000001").isExploited()).isTrue();
+        assertThat(kbArticles.get("5000001").getSeverity()).isNull();
     }
 
     static InputStream fixture(String name) {

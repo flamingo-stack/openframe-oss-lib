@@ -1,11 +1,10 @@
-package com.openframe.client.scheduler;
+package com.openframe.management.osupdate;
 
-import com.openframe.client.service.rmm.osupdate.OsUpdateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +20,8 @@ import java.time.Instant;
 @Slf4j
 public class OsUpdateEnrichmentScheduler {
 
-    private final OsUpdateService osUpdateService;
+    private final OsUpdateEnrichmentService osUpdateEnrichmentService;
+    private final OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
 
     @Value("${openframe.rmm.os-update.enrichment.ttl:24h}")
     private Duration ttl;
@@ -35,9 +35,11 @@ public class OsUpdateEnrichmentScheduler {
             lockAtLeastFor = "${openframe.rmm.os-update.enrichment.lock-at-least-for:1m}")
     public void run() {
         try {
-            osUpdateService.enrichNotEnrichedSince(Instant.now().minus(ttl), batchSize);
+            Instant enrichedBefore = Instant.now().minus(ttl);
+            osUpdateEnrichmentService.enrichNotEnrichedSince(enrichedBefore, batchSize);
         } catch (Exception e) {
             log.error("OS update enrichment failed", e);
+            osUpdateEnrichmentMetrics.recordRunFailed();
         }
     }
 }

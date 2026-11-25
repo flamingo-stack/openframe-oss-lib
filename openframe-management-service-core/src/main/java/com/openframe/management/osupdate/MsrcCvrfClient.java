@@ -1,8 +1,8 @@
-package com.openframe.client.service.rmm.osupdate.enrichment;
+package com.openframe.management.osupdate;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.openframe.client.service.rmm.osupdate.enrichment.parser.MsrcCvrfDocumentParser;
+import com.openframe.management.osupdate.parser.MsrcCvrfDocumentParser;
 import com.openframe.core.rest.PackageSearchRestClientFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,15 +30,18 @@ public class MsrcCvrfClient {
 
     private final RestClient restClient;
     private final MsrcCvrfDocumentParser msrcCvrfDocumentParser;
+    private final OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
     private final Cache<YearMonth, Map<String, MsrcKbArticle>> kbArticlesByMonth;
 
     public MsrcCvrfClient(
             MsrcCvrfDocumentParser msrcCvrfDocumentParser,
+            OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics,
             @Value("${openframe.rmm.os-update.enrichment.msrc.base-url:https://api.msrc.microsoft.com/cvrf/v3.0}")
             String baseUrl,
             @Value("${openframe.rmm.os-update.enrichment.msrc.timeout:60s}") Duration timeout,
             @Value("${openframe.rmm.os-update.enrichment.msrc.cache-ttl:6h}") Duration cacheTtl) {
         this.msrcCvrfDocumentParser = msrcCvrfDocumentParser;
+        this.osUpdateEnrichmentMetrics = osUpdateEnrichmentMetrics;
         this.restClient = PackageSearchRestClientFactory.create(baseUrl, timeout);
         this.kbArticlesByMonth = Caffeine.newBuilder()
                 .expireAfterWrite(cacheTtl)
@@ -52,6 +55,17 @@ public class MsrcCvrfClient {
     }
 
     private Map<String, MsrcKbArticle> fetchKbArticles(YearMonth month) {
+        try {
+            Map<String, MsrcKbArticle> kbArticles = readKbArticles(month);
+            osUpdateEnrichmentMetrics.recordSourceFetched(OsUpdateSource.MSRC_CVRF);
+            return kbArticles;
+        } catch (OsUpdateSourceUnavailableException failure) {
+            osUpdateEnrichmentMetrics.recordSourceFailed(OsUpdateSource.MSRC_CVRF);
+            throw failure;
+        }
+    }
+
+    private Map<String, MsrcKbArticle> readKbArticles(YearMonth month) {
         String monthId = MONTH_ID.format(month);
         try {
             return restClient.get()

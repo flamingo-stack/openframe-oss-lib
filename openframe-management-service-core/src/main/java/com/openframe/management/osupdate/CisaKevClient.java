@@ -1,8 +1,8 @@
-package com.openframe.client.service.rmm.osupdate.enrichment;
+package com.openframe.management.osupdate;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.openframe.client.service.rmm.osupdate.enrichment.parser.CisaKevCatalogParser;
+import com.openframe.management.osupdate.parser.CisaKevCatalogParser;
 import com.openframe.core.rest.PackageSearchRestClientFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,16 +26,19 @@ public class CisaKevClient {
     private final RestClient restClient;
     private final String catalogPath;
     private final CisaKevCatalogParser cisaKevCatalogParser;
+    private final OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
     private final Cache<String, Set<String>> knownExploitedCveIds;
 
     public CisaKevClient(
             CisaKevCatalogParser cisaKevCatalogParser,
+            OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics,
             @Value("${openframe.rmm.os-update.enrichment.kev.base-url:https://www.cisa.gov}") String baseUrl,
             @Value("${openframe.rmm.os-update.enrichment.kev.path:/sites/default/files/feeds/known_exploited_vulnerabilities.json}")
             String catalogPath,
             @Value("${openframe.rmm.os-update.enrichment.kev.timeout:30s}") Duration timeout,
             @Value("${openframe.rmm.os-update.enrichment.kev.cache-ttl:6h}") Duration cacheTtl) {
         this.cisaKevCatalogParser = cisaKevCatalogParser;
+        this.osUpdateEnrichmentMetrics = osUpdateEnrichmentMetrics;
         this.catalogPath = catalogPath;
         this.restClient = PackageSearchRestClientFactory.create(baseUrl, timeout);
         this.knownExploitedCveIds = Caffeine.newBuilder()
@@ -50,6 +53,17 @@ public class CisaKevClient {
     }
 
     private Set<String> fetchKnownExploitedCveIds() {
+        try {
+            Set<String> knownExploitedCveIds = readKnownExploitedCveIds();
+            osUpdateEnrichmentMetrics.recordSourceFetched(OsUpdateSource.CISA_KEV);
+            return knownExploitedCveIds;
+        } catch (OsUpdateSourceUnavailableException failure) {
+            osUpdateEnrichmentMetrics.recordSourceFailed(OsUpdateSource.CISA_KEV);
+            throw failure;
+        }
+    }
+
+    private Set<String> readKnownExploitedCveIds() {
         try {
             return restClient.get()
                     .uri(catalogPath)

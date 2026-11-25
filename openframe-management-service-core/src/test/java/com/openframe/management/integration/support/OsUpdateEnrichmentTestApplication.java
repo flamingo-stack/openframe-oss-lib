@@ -1,17 +1,14 @@
-package com.openframe.client.integration.support;
+package com.openframe.management.integration.support;
 
-import com.openframe.client.metrics.DeviceOsReportMetrics;
-import com.openframe.client.metrics.OsUpdateEnrichmentMetrics;
-import com.openframe.client.scheduler.OsUpdateEnrichmentScheduler;
-import com.openframe.client.service.rmm.osupdate.OsUpdateClassifier;
-import com.openframe.client.service.rmm.osupdate.OsUpdateService;
-import com.openframe.client.service.rmm.osupdate.StoredOsUpdateRefresher;
-import com.openframe.client.service.rmm.osupdate.enrichment.CisaKevClient;
-import com.openframe.client.service.rmm.osupdate.enrichment.MsrcCvrfClient;
-import com.openframe.client.service.rmm.osupdate.enrichment.WindowsOsUpdateEnricher;
-import com.openframe.client.service.rmm.osupdate.enrichment.parser.CisaKevCatalogParser;
-import com.openframe.client.service.rmm.osupdate.enrichment.parser.MsrcCvrfDocumentParser;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.management.osupdate.CisaKevClient;
+import com.openframe.management.osupdate.MsrcCvrfClient;
+import com.openframe.management.osupdate.OsUpdateEnrichmentMetrics;
+import com.openframe.management.osupdate.OsUpdateEnrichmentScheduler;
+import com.openframe.management.osupdate.OsUpdateEnrichmentService;
+import com.openframe.management.osupdate.WindowsOsUpdateEnricher;
+import com.openframe.management.osupdate.parser.CisaKevCatalogParser;
+import com.openframe.management.osupdate.parser.MsrcCvrfDocumentParser;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.boot.SpringBootConfiguration;
@@ -37,10 +34,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         basePackages = "com.openframe.data.repository.rmm.osupdate",
         includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = ".*\\.OsUpdateRepository"))
 @Import({
-        OsUpdateService.class,
-        OsUpdateClassifier.class,
-        StoredOsUpdateRefresher.class,
-        DeviceOsReportMetrics.class,
+        OsUpdateEnrichmentService.class,
         OsUpdateEnrichmentMetrics.class,
         OsUpdateEnrichmentScheduler.class,
         WindowsOsUpdateEnricher.class,

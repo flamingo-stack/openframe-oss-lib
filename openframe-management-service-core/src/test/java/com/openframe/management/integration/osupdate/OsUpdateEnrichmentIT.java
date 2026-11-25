@@ -1,7 +1,7 @@
-package com.openframe.client.integration.osupdate;
+package com.openframe.management.integration.osupdate;
 
-import com.openframe.client.integration.support.OsUpdateEnrichmentTestApplication;
-import com.openframe.client.scheduler.OsUpdateEnrichmentScheduler;
+import com.openframe.management.integration.support.OsUpdateEnrichmentTestApplication;
+import com.openframe.management.osupdate.OsUpdateEnrichmentScheduler;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
@@ -38,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.openframe.client.integration.support.OsUpdateEnrichmentTestApplication.TENANT_ID;
+import static com.openframe.management.integration.support.OsUpdateEnrichmentTestApplication.TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // The scheduled run against a real Mongo, with MSRC and CISA answering from checked-in trimmed documents.
@@ -118,35 +118,21 @@ class OsUpdateEnrichmentIT {
         // verifications
         OsUpdate storedNovember = stored(november);
         assertThat(storedNovember.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
-        assertThat(storedNovember.getCvssScore()).isEqualTo(9.8);
         assertThat(storedNovember.getSeverity()).isEqualTo(OsUpdateSeverity.IMPORTANT);
         assertThat(storedNovember.getExploited()).isFalse();
         assertThat(storedNovember.getEnrichedAt()).isNotNull();
         OsUpdate storedOctober = stored(october);
         assertThat(storedOctober.getExploited()).isTrue();
-        assertThat(storedOctober.getCvssScore()).isEqualTo(8.8);
+        assertThat(storedOctober.getCveIds()).containsExactly("CVE-2026-96951");
         OsUpdate storedPreview = stored(preview);
         assertThat(storedPreview.getEnrichedAt()).isNotNull();
-        assertThat(storedPreview.getCvssScore()).isNull();
         assertThat(storedPreview.getCveIds()).isEmpty();
         assertThat(stored(mac).getEnrichedAt()).isNotNull();
         assertThat(entries("WINDOWS", "enriched")).isEqualTo(2);
         assertThat(entries("WINDOWS", "no_data")).isEqualTo(1);
         assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.duration").timer().count()).isEqualTo(1);
-    }
-
-    @Test
-    void run_laterBulletinOfTheRunSupersedesTheKb_supersededByStored() {
-        // setup
-        OsUpdate november = osUpdateRepository.save(windows("nov", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061"));
-        OsUpdate october = osUpdateRepository.save(windows("oct", "2026-10 Cumulative Update for Windows 11 (KB5127648)", "KB5127648"));
-
-        // execution
-        osUpdateEnrichmentScheduler.run();
-
-        // verifications
-        assertThat(stored(october).getSupersededBy()).containsExactly("5132061");
-        assertThat(stored(november).getSupersededBy()).isNull();
+        assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_fetch")
+                .tags("source", "cisa_kev", "result", "success").counter().count()).isPositive();
     }
 
     @Test
@@ -162,15 +148,15 @@ class OsUpdateEnrichmentIT {
         // verifications
         assertThat(stored(november).getEnrichedAt()).isNull();
         assertThat(stored(october).getEnrichedAt()).isNotNull();
-        assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_failed")
-                .tag("source", "msrc_cvrf").counter().count()).isPositive();
+        assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_fetch")
+                .tags("source", "msrc_cvrf", "result", "failure").counter().count()).isPositive();
 
         // execution
         FAILING_PATHS.clear();
         osUpdateEnrichmentScheduler.run();
 
         // verifications
-        assertThat(stored(november).getCvssScore()).isEqualTo(9.8);
+        assertThat(stored(november).getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
         assertThat(REQUESTS.get("/cvrf/2026-Oct").get()).as("October was fresh, not asked again").isEqualTo(1);
     }
 
@@ -190,7 +176,7 @@ class OsUpdateEnrichmentIT {
         // verifications
         List<OsUpdate> stored = osUpdateRepository.findAll();
         assertThat(stored).singleElement().satisfies(osUpdate -> {
-            assertThat(osUpdate.getCvssScore()).isEqualTo(9.8);
+            assertThat(osUpdate.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
             assertThat(osUpdate.getVersion()).isNotNull();
         });
     }
@@ -218,7 +204,7 @@ class OsUpdateEnrichmentIT {
         osUpdateEnrichmentScheduler.run();
 
         // verifications
-        assertThat(stored(november).getCvssScore()).isEqualTo(9.8);
+        assertThat(stored(november).getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
         assertThat(stored(november).getBrowseOnly()).isTrue();
     }
 
@@ -244,7 +230,7 @@ class OsUpdateEnrichmentIT {
     }
 
     @Test
-    void run_monthThatKeepsFailingAndBatchOfOne_healthyEntryStillEnriched() {
+    void run_monthThatFailsAndBatchOfOne_healthyEntryAfterItEnrichedInTheSameRun() {
         // setup
         osUpdateRepository.save(windows("nov-1", "2026-11 Cumulative Update for Windows 11 (KB5132061)", "5132061"));
         osUpdateRepository.save(windows("nov-2", "2026-11 Cumulative Update for Windows 10 (KB5132061)", "5132061"));
@@ -254,15 +240,13 @@ class OsUpdateEnrichmentIT {
 
         // execution
         try {
-            for (int run = 0; run < 3; run++) {
-                osUpdateEnrichmentScheduler.run();
-            }
+            osUpdateEnrichmentScheduler.run();
         } finally {
             ReflectionTestUtils.setField(osUpdateEnrichmentScheduler, "batchSize", 500);
         }
 
         // verifications
-        assertThat(stored(october).getCvssScore()).isEqualTo(8.8);
+        assertThat(stored(october).getCveIds()).containsExactly("CVE-2026-96951");
     }
 
     @Test
@@ -290,12 +274,11 @@ class OsUpdateEnrichmentIT {
 
         // verifications
         OsUpdate storedNovember = stored(november);
-        assertThat(storedNovember.getCvssScore()).isEqualTo(9.8);
         assertThat(storedNovember.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
         assertThat(storedNovember.getExploited()).isFalse();
         assertThat(storedNovember.getEnrichedAt()).isNotNull();
-        assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_failed")
-                .tag("source", "cisa_kev").counter().count()).isPositive();
+        assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_fetch")
+                .tags("source", "cisa_kev", "result", "failure").counter().count()).isPositive();
     }
 
     private OsUpdate stored(OsUpdate osUpdate) {

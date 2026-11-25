@@ -1,4 +1,4 @@
-package com.openframe.client.service.rmm.osupdate.enrichment.parser;
+package com.openframe.management.osupdate.parser;
 
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;

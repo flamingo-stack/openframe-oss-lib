@@ -1,6 +1,5 @@
-package com.openframe.client.service.rmm.osupdate.enrichment;
+package com.openframe.management.osupdate;
 
-import com.openframe.client.metrics.OsUpdateEnrichmentMetrics;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
@@ -32,21 +31,13 @@ class WindowsOsUpdateEnricherTest {
             .kbArticleId("5132061")
             .cveIds(List.of("CVE-2026-113766", "CVE-2026-96157"))
             .severity(OsUpdateSeverity.IMPORTANT)
-            .cvssScore(9.8)
             .exploited(false)
             .build();
     private static final MsrcKbArticle OCTOBER_CUMULATIVE = MsrcKbArticle.builder()
             .kbArticleId("5126868")
             .cveIds(List.of("CVE-2026-96951"))
             .severity(OsUpdateSeverity.IMPORTANT)
-            .cvssScore(8.8)
             .exploited(true)
-            .build();
-
-    private static final MsrcKbArticle NOVEMBER_SUPERSEDING_OCTOBER = MsrcKbArticle.builder()
-            .kbArticleId("5132061")
-            .cveIds(List.of("CVE-2026-113766"))
-            .supersededKbArticleIds(List.of("5126868"))
             .build();
 
     @Mock private MsrcCvrfClient msrcCvrfClient;
@@ -63,7 +54,7 @@ class WindowsOsUpdateEnricherTest {
     }
 
     @Test
-    void enrich_securityUpdateOfTheMonth_cvesScoreRatingAndCheckedAt() {
+    void enrich_securityUpdateOfTheMonth_cvesRatingAndCheckedAt() {
         // setup
         OsUpdate cumulative = osUpdate(OsPlatform.WINDOWS,
                 "2026-11 Cumulative Update for Windows 11, version 25H2 for x64-based Systems (KB5132061)",
@@ -77,7 +68,6 @@ class WindowsOsUpdateEnricherTest {
         // verifications
         assertThat(cumulative.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
         assertThat(cumulative.getSeverity()).isEqualTo(OsUpdateSeverity.IMPORTANT);
-        assertThat(cumulative.getCvssScore()).isEqualTo(9.8);
         assertThat(cumulative.getExploited()).isFalse();
         assertThat(cumulative.getEnrichedAt()).isEqualTo(ENRICHED_AT);
         verify(osUpdateEnrichmentMetrics).recordEnriched(OsPlatform.WINDOWS);
@@ -147,7 +137,6 @@ class WindowsOsUpdateEnricherTest {
         // verifications
         assertThat(preview.getEnrichedAt()).isEqualTo(ENRICHED_AT);
         assertThat(preview.getCveIds()).isEmpty();
-        assertThat(preview.getCvssScore()).isNull();
         assertThat(preview.getExploited()).isNull();
         verify(osUpdateEnrichmentMetrics).recordNoData(OsPlatform.WINDOWS);
     }
@@ -164,7 +153,6 @@ class WindowsOsUpdateEnricherTest {
         enricher.enrich(List.of(cumulative), ENRICHED_AT);
 
         // verifications
-        assertThat(cumulative.getCvssScore()).isEqualTo(9.8);
     }
 
     @Test
@@ -196,9 +184,7 @@ class WindowsOsUpdateEnricherTest {
 
         // verifications
         assertThat(november.getEnrichedAt()).isNull();
-        assertThat(november.getCvssScore()).isNull();
         assertThat(october.getEnrichedAt()).isEqualTo(ENRICHED_AT);
-        verify(osUpdateEnrichmentMetrics).recordSourceFailed(OsUpdateSource.MSRC_CVRF);
     }
 
     @Test
@@ -214,10 +200,8 @@ class WindowsOsUpdateEnricherTest {
 
         // verifications
         assertThat(cumulative.getCveIds()).containsExactly("CVE-2026-96951");
-        assertThat(cumulative.getCvssScore()).isEqualTo(8.8);
         assertThat(cumulative.getExploited()).isTrue();
         assertThat(cumulative.getEnrichedAt()).isEqualTo(ENRICHED_AT);
-        verify(osUpdateEnrichmentMetrics).recordSourceFailed(OsUpdateSource.CISA_KEV);
     }
 
     @Test
@@ -238,44 +222,9 @@ class WindowsOsUpdateEnricherTest {
     }
 
     @Test
-    void enrich_laterMonthOfTheRunSupersedesTheKb_supersededByStored() {
+    void enrich_kbIdWithItsPrefix_matchedByNumber() {
         // setup
         OsUpdate october = osUpdate(OsPlatform.WINDOWS, "2026-10 Cumulative Update (KB5126868)", List.of("KB5126868"));
-        OsUpdate november = osUpdate(OsPlatform.WINDOWS, "2026-11 Cumulative Update (KB5132061)", List.of("5132061"));
-        when(cisaKevClient.getKnownExploitedCveIds()).thenReturn(Set.of());
-        when(msrcCvrfClient.getKbArticles(OCTOBER)).thenReturn(Map.of("5126868", OCTOBER_CUMULATIVE));
-        when(msrcCvrfClient.getKbArticles(NOVEMBER)).thenReturn(Map.of("5132061", NOVEMBER_SUPERSEDING_OCTOBER));
-
-        // execution
-        enricher.enrich(List.of(october, november), ENRICHED_AT);
-
-        // verifications
-        assertThat(october.getSupersededBy()).containsExactly("5132061");
-        assertThat(november.getSupersededBy()).isNull();
-    }
-
-    @Test
-    void enrich_storedSupersededByDiffersFromMsrc_replaced() {
-        // setup
-        OsUpdate october = osUpdate(OsPlatform.WINDOWS, "2026-10 Cumulative Update (KB5126868)", List.of("5126868"));
-        october.setSupersededBy(List.of("5000000"));
-        OsUpdate november = osUpdate(OsPlatform.WINDOWS, "2026-11 Cumulative Update (KB5132061)", List.of("5132061"));
-        when(cisaKevClient.getKnownExploitedCveIds()).thenReturn(Set.of());
-        when(msrcCvrfClient.getKbArticles(OCTOBER)).thenReturn(Map.of("5126868", OCTOBER_CUMULATIVE));
-        when(msrcCvrfClient.getKbArticles(NOVEMBER)).thenReturn(Map.of("5132061", NOVEMBER_SUPERSEDING_OCTOBER));
-
-        // execution
-        enricher.enrich(List.of(october, november), ENRICHED_AT);
-
-        // verifications
-        assertThat(october.getSupersededBy()).containsExactly("5132061");
-    }
-
-    @Test
-    void enrich_noMonthOfTheRunSupersedesTheKb_storedSupersededByKept() {
-        // setup
-        OsUpdate october = osUpdate(OsPlatform.WINDOWS, "2026-10 Cumulative Update (KB5126868)", List.of("5126868"));
-        october.setSupersededBy(List.of("5132061"));
         when(cisaKevClient.getKnownExploitedCveIds()).thenReturn(Set.of());
         when(msrcCvrfClient.getKbArticles(OCTOBER)).thenReturn(Map.of("5126868", OCTOBER_CUMULATIVE));
 
@@ -283,8 +232,7 @@ class WindowsOsUpdateEnricherTest {
         enricher.enrich(List.of(october), ENRICHED_AT);
 
         // verifications
-        assertThat(october.getSupersededBy()).containsExactly("5132061");
-        assertThat(october.getEnrichedAt()).isEqualTo(ENRICHED_AT);
+        assertThat(october.getCveIds()).containsExactly("CVE-2026-96951");
     }
 
     private static OsUpdate osUpdate(OsPlatform platform, String displayName, List<String> kbArticleIds) {

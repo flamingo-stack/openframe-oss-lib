@@ -1,6 +1,5 @@
-package com.openframe.client.service.rmm.osupdate.enrichment;
+package com.openframe.management.osupdate;
 
-import com.openframe.client.metrics.OsUpdateEnrichmentMetrics;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +11,6 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,20 +53,8 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         Map<Optional<YearMonth>, Map<String, MsrcKbArticle>> kbArticlesByMonth = new LinkedHashMap<>();
         osUpdatesByMonth.keySet().forEach(month ->
                 findKbArticles(month.orElse(null)).ifPresent(kbArticles -> kbArticlesByMonth.put(month, kbArticles)));
-        Map<String, Set<String>> supersedingKbsByKb = findSupersedingKbsByKb(kbArticlesByMonth.values());
         kbArticlesByMonth.forEach((month, kbArticles) -> osUpdatesByMonth.get(month).forEach(osUpdate ->
-                enrich(osUpdate, kbArticles, supersedingKbsByKb, knownExploitedCveIds, enrichedAt)));
-    }
-
-    // Only the months of this run: a KB is shown superseded once an update of a later month is enriched with it.
-    private static Map<String, Set<String>> findSupersedingKbsByKb(Collection<Map<String, MsrcKbArticle>> months) {
-        Map<String, Set<String>> supersedingKbsByKb = new HashMap<>();
-        months.forEach(kbArticles -> kbArticles.values().forEach(kbArticle ->
-                Objects.requireNonNullElse(kbArticle.getSupersededKbArticleIds(), List.<String>of())
-                        .forEach(supersededKb -> supersedingKbsByKb
-                                .computeIfAbsent(supersededKb, key -> new TreeSet<>())
-                                .add(kbArticle.getKbArticleId()))));
-        return supersedingKbsByKb;
+                enrich(osUpdate, kbArticles, knownExploitedCveIds, enrichedAt)));
     }
 
     // Empty = KEV unavailable this run; it is asked again when the entry's TTL runs out.
@@ -77,7 +62,7 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         try {
             return Optional.of(cisaKevClient.getKnownExploitedCveIds());
         } catch (OsUpdateSourceUnavailableException failure) {
-            recordSourceFailed(failure);
+            logSourceFailed(failure);
             return Optional.empty();
         }
     }
@@ -90,31 +75,24 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
         try {
             return Optional.of(msrcCvrfClient.getKbArticles(month));
         } catch (OsUpdateSourceUnavailableException failure) {
-            recordSourceFailed(failure);
+            logSourceFailed(failure);
             return Optional.empty();
         }
     }
 
-    private void recordSourceFailed(OsUpdateSourceUnavailableException failure) {
+    private static void logSourceFailed(OsUpdateSourceUnavailableException failure) {
         log.warn("OS update enrichment source {} failed, its updates wait for the next run: {}",
                 failure.getOsUpdateSource(), failure.getMessage());
-        osUpdateEnrichmentMetrics.recordSourceFailed(failure.getOsUpdateSource());
     }
 
-    // MSRC is authoritative for the CVEs, rating and score of a KB it lists; without MSRC data the stored ones stay.
+    // MSRC is authoritative for the CVEs and rating of a KB it lists; without MSRC data the stored ones stay.
     // knownExploitedCveIds is null when KEV was unavailable this run.
     private void enrich(OsUpdate osUpdate, Map<String, MsrcKbArticle> kbArticles,
-                        Map<String, Set<String>> supersedingKbsByKb,
                         Set<String> knownExploitedCveIds, Instant enrichedAt) {
         List<String> kbNumbers = Objects.requireNonNullElse(osUpdate.getKbArticleIds(), List.<String>of())
                 .stream()
                 .map(WindowsOsUpdateEnricher::toKbNumber)
                 .toList();
-        Set<String> supersedingKbs = new TreeSet<>();
-        kbNumbers.forEach(kbNumber -> supersedingKbs.addAll(supersedingKbsByKb.getOrDefault(kbNumber, Set.of())));
-        if (!supersedingKbs.isEmpty()) {
-            osUpdate.setSupersededBy(List.copyOf(supersedingKbs));
-        }
         List<MsrcKbArticle> matchedKbArticles = kbNumbers.stream()
                 .map(kbArticles::get)
                 .filter(Objects::nonNull)
@@ -128,11 +106,6 @@ public class WindowsOsUpdateEnricher implements OsUpdateEnricher {
                     .filter(Objects::nonNull)
                     .min(Enum::compareTo)
                     .ifPresent(osUpdate::setSeverity);
-            matchedKbArticles.stream()
-                    .map(MsrcKbArticle::getCvssScore)
-                    .filter(Objects::nonNull)
-                    .max(Double::compare)
-                    .ifPresent(osUpdate::setCvssScore);
         }
         boolean exploitedByMsrc = matchedKbArticles.stream().anyMatch(MsrcKbArticle::isExploited);
         List<String> cveIds = Objects.requireNonNullElse(osUpdate.getCveIds(), List.of());

@@ -92,7 +92,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 edges { cursor node {
                   id platform identifier displayName displayVersion kbArticleIds severity categories categoryIds
                   updateType classification cveIds publishedAt sizeBytes rebootBehavior browseOnly firstSeenAt
-                  cvssScore exploited supersededBy enrichedAt
+                  exploited enrichedAt
                   pendingDeviceCount installedDeviceCount
                 } }
                 pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
@@ -229,9 +229,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         expected.put("rebootBehavior", "ALWAYS");
         expected.put("browseOnly", false);
         expected.put("firstSeenAt", NEWEST_SEEN);
-        expected.put("cvssScore", 9.8);
         expected.put("exploited", true);
-        expected.put("supersededBy", List.of("5053598"));
         expected.put("enrichedAt", ENRICHED_AT);
         expected.put("pendingDeviceCount", 2);
         expected.put("installedDeviceCount", 3);
@@ -261,9 +259,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .containsEntry("categoryIds", List.of())
                 .containsEntry("classification", null)
                 .containsEntry("updateType", null)
-                .containsEntry("cvssScore", null)
                 .containsEntry("exploited", null)
-                .containsEntry("supersededBy", null)
                 .containsEntry("enrichedAt", null)
                 .containsEntry("pendingDeviceCount", 0)
                 .containsEntry("installedDeviceCount", 0));
@@ -745,9 +741,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                 .append("sizeBytes", 764317696L)
                 .append("rebootBehavior", "ALWAYS")
                 .append("browseOnly", false)
-                .append("cvssScore", 9.8)
                 .append("exploited", true)
-                .append("supersededBy", List.of("5053598"))
                 .append("enrichedAt", date(ENRICHED_AT));
     }
 
