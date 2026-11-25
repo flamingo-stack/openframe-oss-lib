@@ -20,6 +20,6 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class UpdateDeviceStatusRequest {
 
-    /** Contract values: ACTIVE, PENDING, INACTIVE, MAINTENANCE, DECOMMISSIONED, ONLINE, OFFLINE, PENDING_DELETION, DELETED, ARCHIVED. Kept as String so a new backend value deserializes rather than throwing. */
+    /** Contract values: PENDING, MANAGED, PENDING_DELETION, DELETED, ARCHIVED. Kept as String so a new backend value deserializes rather than throwing. */
     private String status;
 }

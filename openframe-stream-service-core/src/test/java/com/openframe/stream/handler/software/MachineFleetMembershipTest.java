@@ -34,7 +34,7 @@ class MachineFleetMembershipTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "MANAGED", "ONLINE", "OFFLINE"})
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "MANAGED"})
     void inFleet_deviceOutsideTheFrozenStatuses_isInTheFleet(DeviceStatus status) {
         // setup
         stubMachineIn(status);

@@ -165,8 +165,7 @@ public class ToolConnectionService {
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new MachineNotFoundException("Machine not found: " + machineId));
         DeviceStatus status = machine.getStatus();
-        boolean retired = DeviceStatus.FROZEN.contains(status) || status == DeviceStatus.DECOMMISSIONED;
-        if (retired) {
+        if (DeviceStatus.FROZEN.contains(status)) {
             throw new MachineNotFoundException(MACHINE_NO_LONGER_MANAGED + machineId);
         }
         return machine;

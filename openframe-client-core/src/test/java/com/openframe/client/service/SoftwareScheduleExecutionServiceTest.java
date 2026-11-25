@@ -63,7 +63,7 @@ class SoftwareScheduleExecutionServiceTest {
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-1", "m-2"));
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-1", DeviceStatus.ONLINE), machine("m-2", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m-1", DeviceStatus.MANAGED, TelemetryStatus.ONLINE), machine("m-2", DeviceStatus.MANAGED, TelemetryStatus.ONLINE)));
 
         service.runDueSchedules();
 
@@ -84,7 +84,7 @@ class SoftwareScheduleExecutionServiceTest {
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-1"));
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-1", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m-1", DeviceStatus.MANAGED, TelemetryStatus.ONLINE)));
 
         service.runDueSchedules();
 
@@ -103,9 +103,9 @@ class SoftwareScheduleExecutionServiceTest {
                 .build();
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
-        Machine online = machine("m-online", DeviceStatus.DELETED);
+        Machine online = machine("m-online", DeviceStatus.DELETED, TelemetryStatus.OFFLINE);
         online.setTelemetryStatus(TelemetryStatus.ONLINE);
-        Machine offline = machine("m-offline", DeviceStatus.DELETED);
+        Machine offline = machine("m-offline", DeviceStatus.DELETED, TelemetryStatus.OFFLINE);
         offline.setTelemetryStatus(TelemetryStatus.OFFLINE);
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(online, offline));
@@ -127,11 +127,11 @@ class SoftwareScheduleExecutionServiceTest {
         when(targetResolver.resolveMachineIds(schedule))
                 .thenReturn(List.of("retained-first", "reenrolled", "retained-last"),
                         List.of("retained-last", "retained-first", "new-assignment"));
-        Machine reenrolled = machine("reenrolled", DeviceStatus.ONLINE);
+        Machine reenrolled = machine("reenrolled", DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
         reenrolled.setStatus(DeviceStatus.MANAGED);
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(
-                machine("retained-first", DeviceStatus.ONLINE), reenrolled,
-                machine("retained-last", DeviceStatus.ONLINE)));
+                machine("retained-first", DeviceStatus.MANAGED, TelemetryStatus.ONLINE), reenrolled,
+                machine("retained-last", DeviceStatus.MANAGED, TelemetryStatus.ONLINE)));
 
         // execution
         service.runDueSchedules();
@@ -177,9 +177,9 @@ class SoftwareScheduleExecutionServiceTest {
                 .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
                 .build();
         dueOfflineTarget(schedule);
-        Machine renamed = machine("m-off", DeviceStatus.OFFLINE);
+        Machine renamed = machine("m-off", DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
         renamed.setVersion(2L);
-        Machine changedAgain = machine("m-off", DeviceStatus.OFFLINE);
+        Machine changedAgain = machine("m-off", DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
         changedAgain.setVersion(3L);
         when(machineRepository.findOnPrimaryByTenantIdAndMachineId(TENANT, "m-off"))
                 .thenReturn(Optional.of(renamed), Optional.of(changedAgain));
@@ -208,8 +208,8 @@ class SoftwareScheduleExecutionServiceTest {
                 .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT).reconnectWindowSeconds(3600L)
                 .build();
         dueOfflineTarget(schedule);
-        Machine offline = machine("m-off", DeviceStatus.OFFLINE);
-        Machine online = machine("m-on", DeviceStatus.ONLINE);
+        Machine offline = machine("m-off", DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
+        Machine online = machine("m-on", DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-on", "m-off"));
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(online, offline));
@@ -251,7 +251,7 @@ class SoftwareScheduleExecutionServiceTest {
         List<String> candidates = List.of("m-on", "m-reconnected");
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(candidates);
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-on", DeviceStatus.ONLINE), machine("m-reconnected", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m-on", DeviceStatus.MANAGED, TelemetryStatus.ONLINE), machine("m-reconnected", DeviceStatus.MANAGED, TelemetryStatus.ONLINE)));
         SoftwareScheduleOnlineDispatch dispatchedOnReconnect = SoftwareScheduleOnlineDispatch.builder()
                 .tenantId(TENANT).scheduleId(schedule.getId()).machineId("m-reconnected")
                 .scheduledFor(scheduledFor).status(DeviceOnlineDispatchStatus.DISPATCHED).build();
@@ -295,7 +295,7 @@ class SoftwareScheduleExecutionServiceTest {
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-off"));
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-off", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machine("m-off", DeviceStatus.MANAGED, TelemetryStatus.OFFLINE)));
 
         service.runDueSchedules();
 
@@ -304,7 +304,7 @@ class SoftwareScheduleExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE goes to the offline branch")
+    @DisplayName("online is decided by telemetryStatus: status MANAGED with telemetry OFFLINE goes to the offline branch")
     void runDue_statusOnlineTelemetryOffline_treatedAsOffline() {
         // setup
         SoftwareSchedule schedule = SoftwareSchedule.builder()
@@ -313,7 +313,7 @@ class SoftwareScheduleExecutionServiceTest {
                 .offlineBehavior(ScheduleOfflineBehavior.SKIP)
                 .build();
         due(schedule);
-        Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
+        Machine staleStatus = machine("m-stale", DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
         staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-stale"));
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
@@ -345,7 +345,7 @@ class SoftwareScheduleExecutionServiceTest {
 
     private void dueOfflineTarget(SoftwareSchedule schedule) {
         due(schedule);
-        Machine machine = machine("m-off", DeviceStatus.OFFLINE);
+        Machine machine = machine("m-off", DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of(machine.getMachineId()));
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(machine));
         when(scheduleRepository.findOnPrimaryByTenantIdAndIdAndStatus(TENANT, schedule.getId(), ScriptStatus.ACTIVE))
@@ -359,11 +359,11 @@ class SoftwareScheduleExecutionServiceTest {
         });
     }
 
-    private static Machine machine(String machineId, DeviceStatus status) {
+    private static Machine machine(String machineId, DeviceStatus status, TelemetryStatus connectivity) {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setStatus(status);
-        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
+        m.setTelemetryStatus(connectivity);
         return m;
     }
 }

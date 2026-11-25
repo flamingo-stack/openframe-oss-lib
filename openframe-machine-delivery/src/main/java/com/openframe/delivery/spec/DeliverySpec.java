@@ -24,7 +24,7 @@ public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload>
 
     // a machine that never connected is still waiting for its first commands; one that is gone or leaving gets none
     default Set<DeviceStatus> getDeliverableStatuses() {
-        return EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);
+        return EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.PENDING);
     }
 
     // null = the result-timeout of the policy; a type set in config under types.<TYPE> keeps that value

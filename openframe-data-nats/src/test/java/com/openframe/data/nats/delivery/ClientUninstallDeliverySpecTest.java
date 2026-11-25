@@ -39,9 +39,8 @@ class ClientUninstallDeliverySpecTest {
 
         // verifications
         assertThat(statuses)
-                .containsExactlyInAnyOrder(DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE,
-                        DeviceStatus.PENDING, DeviceStatus.PENDING_DELETION)
-                .doesNotContain(DeviceStatus.DELETED, DeviceStatus.ARCHIVED, DeviceStatus.DECOMMISSIONED);
+                .containsExactlyInAnyOrder(DeviceStatus.MANAGED, DeviceStatus.PENDING, DeviceStatus.PENDING_DELETION)
+                .doesNotContain(DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
     }
 
     @Test

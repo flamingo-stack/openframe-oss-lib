@@ -40,7 +40,7 @@ class CustomMachineRepositoryHostFactsCheckedIT extends BaseMongoIntegrationTest
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setTenantId("tenant-1");
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         machine.setSerialNumber("C02XG2JHJG5H");
         machine.setDirectorySources(List.of(DirectorySource.MICROSOFT_365));
         machine.setDirectoryUserLink(DirectoryUserLink.PRIMARY);
@@ -60,7 +60,7 @@ class CustomMachineRepositoryHostFactsCheckedIT extends BaseMongoIntegrationTest
         assertThat(stored.getHostFactsCheckedAt()).isEqualTo(checkedAt);
         assertThat(stored).extracting(Machine::getStatus, Machine::getSerialNumber, Machine::getDirectorySources,
                         Machine::getDirectoryUserLink)
-                .containsExactly(DeviceStatus.ONLINE, "C02XG2JHJG5H", List.of(DirectorySource.MICROSOFT_365),
+                .containsExactly(DeviceStatus.MANAGED, "C02XG2JHJG5H", List.of(DirectorySource.MICROSOFT_365),
                         DirectoryUserLink.PRIMARY);
     }
 

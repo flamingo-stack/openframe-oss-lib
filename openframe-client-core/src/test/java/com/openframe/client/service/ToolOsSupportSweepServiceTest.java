@@ -38,7 +38,7 @@ class ToolOsSupportSweepServiceTest {
     private static final String OLD_MAC_VERSION = "11.7.10";
     private static final String NEW_MAC_VERSION = "14.2";
     private static final Set<DeviceStatus> SWEPT =
-            EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);
+            EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.PENDING);
     private static final Limit PAGE = Limit.of(ToolOsSupportSweepService.PAGE_SIZE);
 
     @Mock private ToolOsSupportService toolOsSupportService;

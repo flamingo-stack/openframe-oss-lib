@@ -661,7 +661,7 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
         String windowsMachineId = newMachine();
         String macMachineId = newMachine();
         String otherTenantMachineId = OWN_MACHINES + MACHINES.incrementAndGet();
-        saveMachine(otherTenantMachineId, DeviceStatus.ONLINE, OTHER_TENANT_ID);
+        saveMachine(otherTenantMachineId, DeviceStatus.MANAGED, OTHER_TENANT_ID);
         ObjectNode windowsReport = windowsReport();
         ((ObjectNode) items(windowsReport).get(0)).put("identifier", "shared-identifier");
         ObjectNode macReport = fixture(MAC_UPDATES_AVAILABLE);
@@ -1433,7 +1433,7 @@ class MachineOsUpdatesIngestIT extends BaseOsReportIngestIT {
 
     private String newMachine() {
         String machineId = OWN_MACHINES + MACHINES.incrementAndGet();
-        saveMachine(machineId, DeviceStatus.ONLINE, TENANT_ID);
+        saveMachine(machineId, DeviceStatus.MANAGED, TENANT_ID);
         return machineId;
     }
 

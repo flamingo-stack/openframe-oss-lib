@@ -178,7 +178,7 @@ class CustomMachineRepositorySearchTest {
     @Test
     void findMachines_noNameSelector_preservesCallerActiveStatusPolicy() {
         // setup
-        MachineQueryFilter filter = MachineQueryFilter.builder().statuses(List.of("ONLINE", "OFFLINE")).build();
+        MachineQueryFilter filter = MachineQueryFilter.builder().statuses(List.of("MANAGED", "PENDING")).build();
 
         // execution
         repository.findMachines(TENANT_ID, filter);
@@ -186,7 +186,7 @@ class CustomMachineRepositorySearchTest {
         // verifications
         Query query = machineQuery();
         Document status = clauseFor(query, "status");
-        assertThat(status).containsEntry("status", new Document("$in", List.of("ONLINE", "OFFLINE")));
+        assertThat(status).containsEntry("status", new Document("$in", List.of("MANAGED", "PENDING")));
         assertThat(clauses(query.getQueryObject())).noneMatch(clause -> clause.containsKey("hostname"));
     }
 
@@ -195,7 +195,7 @@ class CustomMachineRepositorySearchTest {
         // setup
         MachineQueryFilter filter = MachineQueryFilter.builder()
                 .hostnames(List.of("TADC01")).nicknames(List.of("Office Mac"))
-                .statuses(List.of("ONLINE")).osTypes(List.of(WINDOWS)).organizationIds(List.of("organization-1"))
+                .statuses(List.of("MANAGED")).osTypes(List.of(WINDOWS)).organizationIds(List.of("organization-1"))
                 .tagValues(List.of("production")).build();
         TagAssignment assignment = tagAssignment("machine-1");
         when(mongoTemplate.find(any(Query.class), eq(TagAssignment.class))).thenReturn(List.of(assignment));
@@ -205,7 +205,7 @@ class CustomMachineRepositorySearchTest {
 
         // verifications
         Query query = machineQuery();
-        assertThat(clauseFor(query, "status")).containsEntry("status", new Document("$in", List.of("ONLINE")));
+        assertThat(clauseFor(query, "status")).containsEntry("status", new Document("$in", List.of("MANAGED")));
         assertThat(clauseFor(query, "osType")).containsEntry("osType", new Document("$in", List.of(WINDOWS)));
         assertThat(clauseFor(query, "organizationId"))
                 .containsEntry("organizationId", new Document("$in", List.of("organization-1")));
@@ -428,7 +428,7 @@ class CustomMachineRepositorySearchTest {
     @Test
     void machineQueryFilter_legacyConstructor_preservesExistingArguments() {
         // setup
-        List<String> statuses = List.of("ONLINE");
+        List<String> statuses = List.of("MANAGED");
         List<String> hidden = List.of("DELETED");
         List<String> types = List.of("LAPTOP");
         List<String> organizations = List.of("organization-1");
@@ -439,7 +439,7 @@ class CustomMachineRepositorySearchTest {
                 organizations, machineIds, List.of());
 
         // verifications
-        assertThat(filter.getStatuses()).containsExactly("ONLINE");
+        assertThat(filter.getStatuses()).containsExactly("MANAGED");
         assertThat(filter.getExcludeStatuses()).containsExactly("DELETED");
         assertThat(filter.getDeviceTypes()).containsExactly("LAPTOP");
         assertThat(filter.getOsTypes()).containsExactly(WINDOWS);

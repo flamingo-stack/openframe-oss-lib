@@ -10,6 +10,7 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import org.bson.Document;
@@ -78,20 +79,21 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("queryDevicesForPlatforms: a status filter combined with a platform scope resolves and counts correctly")
+    @DisplayName("queryDevicesForPlatforms: a status and connectivity filter combined with a platform scope resolves and counts correctly")
     void queryDevicesForPlatforms_statusFilterPlusPlatform() {
-        machine("m-online-win", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
-        machine("m-offline-win", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
-        machine("m-online-mac", "org-1", DeviceType.LAPTOP, MAC_OS, DeviceStatus.ONLINE);
+        machine("m-online-win", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
+        machine("m-offline-win", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
+        machine("m-online-mac", "org-1", DeviceType.LAPTOP, MAC_OS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
 
         DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
-                .statuses(List.of(DeviceStatus.ONLINE))
+                .statuses(List.of(DeviceStatus.MANAGED))
+                .connectivity(List.of(TelemetryStatus.ONLINE))
                 .build();
 
         CountedGenericQueryResult<Machine> result = deviceService.queryDevicesForPlatforms(
                 List.of(WINDOWS), filter, CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
-        assertThat(result.getFilteredCount()).isEqualTo(1);   // ONLINE AND windows
+        assertThat(result.getFilteredCount()).isEqualTo(1);   // MANAGED, ONLINE AND windows
         assertThat(result.getItems()).extracting(Machine::getMachineId).containsExactly("m-online-win");
     }
 
@@ -121,11 +123,11 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("queryAvailableDevicesForSchedule: default order is assigned+ONLINE, assigned+OFFLINE, unassigned+ONLINE, unassigned+OFFLINE")
     void queryAvailableDevicesForSchedule_bucketOrder() {
-        machine("a-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
-        machine("a-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
-        machine("u-on1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
-        machine("u-on2", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
-        machine("u-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
+        machine("a-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
+        machine("a-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
+        machine("u-on1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
+        machine("u-on2", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
+        machine("u-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
 
         CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
                 null, Set.of("a-on", "a-off"), null,
@@ -142,10 +144,10 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("queryAvailableDevicesForSchedule: compound (bucket|id) cursor paginates across a bucket boundary with no gaps or duplicates")
     void queryAvailableDevicesForSchedule_cursorPaginationAcrossBuckets() {
-        machine("a-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
-        machine("a-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
-        machine("u-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
-        machine("u-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
+        machine("a-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
+        machine("a-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
+        machine("u-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
+        machine("u-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
         Set<String> assigned = Set.of("a-on", "a-off");
 
         CountedGenericQueryResult<Machine> page1 = deviceService.queryAvailableDevicesForSchedule(
@@ -166,9 +168,9 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("queryAvailableDevicesForSchedule: soft-deleted (status DELETED) devices are excluded from the picker")
     void queryAvailableDevicesForSchedule_excludesDeleted() {
-        machine("live-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
-        machine("live-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.OFFLINE);
-        machine("gone", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.DELETED);
+        machine("live-on", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
+        machine("live-off", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
+        machine("gone", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.DELETED, TelemetryStatus.OFFLINE);
 
         CountedGenericQueryResult<Machine> result = deviceService.queryAvailableDevicesForSchedule(
                 null, Set.of(), null, CursorPaginationCriteria.builder().limit(10).build(), null);
@@ -182,7 +184,7 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("updateNickname: atomic $set — a concurrent writer's fields survive the rename (regression: save() rewrote the whole document)")
     void updateNickname_preservesConcurrentWrites() {
-        machine("m1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("m1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
         mongoTemplate.updateFirst(byMachineId("m1"),
                 new Update().set("agentReportedField", "keep-me"), Machine.class);
 
@@ -195,7 +197,7 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
         assertThat(stored).isNotNull();
         assertThat(stored.get("nickname")).isEqualTo("Reception iMac");
         assertThat(stored.get("agentReportedField")).as("concurrent writer's field").isEqualTo("keep-me");
-        assertThat(stored.get("status")).isEqualTo(DeviceStatus.ONLINE.name());
+        assertThat(stored.get("status")).isEqualTo(DeviceStatus.MANAGED.name());
         assertThat(stored.get("osType")).isEqualTo(WINDOWS.name());
         assertThat(stored.get("updatedAt")).isNotNull();
     }
@@ -203,7 +205,7 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("updateNickname: a blank value clears the stored nickname; an unknown device throws")
     void updateNickname_clearsAndRejectsUnknown() {
-        machine("m1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.ONLINE);
+        machine("m1", "org-1", DeviceType.LAPTOP, WINDOWS, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
         deviceService.updateNickname("m1", "Reception iMac");
 
         assertThat(deviceService.updateNickname("m1", "   ").getNickname()).isNull();
@@ -221,10 +223,11 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
     }
 
     private void machine(String machineId, String orgId, DeviceType type, OsType osType) {
-        machine(machineId, orgId, type, osType, DeviceStatus.ONLINE);
+        machine(machineId, orgId, type, osType, DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
     }
 
-    private void machine(String machineId, String orgId, DeviceType type, OsType osType, DeviceStatus status) {
+    private void machine(String machineId, String orgId, DeviceType type, OsType osType, DeviceStatus status,
+                         TelemetryStatus connectivity) {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setTenantId(TENANT);
@@ -232,6 +235,7 @@ class DeviceServiceIT extends BaseMongoIntegrationTest {
         m.setType(type);
         m.setOsType(osType);
         m.setStatus(status);
+        m.setTelemetryStatus(connectivity);
         machineRepository.save(m);
     }
 }

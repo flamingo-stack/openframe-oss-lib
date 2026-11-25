@@ -97,7 +97,7 @@ class ToolUpdateDeliverySpecTest {
 
         // verifications
         assertThat(statuses).containsExactlyInAnyOrder(
-                DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);
+                DeviceStatus.MANAGED, DeviceStatus.PENDING);
     }
 
     @Test

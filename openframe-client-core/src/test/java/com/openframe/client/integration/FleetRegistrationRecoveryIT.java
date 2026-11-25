@@ -154,7 +154,7 @@ class FleetRegistrationRecoveryIT {
         FleetHostFactsWriter facts = new FleetHostFactsWriter(machines, writer);
         FleetMdmAgentIdTransformer transformer = new FleetMdmAgentIdTransformer(clients, facts);
         events = mock(ApplicationEventPublisher.class);
-        DeviceLifecycleService lifecycle = new DeviceLifecycleService(machines, connections, writer, events, mock(ToolOsSupportService.class), true);
+        DeviceLifecycleService lifecycle = new DeviceLifecycleService(machines, connections, writer, events, mock(ToolOsSupportService.class));
         service = new ToolConnectionService(connections, machines,
                 new ToolAgentIdTransformerService(List.of(transformer)), lifecycle);
         THREADS.add(Thread.currentThread().getName());

@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm.schedule;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -37,7 +38,8 @@ class ScheduleDeviceExistenceTest {
         // setup
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
-        machine.setStatus(DeviceStatus.OFFLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
+        machine.setTelemetryStatus(TelemetryStatus.OFFLINE);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.findByTenantIdAndMachineIdIn(TENANT_ID, Set.of(MACHINE_ID))).thenReturn(List.of(machine));
         List<String> machineIds = List.of(MACHINE_ID);

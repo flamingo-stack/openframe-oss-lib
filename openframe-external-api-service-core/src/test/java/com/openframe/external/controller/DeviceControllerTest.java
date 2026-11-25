@@ -87,7 +87,7 @@ class DeviceControllerTest {
         when(deviceService.queryDevices(any(), any(), any(), any())).thenReturn(page());
 
         mockMvc.perform(get(BASE)
-                        .param("statuses", "ONLINE,OFFLINE")
+                        .param("statuses", "MANAGED,PENDING")
                         .param("connectivity", "ONLINE")
                         .param("clientOutdated", "true")
                         .param("deviceTypes", "LAPTOP")
@@ -108,7 +108,7 @@ class DeviceControllerTest {
         ArgumentCaptor<SortInput> sort = ArgumentCaptor.forClass(SortInput.class);
         verify(deviceService).queryDevices(filter.capture(), pagination.capture(), eq("reception"), sort.capture());
 
-        assertEquals(List.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE), filter.getValue().getStatuses());
+        assertEquals(List.of(DeviceStatus.MANAGED, DeviceStatus.PENDING), filter.getValue().getStatuses());
         assertEquals(List.of(TelemetryStatus.ONLINE), filter.getValue().getConnectivity());
         assertEquals(Boolean.TRUE, filter.getValue().getClientOutdated());
         assertEquals(List.of(DeviceType.LAPTOP, DeviceType.SERVER), filter.getValue().getDeviceTypes());
@@ -242,7 +242,7 @@ class DeviceControllerTest {
                 .andExpect(jsonPath("$.ip").value("192.168.1.100"))
                 .andExpect(jsonPath("$.macAddress").value("00:11:22:33:44:55"))
                 .andExpect(jsonPath("$.agentVersion").value("1.2.3"))
-                .andExpect(jsonPath("$.status").value("ONLINE"))
+                .andExpect(jsonPath("$.status").value("MANAGED"))
                 .andExpect(jsonPath("$.type").value("LAPTOP"))
                 .andExpect(jsonPath("$.osType").value("MAC_OS"))
                 .andExpect(jsonPath("$.customerId").value("cust-1"))
@@ -272,7 +272,7 @@ class DeviceControllerTest {
     void filtersPassEveryParamToTheDomainAndRenameOrganizationsToCustomers() throws Exception {
         when(deviceFilterService.getDeviceFilters(any(DeviceFilterCriteria.class), any())).thenReturn(CompletableFuture.completedFuture(
                 DeviceFilters.builder()
-                        .statuses(List.of(new DeviceFilterOption("ONLINE", "Online", 4)))
+                        .statuses(List.of(new DeviceFilterOption("MANAGED", "Managed", 4)))
                         .connectivity(List.of(new DeviceFilterOption("OFFLINE", "OFFLINE", 2)))
                         .clientOutdated(List.of(new DeviceFilterOption("true", "true", 6), new DeviceFilterOption("false", "false", 3)))
                         .deviceTypes(List.of(new DeviceFilterOption("LAPTOP", "Laptop", 3)))
@@ -283,7 +283,7 @@ class DeviceControllerTest {
                         .build()));
 
         mockMvc.perform(get(BASE + "/filters")
-                        .param("statuses", "ONLINE")
+                        .param("statuses", "MANAGED")
                         .param("connectivity", "OFFLINE")
                         .param("clientOutdated", "false")
                         .param("deviceTypes", "LAPTOP")
@@ -292,8 +292,8 @@ class DeviceControllerTest {
                         .param("tagKeys", "site")
                         .param("tagValues", "hq"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.statuses[0].value").value("ONLINE"))
-                .andExpect(jsonPath("$.statuses[0].label").value("Online"))
+                .andExpect(jsonPath("$.statuses[0].value").value("MANAGED"))
+                .andExpect(jsonPath("$.statuses[0].label").value("Managed"))
                 .andExpect(jsonPath("$.statuses[0].count").value(4))
                 .andExpect(jsonPath("$.connectivity[0].value").value("OFFLINE"))
                 .andExpect(jsonPath("$.connectivity[0].count").value(2))
@@ -315,7 +315,7 @@ class DeviceControllerTest {
         ArgumentCaptor<DeviceFilterCriteria> filter = ArgumentCaptor.forClass(DeviceFilterCriteria.class);
         verify(deviceFilterService).getDeviceFilters(filter.capture(), any());
         assertEquals(DeviceFilterCriteria.builder()
-                .statuses(List.of(DeviceStatus.ONLINE))
+                .statuses(List.of(DeviceStatus.MANAGED))
                 .connectivity(List.of(TelemetryStatus.OFFLINE))
                 .clientOutdated(false)
                 .deviceTypes(List.of(DeviceType.LAPTOP))
@@ -348,6 +348,39 @@ class DeviceControllerTest {
                 DeviceFilterFacet.ORGANIZATION_IDS,
                 DeviceFilterFacet.TAG_KEYS,
                 DeviceFilterFacet.FILTERED_COUNT), facets.getValue());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ONLINE", "OFFLINE", "ACTIVE", "INACTIVE", "MAINTENANCE", "DECOMMISSIONED"})
+    void listWithRemovedStatusIs400TypeMismatch(String status) throws Exception {
+        mockMvc.perform(get(BASE).param("statuses", status))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
+
+        verifyNoInteractions(deviceService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ONLINE", "OFFLINE", "ACTIVE", "INACTIVE", "MAINTENANCE", "DECOMMISSIONED"})
+    void filtersWithRemovedStatusAre400TypeMismatch(String status) throws Exception {
+        mockMvc.perform(get(BASE + "/filters").param("statuses", status))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
+
+        verifyNoInteractions(deviceFilterService);
+    }
+
+    @Test
+    void listWithManagedStatusAndOnlineConnectivityPassesBothToTheDomain() throws Exception {
+        when(deviceService.queryDevices(any(), any(), any(), any())).thenReturn(page());
+
+        mockMvc.perform(get(BASE).param("statuses", "MANAGED").param("connectivity", "ONLINE"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<DeviceFilterCriteria> filter = ArgumentCaptor.forClass(DeviceFilterCriteria.class);
+        verify(deviceService).queryDevices(filter.capture(), any(), isNull(), isNull());
+        assertEquals(List.of(DeviceStatus.MANAGED), filter.getValue().getStatuses());
+        assertEquals(List.of(TelemetryStatus.ONLINE), filter.getValue().getConnectivity());
     }
 
     @Test
@@ -391,7 +424,8 @@ class DeviceControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"{\"status\":\"BOGUS\"}", "{\"status\":\"archived\"}", "{not json"})
+    @ValueSource(strings = {"{\"status\":\"BOGUS\"}", "{\"status\":\"archived\"}", "{\"status\":\"ONLINE\"}",
+            "{\"status\":\"OFFLINE\"}", "{\"status\":\"DECOMMISSIONED\"}", "{not json"})
     void updateStatusWithUnreadableBodyIs400AndNothingIsUpdated(String body) throws Exception {
         mockMvc.perform(patch(BASE + "/m-1").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
@@ -451,7 +485,7 @@ class DeviceControllerTest {
         machine.setIp("192.168.1.100");
         machine.setMacAddress("00:11:22:33:44:55");
         machine.setAgentVersion("1.2.3");
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         machine.setType(DeviceType.LAPTOP);
         machine.setOsType(OsType.MAC_OS);
         machine.setOrganizationId("cust-1");

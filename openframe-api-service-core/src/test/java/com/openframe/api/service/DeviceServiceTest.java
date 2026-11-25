@@ -132,10 +132,10 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("verifyDispatchable(list): ONLINE and OFFLINE machines both pass; every id is checked")
+    @DisplayName("verifyDispatchable(list): managed machines pass; every id is checked")
     void verifyDispatchable_eligibleMachines() {
-        when(machineRepository.findByMachineId("m-on")).thenReturn(Optional.of(machine("m-on", DeviceStatus.ONLINE)));
-        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(machine("m-off", DeviceStatus.OFFLINE)));
+        when(machineRepository.findByMachineId("m-on")).thenReturn(Optional.of(machine("m-on", DeviceStatus.MANAGED)));
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(machine("m-off", DeviceStatus.MANAGED)));
 
         service().verifyDispatchable(List.of("m-on", "m-off"));
 
@@ -451,14 +451,14 @@ class DeviceServiceTest {
                 .thenReturn(List.of("m1"));
 
         DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
-                .statuses(List.of(DeviceStatus.ONLINE)).build();
+                .statuses(List.of(DeviceStatus.MANAGED)).build();
 
         assertThat(s.findAssignedDeviceIds(List.of("m1", "m2"), filter, null))
                 .containsExactly("m1");
         ArgumentCaptor<MachineQueryFilter> captor = ArgumentCaptor.forClass(MachineQueryFilter.class);
         verify(machineRepository).findMachineIds(any(), captor.capture(), any());
         assertThat(captor.getValue().getRestrictToMachineIds()).containsExactlyInAnyOrder("m1", "m2");
-        assertThat(captor.getValue().getStatuses()).containsExactly(DeviceStatus.ONLINE.name());
+        assertThat(captor.getValue().getStatuses()).containsExactly(DeviceStatus.MANAGED.name());
     }
 
     @Test
@@ -467,7 +467,7 @@ class DeviceServiceTest {
         Machine m = new Machine();
         m.setMachineId("m-del");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.ONLINE);
+        m.setStatus(DeviceStatus.MANAGED);
         when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
         when(deletedMachineCleanup.markDeleted(m)).thenReturn(m);
 
@@ -498,7 +498,7 @@ class DeviceServiceTest {
         Machine m = new Machine();
         m.setMachineId("m-del");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.ONLINE);
+        m.setStatus(DeviceStatus.MANAGED);
         when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
         doThrow(new RuntimeException("mongo hiccup"))
                 .when(deletedMachineCleanup).markDeleted(m);
@@ -509,7 +509,7 @@ class DeviceServiceTest {
 
         verify(machineWriter, never()).update(any(), any(MachineUpdate.class));
         verify(machineRepository, never()).save(any());
-        assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
+        assertThat(m.getStatus()).isEqualTo(DeviceStatus.MANAGED);
         verifyNoInteractions(deviceStatusProcessor);
     }
 
@@ -604,7 +604,7 @@ class DeviceServiceTest {
         Machine m = new Machine();
         m.setMachineId("m-del");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.ONLINE);
+        m.setStatus(DeviceStatus.MANAGED);
         when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
         when(deletedMachineCleanup.markDeleted(m)).thenReturn(m);
 

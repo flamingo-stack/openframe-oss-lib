@@ -129,7 +129,7 @@ class RelayAccessWatcherTest {
 
     @ParameterizedTest
     @NullSource
-    @EnumSource(value = DeviceStatus.class, names = {"ONLINE", "OFFLINE", "ACTIVE", "PENDING", "INACTIVE"})
+    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "PENDING"})
     void watch_machineStillThere_sessionKeptOpen(DeviceStatus status) {
         // setup
         Machine machine = machineWithStatus(status);
@@ -158,10 +158,10 @@ class RelayAccessWatcherTest {
     @Test
     void watch_machineRemovedAfterFirstCheck_sessionClosedAtNextCheck() {
         // setup
-        Machine online = machineWithStatus(DeviceStatus.ONLINE);
+        Machine managed = machineWithStatus(DeviceStatus.MANAGED);
         Machine deleted = machineWithStatus(DeviceStatus.DELETED);
         when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
-                .thenReturn(Mono.just(online), Mono.just(deleted));
+                .thenReturn(Mono.just(managed), Mono.just(deleted));
         stubSessionClose();
 
         // execution
@@ -176,8 +176,8 @@ class RelayAccessWatcherTest {
     @Test
     void watch_machineRemovedAfterFirstCheck_sessionKeptOpenUntilNextCheck() {
         // setup
-        Machine online = machineWithStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Mono.just(online));
+        Machine managed = machineWithStatus(DeviceStatus.MANAGED);
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(Mono.just(managed));
         Duration justBeforeSecondCheck = RECHECK_INTERVAL.minusSeconds(1);
 
         // execution
@@ -275,7 +275,7 @@ class RelayAccessWatcherTest {
         // setup
         Context requestContext = Context.of(CONTEXT_KEY, DeviceStatus.DELETED);
         Mono<Machine> statusFromContext = Mono.deferContextual(context ->
-                Mono.just(machineWithStatus(context.getOrDefault(CONTEXT_KEY, DeviceStatus.ONLINE))));
+                Mono.just(machineWithStatus(context.getOrDefault(CONTEXT_KEY, DeviceStatus.MANAGED))));
         when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID)).thenReturn(statusFromContext);
         stubSessionClose();
 

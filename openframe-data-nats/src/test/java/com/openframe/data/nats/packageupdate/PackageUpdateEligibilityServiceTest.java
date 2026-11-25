@@ -46,7 +46,7 @@ class PackageUpdateEligibilityServiceTest {
     void install_isNeverEligible_noLookups() {
         assertThat(service.eligibleMachines(INSTALL, List.of("m1"))).isEmpty();
         assertThat(service.eligibleConnectedMachines(INSTALL, List.of("m1"))).isEmpty();
-        assertThat(service.isEligible(INSTALL, machine("m1", DeviceStatus.ONLINE))).isFalse();
+        assertThat(service.isEligible(INSTALL, machine("m1", DeviceStatus.MANAGED))).isFalse();
         verifyNoInteractions(deliveryRouter, machineRepository);
     }
 
@@ -68,16 +68,16 @@ class PackageUpdateEligibilityServiceTest {
 
     @Test
     void eligibleConnectedMachines_skipsDevicesThatAreNoLongerConnected() {
-        List<String> asked = List.of("on", "off", "archived", "deleted", "old");
-        Set<String> reachable = Set.of("on", "off", "archived", "deleted");    // "old": below the floor
+        List<String> asked = List.of("managed", "pending", "archived", "deleted", "old");
+        Set<String> reachable = Set.of("managed", "pending", "archived", "deleted");    // "old": below the floor
         when(deliveryRouter.reachable(DeliveryType.PACKAGE_UPDATE, asked)).thenReturn(reachable);
         when(machineRepository.findByMachineIdIn(reachable)).thenReturn(List.of(
-                machine("on", DeviceStatus.ONLINE),
-                machine("off", DeviceStatus.OFFLINE),
+                machine("managed", DeviceStatus.MANAGED),
+                machine("pending", DeviceStatus.PENDING),
                 machine("archived", DeviceStatus.ARCHIVED),
                 machine("deleted", DeviceStatus.DELETED)));
 
-        assertThat(service.eligibleConnectedMachines(UPDATE, asked)).containsExactlyInAnyOrder("on", "off");
+        assertThat(service.eligibleConnectedMachines(UPDATE, asked)).containsExactly("managed");
     }
 
     @Test
@@ -93,8 +93,8 @@ class PackageUpdateEligibilityServiceTest {
         when(deliveryRouter.reaches(DeliveryType.PACKAGE_UPDATE, "m1")).thenReturn(true);
         when(deliveryRouter.reaches(DeliveryType.PACKAGE_UPDATE, "m2")).thenReturn(false);
 
-        assertThat(service.isEligible(UPDATE, machine("m1", DeviceStatus.ONLINE))).isTrue();
-        assertThat(service.isEligible(UPDATE, machine("m2", DeviceStatus.ONLINE))).isFalse();
+        assertThat(service.isEligible(UPDATE, machine("m1", DeviceStatus.MANAGED))).isTrue();
+        assertThat(service.isEligible(UPDATE, machine("m2", DeviceStatus.MANAGED))).isFalse();
         verifyNoInteractions(machineRepository);
     }
 }

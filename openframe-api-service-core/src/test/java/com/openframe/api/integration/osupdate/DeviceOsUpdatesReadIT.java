@@ -728,7 +728,7 @@ class DeviceOsUpdatesReadIT extends BaseMongoIntegrationTest {
     private static Document machine(String machineId, String tenantId) {
         return new Document("machineId", machineId)
                 .append("tenantId", tenantId)
-                .append("status", "ONLINE")
+                .append("status", "MANAGED")
                 .append("hostname", "host-" + machineId)
                 .append("osType", "WINDOWS");
     }
