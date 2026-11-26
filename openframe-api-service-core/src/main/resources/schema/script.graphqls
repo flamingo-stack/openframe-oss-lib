@@ -10,7 +10,9 @@ extend type Query {
     """Cursor-paginated list of scripts within the current tenant (Relay Connection Spec).
     Default order is newest-first by _id. Optional filter / search / sort.
     Sortable fields: _id (default), name, createdAt, updatedAt. Search is a
-    case-insensitive substring match on name."""
+    case-insensitive substring match on name.
+    When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor
+    are valid paging cursors."""
     scripts(
         filter: ScriptFilterInput,
         search: String,

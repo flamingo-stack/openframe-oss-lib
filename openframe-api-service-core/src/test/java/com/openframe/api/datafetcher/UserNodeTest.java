@@ -75,7 +75,7 @@ class UserNodeTest {
                 .build());
 
         CountedGenericConnection<GenericEdge<UserResponse>> connection = new UserDataFetcher(
-                userService, new GraphQLUserMapper(), CODEC).users(null, "jane", 10, CursorCodec.encode("a@acme.io_u-1"));
+                userService, new GraphQLUserMapper(), CODEC).users(null, "jane", 10, CursorCodec.encode("a@acme.io_u-1"), null, null);
 
         ArgumentCaptor<CursorPaginationCriteria> pagination = ArgumentCaptor.forClass(CursorPaginationCriteria.class);
         verify(userService).queryUsers(isNull(), eq("jane"), pagination.capture());
@@ -100,10 +100,80 @@ class UserNodeTest {
                         .build());
 
         CountedGenericConnection<GenericEdge<InvitationResponse>> connection = new InvitationDataFetcher(
-                invitationService, new GraphQLUserMapper(), CODEC).invitations(null, null, null, null);
+                invitationService, new GraphQLUserMapper(), CODEC).invitations(null, null, null, null, null, null);
 
         assertThat(CursorCodec.decode(connection.getEdges().getFirst().getCursor()))
                 .isEqualTo(createdAt.toEpochMilli() + "_inv-1");
     }
 
+    @Test
+    void users_lastAndBeforeNextToFirstAndAfter_backwardPageBeforeTheDecodedCursorReachesTheService() {
+        // setup
+        String after = CursorCodec.encode("a@acme.io_u-1");
+        String before = CursorCodec.encode("c@acme.io_u-3");
+        CursorPaginationCriteria backwardPage = CursorPaginationCriteria.builder()
+                .limit(5)
+                .cursor("c@acme.io_u-3")
+                .backward(true)
+                .build();
+        CountedGenericQueryResult<UserResponse> noUsers = CountedGenericQueryResult.<UserResponse>builder()
+                .items(List.of())
+                .pageInfo(PageInfo.builder().build())
+                .build();
+        UserDataFetcher dataFetcher = new UserDataFetcher(userService, new GraphQLUserMapper(), CODEC);
+        when(userService.queryUsers(null, null, backwardPage)).thenReturn(noUsers);
+
+        // execution
+        CountedGenericConnection<GenericEdge<UserResponse>> connection =
+                dataFetcher.users(null, null, 10, after, 5, before);
+
+        // verifications
+        verify(userService).queryUsers(null, null, backwardPage);
+        assertThat(connection.getPageInfo()).isSameAs(noUsers.getPageInfo());
+    }
+
+    @Test
+    void invitations_lastAndBeforeNextToFirstAndAfter_backwardPageBeforeTheDecodedCursorReachesTheService() {
+        // setup
+        String after = CursorCodec.encode("1750000000000_inv-9");
+        String before = CursorCodec.encode("1750000000000_inv-3");
+        CursorPaginationCriteria backwardPage = CursorPaginationCriteria.builder()
+                .limit(5)
+                .cursor("1750000000000_inv-3")
+                .backward(true)
+                .build();
+        CountedGenericQueryResult<InvitationResponse> noInvitations =
+                CountedGenericQueryResult.<InvitationResponse>builder()
+                        .items(List.of())
+                        .pageInfo(PageInfo.builder().build())
+                        .build();
+        InvitationDataFetcher dataFetcher = new InvitationDataFetcher(invitationService, new GraphQLUserMapper(), CODEC);
+        when(invitationService.queryInvitations(null, null, backwardPage)).thenReturn(noInvitations);
+
+        // execution
+        CountedGenericConnection<GenericEdge<InvitationResponse>> connection =
+                dataFetcher.invitations(null, null, 10, after, 5, before);
+
+        // verifications
+        verify(invitationService).queryInvitations(null, null, backwardPage);
+        assertThat(connection.getPageInfo()).isSameAs(noInvitations.getPageInfo());
+    }
+
+    @Test
+    void users_lastWithoutBefore_backwardPageWithoutACursorReachesTheService() {
+        // setup
+        CursorPaginationCriteria lastPage = CursorPaginationCriteria.builder().limit(5).backward(true).build();
+        CountedGenericQueryResult<UserResponse> noUsers = CountedGenericQueryResult.<UserResponse>builder()
+                .items(List.of())
+                .pageInfo(PageInfo.builder().build())
+                .build();
+        UserDataFetcher dataFetcher = new UserDataFetcher(userService, new GraphQLUserMapper(), CODEC);
+        when(userService.queryUsers(null, null, lastPage)).thenReturn(noUsers);
+
+        // execution
+        dataFetcher.users(null, null, null, null, 5, null);
+
+        // verifications
+        verify(userService).queryUsers(null, null, lastPage);
+    }
 }

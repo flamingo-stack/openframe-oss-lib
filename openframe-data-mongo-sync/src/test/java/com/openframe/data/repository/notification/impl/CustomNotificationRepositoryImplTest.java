@@ -1,5 +1,6 @@
 package com.openframe.data.repository.notification.impl;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
@@ -12,6 +13,10 @@ import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
@@ -23,8 +28,10 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,6 +40,7 @@ class CustomNotificationRepositoryImplTest {
 
     private static final String RECIPIENT_ID = "user-1";
     private static final String TENANT_ID = "tenant-1";
+    private static final String NOTIFICATION_ID = "65f1a2b3c4d5e6f708192a3b";
     private static final List<NotificationCategory> APPROVAL_CATEGORIES =
             List.of(NotificationCategory.TICKETS, NotificationCategory.MINGO);
     private static final List<String> APPROVAL_TYPES = List.of("TICKET_APPROVAL_REQUEST", "MINGO_APPROVAL_REQUEST");
@@ -183,6 +191,64 @@ class CustomNotificationRepositoryImplTest {
         assertThat(queryCaptor.getValue().getQueryObject())
                 .containsEntry("entityType", NotificationEntityType.INSIGHT)
                 .containsEntry("entityId", "insight-1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "not-a-notification-id",
+            "65f1a2b3c4d5e6f708192a3",
+            "65f1a2b3c4d5e6f708192a3b|1700000000123",
+            "zzf1a2b3c4d5e6f708192a3b"
+    })
+    void findPageForRecipient_cursorThatIsNotANotificationId_throwsInvalidCursor(String cursor) {
+        // setup
+        stubTenant();
+
+        // execution
+        Throwable thrown = catchThrowable(() -> repository.findPageForRecipient(RECIPIENT_ID, RecipientType.USER,
+                NotificationReadStateFilter.NONE, cursor, false, Sort.Direction.DESC, 10));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage("Invalid cursor");
+        verify(mongoTemplate, never()).find(any(Query.class), eq(NotificationReadState.class));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "DESC, false, $lt",
+            "DESC, true, $gt",
+            "ASC, false, $gt",
+            "ASC, true, $lt"
+    })
+    void findPageForRecipient_notificationIdCursor_stillPagesPastThatId(
+            Sort.Direction direction, boolean backward, String operator) {
+        // setup
+        stubTenant();
+        stubEmptyReadStates();
+        Document pastId = new Document(operator, NOTIFICATION_ID);
+
+        // execution
+        repository.findPageForRecipient(RECIPIENT_ID, RecipientType.USER, NotificationReadStateFilter.NONE,
+                NOTIFICATION_ID, backward, direction, 10);
+
+        // verifications
+        assertThat(readStateQuery()).containsEntry("notificationId", pastId);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void findPageForRecipient_blankCursor_firstPageWithoutAnIdBound(String cursor) {
+        // setup
+        stubTenant();
+        stubEmptyReadStates();
+
+        // execution
+        repository.findPageForRecipient(RECIPIENT_ID, RecipientType.USER, NotificationReadStateFilter.NONE,
+                cursor, false, Sort.Direction.DESC, 10);
+
+        // verifications
+        assertThat(readStateQuery()).doesNotContainKey("notificationId");
     }
 
     private void stubTenant() {

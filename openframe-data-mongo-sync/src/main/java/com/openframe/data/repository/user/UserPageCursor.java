@@ -1,6 +1,10 @@
 package com.openframe.data.repository.user;
 
+import com.openframe.core.exception.InvalidCursorException;
+
 import java.util.Optional;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
  * Keyset position in the {@code (email, _id)} order of {@link CustomUserRepository#findUsersPage}.
@@ -15,12 +19,12 @@ public record UserPageCursor(String email, String id) {
     }
 
     static Optional<UserPageCursor> parse(String raw) {
-        if (raw == null) {
+        if (isBlank(raw)) {
             return Optional.empty();
         }
         int split = raw.lastIndexOf(SEPARATOR);
         if (split <= 0 || split == raw.length() - 1) {
-            return Optional.empty();
+            throw new InvalidCursorException();
         }
         return Optional.of(new UserPageCursor(raw.substring(0, split), raw.substring(split + 1)));
     }

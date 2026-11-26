@@ -31,6 +31,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -152,7 +153,7 @@ class TicketServiceStatusFilterTest {
         Query query = new Query();
         when(ticketRepository.buildTicketQuery(any(), any(), any(), any())).thenReturn(query);
         when(ticketRepository.countTickets(query)).thenReturn((long) page.size());
-        when(ticketRepository.findTicketsWithCursor(eq(query), any(), anyInt(), any(), any()))
+        when(ticketRepository.findTicketsWithCursor(eq(query), any(), anyBoolean(), anyInt(), any(), any()))
                 .thenReturn(page);
     }
 

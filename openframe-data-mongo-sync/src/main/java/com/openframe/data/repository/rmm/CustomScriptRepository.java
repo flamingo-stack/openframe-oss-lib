@@ -2,6 +2,8 @@ package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -20,11 +22,11 @@ public interface CustomScriptRepository {
      * Fetch a single page of scripts within a tenant with optional filter,
      * search, and sort. Always tenant-scoped.
      *
-     * <p>Cursor semantics: the cursor is the raw {@code ObjectId} hex from the
-     * boundary script of the previous page. With {@code backward=true} the
-     * underlying scan walks in the opposite direction so that paging "before"
-     * a cursor returns the rows immediately newer than it; the caller is
-     * expected to reverse the returned list for display.
+     * <p>Position semantics: a keyset position of the active sort, or the id of the
+     * boundary script of the previous page. With {@code backward=true} the underlying scan
+     * walks in the opposite direction so that paging "before" a position returns the rows
+     * immediately ahead of it; the caller is expected to reverse the returned list for display.
+     * A position that cannot be used is rejected with {@code InvalidCursorException}.
      *
      * <p>Pass {@code limit + 1} from the caller to detect whether more pages
      * exist beyond this one (the canonical "fetch one extra" trick).
@@ -36,8 +38,7 @@ public interface CustomScriptRepository {
      *        (case-insensitive); {@code null} or blank means no search
      * @param sortField sort field, must be one of {@link #isSortableField}
      * @param sortDirection sort direction
-     * @param cursor raw {@code _id} cursor (already base64-decoded); {@code null}
-     *        means "first page"
+     * @param position where the page starts; {@code CursorPosition.None} means "first page"
      * @param backward {@code true} when paginating with {@code before/last}
      * @param limit max rows to return (usually {@code pageSize + 1})
      */
@@ -46,9 +47,11 @@ public interface CustomScriptRepository {
                                    String search,
                                    String sortField,
                                    Sort.Direction sortDirection,
-                                   String cursor,
+                                   CursorPosition position,
                                    boolean backward,
                                    int limit);
+
+    KeysetCursor keysetCursor(Script script, String sortField, Sort.Direction sortDirection);
 
     /**
      * Count all scripts matching the tenant + filter + search, ignoring

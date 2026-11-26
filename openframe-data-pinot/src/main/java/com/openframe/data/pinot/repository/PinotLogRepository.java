@@ -1,6 +1,7 @@
 package com.openframe.data.pinot.repository;
 
 import com.openframe.data.pinot.model.LogProjection;
+import com.openframe.data.pinot.model.LogSortPosition;
 import com.openframe.data.pinot.model.OrganizationOption;
 import org.springframework.stereotype.Repository;
 
@@ -22,10 +23,11 @@ public interface PinotLogRepository {
             List<String> severities,
             List<String> organizationIds,
             String deviceId,
-            String cursor,
+            LogSortPosition position,
             int limit,
             String sortField,
-            String sortDirection
+            String sortDirection,
+            boolean backward
     );
 
     List<LogProjection> searchLogs(
@@ -40,11 +42,14 @@ public interface PinotLogRepository {
             List<String> organizationIds,
             String deviceId,
             String searchTerm,
-            String cursor,
+            LogSortPosition position,
             int limit,
             String sortField,
-            String sortDirection
+            String sortDirection,
+            boolean backward
     );
+
+    LogSortPosition sortPositionOf(LogProjection row, String sortField);
 
     List<String> getToolTypeOptions(
             String tenantId,
