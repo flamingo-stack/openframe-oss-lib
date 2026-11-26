@@ -5,35 +5,46 @@
  * URL from the host, the PUT with progress, then the server's status until the file is ready, blocked or failed.
  * Its `items` feed the composer's tray (`OpenFrameComposerAttachments`) as they are.
  *
- *   picked → checks → uploading (%) → scanning → ready
- *                 ↘ error (TOO_LARGE, TYPE_NOT_ALLOWED, MESSAGE_LIMIT, CHAT_LIMIT, BLOCKED, UPLOAD_FAILED)
- *
  * `scanning` covers everything after the bytes are up and before the server says `ready`: the type and size checks and,
  * once it exists, the malware scan. The host's `uploader` talks to its backend; this hook never adds a credential.
+ *
+ * This hook is the React glue: the transitions are pure functions (`openframe-attachment-tray`), the uploads and their
+ * queue live in `openframe-attachment-upload`, the status reads in `useOpenFrameAttachmentStatusPoll`.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   isOpenFrameImageType,
   type OpenFrameAttachmentErrorCode,
   type OpenFrameAttachmentItem,
   type OpenFrameAttachmentProfile,
 } from '../../../chat-protocol/attachment-profiles';
-import {
-  type OpenFrameAttachmentServerStatus,
-  type OpenFrameAttachmentUploader,
-  OpenFrameAttachmentUploadError,
+import type {
+  OpenFrameAttachmentServerStatus,
+  OpenFrameAttachmentUploader,
 } from '../../../chat-protocol/attachment-uploader';
-import { putFileWithProgress } from '../../../utils/put-file-with-progress';
 import { randomId } from '../../../utils/random-id';
+import {
+  applyOpenFrameServerStatus,
+  failOpenFrameItem,
+  isFinalOpenFrameStatus,
+  isOpenFrameTrayPending,
+  type OpenFrameReadyAttachment,
+  type OpenFrameTrayEntry,
+  openFrameReadyAttachments,
+  openFrameStagedCount,
+  openFrameWaitingFiles,
+  patchOpenFrameItem,
+  stageOpenFrameChecks,
+} from '../utils/openframe-attachment-tray';
+import { OpenFrameUploadQueue, uploadOpenFrameAttachment } from '../utils/openframe-attachment-upload';
 import { validateOpenFrameAttachments } from '../utils/openframe-attachment-validation';
+import { useOpenFrameAttachmentStatusPoll } from './use-openframe-attachment-status-poll';
 
 /** How often the server is asked about the files being checked. */
 const DEFAULT_STATUS_POLL_MS = 1500;
 /** How long a file may stay unchecked before it is shown as failed. */
 const DEFAULT_STATUS_MAX_WAIT_MS = 2 * 60 * 1000;
-/** Status reads that may fail in a row before the files waiting on them fail. */
-const STATUS_FAILURES_ALLOWED = 3;
 /** Files uploading at once; the rest wait their turn (still shown as uploading at 0%). */
 const CONCURRENT_UPLOADS = 3;
 
@@ -47,12 +58,6 @@ export interface UseOpenFrameAttachmentUploadsOptions {
   statusPollMs?: number;
   /** Milliseconds a file may wait for `ready` before it fails. Default 2 minutes. */
   statusMaxWaitMs?: number;
-}
-
-/** A ready file, as the message carries it: the server's id and the tray's view of it. */
-export interface OpenFrameReadyAttachment {
-  attachmentId: string;
-  item: OpenFrameAttachmentItem;
 }
 
 export interface OpenFrameAttachmentUploads {
@@ -76,16 +81,6 @@ export interface OpenFrameAttachmentUploads {
   clear: () => void;
 }
 
-/** What the hook keeps per staged file beside its view model. */
-interface Entry {
-  file: File;
-  mediaType?: string;
-  attachmentId?: string;
-  controller?: AbortController;
-  /** When the bytes finished going up: the start of the wait for `ready`. */
-  uploadedAt?: number;
-}
-
 interface View {
   items: readonly OpenFrameAttachmentItem[];
   ready: readonly OpenFrameReadyAttachment[];
@@ -93,25 +88,42 @@ interface View {
 
 const EMPTY_VIEW: View = { items: [], ready: [] };
 
-function errorCodeOf(err: unknown): OpenFrameAttachmentErrorCode {
-  return err instanceof OpenFrameAttachmentUploadError ? err.code : 'UPLOAD_FAILED';
+/** Runs the uploads, a few at once; the line is dropped on unmount. */
+function useUploadQueue(): OpenFrameUploadQueue {
+  const [queue] = useState(() => new OpenFrameUploadQueue(CONCURRENT_UPLOADS));
+  useEffect(() => () => queue.clear(), [queue]);
+  return queue;
 }
 
-/** The files whose bytes are up and that wait for the server's `ready`. */
-function waitingIdsOf(entries: ReadonlyMap<string, Entry>): string[] {
-  return [...entries].filter(([, entry]) => entry.uploadedAt !== undefined && entry.attachmentId).map(([id]) => id);
+interface ImagePreviews {
+  /** A local picture of an accepted image; nothing for other types. */
+  make: (file: File, mediaType: string) => string | undefined;
+  revoke: (url: string | undefined) => void;
 }
 
-/** The ready files of a tray, with their server ids. */
-function readyOf(
-  items: readonly OpenFrameAttachmentItem[],
-  entries: ReadonlyMap<string, Entry>,
-): OpenFrameReadyAttachment[] {
-  return items.flatMap(item => {
-    const attachmentId = item.state === 'ready' ? entries.get(item.id)?.attachmentId : undefined;
-    return attachmentId ? [{ attachmentId, item }] : [];
-  });
+/** Local pictures of picked images. All are revoked on unmount, not on send: a sent message may still be drawing one. */
+function useImagePreviews(): ImagePreviews {
+  const urls = useRef(new Set<string>());
+  const make = useCallback((file: File, mediaType: string) => {
+    if (!isOpenFrameImageType(mediaType) || typeof URL.createObjectURL !== 'function') return undefined;
+    const url = URL.createObjectURL(file);
+    urls.current.add(url);
+    return url;
+  }, []);
+  const revoke = useCallback((url: string | undefined) => {
+    if (url && urls.current.delete(url)) URL.revokeObjectURL(url);
+  }, []);
+  useEffect(() => {
+    const all = urls.current;
+    return () => {
+      for (const url of all) URL.revokeObjectURL(url);
+      all.clear();
+    };
+  }, []);
+  return useMemo(() => ({ make, revoke }), [make, revoke]);
 }
+
+type TrayChange = (prev: readonly OpenFrameAttachmentItem[]) => readonly OpenFrameAttachmentItem[];
 
 export function useOpenFrameAttachmentUploads({
   profile,
@@ -123,124 +135,52 @@ export function useOpenFrameAttachmentUploads({
   const [view, setView] = useState<View>(EMPTY_VIEW);
   // The tray as of the last change, read synchronously by the async steps (React state lags a commit behind).
   const itemsRef = useRef<readonly OpenFrameAttachmentItem[]>([]);
-  const entries = useRef(new Map<string, Entry>());
-  const queue = useRef<string[]>([]);
-  const active = useRef(0);
+  const entries = useRef(new Map<string, OpenFrameTrayEntry>());
   const intake = useRef<Promise<void>>(Promise.resolve());
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pollController = useRef<AbortController | null>(null);
-  const statusFailures = useRef(0);
-  // Every local picture made, revoked on unmount: a sent message may still be drawing one.
-  const objectUrls = useRef(new Set<string>());
   const mounted = useRef(true);
-
   // The latest options, for the async steps started under older ones.
-  const latest = useRef({ profile, uploader, chatFileCount, statusPollMs, statusMaxWaitMs });
+  const latest = useRef({ profile, uploader, chatFileCount });
   useEffect(() => {
-    latest.current = { profile, uploader, chatFileCount, statusPollMs, statusMaxWaitMs };
+    latest.current = { profile, uploader, chatFileCount };
   });
 
   /** Apply a change to the tray. Computed outside React's updater so it runs once, also under StrictMode. */
-  const commit = useCallback((change: (prev: readonly OpenFrameAttachmentItem[]) => OpenFrameAttachmentItem[]) => {
-    if (!mounted.current) return;
+  const commit = useCallback((change: TrayChange) => {
     const next = change(itemsRef.current);
+    if (!mounted.current || next === itemsRef.current) return;
     itemsRef.current = next;
-    setView({ items: next, ready: readyOf(next, entries.current) });
+    setView({ items: next, ready: openFrameReadyAttachments(next, entries.current) });
   }, []);
-
-  const patch = useCallback(
-    (id: string, update: Partial<OpenFrameAttachmentItem>) => {
-      commit(prev => prev.map(item => (item.id === id ? { ...item, ...update } : item)));
-    },
-    [commit],
-  );
 
   /** Show a file as refused and stop waiting on it. */
   const fail = useCallback(
     (id: string, error: OpenFrameAttachmentErrorCode) => {
       const entry = entries.current.get(id);
       if (entry) entry.uploadedAt = undefined;
-      patch(id, { state: 'error', error, progress: undefined });
+      commit(prev => failOpenFrameItem(prev, id, error));
     },
-    [patch],
+    [commit],
   );
-
-  // ── Status polling ────────────────────────────────────────────────────────
 
   const applyStatus = useCallback(
     (id: string, status: OpenFrameAttachmentServerStatus) => {
       const entry = entries.current.get(id);
       if (!entry) return;
-      if (status.state === 'ready') {
-        entry.uploadedAt = undefined;
-        const current = itemsRef.current.find(item => item.id === id);
-        patch(id, {
-          state: 'ready',
-          progress: undefined,
-          tokenEstimate: status.tokenEstimate,
-          thumbnailUrl: current?.thumbnailUrl ?? status.thumbnailUrl,
-        });
-      } else if (status.state === 'blocked' || status.state === 'failed') {
-        fail(id, status.state === 'blocked' ? 'BLOCKED' : (status.error ?? 'UPLOAD_FAILED'));
-      } else if (status.tokenEstimate !== undefined) {
-        patch(id, { tokenEstimate: status.tokenEstimate });
-      }
+      if (isFinalOpenFrameStatus(status)) entry.uploadedAt = undefined;
+      commit(prev => applyOpenFrameServerStatus(prev, id, status));
     },
-    [fail, patch],
+    [commit],
   );
 
-  /** One status read for every waiting file; it books the next one while any file still waits. */
-  const poll = useCallback(
-    async function pollOnce(): Promise<void> {
-      const now = Date.now();
-      for (const id of waitingIdsOf(entries.current)) {
-        const uploadedAt = entries.current.get(id)?.uploadedAt;
-        if (uploadedAt !== undefined && now - uploadedAt > latest.current.statusMaxWaitMs) fail(id, 'UPLOAD_FAILED');
-      }
-      const asking = waitingIdsOf(entries.current);
-      if (asking.length > 0) {
-        const byServerId = new Map(asking.map(id => [entries.current.get(id)?.attachmentId ?? '', id]));
-        const controller = new AbortController();
-        pollController.current = controller;
-        try {
-          const statuses = await latest.current.uploader.getStatuses([...byServerId.keys()], controller.signal);
-          if (controller.signal.aborted) return;
-          statusFailures.current = 0;
-          for (const status of statuses) {
-            const id = byServerId.get(status.attachmentId);
-            if (id) applyStatus(id, status);
-          }
-        } catch {
-          if (controller.signal.aborted) return;
-          statusFailures.current += 1;
-          if (statusFailures.current >= STATUS_FAILURES_ALLOWED) {
-            statusFailures.current = 0;
-            for (const id of waitingIdsOf(entries.current)) fail(id, 'UPLOAD_FAILED');
-          }
-        } finally {
-          if (pollController.current === controller) pollController.current = null;
-        }
-      }
-      if (mounted.current && pollTimer.current === null && waitingIdsOf(entries.current).length > 0) {
-        pollTimer.current = setTimeout(() => {
-          pollTimer.current = null;
-          void pollOnce();
-        }, latest.current.statusPollMs);
-      }
-    },
-    [applyStatus, fail],
-  );
-
-  /** Book a status read unless one is booked or running. */
-  const schedulePoll = useCallback(() => {
-    if (pollTimer.current !== null || pollController.current !== null || !mounted.current) return;
-    pollTimer.current = setTimeout(() => {
-      pollTimer.current = null;
-      void poll();
-    }, latest.current.statusPollMs);
-  }, [poll]);
-
-  // ── Uploads ───────────────────────────────────────────────────────────────
+  const waiting = useCallback(() => openFrameWaitingFiles(entries.current), []);
+  const { schedule: schedulePoll, cancelRead } = useOpenFrameAttachmentStatusPoll({
+    waiting,
+    uploader,
+    onStatus: applyStatus,
+    onFail: fail,
+    pollMs: statusPollMs,
+    maxWaitMs: statusMaxWaitMs,
+  });
 
   const upload = useCallback(
     async (id: string) => {
@@ -248,54 +188,25 @@ export function useOpenFrameAttachmentUploads({
       if (!entry?.mediaType) return;
       const controller = new AbortController();
       entry.controller = controller;
-      const { signal } = controller;
       try {
-        const target = await latest.current.uploader.createUpload(
-          { name: entry.file.name, mediaType: entry.mediaType, size: entry.file.size },
-          signal,
-        );
-        if (signal.aborted) return;
-        entry.attachmentId = target.attachmentId;
-        let shown = 0;
-        await putFileWithProgress(target.uploadUrl, entry.file, {
-          headers: target.uploadHeaders,
-          signal,
-          onProgress: fraction => {
-            // Whole percents only, and never 100 before the answer: a render per progress event is wasted.
-            const percent = Math.min(99, Math.floor(fraction * 100));
-            if (percent === shown) return;
-            shown = percent;
-            patch(id, { progress: percent });
+        await uploadOpenFrameAttachment(entry.file, entry.mediaType, latest.current.uploader, controller.signal, {
+          onProgress: progress => commit(prev => patchOpenFrameItem(prev, id, { progress })),
+          onUploaded: attachmentId => {
+            entry.attachmentId = attachmentId;
+            entry.uploadedAt = Date.now();
+            commit(prev => patchOpenFrameItem(prev, id, { state: 'scanning', progress: undefined }));
+            schedulePoll();
           },
+          onFailed: error => fail(id, error),
         });
-        if (signal.aborted) return;
-        entry.uploadedAt = Date.now();
-        patch(id, { state: 'scanning', progress: undefined });
-        schedulePoll();
-      } catch (err) {
-        if (signal.aborted) return;
-        fail(id, errorCodeOf(err));
       } finally {
-        entry.controller = undefined;
+        if (entry.controller === controller) entry.controller = undefined;
       }
     },
-    [fail, patch, schedulePoll],
+    [commit, fail, schedulePoll],
   );
-
-  const pump = useCallback(
-    function pumpQueue() {
-      while (active.current < CONCURRENT_UPLOADS && queue.current.length > 0) {
-        const id = queue.current.shift();
-        if (!id || !entries.current.has(id)) continue;
-        active.current += 1;
-        void upload(id).finally(() => {
-          active.current -= 1;
-          pumpQueue();
-        });
-      }
-    },
-    [upload],
-  );
+  const queue = useUploadQueue();
+  const previews = useImagePreviews();
 
   const addFiles = useCallback(
     (files: File[]) => {
@@ -303,102 +214,64 @@ export function useOpenFrameAttachmentUploads({
       const run = async () => {
         if (!mounted.current) return;
         const { profile: currentProfile, chatFileCount: sent } = latest.current;
-        const staged = itemsRef.current.filter(item => item.state !== 'error').length;
-        const checks = await validateOpenFrameAttachments(files, currentProfile, {
-          messageFileCount: staged,
-          chatFileCount: sent + staged,
-        });
+        const staged = openFrameStagedCount(itemsRef.current);
+        const counts = { messageFileCount: staged, chatFileCount: sent + staged };
+        const checks = await validateOpenFrameAttachments(files, currentProfile, counts);
         if (!mounted.current) return;
-        const additions: OpenFrameAttachmentItem[] = [];
-        for (const check of checks) {
-          const id = randomId();
-          const { file } = check;
-          if (!check.ok) {
-            entries.current.set(id, { file });
-            additions.push({ id, name: file.name, size: file.size, state: 'error', error: check.error });
-            continue;
-          }
-          let thumbnailUrl: string | undefined;
-          if (isOpenFrameImageType(check.mediaType) && typeof URL.createObjectURL === 'function') {
-            thumbnailUrl = URL.createObjectURL(file);
-            objectUrls.current.add(thumbnailUrl);
-          }
-          entries.current.set(id, { file, mediaType: check.mediaType });
-          queue.current.push(id);
-          additions.push({
-            id,
-            name: file.name,
-            size: file.size,
-            mediaType: check.mediaType,
-            state: 'uploading',
-            progress: 0,
-            thumbnailUrl,
-          });
-        }
-        commit(prev => [...prev, ...additions]);
-        pump();
+        const pick = stageOpenFrameChecks(checks, randomId, previews.make);
+        for (const [id, entry] of pick.entries) entries.current.set(id, entry);
+        commit(prev => [...prev, ...pick.additions]);
+        for (const id of pick.queued) queue.add(id, () => upload(id));
       };
       // One call after another, so the second pick counts the first one's files. A check that throws must not stop
       // the picks after it.
       intake.current = intake.current.then(run).catch(() => undefined);
     },
-    [commit, pump],
+    [commit, previews, queue, upload],
   );
 
   /** Forget a file: cancel its upload, take it out of the queue and the status reads. */
-  const drop = useCallback((id: string) => {
-    entries.current.get(id)?.controller?.abort();
-    entries.current.delete(id);
-    queue.current = queue.current.filter(queued => queued !== id);
-  }, []);
+  const drop = useCallback(
+    (id: string) => {
+      entries.current.get(id)?.controller?.abort();
+      entries.current.delete(id);
+      queue.remove(id);
+    },
+    [queue],
+  );
 
   const remove = useCallback(
     (id: string) => {
-      const item = itemsRef.current.find(candidate => candidate.id === id);
+      const thumbnailUrl = itemsRef.current.find(candidate => candidate.id === id)?.thumbnailUrl;
       drop(id);
-      if (item?.thumbnailUrl && objectUrls.current.has(item.thumbnailUrl)) {
-        URL.revokeObjectURL(item.thumbnailUrl);
-        objectUrls.current.delete(item.thumbnailUrl);
-      }
+      previews.revoke(thumbnailUrl);
       commit(prev => prev.filter(candidate => candidate.id !== id));
     },
-    [commit, drop],
+    [commit, drop, previews],
   );
 
   const clear = useCallback(() => {
     for (const id of [...entries.current.keys()]) drop(id);
-    // Nothing waits any more: a status read in flight is moot.
-    pollController.current?.abort();
-    pollController.current = null;
-    // Leave the state alone when the tray is already empty, so React skips the render.
-    if (itemsRef.current.length > 0) commit(() => []);
-  }, [commit, drop]);
+    cancelRead(); // nothing waits any more: a status read in flight is moot
+    commit(prev => (prev.length > 0 ? [] : prev)); // an empty tray stays the same array, so React skips the render
+  }, [cancelRead, commit, drop]);
 
   const takeForSend = useCallback(() => {
-    const taken = readyOf(itemsRef.current, entries.current);
+    const taken = openFrameReadyAttachments(itemsRef.current, entries.current);
     clear();
     return taken;
   }, [clear]);
 
   useEffect(() => {
     mounted.current = true;
-    const urls = objectUrls.current;
     const all = entries.current;
     return () => {
       mounted.current = false;
       for (const entry of all.values()) entry.controller?.abort();
       all.clear();
-      queue.current = [];
-      pollController.current?.abort();
-      pollController.current = null;
-      if (pollTimer.current !== null) clearTimeout(pollTimer.current);
-      pollTimer.current = null;
-      for (const url of urls) URL.revokeObjectURL(url);
-      urls.clear();
     };
   }, []);
 
-  const pending = view.items.some(item => item.state === 'uploading' || item.state === 'scanning');
-
-  return { items: view.items, addFiles, remove, ready: view.ready, pending, takeForSend, clear };
+  const { items, ready } = view;
+  return { items, addFiles, remove, ready, pending: isOpenFrameTrayPending(items), takeForSend, clear };
 }
