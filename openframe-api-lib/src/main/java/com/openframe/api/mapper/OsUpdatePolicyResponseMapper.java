@@ -2,14 +2,19 @@ package com.openframe.api.mapper;
 
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStatus;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceClassRestartModeResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateMaintenanceWindowResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateOverrideResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateRestartDeadlineResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateRolloutRuleResponse;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
+import com.openframe.data.document.rmm.osupdate.OsUpdateMaintenanceWindow;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOverride;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOverrideAction;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -17,6 +22,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
@@ -30,6 +36,12 @@ public class OsUpdatePolicyResponseMapper {
                 .rolloutRules(toRolloutRules(osUpdatePolicy))
                 .restartDeadlines(toRestartDeadlines(osUpdatePolicy))
                 .pilotTagId(osUpdatePolicy.getPilotTagId())
+                .maintenanceWindows(toMaintenanceWindows(osUpdatePolicy.getMaintenanceWindows()))
+                .offlineRule(osUpdatePolicy.getOfflineRule())
+                .inUseRule(osUpdatePolicy.getInUseRule())
+                .domainControllerRestartManual(osUpdatePolicy.isDomainControllerRestartManual())
+                .restartModes(toRestartModes(osUpdatePolicy.getRestartModes()))
+                .restartDialog(osUpdatePolicy.getRestartDialog())
                 .createdAt(osUpdatePolicy.getCreatedAt())
                 .updatedAt(osUpdatePolicy.getUpdatedAt())
                 .build();
@@ -67,6 +79,37 @@ public class OsUpdatePolicyResponseMapper {
                     : DeviceOsUpdateRolloutStatus.HELD;
         }
         return installFrom.isAfter(now) ? DeviceOsUpdateRolloutStatus.SCHEDULED : DeviceOsUpdateRolloutStatus.APPROVED;
+    }
+
+    // A policy saved before the windows existed has none.
+    private List<OsUpdateMaintenanceWindowResponse> toMaintenanceWindows(
+            Map<OsUpdateDeviceClass, OsUpdateMaintenanceWindow> maintenanceWindows) {
+        if (maintenanceWindows == null) {
+            return List.of();
+        }
+        return Arrays.stream(OsUpdateDeviceClass.values())
+                .filter(maintenanceWindows::containsKey)
+                .map(deviceClass -> OsUpdateMaintenanceWindowResponse.builder()
+                        .deviceClass(deviceClass)
+                        .daysOfWeek(maintenanceWindows.get(deviceClass).getDaysOfWeek())
+                        .fromTime(maintenanceWindows.get(deviceClass).getFromTime())
+                        .toTime(maintenanceWindows.get(deviceClass).getToTime())
+                        .build())
+                .toList();
+    }
+
+    private List<OsUpdateDeviceClassRestartModeResponse> toRestartModes(
+            Map<OsUpdateDeviceClass, OsUpdateRestartMode> restartModes) {
+        if (restartModes == null) {
+            return List.of();
+        }
+        return Arrays.stream(OsUpdateDeviceClass.values())
+                .filter(restartModes::containsKey)
+                .map(deviceClass -> OsUpdateDeviceClassRestartModeResponse.builder()
+                        .deviceClass(deviceClass)
+                        .mode(restartModes.get(deviceClass))
+                        .build())
+                .toList();
     }
 
     private List<OsUpdateRolloutRuleResponse> toRolloutRules(OsUpdatePolicy osUpdatePolicy) {

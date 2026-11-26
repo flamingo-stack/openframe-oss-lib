@@ -7,10 +7,17 @@ import com.openframe.api.exception.OsUpdatePolicyNotFoundException;
 import com.openframe.api.mapper.OsUpdatePolicyResponseMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeferOption;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
+import com.openframe.data.document.rmm.osupdate.OsUpdateInUseRule;
+import com.openframe.data.document.rmm.osupdate.OsUpdateMaintenanceWindow;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOfflineRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTarget;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTargetType;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDeadline;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDialog;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
@@ -32,6 +39,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +94,14 @@ class OsUpdatePolicyServiceTest {
                 .restartDeadlines(Map.of(OsUpdateUrgency.QUALITY,
                         OsUpdateRestartDeadline.builder().focusDays(1).softDays(5).hardDays(7).build()))
                 .pilotTagId("tag-pilot")
+                .maintenanceWindows(Map.of(OsUpdateDeviceClass.SERVER, OsUpdateMaintenanceWindow.builder()
+                        .daysOfWeek(List.of(DayOfWeek.SATURDAY)).fromTime("03:00").toTime("06:00").build()))
+                .offlineRule(OsUpdateOfflineRule.INSTALL_AT_NEXT_CHECK_IN)
+                .inUseRule(OsUpdateInUseRule.INSTALL_RESTART_IN_NEXT_WINDOW)
+                .domainControllerRestartManual(true)
+                .restartModes(Map.of(OsUpdateDeviceClass.SERVER, OsUpdateRestartMode.NEVER))
+                .restartDialog(OsUpdateRestartDialog.builder()
+                        .deferOptions(List.of(OsUpdateDeferOption.FOUR_HOURS)).autoAnswerMinutes(60).build())
                 .build();
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(osUpdatePolicyRepository.findByTenantIdOrderByCreatedAtAsc(TENANT_ID))
@@ -112,6 +128,16 @@ class OsUpdatePolicyServiceTest {
                 .satisfies(rule -> assertThat(rule.getMode()).isEqualTo(OsUpdateRolloutMode.HOLD));
         assertThat(created.getRestartDeadlines()).singleElement()
                 .satisfies(deadline -> assertThat(deadline.getHardDays()).isEqualTo(7));
+        assertThat(savedOsUpdatePolicy.getValue().getMaintenanceWindows()).isEqualTo(command.getMaintenanceWindows());
+        assertThat(savedOsUpdatePolicy.getValue().getRestartModes()).isEqualTo(command.getRestartModes());
+        assertThat(created.getMaintenanceWindows()).singleElement()
+                .satisfies(window -> assertThat(window.getFromTime()).isEqualTo("03:00"));
+        assertThat(created.getOfflineRule()).isEqualTo(OsUpdateOfflineRule.INSTALL_AT_NEXT_CHECK_IN);
+        assertThat(created.getInUseRule()).isEqualTo(OsUpdateInUseRule.INSTALL_RESTART_IN_NEXT_WINDOW);
+        assertThat(created.isDomainControllerRestartManual()).isTrue();
+        assertThat(created.getRestartModes()).singleElement()
+                .satisfies(restartMode -> assertThat(restartMode.getMode()).isEqualTo(OsUpdateRestartMode.NEVER));
+        assertThat(created.getRestartDialog()).isEqualTo(command.getRestartDialog());
         verify(deviceOsUpdateRolloutStateService).refreshAll();
     }
 

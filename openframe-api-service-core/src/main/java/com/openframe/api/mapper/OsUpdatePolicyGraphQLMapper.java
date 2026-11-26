@@ -1,5 +1,7 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceClassRestartModeInput;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateMaintenanceWindowInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyCommand;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyResponse;
@@ -7,8 +9,11 @@ import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyTargetInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateRestartDeadlineInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateRolloutRuleInput;
 import com.openframe.core.exception.ValidationException;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
+import com.openframe.data.document.rmm.osupdate.OsUpdateMaintenanceWindow;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTarget;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDeadline;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -38,6 +43,12 @@ public class OsUpdatePolicyGraphQLMapper {
                 .restartDeadlines(toRestartDeadlines(osUpdatePolicyInput.getRestartDeadlines()))
                 .pilotTagId(osUpdatePolicyInput.getPilotTagId() == null
                         ? null : relayIdCodec.decode(osUpdatePolicyInput.getPilotTagId(), TAG))
+                .maintenanceWindows(toMaintenanceWindows(osUpdatePolicyInput.getMaintenanceWindows()))
+                .offlineRule(osUpdatePolicyInput.getOfflineRule())
+                .inUseRule(osUpdatePolicyInput.getInUseRule())
+                .domainControllerRestartManual(osUpdatePolicyInput.isDomainControllerRestartManual())
+                .restartModes(toRestartModes(osUpdatePolicyInput.getRestartModes()))
+                .restartDialog(osUpdatePolicyInput.getRestartDialog())
                 .build();
     }
 
@@ -97,9 +108,39 @@ public class OsUpdatePolicyGraphQLMapper {
         return restartDeadlines;
     }
 
-    private void verifyListedOnce(Object replaced, String field, OsUpdateUrgency urgency) {
+    private Map<OsUpdateDeviceClass, OsUpdateMaintenanceWindow> toMaintenanceWindows(
+            List<OsUpdateMaintenanceWindowInput> osUpdateMaintenanceWindowInputs) {
+        Map<OsUpdateDeviceClass, OsUpdateMaintenanceWindow> maintenanceWindows =
+                new EnumMap<>(OsUpdateDeviceClass.class);
+        for (OsUpdateMaintenanceWindowInput osUpdateMaintenanceWindowInput : osUpdateMaintenanceWindowInputs) {
+            OsUpdateMaintenanceWindow replaced = maintenanceWindows.put(
+                    osUpdateMaintenanceWindowInput.getDeviceClass(),
+                    OsUpdateMaintenanceWindow.builder()
+                            .daysOfWeek(osUpdateMaintenanceWindowInput.getDaysOfWeek())
+                            .fromTime(osUpdateMaintenanceWindowInput.getFromTime())
+                            .toTime(osUpdateMaintenanceWindowInput.getToTime())
+                            .build());
+            verifyListedOnce(replaced, "maintenanceWindows", osUpdateMaintenanceWindowInput.getDeviceClass());
+        }
+        return maintenanceWindows;
+    }
+
+    private Map<OsUpdateDeviceClass, OsUpdateRestartMode> toRestartModes(
+            List<OsUpdateDeviceClassRestartModeInput> osUpdateDeviceClassRestartModeInputs) {
+        Map<OsUpdateDeviceClass, OsUpdateRestartMode> restartModes = new EnumMap<>(OsUpdateDeviceClass.class);
+        for (OsUpdateDeviceClassRestartModeInput osUpdateDeviceClassRestartModeInput
+                : osUpdateDeviceClassRestartModeInputs) {
+            OsUpdateRestartMode replaced = restartModes.put(
+                    osUpdateDeviceClassRestartModeInput.getDeviceClass(),
+                    osUpdateDeviceClassRestartModeInput.getMode());
+            verifyListedOnce(replaced, "restartModes", osUpdateDeviceClassRestartModeInput.getDeviceClass());
+        }
+        return restartModes;
+    }
+
+    private void verifyListedOnce(Object replaced, String field, Enum<?> listed) {
         if (replaced != null) {
-            throw new ValidationException(field + " lists " + urgency + " twice");
+            throw new ValidationException(field + " lists " + listed + " twice");
         }
     }
 }

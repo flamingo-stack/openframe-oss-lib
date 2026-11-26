@@ -3,10 +3,17 @@ package com.openframe.api.service.rmm.osupdate;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyCommand;
 import com.openframe.api.exception.OsUpdatePolicyConflictException;
 import com.openframe.core.exception.ValidationException;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeferOption;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
+import com.openframe.data.document.rmm.osupdate.OsUpdateInUseRule;
+import com.openframe.data.document.rmm.osupdate.OsUpdateMaintenanceWindow;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOfflineRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTarget;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTargetType;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDeadline;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDialog;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
@@ -16,10 +23,13 @@ import com.openframe.data.repository.tag.TagAssignmentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
 
@@ -46,7 +56,16 @@ class OsUpdatePolicyValidatorTest {
                 .rolloutRules(Map.of(OsUpdateUrgency.QUALITY, OsUpdateRolloutRule.builder()
                         .mode(OsUpdateRolloutMode.EVERYONE_AT_ONCE).daysAfterRelease(7).build()))
                 .restartDeadlines(Map.of(OsUpdateUrgency.QUALITY, OsUpdateRestartDeadline.builder()
-                        .focusDays(1).softDays(5).hardDays(7).build()));
+                        .focusDays(1).softDays(5).hardDays(7).build()))
+                .maintenanceWindows(Map.of(
+                        OsUpdateDeviceClass.WORKSTATION, window("01:00", "04:00").build(),
+                        OsUpdateDeviceClass.SERVER, window("03:00", "06:00").build()))
+                .offlineRule(OsUpdateOfflineRule.WAIT_FOR_NEXT_WINDOW)
+                .inUseRule(OsUpdateInUseRule.SKIP_WINDOW)
+                .restartModes(Map.of(
+                        OsUpdateDeviceClass.WORKSTATION, OsUpdateRestartMode.DIALOG_THEN_DEADLINES,
+                        OsUpdateDeviceClass.SERVER, OsUpdateRestartMode.MAINTENANCE_WINDOW_ONLY))
+                .restartDialog(restartDialog().build());
     }
 
     @Test
@@ -166,6 +185,114 @@ class OsUpdatePolicyValidatorTest {
     }
 
     @Test
+    void validate_noWindowOfTheServersAndNoRestartModeOfTheWorkstations_nameTheDeviceClasses() {
+        // setup
+        command.maintenanceWindows(Map.of(OsUpdateDeviceClass.WORKSTATION, window("01:00", "04:00").build()))
+                .restartModes(Map.of(OsUpdateDeviceClass.SERVER, OsUpdateRestartMode.NEVER));
+
+        // execution, verifications
+        assertFieldErrors("maintenanceWindows.SERVER", "restartModes.WORKSTATION");
+    }
+
+    @Test
+    void validate_noWindowsAndNoRestartModesAtAll_nameBothDeviceClassesOfBoth() {
+        // setup
+        command.maintenanceWindows(null).restartModes(null);
+
+        // execution, verifications
+        assertFieldErrors("maintenanceWindows.WORKSTATION", "maintenanceWindows.SERVER",
+                "restartModes.WORKSTATION", "restartModes.SERVER");
+    }
+
+    @Test
+    void validate_windowWithoutDaysAndWithTheSameStartAndEnd_namesBothFields() {
+        // setup
+        command.maintenanceWindows(Map.of(
+                OsUpdateDeviceClass.WORKSTATION, window("01:00", "01:00").daysOfWeek(List.of()).build(),
+                OsUpdateDeviceClass.SERVER, window("03:00", "06:00").build()));
+
+        // execution, verifications
+        assertFieldErrors("maintenanceWindows.WORKSTATION.daysOfWeek", "maintenanceWindows.WORKSTATION.toTime");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"24:00", "1:00", "01:60", "01:00:00", "night"})
+    void validate_windowTimeThatIsNotATimeOfDay_namesTheField(String time) {
+        // setup
+        command.maintenanceWindows(Map.of(
+                OsUpdateDeviceClass.WORKSTATION, window(time, "04:00").build(),
+                OsUpdateDeviceClass.SERVER, window("03:00", time).build()));
+
+        // execution, verifications
+        assertFieldErrors("maintenanceWindows.WORKSTATION.fromTime", "maintenanceWindows.SERVER.toTime");
+    }
+
+    @Test
+    void validate_windowWithoutItsTimes_namesBoth() {
+        // setup
+        command.maintenanceWindows(Map.of(
+                OsUpdateDeviceClass.WORKSTATION, window(null, null).build(),
+                OsUpdateDeviceClass.SERVER, window("03:00", "06:00").build()));
+
+        // execution, verifications
+        assertFieldErrors("maintenanceWindows.WORKSTATION.fromTime", "maintenanceWindows.WORKSTATION.toTime");
+    }
+
+    @Test
+    void validate_windowOverMidnightAndTheLastMinuteOfTheDay_passes() {
+        // setup
+        command.maintenanceWindows(Map.of(
+                OsUpdateDeviceClass.WORKSTATION, window("22:00", "02:00").build(),
+                OsUpdateDeviceClass.SERVER, window("00:00", "23:59").build()));
+
+        // execution, verifications
+        assertThatCode(() -> osUpdatePolicyValidator.validate(command.build(), List.of())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void validate_serversUnderTheDialogMode_namesTheServers() {
+        // setup
+        command.restartModes(Map.of(
+                OsUpdateDeviceClass.WORKSTATION, OsUpdateRestartMode.DIALOG_THEN_DEADLINES,
+                OsUpdateDeviceClass.SERVER, OsUpdateRestartMode.DIALOG_THEN_DEADLINES));
+
+        // execution, verifications
+        assertFieldErrors("restartModes.SERVER");
+    }
+
+    @Test
+    void validate_noOfflineRuleNoInUseRuleAndNoRestartDialog_namesTheThree() {
+        // setup
+        command.offlineRule(null).inUseRule(null).restartDialog(null);
+
+        // execution, verifications
+        assertFieldErrors("offlineRule", "inUseRule", "restartDialog");
+    }
+
+    @Test
+    void validate_dialogThatAnswersItselfAtOnceAndListsADeferOptionTwice_namesBothFields() {
+        // setup
+        command.restartDialog(restartDialog().autoAnswerMinutes(0)
+                .deferOptions(List.of(OsUpdateDeferOption.ONE_HOUR, OsUpdateDeferOption.ONE_HOUR)).build());
+
+        // execution, verifications
+        assertFieldErrors("restartDialog.autoAnswerMinutes", "restartDialog.deferOptions");
+        command.restartDialog(restartDialog().autoAnswerMinutes(null).build());
+        assertFieldErrors("restartDialog.autoAnswerMinutes");
+    }
+
+    @Test
+    void validate_dialogWithoutDeferralsThatAnswersItselfAfterOneMinute_passes() {
+        // setup
+        command.restartDialog(restartDialog().autoAnswerMinutes(1).deferOptions(List.of()).build());
+
+        // execution, verifications
+        assertThatCode(() -> osUpdatePolicyValidator.validate(command.build(), List.of())).doesNotThrowAnyException();
+        command.restartDialog(restartDialog().deferOptions(null).build());
+        assertThatCode(() -> osUpdatePolicyValidator.validate(command.build(), List.of())).doesNotThrowAnyException();
+    }
+
+    @Test
     void validate_secondTenantPolicy_conflictNamingTheFirst() {
         // setup
         OsUpdatePolicy other = policy("Everyone", target(OsUpdatePolicyTargetType.TENANT).build());
@@ -267,6 +394,17 @@ class OsUpdatePolicyValidatorTest {
 
     private static OsUpdatePolicyTarget.OsUpdatePolicyTargetBuilder target(OsUpdatePolicyTargetType type) {
         return OsUpdatePolicyTarget.builder().type(type);
+    }
+
+    private static OsUpdateMaintenanceWindow.OsUpdateMaintenanceWindowBuilder window(String fromTime, String toTime) {
+        return OsUpdateMaintenanceWindow.builder()
+                .daysOfWeek(List.of(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY)).fromTime(fromTime).toTime(toTime);
+    }
+
+    private static OsUpdateRestartDialog.OsUpdateRestartDialogBuilder restartDialog() {
+        return OsUpdateRestartDialog.builder()
+                .deferOptions(List.of(OsUpdateDeferOption.ONE_HOUR, OsUpdateDeferOption.FOUR_HOURS))
+                .autoAnswerMinutes(60).userMayScheduleRestart(true);
     }
 
     private static OsUpdatePolicy policy(String name, OsUpdatePolicyTarget target) {

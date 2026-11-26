@@ -41,6 +41,20 @@ type OsUpdatePolicy {
     restartDeadlines: [OsUpdateRestartDeadline!]!
     """The pilot ring: the devices with this tag are the first to get an update under PILOT_THEN_EVERYONE."""
     pilotTagId: ID
+    """One per device class. Downloads happen any time; installs and restarts only inside the window. Empty = the
+    policy was saved before maintenance windows existed."""
+    maintenanceWindows: [OsUpdateMaintenanceWindow!]!
+    """What a device that was offline during its window does. Null = saved before the setting existed."""
+    offlineRule: OsUpdateOfflineRule
+    """What a device that is in use during its window does. Null = saved before the setting existed."""
+    inUseRule: OsUpdateInUseRule
+    """True = a domain controller installs in the server window but never restarts on its own: a technician
+    presses Restart now."""
+    domainControllerRestartManual: Boolean!
+    """One per device class. Empty = saved before the setting existed."""
+    restartModes: [OsUpdateDeviceClassRestartMode!]!
+    """The dialog the devices under DIALOG_THEN_DEADLINES show. Null = saved before the setting existed."""
+    restartDialog: OsUpdateRestartDialog
     createdAt: Instant!
     updatedAt: Instant!
 }
@@ -101,6 +115,77 @@ type OsUpdateRestartDeadline {
     hardDays: Int!
 }
 
+"""WORKSTATION: workstations and laptops."""
+enum OsUpdateDeviceClass {
+    WORKSTATION
+    SERVER
+}
+
+enum DayOfWeek {
+    MONDAY
+    TUESDAY
+    WEDNESDAY
+    THURSDAY
+    FRIDAY
+    SATURDAY
+    SUNDAY
+}
+
+"""The hours in which the devices of one class install and restart, by the clock of the device."""
+type OsUpdateMaintenanceWindow {
+    deviceClass: OsUpdateDeviceClass!
+    daysOfWeek: [DayOfWeek!]!
+    """HH:mm, 24 hours."""
+    fromTime: String!
+    """HH:mm, 24 hours. Earlier than fromTime = the window ends on the next day."""
+    toTime: String!
+}
+
+"""INSTALL_AT_NEXT_CHECK_IN: install at the next check-in, outside the window too. WAIT_FOR_NEXT_WINDOW: wait
+for the next window."""
+enum OsUpdateOfflineRule {
+    INSTALL_AT_NEXT_CHECK_IN
+    WAIT_FOR_NEXT_WINDOW
+}
+
+"""INSTALL_ASK_BEFORE_RESTART: install, ask before the restart. INSTALL_RESTART_IN_NEXT_WINDOW: install, restart
+in the next window. SKIP_WINDOW: skip this window."""
+enum OsUpdateInUseRule {
+    INSTALL_ASK_BEFORE_RESTART
+    INSTALL_RESTART_IN_NEXT_WINDOW
+    SKIP_WINDOW
+}
+
+type OsUpdateDeviceClassRestartMode {
+    deviceClass: OsUpdateDeviceClass!
+    mode: OsUpdateRestartMode!
+}
+
+"""DIALOG_THEN_DEADLINES: show the dialog, then enforce at the restart deadlines; not for SERVER.
+MAINTENANCE_WINDOW_ONLY: restart only in the maintenance window, no dialog. NEVER: never restart automatically."""
+enum OsUpdateRestartMode {
+    DIALOG_THEN_DEADLINES
+    MAINTENANCE_WINDOW_ONLY
+    NEVER
+}
+
+type OsUpdateRestartDialog {
+    """The defer menu, in its order: the first option is what a dialog nobody answers picks. Empty = no
+    deferrals: the dialog only offers Restart now and Schedule."""
+    deferOptions: [OsUpdateDeferOption!]!
+    """Minutes after which the dialog answers itself, as a deferral."""
+    autoAnswerMinutes: Int!
+    """True = the user may schedule the restart from the dialog, up to the soft deadline."""
+    userMayScheduleRestart: Boolean!
+}
+
+"""TOMORROW_MORNING: tomorrow at 08:00 by the clock of the device."""
+enum OsUpdateDeferOption {
+    ONE_HOUR
+    FOUR_HOURS
+    TOMORROW_MORNING
+}
+
 input OsUpdatePolicyInput {
     name: String!
     target: OsUpdatePolicyTargetInput!
@@ -108,6 +193,36 @@ input OsUpdatePolicyInput {
     restartDeadlines: [OsUpdateRestartDeadlineInput!]!
     """Required when a rule uses PILOT_THEN_EVERYONE."""
     pilotTagId: ID
+    """One for WORKSTATION and one for SERVER."""
+    maintenanceWindows: [OsUpdateMaintenanceWindowInput!]!
+    offlineRule: OsUpdateOfflineRule!
+    inUseRule: OsUpdateInUseRule!
+    domainControllerRestartManual: Boolean!
+    """One for WORKSTATION and one for SERVER. SERVER cannot use DIALOG_THEN_DEADLINES."""
+    restartModes: [OsUpdateDeviceClassRestartModeInput!]!
+    restartDialog: OsUpdateRestartDialogInput!
+}
+
+input OsUpdateMaintenanceWindowInput {
+    deviceClass: OsUpdateDeviceClass!
+    """At least one day."""
+    daysOfWeek: [DayOfWeek!]!
+    fromTime: String!
+    """Must differ from fromTime."""
+    toTime: String!
+}
+
+input OsUpdateDeviceClassRestartModeInput {
+    deviceClass: OsUpdateDeviceClass!
+    mode: OsUpdateRestartMode!
+}
+
+input OsUpdateRestartDialogInput {
+    """Without repeats."""
+    deferOptions: [OsUpdateDeferOption!]!
+    """1 or more."""
+    autoAnswerMinutes: Int!
+    userMayScheduleRestart: Boolean!
 }
 
 input OsUpdatePolicyTargetInput {

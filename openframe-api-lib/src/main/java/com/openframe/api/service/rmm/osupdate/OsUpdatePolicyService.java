@@ -104,6 +104,12 @@ public class OsUpdatePolicyService {
         osUpdatePolicy.setRolloutRules(osUpdatePolicyCommand.getRolloutRules());
         osUpdatePolicy.setRestartDeadlines(osUpdatePolicyCommand.getRestartDeadlines());
         osUpdatePolicy.setPilotTagId(osUpdatePolicyCommand.getPilotTagId());
+        osUpdatePolicy.setMaintenanceWindows(osUpdatePolicyCommand.getMaintenanceWindows());
+        osUpdatePolicy.setOfflineRule(osUpdatePolicyCommand.getOfflineRule());
+        osUpdatePolicy.setInUseRule(osUpdatePolicyCommand.getInUseRule());
+        osUpdatePolicy.setDomainControllerRestartManual(osUpdatePolicyCommand.isDomainControllerRestartManual());
+        osUpdatePolicy.setRestartModes(osUpdatePolicyCommand.getRestartModes());
+        osUpdatePolicy.setRestartDialog(osUpdatePolicyCommand.getRestartDialog());
         osUpdatePolicy.setUpdatedAt(now);
         OsUpdatePolicy savedOsUpdatePolicy = osUpdatePolicyRepository.save(osUpdatePolicy);
         deviceOsUpdateRolloutStateService.refreshAll();

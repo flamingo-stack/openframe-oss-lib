@@ -3,9 +3,14 @@ package com.openframe.api.service.rmm.osupdate;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyCommand;
 import com.openframe.api.exception.OsUpdatePolicyConflictException;
 import com.openframe.core.exception.ValidationException;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeferOption;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
+import com.openframe.data.document.rmm.osupdate.OsUpdateMaintenanceWindow;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTarget;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDeadline;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDialog;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
@@ -23,11 +28,14 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class OsUpdatePolicyValidator {
+
+    private static final Pattern TIME_OF_DAY = Pattern.compile("([01]\\d|2[0-3]):[0-5]\\d");
 
     private final TagAssignmentRepository tagAssignmentRepository;
 
@@ -40,6 +48,10 @@ public class OsUpdatePolicyValidator {
         validateTarget(osUpdatePolicyCommand.getTarget(), fieldErrors);
         validateRolloutRules(osUpdatePolicyCommand, fieldErrors);
         validateRestartDeadlines(osUpdatePolicyCommand, fieldErrors);
+        validateMaintenanceWindows(osUpdatePolicyCommand, fieldErrors);
+        validateRestartModes(osUpdatePolicyCommand, fieldErrors);
+        validateDeviceRules(osUpdatePolicyCommand, fieldErrors);
+        validateRestartDialog(osUpdatePolicyCommand.getRestartDialog(), fieldErrors);
         if (!fieldErrors.isEmpty()) {
             throw new ValidationException("OS update policy is not valid", fieldErrors);
         }
@@ -148,6 +160,86 @@ public class OsUpdatePolicyValidator {
                 || isNegativeOrMissing(osUpdateRestartDeadline.getHardDays())
                 || osUpdateRestartDeadline.getFocusDays() > osUpdateRestartDeadline.getSoftDays()
                 || osUpdateRestartDeadline.getSoftDays() > osUpdateRestartDeadline.getHardDays();
+    }
+
+    private void validateMaintenanceWindows(OsUpdatePolicyCommand osUpdatePolicyCommand,
+                                            List<ValidationException.FieldError> fieldErrors) {
+        Map<OsUpdateDeviceClass, OsUpdateMaintenanceWindow> maintenanceWindows =
+                Optional.ofNullable(osUpdatePolicyCommand.getMaintenanceWindows()).orElse(Map.of());
+        for (OsUpdateDeviceClass deviceClass : OsUpdateDeviceClass.values()) {
+            String field = "maintenanceWindows." + deviceClass;
+            OsUpdateMaintenanceWindow osUpdateMaintenanceWindow = maintenanceWindows.get(deviceClass);
+            if (osUpdateMaintenanceWindow == null) {
+                fieldErrors.add(new ValidationException.FieldError(field, "must be set"));
+            } else {
+                validateMaintenanceWindow(field, osUpdateMaintenanceWindow, fieldErrors);
+            }
+        }
+    }
+
+    private void validateMaintenanceWindow(String field, OsUpdateMaintenanceWindow osUpdateMaintenanceWindow,
+                                           List<ValidationException.FieldError> fieldErrors) {
+        if (CollectionUtils.isEmpty(osUpdateMaintenanceWindow.getDaysOfWeek())) {
+            fieldErrors.add(new ValidationException.FieldError(field + ".daysOfWeek", "must not be empty"));
+        }
+        if (isNotTimeOfDay(osUpdateMaintenanceWindow.getFromTime())) {
+            fieldErrors.add(new ValidationException.FieldError(field + ".fromTime", "must be a time as HH:mm"));
+        }
+        if (isNotTimeOfDay(osUpdateMaintenanceWindow.getToTime())) {
+            fieldErrors.add(new ValidationException.FieldError(field + ".toTime", "must be a time as HH:mm"));
+        } else if (osUpdateMaintenanceWindow.getToTime().equals(osUpdateMaintenanceWindow.getFromTime())) {
+            fieldErrors.add(new ValidationException.FieldError(field + ".toTime", "must differ from fromTime"));
+        }
+    }
+
+    private boolean isNotTimeOfDay(String time) {
+        return time == null || !TIME_OF_DAY.matcher(time).matches();
+    }
+
+    private void validateRestartModes(OsUpdatePolicyCommand osUpdatePolicyCommand,
+                                      List<ValidationException.FieldError> fieldErrors) {
+        Map<OsUpdateDeviceClass, OsUpdateRestartMode> restartModes =
+                Optional.ofNullable(osUpdatePolicyCommand.getRestartModes()).orElse(Map.of());
+        for (OsUpdateDeviceClass deviceClass : OsUpdateDeviceClass.values()) {
+            if (restartModes.get(deviceClass) == null) {
+                fieldErrors.add(new ValidationException.FieldError("restartModes." + deviceClass, "must be set"));
+            }
+        }
+        if (restartModes.get(OsUpdateDeviceClass.SERVER) == OsUpdateRestartMode.DIALOG_THEN_DEADLINES) {
+            fieldErrors.add(new ValidationException.FieldError(
+                    "restartModes." + OsUpdateDeviceClass.SERVER, "a server cannot use DIALOG_THEN_DEADLINES"));
+        }
+    }
+
+    private void validateDeviceRules(OsUpdatePolicyCommand osUpdatePolicyCommand,
+                                     List<ValidationException.FieldError> fieldErrors) {
+        if (osUpdatePolicyCommand.getOfflineRule() == null) {
+            fieldErrors.add(new ValidationException.FieldError("offlineRule", "must be set"));
+        }
+        if (osUpdatePolicyCommand.getInUseRule() == null) {
+            fieldErrors.add(new ValidationException.FieldError("inUseRule", "must be set"));
+        }
+    }
+
+    private void validateRestartDialog(OsUpdateRestartDialog osUpdateRestartDialog,
+                                       List<ValidationException.FieldError> fieldErrors) {
+        if (osUpdateRestartDialog == null) {
+            fieldErrors.add(new ValidationException.FieldError("restartDialog", "must be set"));
+            return;
+        }
+        if (osUpdateRestartDialog.getAutoAnswerMinutes() == null || osUpdateRestartDialog.getAutoAnswerMinutes() < 1) {
+            fieldErrors.add(new ValidationException.FieldError("restartDialog.autoAnswerMinutes", "must be 1 or more"));
+        }
+        if (hasRepeatedDeferOption(osUpdateRestartDialog)) {
+            fieldErrors.add(new ValidationException.FieldError(
+                    "restartDialog.deferOptions", "must not list an option twice"));
+        }
+    }
+
+    private boolean hasRepeatedDeferOption(OsUpdateRestartDialog osUpdateRestartDialog) {
+        List<OsUpdateDeferOption> deferOptions =
+                Optional.ofNullable(osUpdateRestartDialog.getDeferOptions()).orElse(List.of());
+        return deferOptions.stream().distinct().count() < deferOptions.size();
     }
 
     private boolean isNegativeOrMissing(Integer days) {

@@ -1,18 +1,25 @@
 package com.openframe.api.mapper;
 
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStatus;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceClassRestartModeResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateMaintenanceWindowResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateRolloutRuleResponse;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
+import com.openframe.data.document.rmm.osupdate.OsUpdateMaintenanceWindow;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOverrideAction;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDeadline;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
 import org.junit.jupiter.api.Test;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,5 +81,55 @@ class OsUpdatePolicyResponseMapperTest {
         DeviceOsUpdateRolloutState deviceOsUpdateRolloutState = DeviceOsUpdateRolloutState.builder()
                 .policyId("policy-1").installFrom(installFrom).overrideAction(overrideAction).build();
         return osUpdatePolicyResponseMapper.toResponse(deviceOsUpdateRolloutState, NOW).getStatus();
+    }
+
+    @Test
+    void toResponse_policy_windowsAndRestartModesInTheOrderOfDeviceClass() {
+        // setup
+        OsUpdatePolicy osUpdatePolicy = OsUpdatePolicy.builder()
+                .rolloutRules(Map.of()).restartDeadlines(Map.of())
+                .maintenanceWindows(Map.of(
+                        OsUpdateDeviceClass.SERVER, OsUpdateMaintenanceWindow.builder()
+                                .daysOfWeek(List.of(DayOfWeek.SATURDAY)).fromTime("03:00").toTime("06:00").build(),
+                        OsUpdateDeviceClass.WORKSTATION, OsUpdateMaintenanceWindow.builder()
+                                .daysOfWeek(List.of(DayOfWeek.TUESDAY)).fromTime("01:00").toTime("04:00").build()))
+                .restartModes(Map.of(
+                        OsUpdateDeviceClass.SERVER, OsUpdateRestartMode.NEVER,
+                        OsUpdateDeviceClass.WORKSTATION, OsUpdateRestartMode.DIALOG_THEN_DEADLINES))
+                .build();
+
+        // execution
+        OsUpdatePolicyResponse response = osUpdatePolicyResponseMapper.toResponse(osUpdatePolicy);
+
+        // verifications
+        assertThat(response.getMaintenanceWindows()).containsExactly(
+                OsUpdateMaintenanceWindowResponse.builder().deviceClass(OsUpdateDeviceClass.WORKSTATION)
+                        .daysOfWeek(List.of(DayOfWeek.TUESDAY)).fromTime("01:00").toTime("04:00").build(),
+                OsUpdateMaintenanceWindowResponse.builder().deviceClass(OsUpdateDeviceClass.SERVER)
+                        .daysOfWeek(List.of(DayOfWeek.SATURDAY)).fromTime("03:00").toTime("06:00").build());
+        assertThat(response.getRestartModes()).containsExactly(
+                OsUpdateDeviceClassRestartModeResponse.builder().deviceClass(OsUpdateDeviceClass.WORKSTATION)
+                        .mode(OsUpdateRestartMode.DIALOG_THEN_DEADLINES).build(),
+                OsUpdateDeviceClassRestartModeResponse.builder().deviceClass(OsUpdateDeviceClass.SERVER)
+                        .mode(OsUpdateRestartMode.NEVER).build());
+    }
+
+    @Test
+    void toResponse_policySavedBeforeTheSettingsExisted_emptyListsAndNoRules() {
+        // setup
+        OsUpdatePolicy osUpdatePolicy = OsUpdatePolicy.builder()
+                .rolloutRules(Map.of()).restartDeadlines(Map.of())
+                .build();
+
+        // execution
+        OsUpdatePolicyResponse response = osUpdatePolicyResponseMapper.toResponse(osUpdatePolicy);
+
+        // verifications
+        assertThat(response.getMaintenanceWindows()).isEmpty();
+        assertThat(response.getRestartModes()).isEmpty();
+        assertThat(response.getOfflineRule()).isNull();
+        assertThat(response.getInUseRule()).isNull();
+        assertThat(response.isDomainControllerRestartManual()).isFalse();
+        assertThat(response.getRestartDialog()).isNull();
     }
 }

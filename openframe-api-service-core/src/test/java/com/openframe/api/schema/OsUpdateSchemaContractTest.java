@@ -7,11 +7,16 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsRebootPending;
 import com.openframe.data.document.rmm.osupdate.OsUpdateAuthorization;
 import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeferOption;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
+import com.openframe.data.document.rmm.osupdate.OsUpdateInUseRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdateInstallResult;
 import com.openframe.data.document.rmm.osupdate.OsUpdateListConfidence;
 import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOfflineRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRebootBehavior;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartMode;
 import com.openframe.data.document.rmm.osupdate.OsUpdateScanState;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
 import com.openframe.data.document.rmm.osupdate.OsUpdateType;
@@ -42,6 +47,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -319,6 +325,12 @@ class OsUpdateSchemaContractTest {
         expected.put("rolloutRules", "[OsUpdateRolloutRule!]!");
         expected.put("restartDeadlines", "[OsUpdateRestartDeadline!]!");
         expected.put("pilotTagId", "ID");
+        expected.put("maintenanceWindows", "[OsUpdateMaintenanceWindow!]!");
+        expected.put("offlineRule", "OsUpdateOfflineRule");
+        expected.put("inUseRule", "OsUpdateInUseRule");
+        expected.put("domainControllerRestartManual", "Boolean!");
+        expected.put("restartModes", "[OsUpdateDeviceClassRestartMode!]!");
+        expected.put("restartDialog", "OsUpdateRestartDialog");
         expected.put("createdAt", "Instant!");
         expected.put("updatedAt", "Instant!");
         Map<String, String> expectedInput = new LinkedHashMap<>();
@@ -327,6 +339,12 @@ class OsUpdateSchemaContractTest {
         expectedInput.put("rolloutRules", "[OsUpdateRolloutRuleInput!]!");
         expectedInput.put("restartDeadlines", "[OsUpdateRestartDeadlineInput!]!");
         expectedInput.put("pilotTagId", "ID");
+        expectedInput.put("maintenanceWindows", "[OsUpdateMaintenanceWindowInput!]!");
+        expectedInput.put("offlineRule", "OsUpdateOfflineRule!");
+        expectedInput.put("inUseRule", "OsUpdateInUseRule!");
+        expectedInput.put("domainControllerRestartManual", "Boolean!");
+        expectedInput.put("restartModes", "[OsUpdateDeviceClassRestartModeInput!]!");
+        expectedInput.put("restartDialog", "OsUpdateRestartDialogInput!");
 
         // execution, verifications
         assertThat(fields("OsUpdatePolicy")).containsExactlyInAnyOrderEntriesOf(expected);
@@ -352,6 +370,32 @@ class OsUpdateSchemaContractTest {
         assertThat(inputFields("OsUpdateRolloutRuleInput")).containsExactlyInAnyOrderEntriesOf(expectedRule);
         assertThat(fields("OsUpdateRestartDeadline")).containsExactlyInAnyOrderEntriesOf(expectedDeadline);
         assertThat(inputFields("OsUpdateRestartDeadlineInput")).containsExactlyInAnyOrderEntriesOf(expectedDeadline);
+    }
+
+    @Test
+    void windowRestartModeAndRestartDialog_sameFieldsInTheTypeAndInItsInput() {
+        // setup
+        Map<String, String> expectedWindow = new LinkedHashMap<>();
+        expectedWindow.put("deviceClass", "OsUpdateDeviceClass!");
+        expectedWindow.put("daysOfWeek", "[DayOfWeek!]!");
+        expectedWindow.put("fromTime", "String!");
+        expectedWindow.put("toTime", "String!");
+        Map<String, String> expectedRestartMode = new LinkedHashMap<>();
+        expectedRestartMode.put("deviceClass", "OsUpdateDeviceClass!");
+        expectedRestartMode.put("mode", "OsUpdateRestartMode!");
+        Map<String, String> expectedDialog = new LinkedHashMap<>();
+        expectedDialog.put("deferOptions", "[OsUpdateDeferOption!]!");
+        expectedDialog.put("autoAnswerMinutes", "Int!");
+        expectedDialog.put("userMayScheduleRestart", "Boolean!");
+
+        // execution, verifications
+        assertThat(fields("OsUpdateMaintenanceWindow")).containsExactlyInAnyOrderEntriesOf(expectedWindow);
+        assertThat(inputFields("OsUpdateMaintenanceWindowInput")).containsExactlyInAnyOrderEntriesOf(expectedWindow);
+        assertThat(fields("OsUpdateDeviceClassRestartMode")).containsExactlyInAnyOrderEntriesOf(expectedRestartMode);
+        assertThat(inputFields("OsUpdateDeviceClassRestartModeInput"))
+                .containsExactlyInAnyOrderEntriesOf(expectedRestartMode);
+        assertThat(fields("OsUpdateRestartDialog")).containsExactlyInAnyOrderEntriesOf(expectedDialog);
+        assertThat(inputFields("OsUpdateRestartDialogInput")).containsExactlyInAnyOrderEntriesOf(expectedDialog);
     }
 
     @Test
@@ -424,6 +468,12 @@ class OsUpdateSchemaContractTest {
                 Arguments.of("OsUpdatePolicyTargetType", OsUpdatePolicyTargetType.class),
                 Arguments.of("OsUpdateUrgency", OsUpdateUrgency.class),
                 Arguments.of("OsUpdateRolloutMode", OsUpdateRolloutMode.class),
+                Arguments.of("OsUpdateDeviceClass", OsUpdateDeviceClass.class),
+                Arguments.of("DayOfWeek", DayOfWeek.class),
+                Arguments.of("OsUpdateOfflineRule", OsUpdateOfflineRule.class),
+                Arguments.of("OsUpdateInUseRule", OsUpdateInUseRule.class),
+                Arguments.of("OsUpdateRestartMode", OsUpdateRestartMode.class),
+                Arguments.of("OsUpdateDeferOption", OsUpdateDeferOption.class),
                 Arguments.of("OsUpdateOverrideAction", OsUpdateOverrideAction.class),
                 Arguments.of("DeviceOsUpdateRolloutStatus", DeviceOsUpdateRolloutStatus.class));
     }

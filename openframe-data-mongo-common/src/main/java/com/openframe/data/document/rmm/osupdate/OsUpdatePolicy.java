@@ -41,6 +41,22 @@ public class OsUpdatePolicy implements TenantScoped {
     // The devices with this tag are the pilot ring. Null = the policy has no pilot ring.
     private String pilotTagId;
 
+    // WARNING: the fields below are missing in a policy saved before they existed: read them as nullable
+
+    // Downloads happen any time; installs and restarts only inside the window of the device class.
+    private Map<OsUpdateDeviceClass, OsUpdateMaintenanceWindow> maintenanceWindows;
+
+    private OsUpdateOfflineRule offlineRule;
+
+    private OsUpdateInUseRule inUseRule;
+
+    // A domain controller installs in the server window and restarts only when a technician tells it to.
+    private boolean domainControllerRestartManual;
+
+    private Map<OsUpdateDeviceClass, OsUpdateRestartMode> restartModes;
+
+    private OsUpdateRestartDialog restartDialog;
+
     // WARNING: breaks the tie between two policies of one target type that cover the same device, the earlier
     // one applies; never moved by an update
     private Instant createdAt;
