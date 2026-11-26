@@ -2635,6 +2635,7 @@ function EmbeddableChatInner({
                 hasNextPage={hasMoreMessages}
                 isFetchingNextPage={isMessagesLoading}
                 onLoadMore={loadMoreMessages}
+                onOpenAttachment={openframeAttachments?.onOpenAttachment}
               />
             </RecordActionsProvider>
           </div>

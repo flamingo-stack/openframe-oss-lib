@@ -3,7 +3,11 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
-import type { OpenFrameAttachmentItem, OpenFrameAttachmentProfile } from '../../../chat-protocol/attachment-profiles';
+import type {
+  OpenFrameAttachmentItem,
+  OpenFrameAttachmentProfile,
+  OpenFrameMessageAttachment,
+} from '../../../chat-protocol/attachment-profiles';
 import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
@@ -223,6 +227,11 @@ export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement>
    * simply default to undefined on the receiver.
    */
   NavLinkAnchor?: NavLinkAnchorComponent;
+  /** The files an OpenFrame (Mingo, Fae) user message carries (`metadata.openframeAttachments`): file tiles, then an
+   *  image grid, under the bubble. Hub file parts are separate (drawn inside the bubble). */
+  openframeAttachments?: readonly OpenFrameMessageAttachment[];
+  /** A sent OpenFrame file was clicked (any file that does not open in the lightbox). */
+  onOpenAttachment?: (attachment: OpenFrameMessageAttachment) => void;
 }
 
 // ========== Chat Message List Props ==========
@@ -344,6 +353,8 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
   NavLinkAnchor?: NavLinkAnchorComponent;
+  /** A sent OpenFrame file was clicked: forwarded to every message (see `ChatMessageEnhancedProps`). */
+  onOpenAttachment?: (attachment: OpenFrameMessageAttachment) => void;
 }
 
 export interface ChatMessageListRef {
@@ -467,8 +478,10 @@ export interface OpenFrameComposerAttachments {
   onRemove: (id: string) => void;
 }
 
-/** `EmbeddableChat`'s form of the prop: the composer's, plus the send's hook. */
+/** `EmbeddableChat`'s form of the prop: the composer's, plus the thread's and the send's hooks. */
 export interface OpenFrameChatAttachments extends OpenFrameComposerAttachments {
+  /** A sent file (not an image with a picture) was clicked: the host signs and opens it. */
+  onOpenAttachment?: (attachment: OpenFrameMessageAttachment) => void;
   /** The composer sent a message: the host moves its ready items into it and clears the tray. */
   onMessageSend?: (text: string) => void;
 }

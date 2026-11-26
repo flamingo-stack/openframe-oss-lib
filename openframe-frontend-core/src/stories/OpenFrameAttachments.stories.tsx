@@ -3,15 +3,17 @@ import type React from 'react';
 
 import {
   type OpenFrameAttachmentItem,
+  type OpenFrameMessageAttachment,
   OPENFRAME_FAE_ATTACHMENT_PROFILE,
   OPENFRAME_MINGO_ATTACHMENT_PROFILE,
 } from '../chat-protocol/attachment-profiles';
 import { ChatInput } from '../components/chat/chat-input';
 import { OpenFrameAttachmentTile } from '../components/chat/openframe-attachment-tray';
+import { OpenFrameMessageAttachments } from '../components/chat/openframe-message-attachments';
 
 /**
  * OpenFrame (Mingo, Fae) chat attachments (Figma `chat-uploaded-file`, Mingo 1360:42966, Fae 1051:7201): every tile
- * state and the composer tray in both placements. The design may still change.
+ * state, the composer tray in both placements, and a sent message's files. The design may still change.
  */
 
 const KB = 1024;
@@ -63,6 +65,11 @@ function Composer({ product }: { product: 'mingo' | 'fae' }) {
   );
 }
 
+const sent: OpenFrameMessageAttachment[] = [
+  { id: 'f1', name: 'dns-trace.log', mediaType: 'text/plain', size: 24 * KB },
+  { id: 'f2', name: 'speed-up-checklist.pdf', mediaType: 'application/pdf', size: 212 * KB },
+];
+
 const meta = {
   title: 'Chat/OpenFrameAttachments',
   component: TileSheet,
@@ -85,3 +92,8 @@ export const MingoComposer: Story = { render: () => <Composer product="mingo" />
 
 /** Fae's composer: the one-click attach button and the tray over the input, scrolling. */
 export const FaeComposer: Story = { render: () => <Composer product="fae" /> };
+
+/** A sent message's files (no ×, no tokens); the host's onOpenAttachment opens them. */
+export const SentFiles: Story = {
+  render: () => <OpenFrameMessageAttachments attachments={sent} onOpenAttachment={() => {}} />,
+};
