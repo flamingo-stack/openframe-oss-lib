@@ -24,7 +24,7 @@ public class DeviceOsUpdateRolloutStateScheduler {
 
     @Scheduled(cron = "${openframe.rmm.os-update.rollout.cron:0 * * * * *}", zone = "UTC")
     @SchedulerLock(name = "deviceOsUpdateRolloutState",
-            lockAtMostFor = "${openframe.rmm.os-update.rollout.lock-at-most-for:30m}",
+            lockAtMostFor = "${openframe.rmm.os-update.rollout.lock-at-most-for:5m}",
             lockAtLeastFor = "${openframe.rmm.os-update.rollout.lock-at-least-for:10s}")
     public void run() {
         Timer.Sample runStarted = deviceOsUpdateRolloutStateMetrics.startRun();

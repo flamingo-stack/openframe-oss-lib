@@ -152,14 +152,14 @@ class OsUpdateDeviceServiceTest {
         when(osUpdateService.findDeviceScope(ORGANIZATIONS)).thenReturn(devicesOfCustomer);
         when(deviceOsStateService.countManageableDevices(OsPlatform.WINDOWS, ORGANIZATION_MACHINE_IDS))
                 .thenReturn(new ManageableOsDeviceCounts(142, 7));
-        when(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(eq(TENANT_ID), eq("org-1"), any()))
+        when(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(eq(TENANT_ID), eq(ORGANIZATIONS), any()))
                 .thenReturn(25L);
-        when(deviceOsUpdateRolloutStateRepository.countOverdueDevices(eq(TENANT_ID), eq("org-1"), any()))
+        when(deviceOsUpdateRolloutStateRepository.countOverdueDevices(eq(TENANT_ID), eq(ORGANIZATIONS), any()))
                 .thenReturn(new OsUpdateOverdueDeviceCounts(12, 3));
         when(osUpdateService.countHeldOsUpdates(devicesOfCustomer)).thenReturn(3);
 
         // execution
-        OsUpdateSummaryResponse summary = osUpdateDeviceService.getSummary("org-1");
+        OsUpdateSummaryResponse summary = osUpdateDeviceService.getSummary(ORGANIZATIONS);
 
         // verifications
         assertThat(summary).isEqualTo(OsUpdateSummaryResponse.builder()
@@ -175,9 +175,9 @@ class OsUpdateDeviceServiceTest {
         when(osUpdateService.findDeviceScope(EVERY_ORGANIZATION)).thenReturn(OsUpdateDeviceScope.EVERY_DEVICE);
         when(deviceOsStateService.countManageableDevices(OsPlatform.WINDOWS, EVERY_DEVICE))
                 .thenReturn(new ManageableOsDeviceCounts(2, 0));
-        when(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(eq(TENANT_ID), isNull(), any()))
+        when(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(eq(TENANT_ID), eq(EVERY_ORGANIZATION), any()))
                 .thenReturn(3L);
-        when(deviceOsUpdateRolloutStateRepository.countOverdueDevices(eq(TENANT_ID), isNull(), any()))
+        when(deviceOsUpdateRolloutStateRepository.countOverdueDevices(eq(TENANT_ID), eq(EVERY_ORGANIZATION), any()))
                 .thenReturn(OsUpdateOverdueDeviceCounts.NONE);
 
         // execution

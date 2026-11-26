@@ -247,6 +247,7 @@ class OsUpdatePolicyServiceTest {
         return OsUpdatePolicy.builder()
                 .id(id).tenantId(TENANT_ID).name(name).target(target)
                 .rolloutRules(Map.of()).restartDeadlines(Map.of())
+                .maintenanceWindows(Map.of()).restartModes(Map.of())
                 .createdAt(CREATED_AT).updatedAt(CREATED_AT)
                 .build();
     }

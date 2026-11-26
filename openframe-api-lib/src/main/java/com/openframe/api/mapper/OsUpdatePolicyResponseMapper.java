@@ -107,12 +107,8 @@ public class OsUpdatePolicyResponseMapper {
         return installFrom.isAfter(now) ? DeviceOsUpdateRolloutStatus.SCHEDULED : DeviceOsUpdateRolloutStatus.APPROVED;
     }
 
-    // A policy saved before the windows existed has none.
     private List<OsUpdateMaintenanceWindowResponse> toMaintenanceWindows(
             Map<OsUpdateDeviceClass, OsUpdateMaintenanceWindow> maintenanceWindows) {
-        if (maintenanceWindows == null) {
-            return List.of();
-        }
         return Arrays.stream(OsUpdateDeviceClass.values())
                 .filter(maintenanceWindows::containsKey)
                 .map(deviceClass -> OsUpdateMaintenanceWindowResponse.builder()
@@ -126,9 +122,6 @@ public class OsUpdatePolicyResponseMapper {
 
     private List<OsUpdateDeviceClassRestartModeResponse> toRestartModes(
             Map<OsUpdateDeviceClass, OsUpdateRestartMode> restartModes) {
-        if (restartModes == null) {
-            return List.of();
-        }
         return Arrays.stream(OsUpdateDeviceClass.values())
                 .filter(restartModes::containsKey)
                 .map(deviceClass -> OsUpdateDeviceClassRestartModeResponse.builder()

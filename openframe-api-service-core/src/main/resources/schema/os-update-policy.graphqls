@@ -50,20 +50,19 @@ type OsUpdatePolicy {
     restartDeadlines: [OsUpdateRestartDeadline!]!
     """The pilot ring: the devices with this tag are the first to get an update under PILOT_THEN_EVERYONE."""
     pilotTagId: ID
-    """One per device class. Downloads happen any time; installs and restarts only inside the window. Empty = the
-    policy was saved before maintenance windows existed."""
+    """One per device class. Downloads happen any time; installs and restarts only inside the window."""
     maintenanceWindows: [OsUpdateMaintenanceWindow!]!
-    """What a device that was offline during its window does. Null = saved before the setting existed."""
-    offlineRule: OsUpdateOfflineRule
-    """What a device that is in use during its window does. Null = saved before the setting existed."""
-    inUseRule: OsUpdateInUseRule
+    """What a device that was offline during its window does."""
+    offlineRule: OsUpdateOfflineRule!
+    """What a device that is in use during its window does."""
+    inUseRule: OsUpdateInUseRule!
     """True = a domain controller installs in the server window but never restarts on its own: a technician
     presses Restart now."""
     domainControllerRestartManual: Boolean!
-    """One per device class. Empty = saved before the setting existed."""
+    """One per device class."""
     restartModes: [OsUpdateDeviceClassRestartMode!]!
-    """The dialog the devices under DIALOG_THEN_DEADLINES show. Null = saved before the setting existed."""
-    restartDialog: OsUpdateRestartDialog
+    """The dialog the devices under DIALOG_THEN_DEADLINES show."""
+    restartDialog: OsUpdateRestartDialog!
     createdAt: Instant!
     updatedAt: Instant!
 }

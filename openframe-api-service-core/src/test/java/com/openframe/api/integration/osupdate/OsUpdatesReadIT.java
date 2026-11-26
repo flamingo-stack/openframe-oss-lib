@@ -133,8 +133,8 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
             }
             """;
     private static final String SUMMARY = """
-            query($organizationId: String) {
-              osUpdateSummary(organizationId: $organizationId) {
+            query($organizationIds: [String!]) {
+              osUpdateSummary(organizationIds: $organizationIds) {
                 deviceCount currentDeviceCount overdueDeviceCount overdueOfflineDeviceCount
                 restartPendingDeviceCount heldUpdateCount
               }
@@ -779,8 +779,8 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
 
         // execution
         Map<String, Object> ofTenant = map(data(SUMMARY, new HashMap<>()).get("osUpdateSummary"));
-        Map<String, Object> ofOrgA = map(data(SUMMARY, Map.of("organizationId", ORG_A)).get("osUpdateSummary"));
-        Map<String, Object> ofOrgB = map(data(SUMMARY, Map.of("organizationId", ORG_B)).get("osUpdateSummary"));
+        Map<String, Object> ofOrgA = map(data(SUMMARY, Map.of("organizationIds", List.of(ORG_A))).get("osUpdateSummary"));
+        Map<String, Object> ofOrgB = map(data(SUMMARY, Map.of("organizationIds", List.of(ORG_B))).get("osUpdateSummary"));
 
         // verifications
         assertThat(ofTenant).containsExactlyInAnyOrderEntriesOf(Map.of(

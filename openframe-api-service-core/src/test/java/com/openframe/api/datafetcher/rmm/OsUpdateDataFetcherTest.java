@@ -229,13 +229,13 @@ class OsUpdateDataFetcherTest {
     }
 
     @Test
-    void osUpdateSummary_customer_summaryOfTheServiceForIt() {
+    void osUpdateSummary_customers_summaryOfTheServiceForThem() {
         // setup
         OsUpdateSummaryResponse summary = OsUpdateSummaryResponse.builder().deviceCount(142).build();
-        when(osUpdateDeviceService.getSummary("org-1")).thenReturn(summary);
+        when(osUpdateDeviceService.getSummary(List.of("org-1"))).thenReturn(summary);
 
         // execution
-        OsUpdateSummaryResponse found = dataFetcher.osUpdateSummary("org-1");
+        OsUpdateSummaryResponse found = dataFetcher.osUpdateSummary(List.of("org-1"));
 
         // verifications
         assertThat(found).isSameAs(summary);

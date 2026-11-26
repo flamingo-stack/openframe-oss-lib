@@ -253,11 +253,12 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
                 rolloutState(OTHER_TENANT_ID, "machine-9", "kb-1")));
 
         // execution, verifications
-        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, null, now))
+        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, List.of(), now))
                 .isEqualTo(2);
-        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, "org-1", now))
+        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, List.of("org-1"), now))
                 .isEqualTo(1);
-        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, "org-3", now)).isZero();
+        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, List.of("org-3"), now))
+                .isZero();
     }
 
     @Test
@@ -275,11 +276,11 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
 
         // execution
         OsUpdateOverdueDeviceCounts ofTenant =
-                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, null, now);
+                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, List.of(), now);
         OsUpdateOverdueDeviceCounts ofCustomer =
-                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, "org-1", now);
+                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, List.of("org-1"), now);
         OsUpdateOverdueDeviceCounts ofCustomerWithoutDevices =
-                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, "org-3", now);
+                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, List.of("org-3"), now);
 
         // verifications
         assertThat(ofTenant).isEqualTo(new OsUpdateOverdueDeviceCounts(3, 2));

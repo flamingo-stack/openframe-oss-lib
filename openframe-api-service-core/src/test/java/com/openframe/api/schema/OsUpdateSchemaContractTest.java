@@ -233,13 +233,13 @@ class OsUpdateSchemaContractTest {
     }
 
     @Test
-    void osUpdateSummary_countsOfTheTenantOrOfOneOptionalCustomer() {
+    void osUpdateSummary_countsOfTheTenantOrOfTheOptionalCustomers() {
         // execution
         Optional<FieldDefinition> query = queryField("osUpdateSummary");
 
         // verifications
         assertThat(query).as("Query.osUpdateSummary").isPresent();
-        assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(Map.of("organizationId", "String"));
+        assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(Map.of("organizationIds", "[String!]"));
         assertThat(print(query.get().getType())).isEqualTo("OsUpdateSummary!");
         assertThat(fields("OsUpdateSummary")).containsExactlyInAnyOrderEntriesOf(Map.of(
                 "deviceCount", "Int!",
@@ -367,11 +367,11 @@ class OsUpdateSchemaContractTest {
         expected.put("restartDeadlines", "[OsUpdateRestartDeadline!]!");
         expected.put("pilotTagId", "ID");
         expected.put("maintenanceWindows", "[OsUpdateMaintenanceWindow!]!");
-        expected.put("offlineRule", "OsUpdateOfflineRule");
-        expected.put("inUseRule", "OsUpdateInUseRule");
+        expected.put("offlineRule", "OsUpdateOfflineRule!");
+        expected.put("inUseRule", "OsUpdateInUseRule!");
         expected.put("domainControllerRestartManual", "Boolean!");
         expected.put("restartModes", "[OsUpdateDeviceClassRestartMode!]!");
-        expected.put("restartDialog", "OsUpdateRestartDialog");
+        expected.put("restartDialog", "OsUpdateRestartDialog!");
         expected.put("createdAt", "Instant!");
         expected.put("updatedAt", "Instant!");
         Map<String, String> expectedInput = new LinkedHashMap<>();

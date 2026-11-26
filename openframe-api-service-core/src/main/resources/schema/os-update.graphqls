@@ -26,8 +26,9 @@ extend type Query {
         after: String): OsUpdateDeviceConnection!
 
     """The numbers of the cards above the OS update list. Windows devices only; devices we cannot manage are not
-    counted. `organizationId`: only that customer; omitted = every customer."""
-    osUpdateSummary(organizationId: String): OsUpdateSummary!
+    counted. `organizationIds`: only these customers, the same as in the list filter; omitted or empty = every
+    customer."""
+    osUpdateSummary(organizationIds: [String!]): OsUpdateSummary!
 }
 
 type OsUpdateSummary {

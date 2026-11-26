@@ -85,8 +85,8 @@ public class OsUpdateDataFetcher {
     }
 
     @DgsQuery
-    public OsUpdateSummaryResponse osUpdateSummary(@InputArgument String organizationId) {
-        return osUpdateDeviceService.getSummary(organizationId);
+    public OsUpdateSummaryResponse osUpdateSummary(@InputArgument List<String> organizationIds) {
+        return osUpdateDeviceService.getSummary(organizationIds);
     }
 
     @DgsData(parentType = "OsUpdate", field = "customerStatuses")

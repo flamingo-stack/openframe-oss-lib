@@ -71,6 +71,7 @@ class OsUpdatePolicyResponseMapperTest {
                                 .daysAfterRelease(0).build()))
                 .restartDeadlines(Map.of(OsUpdateUrgency.CRITICAL_SECURITY,
                         OsUpdateRestartDeadline.builder().focusDays(0).softDays(1).hardDays(2).build()))
+                .maintenanceWindows(Map.of()).restartModes(Map.of())
                 .build();
 
         // execution
@@ -170,24 +171,5 @@ class OsUpdatePolicyResponseMapperTest {
                         .mode(OsUpdateRestartMode.DIALOG_THEN_DEADLINES).build(),
                 OsUpdateDeviceClassRestartModeResponse.builder().deviceClass(OsUpdateDeviceClass.SERVER)
                         .mode(OsUpdateRestartMode.NEVER).build());
-    }
-
-    @Test
-    void toResponse_policySavedBeforeTheSettingsExisted_emptyListsAndNoRules() {
-        // setup
-        OsUpdatePolicy osUpdatePolicy = OsUpdatePolicy.builder()
-                .rolloutRules(Map.of()).restartDeadlines(Map.of())
-                .build();
-
-        // execution
-        OsUpdatePolicyResponse response = osUpdatePolicyResponseMapper.toResponse(osUpdatePolicy);
-
-        // verifications
-        assertThat(response.getMaintenanceWindows()).isEmpty();
-        assertThat(response.getRestartModes()).isEmpty();
-        assertThat(response.getOfflineRule()).isNull();
-        assertThat(response.getInUseRule()).isNull();
-        assertThat(response.isDomainControllerRestartManual()).isFalse();
-        assertThat(response.getRestartDialog()).isNull();
     }
 }

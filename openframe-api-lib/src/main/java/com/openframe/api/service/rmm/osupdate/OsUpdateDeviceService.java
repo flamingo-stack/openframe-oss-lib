@@ -65,18 +65,18 @@ public class OsUpdateDeviceService {
     }
 
     // Windows only: the policies are not applied to Macs. Devices we cannot manage are not counted.
-    // organizationId null = every customer.
-    public OsUpdateSummaryResponse getSummary(String organizationId) {
+    // No organizationIds = every customer.
+    public OsUpdateSummaryResponse getSummary(List<String> organizationIds) {
         String tenantId = tenantIdProvider.getTenantId();
-        OsUpdateDeviceScope osUpdateDeviceScope =
-                osUpdateService.findDeviceScope(organizationId == null ? List.of() : List.of(organizationId));
+        List<String> scopeOrganizationIds = organizationIds == null ? List.of() : organizationIds;
+        OsUpdateDeviceScope osUpdateDeviceScope = osUpdateService.findDeviceScope(scopeOrganizationIds);
         ManageableOsDeviceCounts manageableOsDeviceCounts = deviceOsStateService.countManageableDevices(
                 OsPlatform.WINDOWS, osUpdateDeviceScope.getMachineIds());
         Instant now = Instant.now();
         long installDueDeviceCount =
-                deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(tenantId, organizationId, now);
+                deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(tenantId, scopeOrganizationIds, now);
         OsUpdateOverdueDeviceCounts osUpdateOverdueDeviceCounts =
-                deviceOsUpdateRolloutStateRepository.countOverdueDevices(tenantId, organizationId, now);
+                deviceOsUpdateRolloutStateRepository.countOverdueDevices(tenantId, scopeOrganizationIds, now);
         long deviceCount = manageableOsDeviceCounts.getDeviceCount();
         return OsUpdateSummaryResponse.builder()
                 .deviceCount(Math.toIntExact(deviceCount))

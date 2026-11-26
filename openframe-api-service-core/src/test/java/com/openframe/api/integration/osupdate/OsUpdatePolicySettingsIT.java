@@ -103,32 +103,4 @@ class OsUpdatePolicySettingsIT extends BaseMongoIntegrationTest {
                 .containsEntry("name", "Default")
                 .containsAllEntriesOf(settings);
     }
-
-    @Test
-    void policyStoredBeforeTheSettingsExisted_readWithEmptyListsAndNoRules() {
-        // setup
-        mongoTemplate.getCollection(POLICIES).insertOne(new Document("_id", "policy-before-the-settings")
-                .append("tenantId", TENANT_ID)
-                .append("name", "Earlier")
-                .append("target", new Document("type", "TENANT"))
-                .append("rolloutRules", new Document())
-                .append("restartDeadlines", new Document())
-                .append("createdAt", new Date())
-                .append("updatedAt", new Date()));
-
-        // execution
-        ExecutionResult read = queryExecutor.execute(READ, Map.of("id", "policy-before-the-settings"));
-
-        // verifications
-        assertThat(read.getErrors()).isEmpty();
-        Map<String, Object> policy = read.<Map<String, Map<String, Object>>>getData().get("osUpdatePolicy");
-        assertThat(policy)
-                .containsEntry("name", "Earlier")
-                .containsEntry("maintenanceWindows", List.of())
-                .containsEntry("restartModes", List.of())
-                .containsEntry("domainControllerRestartManual", false)
-                .containsEntry("offlineRule", null)
-                .containsEntry("inUseRule", null)
-                .containsEntry("restartDialog", null);
-    }
 }
