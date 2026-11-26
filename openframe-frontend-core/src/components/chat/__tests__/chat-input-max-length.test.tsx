@@ -8,6 +8,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatInput } from '../chat-input';
+import { LENGTH_NOTE_FROM, showsLengthNote } from '../chat-input-length-note';
 import type { ChatInputRef } from '../types/component.types';
 
 const LIMIT = 10_000;
@@ -107,5 +108,18 @@ describe('ChatInput maxLength', () => {
 
     rerender(<ChatInput ref={ref} onSend={vi.fn()} maxLength={LIMIT} />);
     expect(screen.getByTestId('chat-input-notes')).not.toHaveClass('px-[var(--spacing-system-sf)]');
+  });
+});
+
+describe('showsLengthNote', () => {
+  it('starts past 90% of the limit, not at it', () => {
+    expect(LENGTH_NOTE_FROM).toBe(0.9);
+    expect(showsLengthNote(9_000, LIMIT)).toBe(false);
+    expect(showsLengthNote(9_001, LIMIT)).toBe(true);
+    expect(showsLengthNote(10_500, LIMIT)).toBe(true);
+  });
+
+  it('never shows without a limit', () => {
+    expect(showsLengthNote(50_000, undefined)).toBe(false);
   });
 });
