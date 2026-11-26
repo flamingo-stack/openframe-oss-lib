@@ -1,4 +1,5 @@
 use super::*;
+use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
 
@@ -103,4 +104,226 @@ fn test_registry_distributes_reads_across_sources() {
 
     let logs = registry.read_all(50);
     assert!(logs.len() <= 50);
+}
+
+#[test]
+fn a_chat_source_reads_chat_lines_as_chat_entries() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("openframe-chat.log");
+    std::fs::write(
+        &log_path,
+        "[2026-11-25][01:00:00][INFO][app_lib] first\n[2026-11-25][01:00:01][ERROR][app_lib] second\n",
+    )
+    .unwrap();
+
+    let mut source = FileLogSource::new(
+        LogSourceKind::OpenframeChat,
+        log_path,
+        tmp.path().join("chat_offset"),
+    );
+
+    let entries = source.read(10).unwrap();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[1].msg, "[chat] app_lib: second");
+    assert_eq!(entries[1].level, "ERROR");
+}
+
+#[test]
+fn a_chat_source_does_not_pass_client_or_tool_lines_through() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("openframe-chat.log");
+    std::fs::write(
+        &log_path,
+        format!(
+            "{}time=\"2026-11-26T10:00:00Z\" level=error msg=\"faked\"\n[2026-11-25][01:00:00][INFO][app_lib] real\n",
+            line(1)
+        ),
+    )
+    .unwrap();
+
+    let mut source = FileLogSource::new(
+        LogSourceKind::OpenframeChat,
+        log_path,
+        tmp.path().join("chat_offset"),
+    );
+
+    let entries = source.read(10).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].msg, "[chat] app_lib: real");
+}
+
+#[test]
+fn a_source_from_the_end_skips_the_old_lines_and_keeps_its_start() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("openframe-chat.log");
+    let offset_path = tmp.path().join("chat_offset");
+    std::fs::write(&log_path, "[2026-11-25][01:00:00][INFO][app_lib] old\n").unwrap();
+
+    let mut source = FileLogSource::new_at_end(
+        LogSourceKind::OpenframeChat,
+        log_path.clone(),
+        offset_path.clone(),
+    );
+    assert!(source.read(10).unwrap().is_empty());
+
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&log_path)
+        .unwrap();
+    file.write_all(b"[2026-11-25][01:00:01][INFO][app_lib] new\n")
+        .unwrap();
+
+    // A restart before anything is committed starts where the first run did, not at the new end.
+    let mut restarted =
+        FileLogSource::new_at_end(LogSourceKind::OpenframeChat, log_path, offset_path);
+    let entries = restarted.read(10).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].msg, "[chat] app_lib: new");
+}
+
+#[test]
+fn with_more_sources_than_budget_every_source_gets_a_turn() {
+    let tmp = TempDir::new().unwrap();
+    let mut registry = LogSourceRegistry::new();
+    for n in 0..4 {
+        let log_path = tmp.path().join(format!("{n}.log"));
+        std::fs::write(&log_path, line(n).repeat(5)).unwrap();
+        registry.register(Box::new(FileLogSource::new(
+            LogSourceKind::Openframe,
+            log_path,
+            tmp.path().join(format!("{n}.offset")),
+        )));
+    }
+
+    let mut seen = Vec::new();
+    for _ in 0..3 {
+        let entries = registry.read_all(2);
+        registry.commit_all();
+        assert_eq!(entries[0].msg, "openframe::test: message 0");
+        seen.push(entries[1].msg.clone());
+    }
+
+    assert_eq!(
+        seen,
+        [
+            "openframe::test: message 1",
+            "openframe::test: message 2",
+            "openframe::test: message 3"
+        ]
+    );
+}
+
+fn line(n: u32) -> String {
+    format!("2026-04-06T14:15:1{n}.488Z INFO openframe::test: message {n}\n")
+}
+
+fn source_for(tmp: &TempDir, log_path: PathBuf) -> FileLogSource {
+    FileLogSource::new(
+        LogSourceKind::Openframe,
+        log_path,
+        tmp.path().join("offset"),
+    )
+}
+
+#[test]
+fn a_batch_cut_short_continues_at_the_first_unread_line() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("test.log");
+    std::fs::write(&log_path, format!("{}{}{}", line(1), line(2), line(3))).unwrap();
+    let mut source = source_for(&tmp, log_path);
+
+    let first = source.read(1).unwrap();
+    let rest = source.read(10).unwrap();
+
+    assert_eq!(first[0].msg, "openframe::test: message 1");
+    let rest: Vec<_> = rest.iter().map(|e| e.msg.as_str()).collect();
+    assert_eq!(
+        rest,
+        ["openframe::test: message 2", "openframe::test: message 3"]
+    );
+}
+
+#[test]
+fn a_half_written_last_line_waits_for_its_end() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("test.log");
+    std::fs::write(
+        &log_path,
+        format!("{}2026-04-06T14:15:12.488Z INFO", line(1)),
+    )
+    .unwrap();
+    let mut source = source_for(&tmp, log_path.clone());
+
+    assert_eq!(source.read(10).unwrap().len(), 1);
+
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&log_path)
+        .unwrap();
+    file.write_all(b" openframe::test: message 2\n").unwrap();
+
+    let entries = source.read(10).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].msg, "openframe::test: message 2");
+}
+
+#[test]
+fn a_line_longer_than_the_limit_is_skipped() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("test.log");
+    let long = format!(
+        "2026-04-06T14:15:10.488Z INFO openframe::test: {}\n",
+        "x".repeat(MAX_LINE_BYTES as usize)
+    );
+    std::fs::write(&log_path, format!("{long}{}", line(2))).unwrap();
+    let mut source = source_for(&tmp, log_path);
+
+    let entries = source.read(10).unwrap();
+
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].msg, "openframe::test: message 2");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_log_is_refused() {
+    let tmp = TempDir::new().unwrap();
+    let target = tmp.path().join("target.log");
+    std::fs::write(&target, line(1)).unwrap();
+    let log_path = tmp.path().join("test.log");
+    std::os::unix::fs::symlink(&target, &log_path).unwrap();
+
+    assert!(source_for(&tmp, log_path).read(10).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_hard_linked_log_is_refused() {
+    let tmp = TempDir::new().unwrap();
+    let target = tmp.path().join("target.log");
+    std::fs::write(&target, line(1)).unwrap();
+    let log_path = tmp.path().join("test.log");
+    std::fs::hard_link(&target, &log_path).unwrap();
+
+    assert!(source_for(&tmp, log_path).read(10).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_fifo_in_place_of_the_log_is_refused_without_blocking() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("test.log");
+    let c_path = std::ffi::CString::new(log_path.to_str().unwrap()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(c_path.as_ptr(), 0o644) }, 0);
+    let mut source = source_for(&tmp, log_path);
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(source.read(10).is_err());
+    });
+
+    let refused = rx
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("reading a FIFO blocked");
+    assert!(refused);
 }

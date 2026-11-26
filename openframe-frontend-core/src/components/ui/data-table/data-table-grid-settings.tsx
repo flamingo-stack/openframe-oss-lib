@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../dropd
 import { useDataTableContext } from './data-table';
 import { gridCanHide, gridCellClass, gridCellStyle, mergeColumnOrder, type GridColumn } from './data-table-grid';
 import { GridPrefsContext, GridSettingsContext, useGridPrefs } from './data-table-grid-prefs';
+import { clearColumnFilter } from './utils';
 
 /** A column's name in the settings menu: its `meta.label`, else its header when that is plain text, else its id. */
 function columnLabel(column: Column<unknown, unknown>): string {
@@ -128,8 +129,9 @@ function GridSettingsMenu() {
     refocusRef.current = id;
     // A hidden column does not go on filtering: its header, the one place that shows and resets its filter, is gone
     // with it, and the list would stay narrowed with nothing on screen to say why.
+    // Wherever the filter is stored: under the column's id, or the key it carries (`meta.filter.id`).
     const column = table.getColumn(id);
-    if (column?.getIsFiltered()) column.setFilterValue(undefined);
+    if (column) clearColumnFilter(table, column);
     store.update(current => ({
       ...current,
       order: ordered,

@@ -3,7 +3,6 @@ package com.openframe.authz.service.tenant;
 import com.openframe.authz.service.validation.RegistrationValidationService;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.tenant.Tenant;
-import com.openframe.data.document.tenant.TenantDisplayId;
 import com.openframe.data.document.tenant.TenantStatus;
 import com.openframe.data.repository.tenant.TenantRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,8 +27,6 @@ import static org.springframework.util.StringUtils.hasText;
 @RequiredArgsConstructor
 public class TenantService {
 
-    private static final int DISPLAY_ID_ATTEMPTS = 5;
-
     private final TenantRepository tenantRepository;
     private final RegistrationValidationService registrationValidationService;
 
@@ -50,7 +47,6 @@ public class TenantService {
                 .id(tenantId)
                 .name(tenantName)
                 .domain(domain)
-                .displayId(newDisplayId())
                 .status(TenantStatus.ACTIVE)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -59,20 +55,6 @@ public class TenantService {
         log.info("Created tenant: {} with ID: {} and domain: {}", savedTenant.getName(), savedTenant.getId(), savedTenant.getDomain());
 
         return savedTenant;
-    }
-
-    /**
-     * A display id no tenant carries yet. A clash is unlikely (32^8 values), so a few draws are plenty; the unique
-     * index still refuses the rare race between the check and the save.
-     */
-    private String newDisplayId() {
-        for (int attempt = 0; attempt < DISPLAY_ID_ATTEMPTS; attempt++) {
-            String candidate = TenantDisplayId.generate();
-            if (!tenantRepository.existsByDisplayId(candidate)) {
-                return candidate;
-            }
-        }
-        throw new IllegalStateException("No free tenant display id after " + DISPLAY_ID_ATTEMPTS + " attempts");
     }
 
     /**

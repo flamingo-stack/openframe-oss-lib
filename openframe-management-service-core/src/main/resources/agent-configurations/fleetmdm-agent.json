@@ -6,7 +6,6 @@
   "runCommandArgs": [
     "--fleet-url", "${client.serverUrl}",
     "--enroll-secret", "${server.registrationSecret}",
-    "--insecure",
     "--disable-updates",
     "--openframe-mode",
     "--openframe-secret", "${client.openframeSecret}",

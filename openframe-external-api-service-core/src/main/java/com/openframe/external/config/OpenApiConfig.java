@@ -39,7 +39,7 @@ public class OpenApiConfig {
                     - **Customers** – full CRUD incl. archiving
                     - **Tickets** – list, create, update, transition, assign, tag and annotate tickets (SaaS deployments)
                     - **Knowledge Base** – browse folders and articles, create/update/publish/archive articles, tag them and attach files
-                    - **Logs** / **Tools** – read access and integration proxying
+                    - **Logs** / **Tools** – read access and integration proxying; Fleet MDM answers the dashboard's Fleet endpoints for your own devices
                     
                     ## Authentication
                     
