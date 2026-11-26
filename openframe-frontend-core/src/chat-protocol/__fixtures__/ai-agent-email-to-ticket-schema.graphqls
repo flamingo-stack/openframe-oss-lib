@@ -1,0 +1,173 @@
+# The ai-agent's email-to-ticket schema file, loaded on top of ai-agent-schema.graphqls only when the backend runs with
+# openframe.features.email-to-ticket.enabled: openframe-saas-ai-agent src/main/resources/schema-email-to-ticket/
+# email-to-ticket.graphqls of flamingo-stack/openframe-saas-tenant tag 1.7.60 (the QA backend of 2026-11-25). Verbatim.
+
+# Email-to-ticket GraphQL schema (contract part 0, item 2; part E, "Feature flags").
+# Loaded only by EmailToTicketSchemaRegistry when openframe.features.email-to-ticket.enabled is true; it sits outside
+# schema/** so DGS's default scan never picks it up. Every SDL line of the feature goes here: additions to existing
+# types are `extend` definitions in this file, never edits to ticket.graphqls, message.graphqls or dialog.graphqls.
+# A new type that implements Node needs a `resolvable: false` stub in openframe-saas-api schema/federation.graphqls.
+#
+# Part A of the contract (mailbox settings, CU-17tkuw66n93) is served by openframe-saas-api. The ticket fields below
+# return a mailbox as this reference; the router completes the other fields from api.
+type Mailbox implements Node @key(fields: "id", resolvable: false) {
+  id: ID!
+}
+
+# Shared with api's part A (TicketRequester.directoryProvider); keep the two definitions identical.
+enum MailboxProvider { MICROSOFT_365 GOOGLE_WORKSPACE }
+
+# ---- Tickets and conversation (contract part C) ----
+
+extend enum TicketCreationSource { EMAIL }
+
+extend enum MessageDataType { EMAIL }
+
+extend enum TicketOwnerEnum { EMAIL }
+
+extend enum DialogOwnerEnum { EMAIL }
+
+extend enum MessageOwnerEnum { EMAIL }
+
+extend input TicketFilterInput {
+    "Null or empty: no filter. [EMAIL] = Email; [FAE_FORM, FAE_DIALOG, ADMIN_DASHBOARD] = everything that is not email."
+    creationSources: [TicketCreationSource!]
+}
+
+"Owner of every ticket created from email: the original sender's address, no machine and no user."
+type EmailTicketOwner implements TicketOwner {
+    type: TicketOwnerEnum!
+    address: String!
+}
+
+"Owner of the dialog of a ticket created from email."
+type EmailDialogOwner implements DialogOwner {
+    type: DialogOwnerEnum!
+    address: String!
+}
+
+"Author of an inbound email."
+type EmailOwner implements MessageOwner {
+    type: MessageOwnerEnum!
+    address: String!
+    name: String
+}
+
+enum MessageChannel {
+    CHAT
+    EMAIL
+}
+
+enum EmailDirection {
+    INBOUND
+    OUTBOUND
+}
+
+enum EmailDeliveryState {
+    SENDING
+    DELIVERED
+    FAILED
+}
+
+extend type Message {
+    "CHAT for every chat message and for every message stored before this feature."
+    channel: MessageChannel!
+}
+
+"Second block of an email message. The first block is a TextData holding the stripped body."
+type EmailData implements MessageData {
+    type: MessageDataType!
+    direction: EmailDirection!
+    from: EmailAddress!
+    to: [EmailAddress!]!
+    cc: [EmailAddress!]!
+    subject: String
+    "The folded part: quoted thread and signature. Null when nothing was folded."
+    quotedText: String
+    rawAvailable: Boolean!
+    attachments: [TicketAttachment!]!
+    "Null on inbound."
+    deliveryState: EmailDeliveryState
+    "The provider's reason or the bounce text. Set only with FAILED."
+    deliveryFailureReason: String
+    "Inbound: Auto-Submitted present with any value but `no`. False on outbound."
+    automatic: Boolean!
+}
+
+type EmailAddress {
+    address: String!
+    name: String
+}
+
+extend type Ticket {
+    "Null on a ticket not created from email."
+    emailOrigin: TicketEmailOrigin
+    "The directory user the sender was matched to. Null when there is none."
+    requester: TicketRequester
+    "What Reply by Email would do right now. Null for AGENT callers."
+    emailReply: TicketEmailReply @auth(requires: "ADMIN")
+    "Whether Reply in Chat can reach the customer right now."
+    chatReplyAvailable: Boolean!
+}
+
+type TicketEmailOrigin {
+    "Null once the mailbox was disconnected, and for AGENT callers."
+    mailbox: Mailbox @auth(requires: "ADMIN")
+    "Support address of the mailbox, stored on the ticket; stays after a disconnect."
+    mailboxAddress: String!
+    "The original sender: From of the email that created the ticket; for a released hand-forward, the address parsed from the forwarded body."
+    senderAddress: String!
+    "Cc of the email that created the ticket. Later emails carry their own (EmailData.cc)."
+    cc: [String!]!
+}
+
+type TicketRequester {
+    "Raw org_users id, the id `directoryAccount(id)` of the tenant API takes. Not a Relay id."
+    accountId: ID!
+    "name and email (the directory primary address; null when the account has none) are copied at match time."
+    name: String
+    email: String
+    "The directory the person is synced from. Null when it is not known."
+    directoryProvider: MailboxProvider
+    matchedBy: TicketRequesterMatch!
+    "The address tied to the person, the one Reply by Email writes to: the sender address that matched; with MANUAL, emailOrigin.senderAddress."
+    matchedAddress: String!
+    "Machines linked to this directory user now. Reply in Chat and Fae reach all of them."
+    linkedDevices: [Machine!]!
+}
+
+enum TicketRequesterMatch {
+    EMAIL
+    ALIAS
+    MANUAL
+}
+
+type TicketEmailReply {
+    available: Boolean!
+    "Null when available."
+    unavailableReason: TicketEmailReplyUnavailableReason
+    "The recipient the server will use. Read-only. Null when there is none, and when toOptions is not empty."
+    to: String
+    "The addresses of the directory users linked to the ticket's device, when there are several. At most one is suggested. Empty in every other case."
+    toOptions: [TicketEmailReplyRecipient!]!
+    cc: [String!]!
+    "Mailboxes the reply may leave through: only those that can send as the mailbox. Empty when none; otherwise exactly one is suggested."
+    mailboxes: [TicketEmailReplyMailbox!]!
+}
+
+type TicketEmailReplyMailbox {
+    mailbox: Mailbox!
+    suggested: Boolean!
+}
+
+type TicketEmailReplyRecipient {
+    address: String!
+    suggested: Boolean!
+}
+
+enum TicketEmailReplyUnavailableReason {
+    NO_MAILBOX
+    MAILBOX_CANNOT_SEND
+    NO_RECIPIENT
+    TICKET_CLOSED
+}

@@ -1,5 +1,6 @@
 package com.openframe.data.integration.repository.rmm;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.script.ScriptStatus;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integration tests for {@link ScriptScheduleRepository} /
@@ -220,21 +222,21 @@ class ScheduleScriptRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("a malformed cursor falls back to the first page instead of throwing")
-    void findPageForTenant_malformedCursorFallsBackToFirstPage() {
+    @DisplayName("a malformed cursor is refused with the invalid cursor error instead of serving the first page")
+    void findPageForTenant_malformedCursorIsRefused() {
         saveWithRepeat(TENANT_A, "a", 1800L);
         saveWithRepeat(TENANT_A, "b", 1800L);
+        String badValue = "abc|" + new ObjectId();
 
-        List<ScheduleScript> noSeparator = scheduleRepository.findPageForTenant(
-                TENANT_A, null, null, "repeat", Sort.Direction.DESC, "garbage", false, 10);
-        List<ScheduleScript> badId = scheduleRepository.findPageForTenant(
-                TENANT_A, null, null, "repeat", Sort.Direction.DESC, "1800|not-an-objectid", false, 10);
-        List<ScheduleScript> badValue = scheduleRepository.findPageForTenant(
-                TENANT_A, null, null, "repeat", Sort.Direction.DESC, "abc|" + new ObjectId(), false, 10);
-
-        assertThat(noSeparator).hasSize(2);
-        assertThat(badId).hasSize(2);
-        assertThat(badValue).hasSize(2);
+        assertThatThrownBy(() -> scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, "garbage", false, 10))
+                .isInstanceOf(InvalidCursorException.class);
+        assertThatThrownBy(() -> scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, "1800|not-an-objectid", false, 10))
+                .isInstanceOf(InvalidCursorException.class);
+        assertThatThrownBy(() -> scheduleRepository.findPageForTenant(
+                TENANT_A, null, null, "repeat", Sort.Direction.DESC, badValue, false, 10))
+                .isInstanceOf(InvalidCursorException.class);
     }
 
     private ScheduleScript saveWithRepeat(String tenantId, String name, Long repeat) {

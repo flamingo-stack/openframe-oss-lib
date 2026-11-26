@@ -44,18 +44,28 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
     }
 
     @Override
-    public List<User> findUsersPage(UserListFilter filter, String cursor, int limit) {
+    public List<User> findUsersPage(UserListFilter filter, String cursor, boolean backward, int limit) {
         List<Criteria> criteria = listCriteria(filter);
-        UserPageCursor.parse(cursor).ifPresent(after -> criteria.add(new Criteria().orOperator(
-                Criteria.where(FIELD_EMAIL).gt(after.email()),
-                new Criteria().andOperator(
-                        Criteria.where(FIELD_EMAIL).is(after.email()),
-                        Criteria.where(FIELD_ID).gt(after.id())))));
+        UserPageCursor.parse(cursor)
+                .map(position -> pastPosition(position, backward))
+                .ifPresent(criteria::add);
+        Sort.Direction fetchDirection = backward ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort sort = Sort.by(fetchDirection, FIELD_EMAIL, FIELD_ID);
         Query query = toQuery(criteria)
-                .with(Sort.by(Sort.Order.asc(FIELD_EMAIL), Sort.Order.asc(FIELD_ID)))
+                .with(sort)
                 .limit(limit);
         log.debug("Executing MongoDB user page query: {}", query);
         return mongoTemplate.find(query, User.class);
+    }
+
+    private static Criteria pastPosition(UserPageCursor position, boolean backward) {
+        Criteria email = Criteria.where(FIELD_EMAIL);
+        Criteria pastEmail = backward ? email.lt(position.email()) : email.gt(position.email());
+        Criteria id = Criteria.where(FIELD_ID);
+        Criteria pastId = backward ? id.lt(position.id()) : id.gt(position.id());
+        Criteria sameEmail = Criteria.where(FIELD_EMAIL).is(position.email());
+        Criteria sameEmailPastId = new Criteria().andOperator(sameEmail, pastId);
+        return new Criteria().orOperator(pastEmail, sameEmailPastId);
     }
 
     @Override

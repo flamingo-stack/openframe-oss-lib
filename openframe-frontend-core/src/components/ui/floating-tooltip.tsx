@@ -16,7 +16,7 @@ import {
   safePolygon,
   arrow,
 } from '@floating-ui/react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { cn } from '../../utils/cn';
 
 interface FloatingTooltipProps {
@@ -39,6 +39,28 @@ interface FloatingTooltipProps {
    * is invalid HTML — inside a `<p>`, a heading, or another `<span>`.
    */
   as?: 'div' | 'span';
+  /**
+   * Opens and closes the tooltip from outside. Leave it undefined (the default) and the tooltip keeps its own state,
+   * opened by hover and keyboard focus, exactly as before. `true` holds it open whatever the pointer does, `false`
+   * holds it shut.
+   */
+  open?: boolean;
+  /**
+   * Called whenever the tooltip asks to open or close (hover, keyboard focus, Escape, a press outside), whether or not
+   * `open` is controlled. A controlled caller clears its own state here.
+   */
+  onOpenChange?: (open: boolean) => void;
+  /**
+   * Hover opens it for a mouse (or a pen) only. A finger's tap fires the compatibility `mouseenter` too, which
+   * otherwise opens the tooltip on its own; set this where a tap must decide for itself what the tooltip shows.
+   */
+  mouseOnly?: boolean;
+  /**
+   * The bubble's id, also what the trigger's `aria-describedby` names while it is open. Give one when a control
+   * inside the trigger, not the trigger itself, must point its own `aria-describedby` at the bubble. Omit it and
+   * Floating UI makes one up, as before.
+   */
+  contentId?: string;
 }
 
 // Parse colored text markup like [YELLOW]text[/YELLOW] into JSX
@@ -107,8 +129,22 @@ export function FloatingTooltip({
   disabled = false,
   triggerClassName,
   as: TriggerTag = 'div',
+  open,
+  onOpenChange,
+  mouseOnly = false,
+  contentId,
 }: FloatingTooltipProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isOpen = open ?? uncontrolledOpen;
+  // The own state follows every request even while `open` is controlled: a tooltip a press outside closed must not
+  // come back open from a stale hover the moment the caller lets go of `open`.
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [onOpenChange],
+  );
   // The arrow node is STATE, not a ref: `arrow()`'s `element` accepts either,
   // and the ref form has to be read during render to build the middleware
   // array. State also makes the middleware re-run the moment the arrow mounts
@@ -117,7 +153,7 @@ export function FloatingTooltip({
 
   const { refs, floatingStyles, context, placement, middlewareData } = useFloating({
     open: isOpen,
-    onOpenChange: setIsOpen,
+    onOpenChange: handleOpenChange,
     placement: side,
     middleware: [
       offset(12),
@@ -146,6 +182,7 @@ export function FloatingTooltip({
   const hover = useHover(context, {
     move: false,
     enabled: !disabled,
+    mouseOnly,
     delay: { open: delayDuration, close: 0 },
     handleClose: safePolygon(),
   });
@@ -182,7 +219,12 @@ export function FloatingTooltip({
 
   return (
     <>
-      <TriggerTag ref={setReference} className={triggerClassName} {...getReferenceProps()}>
+      <TriggerTag
+        ref={setReference}
+        className={triggerClassName}
+        {...getReferenceProps()}
+        {...(contentId && isOpen ? { 'aria-describedby': contentId } : {})}
+      >
         {children}
       </TriggerTag>
       <FloatingPortal>
@@ -194,6 +236,7 @@ export function FloatingTooltip({
               zIndex: 2147483647,
             }}
             {...getFloatingProps()}
+            {...(contentId ? { id: contentId } : {})}
             className={cn(
               // ODS Design System tooltip styling. `flex flex-col` + `overflow-hidden`
               // let the inner wrapper own the scroll while the rounded corners clip it.

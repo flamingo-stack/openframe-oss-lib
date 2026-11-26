@@ -149,6 +149,30 @@ pub fn get_logs_directory() -> PathBuf {
     }
 }
 
+/// Returns the openframe-chat logs directory inside a user's home folder
+pub fn get_chat_logs_directory(home: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        home.join("AppData")
+            .join("Local")
+            .join("com.openframe.chat")
+            .join("logs")
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        home.join("Library").join("Logs").join("com.openframe.chat")
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        home.join(".local")
+            .join("share")
+            .join("com.openframe.chat")
+            .join("logs")
+    }
+}
+
 /// Returns the platform-specific secured directory path (admin/root access only)
 pub fn get_secured_directory() -> PathBuf {
     #[cfg(target_os = "windows")]

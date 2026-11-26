@@ -1,6 +1,9 @@
 extend type Query {
     logFilters(filter: LogFilterInput): LogFilters!
 
+    """Log events of the tenant. Sortable field: TIMESTAMP, the event time (default: TIMESTAMP DESC, newest first);
+    events with the same time are ordered by toolEventId. first/after page forward, last/before page backward; when
+    both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     logs(
         filter: LogFilterInput
         first: Int
