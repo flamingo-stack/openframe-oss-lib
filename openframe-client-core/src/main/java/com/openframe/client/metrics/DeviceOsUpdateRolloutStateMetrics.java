@@ -1,11 +1,11 @@
-package com.openframe.management.osupdate;
+package com.openframe.client.metrics;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-// Tenant ids are never tags: every tenant's management service is its own scrape target.
+// Tenant ids are never tags: every tenant's client service is its own scrape target.
 @Component
 @RequiredArgsConstructor
 public class DeviceOsUpdateRolloutStateMetrics {

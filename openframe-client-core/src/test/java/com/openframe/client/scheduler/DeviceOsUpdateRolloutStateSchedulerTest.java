@@ -1,5 +1,6 @@
-package com.openframe.management.osupdate;
+package com.openframe.client.scheduler;
 
+import com.openframe.client.metrics.DeviceOsUpdateRolloutStateMetrics;
 import com.openframe.data.service.rmm.osupdate.DeviceOsUpdateRolloutStateService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
