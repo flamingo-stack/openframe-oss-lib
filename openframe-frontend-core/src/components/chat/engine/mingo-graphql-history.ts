@@ -9,11 +9,11 @@ import {
   MINGO_COMPACT_DIALOG_MUTATION,
   MINGO_DIALOG_QUERY,
   MINGO_DIALOG_TOKEN_USAGE_SPLIT_QUERY,
-  MINGO_MESSAGES_QUERY,
   MINGO_RENAME_DIALOG_MUTATION,
   MINGO_UNARCHIVE_DIALOG_MUTATION,
   mingoDialogsQuery,
   mingoMessagesPage,
+  mingoMessagesQuery,
   mingoMessagesVariables,
   throwOnUserErrors,
   type MingoChatType,
@@ -61,15 +61,20 @@ function isRefusal(error: unknown): boolean {
 export interface MingoGraphqlHistoryOptions {
   /** Only this chat of the dialog (the client's side of a ticket, the operator's Mingo). */
   chatType?: MingoChatType;
+  /**
+   * Email messages draw as emails (email-to-ticket): their sender and envelope are read too. Only for a backend with
+   * email-to-ticket on: any other refuses the whole history. A function is asked on every page.
+   */
+  email?: boolean | (() => boolean);
 }
 
 export function createMingoGraphqlHistory(
   post: MingoGraphqlPost,
-  { chatType }: MingoGraphqlHistoryOptions = {},
+  { chatType, email = false }: MingoGraphqlHistoryOptions = {},
 ): (params: FetchDialogMessagesParams) => Promise<FetchDialogMessagesResult> {
   return async ({ dialogId, cursor, limit = 50 }) => {
     const data = await post<{ messages: MingoMessagesConnection | null }>(
-      MINGO_MESSAGES_QUERY,
+      mingoMessagesQuery({ email: typeof email === 'function' ? email() : email }),
       mingoMessagesVariables({ dialogId, chatType, cursor, limit }),
     );
     if (!data.messages) return { messages: [], nextCursor: null };
