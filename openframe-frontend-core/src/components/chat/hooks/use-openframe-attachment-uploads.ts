@@ -2,7 +2,8 @@
 
 /**
  * The OpenFrame (Mingo, Fae) composer's staged files, from the pick to "ready to send": the client's checks, the upload
- * URL from the host, the PUT with progress, then the server's status until the file is ready, blocked or failed.
+ * URL from the host, the PUT with progress, the host's complete call, then the server's status until the file is ready,
+ * blocked or failed.
  * Its `items` feed the composer's tray (`OpenFrameComposerAttachments`) as they are.
  *
  * `scanning` covers everything after the bytes are up and before the server says `ready`: the type and size checks and,

@@ -12,7 +12,7 @@ function setup() {
   const getStatuses = vi.fn<OpenFrameAttachmentUploader['getStatuses']>(ids =>
     Promise.resolve(ids.map(attachmentId => ({ attachmentId, state: 'scanning' as const }))),
   );
-  const uploader: OpenFrameAttachmentUploader = { createUpload: vi.fn(), getStatuses };
+  const uploader: OpenFrameAttachmentUploader = { createUpload: vi.fn(), completeUpload: vi.fn(), getStatuses };
   const { result } = renderHook(() =>
     useOpenFrameAttachmentStatusPoll({
       waiting: () => [{ id: 'f1', attachmentId: 'att_1', uploadedAt: Date.now() }],

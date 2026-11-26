@@ -41,7 +41,9 @@ export interface OpenFrameAttachmentServerStatus {
 }
 
 /**
- * What a host implements. Both calls get an `AbortSignal`: the user removed the file, or the composer went away.
+ * What a host implements, called in this order per file: `createUpload`, the lib's PUT, `completeUpload`, then
+ * `getStatuses` until the file is ready, blocked or failed. Every call gets an `AbortSignal`: the user removed the file,
+ * or the composer went away.
  * A refusal the host can name (the server's code) is thrown as `OpenFrameAttachmentUploadError`; anything else thrown
  * shows the file as `UPLOAD_FAILED`.
  */
@@ -51,6 +53,8 @@ export interface OpenFrameAttachmentUploader {
     request: OpenFrameAttachmentUploadRequest,
     signal: AbortSignal,
   ) => Promise<OpenFrameAttachmentUploadTarget>;
+  /** Tell the server the bytes are up, so it starts checking the file (type, size, later the malware scan). */
+  completeUpload: (attachmentId: string, signal: AbortSignal) => Promise<void>;
   /** Read the status of files whose bytes are up. One call for every file still waiting; a missing id keeps waiting. */
   getStatuses: (attachmentIds: readonly string[], signal: AbortSignal) => Promise<OpenFrameAttachmentServerStatus[]>;
 }

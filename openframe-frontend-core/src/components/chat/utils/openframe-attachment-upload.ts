@@ -1,6 +1,6 @@
 /**
- * The OpenFrame composer's uploads without React: one file's upload (the host's upload URL, then the PUT with
- * progress) and the queue that keeps a few of them running at once.
+ * The OpenFrame composer's uploads without React: one file's upload (the host's upload URL, the PUT with progress,
+ * then the host's complete call that starts the server's checks) and the queue that keeps a few of them running at once.
  */
 
 import type { OpenFrameAttachmentErrorCode } from '../../../chat-protocol/attachment-profiles';
@@ -40,6 +40,8 @@ export async function uploadOpenFrameAttachment(
         handlers.onProgress(percent);
       },
     });
+    if (signal.aborted) return;
+    await uploader.completeUpload(target.attachmentId, signal);
     if (signal.aborted) return;
     handlers.onUploaded(target.attachmentId);
   } catch (err) {

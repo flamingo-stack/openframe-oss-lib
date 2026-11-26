@@ -19,8 +19,11 @@ const put = vi.mocked(putFileWithProgress);
 
 const file = new File(['hello'], 'notes.txt', { type: 'text/plain' });
 
-function uploader(createUpload: OpenFrameAttachmentUploader['createUpload']): OpenFrameAttachmentUploader {
-  return { createUpload, getStatuses: vi.fn() };
+function uploader(
+  createUpload: OpenFrameAttachmentUploader['createUpload'],
+  completeUpload: OpenFrameAttachmentUploader['completeUpload'] = vi.fn(() => Promise.resolve()),
+): OpenFrameAttachmentUploader {
+  return { createUpload, completeUpload, getStatuses: vi.fn() };
 }
 
 const target = () =>
@@ -55,6 +58,54 @@ describe('uploadOpenFrameAttachment', () => {
     expect(h.onProgress.mock.calls.map(([percent]) => percent)).toEqual([10, 50, 99]);
     expect(h.onUploaded).toHaveBeenCalledWith('att_1');
     expect(h.onFailed).not.toHaveBeenCalled();
+  });
+
+  it('completes the upload after the PUT and before reporting it uploaded', async () => {
+    const order: string[] = [];
+    put.mockImplementation(() => {
+      order.push('put');
+      return Promise.resolve();
+    });
+    const complete = vi.fn<OpenFrameAttachmentUploader['completeUpload']>(() => {
+      order.push('complete');
+      return Promise.resolve();
+    });
+    const h = handlers();
+    h.onUploaded.mockImplementation(() => order.push('uploaded'));
+
+    await uploadOpenFrameAttachment(file, 'text/plain', uploader(target, complete), new AbortController().signal, h);
+
+    expect(complete).toHaveBeenCalledWith('att_1', expect.any(AbortSignal));
+    expect(order).toEqual(['put', 'complete', 'uploaded']);
+  });
+
+  it('reports a refused complete with its code, and nothing when cancelled during it', async () => {
+    put.mockResolvedValue(undefined);
+    const refused = handlers();
+    await uploadOpenFrameAttachment(
+      file,
+      'text/plain',
+      uploader(target, () => Promise.reject(new OpenFrameAttachmentUploadError('CHAT_LIMIT'))),
+      new AbortController().signal,
+      refused,
+    );
+    expect(refused.onFailed).toHaveBeenCalledWith('CHAT_LIMIT');
+    expect(refused.onUploaded).not.toHaveBeenCalled();
+
+    const cancel = new AbortController();
+    const cancelled = handlers();
+    await uploadOpenFrameAttachment(
+      file,
+      'text/plain',
+      uploader(target, () => {
+        cancel.abort();
+        return Promise.reject(new Error('aborted'));
+      }),
+      cancel.signal,
+      cancelled,
+    );
+    expect(cancelled.onUploaded).not.toHaveBeenCalled();
+    expect(cancelled.onFailed).not.toHaveBeenCalled();
   });
 
   it('reports the host refusal code, and UPLOAD_FAILED for a PUT failure', async () => {

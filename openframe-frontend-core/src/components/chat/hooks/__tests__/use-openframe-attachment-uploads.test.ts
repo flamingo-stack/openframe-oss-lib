@@ -42,6 +42,7 @@ function fakeUploader() {
         uploadHeaders: { a: 'b' },
       });
     }),
+    completeUpload: vi.fn<OpenFrameAttachmentUploader['completeUpload']>(() => Promise.resolve()),
     getStatuses: vi.fn<OpenFrameAttachmentUploader['getStatuses']>(ids =>
       Promise.resolve(ids.map(id => statuses.get(id) ?? { attachmentId: id, state: 'scanning' })),
     ),
@@ -103,9 +104,11 @@ describe('useOpenFrameAttachmentUploads', () => {
       expect.objectContaining({ headers: { a: 'b' } }),
     );
     expect(result.current.pending).toBe(true);
+    expect(uploader.completeUpload).not.toHaveBeenCalled();
 
     act(() => finishPut());
     await waitFor(() => expect(result.current.items[0]?.state).toBe('scanning'));
+    expect(uploader.completeUpload).toHaveBeenCalledWith('att_1', expect.any(AbortSignal));
     await waitFor(() => expect(uploader.getStatuses).toHaveBeenCalledWith(['att_1'], expect.any(AbortSignal)));
 
     setStatus({ attachmentId: 'att_1', state: 'ready', tokenEstimate: 2600 });
