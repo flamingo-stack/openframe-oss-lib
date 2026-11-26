@@ -24,6 +24,8 @@ import {
   type Row,
   type RowSelectionState,
   selectionColumn,
+  TABLE_PAGINATION_PENDING,
+  type TablePaginationProps,
   Tag,
   TruncateText,
   useDataTable,
@@ -151,7 +153,18 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   emptyMessage?: string;
   skeletonRows?: number;
   stickyHeaderOffset?: string;
+  /** Under the body: the infinite footer of a list read page after page. A paged list passes `pager` instead. */
   footerSlot?: ReactNode;
+  /**
+   * A paged list's pager (`useCursorPager` `footerProps`), drawn in the row above the table with the page's range
+   * ("21–40 of 340 devices") in place of the count. `null`: a paged list whose first page is being read (the pager
+   * waits).
+   */
+  pager?: (TablePaginationProps & { rangeStart?: number }) | null;
+  /** The pager's buttons wait (the next page is being read; the rows on screen are the last page's). */
+  pagerLoading?: boolean;
+  /** Controls at the right end of the row above the table: the auto-refresh picker. */
+  metaActions?: ReactNode;
   deviceFilters?: DeviceFilters | null;
   columnFilters?: ColumnFiltersState;
   onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
@@ -220,6 +233,9 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   skeletonRows,
   stickyHeaderOffset,
   footerSlot,
+  pager,
+  pagerLoading = false,
+  metaActions,
   deviceFilters,
   columnFilters,
   onColumnFiltersChange,
@@ -277,6 +293,13 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
     [isLoading, skeletonRows],
   );
 
+  // An empty FIRST page has no pager (the empty state is the whole answer); an empty later page keeps it, so the way
+  // back stays, even where the host hides the column header.
+  const paged =
+    pager !== undefined &&
+    (pager === null || isLoading || pagerLoading || devices.length > 0 || !(pager.isFirstPage ?? true));
+  const metaRow = (showHeader && layout === 'grid') || paged || (showHeader && !!metaActions);
+
   const table = useDataTable<T>({
     data: loadingRows ?? devices,
     columns,
@@ -297,17 +320,40 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
       maxHeight={layout === 'grid' ? tableMaxHeight : undefined}
       settings={layout === 'grid' ? tableSettings : undefined}
     >
-      {/* The grid's results count sits above the table; the card header carries its own (`rightSlot`). */}
-      {showHeader && layout === 'grid' && (
-        <DataTable.Meta>
-          <DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />
+      {/* The row above the table: the grid's results count (the card header carries its own in `rightSlot`), or on a
+          paged list the page's range with the pager, and the host's controls. */}
+      {metaRow && (
+        <DataTable.Meta
+          pagination={
+            paged && (
+              <DataTable.Pagination
+                {...(pager ?? TABLE_PAGINATION_PENDING)}
+                loading={pager === null || isLoading || pagerLoading}
+              />
+            )
+          }
+          actions={metaActions}
+        >
+          {paged ? (
+            <DataTable.PageRange
+              itemName="device"
+              rangeStart={pager?.rangeStart}
+              totalCount={totalCount}
+              hasNextPage={pager?.hasNextPage}
+              loading={isLoading}
+            />
+          ) : (
+            showHeader && <DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />
+          )}
         </DataTable.Meta>
       )}
       {showHeader && (
         <DataTable.Header
           stickyHeader={!!stickyHeaderOffset}
           stickyHeaderOffset={stickyHeaderOffset}
-          rightSlot={<DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />}
+          rightSlot={
+            metaRow ? undefined : <DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />
+          }
           loading={isLoading}
         />
       )}

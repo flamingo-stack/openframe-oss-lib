@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { cn } from '../../utils/cn';
-import { Refresh01RightIcon } from '../icons-v2-generated/media-playback/refresh-01-right-icon';
+import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02-vr-icon';
 import { DropdownButton } from './dropdown-button';
 
 /** One choice of the auto-refresh control: its URL value (`30s`) and what the menu says. */
@@ -46,9 +46,10 @@ export interface AutoRefreshControlProps {
 }
 
 /**
- * The auto-refresh picker of a table header: a refresh icon and the current interval, opening the choices. Below the
- * content's md width only the icon shows (the name and value stay in its aria-label). Presentational: the timer, its
- * gates and the URL key belong to the caller.
+ * The auto-refresh picker of a table (the design's `auto-refresh`): a 32px outline button with the refresh glyph, the
+ * current interval in the mono caption ("OFF", "30S") and a chevron, opening the choices. The glyph takes the accent
+ * while a refresh runs. It sits at the right end of the row above the table (`DataTable.Meta`'s `actions`).
+ * Presentational: the timer, its gates and the URL key belong to the caller.
  */
 export function AutoRefreshControl({
   value,
@@ -76,12 +77,14 @@ export function AutoRefreshControl({
   return (
     <DropdownButton
       variant="outline"
-      size="small-legacy"
+      size="small"
+      align="end"
       disabled={disabled}
-      className={className}
+      // The small button's mono caption, 32px at every width (the design's control height beside the pager's arrows).
+      className={cn('h-8', className)}
       ariaLabel={`${label}: ${current?.label ?? ''}`}
-      icon={<Refresh01RightIcon size={16} className={cn(on ? 'text-ods-accent' : 'text-ods-text-secondary')} />}
-      label={<span className="hidden content-md:inline">{current?.label}</span>}
+      icon={<Refresh02VrIcon size={16} className={cn(on ? 'text-ods-accent' : 'text-ods-text-secondary')} />}
+      label={current?.label}
       items={items}
     />
   );

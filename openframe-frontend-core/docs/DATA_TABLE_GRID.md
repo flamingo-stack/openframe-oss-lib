@@ -55,6 +55,25 @@ With `DataTable` directly, the results count goes in `<DataTable.Meta>`, a direc
 </DataTable>
 ```
 
+A cursor-paged table puts its pager in the same row (the design's meta row): the page's range in place of the count,
+`<DataTable.Pagination>` (First from page 3, Previous, Next) and the auto-refresh picker after a divider. The row is
+outside the table's scroll viewport, so the pager never scrolls with the rows or the columns; below 720px of content
+the pager takes its own line under the range.
+
+```tsx
+const footer = pager.footerProps(data.list.pageInfo); // useCursorPager
+<DataTable table={table} layout="grid" maxHeight="fill">
+  <DataTable.Meta
+    pagination={<DataTable.Pagination {...footer} loading={isPending} />}
+    actions={<AutoRefreshControl {...refresh} />}
+  >
+    <DataTable.PageRange itemName="device" rangeStart={footer.rangeStart} totalCount={totalCount} />
+  </DataTable.Meta>
+  <DataTable.Header />
+  <DataTable.Body />
+</DataTable>
+```
+
 ## What the grid does not read
 
 - `DataTable.Body`: `rowClassName`, `rowHeightClassName`, `compact`. Rows are 48px and touch.

@@ -16,7 +16,10 @@
  * @example
  * const pager = useCursorPager({ prefix: 'cve', pageSize: 20, resetOn: filtersKey });
  * const data = useLazyLoadQuery(query, { ...filters, ...pager.variables });
- * <DataTable.CursorFooter {...pager.footerProps(data.list.pageInfo)} totalCount={data.list.filteredCount} />
+ * const footer = pager.footerProps(data.list.pageInfo);
+ * <DataTable.Meta pagination={<DataTable.Pagination {...footer} />}>
+ *   <DataTable.PageRange rangeStart={footer.rangeStart} totalCount={data.list.filteredCount} />
+ * </DataTable.Meta>
  */
 
 'use client';
@@ -70,6 +73,8 @@ export interface CursorPagerFooterProps {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   isFirstPage: boolean;
+  /** 1-based display index; `undefined` when unknown. The pager draws First from page 3 on. */
+  page: number | undefined;
   startCursor: string | null;
   endCursor: string | null;
   rangeStart: number | undefined;
@@ -97,7 +102,7 @@ export interface UseCursorPagerReturn {
   goFirst: () => void;
   /** Leave the cursor (a stale or tampered one) without a history entry: the table shows its first page. */
   dropCursor: () => void;
-  /** Props for `CursorPagination` / `DataTable.CursorFooter`, from the page's `pageInfo`. */
+  /** Props for `DataTable.Pagination` / `TablePagination` (and `DataTable.PageRange`'s `rangeStart`), from `pageInfo`. */
   footerProps: (pageInfo: CursorPageInfo | null | undefined) => CursorPagerFooterProps;
   /** The page that came back cannot be the one the cursor asked for ({@link isStaleCursorPage}): drop the cursor. */
   isStale: (pageInfo: CursorPageInfo | null | undefined, rowCount: number) => boolean;
@@ -290,6 +295,7 @@ export function useCursorPager({
         hasPreviousPage:
           !isFirstPage && (canGoBackInHistory || page === 2 || (serverPrev && !!startCursor && page !== 1)),
         isFirstPage,
+        page,
         startCursor,
         endCursor: pageInfo?.endCursor ?? null,
         rangeStart,
