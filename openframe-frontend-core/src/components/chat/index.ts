@@ -85,6 +85,15 @@ export {
   type ChatAttachmentAddButtonProps,
   type ChatAttachmentChipStripProps,
 } from './chat-attachment-bar';
+// OpenFrame (Mingo, Fae) attachments: the composer's tile, tray, notes, counter, attach button and drop overlay, and a
+// sent message's files.
+export * from './openframe-attach-button';
+export * from './openframe-attachment-counter';
+export * from './openframe-attachment-notes';
+export * from './openframe-attachment-tile';
+export * from './openframe-attachment-tray';
+export * from './openframe-drop-overlay';
+export * from './openframe-message-attachments';
 
 // Entity-cards (12 refactored + 4 moved + supporting primitives)
 export * from './entity-cards';

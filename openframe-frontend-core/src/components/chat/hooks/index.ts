@@ -11,6 +11,8 @@ export * from './use-slash-commands';
 export * from './use-empty-state-config';
 export * from './use-chat-attachments';
 export * from './use-chat-attachment-image-gallery';
+// OpenFrame (Mingo, Fae) attachments: the lib's file picker and the drop zone.
+export * from './use-openframe-file-intake';
 export * from './use-chat-identity';
 export * from './use-chat-card-item';
 export * from './use-close-on-navigation';

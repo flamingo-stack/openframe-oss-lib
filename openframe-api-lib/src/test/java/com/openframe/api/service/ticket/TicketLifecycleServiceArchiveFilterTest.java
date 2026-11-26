@@ -83,10 +83,12 @@ class TicketLifecycleServiceArchiveFilterTest {
     }
 
     @Test
-    void archiveResolvedTickets_eachArchivedTicket_recordedWithItsCustomerDeviceAndStatusChange() {
-        Ticket printer = Ticket.builder().id("t-1").title("Printer offline").organizationId("org-1")
-                .deviceId("machine-1").statusId("st-resolved").statusKind(TicketStatusKind.RESOLVED).build();
-        resolvedTickets = List.of(printer);
+    void archiveResolvedTickets_ticketEditedAfterTheRead_recordedAsMongoArchivedIt() {
+        resolvedTickets = List.of(resolvedTicket("t-1", "Printer offline"));
+        Ticket asArchived = Ticket.builder().id("t-1").title("Printer offline on floor 2").organizationId("org-2")
+                .deviceId("machine-2").statusId("st-resolved").statusKind(TicketStatusKind.RESOLVED).build();
+        when(ticketRepository.moveFromStatus("t-1", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
+                .thenReturn(Optional.of(asArchived));
 
         List<String> archivedIds = service.archiveResolvedTickets(admin, null);
 
@@ -96,11 +98,29 @@ class TicketLifecycleServiceArchiveFilterTest {
         assertThat(entries.getValue()).singleElement()
                 .returns(TICKET_STATUS_CHANGE, AuditEntry::getAction)
                 .returns("t-1", AuditEntry::getTargetId)
-                .returns("Printer offline", AuditEntry::getTargetName)
-                .returns("org-1", AuditEntry::getOrganizationId)
-                .returns("machine-1", AuditEntry::getDeviceId)
+                .returns("Printer offline on floor 2", AuditEntry::getTargetName)
+                .returns("org-2", AuditEntry::getOrganizationId)
+                .returns("machine-2", AuditEntry::getDeviceId)
                 .returns(Map.of("statusId", new AuditChange("st-resolved", "st-archived"),
                         "statusKind", new AuditChange("RESOLVED", "ARCHIVED")), AuditEntry::getChanges);
+    }
+
+    @Test
+    void archiveResolvedTickets_ticketReopenedAfterTheRead_neitherReturnedNorRecorded() {
+        Ticket printer = resolvedTicket("t-1", "Printer offline");
+        Ticket vpn = resolvedTicket("t-2", "VPN drops");
+        resolvedTickets = List.of(printer, vpn);
+        when(ticketRepository.moveFromStatus("t-1", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
+                .thenReturn(Optional.of(printer));
+        when(ticketRepository.moveFromStatus("t-2", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
+                .thenReturn(Optional.empty());
+
+        List<String> archivedIds = service.archiveResolvedTickets(admin, null);
+
+        assertThat(archivedIds).containsExactly("t-1");
+        ArgumentCaptor<List<AuditEntry>> entries = ArgumentCaptor.captor();
+        verify(auditRecorder).recordAllWithoutLoadingTargets(entries.capture());
+        assertThat(entries.getValue()).extracting(AuditEntry::getTargetId).containsExactly("t-1");
     }
 
     @Test
@@ -168,6 +188,11 @@ class TicketLifecycleServiceArchiveFilterTest {
         ArgumentCaptor<TicketQueryFilter> captor = ArgumentCaptor.forClass(TicketQueryFilter.class);
         verify(ticketRepository, atLeastOnce()).buildTicketQuery(captor.capture(), isNull(), any(), isNull());
         return captor.getValue();
+    }
+
+    private static Ticket resolvedTicket(String id, String title) {
+        return Ticket.builder().id(id).title(title).organizationId("org-1").deviceId("machine-1")
+                .statusId("st-resolved").statusKind(TicketStatusKind.RESOLVED).build();
     }
 
     private static TicketStatusDefinition definition(String id, TicketStatusKind kind) {
