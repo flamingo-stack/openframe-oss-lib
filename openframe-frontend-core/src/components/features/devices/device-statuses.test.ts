@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { getDeviceConnectivityConfig, getDeviceLifecycleConfig } from './device-status';
 import {
+  ARCHIVE_LIFECYCLE_STATUSES,
   expandDeviceStatuses,
+  isArchiveLifecycle,
+  isArchiveLifecycleStatus,
   isDeviceConnected,
   isManagedStatus,
   joinStatusFilterValue,
@@ -90,5 +93,30 @@ describe('getDeviceLifecycleConfig', () => {
 
   it('never crashes on a missing status', () => {
     expect(getDeviceLifecycleConfig(undefined)).toEqual({ label: '', variant: 'grey' });
+  });
+});
+
+describe('the archive lifecycle statuses', () => {
+  it('are the record that is an archive or about to become one, as the app had them', () => {
+    expect([...ARCHIVE_LIFECYCLE_STATUSES].sort()).toEqual([
+      'ARCHIVED',
+      'DECOMMISSIONED',
+      'DELETED',
+      'PENDING_DELETION',
+    ]);
+  });
+
+  it('match in any case, and nothing else (absent included)', () => {
+    expect(isArchiveLifecycleStatus('pending_deletion')).toBe(true);
+    expect(isArchiveLifecycleStatus('Decommissioned')).toBe(true);
+    for (const status of ['MANAGED', 'ONLINE', 'OFFLINE', 'PENDING', 'ACTIVE', '', null, undefined]) {
+      expect(isArchiveLifecycleStatus(status)).toBe(false);
+    }
+  });
+
+  it('isArchiveLifecycle reads the device record', () => {
+    expect(isArchiveLifecycle({ status: 'DELETED' })).toBe(true);
+    expect(isArchiveLifecycle({ status: 'MANAGED' })).toBe(false);
+    expect(isArchiveLifecycle({})).toBe(false);
   });
 });

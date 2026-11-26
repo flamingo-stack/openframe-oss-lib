@@ -16,4 +16,9 @@ public interface CustomDeviceOsUpdateHistoryRepository {
                                                           Collection<String> machineIds, String cursor, int limit);
 
     String encodeInstalledDeviceCursor(InstalledOsUpdateDevice installedDevice);
+
+    // The devices that installed each update, per customer. identifiers null = every update; machineIds null =
+    // every device.
+    List<OsUpdateOrganizationDeviceCount> countInstalledDevicesByIdentifierAndOrganization(
+            String tenantId, Collection<String> identifiers, Collection<String> machineIds);
 }

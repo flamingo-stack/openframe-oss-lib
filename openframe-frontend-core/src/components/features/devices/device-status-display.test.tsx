@@ -258,15 +258,34 @@ describe('useTagFilterModal in the legacy display', () => {
 });
 
 describe('an outdated client (clientOutdated)', () => {
-  it('reads OUTDATED in place of the status tag in either display', () => {
-    expect(deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', clientOutdated: true })).toEqual({
-      label: 'OUTDATED',
-      variant: 'warning',
-    });
+  it('reads OUTDATED in place of the status tag in the legacy display only', () => {
     expect(
       deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', display: 'legacy', clientOutdated: true }),
     ).toEqual({ label: 'OUTDATED', variant: 'warning' });
-    expect(deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', clientOutdated: false }).label).toBe('MANAGED');
+    expect(
+      deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', display: 'legacy', clientOutdated: false }).label,
+    ).toBe('ONLINE');
+  });
+
+  it('never hides the lifecycle tag in the lifecycle display (CU-17tkuw6818w)', () => {
+    // The default display is the lifecycle one: the tag says the status, whatever the client.
+    expect(deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', clientOutdated: true })).toMatchObject({
+      label: 'MANAGED',
+      variant: 'success',
+    });
+    for (const [status, label] of [
+      ['PENDING', 'PENDING'],
+      ['PENDING_DELETION', 'PENDING DELETION'],
+      ['DELETED', 'DELETED'],
+    ] as const) {
+      expect(deviceLifecycleTagProps(status, { display: 'lifecycle', clientOutdated: true }).label).toBe(label);
+    }
+  });
+
+  it('draws PENDING DELETION, not OUTDATED, on the tag in the lifecycle display', () => {
+    render(<DeviceLifecycleTag status="PENDING_DELETION" connectivity="OFFLINE" clientOutdated />);
+    expect(screen.getByText('PENDING DELETION')).toBeInTheDocument();
+    expect(screen.queryByText('OUTDATED')).not.toBeInTheDocument();
   });
 
   it('draws OUTDATED on the tag in the legacy display', () => {

@@ -1,0 +1,162 @@
+package com.openframe.api.mapper;
+
+import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStateResponse;
+import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStatus;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateCustomerResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceClassRestartModeResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateMaintenanceWindowResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateOverrideResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateRestartDeadlineResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateRolloutRuleResponse;
+import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
+import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
+import com.openframe.data.document.rmm.osupdate.OsUpdateMaintenanceWindow;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOverride;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOverrideAction;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRestartMode;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
+import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
+import com.openframe.data.service.rmm.osupdate.OsUpdateCustomerRollout;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+@Component
+@ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
+public class OsUpdatePolicyResponseMapper {
+
+    public OsUpdatePolicyResponse toResponse(OsUpdatePolicy osUpdatePolicy) {
+        return OsUpdatePolicyResponse.builder()
+                .id(osUpdatePolicy.getId())
+                .name(osUpdatePolicy.getName())
+                .target(osUpdatePolicy.getTarget())
+                .rolloutRules(toRolloutRules(osUpdatePolicy))
+                .restartDeadlines(toRestartDeadlines(osUpdatePolicy))
+                .pilotTagId(osUpdatePolicy.getPilotTagId())
+                .maintenanceWindows(toMaintenanceWindows(osUpdatePolicy.getMaintenanceWindows()))
+                .offlineRule(osUpdatePolicy.getOfflineRule())
+                .inUseRule(osUpdatePolicy.getInUseRule())
+                .domainControllerRestartManual(osUpdatePolicy.isDomainControllerRestartManual())
+                .restartModes(toRestartModes(osUpdatePolicy.getRestartModes()))
+                .restartDialog(osUpdatePolicy.getRestartDialog())
+                .createdAt(osUpdatePolicy.getCreatedAt())
+                .updatedAt(osUpdatePolicy.getUpdatedAt())
+                .build();
+    }
+
+    public OsUpdateOverrideResponse toResponse(OsUpdateOverride osUpdateOverride) {
+        return OsUpdateOverrideResponse.builder()
+                .action(osUpdateOverride.getAction())
+                .organizationId(osUpdateOverride.getOrganizationId())
+                .machineId(osUpdateOverride.getMachineId())
+                .actedBy(osUpdateOverride.getActedBy())
+                .actedAt(osUpdateOverride.getActedAt())
+                .build();
+    }
+
+    public OsUpdateCustomerResponse toResponse(OsUpdate osUpdate, String organizationId,
+                                               OsUpdateCustomerRollout osUpdateCustomerRollout,
+                                               OsUpdateDeviceCounts osUpdateDeviceCounts) {
+        OsUpdatePolicy osUpdatePolicy = osUpdateCustomerRollout.getOsUpdatePolicy();
+        OsUpdateRolloutRule osUpdateRolloutRule = osUpdateCustomerRollout.getOsUpdateRolloutRule();
+        OsUpdateOverride osUpdateOverride = osUpdateCustomerRollout.getOsUpdateOverride();
+        return OsUpdateCustomerResponse.builder()
+                .osUpdateId(osUpdate.getId())
+                .organizationId(organizationId)
+                .status(osUpdateCustomerRollout.getOsUpdateCustomerStatus())
+                .policyId(osUpdatePolicy == null ? null : osUpdatePolicy.getId())
+                .policyName(osUpdatePolicy == null ? null : osUpdatePolicy.getName())
+                .rolloutRule(osUpdateRolloutRule == null
+                        ? null
+                        : toRolloutRule(osUpdateCustomerRollout.getOsUpdateUrgency(), osUpdateRolloutRule))
+                .override(osUpdateOverride == null ? null : toResponse(osUpdateOverride))
+                .pendingDeviceCount(osUpdateDeviceCounts.getPendingDeviceCount())
+                .installedDeviceCount(osUpdateDeviceCounts.getInstalledDeviceCount())
+                .build();
+    }
+
+    // The status is the stored dates read at the given moment: nothing moves it but time.
+    public DeviceOsUpdateRolloutStateResponse toResponse(DeviceOsUpdateRolloutState deviceOsUpdateRolloutState,
+                                                         Instant now) {
+        return DeviceOsUpdateRolloutStateResponse.builder()
+                .policyId(deviceOsUpdateRolloutState.getPolicyId())
+                .status(toStatus(deviceOsUpdateRolloutState, now))
+                .overrideAction(deviceOsUpdateRolloutState.getOverrideAction())
+                .installFrom(deviceOsUpdateRolloutState.getInstallFrom())
+                .focusAt(deviceOsUpdateRolloutState.getFocusAt())
+                .softAt(deviceOsUpdateRolloutState.getSoftAt())
+                .hardAt(deviceOsUpdateRolloutState.getHardAt())
+                .build();
+    }
+
+    private DeviceOsUpdateRolloutStatus toStatus(DeviceOsUpdateRolloutState deviceOsUpdateRolloutState, Instant now) {
+        Instant installFrom = deviceOsUpdateRolloutState.getInstallFrom();
+        if (installFrom == null) {
+            return deviceOsUpdateRolloutState.getOverrideAction() == OsUpdateOverrideAction.REJECT
+                    ? DeviceOsUpdateRolloutStatus.REJECTED
+                    : DeviceOsUpdateRolloutStatus.HELD;
+        }
+        return installFrom.isAfter(now) ? DeviceOsUpdateRolloutStatus.SCHEDULED : DeviceOsUpdateRolloutStatus.APPROVED;
+    }
+
+    private List<OsUpdateMaintenanceWindowResponse> toMaintenanceWindows(
+            Map<OsUpdateDeviceClass, OsUpdateMaintenanceWindow> maintenanceWindows) {
+        return Arrays.stream(OsUpdateDeviceClass.values())
+                .filter(maintenanceWindows::containsKey)
+                .map(deviceClass -> OsUpdateMaintenanceWindowResponse.builder()
+                        .deviceClass(deviceClass)
+                        .daysOfWeek(maintenanceWindows.get(deviceClass).getDaysOfWeek())
+                        .fromTime(maintenanceWindows.get(deviceClass).getFromTime())
+                        .toTime(maintenanceWindows.get(deviceClass).getToTime())
+                        .build())
+                .toList();
+    }
+
+    private List<OsUpdateDeviceClassRestartModeResponse> toRestartModes(
+            Map<OsUpdateDeviceClass, OsUpdateRestartMode> restartModes) {
+        return Arrays.stream(OsUpdateDeviceClass.values())
+                .filter(restartModes::containsKey)
+                .map(deviceClass -> OsUpdateDeviceClassRestartModeResponse.builder()
+                        .deviceClass(deviceClass)
+                        .mode(restartModes.get(deviceClass))
+                        .build())
+                .toList();
+    }
+
+    private List<OsUpdateRolloutRuleResponse> toRolloutRules(OsUpdatePolicy osUpdatePolicy) {
+        return Arrays.stream(OsUpdateUrgency.values())
+                .filter(osUpdatePolicy.getRolloutRules()::containsKey)
+                .map(urgency -> toRolloutRule(urgency, osUpdatePolicy.getRolloutRules().get(urgency)))
+                .toList();
+    }
+
+    private OsUpdateRolloutRuleResponse toRolloutRule(OsUpdateUrgency urgency,
+                                                      OsUpdateRolloutRule osUpdateRolloutRule) {
+        return OsUpdateRolloutRuleResponse.builder()
+                .urgency(urgency)
+                .mode(osUpdateRolloutRule.getMode())
+                .daysAfterRelease(osUpdateRolloutRule.getDaysAfterRelease())
+                .daysLaterToEveryone(osUpdateRolloutRule.getDaysLaterToEveryone())
+                .build();
+    }
+
+    private List<OsUpdateRestartDeadlineResponse> toRestartDeadlines(OsUpdatePolicy osUpdatePolicy) {
+        return Arrays.stream(OsUpdateUrgency.values())
+                .filter(osUpdatePolicy.getRestartDeadlines()::containsKey)
+                .map(urgency -> OsUpdateRestartDeadlineResponse.builder()
+                        .urgency(urgency)
+                        .focusDays(osUpdatePolicy.getRestartDeadlines().get(urgency).getFocusDays())
+                        .softDays(osUpdatePolicy.getRestartDeadlines().get(urgency).getSoftDays())
+                        .hardDays(osUpdatePolicy.getRestartDeadlines().get(urgency).getHardDays())
+                        .build())
+                .toList();
+    }
+}
