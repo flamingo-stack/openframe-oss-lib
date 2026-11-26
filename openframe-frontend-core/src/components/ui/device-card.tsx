@@ -161,8 +161,9 @@ export function DeviceCard({
   // skeletons, in the same boxes; its static parts stay real and the whole card is inert.
   const loading = useLoadingScope() || !!loadingProp;
   const display = useDeviceStatusDisplay();
-  // The loading card keeps its one form (the tag's and the time's bars) whatever form the loaded row takes.
-  const statusLineForm = statusLine !== undefined && !loading;
+  // The loading card keeps its one form (the tag's and the time's bars) whatever form the loaded row takes: the status
+  // row's `statusLine` form, narrowed, only once the card is read.
+  const statusLineForm = loading ? undefined : statusLine;
   // "Last seen" is read as "your local time", the same way the devices table
   // column renders it: the viewer's zone and locale, never UTC.
   const formatLastSeen = (lastSeen?: string | Date) => {
@@ -267,7 +268,7 @@ export function DeviceCard({
       </div>
 
       {/* Row 2, the lifecycle display's form: the tag or a line of text, then the adornment; no "Last Seen:" line. */}
-      {statusLine && !loading && <DeviceCardStatusLineRow statusTag={statusTag} statusLine={statusLine} />}
+      {statusLineForm && <DeviceCardStatusLineRow statusTag={statusTag} statusLine={statusLineForm} />}
 
       {/* Row 2: Status badge | Last seen (both drawn while loading: the tag and the time are read) */}
       {!statusLineForm && (loading || statusTag || device.lastSeen) && (
