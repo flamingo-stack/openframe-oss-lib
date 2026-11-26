@@ -5,16 +5,23 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
@@ -22,8 +29,10 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -49,6 +58,9 @@ class CustomMachineRepositoryClientOutdatedTest {
                     new Document("$isNumber", "$agentVersionKey"),
                     new Document("$lt", List.of("$agentVersionKey", THRESHOLD_KEY)))),
             1, 0));
+    private static final String CURSOR_HEX = "65f1a2b3c4d5e6f708192a3b";
+    private static final ObjectId CURSOR_ID = new ObjectId(CURSOR_HEX);
+    private static final CursorPosition NO_POSITION = new CursorPosition.None();
 
     @Mock private MongoTemplate mongoTemplate;
     @Spy private ClientVersionThreshold clientVersionThreshold = new ClientVersionThreshold("1.6.0");
@@ -187,7 +199,7 @@ class CustomMachineRepositoryClientOutdatedTest {
         stubAggregate();
 
         // execution
-        repository.findMachinesWithCursor(TENANT_ID, filter(), null, null, 10, CLIENT_OUTDATED, "DESC");
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, NO_POSITION, false, 10, CLIENT_OUTDATED, "DESC");
 
         // verifications
         List<Document> stages = capturedStages();
@@ -206,7 +218,7 @@ class CustomMachineRepositoryClientOutdatedTest {
         stubAggregate();
 
         // execution
-        repository.findMachinesWithCursor(TENANT_ID, filter(), null, null, 5, CLIENT_OUTDATED, "ASC");
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, NO_POSITION, false, 5, CLIENT_OUTDATED, "ASC");
 
         // verifications
         assertThat(capturedStages().get(2).get("$sort", Document.class))
@@ -221,7 +233,7 @@ class CustomMachineRepositoryClientOutdatedTest {
         stubAggregate();
 
         // execution
-        repository.findMachinesWithCursor(TENANT_ID, filter(), null, cursorId.toHexString(), 10, CLIENT_OUTDATED, "DESC");
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, rowId(cursorId), false, 10, CLIENT_OUTDATED, "DESC");
 
         // verifications
         List<Document> stages = capturedStages();
@@ -240,7 +252,7 @@ class CustomMachineRepositoryClientOutdatedTest {
         stubAggregate();
 
         // execution
-        repository.findMachinesWithCursor(TENANT_ID, filter(), null, cursorId.toHexString(), 10, CLIENT_OUTDATED, "ASC");
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, rowId(cursorId), false, 10, CLIENT_OUTDATED, "ASC");
 
         // verifications
         List<Document> branches = capturedStages().get(2).get("$match", Document.class).getList("$or", Document.class);
@@ -257,13 +269,89 @@ class CustomMachineRepositoryClientOutdatedTest {
         stubAggregate();
 
         // execution
-        repository.findMachinesWithCursor(TENANT_ID, filter(), null, cursorId.toHexString(), 10, CLIENT_OUTDATED, "DESC");
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, rowId(cursorId), false, 10, CLIENT_OUTDATED, "DESC");
 
         // verifications
         List<Document> branches = capturedStages().get(2).get("$match", Document.class).getList("$or", Document.class);
         assertThat(branches).containsExactly(
                 new Document(RANK_FIELD, new Document("$lt", 0)),
                 new Document(RANK_FIELD, 0).append("_id", new Document("$lt", cursorId)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "ASC, -1",
+            "DESC, 1"
+    })
+    void clientOutdatedBackward_sortsAgainstTheDisplayDirection(String direction, int order) {
+        // setup
+        stubAggregate();
+
+        // execution
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, NO_POSITION, true, 10, CLIENT_OUTDATED, direction);
+
+        // verifications
+        List<Document> stages = capturedStages();
+        assertThat(stages.getFirst().get("$match", Document.class)).containsEntry("tenantId", TENANT_ID);
+        assertThat(stages.get(2).get("$sort", Document.class))
+                .containsExactly(Map.entry(RANK_FIELD, order), Map.entry("_id", order));
+    }
+
+    @ParameterizedTest
+    @MethodSource("rankKeysetsInEachFetchDirection")
+    void clientOutdatedKeysetCursor_continuesFromTheCarriedRankInFetchDirection(
+            KeysetCursor cursor, boolean backward, String operator, int order) {
+        // setup
+        String direction = cursor.direction().name();
+        stubAggregate();
+
+        // execution
+        repository.findMachinesWithCursor(TENANT_ID, filter(), null, cursor, backward, 10, CLIENT_OUTDATED, direction);
+
+        // verifications
+        List<Document> stages = capturedStages();
+        assertThat(stages).hasSize(5);
+        assertThat(stages.get(2).get("$match", Document.class).getList("$or", Document.class)).containsExactly(
+                new Document(RANK_FIELD, new Document(operator, 1)),
+                new Document(RANK_FIELD, 1).append("_id", new Document(operator, CURSOR_ID)));
+        assertThat(stages.get(3).get("$sort", Document.class))
+                .containsExactly(Map.entry(RANK_FIELD, order), Map.entry("_id", order));
+        verify(mongoTemplate, never()).findOne(any(Query.class), eq(Machine.class));
+        verify(mongoTemplate, never()).findById(any(Object.class), eq(Machine.class));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "1000005000009, DESC, 1",
+            "1000006000000, ASC, 0",
+            ", DESC, 0"
+    })
+    void keysetCursor_clientOutdatedSort_carriesTheRankAtIssueTime(Long agentVersionKey, String direction, String rank) {
+        // setup
+        Machine machine = new Machine();
+        machine.setId(CURSOR_HEX);
+        machine.setAgentVersionKey(agentVersionKey);
+        Sort.Direction sortDirection = Sort.Direction.valueOf(direction);
+
+        // execution
+        KeysetCursor cursor = repository.keysetCursor(machine, CLIENT_OUTDATED, direction);
+
+        // verifications
+        assertThat(cursor).isEqualTo(new KeysetCursor(CLIENT_OUTDATED, sortDirection, rank, CURSOR_HEX));
+    }
+
+    private static Stream<Arguments> rankKeysetsInEachFetchDirection() {
+        KeysetCursor ascending = new KeysetCursor(CLIENT_OUTDATED, Sort.Direction.ASC, "1", CURSOR_HEX);
+        KeysetCursor descending = new KeysetCursor(CLIENT_OUTDATED, Sort.Direction.DESC, "1", CURSOR_HEX);
+        return Stream.of(
+                arguments(ascending, false, "$gt", 1),
+                arguments(ascending, true, "$lt", -1),
+                arguments(descending, false, "$lt", -1),
+                arguments(descending, true, "$gt", 1));
+    }
+
+    private static CursorPosition rowId(ObjectId id) {
+        return new CursorPosition.RowId(id.toHexString());
     }
 
     private static MachineQueryFilter filter() {
@@ -278,7 +366,7 @@ class CustomMachineRepositoryClientOutdatedTest {
         Machine cursorDoc = new Machine();
         cursorDoc.setId(cursorId.toHexString());
         cursorDoc.setAgentVersionKey(agentVersionKey);
-        when(mongoTemplate.findById(cursorId, Machine.class)).thenReturn(cursorDoc);
+        when(mongoTemplate.findOne(any(Query.class), eq(Machine.class))).thenReturn(cursorDoc);
     }
 
     private void stubAggregate() {

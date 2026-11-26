@@ -36,7 +36,7 @@ class KnowledgeBaseItemKeysetQueryTest {
         KnowledgeBaseItemCursor cursor =
                 new KnowledgeBaseItemCursor(KnowledgeBaseItemType.FOLDER, ID, "Networking", null);
 
-        repo.findFolders(KnowledgeBaseParentFilter.root(), null, null, cursor, 21);
+        repo.findFolders(KnowledgeBaseParentFilter.root(), null, null, cursor, false, 21);
 
         Query query = capturedFind();
         assertThat(query.getLimit()).isEqualTo(21);
@@ -54,7 +54,7 @@ class KnowledgeBaseItemKeysetQueryTest {
     @Test
     @DisplayName("folders: the name is compared case-insensitively and with digits by value")
     void foldersAreOrderedUnderTheNameCollation() {
-        repo.findFolders(KnowledgeBaseParentFilter.root(), null, null, null, 21);
+        repo.findFolders(KnowledgeBaseParentFilter.root(), null, null, null, false, 21);
 
         // Sort and keyset comparison both follow the query's collation.
         assertThat(capturedFind().getCollation())
@@ -71,7 +71,7 @@ class KnowledgeBaseItemKeysetQueryTest {
         Instant updatedAt = Instant.ofEpochMilli(1_760_000_000_000L);
         KnowledgeBaseItemCursor cursor = new KnowledgeBaseItemCursor(KnowledgeBaseItemType.ARTICLE, ID, null, updatedAt);
 
-        repo.findArticles(KnowledgeBaseParentFilter.root(), null, null, null, cursor, 21);
+        repo.findArticles(KnowledgeBaseParentFilter.root(), null, null, null, cursor, false, 21);
 
         Query query = capturedFind();
         assertThat(query.getLimit()).isEqualTo(21);
@@ -94,7 +94,7 @@ class KnowledgeBaseItemKeysetQueryTest {
         KnowledgeBaseItemCursor cursor = new KnowledgeBaseItemCursor(
                 KnowledgeBaseItemType.ARTICLE, ID, null, Instant.ofEpochMilli(1_760_000_000_000L));
 
-        repo.findArticles(KnowledgeBaseParentFilter.any(), "vpn", null, null, cursor, 21);
+        repo.findArticles(KnowledgeBaseParentFilter.any(), "vpn", null, null, cursor, false, 21);
 
         Document filter = capturedFind().getQueryObject();
         assertThat(filter).containsKey("$and");
@@ -111,7 +111,7 @@ class KnowledgeBaseItemKeysetQueryTest {
 
     private static Document folderFilter(KnowledgeBaseParentFilter parent) {
         MongoTemplate folderTemplate = mock(MongoTemplate.class);
-        new CustomKnowledgeBaseItemRepositoryImpl(folderTemplate).findFolders(parent, null, null, null, 5);
+        new CustomKnowledgeBaseItemRepositoryImpl(folderTemplate).findFolders(parent, null, null, null, false, 5);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(folderTemplate).find(captor.capture(), eq(KnowledgeBaseItem.class));
@@ -127,10 +127,10 @@ class KnowledgeBaseItemKeysetQueryTest {
                 new KnowledgeBaseItemCursor(KnowledgeBaseItemType.ARTICLE, ID, null, null);
 
         assertThatCode(() -> repo.findFolders(
-                KnowledgeBaseParentFilter.of(List.of("p1", "p2")), "net", List.of(ID), folderCursor, 5))
+                KnowledgeBaseParentFilter.of(List.of("p1", "p2")), "net", List.of(ID), folderCursor, false, 5))
                 .doesNotThrowAnyException();
         assertThatCode(() -> repo.findArticles(
-                KnowledgeBaseParentFilter.of(List.of("p1")), "net", List.of(ID), null, idOnlyArticleCursor, 5))
+                KnowledgeBaseParentFilter.of(List.of("p1")), "net", List.of(ID), null, idOnlyArticleCursor, false, 5))
                 .doesNotThrowAnyException();
     }
 

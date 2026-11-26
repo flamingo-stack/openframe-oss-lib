@@ -5,6 +5,8 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -26,12 +28,16 @@ public interface CustomMachineRepository {
     List<String> findMachineIds(String tenantId, MachineQueryFilter filter, String search);
 
     List<Machine> findMachinesWithCursor(String tenantId, MachineQueryFilter filter, String search,
-                                         String cursor, int limit,
+                                         CursorPosition position, boolean backward, int limit,
                                          String sortField, String sortDirection);
 
     List<Machine> findAvailableForScheduleWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                      Collection<String> assignedMachineIds,
-                                                     String cursor, int limit);
+                                                     CursorPosition position, boolean backward, int limit);
+
+    KeysetCursor keysetCursor(Machine machine, String sortField, String sortDirection);
+
+    KeysetCursor availableForScheduleKeysetCursor(Machine machine, Collection<String> assignedMachineIds);
 
     List<String> findMachineIdsByCriteria(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope);
 

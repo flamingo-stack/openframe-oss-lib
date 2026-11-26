@@ -42,6 +42,9 @@ import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOverrideRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
@@ -256,7 +259,9 @@ class MachineFieldLevelWritesIT {
                     new ScheduleMutationTransaction(template.getMongoDatabaseFactory()),
                     mock(DeviceOsStateRepository.class),
                     mock(DeviceOsPendingUpdateRepository.class),
-                    mock(DeviceOsUpdateHistoryRepository.class));
+                    mock(DeviceOsUpdateHistoryRepository.class),
+                    mock(DeviceOsUpdateRolloutStateRepository.class),
+                    mock(OsUpdateOverrideRepository.class), mock(OsUpdatePolicyRepository.class));
             return new AgentUninstallService(knownClient(false), mock(ClientSecretValidator.class), machines,
                     mock(ToolConnectionService.class), mock(InstalledAgentService.class),
                     cleanup, mock(ApplicationEventPublisher.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS),

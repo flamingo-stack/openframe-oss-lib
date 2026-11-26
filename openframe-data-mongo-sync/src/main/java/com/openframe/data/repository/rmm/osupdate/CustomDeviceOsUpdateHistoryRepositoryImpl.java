@@ -88,6 +88,23 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
     }
 
     @Override
+    public List<OsUpdateOrganizationDeviceCount> countInstalledDevicesByIdentifierAndOrganization(
+            String tenantId, Collection<String> identifiers, Collection<String> machineIds) {
+        Criteria installs = installs(tenantId);
+        if (identifiers != null) {
+            installs = installs.and(FIELD_IDENTIFIER).in(identifiers);
+        }
+        if (machineIds != null) {
+            installs = installs.and(FIELD_MACHINE_ID).in(machineIds);
+        }
+        List<AggregationOperation> stages = new ArrayList<>();
+        stages.add(Aggregation.match(installs));
+        stages.addAll(OsUpdateMachineStages.countDevicesByIdentifierAndOrganization(tenantId));
+        return mongoTemplate.aggregate(Aggregation.newAggregation(stages), DeviceOsUpdateHistoryEntry.class,
+                OsUpdateOrganizationDeviceCount.class).getMappedResults();
+    }
+
+    @Override
     public String encodeInstalledDeviceCursor(InstalledOsUpdateDevice installedDevice) {
         Instant installedAt = installedDevice.getInstalledAt();
         String machineId = installedDevice.getMachineId();

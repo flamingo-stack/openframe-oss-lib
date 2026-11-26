@@ -1,7 +1,11 @@
 package com.openframe.data.repository.user;
 
+import com.openframe.core.exception.InvalidCursorException;
+
 import java.time.Instant;
 import java.util.Optional;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
  * Keyset position in the {@code (createdAt desc, _id desc)} order of
@@ -17,18 +21,18 @@ public record InvitationPageCursor(Instant createdAt, String id) {
     }
 
     static Optional<InvitationPageCursor> parse(String raw) {
-        if (raw == null) {
+        if (isBlank(raw)) {
             return Optional.empty();
         }
         int split = raw.indexOf(SEPARATOR);
         if (split < 0 || split == raw.length() - 1) {
-            return Optional.empty();
+            throw new InvalidCursorException();
         }
         try {
             Instant createdAt = split == 0 ? null : Instant.ofEpochMilli(Long.parseLong(raw.substring(0, split)));
             return Optional.of(new InvitationPageCursor(createdAt, raw.substring(split + 1)));
         } catch (NumberFormatException e) {
-            return Optional.empty();
+            throw new InvalidCursorException(e);
         }
     }
 }

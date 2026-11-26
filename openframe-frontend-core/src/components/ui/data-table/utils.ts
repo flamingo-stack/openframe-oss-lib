@@ -1,4 +1,4 @@
-import type { FilterFn } from '@tanstack/react-table';
+import type { Column, ColumnFiltersState, FilterFn, Table } from '@tanstack/react-table';
 import type { TailwindBreakpoint } from './types';
 
 /** Ascending breakpoint scale `hideAt` is expressed in. */
@@ -107,6 +107,45 @@ export const multiSelectFilterFn: FilterFn<unknown> = (row, columnId, filterValu
   const cellValue = row.getValue(columnId);
   return values.some(v => v === cellValue || String(v) === String(cellValue));
 };
+
+/** The key a column's filter is stored under in the table's column filters: `meta.filter.id`, else the column's id. */
+export function columnFilterKey<TData>(column: Column<TData, unknown>): string {
+  return column.columnDef.meta?.filter?.id ?? column.id;
+}
+
+/** The table's column filter stored under `key`, whether or not a column has that id. */
+export function getColumnFilterValueByKey<TData>(table: Table<TData>, key: string): unknown {
+  return table.getState().columnFilters.find(filter => filter.id === key)?.value;
+}
+
+/**
+ * Column filters with `value` stored under `key`: in its own place when the key is there, last otherwise; `undefined`
+ * takes the key out. Every other entry is kept as it is.
+ */
+export function withColumnFilterValue(filters: ColumnFiltersState, key: string, value: unknown): ColumnFiltersState {
+  if (value === undefined) return filters.filter(filter => filter.id !== key);
+  return filters.some(filter => filter.id === key)
+    ? filters.map(filter => (filter.id === key ? { id: key, value } : filter))
+    : [...filters, { id: key, value }];
+}
+
+/**
+ * Stores a column filter under `key`, which need not be a column's id (`meta.filter.id`), as a functional update of
+ * the table's column filters: a host's `onColumnFiltersChange` receives an updater that writes only that key.
+ */
+export function setColumnFilterValueByKey<TData>(table: Table<TData>, key: string, value: unknown): void {
+  table.setColumnFilters(filters => withColumnFilterValue(filters, key, value));
+}
+
+/** Drops a column's filter wherever it is stored (`columnFilterKey`); nothing when the column filters nothing. */
+export function clearColumnFilter<TData>(table: Table<TData>, column: Column<TData, unknown>): void {
+  const key = columnFilterKey(column);
+  if (key === column.id) {
+    if (column.getIsFiltered()) column.setFilterValue(undefined);
+    return;
+  }
+  if (getColumnFilterValueByKey(table, key) !== undefined) setColumnFilterValueByKey(table, key, undefined);
+}
 
 /** Skeleton rows of a table that knows no page size: a typical count for an UNPAGED table. */
 export const DATA_TABLE_SKELETON_ROWS = 10;

@@ -4,9 +4,11 @@ import com.openframe.api.dto.rmm.osupdate.DeviceOsStateResponse;
 import com.openframe.api.mapper.DeviceOsResponseMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.rmm.osupdate.DeviceOsState;
+import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdateManageability;
 import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
+import com.openframe.data.repository.rmm.osupdate.ManageableOsDeviceCounts;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -44,6 +46,12 @@ public class DeviceOsStateService {
                 .map(OsUpdateManageability::getState)
                 .filter(OsUpdateManageabilityState.NOT_MANAGEABLE::equals)
                 .isPresent();
+    }
+
+    // scopeMachineIds null = every device.
+    public ManageableOsDeviceCounts countManageableDevices(OsPlatform platform, List<String> scopeMachineIds) {
+        return deviceOsStateRepository.countManageableDevices(
+                tenantIdProvider.getTenantId(), platform, scopeMachineIds);
     }
 
     public List<String> listNotManageableMachineIds() {

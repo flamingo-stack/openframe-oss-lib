@@ -196,6 +196,9 @@ function GridHeaderCell({ column, header, sort, onSortChange, loading }: GridHea
           <DataTableColumnFilter
             variant="grid"
             column={header.column}
+            // The table's fresh handle (`useDataTable`): a filter stored under another key is read through it.
+            storedAs={filter.id ? { table, id: filter.id } : undefined}
+            title={filter.title}
             options={filter.options}
             extraSections={filter.sections}
             placement={filter.placement}

@@ -14,6 +14,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.api.service.organization.OrganizationCommandService;
 import com.openframe.api.service.organization.OrganizationQueryService;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.organization.Address;
 import com.openframe.data.document.organization.ContactInformation;
@@ -34,6 +35,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.math.BigDecimal;
@@ -195,6 +197,23 @@ class CustomerControllerTest {
                 .andExpect(jsonPath("$.message").value("Invalid cursor: %%not-base64%%"));
 
         verifyNoInteractions(organizationQueryService);
+    }
+
+    @Test
+    void list_domainRefusesTheCursor_answers400WithTheInvalidCursorCode() throws Exception {
+        // setup
+        when(organizationQueryService.queryOrganizations(any(), any(), any(), any()))
+                .thenThrow(new InvalidCursorException());
+        String cursor = CursorCodec.encode("not-a-customer-position");
+
+        // execution
+        ResultActions response = mockMvc.perform(get(BASE).param("cursor", cursor));
+
+        // verifications
+        response.andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CURSOR"))
+                .andExpect(jsonPath("$.message").value("Invalid cursor"))
+                .andExpect(jsonPath("$.customers").doesNotExist());
     }
 
     @Test

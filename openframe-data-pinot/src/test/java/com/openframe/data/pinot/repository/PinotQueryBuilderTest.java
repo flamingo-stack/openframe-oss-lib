@@ -4,14 +4,23 @@ import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 class PinotQueryBuilderTest {
 
@@ -279,59 +288,196 @@ class PinotQueryBuilderTest {
     }
 
     @Nested
-    @DisplayName("whereCursor (direction-aware keyset)")
-    class WhereCursor {
+    @DisplayName("whereKeysetAfter (keyset on the sort field, tie-break on the key field)")
+    class WhereKeysetAfter {
 
-        private static final String CURSOR = "1700000000000_evt-1";
+        private static final String SELECT_BY_TENANT = "SELECT id FROM \"logs\" WHERE tenantId = 'uuid-aaa'";
+        private static final long MILLIS = 1_700_000_000_000L;
+        private static final String BLANK_FIELD_MESSAGE = "Field name must not be null or empty";
 
-        @Test
-        @DisplayName("DESC pages toward older rows using '<'")
-        void descUsesLessThan() {
-            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
-                    .select("id")
-                    .whereCursor(CURSOR, "DESC")
-                    .build();
-            assertTrue(query.contains("(eventTimestamp < 1700000000000)"), query);
-            assertTrue(query.contains("(eventTimestamp = 1700000000000 AND toolEventId < 'evt-1')"), query);
-        }
-
-        @Test
-        @DisplayName("ASC pages toward newer rows using '>'")
-        void ascUsesGreaterThan() {
-            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
-                    .select("id")
-                    .whereCursor(CURSOR, "ASC")
-                    .build();
-            assertTrue(query.contains("(eventTimestamp > 1700000000000)"), query);
-            assertTrue(query.contains("(eventTimestamp = 1700000000000 AND toolEventId > 'evt-1')"), query);
-        }
-
-        @Test
-        @DisplayName("null direction defaults to DESC ('<')")
-        void nullDirectionDefaultsToDesc() {
-            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
-                    .select("id")
-                    .whereCursor(CURSOR, null)
-                    .build();
-            assertTrue(query.contains("(eventTimestamp < 1700000000000)"), query);
-        }
-
-        @Test
-        @DisplayName("null cursor adds no keyset condition")
-        void nullCursorNoop() {
-            String query = new PinotQueryBuilder(TABLE, TENANT_ID)
-                    .select("id")
-                    .whereCursor(null, "DESC")
-                    .build();
-            assertFalse(query.contains("eventTimestamp <"), query);
-            assertFalse(query.contains("eventTimestamp >"), query);
-        }
-
-        @Test
-        @DisplayName("throws on a malformed cursor (missing separator)")
-        void throwsOnMalformedCursor() {
+        @ParameterizedTest
+        @CsvSource({"ASC, >", "asc, >", "DESC, <", "desc, <"})
+        void whereKeysetAfter_numericValueByDirection_comparesTheSortFieldThenTheKeyField(String direction, String operator) {
+            // setup
             PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
-            assertThrows(PinotQueryException.class, () -> builder.whereCursor("no-separator", "DESC"));
+
+            // execution
+            String query = builder.whereKeysetAfter("eventTimestamp", MILLIS, "toolEventId", "evt-1", direction).build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND ((eventTimestamp " + operator + " 1700000000000)"
+                    + " OR (eventTimestamp = 1700000000000 AND toolEventId " + operator + " 'evt-1'))", query);
         }
+
+        @ParameterizedTest
+        @CsvSource({"ASC, >", "asc, >", "DESC, <", "desc, <"})
+        void whereKeysetAfter_textValueByDirection_comparesTheSortFieldThenTheKeyField(String direction, String operator) {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            String query = builder.whereKeysetAfter("severity", "INFO", "toolEventId", "evt-1", direction).build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND ((severity " + operator + " 'INFO')"
+                    + " OR (severity = 'INFO' AND toolEventId " + operator + " 'evt-1'))", query);
+        }
+
+        @Test
+        void whereKeysetAfter_directionMissing_seeksTheWayOrderBySortInputOrders() {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            String query = builder.whereKeysetAfter("severity", "INFO", "toolEventId", "evt-1", null)
+                    .orderBySortInput("severity", null, "toolEventId")
+                    .build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT
+                    + " AND ((severity > 'INFO') OR (severity = 'INFO' AND toolEventId > 'evt-1'))"
+                    + " ORDER BY severity ASC, toolEventId ASC", query);
+        }
+
+        @Test
+        void whereKeysetAfter_filtersBeforeAndAfter_keysetIsOneGroupAndedToEveryOtherCondition() {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID)
+                    .select("id")
+                    .whereIn("severity", List.of("ERROR"));
+
+            // execution
+            String query = builder.whereKeysetAfter("eventTimestamp", MILLIS, "toolEventId", "evt-1", "DESC")
+                    .whereEquals("deviceId", "dev-1")
+                    .build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND severity IN ('ERROR')"
+                    + " AND ((eventTimestamp < 1700000000000) OR (eventTimestamp = 1700000000000 AND toolEventId < 'evt-1'))"
+                    + " AND deviceId = 'dev-1'", query);
+        }
+
+        @ParameterizedTest
+        @MethodSource("com.openframe.data.pinot.repository.PinotQueryBuilderTest#sqlMetacharacterPayloads")
+        void whereKeysetAfter_textValueWithSqlMetacharacters_writtenAsOneEscapedLiteral(String payload, String literal) {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            String query = builder.whereKeysetAfter("severity", payload, "toolEventId", "evt-1", "ASC").build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND ((severity > " + literal + ")"
+                    + " OR (severity = " + literal + " AND toolEventId > 'evt-1'))", query);
+        }
+
+        @ParameterizedTest
+        @MethodSource("com.openframe.data.pinot.repository.PinotQueryBuilderTest#sqlMetacharacterPayloads")
+        void whereKeysetAfter_keyValueWithSqlMetacharactersUnderATextSort_writtenAsOneEscapedLiteral(
+                String payload, String literal) {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            String query = builder.whereKeysetAfter("severity", "INFO", "toolEventId", payload, "ASC").build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND ((severity > 'INFO')"
+                    + " OR (severity = 'INFO' AND toolEventId > " + literal + "))", query);
+        }
+
+        @ParameterizedTest
+        @MethodSource("com.openframe.data.pinot.repository.PinotQueryBuilderTest#sqlMetacharacterPayloads")
+        void whereKeysetAfter_keyValueWithSqlMetacharactersUnderANumericSort_writtenAsOneEscapedLiteral(
+                String payload, String literal) {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            String query = builder.whereKeysetAfter("eventTimestamp", MILLIS, "toolEventId", payload, "DESC").build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND ((eventTimestamp < 1700000000000)"
+                    + " OR (eventTimestamp = 1700000000000 AND toolEventId < " + literal + "))", query);
+        }
+
+        @Test
+        void whereKeysetAfter_emptyTextValue_comparedAsTheEmptyString() {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            String query = builder.whereKeysetAfter("organizationId", "", "toolEventId", "evt-1", "ASC").build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND ((organizationId > '')"
+                    + " OR (organizationId = '' AND toolEventId > 'evt-1'))", query);
+        }
+
+        @Test
+        void whereKeysetAfter_textValueWithSpacesAround_comparedAsItIs() {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            String query = builder.whereKeysetAfter("severity", " INFO ", "toolEventId", " evt-1 ", "ASC").build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND ((severity > ' INFO ')"
+                    + " OR (severity = ' INFO ' AND toolEventId > ' evt-1 '))", query);
+        }
+
+        @Test
+        void whereKeysetAfter_negativeNumericValue_writtenAsANumber() {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            String query = builder.whereKeysetAfter("eventTimestamp", -5L, "toolEventId", "evt-1", "ASC").build();
+
+            // verifications
+            assertEquals(SELECT_BY_TENANT + " AND ((eventTimestamp > -5)"
+                    + " OR (eventTimestamp = -5 AND toolEventId > 'evt-1'))", query);
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"", " "})
+        void whereKeysetAfter_blankSortField_throwsPinotQueryException(String sortField) {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            PinotQueryException ex = assertThrows(PinotQueryException.class,
+                    () -> builder.whereKeysetAfter(sortField, "INFO", "toolEventId", "evt-1", "ASC"));
+
+            // verifications
+            assertEquals(BLANK_FIELD_MESSAGE, ex.getMessage());
+        }
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"", " "})
+        void whereKeysetAfter_blankKeyField_throwsPinotQueryException(String keyField) {
+            // setup
+            PinotQueryBuilder builder = new PinotQueryBuilder(TABLE, TENANT_ID).select("id");
+
+            // execution
+            PinotQueryException ex = assertThrows(PinotQueryException.class,
+                    () -> builder.whereKeysetAfter("eventTimestamp", MILLIS, keyField, "evt-1", "ASC"));
+
+            // verifications
+            assertEquals(BLANK_FIELD_MESSAGE, ex.getMessage());
+        }
+    }
+
+    private static Stream<Arguments> sqlMetacharacterPayloads() {
+        return Stream.of(
+                arguments("O'Brien", "'O''Brien'"),
+                arguments("a\\b", "'a\\\\b'"),
+                arguments("x'; DROP TABLE logs;--", "'x''; DROP TABLE logs;--'"),
+                arguments("\\'; DROP TABLE logs;--", "'\\\\''; DROP TABLE logs;--'"),
+                arguments("' OR tenantId != '", "''' OR tenantId != '''"),
+                arguments("x') OR (tenantId != 'uuid-aaa", "'x'') OR (tenantId != ''uuid-aaa'"));
     }
 }
