@@ -20,8 +20,9 @@ export interface QuickActionSetProps {
   loading?: boolean;
   /** The group's accessible name. */
   label?: string;
-  /** Print the page's topic (`PageTopicLabel`, the stamp the FAQ block prints) at the end of the set's line, so
-   *  whoever tags quick actions on the hub sees which topic this page asks for. On the chips' own line, never a line
+  /** Print the page's stamp (`PageTopicLabel`, the one the FAQ block prints: the page's address, and on hover the
+   *  topic it asks with where the two differ) at the end of the set's line, so whoever tags quick actions on the hub
+   *  sees which page this is and which topic it asks for. On the chips' own line, never a line
    *  of its own: it takes no height. Default: the host's choice (`PageTopicsProvider showTopic`), so every surface
    *  that draws the set prints it alike. Drawn in the loading form too, so the set is the same box either way. */
   showTopic?: boolean;
@@ -104,8 +105,8 @@ const toChip = (action: MingoQuickAction): QuickActionChip => ({
  * Mingo's quick actions as the chat's empty state draws them (`MingoWelcome`): the {@link QuickActionSet}. One
  * component, so a host that shows the actions outside the chat (a docked composer's home) draws the very same row.
  * A page with no action draws nothing, except the page's topic stamp where the host asks for it (whoever tags quick
- * actions on the hub reads the path to tag on exactly the pages that have none yet); with `reserve`, the line keeps its
- * height either way.
+ * actions on the hub finds exactly the pages that have none yet, and the path to tag on its hover); with `reserve`, the
+ * line keeps its height either way.
  */
 export function MingoQuickActionWall({
   quickActions,

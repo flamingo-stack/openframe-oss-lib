@@ -1,5 +1,6 @@
 package com.openframe.data.repository.knowledgebase;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 
@@ -36,7 +37,7 @@ public record KnowledgeBaseItemCursor(KnowledgeBaseItemType type, String id, Str
                 : new KnowledgeBaseItemCursor(KnowledgeBaseItemType.ARTICLE, item.getId(), null, item.getUpdatedAt());
     }
 
-    /** The position a tagged cursor names, or null when {@code raw} is not one. */
+    /** The position a tagged cursor names, or null for untagged text; an unreadable sort key is an invalid cursor. */
     public static KnowledgeBaseItemCursor parse(String raw) {
         if (raw == null) {
             return null;
@@ -48,7 +49,7 @@ public record KnowledgeBaseItemCursor(KnowledgeBaseItemType type, String id, Str
         String sortKey = parts.length == 3 ? parts[2] : "";
         if (FOLDER_TAG.equals(parts[0])) {
             String name = decodeName(sortKey);
-            return name == null ? null : new KnowledgeBaseItemCursor(KnowledgeBaseItemType.FOLDER, parts[1], name, null);
+            return new KnowledgeBaseItemCursor(KnowledgeBaseItemType.FOLDER, parts[1], name, null);
         }
         if (ARTICLE_TAG.equals(parts[0])) {
             return new KnowledgeBaseItemCursor(KnowledgeBaseItemType.ARTICLE, parts[1], null, parseEpochMillis(sortKey));
@@ -69,7 +70,7 @@ public record KnowledgeBaseItemCursor(KnowledgeBaseItemType type, String id, Str
         try {
             return URLDecoder.decode(encoded, StandardCharsets.UTF_8);
         } catch (IllegalArgumentException ex) {
-            return null;
+            throw new InvalidCursorException(ex);
         }
     }
 
@@ -80,7 +81,7 @@ public record KnowledgeBaseItemCursor(KnowledgeBaseItemType type, String id, Str
         try {
             return Instant.ofEpochMilli(Long.parseLong(value));
         } catch (NumberFormatException ex) {
-            return null;
+            throw new InvalidCursorException(ex);
         }
     }
 }

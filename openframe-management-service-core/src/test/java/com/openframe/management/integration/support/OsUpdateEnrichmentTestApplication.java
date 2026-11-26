@@ -9,6 +9,7 @@ import com.openframe.management.osupdate.OsUpdateEnrichmentService;
 import com.openframe.management.osupdate.WindowsOsUpdateEnricher;
 import com.openframe.management.osupdate.parser.CisaKevCatalogParser;
 import com.openframe.management.osupdate.parser.MsrcCvrfDocumentParser;
+import com.openframe.management.osupdate.parser.MsrcWindowsBuildParser;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.boot.SpringBootConfiguration;
@@ -32,7 +33,8 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 })
 @EnableMongoRepositories(
         basePackages = "com.openframe.data.repository.rmm.osupdate",
-        includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = ".*\\.OsUpdateRepository"))
+        includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = {
+                ".*\\.OsUpdateRepository", ".*\\.OsVersionBuildRepository"}))
 @Import({
         OsUpdateEnrichmentService.class,
         OsUpdateEnrichmentMetrics.class,
@@ -41,6 +43,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         MsrcCvrfClient.class,
         CisaKevClient.class,
         MsrcCvrfDocumentParser.class,
+        MsrcWindowsBuildParser.class,
         CisaKevCatalogParser.class
 })
 public class OsUpdateEnrichmentTestApplication {

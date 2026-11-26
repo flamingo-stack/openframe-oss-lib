@@ -39,6 +39,16 @@ class ErrorCodeTest {
     }
 
     @Test
+    void valueOf_invalidCursor_codeStringAndBadRequestStatus() {
+        // execution
+        ErrorCode errorCode = ErrorCode.valueOf("INVALID_CURSOR");
+
+        // verifications
+        assertThat(errorCode.getCode()).isEqualTo("INVALID_CURSOR");
+        assertThat(errorCode.getHttpStatus()).isEqualTo(400);
+    }
+
+    @Test
     void values_emailOrMailboxPrefix_exactlyTheTwelveCodes() {
         // execution
         List<String> emailToTicketCodes = Arrays.stream(ErrorCode.values())

@@ -2,6 +2,8 @@ package com.openframe.data.repository.timetracking;
 
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
@@ -12,8 +14,10 @@ public interface CustomTimeEntryRepository {
 
     Query buildTimeEntryQuery(TimeEntryQueryFilter filter);
 
-    List<TimeEntry> findTimeEntriesWithCursor(Query query, String cursor, int limit,
+    List<TimeEntry> findTimeEntriesWithCursor(Query query, CursorPosition position, boolean backward, int limit,
                                               String sortField, String sortDirection);
+
+    KeysetCursor keysetCursor(TimeEntry entry, String sortField, String sortDirection);
 
     long countTimeEntries(Query query);
 

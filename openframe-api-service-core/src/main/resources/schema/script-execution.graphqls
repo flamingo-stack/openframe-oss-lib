@@ -11,6 +11,8 @@ extend type Query {
     Throws (not null) if the id is absent or in another tenant."""
     scriptExecution(id: ID!): ScriptExecution!
 
+    """Execution History rows for one script. When both directions are sent, last/before wins.
+    Only pageInfo.startCursor / endCursor are valid paging cursors."""
     scriptExecutions(
         scriptId: ID!
         filter: ScriptExecutionFilterInput,
@@ -26,7 +28,9 @@ extend type Query {
 
     """Execution History rows for one schedule — parallel to scriptExecutions but
     scoped by scheduleId. Same ScriptExecutionConnection shape (rows are the same
-    ScriptExecution rows the schedule produced), same filter / search / sort options."""
+    ScriptExecution rows the schedule produced), same filter / search / sort options.
+    When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor
+    are valid paging cursors."""
     scheduleExecutions(
         scheduleId: ID!,
         filter: ScriptExecutionFilterInput,
@@ -44,7 +48,9 @@ extend type Query {
     """Execution History rows for one software package's install/update runs — parallel to
     scriptExecutions but scoped by (packageManager, packageName, action). All packages of a manager
     share one generic script, so the package identity (not scriptId) narrows the rows. Same
-    ScriptExecutionConnection shape, same filter / search / sort options."""
+    ScriptExecutionConnection shape, same filter / search / sort options.
+    When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor
+    are valid paging cursors."""
     softwareExecutions(
         packageManager: PackageManagerType!,
         packageName: String!,

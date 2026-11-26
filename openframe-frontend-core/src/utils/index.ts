@@ -362,6 +362,7 @@ export {
   deepestTopic,
   isPagePathTopic,
   normalizeTopic,
+  pageAddressFor,
   pageTopicFor,
   type PageTopicOptions,
   sectionTopicFor,

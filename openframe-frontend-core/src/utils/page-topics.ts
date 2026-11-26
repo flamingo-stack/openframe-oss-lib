@@ -50,6 +50,15 @@ export interface PageTopicOptions {
   basePath?: string;
 }
 
+/**
+ * The page's own address in the form topics are compared in (`/Help-Center/FAQs/?x` is `/help-center/faqs`), the
+ * host's mount kept: what the page's topic stamp prints. Where a host mounts the hub's pages, it differs from the
+ * page's topic (`pageTopicFor`), the path its quick actions and FAQs are tagged with.
+ */
+export function pageAddressFor(pathname: string): string {
+  return normalizePath(pathname);
+}
+
 /** The topic the page at `pathname` asks with: its path, without the host's mount. */
 export function pageTopicFor(pathname: string, options: PageTopicOptions = {}): string {
   const path = normalizePath(pathname);

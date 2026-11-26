@@ -80,7 +80,7 @@ export type { DataTableInfiniteFooterProps } from './data-table-infinite-footer'
 export type { DataTableCursorFooterProps } from './data-table-cursor-footer';
 export type { DataTableRowCountProps } from './data-table-row-count';
 export type { DataTableMetaProps } from './data-table-meta';
-export type { DataTableLayout, GridPinFirstColumn } from './data-table-grid';
+export type { DataTableLayout } from './data-table-grid';
 export {
   actionColumn,
   selectionColumn,

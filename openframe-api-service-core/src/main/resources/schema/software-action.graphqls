@@ -11,6 +11,8 @@ extend type Query {
     (by meaning, ascending Failed, Waiting, In progress, Scheduled, Completed), software, processedDevices
     (processed count, then total), devices or dispatchedAt; ties go by dispatch time (a scheduled row's
     scheduledAt) in the same direction. Scheduled rows sort with the rest. An unknown field is rejected.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors.
     """
     softwareActions(
         filter: SoftwareActionFilterInput,

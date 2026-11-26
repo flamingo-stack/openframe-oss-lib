@@ -117,6 +117,7 @@ public enum AuditAction {
     DEVICE_STATUS_CHANGE("device.status.change", CHANGE, DEVICE),
     DEVICE_UNINSTALL_REQUEST("device.uninstall.request", CHANGE, DEVICE),
     DEVICE_UNINSTALL("device.uninstall", CHANGE, DEVICE),
+    DEVICE_WIPE("device.wipe", CHANGE, DEVICE),
     DEVICE_CLIENT_UPDATE("device.client.update", CHANGE, DEVICE),
     DEVICE_TOOL_AGENT_INSTALL("device.tool_agent.install", CHANGE, DEVICE),
     DEVICE_TOOL_AGENT_REINSTALL("device.tool_agent.reinstall", CHANGE, DEVICE),
