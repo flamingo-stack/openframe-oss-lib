@@ -1,5 +1,7 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -39,6 +41,8 @@ import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -82,7 +86,7 @@ class TicketServiceGetTicketsTest {
     void setUp() {
         ticketService = new TicketService(ticketRepository, ticketNumberService, ticketTagService, ticketIdsForFilter,
                 ticketStalenessResolver, machineRepository, organizationRepository, userRepository, assignmentService,
-                ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of());
+                ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of(), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
     }
 
     @ParameterizedTest

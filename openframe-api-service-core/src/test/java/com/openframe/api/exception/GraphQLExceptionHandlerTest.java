@@ -2,6 +2,8 @@ package com.openframe.api.exception;
 
 import com.openframe.api.dto.device.DeviceLogFilterInput;
 import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -210,6 +212,49 @@ class GraphQLExceptionHandlerTest {
                 .containsOnlyKeys("code", "httpStatus", "timestamp")
                 .containsEntry("code", "INVALID_CURSOR")
                 .containsEntry("httpStatus", 400);
+    }
+
+    @ParameterizedTest
+    @MethodSource("fleetFailures")
+    void handleException_fleetFailure_reportsAnOpenFrameError(Throwable exception, String message, String code,
+                                                              int httpStatus) {
+        List<GraphQLError> errors = handle(exception);
+
+        assertThat(errors)
+                .singleElement()
+                .returns(message, GraphQLError::getMessage)
+                .extracting(GraphQLError::getExtensions, as(MAP))
+                .containsEntry("code", code)
+                .containsEntry("httpStatus", httpStatus);
+    }
+
+    @Test
+    void handleException_fleetRefusal_logsItAsAWarningOnly(CapturedOutput output) {
+        handle(fleetRefusal(422, "Host has pending lock request."));
+
+        assertThat(output.getOut())
+                .containsPattern("WARN .*GraphQL Fleet refusal")
+                .doesNotContain("GraphQL error occurred");
+    }
+
+    private static Stream<Arguments> fleetFailures() {
+        String unavailable = "Device management is temporarily unavailable. Please try again later.";
+        return Stream.of(
+                arguments(fleetRefusal(422, "Can't wipe the host because it doesn't have MDM turned on."),
+                        "Can't wipe the host because it doesn't have MDM turned on.", "BAD_REQUEST", 400),
+                arguments(fleetRefusal(400, null), "Device management refused the request.", "BAD_REQUEST", 400),
+                arguments(fleetRefusal(409, "Host is already wiped."), "Host is already wiped.", "CONFLICT", 409),
+                arguments(fleetRefusal(402, "Requires Fleet Premium license"),
+                        "This action is not available yet.", "BAD_REQUEST", 400),
+                arguments(fleetRefusal(404, "Resource Not Found"), "Not found in device management.", "NOT_FOUND", 404),
+                arguments(fleetRefusal(401, "Authentication required"), unavailable, "FLEET_ERROR", 503),
+                arguments(fleetRefusal(500, "boom"), unavailable, "FLEET_ERROR", 503),
+                arguments(new FleetMdmException("Failed to wipe Fleet host 42", new IOException("connection reset")),
+                        unavailable, "FLEET_ERROR", 503));
+    }
+
+    private static FleetMdmApiException fleetRefusal(int status, String reason) {
+        return new FleetMdmApiException("wipe Fleet host 42 failed with HTTP " + status, status, "{}", reason);
     }
 
     private static Stream<Arguments> failuresReportedWithTheirOwnMessage() {

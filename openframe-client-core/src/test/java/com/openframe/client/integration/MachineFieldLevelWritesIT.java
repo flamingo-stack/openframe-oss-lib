@@ -1,5 +1,7 @@
 package com.openframe.client.integration;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -33,8 +35,10 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
@@ -68,6 +72,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static com.openframe.data.service.machine.MachineFields.COMPUTER_NAME;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_SOURCES;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_IDS;
@@ -243,8 +248,10 @@ class MachineFieldLevelWritesIT {
 
         private static AgentUninstallService uninstallService(MachineRepository machines) {
             DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
-                    mock(ScriptScheduleMachineAssignedRepository.class), mock(DeviceOnlineDispatchRepository.class),
-                    mock(SoftwareScheduleMachineAssignedRepository.class), mock(SoftwareScheduleOnlineDispatchRepository.class),
+                    mock(ScriptScheduleMachineAssignedRepository.class), mock(ScriptScheduleRepository.class),
+                    mock(DeviceOnlineDispatchRepository.class),
+                    mock(SoftwareScheduleMachineAssignedRepository.class), mock(SoftwareScheduleRepository.class),
+                    mock(SoftwareScheduleOnlineDispatchRepository.class),
                     mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), machineWriter,
                     new ScheduleMutationTransaction(template.getMongoDatabaseFactory()),
                     mock(DeviceOsStateRepository.class),
@@ -252,7 +259,8 @@ class MachineFieldLevelWritesIT {
                     mock(DeviceOsUpdateHistoryRepository.class));
             return new AgentUninstallService(knownClient(false), mock(ClientSecretValidator.class), machines,
                     mock(ToolConnectionService.class), mock(InstalledAgentService.class),
-                    cleanup, mock(ApplicationEventPublisher.class));
+                    cleanup, mock(ApplicationEventPublisher.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS),
+                    mock(AuditRecorder.class, CALLS_REAL_METHODS));
         }
 
         private static AgentRegistrationService registrationService(MachineRepository machines) {
@@ -264,7 +272,8 @@ class MachineFieldLevelWritesIT {
                     mock(AgentRegistrationToolInstallationService.class), mock(AgentRegistrationProcessor.class),
                     mock(RegistrationTagAssignmentService.class), mock(InstalledAgentService.class),
                     mock(ToolConnectionService.class), mock(AgentRegistrationClientFeatureFlagsService.class),
-                    mock(AgentRegistrationClientUpdateService.class), mock(DeletedMachineCleanup.class));
+                    mock(AgentRegistrationClientUpdateService.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS),
+                    mock(AuditRecorder.class, CALLS_REAL_METHODS), mock(DeletedMachineCleanup.class));
         }
 
         private static OAuthClientRepository knownClient(boolean concurrentWriteAfterTheRead) {

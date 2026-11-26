@@ -21,6 +21,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.User;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -52,7 +53,7 @@ public class OssAuditTargets implements AuditTargetProvider {
     @Override
     public List<AuditTarget<?>> targets() {
         return List.of(
-                AuditTarget.of(TICKET, Ticket.class, Ticket::getTitle)
+                AuditTarget.of(TICKET, Ticket.class, OssAuditTargets::ticketName)
                         .withOrganizationId(Ticket::getOrganizationId)
                         .withDeviceId(Ticket::getDeviceId)
                         .withIgnoredFields(Set.of("lastActivityAt", "awaitingClientSince", "hasPendingApproval")),
@@ -63,7 +64,8 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withIgnoredFields(Set.of("lastSeen", "telemetryStatus", "packageManagers", "securityState",
                                 "complianceState", "securityAlerts", "lastSecurityScan", "lastComplianceScan",
                                 "stuckNotifiedAt", "hostFactsCheckedAt", "computerName", "directorySources",
-                                "directoryUserLink", "directoryUserIds", "directoryUserName")),
+                                "directoryUserLink", "directoryUserIds", "directoryUserName",
+                                "organizationAssignedAt", "agentVersionKey")),
                 AuditTarget.of(USER, User.class, User::nameOrEmail)
                         .withIgnoredFields(Set.of("crmSynced", "lastLogin"))
                         .withMaskedFields(Set.of("passwordHash")),
@@ -85,7 +87,7 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withMaskedFields(Set.of("stdout", "stderr", "error")),
                 AuditTarget.of(EXECUTION, CommandExecution.class, CommandExecution::getExecutionId)
                         .withDeviceId(CommandExecution::getMachineId)
-                        .withMaskedFields(Set.of("command", "stdout", "stderr", "error")),
+                        .withMaskedFields(Set.of("stdout", "stderr", "error")),
                 AuditTarget.of(TAG, Tag.class, Tag::getKey),
                 AuditTarget.of(KB_ARTICLE, KnowledgeBaseItem.class, KnowledgeBaseItem::getName)
                         .withMaskedFields(Set.of("content")),
@@ -93,7 +95,7 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withMaskedFields(Set.of("content")),
                 AuditTarget.of(IMAGE, KnowledgeBaseImage.class, KnowledgeBaseImage::getFileName),
                 AuditTarget.of(TICKET_STATUS, TicketStatusDefinition.class, TicketStatusDefinition::getName),
-                AuditTarget.of(TIME_ENTRY, TimeEntry.class, TimeEntry::getTicketTitle)
+                AuditTarget.of(TIME_ENTRY, TimeEntry.class, OssAuditTargets::timeEntryName)
                         .withOrganizationId(TimeEntry::getOrganizationId),
                 AuditTarget.of(API_KEY, ApiKey.class, ApiKey::getName)
                         .withMaskedFields(Set.of("hashedKey")),
@@ -107,5 +109,16 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(SSO_CONFIG, SSOConfig.class, SSOConfig::getProvider)
                         .withIdField("provider")
                         .withMaskedFields(Set.of("clientSecret")));
+    }
+
+    public static String ticketName(Ticket ticket) {
+        return StringUtils.hasText(ticket.getTitle()) ? ticket.getTitle() : String.valueOf(ticket.getTicketNumber());
+    }
+
+    private static String timeEntryName(TimeEntry entry) {
+        if (StringUtils.hasText(entry.getTicketTitle())) {
+            return entry.getTicketTitle();
+        }
+        return entry.getTicketNumber() == null ? null : String.valueOf(entry.getTicketNumber());
     }
 }

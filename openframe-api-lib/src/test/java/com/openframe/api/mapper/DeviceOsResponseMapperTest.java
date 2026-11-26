@@ -12,6 +12,7 @@ import com.openframe.data.document.rmm.osupdate.OsPatchState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsRebootPending;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import com.openframe.data.document.rmm.osupdate.OsUpdateAuthorization;
 import com.openframe.data.document.rmm.osupdate.OsUpdateInstallResult;
 import com.openframe.data.document.rmm.osupdate.OsUpdateListConfidence;
@@ -136,11 +137,14 @@ class DeviceOsResponseMapperTest {
                 .categories(List.of("Security Updates"))
                 .categoryIds(List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
                 .updateType(OsUpdateType.SOFTWARE)
+                .classification(OsUpdateClassification.SECURITY)
                 .cveIds(List.of("CVE-2026-21309"))
                 .publishedAt(PUBLISHED_AT)
                 .sizeBytes(764317696L)
                 .rebootBehavior(OsUpdateRebootBehavior.ALWAYS)
                 .browseOnly(false)
+                .exploited(true)
+                .enrichedAt(INSTALLED_AT)
                 .firstSeenAt(INSTALLED_AT)
                 .build();
         DeviceOsPendingUpdateResponse expected = DeviceOsPendingUpdateResponse.builder()
@@ -152,11 +156,14 @@ class DeviceOsResponseMapperTest {
                 .categories(List.of("Security Updates"))
                 .categoryIds(List.of("0fa1201d-4330-4fa8-8ae9-b877473b6441"))
                 .updateType(OsUpdateType.SOFTWARE)
+                .classification(OsUpdateClassification.SECURITY)
                 .cveIds(List.of("CVE-2026-21309"))
                 .publishedAt(PUBLISHED_AT)
                 .sizeBytes(764317696L)
                 .rebootBehavior(OsUpdateRebootBehavior.ALWAYS)
                 .browseOnly(false)
+                .exploited(true)
+                .enrichedAt(INSTALLED_AT)
                 .discoveredAt(RECEIVED_AT)
                 .downloaded(true)
                 .build();

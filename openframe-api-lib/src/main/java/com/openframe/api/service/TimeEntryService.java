@@ -219,11 +219,12 @@ public class TimeEntryService {
             entry.setUserId(cmd.getUserId());
         }
 
-        boolean startedAtChanged = cmd.getStartedAt() != null;
-        boolean durationChanged = cmd.getDurationSeconds() != null;
-        if (durationChanged && cmd.getDurationSeconds() <= 0) {
+        if (cmd.getDurationSeconds() != null && cmd.getDurationSeconds() <= 0) {
             throw new ValidationException("Duration must be positive");
         }
+        boolean startedAtChanged = cmd.getStartedAt() != null && !cmd.getStartedAt().equals(entry.getStartedAt());
+        boolean durationChanged = cmd.getDurationSeconds() != null
+                && cmd.getDurationSeconds() != entry.getDurationSeconds();
         if (startedAtChanged) entry.setStartedAt(cmd.getStartedAt());
         if (durationChanged) entry.setDurationSeconds(cmd.getDurationSeconds());
         if (startedAtChanged || durationChanged) {
@@ -246,7 +247,7 @@ public class TimeEntryService {
         if (entry.getTicketId() == null) {
             return entry;
         }
-        entry.setTicketId(null);
+        populateTicketReference(entry, null);
         entry.setLastModifiedBy(actingUserId);
         return timeEntryRepository.save(entry);
     }

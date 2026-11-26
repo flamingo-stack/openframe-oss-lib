@@ -29,6 +29,10 @@ A column with no `meta.gridKind` is a data column: it can be resized, hidden and
 takes the free width. An `open` or `actions` column left as a data column is therefore not pinned, shows up in the
 gear menu and stretches.
 
+A data column with `enableHiding: false` stays in the table: its row in the gear menu cannot hide it, and a stored
+layout that hides it is not applied to it. It can still be moved. Only the column's own flag counts (`gridCanHide`):
+the table-level TanStack option does not change the grid.
+
 ## Switching
 
 Through the web app's `LiveTable`:
@@ -108,7 +112,10 @@ hand, with a grid form of its own: a bare icon button (a plus, the accent check 
 the Selected tab), each named for a screen reader ("Add <device>"), and the reason a device cannot be added as the
 control's tooltip, since a 56px cell has no room for the text a card row prints beside the button. The picker keeps
 its own card (the tabs and the search row) around the table; "Add All Devices" or the device count sits above the
-table in `DataTable.Meta`.
+table in `DataTable.Meta`. Its Device column (which cannot be hidden) is pinned by the shared rule, like every other
+grid table's first column: it scrolls away in a narrow content column, on a tablet and on a phone, while the add /
+remove column stays pinned right, so the button's tooltip names the device ("Add <device>", then the reason when it
+cannot be added).
 
 `PoliciesTable` and `LogsTableView` are ready too. Both put a card row's two lines on one with
 `GridTextWithDetailCell` (`features/feature-table-grid-cells.tsx`): the subject (a policy's name, a log's time, a

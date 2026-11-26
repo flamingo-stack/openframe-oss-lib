@@ -50,11 +50,14 @@ public class DeviceOsResponseMapper {
                 .categories(orEmpty(osUpdate.getCategories()))
                 .categoryIds(orEmpty(osUpdate.getCategoryIds()))
                 .updateType(osUpdate.getUpdateType())
+                .classification(osUpdate.getClassification())
                 .cveIds(orEmpty(osUpdate.getCveIds()))
                 .publishedAt(osUpdate.getPublishedAt())
                 .sizeBytes(osUpdate.getSizeBytes())
                 .rebootBehavior(osUpdate.getRebootBehavior())
                 .browseOnly(osUpdate.getBrowseOnly())
+                .exploited(osUpdate.getExploited())
+                .enrichedAt(osUpdate.getEnrichedAt())
                 .build();
     }
 

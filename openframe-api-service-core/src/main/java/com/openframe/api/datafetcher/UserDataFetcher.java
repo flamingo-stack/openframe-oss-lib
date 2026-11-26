@@ -89,7 +89,11 @@ public class UserDataFetcher {
     public UserPayload deleteUser(@InputArgument @Valid DeleteUserInput input,
                                   @AuthenticationPrincipal AuthPrincipal principal) {
         String id = relayIdCodec.decode(input.getId(), USER);
-        userService.softDeleteUser(id, requireHumanUserId(principal));
+        if (requireHumanUserId(principal).equals(id)) {
+            userService.deleteOwnAccount(id);
+        } else {
+            userService.deleteUser(id);
+        }
         return new UserPayload(userService.getUserById(id));
     }
 

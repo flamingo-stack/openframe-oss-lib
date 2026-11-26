@@ -15,12 +15,18 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.user.FilterOption;
 import com.openframe.api.mapper.InvitationMapper;
 import com.openframe.api.service.processor.InvitationProcessor;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.core.exception.BaseException;
 import com.openframe.core.validation.ValidEmail;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.InvitationStatus;
 import com.openframe.data.document.user.UserRole;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.user.InvitationListFilter;
 import com.openframe.data.repository.user.InvitationPageCursor;
 import com.openframe.data.repository.user.InvitationRepository;
@@ -43,6 +49,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static com.openframe.data.document.audit.AuditAction.INVITATION_CREATE;
+import static com.openframe.data.document.audit.AuditAction.INVITATION_RESEND;
+import static com.openframe.data.document.audit.AuditAction.INVITATION_REVOKE;
 import static com.openframe.data.document.user.UserRole.grantedFor;
 
 @Service
@@ -56,12 +65,17 @@ public class InvitationService {
     private final UserService userService;
     private final InvitationProcessor invitationProcessor;
     private final EmailDomainPolicy emailDomainPolicy;
+    private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
 
+    @Audited(action = INVITATION_CREATE, targetId = "#result.id",
+            targetName = "#request.email.toLowerCase(T(java.util.Locale).ROOT)")
     public InvitationResponse createInvitation(CreateInvitationRequest request) {
         emailDomainPolicy.ensureEmailAllowed(request.getEmail());
 
-        if (userService.existsActiveUserByEmail(request.getEmail())) {
-            throw new IllegalStateException("User with email " + request.getEmail() + " already exists in tenant");
+        String email = request.getEmail().toLowerCase(Locale.ROOT);
+        if (userService.existsActiveUserByEmail(email)) {
+            throw new IllegalStateException("User with email " + email + " already exists in tenant");
         }
 
         Invitation saved = invitationRepository.save(invitationMapper.toEntity(request));
@@ -102,10 +116,14 @@ public class InvitationService {
                 problem = "Listed twice";
             } else {
                 problem = openInvitationProblem(email);
+                if (problem != null) {
+                    recordRefusedInvitation(email, problem);
+                }
             }
             if (problem == null) {
+                CreateInvitationRequest request = CreateInvitationRequest.builder().email(email).build();
                 try {
-                    invitations.add(createInvitation(CreateInvitationRequest.builder().email(email).build()));
+                    invitations.add(auditedMethodRunner.run(auditCallOfInvite(email), () -> createInvitation(request)));
                 } catch (IllegalArgumentException | IllegalStateException | BaseException e) {
                     problem = e.getMessage();
                 } catch (RuntimeException e) {
@@ -120,14 +138,34 @@ public class InvitationService {
         return new InviteUsersResult(invitations, errors);
     }
 
+    private static AuditCall auditCallOfInvite(String email) {
+        return AuditCall.of(INVITATION_CREATE, null)
+                .withCompare(false)
+                .withTargetIdInResult(true)
+                .withTargetIdFromResult(result -> ((InvitationResponse) result).getId())
+                .withTargetNameOf(_ -> email.toLowerCase(Locale.ROOT));
+    }
+
+    private void recordRefusedInvitation(String email, String reason) {
+        auditRecorder.record(AuditEntry.builder()
+                .action(INVITATION_CREATE)
+                .outcome(AuditOutcome.REFUSED)
+                .reason(reason)
+                .targetName(email.toLowerCase(Locale.ROOT))
+                .build());
+    }
+
     /**
-     * Why the address cannot be invited again, or null when it has no open invitation: a second one
-     * would be a second row in the list and a second email.
+     * Why the address cannot be invited again, or null when it has no open invitation or already belongs to a
+     * user (the create refuses that): a second one would be a second row in the list and a second email.
      */
     private String openInvitationProblem(String email) {
+        String lowercase = email.toLowerCase(Locale.ROOT);
+        if (userService.existsActiveUserByEmail(lowercase)) {
+            return null;
+        }
         // Stored lowercased (InvitationMapper.toEntity).
-        List<Invitation> open = invitationRepository.findAllByEmailAndStatus(email.toLowerCase(Locale.ROOT),
-                InvitationStatus.PENDING);
+        List<Invitation> open = invitationRepository.findAllByEmailAndStatus(lowercase, InvitationStatus.PENDING);
         if (open.isEmpty()) {
             return null;
         }
@@ -220,6 +258,7 @@ public class InvitationService {
         return CursorCodec.encode(InvitationPageCursor.of(invitation.getCreatedAt(), invitation.getId()));
     }
 
+    @Audited(action = INVITATION_REVOKE, targetId = "#id")
     public void revokeInvitation(String id) {
         Invitation invitation = invitationRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
@@ -234,6 +273,8 @@ public class InvitationService {
         invitationProcessor.postProcessInvitationRevoked(revokedInvitation);
     }
 
+    @Audited(action = INVITATION_RESEND, targetId = "#expiredInvitationId",
+            details = "invitationIds={T(com.openframe.core.util.Sha256).hex(#result.id)}")
     public InvitationResponse renewInvitation(String expiredInvitationId) {
         Invitation old = invitationRepository.findById(expiredInvitationId)
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));

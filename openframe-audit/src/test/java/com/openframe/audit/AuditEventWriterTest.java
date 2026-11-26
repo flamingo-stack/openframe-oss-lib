@@ -69,6 +69,9 @@ class AuditEventWriterTest {
             AuditTarget.of(AuditTargetType.TICKET, Ticket.class, Ticket::getTitle)
                     .withOrganizationId(Ticket::getOrganizationId)
                     .withDeviceId(Ticket::getDeviceId);
+    private static final AuditTarget<Machine> DEVICE_TARGET =
+            AuditTarget.of(AuditTargetType.DEVICE, Machine.class, Machine::deviceName)
+                    .withOrganizationId(Machine::getOrganizationId);
 
     @Mock private AuditEventRepository auditEventRepository;
     @Mock private UserRepository userRepository;
@@ -260,6 +263,90 @@ class AuditEventWriterTest {
 
         assertThat(mappedEntry().getTargetName()).isEqualTo("Printer offline");
         verifyNoInteractions(targetRepository);
+    }
+
+    @Test
+    void write_deviceWithoutCustomer_takesTheCustomerOfTheDevice() {
+        mapsToAnEvent();
+        AuditTarget<Machine> deviceTarget = AuditTarget.of(AuditTargetType.DEVICE, Machine.class, Machine::deviceName)
+                .withOrganizationId(Machine::getOrganizationId);
+        Machine device = new Machine();
+        device.setOrganizationId("org-9");
+        when(targetRepository.load(List.of(deviceTarget), MACHINE_ID))
+                .thenReturn(Optional.of(new LoadedTarget(deviceTarget, device)));
+
+        writer(targetsOf(deviceTarget)).write(List.of(entry(AuditAction.SCRIPT_RUN).toBuilder()
+                .targetId("script-1")
+                .deviceId(MACHINE_ID)
+                .build()), JOB_CONTEXT, false);
+
+        assertThat(mappedEntry().getOrganizationId()).isEqualTo("org-9");
+    }
+
+    @Test
+    void write_targetGivesADeviceButNoCustomer_takesTheCustomerOfThatDevice() {
+        mapsToAnEvent();
+        Optional<LoadedTarget> ticketWithoutCustomer = storedTicket();
+        ((Ticket) ticketWithoutCustomer.orElseThrow().document()).setOrganizationId(null);
+        Machine device = new Machine();
+        device.setOrganizationId("org-9");
+        when(targetRepository.load(List.of(TICKET_TARGET), "ticket-1")).thenReturn(ticketWithoutCustomer);
+        when(targetRepository.load(List.of(DEVICE_TARGET), "device-7"))
+                .thenReturn(Optional.of(new LoadedTarget(DEVICE_TARGET, device)));
+
+        writer(new AuditTargetRegistry(List.of(() -> List.of(TICKET_TARGET, DEVICE_TARGET))))
+                .write(List.of(ticketArchive()), JOB_CONTEXT, true);
+
+        assertThat(mappedEntry())
+                .extracting(AuditEntry::getDeviceId, AuditEntry::getOrganizationId)
+                .containsExactly("device-7", "org-9");
+    }
+
+    @Test
+    void write_deviceWithItsCustomerGiven_readsNoDevice() {
+        mapsToAnEvent();
+
+        writer(targetsOf(DEVICE_TARGET)).write(
+                List.of(scriptRunOnTheDevice().toBuilder().organizationId("org-1").build()), JOB_CONTEXT, false);
+
+        assertThat(mappedEntry().getOrganizationId()).isEqualTo("org-1");
+        verifyNoInteractions(targetRepository);
+    }
+
+    @Test
+    void write_deviceIsTheTarget_readsNoDeviceForItsCustomer() {
+        mapsToAnEvent();
+
+        writer(targetsOf(DEVICE_TARGET)).write(List.of(entry(AuditAction.DEVICE_REGISTER).toBuilder()
+                .targetId(MACHINE_ID)
+                .deviceId(MACHINE_ID)
+                .build()), JOB_CONTEXT, false);
+
+        verifyNoInteractions(targetRepository);
+    }
+
+    @Test
+    void write_deviceNotFound_storesTheEventWithoutACustomer() {
+        mapsToAnEvent();
+        when(targetRepository.load(List.of(DEVICE_TARGET), MACHINE_ID)).thenReturn(Optional.empty());
+
+        writer(targetsOf(DEVICE_TARGET)).write(List.of(scriptRunOnTheDevice()), JOB_CONTEXT, false);
+
+        assertThat(mappedEntry()).extracting(AuditEntry::getDeviceId, AuditEntry::getOrganizationId)
+                .containsExactly(MACHINE_ID, null);
+    }
+
+    @Test
+    void write_deviceReadFails_storesTheEventWithoutACustomer() {
+        mapsToAnEvent();
+        when(targetRepository.load(List.of(DEVICE_TARGET), MACHINE_ID))
+                .thenThrow(new DataAccessResourceFailureException("mongo down"));
+
+        boolean stored = writer(targetsOf(DEVICE_TARGET)).write(List.of(scriptRunOnTheDevice()), JOB_CONTEXT, false);
+
+        assertThat(stored).isTrue();
+        assertThat(mappedEntry()).extracting(AuditEntry::getDeviceId, AuditEntry::getOrganizationId)
+                .containsExactly(MACHINE_ID, null);
     }
 
     @Test
@@ -508,6 +595,10 @@ class AuditEventWriterTest {
 
     private static AuditEntry ticketArchive() {
         return entry(AuditAction.TICKET_ARCHIVE).toBuilder().targetId("ticket-1").build();
+    }
+
+    private static AuditEntry scriptRunOnTheDevice() {
+        return entry(AuditAction.SCRIPT_RUN).toBuilder().targetId("script-1").deviceId(MACHINE_ID).build();
     }
 
     private static Optional<LoadedTarget> storedTicket() {

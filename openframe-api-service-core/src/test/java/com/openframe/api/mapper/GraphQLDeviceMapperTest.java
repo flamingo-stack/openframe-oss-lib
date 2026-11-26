@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The setup wizard's enrollment milestones are derived here, from the machine document and its tool
@@ -68,6 +69,47 @@ class GraphQLDeviceMapperTest {
 
     private static ToolConnection fleet(ConnectionStatus status, String agentToolId) {
         return connection(ToolType.FLEET_MDM, status, agentToolId);
+    }
+
+    @Test
+    @DisplayName("toDeviceFilterCriteria rejects an MDM state filter instead of ignoring it")
+    void toDeviceFilterCriteria_rejectsMdmStates() {
+        // setup
+        DeviceFilterInput input = DeviceFilterInput.builder().mdmStates(List.of("MANAGED")).build();
+
+        // execution and verifications
+        assertThatThrownBy(() -> mapper.toDeviceFilterCriteria(input))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("MDM or disk encryption state");
+    }
+
+    @Test
+    @DisplayName("toDeviceFilterCriteria rejects a disk encryption state filter instead of ignoring it")
+    void toDeviceFilterCriteria_rejectsDiskEncryptionStates() {
+        // setup
+        DeviceFilterInput input = DeviceFilterInput.builder().diskEncryptionStates(List.of("FAILED")).build();
+
+        // execution and verifications
+        assertThatThrownBy(() -> mapper.toDeviceFilterCriteria(input))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("MDM or disk encryption state");
+    }
+
+    @Test
+    @DisplayName("toDeviceFilterCriteria accepts empty MDM and disk encryption filters")
+    void toDeviceFilterCriteria_acceptsEmptyMdmFilters() {
+        // setup
+        DeviceFilterInput input = DeviceFilterInput.builder()
+                .statuses(List.of(DeviceStatus.ONLINE))
+                .mdmStates(List.of())
+                .diskEncryptionStates(List.of())
+                .build();
+
+        // execution
+        DeviceFilterCriteria criteria = mapper.toDeviceFilterCriteria(input);
+
+        // verifications
+        assertThat(criteria.getStatuses()).containsExactly(DeviceStatus.ONLINE);
     }
 
     @Test

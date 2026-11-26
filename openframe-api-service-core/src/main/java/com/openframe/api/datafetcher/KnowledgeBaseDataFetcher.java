@@ -247,7 +247,8 @@ public class KnowledgeBaseDataFetcher {
     @DgsQuery
     public String knowledgeBaseAttachmentDownloadUrl(@InputArgument @NotBlank String attachmentId) {
         log.info("Generating download URL for Knowledge Base attachment: {}", attachmentId);
-        return knowledgeBaseAttachmentService.generateDownloadUrl(attachmentId);
+        return knowledgeBaseAttachmentService.generateDownloadUrl(attachmentId,
+                () -> knowledgeBaseAttachmentService.getAttachment(attachmentId));
     }
 
     @DgsMutation
@@ -303,7 +304,9 @@ public class KnowledgeBaseDataFetcher {
         log.info("Deleting Knowledge Base attachment: {}", input.getId());
         return executeMutation(
                 () -> {
-                    knowledgeBaseAttachmentService.deleteAttachment(input.getId());
+                    String attachmentId = input.getId();
+                    knowledgeBaseAttachmentService.deleteAttachment(attachmentId,
+                            () -> knowledgeBaseAttachmentService.getAttachment(attachmentId));
                     return input.getId();
                 },
                 MutationDeletePayload::success,

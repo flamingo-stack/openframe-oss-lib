@@ -150,7 +150,7 @@ public class SoftwareDataFetcher {
 
     @DgsMutation
     public SoftwareResponse turnOffSoftwareAutoUpdate(@InputArgument String softwareId) {
-        return softwareInventoryService.turnOffAutoUpdate(softwareId, getCurrentUserId());
+        return softwareInventoryService.turnOffAutoUpdate(softwareId, getCurrentUserId()).software();
     }
 
     private String getCurrentUserId() {

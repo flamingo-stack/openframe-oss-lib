@@ -24,11 +24,13 @@ import java.time.Instant;
 @CompoundIndex(
         name = "tenant_machine_installed",
         def = "{'tenantId': 1, 'machineId': 1, 'installedAt': -1, '_id': -1}")
+@CompoundIndex(
+        name = "tenant_identifier_installed",
+        def = "{'tenantId': 1, 'identifier': 1, 'installedAt': -1}")
 public class DeviceOsUpdateHistoryEntry implements TenantScoped {
 
-    // Counted from installedAt. The TTL index of the collection is created with this value, and an index that
-    // already exists with another value is not changed by a new one: it has to be dropped first.
-    public static final Duration RETENTION = Duration.ofDays(30);
+    // Counted from installedAt. The TTL index of the collection follows this value on startup (MongoIndexConfig).
+    public static final Duration RETENTION = Duration.ofDays(90);
 
     @Id
     private String id;

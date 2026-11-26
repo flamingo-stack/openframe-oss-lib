@@ -11,15 +11,18 @@ import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.config.ClientVersionThreshold;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.cursor.CursorBase64;
 import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.cursor.KeysetCursor;
@@ -33,6 +36,7 @@ import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.DeletedMachineCleanup.LifecycleChange;
 import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -68,6 +72,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
@@ -99,6 +104,7 @@ class DeviceServiceTest {
 
     @Mock private MachineRepository machineRepository;
     @Mock private DeletedMachineCleanup deletedMachineCleanup;
+    @Mock private AuditRecorder auditRecorder;
     @Mock private DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     @Mock private MachineWriter machineWriter;
     @Mock private TagRepository tagRepository;
@@ -116,7 +122,8 @@ class DeviceServiceTest {
             new CustomMachineRepositoryImpl(mock(MongoTemplate.class), new ClientVersionThreshold("1.6.0"));
 
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, deviceSoftwareConnectivitySync,
+        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, auditRecorder,
+                deviceSoftwareConnectivitySync,
                 machineWriter, tagRepository, tagAssignmentRepository,
                 deviceStatusProcessor, deviceFilterOptionMapper, tenantIdProvider,
                 eventPublisher);
@@ -500,11 +507,29 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
-        when(deletedMachineCleanup.markDeleted(m)).thenReturn(m);
+        when(deletedMachineCleanup.markDeleted(m)).thenReturn(new LifecycleChange(m, List.of()));
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
         verify(deletedMachineCleanup).markDeleted(m);
+    }
+
+    @Test
+    void updateStatusByMachineId_deletedDeviceWasOnSchedules_recordsItsRemovalFromThem() {
+        Machine m = new Machine();
+        m.setMachineId("m-del");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
+        List<AuditEntry> removals = List.of(AuditEntry.builder()
+                .action(AuditAction.SCRIPT_SCHEDULE_DEVICES_REMOVE)
+                .targetId("schedule-1")
+                .build());
+        when(deletedMachineCleanup.markDeleted(m)).thenReturn(new LifecycleChange(m, removals));
+
+        service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
+
+        verify(auditRecorder).recordAll(removals);
     }
 
     @Test
@@ -514,6 +539,7 @@ class DeviceServiceTest {
         machine.setTenantId("t-1");
         machine.setStatus(DeviceStatus.DELETED);
         when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(machine));
+        when(deletedMachineCleanup.markDeleted(machine)).thenReturn(new LifecycleChange(machine, List.of()));
 
         // execution
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
@@ -637,7 +663,7 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
-        when(deletedMachineCleanup.markDeleted(m)).thenReturn(m);
+        when(deletedMachineCleanup.markDeleted(m)).thenReturn(new LifecycleChange(m, List.of()));
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
@@ -1326,5 +1352,47 @@ class DeviceServiceTest {
                 .thenAnswer(call -> rowsPast(displayOrder, call.getArgument(4), call.getArgument(5), call.getArgument(6)));
         when(machineRepository.availableForScheduleKeysetCursor(any(Machine.class), eq(ASSIGNED_MACHINE_IDS)))
                 .thenAnswer(call -> cursorIssuer.availableForScheduleKeysetCursor(call.getArgument(0), ASSIGNED_MACHINE_IDS));
+    }
+
+    @Test
+    void verifyExists_knownDevice_passes() {
+        // setup
+        when(machineRepository.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+
+        // execution
+        service().verifyExists("machine-1");
+
+        // verifications
+        verify(machineRepository).findByMachineId("machine-1");
+    }
+
+    @Test
+    void verifyExists_unknownDevice_throwsDeviceNotFound() {
+        // setup
+        when(machineRepository.findByMachineId("machine-1")).thenReturn(Optional.empty());
+
+        // execution
+        DeviceNotFoundException ex =
+                assertThrows(DeviceNotFoundException.class, () -> service().verifyExists("machine-1"));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Device not found: machine-1");
+    }
+
+    @Test
+    void findDeviceIdsOfOrganizations_organizations_machineIdsOfTheTenantInThoseOrganizations() {
+        // setup
+        when(machineRepository.findMachineIdsByCriteria(eq(TENANT_ID),
+                argThat(machineQueryFilter ->
+                        List.of("org-1").equals(machineQueryFilter.getOrganizationIds())
+                                && machineQueryFilter.getStatuses() == null
+                                && machineQueryFilter.getExcludeStatuses() == null),
+                isNull())).thenReturn(List.of("machine-1"));
+
+        // execution
+        List<String> machineIds = service().findDeviceIdsOfOrganizations(List.of("org-1"));
+
+        // verifications
+        assertThat(machineIds).containsExactly("machine-1");
     }
 }

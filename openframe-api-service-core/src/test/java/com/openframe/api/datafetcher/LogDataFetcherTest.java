@@ -18,6 +18,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLLogMapper;
 import com.openframe.api.service.LogDetailsService;
 import com.openframe.api.service.LogService;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.repository.cursor.KeysetCursor;
@@ -37,6 +38,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -55,7 +58,8 @@ class LogDataFetcherTest {
 
     @BeforeEach
     void setUp() {
-        fetcher = new LogDataFetcher(logService, logDetailsService, new GraphQLLogMapper());
+        fetcher = new LogDataFetcher(logService, logDetailsService, new GraphQLLogMapper(),
+                mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
     }
 
     @Test

@@ -52,9 +52,9 @@ export interface FaqSectionProps {
   /** The `id` of the rendered section: what an in-page link to the FAQ points at (`PAGE_FAQ_SECTION_ID` for a page's own block). */
   id?: string;
   /**
-   * Print the page's topic (`usePageTopic`) in small muted text under the heading
-   * (`pricing`), so whoever edits the FAQs can see which topic a page asks
-   * for. Default: the host's choice (`PageTopicsProvider showTopic`), else off. The section always carries it as `data-faq-topic` too.
+   * Print the page's stamp (`PageTopicLabel`: its address, and on hover the
+   * topic it asks with where the two differ) in small muted text under the
+   * heading, so whoever edits the FAQs can see which topic a page asks for. Default: the host's choice (`PageTopicsProvider showTopic`), else off. The section always carries it as `data-faq-topic` too.
    */
   showTopic?: boolean;
   /** Maps to /api/faqs `?count=` (the 5-tier fill target). Absent → param

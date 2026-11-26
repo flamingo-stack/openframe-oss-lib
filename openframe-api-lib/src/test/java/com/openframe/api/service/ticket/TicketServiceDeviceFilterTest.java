@@ -1,5 +1,7 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.api.service.device.ClientOwnerScopeResolver;
@@ -21,6 +23,8 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -60,7 +64,7 @@ class TicketServiceDeviceFilterTest {
     void setUp() {
         service = new TicketService(ticketRepository, ticketNumberService, ticketTagService, ticketIdsForFilter,
                 ticketStalenessResolver, machineRepository, organizationRepository, userRepository, assignmentService,
-                ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of());
+                ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of(), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
         when(ticketRepository.buildTicketQuery(any(), any(), any(), any())).thenReturn(query);
         when(ticketRepository.findTicketsWithCursor(eq(query), any(), anyBoolean(), anyInt(), any(), any())).thenReturn(List.of());
     }

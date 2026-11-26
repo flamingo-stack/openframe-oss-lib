@@ -12,6 +12,8 @@ import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -31,6 +33,7 @@ import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.DeletedMachineCleanup.LifecycleChange;
 import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -51,6 +54,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_RENAME;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_STATUS_CHANGE;
 import static com.openframe.data.service.machine.MachineFields.NICKNAME;
 import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
@@ -71,6 +76,7 @@ public class DeviceService {
 
     private final MachineRepository machineRepository;
     private final DeletedMachineCleanup deletedMachineCleanup;
+    private final AuditRecorder auditRecorder;
     private final DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
@@ -95,6 +101,20 @@ public class DeviceService {
         List<Machine> result = machineRepository.findByMachineIdIn(machineIds);
         log.debug("Found {} of {} machines", result.size(), machineIds.size());
         return result;
+    }
+
+    public void verifyExists(String machineId) {
+        if (findByMachineId(machineId).isEmpty()) {
+            throw new DeviceNotFoundException("Device not found: " + machineId);
+        }
+    }
+
+    // The devices of these organizations in the tenant, whatever their status but DELETED.
+    public List<String> findDeviceIdsOfOrganizations(Collection<String> organizationIds) {
+        MachineQueryFilter machineQueryFilter = MachineQueryFilter.builder()
+                .organizationIds(List.copyOf(organizationIds))
+                .build();
+        return machineRepository.findMachineIdsByCriteria(tenantIdProvider.getTenantId(), machineQueryFilter, null);
     }
 
     public void verifyDispatchable(List<String> machineIds) {
@@ -396,6 +416,7 @@ public class DeviceService {
                 .collect(Collectors.toList());
     }
 
+    @Audited(action = DEVICE_STATUS_CHANGE, targetId = "#machineId", details = "status=#status")
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
         if (!API_SETTABLE_STATUSES.contains(status)) {
@@ -405,7 +426,7 @@ public class DeviceService {
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         if (machine.getStatus() == status) {
             if (status == DeviceStatus.DELETED) {
-                deletedMachineCleanup.markDeleted(machine);
+                auditRecorder.recordAll(deletedMachineCleanup.markDeleted(machine).scheduleRemovals());
             }
             log.info("Device {} already has status {}", machineId, status);
             return;
@@ -423,7 +444,9 @@ public class DeviceService {
     private Machine writeDeviceStatus(Machine machine, DeviceStatus status) {
         String machineId = machine.getMachineId();
         if (status == DeviceStatus.DELETED) {
-            return deletedMachineCleanup.markDeleted(machine);
+            LifecycleChange deleted = deletedMachineCleanup.markDeleted(machine);
+            auditRecorder.recordAll(deleted.scheduleRemovals());
+            return deleted.machine();
         }
 
         boolean inFleet = !DeviceStatus.FROZEN.contains(status);
@@ -436,6 +459,7 @@ public class DeviceService {
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
     }
 
+    @Audited(action = DEVICE_RENAME, targetId = "#machineId")
     public Machine updateNickname(@NotBlank String machineId, String nickname) {
         log.info("Updating device nickname. machineId={}", machineId);
         MachineWriteResult result = machineWriter
