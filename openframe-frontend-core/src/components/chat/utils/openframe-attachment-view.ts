@@ -13,23 +13,21 @@ import {
 } from '../../../chat-protocol/attachment-profiles';
 import { formatFileSize } from '../../../utils/format';
 
-/** The longest name a tile shows whole; longer ones lose their middle. */
-export const OPENFRAME_ATTACHMENT_NAME_MAX_CHARS = 22;
+/** How many characters of the stem stay beside the extension at the end of a cut name. */
+const OPENFRAME_ATTACHMENT_NAME_TAIL_STEM_CHARS = 4;
 
 /**
- * A long name cut in the middle, the extension kept: "outlook-error-report-2026.png" → "outlook-err…t-2026.png". A
- * name that fits is returned as is.
+ * A name split for the tile: `head` shrinks with an ellipsis at its end and `tail` never shrinks, so a name too wide for
+ * the tile reads "outlook-erro…2026.png" whatever the tile's width, and a name that fits reads whole. A name too short to
+ * cut has an empty tail.
  */
-export function middleTruncateFileName(name: string, maxChars = OPENFRAME_ATTACHMENT_NAME_MAX_CHARS): string {
-  if (name.length <= maxChars) return name;
+export function splitFileNameForTile(name: string): { head: string; tail: string } {
   const extension = openFrameFileExtension(name);
   const suffix = extension ? `.${extension}` : '';
   const stem = name.slice(0, name.length - suffix.length);
-  const room = maxChars - 1 - suffix.length;
-  if (room < 2) return `${name.slice(0, maxChars - 1)}…`;
-  const tail = Math.floor(room / 3);
-  const head = room - tail;
-  return `${stem.slice(0, head)}…${stem.slice(stem.length - tail)}${suffix}`;
+  if (stem.length <= OPENFRAME_ATTACHMENT_NAME_TAIL_STEM_CHARS * 2) return { head: name, tail: '' };
+  const tailStart = stem.length - OPENFRAME_ATTACHMENT_NAME_TAIL_STEM_CHARS;
+  return { head: stem.slice(0, tailStart), tail: `${stem.slice(tailStart)}${suffix}` };
 }
 
 /** A token estimate as the tile prints it: "~840", "~2.6k", "~12k". */
@@ -101,7 +99,7 @@ export function attachmentCaption(item: OpenFrameAttachmentItem, profile: OpenFr
 /** The state a screen reader hears last: "ready", "uploading 64%", "scanning", or the error. */
 function spokenState(item: OpenFrameAttachmentItem, profile: OpenFrameAttachmentProfile): string {
   const error = errorOf(item);
-  if (error) return attachmentErrorCaption(error, profile).toLowerCase();
+  if (error) return attachmentErrorCaption(error, profile);
   if (item.state === 'uploading')
     return item.progress === undefined ? 'uploading' : `uploading ${Math.round(item.progress)}%`;
   return item.state;

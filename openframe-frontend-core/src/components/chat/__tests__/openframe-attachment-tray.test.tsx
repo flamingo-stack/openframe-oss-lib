@@ -18,7 +18,7 @@ import {
 import {
   formatTokenEstimate,
   isOpenFrameSendBlocked,
-  middleTruncateFileName,
+  splitFileNameForTile,
   summarizeOpenFrameTray,
 } from '../utils/openframe-attachment-view';
 
@@ -66,10 +66,10 @@ describe('OpenFrameAttachmentTile', () => {
   it.each([
     [{ state: 'uploading', progress: 64 }, '412 KB · 64%', 'uploading 64%'],
     [{ state: 'scanning' }, 'Scanning', 'scanning'],
-    [{ state: 'error', error: 'BLOCKED' }, 'Blocked by scan', 'blocked by scan'],
-    [{ state: 'error', error: 'UPLOAD_FAILED' }, 'Upload failed', 'upload failed'],
-    [{ state: 'error', error: 'TOO_LARGE' }, 'Over 20 MB', 'over 20 mb'],
-    [{ state: 'error', error: 'TYPE_NOT_ALLOWED' }, 'Format not allowed', 'format not allowed'],
+    [{ state: 'error', error: 'BLOCKED' }, 'Blocked by scan', 'Blocked by scan'],
+    [{ state: 'error', error: 'UPLOAD_FAILED' }, 'Upload failed', 'Upload failed'],
+    [{ state: 'error', error: 'TOO_LARGE' }, 'Over 20 MB', 'Over 20 MB'],
+    [{ state: 'error', error: 'TYPE_NOT_ALLOWED' }, 'Format not allowed', 'Format not allowed'],
   ] as const)('state %o reads "%s"', (over, caption, spoken) => {
     render(<OpenFrameAttachmentTile item={item(over)} profile={fae} />);
     const tile = screen.getByRole('group', { name: `outlook-error.png, image, 412 KB, ${spoken}` });
@@ -93,13 +93,23 @@ describe('OpenFrameAttachmentTile', () => {
     expect(screen.getByRole('group')).not.toHaveTextContent('tokens');
   });
 
-  it('truncates a long name in the middle and keeps the whole name for hover and screen readers', () => {
+  it('keeps the end of a long name and its extension whole, and the whole name for hover and screen readers', () => {
     const name = 'outlook-error-screenshot-0921-2026.png';
     render(<OpenFrameAttachmentTile item={item({ name })} profile={fae} />);
     const tile = screen.getByRole('group');
     expect(tile).toHaveAttribute('title', name);
-    expect(tile).toHaveTextContent(middleTruncateFileName(name));
-    expect(middleTruncateFileName(name)).toMatch(/^outlook-err.*….*2026\.png$/);
+    const head = screen.getByTestId('openframe-attachment-name-head');
+    const tail = screen.getByTestId('openframe-attachment-name-tail');
+    expect(head).toHaveTextContent('outlook-error-screenshot-0921-');
+    expect(head).toHaveClass('truncate');
+    expect(tail).toHaveTextContent('2026.png');
+    expect(tail).toHaveClass('shrink-0');
+  });
+
+  it('splits a name into a shrinking head and a fixed tail, leaving short names whole', () => {
+    expect(splitFileNameForTile('CleanMyPC_setup.exe')).toEqual({ head: 'CleanMyPC_s', tail: 'etup.exe' });
+    expect(splitFileNameForTile('sv.log')).toEqual({ head: 'sv.log', tail: '' });
+    expect(splitFileNameForTile('README')).toEqual({ head: 'README', tail: '' });
   });
 });
 

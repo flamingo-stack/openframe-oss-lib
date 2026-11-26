@@ -26,7 +26,7 @@ import {
   attachmentAccessibleName,
   attachmentCaption,
   isImageAttachment,
-  middleTruncateFileName,
+  splitFileNameForTile,
 } from './utils/openframe-attachment-view';
 
 // ===========================================================================
@@ -70,6 +70,27 @@ function TileLeading({ item }: { item: OpenFrameAttachmentItem }) {
 }
 
 /**
+ * The file name, cut in the middle only when the tile is too narrow for it: the head shrinks with an ellipsis, the tail
+ * (the last characters and the extension) always shows, so "outlook-error-screenshot-0921-2026.png" reads
+ * "outlook-erro…2026.png" at any tile width.
+ */
+function TileFileName({ name }: { name: string }) {
+  const { head, tail } = splitFileNameForTile(name);
+  return (
+    <span className="flex min-w-0 text-ods-text-primary text-h6">
+      <span data-testid="openframe-attachment-name-head" className="truncate">
+        {head}
+      </span>
+      {tail && (
+        <span data-testid="openframe-attachment-name-tail" className="shrink-0 whitespace-pre">
+          {tail}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
  * One file. A ready file shows its × on hover (and on keyboard focus); an upload in flight and a refused file show it
  * always, so an upload can be cancelled and an error dismissed. Read by a screen reader as "name, image|file, size,
  * state".
@@ -91,7 +112,7 @@ export function OpenFrameAttachmentTile({
         <TileLeading item={item} />
       </span>
       <span aria-hidden className="flex min-w-0 flex-1 flex-col text-left">
-        <span className="truncate text-ods-text-primary text-h6">{middleTruncateFileName(item.name)}</span>
+        <TileFileName name={item.name} />
         <span className={cn('truncate text-h6', isError ? 'text-ods-error' : 'text-ods-text-secondary')}>
           {caption ?? attachmentCaption(item, captionProfile)}
         </span>

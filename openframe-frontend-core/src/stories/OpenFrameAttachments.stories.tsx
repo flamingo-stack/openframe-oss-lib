@@ -65,9 +65,29 @@ function Composer({ product }: { product: 'mingo' | 'fae' }) {
   );
 }
 
+/** A flat picture for the image grid, so the story needs no network. */
+const picture = (label: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#3a3a3a"/><text x="32" y="210" font-family="sans-serif" font-size="40" fill="#fafafa">${label}</text></svg>`,
+  )}`;
+
 const sent: OpenFrameMessageAttachment[] = [
   { id: 'f1', name: 'dns-trace.log', mediaType: 'text/plain', size: 24 * KB },
   { id: 'f2', name: 'speed-up-checklist.pdf', mediaType: 'application/pdf', size: 212 * KB },
+  {
+    id: 'i1',
+    name: 'outlook-error.png',
+    mediaType: 'image/png',
+    size: 412 * KB,
+    thumbnailUrl: picture('outlook-error.png'),
+  },
+  {
+    id: 'i2',
+    name: 'event-viewer.png',
+    mediaType: 'image/png',
+    size: 688 * KB,
+    thumbnailUrl: picture('event-viewer.png'),
+  },
 ];
 
 const meta = {
