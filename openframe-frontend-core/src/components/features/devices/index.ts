@@ -96,6 +96,7 @@ export {
   type DeviceFilterOption,
   DevicesTableBody,
   type DevicesTableBodyProps,
+  type DevicesTableMetaRow,
   getDeviceActionsColumn,
   getDeviceFilterColumns,
   getDeviceOpenColumn,

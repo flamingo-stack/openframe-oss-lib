@@ -1,7 +1,6 @@
 'use client';
 
 import { type ReactNode, useCallback, useMemo } from 'react';
-import type { CursorPagerFooterProps } from '../../../hooks/state/use-cursor-pager';
 import { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
 import {
   type ColumnFiltersState,
@@ -11,12 +10,16 @@ import {
   type NoDataProps,
   type OnChangeFn,
 } from '../../ui';
-import { AutoRefreshControl, type AutoRefreshControlProps } from '../../ui/auto-refresh-control';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { useDeviceStatusDisplay } from './device-status-display';
 import { deviceStatusFilterGroups, joinStatusFilterValue, splitStatusFilterValue } from './device-statuses';
 import { DevicesFilterToolbar } from './devices-filter-toolbar';
-import { DevicesTableBody, getDeviceActionsColumn, getDeviceFilterColumns } from './devices-table-columns';
+import {
+  DevicesTableBody,
+  type DevicesTableMetaRow,
+  getDeviceActionsColumn,
+  getDeviceFilterColumns,
+} from './devices-table-columns';
 import type { DeviceFilters, DeviceRow } from './types';
 import { useTagFilterModal } from './use-tag-filter-modal';
 
@@ -139,12 +142,11 @@ export interface DevicesListProps<T extends DeviceRow = DeviceRow> {
     skeletonRows?: number;
   };
   /**
-   * A paged list: the First · Previous · Next pager in the row above the table, with the range ("21–40 of 340
-   * devices"), from the host's `useCursorPager` `footerProps`. Wins over `infiniteScroll`.
+   * The row above the table. A paged list passes its `pager` (`useCursorPager` `footerProps`: First · Previous · Next,
+   * with the range "21–40 of 340 devices"), which wins over `infiniteScroll`; a list that refetches its page passes the
+   * auto-refresh picker as `actions`. The pager waits while `isPending` on its own.
    */
-  pager?: CursorPagerFooterProps;
-  /** The auto-refresh picker, at the right end of the row above the table. Only a list that refetches its page passes it. */
-  refresh?: AutoRefreshControlProps;
+  metaRow?: DevicesTableMetaRow;
 
   /**
    * Pins the search / tag toolbar to the top of the scroll area, as the fleet
@@ -215,8 +217,7 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
   narrowedEmptyState,
   skeletonRows = DEVICES_LIST_SKELETON_ROWS,
   infiniteScroll,
-  pager,
-  refresh,
+  metaRow,
   stickyToolbar = true,
   stickyHeaderOffset,
   className,
@@ -386,11 +387,9 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
           totalCount={totalCount}
           // A paged list's pager sits in the row above the table, with the range in place of the count; while the
           // next page is read the rows on screen are the last page's, so its buttons wait for it (the range stays).
-          pager={pager}
-          pagerLoading={!!isPending}
-          metaActions={refresh && <AutoRefreshControl {...refresh} />}
+          metaRow={metaRow && { ...metaRow, loading: !!metaRow.loading || !!isPending }}
           footerSlot={
-            !pager &&
+            metaRow?.pager === undefined &&
             infiniteScroll && (
               <DataTable.InfiniteFooter
                 hasNextPage={infiniteScroll.hasNextPage}

@@ -25,20 +25,24 @@ function renderPage(isPending: boolean) {
       narrowing={EMPTY_DEVICES_NARROWING}
       onNarrowingChange={() => {}}
       totalCount={60}
-      pager={PAGE_3}
+      metaRow={{ pager: PAGE_3, actions: <span>Refresh picker</span> }}
       isPending={isPending}
     />,
   );
 }
 
 describe('DevicesList pager', () => {
-  it('sits in the row above the table, with the range in place of the count', () => {
+  it('sits in the row above the table, with the range in place of the count and the actions after it', () => {
     const { container, unmount } = renderPage(false);
     const html = container.innerHTML;
     unmount();
-    const order = ['data-table-meta', '41–41 of 60 devices', 'aria-label="Pagination"', 'macbook-pro'].map(mark =>
-      html.indexOf(mark),
-    );
+    const order = [
+      'data-table-meta',
+      '41–41 of 60 devices',
+      'aria-label="Pagination"',
+      'Refresh picker',
+      'macbook-pro',
+    ].map(mark => html.indexOf(mark));
     expect(order.every(index => index >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });

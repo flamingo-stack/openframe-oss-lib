@@ -1,13 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { Chevrons03LeftIcon } from '../icons-v2-generated/arrows/chevrons-03-left-icon';
 import { Button } from './button';
-import { DropdownButton } from './dropdown-button';
 import { useLoadingScope } from './loading-scope';
+import { TableRowsPerPage } from './table-rows-per-page';
 
 /** The rows-per-page choices when the caller names none. */
 export const DEFAULT_PAGE_SIZE_OPTIONS: readonly number[] = [20, 50, 100];
@@ -111,7 +110,7 @@ export function TablePagination({
       className={cn('flex min-w-0 items-center gap-[var(--spacing-system-xsf)]', className)}
     >
       {onPageSizeChange && (
-        <RowsPerPage
+        <TableRowsPerPage
           pageSize={pageSize ?? pageSizeOptions[0] ?? 0}
           options={pageSizeOptions}
           onChange={onPageSizeChange}
@@ -151,43 +150,5 @@ export function TablePagination({
         />
       </div>
     </nav>
-  );
-}
-
-/** "20 per page ⌄": a quiet text menu of the row counts. */
-function RowsPerPage({
-  pageSize,
-  options,
-  onChange,
-  disabled,
-}: {
-  pageSize: number;
-  options: readonly number[];
-  onChange: (pageSize: number) => void;
-  disabled: boolean;
-}) {
-  const items = useMemo(
-    () =>
-      options.map(option => ({
-        id: String(option),
-        label: `${option} per page`,
-        type: 'radio' as const,
-        checked: option === pageSize,
-        onClick: () => onChange(option),
-      })),
-    [options, pageSize, onChange],
-  );
-
-  return (
-    <DropdownButton
-      variant="link"
-      size="wrap"
-      disabled={disabled}
-      ariaLabel={`Rows per page: ${pageSize}`}
-      align="end"
-      className="h-8 gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-xxs)] text-h6"
-      label={`${pageSize} per page`}
-      items={items}
-    />
   );
 }

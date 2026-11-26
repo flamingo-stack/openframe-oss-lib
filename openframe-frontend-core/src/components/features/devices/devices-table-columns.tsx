@@ -139,6 +139,23 @@ export function getDeviceOpenColumn<T extends DeviceRow = DeviceRow>(): ColumnDe
   };
 }
 
+/**
+ * The row above a devices table, as the host fills it: a paged list's pager, the wait for its next page, and the
+ * controls at the row's right end. One prop for one row.
+ */
+export interface DevicesTableMetaRow {
+  /**
+   * A paged list's pager (`useCursorPager` `footerProps`): First · Previous · Next, with the page's range ("21–40 of
+   * 340 devices") in place of the count. `null`: a paged list whose first page is being read (the pager waits).
+   * Omitted: the list is not paged.
+   */
+  pager?: (TablePaginationProps & { rangeStart?: number }) | null;
+  /** The pager's buttons wait: the next page is being read, and the rows on screen are the last page's. */
+  loading?: boolean;
+  /** The controls at the row's right end, after a divider when there is a pager: the auto-refresh picker. */
+  actions?: ReactNode;
+}
+
 export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   devices: T[];
   isLoading?: boolean;
@@ -153,18 +170,10 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   emptyMessage?: string;
   skeletonRows?: number;
   stickyHeaderOffset?: string;
-  /** Under the body: the infinite footer of a list read page after page. A paged list passes `pager` instead. */
+  /** Under the body: the infinite footer of a list read page after page. A paged list passes `metaRow.pager` instead. */
   footerSlot?: ReactNode;
-  /**
-   * A paged list's pager (`useCursorPager` `footerProps`), drawn in the row above the table with the page's range
-   * ("21–40 of 340 devices") in place of the count. `null`: a paged list whose first page is being read (the pager
-   * waits).
-   */
-  pager?: (TablePaginationProps & { rangeStart?: number }) | null;
-  /** The pager's buttons wait (the next page is being read; the rows on screen are the last page's). */
-  pagerLoading?: boolean;
-  /** Controls at the right end of the row above the table: the auto-refresh picker. */
-  metaActions?: ReactNode;
+  /** The row above the table: a paged list's pager and its wait, and the controls at its right end. */
+  metaRow?: DevicesTableMetaRow;
   deviceFilters?: DeviceFilters | null;
   columnFilters?: ColumnFiltersState;
   onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
@@ -233,9 +242,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   skeletonRows,
   stickyHeaderOffset,
   footerSlot,
-  pager,
-  pagerLoading = false,
-  metaActions,
+  metaRow: metaRowGiven,
   deviceFilters,
   columnFilters,
   onColumnFiltersChange,
@@ -293,6 +300,9 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
     [isLoading, skeletonRows],
   );
 
+  const pager = metaRowGiven?.pager;
+  const pagerLoading = metaRowGiven?.loading ?? false;
+  const metaActions = metaRowGiven?.actions;
   // An empty FIRST page has no pager (the empty state is the whole answer); an empty later page keeps it, so the way
   // back stays, even where the host hides the column header.
   const paged =
