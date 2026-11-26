@@ -1,20 +1,19 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::path::PathBuf;
 use tracing::{info, warn};
 
 use super::{
-    backup_binary, cleanup_backup, clear_aside_binary, download_and_write_binary,
-    log_update_survivors, restore_from_backup, ToolUpdater, ToolUpdaterDeps, UpdateContext,
+    backup_binary, cleanup_backup, clear_aside_binary, log_update_survivors, restore_from_backup,
+    ToolUpdater, ToolUpdaterDeps, UpdateContext,
 };
 #[cfg(target_os = "windows")]
 use crate::config::service_stop::EXEC_UNLOCK_WAIT_SECS;
 use crate::models::{DownloadConfiguration, Installation, InstalledTool};
-#[cfg(target_os = "windows")]
-use crate::platform::binary_writer;
 #[cfg(target_os = "macos")]
-use crate::platform::{binary_writer, remove_app_bundle_path};
-use crate::platform::{system_service, DirectoryManager};
+use crate::platform::remove_app_bundle_path;
+use crate::platform::{binary_writer, system_service, DirectoryManager};
 
 pub struct ServiceToolUpdater {
     deps: ToolUpdaterDeps,
@@ -108,6 +107,18 @@ impl ServiceToolUpdater {
 
 #[async_trait]
 impl ToolUpdater for ServiceToolUpdater {
+    async fn fetch(&self, _tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Bytes> {
+        let downloads = &self.deps.github_download_service;
+
+        // A bundle is extracted whole in apply, so keep its archive.
+        #[cfg(target_os = "macos")]
+        if Self::is_app_bundle_download(config) {
+            return downloads.download_archive(config).await;
+        }
+
+        downloads.download_and_extract(config).await
+    }
+
     async fn prepare(&self, tool: &InstalledTool) -> Result<UpdateContext> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Preparing Service tool for update");
@@ -149,11 +160,13 @@ impl ToolUpdater for ServiceToolUpdater {
         })
     }
 
+    // config is read only by the macOS .app bundle branch
+    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
     async fn apply(
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
-        _ctx: &UpdateContext,
+        fetched: Bytes,
     ) -> Result<Option<Installation>> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying Service tool update");
@@ -174,9 +187,9 @@ impl ToolUpdater for ServiceToolUpdater {
 
             self.deps
                 .github_download_service
-                .download_and_extract_all(config, &tool_folder)
+                .extract_archive(fetched, config, &tool_folder)
                 .await
-                .with_context(|| format!("Failed to download and extract: {}", tool_agent_id))?;
+                .with_context(|| format!("Failed to extract: {}", tool_agent_id))?;
 
             // Set executable permissions on the binary
             if exec_path.exists() {
@@ -188,7 +201,9 @@ impl ToolUpdater for ServiceToolUpdater {
         }
 
         // Standard single binary update
-        download_and_write_binary(&self.deps, config, &exec_path, tool_agent_id).await?;
+        binary_writer::write_executable(&fetched, &exec_path)
+            .await
+            .with_context(|| format!("Failed to write binary for: {}", tool_agent_id))?;
         Ok(None)
     }
 

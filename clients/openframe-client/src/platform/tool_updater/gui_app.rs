@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::path::{Path, PathBuf};
 use tracing::{error, info, warn};
 
@@ -61,6 +62,13 @@ impl GuiAppToolUpdater {
 
 #[async_trait]
 impl ToolUpdater for GuiAppToolUpdater {
+    async fn fetch(&self, _tool: &InstalledTool, config: &DownloadConfiguration) -> Result<Bytes> {
+        self.deps
+            .github_download_service
+            .download_archive(config)
+            .await
+    }
+
     async fn prepare(&self, tool: &InstalledTool) -> Result<UpdateContext> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Preparing GuiApp for update");
@@ -91,7 +99,7 @@ impl ToolUpdater for GuiAppToolUpdater {
         &self,
         tool: &InstalledTool,
         config: &DownloadConfiguration,
-        _ctx: &UpdateContext,
+        fetched: Bytes,
     ) -> Result<Option<Installation>> {
         let tool_agent_id = &tool.tool_agent_id;
         info!(tool_id = %tool_agent_id, "Applying GuiApp update");
@@ -105,14 +113,12 @@ impl ToolUpdater for GuiAppToolUpdater {
 
         let applications_dir = PathBuf::from("/Applications");
 
-        info!(tool_id = %tool_agent_id, "Downloading and installing new version from: {}", config.link);
+        info!(tool_id = %tool_agent_id, "Installing new version into: {}", applications_dir.display());
         self.deps
             .github_download_service
-            .download_and_extract_all(config, &applications_dir)
+            .extract_archive(fetched, config, &applications_dir)
             .await
-            .with_context(|| {
-                format!("Failed to download and install GUI app: {}", tool_agent_id)
-            })?;
+            .with_context(|| format!("Failed to install GUI app: {}", tool_agent_id))?;
 
         let new_app_path = applications_dir.join(&config.target_file_name);
         if !new_app_path.exists() {

@@ -1,0 +1,201 @@
+package com.openframe.management.osupdate;
+
+import com.openframe.data.document.rmm.osupdate.OsPlatform;
+import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
+import com.openframe.data.service.TenantIdProvider;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.OptimisticLockingFailureException;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class OsUpdateEnrichmentServiceTest {
+
+    private static final String TENANT_ID = "tenant-a";
+    private static final Instant ENRICHED_BEFORE = Instant.parse("2026-11-24T10:25:00Z");
+    private static final int BATCH_SIZE = 500;
+
+    @Mock private OsUpdateRepository osUpdateRepository;
+    @Mock private ObjectProvider<OsUpdateEnricher> osUpdateEnrichers;
+    @Mock private OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
+    @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private OsUpdateEnricher windowsOsUpdateEnricher;
+
+    @InjectMocks private OsUpdateEnrichmentService service;
+
+    @BeforeEach
+    void setUp() {
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        lenient().when(osUpdateEnrichers.orderedStream()).thenAnswer(invocation -> Stream.of(windowsOsUpdateEnricher));
+    }
+
+    @Test
+    void enrichNotEnrichedSince_windowsAndMac_windowsEnrichedMacCheckedBothSaved() {
+        // setup
+        OsUpdate windows = osUpdate("id-1", OsPlatform.WINDOWS);
+        OsUpdate mac = osUpdate("id-2", OsPlatform.MACOS);
+        givenFirstBatch(windows, mac);
+        whenWindowsOnlyApplicable();
+        doAnswer(invocation -> {
+            invocation.<List<OsUpdate>>getArgument(0).forEach(osUpdate -> {
+                osUpdate.setExploited(true);
+                osUpdate.setEnrichedAt(invocation.getArgument(1));
+            });
+            return null;
+        }).when(windowsOsUpdateEnricher).enrich(anyList(), any());
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, BATCH_SIZE);
+
+        // verifications
+        verify(windowsOsUpdateEnricher).enrich(eq(List.of(windows)), any());
+        verify(osUpdateRepository).save(windows);
+        verify(osUpdateRepository).save(mac);
+        assertThat(windows.getExploited()).isTrue();
+        assertThat(mac.getEnrichedAt()).isNotNull().isEqualTo(windows.getEnrichedAt());
+        verify(osUpdateEnrichmentMetrics).recordNoData(OsPlatform.MACOS);
+    }
+
+    @Test
+    void enrichNotEnrichedSince_sourceDown_savedNotEnriched() {
+        // setup
+        OsUpdate windows = osUpdate("id-1", OsPlatform.WINDOWS);
+        givenFirstBatch(windows);
+        when(windowsOsUpdateEnricher.applicableTo(windows)).thenReturn(true);
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, BATCH_SIZE);
+
+        // verifications
+        verify(osUpdateRepository).save(windows);
+        assertThat(windows.getEnrichedAt()).isNull();
+    }
+
+    @Test
+    void enrichNotEnrichedSince_enricherThrows_updatesLeftForTheNextRun() {
+        // setup
+        OsUpdate windows = osUpdate("id-1", OsPlatform.WINDOWS);
+        OsUpdate mac = osUpdate("id-2", OsPlatform.MACOS);
+        givenFirstBatch(windows, mac);
+        whenWindowsOnlyApplicable();
+        doAnswer(invocation -> {
+            invocation.<List<OsUpdate>>getArgument(0).forEach(osUpdate -> osUpdate.setEnrichedAt(invocation.getArgument(1)));
+            throw new IllegalStateException("bug");
+        }).when(windowsOsUpdateEnricher).enrich(anyList(), any());
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, BATCH_SIZE);
+
+        // verifications
+        verify(osUpdateRepository).save(mac);
+        verify(osUpdateRepository).save(windows);
+        assertThat(windows.getEnrichedAt()).isNull();
+        verify(osUpdateEnrichmentMetrics).recordEnricherFailed();
+    }
+
+    @Test
+    void enrichNotEnrichedSince_nothingStale_nothingSaved() {
+        // setup
+        givenFirstBatch();
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, BATCH_SIZE);
+
+        // verifications
+        verify(osUpdateRepository, never()).save(any());
+        verify(osUpdateEnrichmentMetrics).recordRun(any());
+    }
+
+    @Test
+    void enrichNotEnrichedSince_entryChangedMeanwhile_skippedOthersSaved() {
+        // setup
+        OsUpdate changed = osUpdate("id-1", OsPlatform.MACOS);
+        OsUpdate unchanged = osUpdate("id-2", OsPlatform.MACOS);
+        givenFirstBatch(changed, unchanged);
+        when(osUpdateRepository.save(changed)).thenThrow(new OptimisticLockingFailureException("changed"));
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, BATCH_SIZE);
+
+        // verifications
+        verify(osUpdateRepository).save(unchanged);
+    }
+
+    @Test
+    void enrichNotEnrichedSince_firstBatchBroken_nextBatchAfterItsLastIdStillEnriched() {
+        // setup
+        OsUpdate broken = osUpdate("id-1", OsPlatform.MACOS);
+        OsUpdate lastOfBrokenBatch = osUpdate("id-2", OsPlatform.MACOS);
+        OsUpdate healthy = osUpdate("id-3", OsPlatform.MACOS);
+        when(osUpdateRepository.findEnrichedBefore(TENANT_ID, ENRICHED_BEFORE, null, 2))
+                .thenReturn(List.of(broken, lastOfBrokenBatch));
+        when(osUpdateRepository.findEnrichedBefore(TENANT_ID, ENRICHED_BEFORE, "id-2", 2))
+                .thenReturn(List.of(healthy));
+        when(osUpdateRepository.save(broken)).thenThrow(new DataAccessResourceFailureException("broken document"));
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, 2);
+
+        // verifications
+        verify(osUpdateRepository).save(healthy);
+        assertThat(healthy.getEnrichedAt()).isNotNull();
+        verify(osUpdateEnrichmentMetrics).recordBatchFailed();
+        verify(osUpdateEnrichmentMetrics).recordRun(any());
+    }
+
+    @Test
+    void enrichNotEnrichedSince_fullBatches_pagesByLastIdUntilAShortOne() {
+        // setup
+        OsUpdate first = osUpdate("id-1", OsPlatform.MACOS);
+        OsUpdate second = osUpdate("id-2", OsPlatform.MACOS);
+        when(osUpdateRepository.findEnrichedBefore(TENANT_ID, ENRICHED_BEFORE, null, 1)).thenReturn(List.of(first));
+        when(osUpdateRepository.findEnrichedBefore(TENANT_ID, ENRICHED_BEFORE, "id-1", 1)).thenReturn(List.of(second));
+        when(osUpdateRepository.findEnrichedBefore(TENANT_ID, ENRICHED_BEFORE, "id-2", 1)).thenReturn(List.of());
+
+        // execution
+        service.enrichNotEnrichedSince(ENRICHED_BEFORE, 1);
+
+        // verifications
+        verify(osUpdateRepository).save(first);
+        verify(osUpdateRepository).save(second);
+    }
+
+    private void givenFirstBatch(OsUpdate... staleOsUpdates) {
+        when(osUpdateRepository.findEnrichedBefore(TENANT_ID, ENRICHED_BEFORE, null, BATCH_SIZE))
+                .thenReturn(List.of(staleOsUpdates));
+    }
+
+    private void whenWindowsOnlyApplicable() {
+        when(windowsOsUpdateEnricher.applicableTo(any())).thenAnswer(invocation ->
+                invocation.<OsUpdate>getArgument(0).getPlatform() == OsPlatform.WINDOWS);
+    }
+
+    private static OsUpdate osUpdate(String id, OsPlatform platform) {
+        return OsUpdate.builder()
+                .id(id)
+                .tenantId(TENANT_ID)
+                .platform(platform)
+                .identifier(id)
+                .build();
+    }
+}

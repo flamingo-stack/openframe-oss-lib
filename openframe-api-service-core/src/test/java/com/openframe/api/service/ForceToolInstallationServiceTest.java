@@ -70,20 +70,31 @@ class ForceToolInstallationServiceTest {
                 .containsExactly(tuple(MACHINE_ID, AGENT_KEY, ForceAgentStatus.NOT_SUPPORTED));
     }
 
+    @Test
+    void process_commandSent_answersProcessedForTheDevice() {
+        when(integratedToolAgentService.findByKey(AGENT_KEY)).thenReturn(Optional.of(agent));
+        when(toolInstallationService.process(MACHINE_ID, agent, false)).thenReturn(ToolInstallationOutcome.DISPATCHED);
+
+        ForceToolAgentInstallationResponse response = service.process(request);
+
+        assertThat(response.getItems())
+                .extracting(ForceToolAgentInstallationResponseItem::getMachineId,
+                        ForceToolAgentInstallationResponseItem::getStatus)
+                .containsExactly(tuple(MACHINE_ID, ForceAgentStatus.PROCESSED));
+    }
+
     @ParameterizedTest
-    @EnumSource(value = ToolInstallationOutcome.class, names = {"DISPATCHED", "NOT_CARRIED", "FAILED"})
-    void process_otherOutcomes_processedItem(ToolInstallationOutcome outcome) {
-        // setup
+    @EnumSource(value = ToolInstallationOutcome.class, names = {"NOT_CARRIED", "FAILED"})
+    void process_commandNotSent_answersFailedForTheDevice(ToolInstallationOutcome outcome) {
         when(integratedToolAgentService.findByKey(AGENT_KEY)).thenReturn(Optional.of(agent));
         when(toolInstallationService.process(MACHINE_ID, agent, false)).thenReturn(outcome);
 
-        // execution
         ForceToolAgentInstallationResponse response = service.process(request);
 
-        // verifications
         assertThat(response.getItems())
-                .extracting(ForceToolAgentInstallationResponseItem::getStatus)
-                .containsExactly(ForceAgentStatus.PROCESSED);
+                .extracting(ForceToolAgentInstallationResponseItem::getMachineId,
+                        ForceToolAgentInstallationResponseItem::getStatus)
+                .containsExactly(tuple(MACHINE_ID, ForceAgentStatus.FAILED));
     }
 
     @Test

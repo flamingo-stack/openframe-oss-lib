@@ -3,6 +3,7 @@ package com.openframe.audit;
 import com.openframe.audit.targets.AuditTarget;
 import com.openframe.audit.targets.AuditTargetRegistry;
 import com.openframe.audit.targets.AuditTargetRepository;
+import com.openframe.audit.targets.LoadedTarget;
 import com.openframe.core.util.Sha256;
 import com.openframe.data.document.audit.AuditEvent;
 import com.openframe.data.document.audit.AuditTargetType;
@@ -53,6 +54,7 @@ public class AuditEventWriter {
         ActorNames names = namesOf(context.actor());
         List<AuditEvent> events = entries.stream()
                 .map(entry -> loadTarget ? withTargetFields(entry) : entry)
+                .map(this::withOrganizationOfDevice)
                 .map(entry -> eventOf(entry, context, names))
                 .toList();
         try {
@@ -116,6 +118,23 @@ public class AuditEventWriter {
                     .orElse(entry);
         } catch (RuntimeException e) {
             log.error("Audit target {} not read, {} is stored without its name", targetId, entry.getAction().getName(), e);
+            return entry;
+        }
+    }
+
+    private AuditEntry withOrganizationOfDevice(AuditEntry entry) {
+        if (entry.getOrganizationId() != null || entry.getDeviceId() == null
+                || entry.targetTypeOrDefault() == AuditTargetType.DEVICE) {
+            return entry;
+        }
+        try {
+            return targetRepository.load(targets.find(AuditTargetType.DEVICE), entry.getDeviceId())
+                    .map(LoadedTarget::organizationId)
+                    .map(organizationId -> entry.toBuilder().organizationId(organizationId).build())
+                    .orElse(entry);
+        } catch (RuntimeException e) {
+            log.error("Device {} not read, {} is stored without its organization", entry.getDeviceId(),
+                    entry.getAction().getName(), e);
             return entry;
         }
     }

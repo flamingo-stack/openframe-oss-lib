@@ -1,5 +1,7 @@
 package com.openframe.api.datafetcher;
 
+import org.mockito.Answers;
+import com.openframe.audit.AuditedMethodRunner;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
 import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
 import com.openframe.api.config.DateScalarConfig;
@@ -62,6 +64,9 @@ class UserMutationsDgsTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean(answers = Answers.CALLS_REAL_METHODS)
+    private AuditedMethodRunner auditedMethodRunner;
 
     @MockitoBean
     private InvitationService invitationService;

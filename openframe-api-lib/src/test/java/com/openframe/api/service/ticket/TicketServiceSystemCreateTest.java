@@ -4,6 +4,8 @@ import com.openframe.api.dto.ticket.SystemTicketCommand;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.api.service.device.ClientOwnerScopeResolver;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
@@ -43,6 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -98,7 +101,8 @@ class TicketServiceSystemCreateTest {
     void setUp() {
         service = new TicketService(ticketRepository, ticketNumberService, ticketTagService, ticketIdsForFilter,
                 ticketStalenessResolver, machineRepository, organizationRepository, userRepository, assignmentService,
-                ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of(listener));
+                ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of(listener),
+                mock(AuditedMethodRunner.class), mock(AuditRecorder.class));
         emailOrigin = TicketEmailOrigin.builder()
                 .mailboxId(MAILBOX_ID)
                 .mailboxAddress(MAILBOX_ADDRESS)

@@ -41,19 +41,22 @@ public class AuditAspect {
         AuditTargetType targetType = audited.targetType().length > 0
                 ? audited.targetType()[0]
                 : audited.action().getTargetType();
-        AuditCall call = new AuditCall(
+        AuditCall auditCall = new AuditCall(
                 audited.action(),
                 targetType,
                 () -> expressions.evaluate(idExpression, method, arguments, null),
                 result -> expressions.evaluate(idExpression, method, arguments, result),
                 targetIdInResult,
                 result -> expressions.details(audited.details(), method, arguments, result),
+                null,
                 audited.compare(),
+                _ -> audited.storeIfUnchanged(),
+                false,
                 result -> !StringUtils.hasText(condition) || expressions.isConditionMet(condition, method, arguments, result),
                 result -> expressions.evaluate(audited.tenantId(), method, arguments, result),
                 result -> expressions.evaluate(audited.targetName(), method, arguments, result),
                 result -> expressions.evaluate(audited.organizationId(), method, arguments, result),
                 result -> expressions.evaluate(audited.deviceId(), method, arguments, result));
-        return auditedMethodRunner.run(call, joinPoint::proceed);
+        return auditedMethodRunner.run(auditCall, joinPoint::proceed);
     }
 }

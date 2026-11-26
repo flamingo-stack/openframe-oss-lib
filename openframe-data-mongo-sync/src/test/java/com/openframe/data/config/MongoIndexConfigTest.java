@@ -1,6 +1,7 @@
 package com.openframe.data.config;
 
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
+import com.openframe.data.document.tenant.Tenant;
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +38,23 @@ class MongoIndexConfigTest {
 
         // verifications
         verify(mongoTemplate.indexOps(DeviceOsUpdateHistoryEntry.class)).createIndex(indexCaptor.capture());
+        assertThat(indexCaptor.getValue().getIndexKeys()).isEqualTo(expectedKeys);
+        assertThat(indexCaptor.getValue().getIndexOptions()).isEqualTo(expectedOptions);
+    }
+
+    @Test
+    void initIndexes_tenants_sparseUniqueDisplayIdIndexNamedLikeTheAnnotation() {
+        // setup
+        Document expectedKeys = new Document("displayId", 1);
+        Document expectedOptions = new Document("name", Tenant.DISPLAY_ID_INDEX)
+                .append("unique", true)
+                .append("sparse", true);
+
+        // execution
+        mongoIndexConfig.initIndexes();
+
+        // verifications
+        verify(mongoTemplate.indexOps(Tenant.class)).ensureIndex(indexCaptor.capture());
         assertThat(indexCaptor.getValue().getIndexKeys()).isEqualTo(expectedKeys);
         assertThat(indexCaptor.getValue().getIndexOptions()).isEqualTo(expectedOptions);
     }

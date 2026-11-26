@@ -1,6 +1,7 @@
 package com.openframe.client.controller;
 
 import com.openframe.client.exception.MachineDeletedException;
+import com.openframe.client.exception.TenantBlockedException;
 import com.openframe.client.service.AgentAuthService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +39,20 @@ class AgentAuthControllerTest {
         // verifications
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.GONE);
         assertThat(response.getBody()).isEqualTo(Map.of("message", MESSAGE));
+    }
+
+    @Test
+    void getClientToken_tenantBlocked_answersForbidden() {
+        // setup
+        when(agentAuthService.issueClientToken(GRANT_TYPE, REFRESH_TOKEN, null, null))
+                .thenThrow(new TenantBlockedException("Tenant is blocked"));
+
+        // execution
+        ResponseEntity<?> response = controller.getClientToken(GRANT_TYPE, REFRESH_TOKEN, null, null);
+
+        // verifications
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).isEqualTo(Map.of("message", "Tenant is blocked"));
     }
 
     @Test

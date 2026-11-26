@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { usePathname } from '../embed-shims/next-navigation';
-import { pageTopicFor } from '../utils/page-topics';
+import { pageAddressFor, pageTopicFor } from '../utils/page-topics';
 
 /**
  * Page topics for a host (`utils/page-topics`): a page's topic is its own path,
@@ -16,7 +16,7 @@ interface PageTopicsValue {
   basePath?: string;
   /** The address to read, where the router's answer is not the page's. */
   pathname?: string;
-  /** Whether surfaces print the page's topic stamp (`PageTopicLabel`) by default. */
+  /** Whether surfaces print the page's stamp (`PageTopicLabel`: its address, its topic on hover) by default. */
   showTopic: boolean;
 }
 
@@ -36,9 +36,10 @@ export interface PageTopicsProviderProps {
    */
   pathname?: string;
   /**
-   * Print the page's topic stamp (`PageTopicLabel`) on every surface that can
-   * show it (the FAQ block, the chat's quick actions), for whoever edits FAQs
-   * and quick actions. ONE host decision, made at the root; a surface's own
+   * Print the page's stamp (`PageTopicLabel`: the page's address, and the
+   * topic it asks with on hover where the two differ) on every surface that
+   * can show it (the FAQ block, the chat's quick actions), for whoever edits
+   * FAQs and quick actions. ONE host decision, made at the root; a surface's own
    * `showTopic` prop still overrides it. Absent: the enclosing provider's
    * choice, else off.
    */
@@ -60,6 +61,18 @@ export function usePageTopic(): string | undefined {
   const routerPathname = usePathname();
   if (!value) return undefined;
   return pageTopicFor(value.pathname ?? routerPathname ?? '/', { basePath: value.basePath });
+}
+
+/**
+ * The address of the page on screen (`pageAddressFor`), the host's mount kept: what its topic stamp prints. Read from
+ * the same place as its topic (the provider's `pathname`, else the router's). Undefined where the host gave no
+ * provider.
+ */
+export function usePageAddress(): string | undefined {
+  const value = useContext(PageTopicsContext);
+  const routerPathname = usePathname();
+  if (!value) return undefined;
+  return pageAddressFor(value.pathname ?? routerPathname ?? '/');
 }
 
 /** Whether the host asked surfaces to print the page's topic stamp (`PageTopicsProvider showTopic`). */

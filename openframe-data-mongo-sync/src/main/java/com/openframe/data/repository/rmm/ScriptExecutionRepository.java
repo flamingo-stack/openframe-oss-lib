@@ -20,6 +20,8 @@ public interface ScriptExecutionRepository
 
     Optional<ScriptExecution> findByMachineIdAndExecutionId(String machineId, String executionId);
 
+    List<ScriptExecution> findAllByMachineIdAndExecutionId(String machineId, String executionId);
+
     Optional<ScriptExecution> findFirstByTenantIdAndExecutionId(String tenantId, String executionId);
 
     List<ScriptExecution> findByTenantIdAndExecutionId(String tenantId, String executionId);

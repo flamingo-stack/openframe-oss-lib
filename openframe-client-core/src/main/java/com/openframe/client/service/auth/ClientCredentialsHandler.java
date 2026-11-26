@@ -20,9 +20,19 @@ public class ClientCredentialsHandler {
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenGenerator accessTokenGenerator;
     private final RefreshTokenGenerator refreshTokenGenerator;
-    private final DeletedMachineTokenGuard deletedMachineTokenGuard;
+    private final AgentAuthAudit agentAuthAudit;
+    private final MachineTokenGuard machineTokenGuard;
 
     public AgentTokenResponse handle(String clientId, String clientSecret) {
+        try {
+            return issue(clientId, clientSecret);
+        } catch (RuntimeException e) {
+            agentAuthAudit.failed(clientId, CLIENT_CREDENTIALS_GRANT_TYPE, e);
+            throw e;
+        }
+    }
+
+    private AgentTokenResponse issue(String clientId, String clientSecret) {
         OAuthClient client = clientRepository.findByClientId(clientId)
                 .orElseThrow(() -> {
                     log.error("Client not found: {}", clientId);
@@ -30,7 +40,7 @@ public class ClientCredentialsHandler {
                 });
 
         validateClientSecret(client, clientSecret);
-        deletedMachineTokenGuard.requireNotDeleted(client.getMachineId());
+        machineTokenGuard.requireTokenAllowed(client.getMachineId());
 
         String accessToken = accessTokenGenerator.generate(client, CLIENT_CREDENTIALS_GRANT_TYPE);
         String refreshToken = refreshTokenGenerator.generate(client.getClientId());
