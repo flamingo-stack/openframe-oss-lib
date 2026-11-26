@@ -11,9 +11,11 @@ extend type Query {
     scheduleRun(id: ID!): ScheduleRun!
 
     """Cursor-paginated list of individual schedule fires (Schedule Runs tab).
-    Each row is one dispatch of the schedule to its assigned devices. Newest first
-    by dispatchedAt (default). Optional statuses filter + case-insensitive substring
-    search on executionId."""
+    Each row is one dispatch of the schedule to its assigned devices. Default order is
+    newest-first by _id. Sortable fields: _id (default), dispatchedAt. Optional statuses
+    filter + case-insensitive substring search on executionId.
+    When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor
+    are valid paging cursors."""
     scheduleRuns(
         scheduleId: ID!,
         filter: ScheduleRunFilterInput,

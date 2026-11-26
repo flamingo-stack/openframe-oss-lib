@@ -4,6 +4,7 @@ import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ResultSet;
@@ -96,14 +97,15 @@ class ClientOutdatedRuleConsistencyTest {
         Machine cursorDoc = new Machine();
         cursorDoc.setId(cursorId.toHexString());
         cursorDoc.setAgentVersionKey(agentVersionKey);
-        when(mongoTemplate.findById(cursorId, Machine.class)).thenReturn(cursorDoc);
+        when(mongoTemplate.findOne(any(Query.class), eq(Machine.class))).thenReturn(cursorDoc);
         List<Document> rows = List.of();
         AggregationResults<Document> results = new AggregationResults<>(rows, new Document());
         when(mongoTemplate.aggregate(any(Aggregation.class), eq(Machine.class), eq(Document.class))).thenReturn(results);
         MachineQueryFilter filter = MachineQueryFilter.builder().build();
+        CursorPosition position = new CursorPosition.RowId(cursorId.toHexString());
 
         // execution
-        mongoRepository.findMachinesWithCursor(TENANT_ID, filter, null, cursorId.toHexString(), 10,
+        mongoRepository.findMachinesWithCursor(TENANT_ID, filter, null, position, false, 10,
                 "clientOutdated", "DESC");
 
         // verifications

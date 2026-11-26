@@ -1,5 +1,6 @@
 package com.openframe.api.dto.shared;
 
+import com.openframe.data.repository.cursor.CursorBase64;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,7 +23,7 @@ public class CursorPaginationCriteria {
     /**
      * Build pagination criteria from Relay Connection Spec arguments.
      * Backward pagination (last/before) takes precedence if both directions are provided.
-     * Opaque cursors are decoded automatically via {@link CursorCodec}.
+     * Opaque cursors are decoded via {@link CursorBase64}, which rejects a cursor that is not base64.
      */
     public static CursorPaginationCriteria fromConnectionArgs(ConnectionArgs args) {
         if (args == null) {
@@ -32,14 +33,14 @@ public class CursorPaginationCriteria {
         if (args.getLast() != null || args.getBefore() != null) {
             return CursorPaginationCriteria.builder()
                     .limit(args.getLast())
-                    .cursor(CursorCodec.decode(args.getBefore()))
+                    .cursor(CursorBase64.decode(args.getBefore()))
                     .backward(true)
                     .build();
         }
 
         return CursorPaginationCriteria.builder()
                 .limit(args.getFirst())
-                .cursor(CursorCodec.decode(args.getAfter()))
+                .cursor(CursorBase64.decode(args.getAfter()))
                 .backward(false)
                 .build();
     }

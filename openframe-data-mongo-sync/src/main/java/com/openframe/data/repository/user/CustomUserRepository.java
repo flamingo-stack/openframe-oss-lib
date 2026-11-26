@@ -10,10 +10,11 @@ public interface CustomUserRepository {
     List<User> findUsersBySearch(UserQueryFilter filter, int limit);
 
     /**
-     * Users ordered by {@code (email, _id)}, starting after {@code cursor} (a {@link UserPageCursor}). The
-     * search does not match the synthetic email of a self-deleted user.
+     * Users ordered by {@code (email, _id)}, starting after {@code cursor} (a {@link UserPageCursor}). With
+     * {@code backward} the rows before the cursor are returned, nearest first; the caller reverses them for
+     * display. The search does not match the synthetic email of a self-deleted user.
      */
-    List<User> findUsersPage(UserListFilter filter, String cursor, int limit);
+    List<User> findUsersPage(UserListFilter filter, String cursor, boolean backward, int limit);
 
     long countUsers(UserListFilter filter);
 

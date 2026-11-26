@@ -1,11 +1,13 @@
 package com.openframe.data.repository.timetracking;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.filter.TimeEntryQueryFilter;
 import com.openframe.data.document.timetracking.filter.TimeEntryStateFilter;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
-import lombok.extern.slf4j.Slf4j;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,26 +16,33 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.aggregation.DateOperators;
+import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
-@Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
 public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport implements CustomTimeEntryRepository {
 
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
-    private static final String CURSOR_SEPARATOR = "_";
+    private static final String AND_OPERATOR = "$and";
+    private static final String NO_SORT_VALUE = "";
+    private static final String DATE_VALUE_SEPARATOR = "_";
     private static final String DATE_FIELD = "date";
     private static final String WORK_DAY_FIELD = "_workDay";
     private static final String DAY_KEY_FORMAT = "%Y-%m-%d";
+    private static final String NO_DAY_KEY = "0000-00-00";
+    private static final Pattern DAY_KEY = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final String DEFAULT_SORT_FIELD = DATE_FIELD;
 
     private static final String FIELD_USER_ID = "userId";
@@ -128,36 +137,31 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
     }
 
     @Override
-    public List<TimeEntry> findTimeEntriesWithCursor(Query query, String cursor, int limit,
+    public List<TimeEntry> findTimeEntriesWithCursor(Query query, CursorPosition position, boolean backward, int limit,
                                                       String sortField, String sortDirection) {
-        boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
+        Sort.Direction direction = directionOf(sortDirection);
+        boolean fetchDescending = direction.isDescending() != backward;
+        Optional<Criteria> pastAnchor = keysetAnchor(position, sortField, direction)
+                .map(anchor -> keysetCriteria(anchor, sortField, fetchDescending));
 
         if (DATE_FIELD.equals(sortField)) {
-            return findWithDateSort(query, cursor, limit, isDesc);
+            return findWithDateSort(query, pastAnchor, limit, fetchDescending);
         }
 
-        Sort.Direction direction = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Query pageQuery = pastAnchor
+                .map(cursorBound -> withCursorBound(query, cursorBound))
+                .orElse(query);
+        Sort sort = sortWithIdTieBreak(sortField, fetchDescending);
+        pageQuery.limit(limit);
+        pageQuery.with(sort);
 
-        if (cursor != null && !cursor.trim().isEmpty()) {
-            try {
-                ObjectId cursorId = new ObjectId(cursor);
-                applyCursorCriteria(query, cursorId, sortField, isDesc);
-            } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
-            }
-        }
-        query.limit(limit);
+        return mongoTemplate.find(pageQuery, TimeEntry.class);
+    }
 
-        if (ID_FIELD.equals(sortField)) {
-            query.with(Sort.by(direction, ID_FIELD));
-        } else {
-            query.with(Sort.by(
-                    Sort.Order.by(sortField).with(direction),
-                    Sort.Order.by(ID_FIELD).with(direction)
-            ));
-        }
-
-        return mongoTemplate.find(query, TimeEntry.class);
+    @Override
+    public KeysetCursor keysetCursor(TimeEntry entry, String sortField, String sortDirection) {
+        Sort.Direction direction = directionOf(sortDirection);
+        return keysetOf(entry, sortField, direction);
     }
 
     /**
@@ -166,8 +170,9 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
      * its date group by insertion time, while backdated entries stay grouped with other entries
      * of their own day rather than jumping to the top of the list.
      */
-    private List<TimeEntry> findWithDateSort(Query query, String cursor, int limit, boolean isDesc) {
-        Sort.Direction direction = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
+    private List<TimeEntry> findWithDateSort(Query query, Optional<Criteria> pastAnchor, int limit,
+                                             boolean fetchDescending) {
+        Sort.Direction fetchDirection = fetchDescending ? Sort.Direction.DESC : Sort.Direction.ASC;
 
         List<AggregationOperation> stages = new ArrayList<>();
         stages.add(Aggregation.match(tenantCriteria()));
@@ -180,14 +185,12 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
                         DateOperators.DateToString.dateOf(FIELD_STARTED_AT).toString(DAY_KEY_FORMAT))
                 .build());
 
-        if (cursor != null && !cursor.trim().isEmpty()) {
-            applyDateCursor(stages, cursor, isDesc);
-        }
+        pastAnchor.map(Aggregation::match).ifPresent(stages::add);
 
         stages.add(Aggregation.sort(Sort.by(
-                Sort.Order.by(WORK_DAY_FIELD).with(direction),
-                Sort.Order.by(FIELD_CREATED_AT).with(direction),
-                Sort.Order.by(ID_FIELD).with(direction)
+                Sort.Order.by(WORK_DAY_FIELD).with(fetchDirection),
+                Sort.Order.by(FIELD_CREATED_AT).with(fetchDirection),
+                Sort.Order.by(ID_FIELD).with(fetchDirection)
         )));
         stages.add(Aggregation.limit(limit));
 
@@ -196,96 +199,204 @@ public class CustomTimeEntryRepositoryImpl extends TenantAwareRepositorySupport 
         ).getMappedResults();
     }
 
-    /**
-     * Keyset predicate for the compound {@code (workDay, createdAt, _id)} sort. The cursor encodes
-     * {@code "dayKey_createdAtMillis_objectId"}; the comparison operator must match the active
-     * direction so paging stays consistent — DESC pages toward older days ({@code <}), ASC
-     * toward newer ({@code >}). Tie-breakers on {@code createdAt} and {@code _id} use the same
-     * operator as the sort. Follows the pattern in CustomOrganizationRepositoryImpl.
-     */
-    private void applyDateCursor(List<AggregationOperation> stages, String cursor, boolean isDesc) {
-        String[] parts = cursor.split(CURSOR_SEPARATOR, 3);
-        if (parts.length != 3) {
-            log.warn("Invalid compound cursor format: {}", cursor);
-            return;
-        }
-        try {
-            String cursorDay = parts[0];
-            Instant cursorCreated = Instant.ofEpochMilli(Long.parseLong(parts[1]));
-            ObjectId cursorId = new ObjectId(parts[2]);
-
-            Criteria pastDay = isDesc
-                    ? Criteria.where(WORK_DAY_FIELD).lt(cursorDay)
-                    : Criteria.where(WORK_DAY_FIELD).gt(cursorDay);
-            Criteria sameDayPastCreated = new Criteria().andOperator(
-                    Criteria.where(WORK_DAY_FIELD).is(cursorDay),
-                    isDesc ? Criteria.where(FIELD_CREATED_AT).lt(cursorCreated)
-                           : Criteria.where(FIELD_CREATED_AT).gt(cursorCreated)
-            );
-            Criteria sameDayCreatedPastId = new Criteria().andOperator(
-                    Criteria.where(WORK_DAY_FIELD).is(cursorDay),
-                    Criteria.where(FIELD_CREATED_AT).is(cursorCreated),
-                    isDesc ? Criteria.where(ID_FIELD).lt(cursorId)
-                           : Criteria.where(ID_FIELD).gt(cursorId)
-            );
-
-            stages.add(Aggregation.match(new Criteria().orOperator(
-                    pastDay, sameDayPastCreated, sameDayCreatedPastId
-            )));
-        } catch (IllegalArgumentException ex) {
-            log.warn("Invalid compound cursor format: {}", cursor);
-        }
+    private static Sort.Direction directionOf(String sortDirection) {
+        return SORT_DESC.equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
     }
 
-    private void applyCursorCriteria(Query query, ObjectId cursorId, String sortField, boolean isDesc) {
+    private static Sort sortWithIdTieBreak(String sortField, boolean fetchDescending) {
+        Sort.Direction fetchDirection = fetchDescending ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort byId = Sort.by(fetchDirection, ID_FIELD);
         if (ID_FIELD.equals(sortField)) {
-            query.addCriteria(buildIdCriteria(cursorId, isDesc));
-            return;
+            return byId;
         }
-
-        // Use findOne(Query) so TenantAwareMongoTemplate scopes the lookup to the current tenant —
-        // findById(Object, Class) is NOT overridden and would leak across tenants.
-        Query cursorLookup = new Query(Criteria.where(ID_FIELD).is(cursorId));
-        TimeEntry cursorDoc = mongoTemplate.findOne(cursorLookup, TimeEntry.class);
-        if (cursorDoc == null) {
-            log.warn("Cursor document not found for id: {}", cursorId);
-            query.addCriteria(buildIdCriteria(cursorId, isDesc));
-            return;
-        }
-
-        Object cursorSortValue = getSortFieldValue(cursorDoc, sortField);
-        if (cursorSortValue == null) {
-            query.addCriteria(buildIdCriteria(cursorId, isDesc));
-            return;
-        }
-
-        Criteria pastSortValue = isDesc
-                ? Criteria.where(sortField).lt(cursorSortValue)
-                : Criteria.where(sortField).gt(cursorSortValue);
-
-        Criteria sameSortValuePastId = new Criteria().andOperator(
-                Criteria.where(sortField).is(cursorSortValue),
-                buildIdCriteria(cursorId, isDesc)
-        );
-
-        query.addCriteria(new Criteria().orOperator(pastSortValue, sameSortValuePastId));
+        return Sort.by(fetchDirection, sortField).and(byId);
     }
 
-    private Criteria buildIdCriteria(ObjectId cursorId, boolean isDesc) {
-        return isDesc
-                ? Criteria.where(ID_FIELD).lt(cursorId)
-                : Criteria.where(ID_FIELD).gt(cursorId);
+    private static Query withCursorBound(Query base, Criteria cursorCriteria) {
+        Document baseQuery = base.getQueryObject();
+        Document merged = new Document(baseQuery);
+        List<Object> conjuncts = new ArrayList<>();
+        Object existing = merged.get(AND_OPERATOR);
+        if (existing instanceof List<?> existingConjuncts) {
+            conjuncts.addAll(existingConjuncts);
+        }
+        Document cursorBound = cursorCriteria.getCriteriaObject();
+        conjuncts.add(cursorBound);
+        merged.put(AND_OPERATOR, conjuncts);
+        Document fields = base.getFieldsObject();
+        return new BasicQuery(merged, fields);
     }
 
-    private Object getSortFieldValue(TimeEntry entry, String sortField) {
-        return switch (sortField) {
-            case FIELD_STARTED_AT -> entry.getStartedAt();
-            case FIELD_ENDED_AT -> entry.getEndedAt();
-            case FIELD_DURATION_SECONDS -> entry.getDurationSeconds();
-            case FIELD_CREATED_AT -> entry.getCreatedAt();
-            case FIELD_UPDATED_AT -> entry.getUpdatedAt();
-            default -> null;
+    private Optional<KeysetCursor> keysetAnchor(CursorPosition position, String sortField, Sort.Direction direction) {
+        return switch (position) {
+            case CursorPosition.None _ -> Optional.empty();
+            case KeysetCursor keyset -> {
+                keyset.requireSort(sortField, direction);
+                yield Optional.of(keyset);
+            }
+            case CursorPosition.RowId rowId -> {
+                KeysetCursor anchor = rowAnchor(rowId.id(), sortField, direction);
+                yield Optional.of(anchor);
+            }
+            case CursorPosition.Unrecognised unrecognised -> {
+                KeysetCursor anchor = olderDateAnchor(unrecognised.decoded(), sortField, direction);
+                yield Optional.of(anchor);
+            }
         };
+    }
+
+    private KeysetCursor rowAnchor(String rowId, String sortField, Sort.Direction direction) {
+        if (ID_FIELD.equals(sortField)) {
+            return new KeysetCursor(ID_FIELD, direction, NO_SORT_VALUE, rowId);
+        }
+        TimeEntry row = cursorRow(rowId);
+        return keysetOf(row, sortField, direction);
+    }
+
+    private TimeEntry cursorRow(String rowId) {
+        ObjectId id = cursorObjectId(rowId);
+        Criteria byId = Criteria.where(ID_FIELD).is(id);
+        Query query = new Query(byId);
+        TimeEntry row = mongoTemplate.findOne(query, TimeEntry.class);
+        if (row == null) {
+            throw new InvalidCursorException();
+        }
+        return row;
+    }
+
+    private static KeysetCursor olderDateAnchor(String dayCreatedAtAndId, String sortField, Sort.Direction direction) {
+        int idStart = dayCreatedAtAndId.lastIndexOf(DATE_VALUE_SEPARATOR);
+        if (!DATE_FIELD.equals(sortField) || idStart < 0) {
+            throw new InvalidCursorException();
+        }
+        String dayAndCreatedAt = dayCreatedAtAndId.substring(0, idStart);
+        String id = dayCreatedAtAndId.substring(idStart + 1);
+        try {
+            return new KeysetCursor(DATE_FIELD, direction, dayAndCreatedAt, id);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidCursorException(e);
+        }
+    }
+
+    private static KeysetCursor keysetOf(TimeEntry entry, String sortField, Sort.Direction direction) {
+        String id = entry.getId();
+        return switch (sortField) {
+            case DATE_FIELD -> {
+                String dayAndCreatedAt = dayAndCreatedAt(entry);
+                yield new KeysetCursor(sortField, direction, dayAndCreatedAt, id);
+            }
+            case FIELD_STARTED_AT -> KeysetCursor.ofInstant(sortField, direction, entry.getStartedAt(), id);
+            case FIELD_ENDED_AT -> KeysetCursor.ofInstant(sortField, direction, entry.getEndedAt(), id);
+            case FIELD_CREATED_AT -> KeysetCursor.ofInstant(sortField, direction, entry.getCreatedAt(), id);
+            case FIELD_UPDATED_AT -> KeysetCursor.ofInstant(sortField, direction, entry.getUpdatedAt(), id);
+            case FIELD_DURATION_SECONDS -> {
+                String durationSeconds = Long.toString(entry.getDurationSeconds());
+                yield new KeysetCursor(sortField, direction, durationSeconds, id);
+            }
+            default -> new KeysetCursor(sortField, direction, NO_SORT_VALUE, id);
+        };
+    }
+
+    private static String dayAndCreatedAt(TimeEntry entry) {
+        Instant startedAt = entry.getStartedAt();
+        Instant createdAt = entry.getCreatedAt();
+        String dayKey = startedAt != null ? LocalDate.ofInstant(startedAt, ZoneOffset.UTC).toString() : NO_DAY_KEY;
+        long createdAtMillis = createdAt != null ? createdAt.toEpochMilli() : 0L;
+        return dayKey + DATE_VALUE_SEPARATOR + createdAtMillis;
+    }
+
+    private static Criteria keysetCriteria(KeysetCursor cursor, String sortField, boolean fetchDescending) {
+        ObjectId cursorId = cursorObjectId(cursor.id());
+        if (ID_FIELD.equals(sortField)) {
+            Criteria id = Criteria.where(ID_FIELD);
+            return pastId(id, cursorId, fetchDescending);
+        }
+        if (DATE_FIELD.equals(sortField)) {
+            return dateKeyset(cursor.rawValue(), cursorId, fetchDescending);
+        }
+        Object sortValue = FIELD_DURATION_SECONDS.equals(sortField) ? durationValue(cursor) : cursor.instantValue();
+        if (sortValue == null) {
+            return nullGroupKeyset(sortField, cursorId, fetchDescending);
+        }
+        return valueKeyset(sortField, sortValue, cursorId, fetchDescending);
+    }
+
+    private static Long durationValue(KeysetCursor cursor) {
+        if (cursor.hasNullValue()) {
+            return null;
+        }
+        String durationSeconds = cursor.rawValue();
+        return numberOf(durationSeconds);
+    }
+
+    private static long numberOf(String digits) {
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException e) {
+            throw new InvalidCursorException(e);
+        }
+    }
+
+    /**
+     * Keyset predicate for the compound {@code (workDay, createdAt, _id)} sort. The position carries
+     * {@code "dayKey_createdAtMillis"} and the id; the comparison operator follows the fetch direction
+     * so paging stays consistent: descending moves toward older days ({@code <}), ascending toward
+     * newer ({@code >}). Tie-breakers on {@code createdAt} and {@code _id} use the same operator as the sort.
+     */
+    private static Criteria dateKeyset(String dayAndCreatedAt, ObjectId cursorId, boolean fetchDescending) {
+        String[] parts = dayAndCreatedAt.split(DATE_VALUE_SEPARATOR, 2);
+        if (parts.length != 2 || !DAY_KEY.matcher(parts[0]).matches()) {
+            throw new InvalidCursorException();
+        }
+        String cursorDay = parts[0];
+        long createdAtMillis = numberOf(parts[1]);
+        Instant cursorCreated = Instant.ofEpochMilli(createdAtMillis);
+
+        Criteria day = Criteria.where(WORK_DAY_FIELD);
+        Criteria pastDay = fetchDescending ? day.lt(cursorDay) : day.gt(cursorDay);
+        Criteria created = Criteria.where(FIELD_CREATED_AT);
+        Criteria pastCreated = fetchDescending ? created.lt(cursorCreated) : created.gt(cursorCreated);
+        Criteria id = Criteria.where(ID_FIELD);
+        Criteria pastCursorId = pastId(id, cursorId, fetchDescending);
+        Criteria sameDay = Criteria.where(WORK_DAY_FIELD).is(cursorDay);
+        Criteria sameCreated = Criteria.where(FIELD_CREATED_AT).is(cursorCreated);
+        Criteria sameDayPastCreated = new Criteria().andOperator(sameDay, pastCreated);
+        Criteria sameDayCreatedPastId = new Criteria().andOperator(sameDay, sameCreated, pastCursorId);
+
+        return new Criteria().orOperator(pastDay, sameDayPastCreated, sameDayCreatedPastId);
+    }
+
+    private static Criteria nullGroupKeyset(String sortField, ObjectId cursorId, boolean fetchDescending) {
+        Criteria idInsideNullGroup = Criteria.where(sortField).is(null).and(ID_FIELD);
+        Criteria restOfNullGroup = pastId(idInsideNullGroup, cursorId, fetchDescending);
+        if (fetchDescending) {
+            return restOfNullGroup;
+        }
+        Criteria everyValue = Criteria.where(sortField).ne(null);
+        return new Criteria().orOperator(restOfNullGroup, everyValue);
+    }
+
+    private static Criteria valueKeyset(String sortField, Object sortValue, ObjectId cursorId, boolean fetchDescending) {
+        Criteria value = Criteria.where(sortField);
+        Criteria pastValue = fetchDescending ? value.lt(sortValue) : value.gt(sortValue);
+        Criteria idInsideSameValue = Criteria.where(sortField).is(sortValue).and(ID_FIELD);
+        Criteria sameValuePastId = pastId(idInsideSameValue, cursorId, fetchDescending);
+        if (fetchDescending) {
+            Criteria nullGroup = Criteria.where(sortField).is(null);
+            return new Criteria().orOperator(pastValue, sameValuePastId, nullGroup);
+        }
+        return new Criteria().orOperator(pastValue, sameValuePastId);
+    }
+
+    private static Criteria pastId(Criteria id, ObjectId cursorId, boolean fetchDescending) {
+        return fetchDescending ? id.lt(cursorId) : id.gt(cursorId);
+    }
+
+    private static ObjectId cursorObjectId(String value) {
+        if (!ObjectId.isValid(value)) {
+            throw new InvalidCursorException();
+        }
+        return new ObjectId(value);
     }
 
     @Override

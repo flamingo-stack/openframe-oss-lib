@@ -8,7 +8,9 @@ import com.openframe.api.config.JsonScalarConfig;
 import com.openframe.api.config.LongScalarConfig;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.exception.GraphQLExceptionHandler;
 import com.openframe.api.mapper.GraphQLOrganizationMapper;
 import com.openframe.api.service.organization.OrganizationQueryService;
@@ -17,6 +19,7 @@ import com.openframe.data.service.OrganizationService;
 import com.openframe.graphql.relay.RelayAutoConfiguration;
 import graphql.ExecutionResult;
 import graphql.GraphQLError;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +51,16 @@ class OrganizationDataFetcherDgsTest {
     private static final String ORGANIZATIONS_BY_STATUS = """
             { organizations(filter: { status: "%s" }) { edges { node { organizationId } } filteredCount } }
             """;
+
+    private static final String ORGANIZATIONS_AT_CURSOR = """
+            { organizations(%s: "%%%%not-base64%%%%") { edges { node { organizationId } } } }
+            """;
+
+    private static final String ORGANIZATIONS_AFTER_URL_SAFE_CURSOR = """
+            { organizations(first: 2, after: "MTcwMDAwMDAwMDAwMF8-YWI_") { edges { node { organizationId } } filteredCount } }
+            """;
+
+    private static final String URL_SAFE_CURSOR_DECODED = "1700000000000_>ab?";
 
     @Autowired
     private DgsQueryExecutor queryExecutor;
@@ -95,6 +108,48 @@ class OrganizationDataFetcherDgsTest {
         assertThat(refusal.getMessage()).contains("status must be ACTIVE or ARCHIVED");
         assertThat(result.<Object>getData()).isNull();
         verifyNoInteractions(organizationQueryService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"after", "before"})
+    void organizations_cursorThatIsNotBase64_refusedAsInvalidCursorWithoutEdges(String cursorArgument) {
+        // setup
+        String query = ORGANIZATIONS_AT_CURSOR.formatted(cursorArgument);
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(query);
+
+        // verifications
+        assertThat(result.getErrors())
+                .extracting(GraphQLError::getMessage)
+                .containsExactly("Invalid cursor");
+        assertThat(result.getErrors())
+                .extracting(GraphQLError::getExtensions)
+                .allSatisfy(extensions -> assertThat(extensions)
+                        .containsEntry("code", "INVALID_CURSOR")
+                        .containsEntry("httpStatus", 400));
+        assertThat(result.<Object>getData()).isNull();
+        verifyNoInteractions(organizationQueryService);
+    }
+
+    @Test
+    void organizations_cursorInTheUrlSafeBase64Alphabet_reachesTheQueryServiceDecoded() {
+        // setup
+        CursorPaginationCriteria afterDecodedCursor = CursorPaginationCriteria.builder()
+                .limit(2).cursor(URL_SAFE_CURSOR_DECODED).backward(false).build();
+        CountedGenericQueryResult<Organization> empty = CountedGenericQueryResult.<Organization>builder()
+                .items(List.of()).pageInfo(PageInfo.builder().build()).filteredCount(0).build();
+        when(organizationQueryService.queryOrganizations(isNull(), eq(afterDecodedCursor), isNull(), any(SortInput.class)))
+                .thenReturn(empty);
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(ORGANIZATIONS_AFTER_URL_SAFE_CURSOR);
+
+        // verifications
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.<Map<String, Object>>getData())
+                .containsEntry("organizations", Map.of("edges", List.of(), "filteredCount", 0));
+        verify(organizationQueryService).queryOrganizations(isNull(), eq(afterDecodedCursor), isNull(), any(SortInput.class));
     }
 
     @SpringBootConfiguration

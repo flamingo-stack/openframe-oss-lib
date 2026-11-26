@@ -1,5 +1,6 @@
 package com.openframe.data.repository.organization;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
@@ -390,7 +391,7 @@ class CustomOrganizationRepositoryImplIT extends BaseMongoIntegrationTest {
         save("a", 100);
         Query query = repository.buildOrganizationQuery(activeFilter(), null);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        InvalidCursorException ex = assertThrows(InvalidCursorException.class,
                 () -> repository.findOrganizationsWithCursor(query, "not-a-cursor", 2, SORT_UPDATED_AT, DESC));
 
         assertThat(ex.getMessage()).contains("Invalid cursor");
