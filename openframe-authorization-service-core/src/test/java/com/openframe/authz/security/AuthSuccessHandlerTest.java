@@ -188,7 +188,7 @@ class AuthSuccessHandlerTest {
     }
 
     @Test
-    void onAuthenticationSuccess_metricsFail_stillDelegated() throws Exception {
+    void onAuthenticationSuccess_metricsFail_loginStillRecordedAndDelegated() throws Exception {
         // setup
         Authentication auth = passwordAuthentication();
         doThrow(new IllegalStateException("registry")).when(passwordLoginMetrics).recordSucceeded(false);
@@ -197,7 +197,13 @@ class AuthSuccessHandlerTest {
         handler.onAuthenticationSuccess(request, response, auth);
 
         // verifications
+        verify(userService).touchLastLogin("ada@acme.com", TENANT);
         verify(ssoFlowSuccessHandler).onAuthenticationSuccess(request, response, auth);
+        assertThat(appender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly(
+                        "Failed to record the reCAPTCHA session state of a password login",
+                        "Login success email=ada@acme.com tenantId=tenant-1 provider=password ip=127.0.0.1 ua=null recaptchaSession=unknown");
     }
 
     @Test

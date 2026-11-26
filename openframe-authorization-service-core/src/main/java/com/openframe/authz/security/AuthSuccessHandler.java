@@ -37,6 +37,7 @@ import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHandler {
 
     private static final String NOT_PASSWORD_LOGIN = "n/a";
+    private static final String NOT_RECORDED = "unknown";
 
     private final UserService userService;
     private final SsoFlowSuccessHandler ssoFlowSuccessHandler;
@@ -70,8 +71,13 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         if (authentication instanceof OAuth2AuthenticationToken) {
             return NOT_PASSWORD_LOGIN;
         }
-        boolean recaptchaSessionPresent = RecaptchaSessionCookie.presentIn(request);
-        return passwordLoginMetrics.recordSucceeded(recaptchaSessionPresent);
+        try {
+            boolean recaptchaSessionPresent = RecaptchaSessionCookie.presentIn(request);
+            return passwordLoginMetrics.recordSucceeded(recaptchaSessionPresent);
+        } catch (RuntimeException e) {
+            log.warn("Failed to record the reCAPTCHA session state of a password login", e);
+            return NOT_RECORDED;
+        }
     }
 
     private void maybeMarkEmailVerifiedFromSso(Authentication authentication, String tenantId, String email) {
