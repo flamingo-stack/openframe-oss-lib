@@ -154,7 +154,9 @@ interface GridRowActionProps {
 /**
  * The add / remove control in the grid: a bare 40px icon button, the action cell being its frame (the design's
  * `action-button`). A card row draws it outlined, with a fill for "added" and the disabled reason as text beside it;
- * here "added" is the accent check and the reason is the button's tooltip.
+ * here "added" is the accent check and the button's tooltip says what it does to which device ("Add <device>"), with
+ * the reason after it. The column is pinned right at every width while the Device column scrolls away where the table
+ * is narrow (a tablet, a phone, a desktop's narrow content column), so the tooltip is what names a scrolled row's device.
  */
 function GridRowAction({ label, icon, tone = 'default', onClick, disabled, reason }: GridRowActionProps) {
   const button = (
@@ -175,18 +177,19 @@ function GridRowAction({ label, icon, tone = 'default', onClick, disabled, reaso
       disabled={disabled}
     />
   );
+  const tooltip = reason ? `${label}: ${reason}` : label;
   return (
     <div data-no-row-click className="pointer-events-auto flex items-center justify-center">
-      {reason ? (
-        // A disabled button takes no hover or focus: the wrapper is what the tooltip listens on.
-        <FloatingTooltip content={reason} side="left" as="span" triggerClassName="inline-flex">
-          <span tabIndex={0} aria-label={`${label}: ${reason}`} className="inline-flex rounded-md outline-none">
+      <FloatingTooltip content={tooltip} side="left" as="span" triggerClassName="inline-flex">
+        {reason ? (
+          // A disabled button takes no hover or focus: the wrapper is what the tooltip listens on.
+          <span tabIndex={0} aria-label={tooltip} className="inline-flex rounded-md outline-none">
             {button}
           </span>
-        </FloatingTooltip>
-      ) : (
-        button
-      )}
+        ) : (
+          button
+        )}
+      </FloatingTooltip>
     </div>
   );
 }
@@ -846,10 +849,6 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     if (hidden.size === 0) return columns;
     return columns.filter(c => !c.id || !hidden.has(c.id));
   }, [columns, hideColumns, isCriteria]);
-  // The add / remove column is pinned right at every width, so on a desktop window the device's name stays pinned
-  // beside it even in a narrow content column (the Mingo panel docked): otherwise a sideways scroll leaves a row of OS,
-  // status and a plus with no name. Without that column (criteria mode, `hideColumns`) the table keeps the shared rule.
-  const pinFirstColumn = visibleColumns.some(column => column.id === 'actions') ? 'desktop' : 'wide';
 
   // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
   const loadingRows = useMemo(
@@ -933,11 +932,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   );
 
   const deviceTable = (
-    <DataTable
-      table={table}
-      {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}
-      pinFirstColumn={pinFirstColumn}
-    >
+    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
       {/* The grid shows the same slot above the table; the card header carries it at its right end. */}
       {showHeader && layout === 'grid' && <DataTable.Meta>{headerSlot}</DataTable.Meta>}
       {showHeader && <DataTable.Header rightSlot={headerSlot} loading={loading} />}

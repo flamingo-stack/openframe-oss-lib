@@ -3,7 +3,7 @@
 import type { Column } from '@tanstack/react-table';
 import { createContext, useContext, useMemo, useSyncExternalStore } from 'react';
 import { createLocalStorageAdapter, type LocalStorageAdapter } from '../../../utils/local-storage-adapter';
-import { buildGridLayout, type GridLayout, type GridPinFirstColumn } from './data-table-grid';
+import { buildGridLayout, type GridLayout } from './data-table-grid';
 
 /**
  * What the viewer changed about a grid table's columns: which are hidden, their order, their widths. Columns are named
@@ -124,8 +124,6 @@ export interface GridPrefsContextValue {
   store: GridPrefsStore;
   /** The table has settings: its last header cell is the gear (`table/utility-cell`, type settings). */
   settingsEnabled: boolean;
-  /** When the table's left block is pinned (default `wide`): part of the structure, as each pinned column's `pinAt`. */
-  pinFirstColumn?: GridPinFirstColumn;
 }
 
 /** Outside a grid root (a header or body mounted on its own): the designed layout, and nothing to change. */
@@ -164,11 +162,11 @@ const selectHidden = (prefs: GridColumnPrefs) => prefs.hidden;
  * resize builds no new structure and renders no row.
  */
 export function useGridStructure<T>(visibleColumns: Column<T, unknown>[]): GridLayout {
-  const { settingsEnabled, pinFirstColumn } = useContext(GridPrefsContext);
+  const { settingsEnabled } = useContext(GridPrefsContext);
   const order = useGridPref(selectOrder);
   const hidden = useGridPref(selectHidden);
   return useMemo(
-    () => buildGridLayout(visibleColumns, { order, hidden, settings: settingsEnabled, pinFirstColumn }),
-    [visibleColumns, order, hidden, settingsEnabled, pinFirstColumn],
+    () => buildGridLayout(visibleColumns, { order, hidden, settings: settingsEnabled }),
+    [visibleColumns, order, hidden, settingsEnabled],
   );
 }
