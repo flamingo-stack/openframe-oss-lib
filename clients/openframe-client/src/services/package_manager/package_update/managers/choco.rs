@@ -6,7 +6,7 @@ use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::PackageRef;
 use crate::services::package_manager::choco::{report, root, SCRIPT_PRELUDE};
 use crate::services::package_manager::last_line;
-use crate::services::package_manager::update_gate;
+use crate::services::package_manager::{chocolatey_enabled, update_gate};
 
 const PROBE_SCRIPT: &str = r#"$id = $args[1]
 $list = Invoke-Choco list --exact $id --limit-output
@@ -32,6 +32,8 @@ exit $LASTEXITCODE
 
 const UPGRADE_TIMEOUT_SECS: u32 = 510;
 
+const NOT_ENABLED: &str = "Chocolatey is not enabled";
+
 const NOTHING_TO_DO: i32 = 2;
 const PENDING_REBOOT: i32 = 350;
 const REBOOT_INITIATED: i32 = 1641;
@@ -51,7 +53,12 @@ pub(super) async fn probe(package: &PackageRef) -> Result<Probe, QueryError> {
             "not a choco package: {package:?}"
         )));
     };
-    match report().await.map(|report| report.refusal()) {
+    let refusal = if chocolatey_enabled() {
+        report().await.map(|report| report.refusal())
+    } else {
+        Some(Some(NOT_ENABLED.to_string()))
+    };
+    match refusal {
         Some(None) => {}
         Some(Some(reason)) => {
             return Ok(Probe {
@@ -85,6 +92,9 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
             message: format!("not a choco package: {package:?}"),
         };
     };
+    if !chocolatey_enabled() {
+        return UpgradeOutcome::NotUpgradable(NOT_ENABLED.to_string());
+    }
     match update_gate::snapshot().await {
         Ok(processes) if processes.iter().any(|process| is_choco(&process.image)) => {
             return UpgradeOutcome::Busy("another Chocolatey run is in progress".to_string())
