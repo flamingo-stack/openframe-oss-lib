@@ -12,7 +12,7 @@
  * queue live in `openframe-attachment-upload`, the status reads in `useOpenFrameAttachmentStatusPoll`.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   isOpenFrameImageType,
   type OpenFrameAttachmentErrorCode,
@@ -88,10 +88,13 @@ interface View {
 
 const EMPTY_VIEW: View = { items: [], ready: [] };
 
-/** Runs the uploads, a few at once; the line is dropped on unmount. */
-function useUploadQueue(): OpenFrameUploadQueue {
-  const [queue] = useState(() => new OpenFrameUploadQueue(CONCURRENT_UPLOADS));
-  useEffect(() => () => queue.clear(), [queue]);
+/** Runs the uploads, a few at once; the line is dropped on unmount. A ref, not state: nothing renders from it. */
+function useUploadQueue(): RefObject<OpenFrameUploadQueue> {
+  const queue = useRef(new OpenFrameUploadQueue(CONCURRENT_UPLOADS));
+  useEffect(() => {
+    const line = queue.current;
+    return () => line.clear();
+  }, []);
   return queue;
 }
 
@@ -221,7 +224,7 @@ export function useOpenFrameAttachmentUploads({
         const pick = stageOpenFrameChecks(checks, randomId, previews.make);
         for (const [id, entry] of pick.entries) entries.current.set(id, entry);
         commit(prev => [...prev, ...pick.additions]);
-        for (const id of pick.queued) queue.add(id, () => upload(id));
+        for (const id of pick.queued) queue.current.add(id, () => upload(id));
       };
       // One call after another, so the second pick counts the first one's files. A check that throws must not stop
       // the picks after it.
@@ -235,7 +238,7 @@ export function useOpenFrameAttachmentUploads({
     (id: string) => {
       entries.current.get(id)?.controller?.abort();
       entries.current.delete(id);
-      queue.remove(id);
+      queue.current.remove(id);
     },
     [queue],
   );

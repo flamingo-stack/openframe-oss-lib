@@ -33,7 +33,7 @@ export interface OpenFrameAttachmentStatusPollOptions {
 export interface OpenFrameAttachmentStatusPoll {
   /** Book a status read unless one is booked or running. */
   schedule: () => void;
-  /** Drop the read in flight: nothing waits on it any more. */
+  /** Drop the read in flight and the one booked: nothing waits on them any more. */
   cancelRead: () => void;
 }
 
@@ -96,6 +96,8 @@ export function useOpenFrameAttachmentStatusPoll(
   const cancelRead = useCallback(() => {
     controller.current?.abort();
     controller.current = null;
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
   }, []);
 
   useEffect(() => {
