@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPush, mockReplace, setMockSearchParams } from '../../../../vitest.setup';
-import { isPreviousPageEntry, isStaleCursorPage, useCursorPager } from '../use-cursor-pager';
+import { isPreviousPageEntry, isStaleCursorPage, previousRoute, useCursorPager } from '../use-cursor-pager';
 
 const ORIGIN = 'http://localhost:3000';
 
@@ -185,5 +185,38 @@ describe('isStaleCursorPage', () => {
     expect(isStaleCursorPage({ cursor: 'Yw==', rowCount: 20, pageInfo, reliableHasPrev: true, backward: true })).toBe(
       false,
     );
+  });
+});
+
+describe('previousRoute', () => {
+  const at = (overrides: Partial<Parameters<typeof previousRoute>[0]>) =>
+    previousRoute({
+      isFirstPage: false,
+      canGoBackInHistory: false,
+      page: 3,
+      serverPrev: false,
+      startCursor: 's3',
+      ...overrides,
+    });
+
+  it('has no way back from the first page, whatever else holds', () => {
+    expect(at({ isFirstPage: true, canGoBackInHistory: true, serverPrev: true })).toBeNull();
+  });
+
+  it('goes back through history first, then page 2 to page 1, then the server', () => {
+    expect(at({ canGoBackInHistory: true, page: 2, serverPrev: true })).toBe('history');
+    expect(at({ page: 2, serverPrev: true })).toBe('first');
+    expect(at({ serverPrev: true })).toBe('server');
+  });
+
+  it('asks the server only with a start cursor, on a list that pages back for real, never for page 1', () => {
+    expect(at({ serverPrev: true, startCursor: null })).toBeNull();
+    expect(at({ serverPrev: false })).toBeNull();
+    expect(at({ serverPrev: true, page: 1 })).toBeNull();
+  });
+
+  it('asks the server on a page whose index is unknown (a shared link)', () => {
+    expect(at({ serverPrev: true, page: undefined })).toBe('server');
+    expect(at({ serverPrev: false, page: undefined })).toBeNull();
   });
 });

@@ -16,11 +16,6 @@ export interface CursorPaginationProps {
   currentCount?: number;
   totalCount?: number | null;
   itemName?: string;
-  /**
-   * 1-based position of the page's first row. With it the info text is the range ("21–40 of 340 devices", "21–40
-   * devices" with no total); without it, the count ("Showing 20 of 340 devices").
-   */
-  rangeStart?: number;
 
   /**
    * The pager's page is being read: every button is disabled. Before the first count is known (no `currentCount`), and
@@ -29,14 +24,7 @@ export interface CursorPaginationProps {
   loading?: boolean;
 
   onNext?: (cursor: string) => void;
-  /** Called with `startCursor` (an empty string when there is none: a pager that pages back through history). */
   onPrevious?: (cursor: string) => void;
-  /**
-   * Go to the first page. Drawn NEXT TO Previous (First · Previous · Next), disabled on the first page. Prefer it over
-   * `onReset`, which replaces Previous.
-   */
-  onFirst?: () => void;
-  /** Legacy: a First button drawn INSTEAD of Previous. Ignored when `onFirst` is set. */
   onReset?: () => void;
 
   className?: string;
@@ -46,15 +34,23 @@ export interface CursorPaginationProps {
   resetButtonIcon?: 'home' | 'rotate';
 }
 
-/** The info line: the range when the page's position is known, the count otherwise. */
+/** The info line of a paged list: the range when the page's position is known, the count otherwise. */
 export function cursorPaginationText({
   currentCount,
   totalCount,
   hasNextPage,
   itemName,
   rangeStart,
-}: Pick<CursorPaginationProps, 'currentCount' | 'totalCount' | 'hasNextPage' | 'rangeStart'> & {
+}: {
+  currentCount?: number;
+  totalCount?: number | null;
+  hasNextPage?: boolean;
   itemName: string;
+  /**
+   * 1-based position of the page's first row: "21–40 of 340 devices" ("21–40 devices" with no total). Without it, the
+   * count ("Showing 20 of 340 devices").
+   */
+  rangeStart?: number;
 }): string | null {
   if (!currentCount) return null;
   if (rangeStart !== undefined && rangeStart > 0) {
@@ -75,11 +71,9 @@ export function CursorPagination({
   currentCount,
   totalCount,
   itemName = 'items',
-  rangeStart,
   loading: loadingProp = false,
   onNext,
   onPrevious,
-  onFirst,
   onReset,
   className,
   showInfo = true,
@@ -91,10 +85,6 @@ export function CursorPagination({
   // Its data is the count: until the first one is known, the pager draws its skeleton (a page read with a count shown
   // keeps the count and only disables the buttons).
   const skeleton = loading && !currentCount;
-  // `onFirst` draws First beside Previous; the legacy `onReset` draws it instead of Previous.
-  const firstAction = onFirst ?? onReset;
-  const previousShown = hasPreviousPage !== undefined && !!onPrevious && (!!onFirst || !onReset);
-
   const handleNext = () => {
     if (hasNextPage && endCursor && onNext) {
       onNext(endCursor);
@@ -102,32 +92,26 @@ export function CursorPagination({
   };
 
   const handlePrevious = () => {
-    if (!hasPreviousPage || !onPrevious) return;
-    // The legacy pager pages back with the server cursor alone; the First · Previous pager may page back through
-    // history, with no cursor of its own.
-    if (onFirst) onPrevious(startCursor ?? '');
-    else if (startCursor) onPrevious(startCursor);
+    if (hasPreviousPage && startCursor && onPrevious) {
+      onPrevious(startCursor);
+    }
+  };
+
+  const handleReset = () => {
+    if (onReset) {
+      onReset();
+    }
   };
 
   const ResetIcon = resetButtonIcon === 'rotate' ? RotateCcw : Home;
-  const displayText = showInfo
-    ? cursorPaginationText({ currentCount, totalCount, hasNextPage, itemName, rangeStart })
-    : null;
-  // Below the content's md width the labels go (each button keeps its aria-label) and the info line sits above the
-  // buttons; `compact` always hid the labels there.
-  const labelClass = 'hidden content-md:inline';
+
+  const displayText = showInfo ? cursorPaginationText({ currentCount, totalCount, hasNextPage, itemName }) : null;
 
   return (
-    <div
-      className={cn(
-        'flex flex-col items-stretch gap-[var(--spacing-system-xsf)] content-md:flex-row content-md:items-center content-md:justify-between content-md:gap-4',
-        compact ? 'py-2' : 'py-3',
-        className,
-      )}
-    >
+    <div className={cn('flex items-center justify-between gap-4', compact ? 'py-2' : 'py-3', className)}>
       {/* Info text */}
       {showInfo && (
-        <div className="min-w-0 truncate text-ods-text-secondary text-h6">
+        <div className="text-ods-text-secondary text-h6">
           {skeleton ? (
             <TextLineSkeleton type="inherit" as="span" className="w-40" />
           ) : (
@@ -137,37 +121,34 @@ export function CursorPagination({
       )}
 
       {/* Navigation buttons (in the skeleton: the real buttons, their labels the pager's own words, inert) */}
-      <div
-        className="flex items-center justify-end gap-2"
-        inert={skeleton || undefined}
-        aria-hidden={skeleton || undefined}
-      >
-        {firstAction && (
+      <div className="flex items-center gap-2" inert={skeleton || undefined} aria-hidden={skeleton || undefined}>
+        {onReset ? (
           <Button
             variant="outline"
             size={compact ? 'small-legacy' : 'default'}
-            onClick={firstAction}
+            onClick={handleReset}
             disabled={isFirstPage || loading}
             className={cn(compact && 'h-8 px-3')}
             leftIcon={<ResetIcon className="h-4 w-4" />}
             aria-label="Go to first page"
           >
-            <span className={labelClass}>{resetButtonLabel}</span>
+            <span className={compact ? 'hidden content-md:inline' : ''}>{resetButtonLabel}</span>
           </Button>
-        )}
-
-        {previousShown && (
-          <Button
-            variant="outline"
-            size={compact ? 'small-legacy' : 'default'}
-            onClick={handlePrevious}
-            disabled={!hasPreviousPage || loading}
-            className={cn(compact && 'h-8 px-3')}
-            leftIcon={<ChevronLeft className="h-4 w-4" />}
-            aria-label="Go to previous page"
-          >
-            <span className={labelClass}>Previous</span>
-          </Button>
+        ) : (
+          hasPreviousPage !== undefined &&
+          onPrevious && (
+            <Button
+              variant="outline"
+              size={compact ? 'small-legacy' : 'default'}
+              onClick={handlePrevious}
+              disabled={!hasPreviousPage || loading}
+              className={cn(compact && 'h-8 px-3')}
+              leftIcon={<ChevronLeft className="h-4 w-4" />}
+              aria-label="Go to previous page"
+            >
+              <span className={compact ? 'hidden content-md:inline' : ''}>Previous</span>
+            </Button>
+          )
         )}
 
         <Button
@@ -179,7 +160,7 @@ export function CursorPagination({
           rightIcon={<ChevronRight className="h-4 w-4" />}
           aria-label="Go to next page"
         >
-          <span className={labelClass}>Next</span>
+          <span className={compact ? 'hidden content-md:inline' : ''}>Next</span>
         </Button>
       </div>
     </div>
@@ -192,49 +173,38 @@ export function CursorPaginationSimple({
   isFirstPage = true,
   onNext,
   onPrevious,
-  onFirst,
   onReset,
   loading = false,
   className,
 }: Pick<
   CursorPaginationProps,
-  | 'hasNextPage'
-  | 'hasPreviousPage'
-  | 'isFirstPage'
-  | 'onNext'
-  | 'onPrevious'
-  | 'onFirst'
-  | 'onReset'
-  | 'loading'
-  | 'className'
+  'hasNextPage' | 'hasPreviousPage' | 'isFirstPage' | 'onNext' | 'onPrevious' | 'onReset' | 'loading' | 'className'
 >) {
-  const firstAction = onFirst ?? onReset;
-  const previousShown = hasPreviousPage !== undefined && !!onPrevious && (!!onFirst || !onReset);
-
   return (
     <div className={cn('flex items-center gap-1', className)}>
-      {firstAction && (
+      {onReset ? (
         <Button
           variant="transparent"
           size="icon"
-          onClick={firstAction}
+          onClick={onReset}
           disabled={isFirstPage || loading}
           className="h-8 w-8"
           leftIcon={<Home className="h-4 w-4" />}
           aria-label="First"
         />
-      )}
-
-      {previousShown && (
-        <Button
-          variant="transparent"
-          size="icon"
-          onClick={() => onPrevious?.('')}
-          disabled={!hasPreviousPage || loading}
-          className="h-8 w-8"
-          leftIcon={<ChevronLeft className="h-4 w-4" />}
-          aria-label="Previous"
-        />
+      ) : (
+        hasPreviousPage !== undefined &&
+        onPrevious && (
+          <Button
+            variant="transparent"
+            size="icon"
+            onClick={() => onPrevious?.('')}
+            disabled={!hasPreviousPage || loading}
+            className="h-8 w-8"
+            leftIcon={<ChevronLeft className="h-4 w-4" />}
+            aria-label="Previous"
+          />
+        )
       )}
 
       <Button

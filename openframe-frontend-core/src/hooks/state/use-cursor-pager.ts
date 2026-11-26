@@ -205,6 +205,34 @@ export function isPreviousPageEntry(
   return previousPage === page - 1;
 }
 
+/** How Previous leaves a page: back through history, to the first page, back on the server, or not at all. */
+export type PreviousRoute = 'history' | 'first' | 'server' | null;
+
+/**
+ * The one rule for Previous: the button is enabled exactly when this names a route, and the click takes that route.
+ * Browser history first (the entry behind is this table's previous page), then page 2's way to page 1, then the server
+ * (`last/before: startCursor`) on a list that pages back for real.
+ */
+export function previousRoute({
+  isFirstPage,
+  canGoBackInHistory,
+  page,
+  serverPrev,
+  startCursor,
+}: {
+  isFirstPage: boolean;
+  canGoBackInHistory: boolean;
+  page: number | undefined;
+  serverPrev: boolean;
+  startCursor: string | null | undefined;
+}): PreviousRoute {
+  if (isFirstPage) return null;
+  if (canGoBackInHistory) return 'history';
+  if (page === 2) return 'first';
+  if (serverPrev && startCursor && page !== 1) return 'server';
+  return null;
+}
+
 export function useCursorPager({
   prefix = '',
   pageSize,
@@ -255,22 +283,17 @@ export function useCursorPager({
 
   const goPrevious = useCallback(
     (startCursor?: string | null) => {
-      if (canGoBackInHistory) {
-        window.history.back();
-        return;
-      }
-      if (page === 2) {
-        goFirst();
-        return;
-      }
-      if (serverPrev && startCursor) {
+      const route = previousRoute({ isFirstPage, canGoBackInHistory, page, serverPrev, startCursor });
+      if (route === 'history') window.history.back();
+      else if (route === 'first') goFirst();
+      else if (route === 'server' && startCursor) {
         setParams(
           { cursor: startCursor, page: page === undefined ? null : page - 1, dir: 'before' },
           { history: 'push' },
         );
       }
     },
-    [canGoBackInHistory, page, serverPrev, setParams, goFirst],
+    [isFirstPage, canGoBackInHistory, page, serverPrev, setParams, goFirst],
   );
 
   // The safety net: a cursor issued under other filters leaves the URL (without a history entry).
@@ -292,8 +315,7 @@ export function useCursorPager({
       return {
         // A page read backward always has the page it came from after it.
         hasNextPage: backward ? true : !!pageInfo?.hasNextPage,
-        hasPreviousPage:
-          !isFirstPage && (canGoBackInHistory || page === 2 || (serverPrev && !!startCursor && page !== 1)),
+        hasPreviousPage: previousRoute({ isFirstPage, canGoBackInHistory, page, serverPrev, startCursor }) !== null,
         isFirstPage,
         page,
         startCursor,

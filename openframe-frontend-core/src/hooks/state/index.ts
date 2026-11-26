@@ -76,12 +76,14 @@ export {
   isPreviousPageEntry,
   isStaleCursorPage,
   previousHistoryEntryUrl,
+  previousRoute,
   useCursorPager,
 } from './use-cursor-pager';
 export type {
   CursorPageInfo,
   CursorPagerFooterProps,
   CursorPagerVariables,
+  PreviousRoute,
   UseCursorPagerOptions,
   UseCursorPagerReturn,
 } from './use-cursor-pager';
