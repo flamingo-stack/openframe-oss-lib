@@ -36,6 +36,8 @@ import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 @RequiredArgsConstructor
 public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHandler {
 
+    private static final String NOT_PASSWORD_LOGIN = "n/a";
+
     private final UserService userService;
     private final SsoFlowSuccessHandler ssoFlowSuccessHandler;
     private final SsoProviderRegistry ssoProviderRegistry;
@@ -48,14 +50,11 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         try {
             String tenantId = TenantContext.getTenantId();
             String email = extractEmail(authentication);
-            boolean recaptchaSessionPresent = RecaptchaSessionCookie.presentIn(request);
+            String recaptchaSession = recordRecaptchaSession(request, authentication);
             log.info("Login success email={} tenantId={} provider={} ip={} ua={} recaptchaSession={}", email, tenantId,
                     authentication instanceof OAuth2AuthenticationToken oauth2
                             ? oauth2.getAuthorizedClientRegistrationId() : "password",
-                    ClientIp.of(request), request.getHeader(HttpHeaders.USER_AGENT), recaptchaSessionPresent);
-            if (!(authentication instanceof OAuth2AuthenticationToken)) {
-                passwordLoginMetrics.recordSucceeded(recaptchaSessionPresent);
-            }
+                    ClientIp.of(request), request.getHeader(HttpHeaders.USER_AGENT), recaptchaSession);
             if (tenantId != null && email != null && !email.isBlank()) {
                 userService.touchLastLogin(email, tenantId);
                 maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);
@@ -65,6 +64,14 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         }
 
         ssoFlowSuccessHandler.onAuthenticationSuccess(request, response, authentication);
+    }
+
+    private String recordRecaptchaSession(HttpServletRequest request, Authentication authentication) {
+        if (authentication instanceof OAuth2AuthenticationToken) {
+            return NOT_PASSWORD_LOGIN;
+        }
+        boolean recaptchaSessionPresent = RecaptchaSessionCookie.presentIn(request);
+        return passwordLoginMetrics.recordSucceeded(recaptchaSessionPresent);
     }
 
     private void maybeMarkEmailVerifiedFromSso(Authentication authentication, String tenantId, String email) {

@@ -21,9 +21,10 @@ class PasswordLoginMetricsTest {
         PasswordLoginMetrics metrics = new PasswordLoginMetrics(registry, SESSION_SITE_KEY);
 
         // execution
-        metrics.recordSucceeded(true);
+        String recaptchaSession = metrics.recordSucceeded(true);
 
         // verifications
+        assertThat(recaptchaSession).isEqualTo("present");
         assertThat(registry.get(SUCCEEDED_COUNTER).tag(TAG_RECAPTCHA_SESSION, "present").counter().count()).isEqualTo(1.0);
         assertThat(registry.find(SUCCEEDED_COUNTER).tag(TAG_RECAPTCHA_SESSION, "absent").counter()).isNull();
     }
@@ -35,9 +36,10 @@ class PasswordLoginMetricsTest {
 
         // execution
         metrics.recordSucceeded(false);
-        metrics.recordSucceeded(false);
+        String recaptchaSession = metrics.recordSucceeded(false);
 
         // verifications
+        assertThat(recaptchaSession).isEqualTo("absent");
         assertThat(registry.get(SUCCEEDED_COUNTER).tag(TAG_RECAPTCHA_SESSION, "absent").counter().count()).isEqualTo(2.0);
         assertThat(registry.find(SUCCEEDED_COUNTER).tag(TAG_RECAPTCHA_SESSION, "present").counter()).isNull();
     }
@@ -49,10 +51,12 @@ class PasswordLoginMetricsTest {
         PasswordLoginMetrics metrics = new PasswordLoginMetrics(registry, sessionSiteKey);
 
         // execution
-        metrics.recordSucceeded(true);
-        metrics.recordSucceeded(false);
+        String withCookie = metrics.recordSucceeded(true);
+        String withoutCookie = metrics.recordSucceeded(false);
 
         // verifications
+        assertThat(withCookie).isEqualTo("not_expected");
+        assertThat(withoutCookie).isEqualTo("not_expected");
         assertThat(registry.find(SUCCEEDED_COUNTER).counter()).isNull();
     }
 }

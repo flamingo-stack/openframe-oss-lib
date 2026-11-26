@@ -11,6 +11,7 @@ public class PasswordLoginMetrics {
     private static final String TAG_RECAPTCHA_SESSION = "recaptcha_session";
     private static final String PRESENT = "present";
     private static final String ABSENT = "absent";
+    private static final String NOT_EXPECTED = "not_expected";
 
     private final MeterRegistry meterRegistry;
     private final boolean recaptchaSessionExpected;
@@ -21,11 +22,12 @@ public class PasswordLoginMetrics {
         this.recaptchaSessionExpected = !recaptchaSessionSiteKey.isBlank();
     }
 
-    public void recordSucceeded(boolean recaptchaSessionPresent) {
+    public String recordSucceeded(boolean recaptchaSessionPresent) {
         if (!recaptchaSessionExpected) {
-            return;
+            return NOT_EXPECTED;
         }
         String recaptchaSession = recaptchaSessionPresent ? PRESENT : ABSENT;
         meterRegistry.counter(SUCCEEDED_COUNTER, TAG_RECAPTCHA_SESSION, recaptchaSession).increment();
+        return recaptchaSession;
     }
 }
