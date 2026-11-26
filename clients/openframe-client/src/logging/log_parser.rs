@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::{Local, NaiveDateTime, SecondsFormat, Utc};
 use indexmap::IndexMap;
 use serde::Serialize;
 use std::fs::File;
@@ -65,7 +66,7 @@ pub fn read_new_logs(
 }
 
 pub fn parse_log_line(line: &str) -> Option<LogEntry> {
-    if let Some(entry) = parse_tracing_format(line) {
+    if let Some(entry) = parse_tracing_format(line).or_else(|| parse_chat_format(line)) {
         return Some(entry);
     }
 
@@ -98,6 +99,24 @@ fn is_client_log(entry: &LogEntry) -> bool {
         return false;
     }
     entry.msg.starts_with("openframe") || entry.msg.starts_with("async_nats")
+}
+
+/// Parse openframe-chat (tauri-plugin-log) format: `[date][time][LEVEL][target] msg`, in local time
+fn parse_chat_format(line: &str) -> Option<LogEntry> {
+    let (local, rest) = NaiveDateTime::parse_and_remainder(line, "[%Y-%m-%d][%H:%M:%S][").ok()?;
+    let (level, rest) = rest.split_once("][")?;
+    let (target, msg) = rest.split_once("] ")?;
+    let ts = local
+        .and_local_timezone(Local)
+        .earliest()?
+        .with_timezone(&Utc);
+
+    Some(LogEntry {
+        ts: ts.to_rfc3339_opts(SecondsFormat::Micros, true),
+        level: level.to_uppercase(),
+        msg: format!("[chat] {target}: {msg}"),
+        count: None,
+    })
 }
 
 /// Parse OpenFrame tracing compact format

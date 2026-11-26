@@ -1,11 +1,14 @@
 use anyhow::{Context, Result};
 use async_nats::jetstream;
-use std::path::PathBuf;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
 use tracing::{debug, error, info};
 
+use crate::platform::directories::get_chat_logs_directory;
+use crate::platform::user_session::user_homes;
 use crate::platform::DirectoryManager;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::{
@@ -291,26 +294,74 @@ fn spawn_source_discovery(
     directory_manager: DirectoryManager,
 ) {
     tokio::spawn(async move {
+        let mut meshcentral_found = false;
+        let mut chat_logs = HashSet::new();
         loop {
             tokio::time::sleep(Duration::from_secs(SOURCE_DISCOVERY_INTERVAL_SECS)).await;
 
-            match create_meshcentral_source(&installed_tools_service, &directory_manager).await {
-                Some(source) => {
-                    info!("Meshcentral log source discovered, registering");
-                    if tx.send(source).await.is_err() {
-                        return;
+            if !meshcentral_found {
+                match create_meshcentral_source(&installed_tools_service, &directory_manager).await
+                {
+                    Some(source) => {
+                        info!("Meshcentral log source discovered, registering");
+                        if tx.send(source).await.is_err() {
+                            return;
+                        }
+                        meshcentral_found = true;
                     }
-                    return;
+                    None => {
+                        debug!(
+                            "Meshcentral not installed yet, will retry in {}s",
+                            SOURCE_DISCOVERY_INTERVAL_SECS
+                        );
+                    }
                 }
-                None => {
-                    debug!(
-                        "Meshcentral not installed yet, will retry in {}s",
-                        SOURCE_DISCOVERY_INTERVAL_SECS
-                    );
+            }
+
+            let homes = user_homes();
+            for source in new_chat_sources(&mut chat_logs, &homes, directory_manager.secured_dir())
+            {
+                info!("openframe-chat log source discovered, registering");
+                if tx.send(source).await.is_err() {
+                    return;
                 }
             }
         }
     });
+}
+
+/// One source per home folder whose chat log exists and is not streamed yet; `known` holds the streamed paths.
+fn new_chat_sources(
+    known: &mut HashSet<PathBuf>,
+    homes: &[PathBuf],
+    secured_dir: &Path,
+) -> Vec<Box<dyn LogSource>> {
+    let mut sources: Vec<Box<dyn LogSource>> = Vec::new();
+    let chat_id = LogSourceKind::OpenframeChat.to_string();
+    for home in homes {
+        let log_path = get_chat_logs_directory(home).join(format!("{}.log", chat_id));
+        if known.contains(&log_path) || !log_path.is_file() {
+            continue;
+        }
+        let offset_path =
+            secured_dir.join(format!("chat_log_offset_{:016x}", path_hash(&log_path)));
+        known.insert(log_path.clone());
+        sources.push(Box::new(FileLogSource::new(
+            LogSourceKind::OpenframeChat,
+            log_path,
+            offset_path,
+        )));
+    }
+    sources
+}
+
+/// FNV-1a of the path: an offset file name that stays the same across client builds.
+fn path_hash(path: &Path) -> u64 {
+    path.to_string_lossy()
+        .bytes()
+        .fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+        })
 }
 
 async fn create_meshcentral_source(

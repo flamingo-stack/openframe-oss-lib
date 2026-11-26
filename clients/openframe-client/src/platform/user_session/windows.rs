@@ -1,6 +1,6 @@
 use crate::utils::windows_helpers::{build_command_line, to_wide, wcslen};
 use anyhow::{Context, Result};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tracing::{error, info, warn};
 use windows::{
     core::{PCWSTR, PWSTR},
@@ -11,6 +11,8 @@ use windows::{
     Win32::System::Threading::*,
     Win32::UI::WindowsAndMessaging::SW_SHOW,
 };
+use winreg::enums::HKEY_LOCAL_MACHINE;
+use winreg::RegKey;
 
 pub(crate) fn launch_in_user_session(command_path: &str, args: &[String]) -> Result<u32> {
     let session_id = get_active_user_session().context("No active user session found")?;
@@ -49,6 +51,31 @@ pub(crate) fn launch_app_in_session(
 /// The user logged on to the session a process ran in.
 pub(crate) fn session_user(session: Option<u32>) -> Option<String> {
     session.and_then(session_user_name)
+}
+
+const PROFILE_LIST: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList";
+
+/// Home folders of the local and domain user accounts (`S-1-5-21-*`) in the registry profile list.
+pub(crate) fn user_homes() -> Vec<PathBuf> {
+    homes_in(&RegKey::predef(HKEY_LOCAL_MACHINE), PROFILE_LIST)
+}
+
+fn homes_in(root: &RegKey, key_path: &str) -> Vec<PathBuf> {
+    let Ok(list) = root.open_subkey(key_path) else {
+        return Vec::new();
+    };
+    list.enum_keys()
+        .flatten()
+        .filter(|sid| sid.starts_with("S-1-5-21-"))
+        .filter_map(|sid| {
+            let home: String = list
+                .open_subkey(&sid)
+                .ok()?
+                .get_value("ProfileImagePath")
+                .ok()?;
+            Some(PathBuf::from(home))
+        })
+        .collect()
 }
 
 /// The user logged on to a session; `None` for session 0 or when it cannot be read.

@@ -1,4 +1,5 @@
 use super::*;
+use std::fs::File;
 use std::io::Write;
 use tempfile::TempDir;
 
@@ -103,4 +104,26 @@ fn test_registry_distributes_reads_across_sources() {
 
     let logs = registry.read_all(50);
     assert!(logs.len() <= 50);
+}
+
+#[test]
+fn a_chat_source_reads_chat_lines_as_chat_entries() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("openframe-chat.log");
+    std::fs::write(
+        &log_path,
+        "[2026-11-25][01:00:00][INFO][app_lib] first\n[2026-11-25][01:00:01][ERROR][app_lib] second\n",
+    )
+    .unwrap();
+
+    let mut source = FileLogSource::new(
+        LogSourceKind::OpenframeChat,
+        log_path,
+        tmp.path().join("chat_offset"),
+    );
+
+    let entries = source.read(10).unwrap();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[1].msg, "[chat] app_lib: second");
+    assert_eq!(entries[1].level, "ERROR");
 }
