@@ -16,4 +16,6 @@ public interface OsUpdateOverrideRepository extends MongoRepository<OsUpdateOver
 
     List<OsUpdateOverride> findByTenantIdAndPlatformAndIdentifier(
             String tenantId, OsPlatform platform, String identifier);
+
+    long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 }

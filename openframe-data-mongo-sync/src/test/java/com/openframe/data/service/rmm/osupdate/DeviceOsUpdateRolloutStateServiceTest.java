@@ -228,6 +228,29 @@ class DeviceOsUpdateRolloutStateServiceTest {
     }
 
     @Test
+    void isRolloutDevice_manageableWindowsDeviceThatReportsItsOs_true() {
+        // execution, verifications
+        assertThat(deviceOsUpdateRolloutStateService.isRolloutDevice("machine-1")).isTrue();
+    }
+
+    @Test
+    void isRolloutDevice_deviceWeCannotManage_false() {
+        // setup
+        when(deviceOsStateRepository.findByTenantIdAndPlatformAndMachineIdIn(TENANT_ID, OsPlatform.WINDOWS,
+                List.of("machine-1")))
+                .thenReturn(List.of(deviceOsState("machine-1", OsUpdateManageabilityState.NOT_MANAGEABLE)));
+
+        // execution, verifications
+        assertThat(deviceOsUpdateRolloutStateService.isRolloutDevice("machine-1")).isFalse();
+    }
+
+    @Test
+    void isRolloutDevice_deviceWithoutAWindowsOsReport_false() {
+        // execution, verifications
+        assertThat(deviceOsUpdateRolloutStateService.isRolloutDevice("machine-mac")).isFalse();
+    }
+
+    @Test
     void refreshMachines_noPolicyCoversTheDevice_savesNothing() {
         // setup
         osUpdatePolicy.setTarget(OsUpdatePolicyTarget.builder()

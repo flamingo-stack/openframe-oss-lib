@@ -6,7 +6,8 @@ extend type Query {
     osUpdatePolicy(id: ID!): OsUpdatePolicy
 
     """The policy the device follows: the most specific one that covers it, in the order device, device tag,
-    customer, tenant. Null = no policy covers the device, or the device cannot be managed."""
+    customer, tenant. Null = no policy covers the device, or the policies are not applied to it: a Mac, a device
+    that does not report its OS, a device that cannot be managed."""
     deviceOsUpdatePolicy(machineId: String!): OsUpdatePolicy
 
     """The technicians' decisions on one update that stand on top of the policies."""
@@ -15,7 +16,9 @@ extend type Query {
 
 extend type Mutation {
     """Refused with OS_UPDATE_POLICY_CONFLICT when a device would fall under this policy and under another one of
-    the same target type; the message names the other policy and the devices."""
+    the same target type; the message names the other policy and up to 10 of the devices. A saved, changed or
+    deleted policy reaches DeviceOsUpdateRolloutState of the devices with the next scheduled run, within about
+    a minute."""
     createOsUpdatePolicy(input: OsUpdatePolicyInput!): OsUpdatePolicy!
 
     """Replaces the policy as a whole. Refused like createOsUpdatePolicy."""
@@ -24,10 +27,12 @@ extend type Mutation {
     deleteOsUpdatePolicy(id: ID!): ID!
 
     """Approves, holds or rejects one update on top of the policies. Replaces the earlier decision of the same
-    scope."""
+    scope. A decision for one device reaches DeviceOsUpdateRolloutState of that device with this call; one for
+    a customer or for every customer reaches the devices with the next scheduled run, within about a minute."""
     setOsUpdateOverride(input: OsUpdateOverrideInput!): OsUpdateOverride!
 
-    """Takes the decision of that scope back, so the policy decides again. False = there was none."""
+    """Takes the decision of that scope back, so the policy decides again, as fast as setOsUpdateOverride does.
+    False = there was none."""
     removeOsUpdateOverride(osUpdateId: ID!, organizationId: String, machineId: String): Boolean!
 }
 
@@ -205,7 +210,7 @@ input OsUpdatePolicyInput {
 
 input OsUpdateMaintenanceWindowInput {
     deviceClass: OsUpdateDeviceClass!
-    """At least one day."""
+    """At least one day, each day once."""
     daysOfWeek: [DayOfWeek!]!
     fromTime: String!
     """Must differ from fromTime."""

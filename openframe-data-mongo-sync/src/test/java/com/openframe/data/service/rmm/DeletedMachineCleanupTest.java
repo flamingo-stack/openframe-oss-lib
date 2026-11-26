@@ -4,6 +4,9 @@ import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTarget;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTargetType;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
@@ -23,6 +26,8 @@ import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepositor
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOverrideRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
@@ -71,6 +76,8 @@ class DeletedMachineCleanupTest {
     @Mock private DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
     @Mock private DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
     @Mock private DeviceOsUpdateRolloutStateRepository deviceOsUpdateRolloutStateRepository;
+    @Mock private OsUpdateOverrideRepository osUpdateOverrideRepository;
+    @Mock private OsUpdatePolicyRepository osUpdatePolicyRepository;
 
     @InjectMocks private DeletedMachineCleanup cleanup;
 
@@ -102,7 +109,7 @@ class DeletedMachineCleanupTest {
         verifyNoInteractions(assignedRepository, softwareAssignedRepository, softwareOnlineDispatchRepository,
                 onlineDeviceDispatchRepository, deviceSoftwareRepository, projectionTrigger,
                 deviceOsStateRepository, deviceOsPendingUpdateRepository, deviceOsUpdateHistoryRepository,
-                deviceOsUpdateRolloutStateRepository);
+                deviceOsUpdateRolloutStateRepository, osUpdateOverrideRepository, osUpdatePolicyRepository);
     }
 
     @Test
@@ -265,6 +272,34 @@ class DeletedMachineCleanupTest {
 
         // verifications
         verify(deviceOsUpdateRolloutStateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+    }
+
+    @Test
+    void cleanUpDeletedMachine_deviceWithOverrides_overridesOfThatDeviceRemoved() {
+        // execution
+        cleanup.cleanUpDeletedMachine("t-1", "m-1");
+
+        // verifications
+        verify(osUpdateOverrideRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+    }
+
+    @Test
+    void cleanUpDeletedMachine_deviceNamedByDevicePolicies_takenOutOfThemAndAPolicyLeftWithoutDevicesStays() {
+        // setup
+        OsUpdatePolicy ofTwoDevices = OsUpdatePolicy.builder().id("policy-1").target(OsUpdatePolicyTarget.builder()
+                .type(OsUpdatePolicyTargetType.DEVICE).machineIds(List.of("m-1", "m-2")).build()).build();
+        OsUpdatePolicy ofThisDevice = OsUpdatePolicy.builder().id("policy-2").target(OsUpdatePolicyTarget.builder()
+                .type(OsUpdatePolicyTargetType.DEVICE).machineIds(List.of("m-1")).build()).build();
+        when(osUpdatePolicyRepository.findByTenantIdAndTargetMachineIdsContaining("t-1", "m-1"))
+                .thenReturn(List.of(ofTwoDevices, ofThisDevice));
+
+        // execution
+        cleanup.cleanUpDeletedMachine("t-1", "m-1");
+
+        // verifications
+        verify(osUpdatePolicyRepository).saveAll(List.of(ofTwoDevices, ofThisDevice));
+        assertThat(ofTwoDevices.getTarget().getMachineIds()).containsExactly("m-2");
+        assertThat(ofThisDevice.getTarget().getMachineIds()).isEmpty();
     }
 
     @Test

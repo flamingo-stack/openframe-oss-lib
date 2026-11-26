@@ -32,6 +32,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -215,6 +216,18 @@ class OsUpdatePolicyValidatorTest {
         assertFieldErrors("maintenanceWindows.WORKSTATION.daysOfWeek", "maintenanceWindows.WORKSTATION.toTime");
     }
 
+    @Test
+    void validate_windowListingADayTwice_namesTheDays() {
+        // setup
+        command.maintenanceWindows(Map.of(
+                OsUpdateDeviceClass.WORKSTATION, window("01:00", "04:00")
+                        .daysOfWeek(List.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY, DayOfWeek.MONDAY)).build(),
+                OsUpdateDeviceClass.SERVER, window("03:00", "06:00").build()));
+
+        // execution, verifications
+        assertFieldErrors("maintenanceWindows.WORKSTATION.daysOfWeek");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"24:00", "1:00", "01:60", "01:00:00", "night"})
     void validate_windowTimeThatIsNotATimeOfDay_namesTheField(String time) {
@@ -333,6 +346,33 @@ class OsUpdatePolicyValidatorTest {
                 .hasMessageContaining("Servers")
                 .hasMessageContaining("machine-2")
                 .hasMessageNotContaining("machine-1");
+    }
+
+    @Test
+    void validate_devicePolicySharingTwelveDevicesWithAnother_conflictNamingTenAndTheNumberOfTheRest() {
+        // setup
+        List<String> machineIds = IntStream.rangeClosed(1, 12).mapToObj(number -> "machine-" + number).toList();
+        command.target(target(OsUpdatePolicyTargetType.DEVICE).machineIds(machineIds).build());
+        OsUpdatePolicy other = policy("Servers", target(OsUpdatePolicyTargetType.DEVICE).machineIds(machineIds).build());
+
+        // execution, verifications
+        assertThatThrownBy(() -> osUpdatePolicyValidator.validate(command.build(), List.of(other)))
+                .isInstanceOf(OsUpdatePolicyConflictException.class)
+                .hasMessageContaining("machine-10 and 2 more")
+                .hasMessageNotContaining("machine-11");
+    }
+
+    @Test
+    void validate_devicePolicySharingTenDevicesWithAnother_conflictNamingAllOfThem() {
+        // setup
+        List<String> machineIds = IntStream.rangeClosed(1, 10).mapToObj(number -> "machine-" + number).toList();
+        command.target(target(OsUpdatePolicyTargetType.DEVICE).machineIds(machineIds).build());
+        OsUpdatePolicy other = policy("Servers", target(OsUpdatePolicyTargetType.DEVICE).machineIds(machineIds).build());
+
+        // execution, verifications
+        assertThatThrownBy(() -> osUpdatePolicyValidator.validate(command.build(), List.of(other)))
+                .isInstanceOf(OsUpdatePolicyConflictException.class)
+                .hasMessageEndingWith("machine-9, machine-10");
     }
 
     @Test

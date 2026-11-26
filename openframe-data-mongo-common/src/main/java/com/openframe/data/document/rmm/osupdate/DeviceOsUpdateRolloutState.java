@@ -22,8 +22,6 @@ import java.time.Instant;
         name = "tenant_machine_identifier",
         def = "{'tenantId': 1, 'machineId': 1, 'identifier': 1}",
         unique = true)
-@CompoundIndex(name = "tenant_identifier", def = "{'tenantId': 1, 'platform': 1, 'identifier': 1}")
-@CompoundIndex(name = "tenant_hard", def = "{'tenantId': 1, 'hardAt': 1}")
 public class DeviceOsUpdateRolloutState implements TenantScoped {
 
     @Id

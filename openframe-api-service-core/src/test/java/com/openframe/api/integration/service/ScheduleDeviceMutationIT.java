@@ -34,11 +34,14 @@ import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.osupdate.CustomDeviceOsPendingUpdateRepositoryImpl;
+import com.openframe.data.repository.rmm.osupdate.CustomDeviceOsStateRepositoryImpl;
 import com.openframe.data.repository.rmm.osupdate.CustomDeviceOsUpdateHistoryRepositoryImpl;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOverrideRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -235,10 +238,11 @@ class ScheduleDeviceMutationIT {
                 repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class),
                 inventory, mock(SoftwareProjectionTrigger.class), mock(MachineWriter.class),
                 new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory()),
-                repositoryFactory.getRepository(DeviceOsStateRepository.class),
+                osStateRepository(),
                 osPendingUpdateRepository(),
                 osUpdateHistoryRepository(),
-                mock(DeviceOsUpdateRolloutStateRepository.class));
+                mock(DeviceOsUpdateRolloutStateRepository.class),
+                mock(OsUpdateOverrideRepository.class), osUpdatePolicyRepository());
         DeviceService service = new DeviceService(machines, cleanup, mock(AuditRecorder.class),
                 mock(DeviceSoftwareConnectivitySync.class),
                 mock(MachineWriter.class), mock(TagRepository.class), mock(TagAssignmentRepository.class),
@@ -281,10 +285,11 @@ class ScheduleDeviceMutationIT {
                 repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class), inventory, projection,
                 new MachineWriter(mongoTemplate, absent(), absent()),
                 new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory()),
-                repositoryFactory.getRepository(DeviceOsStateRepository.class),
+                osStateRepository(),
                 osPendingUpdateRepository(),
                 osUpdateHistoryRepository(),
-                mock(DeviceOsUpdateRolloutStateRepository.class));
+                mock(DeviceOsUpdateRolloutStateRepository.class),
+                mock(OsUpdateOverrideRepository.class), osUpdatePolicyRepository());
 
         // execution
         assertThatThrownBy(() -> cleanup.markDeleted(machine)).hasMessage("simulated inventory projection failure");
@@ -316,10 +321,11 @@ class ScheduleDeviceMutationIT {
                 reconnects,
                 mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), writer,
                 new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory()),
-                repositoryFactory.getRepository(DeviceOsStateRepository.class),
+                osStateRepository(),
                 osPendingUpdateRepository(),
                 osUpdateHistoryRepository(),
-                mock(DeviceOsUpdateRolloutStateRepository.class));
+                mock(DeviceOsUpdateRolloutStateRepository.class),
+                mock(OsUpdateOverrideRepository.class), osUpdatePolicyRepository());
         String deviceId = "restored-schedule-device";
         Machine machine = new Machine();
         machine.setTenantId(TENANT);
@@ -370,10 +376,11 @@ class ScheduleDeviceMutationIT {
                 repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments, softwareSchedules(),
                 repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class),
                 mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), writer, transaction,
-                repositoryFactory.getRepository(DeviceOsStateRepository.class),
+                osStateRepository(),
                 osPendingUpdateRepository(),
                 osUpdateHistoryRepository(),
-                mock(DeviceOsUpdateRolloutStateRepository.class));
+                mock(DeviceOsUpdateRolloutStateRepository.class),
+                mock(OsUpdateOverrideRepository.class), osUpdatePolicyRepository());
         SoftwareScheduleRepository schedules = repositoryFactory.getRepository(SoftwareScheduleRepository.class);
         SoftwareSchedule schedule = schedules.save(SoftwareSchedule.builder().tenantId(TENANT)
                 .selectionMode(ScheduleDeviceSelectionMode.SPECIFIC).status(ScriptStatus.ACTIVE).packages(List.of()).build());
@@ -421,6 +428,15 @@ class ScheduleDeviceMutationIT {
 
     private static SoftwareScheduleRepository softwareSchedules() {
         return repositoryFactory.getRepository(SoftwareScheduleRepository.class);
+    }
+
+    private static DeviceOsStateRepository osStateRepository() {
+        return repositoryFactory.getRepository(DeviceOsStateRepository.class,
+                RepositoryFragments.just(new CustomDeviceOsStateRepositoryImpl(mongoTemplate)));
+    }
+
+    private static OsUpdatePolicyRepository osUpdatePolicyRepository() {
+        return repositoryFactory.getRepository(OsUpdatePolicyRepository.class);
     }
 
     private static DeviceOsPendingUpdateRepository osPendingUpdateRepository() {

@@ -13,4 +13,6 @@ public interface OsUpdatePolicyRepository extends MongoRepository<OsUpdatePolicy
     List<OsUpdatePolicy> findByTenantIdOrderByCreatedAtAsc(String tenantId);
 
     Optional<OsUpdatePolicy> findByTenantIdAndId(String tenantId, String id);
+
+    List<OsUpdatePolicy> findByTenantIdAndTargetMachineIdsContaining(String tenantId, String machineId);
 }

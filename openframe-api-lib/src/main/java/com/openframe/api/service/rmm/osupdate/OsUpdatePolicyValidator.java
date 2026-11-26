@@ -23,12 +23,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
@@ -36,6 +38,7 @@ import java.util.regex.Pattern;
 public class OsUpdatePolicyValidator {
 
     private static final Pattern TIME_OF_DAY = Pattern.compile("([01]\\d|2[0-3]):[0-5]\\d");
+    private static final int NAMED_DEVICES_LIMIT = 10;
 
     private final TagAssignmentRepository tagAssignmentRepository;
 
@@ -181,6 +184,8 @@ public class OsUpdatePolicyValidator {
                                            List<ValidationException.FieldError> fieldErrors) {
         if (CollectionUtils.isEmpty(osUpdateMaintenanceWindow.getDaysOfWeek())) {
             fieldErrors.add(new ValidationException.FieldError(field + ".daysOfWeek", "must not be empty"));
+        } else if (hasRepeatedDay(osUpdateMaintenanceWindow)) {
+            fieldErrors.add(new ValidationException.FieldError(field + ".daysOfWeek", "must not list a day twice"));
         }
         if (isNotTimeOfDay(osUpdateMaintenanceWindow.getFromTime())) {
             fieldErrors.add(new ValidationException.FieldError(field + ".fromTime", "must be a time as HH:mm"));
@@ -190,6 +195,11 @@ public class OsUpdatePolicyValidator {
         } else if (osUpdateMaintenanceWindow.getToTime().equals(osUpdateMaintenanceWindow.getFromTime())) {
             fieldErrors.add(new ValidationException.FieldError(field + ".toTime", "must differ from fromTime"));
         }
+    }
+
+    private boolean hasRepeatedDay(OsUpdateMaintenanceWindow osUpdateMaintenanceWindow) {
+        List<DayOfWeek> daysOfWeek = osUpdateMaintenanceWindow.getDaysOfWeek();
+        return daysOfWeek.stream().distinct().count() < daysOfWeek.size();
     }
 
     private boolean isNotTimeOfDay(String time) {
@@ -260,7 +270,7 @@ public class OsUpdatePolicyValidator {
                 yield sharedMachineIds.isEmpty()
                         ? Optional.empty()
                         : Optional.of("The policy '%s' already names the devices %s"
-                                .formatted(other.getName(), sharedMachineIds));
+                                .formatted(other.getName(), describeDevices(sharedMachineIds)));
             }
             case DEVICE_TAG -> findTagConflict(target, other);
         };
@@ -291,6 +301,12 @@ public class OsUpdatePolicyValidator {
         return machineIdsOfBoth.isEmpty()
                 ? Optional.empty()
                 : Optional.of("The devices %s also carry a tag of the policy '%s'"
-                        .formatted(machineIdsOfBoth, other.getName()));
+                        .formatted(describeDevices(machineIdsOfBoth), other.getName()));
+    }
+
+    private String describeDevices(List<String> machineIds) {
+        String namedMachineIds = machineIds.stream().limit(NAMED_DEVICES_LIMIT).collect(Collectors.joining(", "));
+        int notNamedCount = machineIds.size() - NAMED_DEVICES_LIMIT;
+        return notNamedCount > 0 ? "%s and %d more".formatted(namedMachineIds, notNamedCount) : namedMachineIds;
     }
 }

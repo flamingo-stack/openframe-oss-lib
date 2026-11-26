@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,7 +69,7 @@ class OsUpdateOverrideServiceTest {
     }
 
     @Test
-    void setOverride_customerThatHasOne_replacesItsActionAndRefreshesEveryDevice() {
+    void setOverride_customerThatHasOne_replacesItsActionAndLeavesTheRolloutToTheScheduledRun() {
         // execution
         OsUpdateOverrideResponse saved = osUpdateOverrideService.setOverride(
                 OS_UPDATE_ID, OsUpdateOverrideAction.APPROVE, "org-1", null, "user-1");
@@ -79,7 +80,7 @@ class OsUpdateOverrideServiceTest {
         assertThat(saved.getOrganizationId()).isEqualTo("org-1");
         assertThat(saved.getActedBy()).isEqualTo("user-1");
         assertThat(saved.getActedAt()).isNotNull();
-        verify(deviceOsUpdateRolloutStateService).refreshAll();
+        verifyNoInteractions(deviceOsUpdateRolloutStateService);
     }
 
     @Test
@@ -98,7 +99,6 @@ class OsUpdateOverrideServiceTest {
         assertThat(saved.getOrganizationId()).isNull();
         verify(deviceService).verifyExists("machine-1");
         verify(deviceOsUpdateRolloutStateService).refreshMachines(List.of("machine-1"));
-        verify(deviceOsUpdateRolloutStateService, never()).refreshAll();
     }
 
     @Test
@@ -133,7 +133,7 @@ class OsUpdateOverrideServiceTest {
         assertThat(savedOsUpdateOverride.getValue()).isNotSameAs(ofCustomer);
         assertThat(saved.getOrganizationId()).isNull();
         assertThat(saved.getMachineId()).isNull();
-        verify(deviceOsUpdateRolloutStateService).refreshAll();
+        verifyNoInteractions(deviceOsUpdateRolloutStateService);
     }
 
     @Test
@@ -146,14 +146,14 @@ class OsUpdateOverrideServiceTest {
     }
 
     @Test
-    void removeOverride_customerThatHasOne_deletesItAndRefreshes() {
+    void removeOverride_customerThatHasOne_deletesItAndLeavesTheRolloutToTheScheduledRun() {
         // execution
         boolean removed = osUpdateOverrideService.removeOverride(OS_UPDATE_ID, "org-1", null);
 
         // verifications
         assertThat(removed).isTrue();
         verify(osUpdateOverrideRepository).delete(ofCustomer);
-        verify(deviceOsUpdateRolloutStateService).refreshAll();
+        verifyNoInteractions(deviceOsUpdateRolloutStateService);
     }
 
     @Test
@@ -164,7 +164,7 @@ class OsUpdateOverrideServiceTest {
         // verifications
         assertThat(removed).isFalse();
         verify(osUpdateOverrideRepository, never()).delete(any());
-        verify(deviceOsUpdateRolloutStateService, never()).refreshAll();
+        verifyNoInteractions(deviceOsUpdateRolloutStateService);
     }
 
     @Test

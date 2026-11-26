@@ -64,7 +64,6 @@ class OsUpdatePolicyServiceTest {
     @Mock private OsUpdatePolicyRepository osUpdatePolicyRepository;
     @Mock private OsUpdatePolicyValidator osUpdatePolicyValidator;
     @Mock private DeviceOsUpdateRolloutStateService deviceOsUpdateRolloutStateService;
-    @Mock private DeviceOsStateService deviceOsStateService;
     @Mock private DeviceService deviceService;
     @Mock private MachineRepository machineRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
@@ -79,7 +78,7 @@ class OsUpdatePolicyServiceTest {
     void setUp() {
         osUpdatePolicyService = new OsUpdatePolicyService(tenantIdProvider, osUpdatePolicyRepository,
                 osUpdatePolicyValidator, new OsUpdatePolicyResponseMapper(), new OsUpdatePolicyResolver(),
-                deviceOsUpdateRolloutStateService, deviceOsStateService, deviceService, machineRepository,
+                deviceOsUpdateRolloutStateService, deviceService, machineRepository,
                 tagAssignmentRepository);
         tenantPolicy = policy("policy-tenant", "Default",
                 OsUpdatePolicyTarget.builder().type(OsUpdatePolicyTargetType.TENANT).build());
@@ -138,7 +137,6 @@ class OsUpdatePolicyServiceTest {
         assertThat(created.getRestartModes()).singleElement()
                 .satisfies(restartMode -> assertThat(restartMode.getMode()).isEqualTo(OsUpdateRestartMode.NEVER));
         assertThat(created.getRestartDialog()).isEqualTo(command.getRestartDialog());
-        verify(deviceOsUpdateRolloutStateService).refreshAll();
     }
 
     @Test
@@ -150,7 +148,6 @@ class OsUpdatePolicyServiceTest {
         assertThatThrownBy(() -> osUpdatePolicyService.createPolicy(command))
                 .isInstanceOf(OsUpdatePolicyConflictException.class);
         verify(osUpdatePolicyRepository, never()).save(any());
-        verify(deviceOsUpdateRolloutStateService, never()).refreshAll();
     }
 
     @Test
@@ -164,7 +161,6 @@ class OsUpdatePolicyServiceTest {
         assertThat(updated.getName()).isEqualTo("Servers");
         assertThat(updated.getCreatedAt()).isEqualTo(CREATED_AT);
         assertThat(updated.getUpdatedAt()).isAfter(CREATED_AT);
-        verify(deviceOsUpdateRolloutStateService).refreshAll();
     }
 
     @Test
@@ -175,13 +171,12 @@ class OsUpdatePolicyServiceTest {
     }
 
     @Test
-    void deletePolicy_existingPolicy_deletesItAndRefreshesTheRollout() {
+    void deletePolicy_existingPolicy_deletesIt() {
         // execution
         osUpdatePolicyService.deletePolicy("policy-tag");
 
         // verifications
         verify(osUpdatePolicyRepository).delete(tagPolicy);
-        verify(deviceOsUpdateRolloutStateService).refreshAll();
     }
 
     @Test
@@ -190,6 +185,7 @@ class OsUpdatePolicyServiceTest {
         Machine machine = new Machine();
         machine.setMachineId("machine-1");
         machine.setOrganizationId("org-1");
+        when(deviceOsUpdateRolloutStateService.isRolloutDevice("machine-1")).thenReturn(true);
         when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, "machine-1")).thenReturn(Optional.of(machine));
         when(tagAssignmentRepository.findByEntityIdAndEntityType("machine-1", TagEntityType.DEVICE))
                 .thenReturn(List.of(TagAssignment.builder().entityId("machine-1").tagId("tag-kiosk").build()));
@@ -207,6 +203,7 @@ class OsUpdatePolicyServiceTest {
         Machine machine = new Machine();
         machine.setMachineId("machine-1");
         machine.setOrganizationId("org-1");
+        when(deviceOsUpdateRolloutStateService.isRolloutDevice("machine-1")).thenReturn(true);
         when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, "machine-1")).thenReturn(Optional.of(machine));
         when(osUpdatePolicyRepository.findByTenantIdOrderByCreatedAtAsc(TENANT_ID)).thenReturn(List.of());
 
@@ -234,9 +231,9 @@ class OsUpdatePolicyServiceTest {
     }
 
     @Test
-    void findPolicyOfDevice_deviceWeCannotManage_null() {
+    void findPolicyOfDevice_deviceThePoliciesAreNotAppliedTo_null() {
         // setup
-        when(deviceOsStateService.isNotManageable("machine-1")).thenReturn(true);
+        when(deviceOsUpdateRolloutStateService.isRolloutDevice("machine-1")).thenReturn(false);
 
         // execution
         OsUpdatePolicyResponse found = osUpdatePolicyService.findPolicyOfDevice("machine-1");

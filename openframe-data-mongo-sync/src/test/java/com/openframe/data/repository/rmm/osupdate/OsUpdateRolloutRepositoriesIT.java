@@ -6,6 +6,8 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOverride;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOverrideAction;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTarget;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTargetType;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,6 +118,38 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    void deleteOverridesOfDevice_overridesOfTwoDevicesACustomerAndAnotherTenant_onlyTheOnesOfThatDevice() {
+        // setup
+        OsUpdateOverride ofOtherTenant = override("kb-1", null, "machine-1");
+        ofOtherTenant.setTenantId(OTHER_TENANT_ID);
+        osUpdateOverrideRepository.saveAll(List.of(override("kb-1", null, "machine-1"),
+                override("kb-2", null, "machine-1"), override("kb-1", null, "machine-2"),
+                override("kb-1", "org-1", null), ofOtherTenant));
+
+        // execution
+        long deleted = osUpdateOverrideRepository.deleteByTenantIdAndMachineId(TENANT_ID, "machine-1");
+
+        // verifications
+        assertThat(deleted).isEqualTo(2);
+        assertThat(osUpdateOverrideRepository.findAll()).hasSize(3);
+    }
+
+    @Test
+    void findPoliciesNamingDevice_devicePoliciesOfTwoTenants_theTenantsOnesThatNameTheDevice() {
+        // setup
+        osUpdatePolicyRepository.saveAll(List.of(
+                devicePolicy(TENANT_ID, "Servers", List.of("machine-1", "machine-2")),
+                devicePolicy(TENANT_ID, "Kiosks", List.of("machine-3")),
+                policy(TENANT_ID, "Default", CREATED_AT),
+                devicePolicy(OTHER_TENANT_ID, "Other", List.of("machine-1"))));
+
+        // execution, verifications
+        assertThat(osUpdatePolicyRepository.findByTenantIdAndTargetMachineIdsContaining(TENANT_ID, "machine-1"))
+                .extracting(OsUpdatePolicy::getName)
+                .containsExactly("Servers");
+    }
+
+    @Test
     void rolloutStates_oneRowPerDeviceAndUpdate_readAndDeletedByDevice() {
         // setup
         deviceOsUpdateRolloutStateRepository.saveAll(List.of(
@@ -140,6 +174,14 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
 
     private static OsUpdatePolicy policy(String tenantId, String name, Instant createdAt) {
         return OsUpdatePolicy.builder().tenantId(tenantId).name(name).createdAt(createdAt).build();
+    }
+
+    private static OsUpdatePolicy devicePolicy(String tenantId, String name, List<String> machineIds) {
+        return OsUpdatePolicy.builder()
+                .tenantId(tenantId).name(name).createdAt(CREATED_AT)
+                .target(OsUpdatePolicyTarget.builder()
+                        .type(OsUpdatePolicyTargetType.DEVICE).machineIds(machineIds).build())
+                .build();
     }
 
     private static OsUpdateOverride override(String identifier, String organizationId, String machineId) {

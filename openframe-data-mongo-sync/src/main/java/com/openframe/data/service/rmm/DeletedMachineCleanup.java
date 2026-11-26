@@ -5,6 +5,7 @@ import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
@@ -24,6 +25,8 @@ import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepositor
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOverrideRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
@@ -68,6 +71,8 @@ public class DeletedMachineCleanup {
     private final DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
     private final DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
     private final DeviceOsUpdateRolloutStateRepository deviceOsUpdateRolloutStateRepository;
+    private final OsUpdateOverrideRepository osUpdateOverrideRepository;
+    private final OsUpdatePolicyRepository osUpdatePolicyRepository;
 
     public record LifecycleChange(Machine machine, List<AuditEntry> scheduleRemovals) { }
 
@@ -92,10 +97,25 @@ public class DeletedMachineCleanup {
         long removedPending = deviceOsPendingUpdateRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
         long removedHistory = deviceOsUpdateHistoryRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
         deviceOsUpdateRolloutStateRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        osUpdateOverrideRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
+        removeFromOsUpdatePolicies(tenantId, machineId);
         if (removedStates > 0 || removedPending > 0 || removedHistory > 0) {
             log.info("Removed {} OS state(s), {} pending OS update row(s) and {} OS update history row(s) for deleted machineId={} tenantId={}",
                     removedStates, removedPending, removedHistory, machineId, tenantId);
         }
+    }
+
+    // A policy left without devices stays: it covers no device until one is named again.
+    private void removeFromOsUpdatePolicies(String tenantId, String machineId) {
+        List<OsUpdatePolicy> osUpdatePolicies =
+                osUpdatePolicyRepository.findByTenantIdAndTargetMachineIdsContaining(tenantId, machineId);
+        for (OsUpdatePolicy osUpdatePolicy : osUpdatePolicies) {
+            List<String> otherMachineIds = osUpdatePolicy.getTarget().getMachineIds().stream()
+                    .filter(otherMachineId -> !otherMachineId.equals(machineId))
+                    .toList();
+            osUpdatePolicy.getTarget().setMachineIds(otherMachineIds);
+        }
+        osUpdatePolicyRepository.saveAll(osUpdatePolicies);
     }
 
     public LifecycleChange markDeleted(Machine expected) {

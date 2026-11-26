@@ -89,15 +89,14 @@ public class OsUpdateOverrideService {
         }
     }
 
-    // The devices follow the override at once, not with the next scheduled run.
+    // An override of one device reaches that device at once. One of a customer or of every customer waits for the
+    // scheduled run in management. That run and this call may write the same rows of the device: the next run
+    // settles it within a minute.
     private void refreshRollout(String machineId) {
-        if (machineId == null) {
-            deviceOsUpdateRolloutStateService.refreshAll();
-        } else {
+        if (machineId != null) {
             deviceOsUpdateRolloutStateService.refreshMachines(List.of(machineId));
         }
     }
-
     private Optional<OsUpdateOverride> findOverride(OsUpdate osUpdate, String organizationId, String machineId) {
         return findOverrides(osUpdate).stream()
                 .filter(osUpdateOverride -> Objects.equals(osUpdateOverride.getOrganizationId(), organizationId))

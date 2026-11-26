@@ -82,6 +82,14 @@ public class DeviceOsUpdateRolloutStateService {
                 tenantId, PLATFORM, machineIds));
     }
 
+    // True = the policies are applied to the device: a Windows device that reports its OS and that we can manage.
+    public boolean isRolloutDevice(String machineId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<DeviceOsState> deviceOsStates = deviceOsStateRepository.findByTenantIdAndPlatformAndMachineIdIn(
+                tenantId, PLATFORM, List.of(machineId));
+        return !findManageableMachineIds(deviceOsStates).isEmpty();
+    }
+
     private void refresh(String tenantId, List<DeviceOsState> deviceOsStates) {
         List<String> machineIds = deviceOsStates.stream().map(DeviceOsState::getMachineId).toList();
         List<DeviceOsUpdateRolloutState> storedRolloutStates =

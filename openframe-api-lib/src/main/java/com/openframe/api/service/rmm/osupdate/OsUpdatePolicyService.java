@@ -39,7 +39,6 @@ public class OsUpdatePolicyService {
     private final OsUpdatePolicyResponseMapper osUpdatePolicyResponseMapper;
     private final OsUpdatePolicyResolver osUpdatePolicyResolver;
     private final DeviceOsUpdateRolloutStateService deviceOsUpdateRolloutStateService;
-    private final DeviceOsStateService deviceOsStateService;
     private final DeviceService deviceService;
     private final MachineRepository machineRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
@@ -52,10 +51,11 @@ public class OsUpdatePolicyService {
         return osUpdatePolicyResponseMapper.toResponse(requirePolicy(id));
     }
 
-    // Null = no policy covers the device, or we cannot manage the device: no policy is applied to it then.
+    // Null = no policy covers the device, or the policies are not applied to it: a Mac, a device that does not
+    // report its OS, a device we cannot manage.
     public OsUpdatePolicyResponse findPolicyOfDevice(String machineId) {
         deviceService.verifyExists(machineId);
-        if (deviceOsStateService.isNotManageable(machineId)) {
+        if (!deviceOsUpdateRolloutStateService.isRolloutDevice(machineId)) {
             return null;
         }
         Set<String> machineTagIds = tagAssignmentRepository
@@ -76,7 +76,7 @@ public class OsUpdatePolicyService {
                 .tenantId(tenantIdProvider.getTenantId())
                 .createdAt(now)
                 .build();
-        return saveAndRefreshRollout(osUpdatePolicy, osUpdatePolicyCommand, now);
+        return save(osUpdatePolicy, osUpdatePolicyCommand, now);
     }
 
     // Replaces the policy as a whole.
@@ -87,18 +87,17 @@ public class OsUpdatePolicyService {
                 .filter(other -> !other.getId().equals(id))
                 .toList();
         osUpdatePolicyValidator.validate(osUpdatePolicyCommand, otherOsUpdatePolicies);
-        return saveAndRefreshRollout(osUpdatePolicy, osUpdatePolicyCommand, Instant.now());
+        return save(osUpdatePolicy, osUpdatePolicyCommand, Instant.now());
     }
 
     @Audited(action = OS_UPDATE_POLICY_DELETE, targetId = "#id")
     public void deletePolicy(String id) {
         osUpdatePolicyRepository.delete(requirePolicy(id));
-        deviceOsUpdateRolloutStateService.refreshAll();
     }
 
-    // The devices follow the saved policy at once, not with the next scheduled run.
-    private OsUpdatePolicyResponse saveAndRefreshRollout(OsUpdatePolicy osUpdatePolicy,
-                                                         OsUpdatePolicyCommand osUpdatePolicyCommand, Instant now) {
+    // Saves only: the scheduled run in management is the one that applies a policy to the devices.
+    private OsUpdatePolicyResponse save(OsUpdatePolicy osUpdatePolicy, OsUpdatePolicyCommand osUpdatePolicyCommand,
+                                        Instant now) {
         osUpdatePolicy.setName(osUpdatePolicyCommand.getName());
         osUpdatePolicy.setTarget(osUpdatePolicyCommand.getTarget());
         osUpdatePolicy.setRolloutRules(osUpdatePolicyCommand.getRolloutRules());
@@ -111,9 +110,7 @@ public class OsUpdatePolicyService {
         osUpdatePolicy.setRestartModes(osUpdatePolicyCommand.getRestartModes());
         osUpdatePolicy.setRestartDialog(osUpdatePolicyCommand.getRestartDialog());
         osUpdatePolicy.setUpdatedAt(now);
-        OsUpdatePolicy savedOsUpdatePolicy = osUpdatePolicyRepository.save(osUpdatePolicy);
-        deviceOsUpdateRolloutStateService.refreshAll();
-        return osUpdatePolicyResponseMapper.toResponse(savedOsUpdatePolicy);
+        return osUpdatePolicyResponseMapper.toResponse(osUpdatePolicyRepository.save(osUpdatePolicy));
     }
 
     private List<OsUpdatePolicy> findPolicies() {
