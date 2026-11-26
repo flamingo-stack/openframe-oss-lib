@@ -14,7 +14,7 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AUTO_REFRESH_OFF, AutoRefreshControl } from '../components/ui/auto-refresh-control';
 import { type ColumnDef, DataTable, useDataTable } from '../components/ui/data-table';
 import { TABLE_PAGINATION_PENDING, TablePagination } from '../components/ui/table-pagination';
@@ -129,7 +129,9 @@ const PAGE_SIZE = 10;
 function PagedTableDemo() {
   const [page, setPage] = useState(1);
   const [refresh, setRefresh] = useState(AUTO_REFRESH_OFF);
-  const rows = ALL.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // The table's data must keep its identity between renders (TanStack re-runs on a new array, and a table state
+  // change re-renders this component): a fresh slice per render loops forever on the first hover or click.
+  const rows = useMemo(() => ALL.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [page]);
   const table = useDataTable<Software>({ data: rows, columns: COLUMNS, getRowId: row => row.id });
   const last = page * PAGE_SIZE >= ALL.length;
 
