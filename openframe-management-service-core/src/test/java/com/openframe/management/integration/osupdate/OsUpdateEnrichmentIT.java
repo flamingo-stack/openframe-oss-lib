@@ -2,10 +2,13 @@ package com.openframe.management.integration.osupdate;
 
 import com.openframe.management.integration.support.OsUpdateEnrichmentTestApplication;
 import com.openframe.management.osupdate.OsUpdateEnrichmentScheduler;
+import com.openframe.management.osupdate.OsUpdateEnrichmentService;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
+import com.openframe.data.document.rmm.osupdate.OsVersionBuild;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
+import com.openframe.data.repository.rmm.osupdate.OsVersionBuildRepository;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -29,10 +32,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,6 +48,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.openframe.management.integration.support.OsUpdateEnrichmentTestApplication.TENANT_ID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 // The scheduled run against a real Mongo, with MSRC and CISA answering from checked-in trimmed documents.
 @SpringBootTest(
@@ -63,10 +72,14 @@ class OsUpdateEnrichmentIT {
     private static final Map<String, Integer> FAILING_PATHS = new ConcurrentHashMap<>();
     private static final Map<String, AtomicInteger> REQUESTS = new ConcurrentHashMap<>();
     private static final AtomicReference<Runnable> BEFORE_KEV_ANSWER = new AtomicReference<>();
+    private static final YearMonth NOVEMBER = YearMonth.of(2026, 11);
+    private static final Duration REFRESH_INTERVAL = Duration.ofHours(6);
     private static HttpServer sources;
 
     @Autowired private OsUpdateEnrichmentScheduler osUpdateEnrichmentScheduler;
+    @Autowired private OsUpdateEnrichmentService osUpdateEnrichmentService;
     @Autowired private OsUpdateRepository osUpdateRepository;
+    @Autowired private OsVersionBuildRepository osVersionBuildRepository;
     @Autowired private MeterRegistry meterRegistry;
     @Autowired private MongoTemplate mongoTemplate;
 
@@ -97,6 +110,7 @@ class OsUpdateEnrichmentIT {
     @BeforeEach
     void setUp() {
         osUpdateRepository.deleteAll();
+        osVersionBuildRepository.deleteAll();
         FAILING_PATHS.clear();
         REQUESTS.clear();
         meterRegistry.clear();
@@ -279,6 +293,131 @@ class OsUpdateEnrichmentIT {
         assertThat(storedNovember.getEnrichedAt()).isNotNull();
         assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_fetch")
                 .tags("source", "cisa_kev", "result", "failure").counter().count()).isPositive();
+    }
+
+    @Test
+    void refreshOsVersionBuilds_bulletinsOfTwoMonths_latestBuildPerWindowsVersionStoredAndNotAskedAgainSoon() {
+        // setup
+
+        // execution
+        osUpdateEnrichmentService.refreshOsVersionBuilds(NOVEMBER, Instant.now().minus(REFRESH_INTERVAL));
+
+        // verifications
+        List<OsVersionBuild> storedOsVersionBuilds = osVersionBuildRepository.findAll();
+        assertThat(storedOsVersionBuilds)
+                .extracting(OsVersionBuild::getTenantId, OsVersionBuild::getPlatform, OsVersionBuild::getOsVersion,
+                        OsVersionBuild::getLatestBuild, OsVersionBuild::getHotpatchBuild)
+                .containsExactlyInAnyOrder(
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 24H2", "26100.9974", "26100.9911"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "11 25H2", "26200.9974", "26200.9911"),
+                        tuple(TENANT_ID, OsPlatform.WINDOWS, "10 1607", "14393.9612", null));
+        assertThat(storedOsVersionBuilds).allSatisfy(osVersionBuild -> {
+            assertThat(osVersionBuild.getUpdatedAt()).isNotNull();
+            assertThat(osVersionBuild.getVersion()).isNotNull();
+        });
+        assertThat(REQUESTS).containsOnlyKeys("/cvrf/2026-Nov", "/cvrf/2026-Oct");
+
+        // execution
+        REQUESTS.clear();
+        osUpdateEnrichmentService.refreshOsVersionBuilds(NOVEMBER, Instant.now().minus(REFRESH_INTERVAL));
+
+        // verifications
+        assertThat(REQUESTS).isEmpty();
+        assertThat(osVersionBuildRepository.count()).isEqualTo(3);
+    }
+
+    @Test
+    void refreshOsVersionBuilds_currentMonthNotPublishedYet_buildsOfThePreviousMonthAndNoSourceFailure() {
+        // setup
+
+        // execution
+        osUpdateEnrichmentService.refreshOsVersionBuilds(NOVEMBER.plusMonths(1), Instant.now().minus(REFRESH_INTERVAL));
+
+        // verifications
+        assertThat(osVersionBuildRepository.findAll())
+                .extracting(OsVersionBuild::getOsVersion, OsVersionBuild::getLatestBuild)
+                .containsExactlyInAnyOrder(tuple("11 24H2", "26100.9974"), tuple("11 25H2", "26200.9974"));
+        assertThat(REQUESTS).containsOnlyKeys("/cvrf/2026-Dec", "/cvrf/2026-Nov");
+        assertThat(meterRegistry.find("openframe.rmm.os_update.enrichment.source_fetch")
+                .tags("source", "msrc_cvrf", "result", "failure").counter()).isNull();
+    }
+
+    @Test
+    void refreshOsVersionBuilds_msrcDownThenBack_storedBuildsKeptThenRaisedWithTheirHotpatchButNeverLowered() {
+        // setup
+        Instant refreshedYesterday = Instant.now().minus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MILLIS);
+        osVersionBuildRepository.save(osVersionBuild("11 24H2", "26100.9711", null, refreshedYesterday));
+        osVersionBuildRepository.save(osVersionBuild("11 25H2", "26200.10075", "26200.10001", refreshedYesterday));
+        osVersionBuildRepository.save(osVersionBuild("10 1607", "14393.9512", "14393.9400", refreshedYesterday));
+        FAILING_PATHS.put("/cvrf/2026-Oct", 503);
+
+        // execution
+        osUpdateEnrichmentService.refreshOsVersionBuilds(NOVEMBER, Instant.now().minus(REFRESH_INTERVAL));
+
+        // verifications
+        assertThat(osVersionBuildRepository.findAll())
+                .extracting(OsVersionBuild::getOsVersion, OsVersionBuild::getLatestBuild,
+                        OsVersionBuild::getHotpatchBuild, OsVersionBuild::getUpdatedAt)
+                .containsExactlyInAnyOrder(tuple("11 24H2", "26100.9711", null, refreshedYesterday),
+                        tuple("11 25H2", "26200.10075", "26200.10001", refreshedYesterday),
+                        tuple("10 1607", "14393.9512", "14393.9400", refreshedYesterday));
+        assertThat(meterRegistry.get("openframe.rmm.os_update.enrichment.source_fetch")
+                .tags("source", "msrc_cvrf", "result", "failure").counter().count()).isEqualTo(1);
+
+        // execution
+        FAILING_PATHS.clear();
+        osUpdateEnrichmentService.refreshOsVersionBuilds(NOVEMBER, Instant.now().minus(REFRESH_INTERVAL));
+
+        // verifications
+        assertThat(osVersionBuildRepository.findAll())
+                .extracting(OsVersionBuild::getOsVersion, OsVersionBuild::getLatestBuild,
+                        OsVersionBuild::getHotpatchBuild)
+                .containsExactlyInAnyOrder(tuple("11 24H2", "26100.9974", "26100.9911"),
+                        tuple("11 25H2", "26200.10075", "26200.10001"),
+                        tuple("10 1607", "14393.9612", null));
+        assertThat(osVersionBuildRepository.findAll())
+                .allSatisfy(osVersionBuild -> assertThat(osVersionBuild.getUpdatedAt()).isAfter(refreshedYesterday));
+    }
+
+    @Test
+    void refreshOsVersionBuilds_truncatedBulletin_nothingStored() {
+        // setup
+        FAILING_PATHS.put("/cvrf/2026-Nov", 0);
+
+        // execution
+        osUpdateEnrichmentService.refreshOsVersionBuilds(NOVEMBER, Instant.now().minus(REFRESH_INTERVAL));
+
+        // verifications
+        assertThat(osVersionBuildRepository.count()).isZero();
+    }
+
+    @Test
+    void refreshOsVersionBuilds_scheduledRun_asksTheBulletinsOfThisAndThePreviousMonth() {
+        // setup
+        YearMonth currentMonth = YearMonth.now(ZoneOffset.UTC);
+
+        // execution
+        osUpdateEnrichmentScheduler.refreshOsVersionBuilds();
+
+        // verifications
+        assertThat(REQUESTS).containsOnlyKeys(cvrfPath(currentMonth), cvrfPath(currentMonth.minusMonths(1)));
+        assertThat(meterRegistry.find("openframe.rmm.os_update.enrichment.errors").counter()).isNull();
+    }
+
+    private static String cvrfPath(YearMonth month) {
+        return "/cvrf/" + DateTimeFormatter.ofPattern("yyyy-MMM", Locale.ENGLISH).format(month);
+    }
+
+    private static OsVersionBuild osVersionBuild(String osVersion, String latestBuild, String hotpatchBuild,
+                                                 Instant updatedAt) {
+        return OsVersionBuild.builder()
+                .tenantId(TENANT_ID)
+                .platform(OsPlatform.WINDOWS)
+                .osVersion(osVersion)
+                .latestBuild(latestBuild)
+                .hotpatchBuild(hotpatchBuild)
+                .updatedAt(updatedAt)
+                .build();
     }
 
     private OsUpdate stored(OsUpdate osUpdate) {

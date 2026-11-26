@@ -31,7 +31,7 @@ public class MsrcCvrfClient {
     private final RestClient restClient;
     private final MsrcCvrfDocumentParser msrcCvrfDocumentParser;
     private final OsUpdateEnrichmentMetrics osUpdateEnrichmentMetrics;
-    private final Cache<YearMonth, Map<String, MsrcKbArticle>> kbArticlesByMonth;
+    private final Cache<YearMonth, MsrcCvrfBulletin> msrcCvrfBulletinsByMonth;
 
     public MsrcCvrfClient(
             MsrcCvrfDocumentParser msrcCvrfDocumentParser,
@@ -43,7 +43,7 @@ public class MsrcCvrfClient {
         this.msrcCvrfDocumentParser = msrcCvrfDocumentParser;
         this.osUpdateEnrichmentMetrics = osUpdateEnrichmentMetrics;
         this.restClient = PackageSearchRestClientFactory.create(baseUrl, timeout);
-        this.kbArticlesByMonth = Caffeine.newBuilder()
+        this.msrcCvrfBulletinsByMonth = Caffeine.newBuilder()
                 .expireAfterWrite(cacheTtl)
                 .maximumSize(CACHED_MONTHS)
                 .build();
@@ -51,21 +51,30 @@ public class MsrcCvrfClient {
 
     // A month MSRC has no document for (not yet published) has no KB. A failure is not cached.
     public Map<String, MsrcKbArticle> getKbArticles(YearMonth month) {
-        return kbArticlesByMonth.get(month, this::fetchKbArticles);
+        return getBulletin(month).getKbArticles();
     }
 
-    private Map<String, MsrcKbArticle> fetchKbArticles(YearMonth month) {
+    // By the Windows version as the agent reports it ("11 24H2"). A month MSRC has no document for has no build.
+    public Map<String, MsrcWindowsBuild> getWindowsBuilds(YearMonth month) {
+        return getBulletin(month).getWindowsBuilds();
+    }
+
+    private MsrcCvrfBulletin getBulletin(YearMonth month) {
+        return msrcCvrfBulletinsByMonth.get(month, this::fetchBulletin);
+    }
+
+    private MsrcCvrfBulletin fetchBulletin(YearMonth month) {
         try {
-            Map<String, MsrcKbArticle> kbArticles = readKbArticles(month);
+            MsrcCvrfBulletin msrcCvrfBulletin = readBulletin(month);
             osUpdateEnrichmentMetrics.recordSourceFetched(OsUpdateSource.MSRC_CVRF);
-            return kbArticles;
+            return msrcCvrfBulletin;
         } catch (OsUpdateSourceUnavailableException failure) {
             osUpdateEnrichmentMetrics.recordSourceFailed(OsUpdateSource.MSRC_CVRF);
             throw failure;
         }
     }
 
-    private Map<String, MsrcKbArticle> readKbArticles(YearMonth month) {
+    private MsrcCvrfBulletin readBulletin(YearMonth month) {
         String monthId = MONTH_ID.format(month);
         try {
             return restClient.get()
@@ -73,7 +82,10 @@ public class MsrcCvrfClient {
                     .accept(MediaType.APPLICATION_JSON)
                     .exchange((request, response) -> {
                         if (response.getStatusCode().isSameCodeAs(HttpStatus.NOT_FOUND)) {
-                            return Map.<String, MsrcKbArticle>of();
+                            return MsrcCvrfBulletin.builder()
+                                    .kbArticles(Map.of())
+                                    .windowsBuilds(Map.of())
+                                    .build();
                         }
                         if (!response.getStatusCode().is2xxSuccessful()) {
                             throw new OsUpdateSourceUnavailableException(OsUpdateSource.MSRC_CVRF,

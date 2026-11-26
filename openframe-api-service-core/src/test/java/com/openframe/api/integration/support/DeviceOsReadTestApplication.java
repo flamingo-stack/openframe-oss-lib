@@ -17,6 +17,7 @@ import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.shared.CursorPageAssembler;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.service.ToolOsSupportService;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.config.TenantIsolationAutoConfiguration;
@@ -46,6 +47,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+import org.springframework.test.context.DynamicPropertyRegistrar;
 
 @SpringBootConfiguration
 @ImportAutoConfiguration({
@@ -63,7 +65,9 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = {
                 ".*\\.MachineRepository",
                 ".*\\.ScriptScheduleMachineAssignedRepository",
+                ".*\\.ScriptScheduleRepository",
                 ".*\\.SoftwareScheduleMachineAssignedRepository",
+                ".*\\.SoftwareScheduleRepository",
                 ".*\\.SoftwareScheduleOnlineDispatchRepository",
                 ".*\\.DeviceOnlineDispatchRepository",
                 ".*\\.DeviceSoftwareRepository",
@@ -105,6 +109,17 @@ public class DeviceOsReadTestApplication {
         Mockito.when(scheduleMutationTransaction.run(Mockito.any())).thenAnswer(invocation ->
                 invocation.<MongoTransactionRunner.Transaction<Object>>getArgument(0).execute());
         return scheduleMutationTransaction;
+    }
+
+    @Bean
+    AuditRecorder auditRecorder() {
+        return Mockito.mock(AuditRecorder.class);
+    }
+
+    // The mock still has the @Value field of AuditRecorder, and the key has no default
+    @Bean
+    DynamicPropertyRegistrar auditFlag() {
+        return registry -> registry.add("openframe.audit.enabled", () -> "false");
     }
 
     @Bean
