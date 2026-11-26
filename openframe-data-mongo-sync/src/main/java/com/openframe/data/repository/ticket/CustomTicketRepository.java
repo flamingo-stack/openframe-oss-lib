@@ -41,7 +41,8 @@ public interface CustomTicketRepository {
 
     List<Ticket> findAuditFieldsByStatusId(String statusId);
 
-    int reassignTicketsToStatus(Query query, String toStatusId, TicketStatusKind toKind);
+    Optional<Ticket> moveToStatusIfStillIn(String ticketId, String fromStatusId, String toStatusId,
+                                           TicketStatusKind toKind);
 
     void updateTitle(String ticketId, String title);
 
