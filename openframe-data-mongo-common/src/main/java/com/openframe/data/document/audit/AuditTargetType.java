@@ -9,6 +9,7 @@ public enum AuditTargetType {
     BASE_AI_POLICY,
     BASE_AI_RULE,
     BILLING_PLAN,
+    CHAT_ATTACHMENT,
     CUSTOMER_USER,
     DEVICE,
     DIALOG,
