@@ -107,7 +107,7 @@ import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onb
 import { MingoQuickActionWall } from './mingo-quick-action-wall';
 import { type MingoQuickAction, MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
-import { OpenFrameDropOverlay } from './openframe-attachment-tray';
+import { OpenFrameDropOverlay } from './openframe-drop-overlay';
 import {
   type QuickActionAccent,
   accentFromIdentityIcon,

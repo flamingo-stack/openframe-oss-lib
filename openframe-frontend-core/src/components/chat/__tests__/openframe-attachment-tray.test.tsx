@@ -10,13 +10,12 @@ import {
   OPENFRAME_FAE_ATTACHMENT_PROFILE,
   OPENFRAME_MINGO_ATTACHMENT_PROFILE,
 } from '../../../chat-protocol/attachment-profiles';
-import {
-  OpenFrameAttachmentNotes,
-  OpenFrameAttachmentTile,
-  OpenFrameAttachmentTray,
-} from '../openframe-attachment-tray';
+import { OpenFrameAttachmentNotes } from '../openframe-attachment-notes';
+import { OpenFrameAttachmentTile } from '../openframe-attachment-tile';
+import { OpenFrameAttachmentTray } from '../openframe-attachment-tray';
 import {
   formatTokenEstimate,
+  isImageAttachment,
   isOpenFrameSendBlocked,
   splitFileNameForTile,
   summarizeOpenFrameTray,
@@ -104,6 +103,14 @@ describe('OpenFrameAttachmentTile', () => {
     expect(head).toHaveClass('truncate');
     expect(tail).toHaveTextContent('2026.png');
     expect(tail).toHaveClass('shrink-0');
+  });
+
+  it("tells an image without a media type by the image types' extensions", () => {
+    expect(isImageAttachment({ name: 'Screen.JPEG' })).toBe(true);
+    expect(isImageAttachment({ name: 'anim.gif' })).toBe(true);
+    expect(isImageAttachment({ name: 'report.pdf' })).toBe(false);
+    expect(isImageAttachment({ name: 'clip.mp4' })).toBe(false);
+    expect(isImageAttachment({ name: 'photo.png', mediaType: 'application/pdf' })).toBe(false);
   });
 
   it('splits a name into a shrinking head and a fixed tail, leaving short names whole', () => {

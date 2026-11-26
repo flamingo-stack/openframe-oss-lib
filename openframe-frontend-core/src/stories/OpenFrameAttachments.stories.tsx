@@ -8,7 +8,7 @@ import {
   OPENFRAME_MINGO_ATTACHMENT_PROFILE,
 } from '../chat-protocol/attachment-profiles';
 import { ChatInput } from '../components/chat/chat-input';
-import { OpenFrameAttachmentTile } from '../components/chat/openframe-attachment-tray';
+import { OpenFrameAttachmentTile } from '../components/chat/openframe-attachment-tile';
 import { OpenFrameMessageAttachments } from '../components/chat/openframe-message-attachments';
 
 /**

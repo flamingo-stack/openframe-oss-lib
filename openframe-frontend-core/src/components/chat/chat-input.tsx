@@ -22,13 +22,11 @@ import { Button } from '../ui/button';
 import { Tag } from '../ui/tag';
 import { ChatTypingIndicator } from './chat-typing-indicator';
 import { useOpenFrameDropZone, useOpenFrameFilePicker } from './hooks/use-openframe-file-intake';
-import {
-  OpenFrameAttachButton,
-  OpenFrameAttachmentCounter,
-  OpenFrameAttachmentNotes,
-  OpenFrameAttachmentTray,
-  OpenFrameDropOverlay,
-} from './openframe-attachment-tray';
+import { OpenFrameAttachButton } from './openframe-attach-button';
+import { OpenFrameAttachmentCounter } from './openframe-attachment-counter';
+import { OpenFrameAttachmentNotes } from './openframe-attachment-notes';
+import { OpenFrameAttachmentTray } from './openframe-attachment-tray';
+import { OpenFrameDropOverlay } from './openframe-drop-overlay';
 import { SlashCommandSuggestions } from './slash-command-suggestions';
 import type { ChatInputProps, ChatInputRef, MentionMeta, SlashCommandSummary } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';

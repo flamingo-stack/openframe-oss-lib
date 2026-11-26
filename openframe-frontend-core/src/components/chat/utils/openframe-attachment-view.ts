@@ -7,6 +7,7 @@ import {
   type OpenFrameAttachmentErrorCode,
   type OpenFrameAttachmentItem,
   type OpenFrameAttachmentProfile,
+  OPENFRAME_IMAGE_EXTENSIONS,
   isOpenFrameImageType,
   openFrameFileExtension,
   openFrameMaxFileMegabytes,
@@ -41,7 +42,7 @@ export function formatTokenEstimate(tokens: number): string {
 /** Whether an item is drawn as a picture. */
 export function isImageAttachment(item: Pick<OpenFrameAttachmentItem, 'mediaType' | 'name'>): boolean {
   if (item.mediaType) return isOpenFrameImageType(item.mediaType);
-  return ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(openFrameFileExtension(item.name));
+  return OPENFRAME_IMAGE_EXTENSIONS.includes(openFrameFileExtension(item.name));
 }
 
 /** A tile's error line (Figma `chat-uploaded-file`). */

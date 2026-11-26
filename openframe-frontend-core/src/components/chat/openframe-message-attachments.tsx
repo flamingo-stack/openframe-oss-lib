@@ -17,8 +17,9 @@ import {
 import Image from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
 import { formatFileSize } from '../../utils/format';
+import { Button } from '../ui/button';
 import { ImageGalleryModal } from '../ui/image-gallery-modal';
-import { OpenFrameAttachmentTile } from './openframe-attachment-tray';
+import { OpenFrameAttachmentTile } from './openframe-attachment-tile';
 
 export interface OpenFrameMessageAttachmentsProps {
   attachments: readonly OpenFrameMessageAttachment[];
@@ -84,11 +85,13 @@ export function OpenFrameMessageAttachments({
         <ul aria-label="Attached images" className={cn('m-0 list-none p-0', rowClass)}>
           {images.map((image, index) => (
             <li key={image.id}>
-              <button
+              {/* The thumbnail is the card: the button adds the click, the keyboard and the focus ring, no box. */}
+              <Button
+                variant="card"
                 type="button"
                 aria-label={`Open ${image.name}`}
                 onClick={() => setOpenImage(index)}
-                className="relative block h-28 w-28 overflow-hidden rounded-[6px] border border-ods-border transition-colors hover:border-ods-border-hover"
+                className="h-28 w-28 overflow-hidden rounded-[6px] border border-ods-border transition-colors hover:border-ods-border-hover"
               >
                 <Image
                   src={pictureOf(image) ?? ''}
@@ -98,7 +101,7 @@ export function OpenFrameMessageAttachments({
                   unoptimized
                   className="h-full w-full object-cover"
                 />
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

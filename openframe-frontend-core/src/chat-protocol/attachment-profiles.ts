@@ -57,6 +57,19 @@ export const OPENFRAME_VIDEO_ATTACHMENT_TYPES: readonly OpenFrameAttachmentType[
   { mediaType: 'video/quicktime', extensions: ['mov'], kind: 'video' },
 ];
 
+/**
+ * The extensions of the image types ("png", "jpg", ...): how a file whose media type is not known yet is told to be an
+ * image. Read from the type tables, so a new image type joins it there.
+ */
+export const OPENFRAME_IMAGE_EXTENSIONS: readonly string[] = [
+  ...OPENFRAME_FAE_ATTACHMENT_TYPES,
+  ...OPENFRAME_MINGO_EXTRA_ATTACHMENT_TYPES,
+  ...OPENFRAME_ARCHIVE_ATTACHMENT_TYPES,
+  ...OPENFRAME_VIDEO_ATTACHMENT_TYPES,
+]
+  .filter(type => type.kind === 'image')
+  .flatMap(type => type.extensions);
+
 /** The products that attach files in an OpenFrame chat. */
 export type OpenFrameAttachmentProduct = 'mingo' | 'fae';
 
