@@ -1196,6 +1196,7 @@ async fn a_package_update_order_is_acked_stored_and_answered_only_when_it_ends()
 
 #[tokio::test]
 async fn a_choco_order_is_stored_with_its_feed() {
+    crate::services::package_manager::enable_chocolatey(true);
     assert_order_stored(json!({
         "manager": "CHOCO",
         "id": "googlechrome",
