@@ -2,6 +2,8 @@ package com.openframe.external.controller;
 
 import com.openframe.api.service.ToolService;
 import com.openframe.api.dto.tool.ToolFilterCriteria;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.targets.ToolCredentialParts;
 import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.tool.ToolFilterResponse;
 import com.openframe.external.dto.tool.ToolsResponse;
@@ -14,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+
 import static org.springframework.http.HttpStatus.*;
 
 @RestController
@@ -25,6 +28,7 @@ public class ToolController {
 
     private final ToolService toolService;
     private final ToolMapper toolMapper;
+    private final AuditRecorder auditRecorder;
 
     @Operation(summary = "Get integrated tools", description = "Retrieve integrated tools with optional filtering")
     @GetMapping
@@ -58,6 +62,7 @@ public class ToolController {
         
         var result = toolService.queryTools(filterCriteria, search,
                                            SortInput.from(sortField, sortDirection));
+        auditRecorder.recordAll(ToolCredentialParts.views(result.getTools()));
         return toolMapper.toToolsResponse(result);
     }
 

@@ -1,8 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ColumnDef, useDataTable } from '../../ui/data-table';
-import { GRID_ACTION_COLUMN_SIZE } from '../../ui/data-table/data-table-grid-columns';
-import { GRID_MIN_WIDTH } from '../../ui/data-table/data-table-grid-resize';
+import { GRID_ACTION_COLUMN_SIZE, GRID_MIN_WIDTH } from '../../ui/data-table/data-table-grid-columns';
 import { LoadingScope } from '../../ui/loading-scope';
 import type { MultiCustomerTenantRow, TenantRow } from './tenant-row';
 import { type TenantsTableFilters, TenantsTableView } from './tenants-table-view';

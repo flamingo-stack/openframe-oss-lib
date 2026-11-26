@@ -23,7 +23,10 @@ public final class MachineFields {
     public static final MachineField<String> NICKNAME = field("nickname", Machine::setNickname);
     public static final MachineField<String> DISPLAY_NAME = field("displayName", Machine::setDisplayName);
     public static final MachineField<String> HOSTNAME = field("hostname", Machine::setHostname);
+    public static final MachineField<Instant> FETCHED_LOG_KEY_CREATED_AT =
+            field("fetchedLogKeyCreatedAt", Machine::setFetchedLogKeyCreatedAt);
     public static final MachineField<DeviceStatus> STATUS = field("status", Machine::setStatus);
+    public static final MachineField<String> ENROLLMENT_ID = field("enrollmentId", Machine::setEnrollmentId);
     public static final MachineField<TelemetryStatus> TELEMETRY_STATUS =
             field("telemetryStatus", Machine::setTelemetryStatus);
     public static final MachineField<Instant> FIRST_CONNECTED_AT = field("firstConnectedAt", Machine::setFirstConnectedAt);

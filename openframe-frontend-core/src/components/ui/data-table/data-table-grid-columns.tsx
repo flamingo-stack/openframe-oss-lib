@@ -10,6 +10,13 @@ export const GRID_UTILITY_COLUMN_SIZE = 48;
 export const GRID_ACTION_COLUMN_SIZE = 56;
 
 /**
+ * The narrowest a grid column may be, by what its cells hold (the design's "min width rules"): about nine characters
+ * of text before the ellipsis, plus the leading mark and its gap. A column states its own with `minSize`; these are
+ * the values to state.
+ */
+export const GRID_MIN_WIDTH = { text: 120, icon: 148, media: 160 } as const;
+
+/**
  * The grid table's checkbox (the design's `table/utility-cell`, type checkbox): a 20px box with a 2px border, in the
  * row's body and in the header's "select all".
  */

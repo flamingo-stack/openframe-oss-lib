@@ -1,5 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
+
+use super::OsVersionNumber;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -24,6 +26,28 @@ pub struct DownloadConfiguration {
     pub bundle_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_name: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "lenient_min_os_version",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub min_os_version: Option<OsVersionNumber>,
+}
+
+fn lenient_min_os_version<'de, D>(deserializer: D) -> Result<Option<OsVersionNumber>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let Some(raw) = Option::<String>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    if raw.trim().is_empty() {
+        return Ok(None);
+    }
+    Ok(raw
+        .parse()
+        .map_err(|e| tracing::warn!("Ignoring minOsVersion {:?}: {:#}", raw, e))
+        .ok())
 }
 
 impl DownloadConfiguration {
@@ -49,16 +73,24 @@ impl DownloadConfiguration {
 
     /// Checks if this configuration matches the current OS
     pub fn matches_current_os(&self) -> bool {
-        let current_os = if cfg!(target_os = "windows") {
-            "windows"
-        } else if cfg!(target_os = "macos") {
-            "macos"
-        } else if cfg!(target_os = "linux") {
-            "linux"
-        } else {
-            return false;
-        };
-
-        self.os.eq_ignore_ascii_case(current_os)
+        is_current_os(&self.os)
     }
 }
+
+pub(crate) fn is_current_os(os: &str) -> bool {
+    let current_os = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        return false;
+    };
+
+    os.eq_ignore_ascii_case(current_os)
+}
+
+#[cfg(test)]
+#[path = "download_configuration_tests.rs"]
+mod tests;

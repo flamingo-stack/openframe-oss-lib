@@ -175,8 +175,9 @@ class NestedAuditTest {
     }
 
     private void addsATag() {
-        runner.runWithoutCompare(TICKET_TAG_ADD, AuditTargetType.TICKET, "ticket-1", Map.of("tagId", "tag-1"),
-                () -> { });
+        AuditCall call = AuditCall.of(TICKET_TAG_ADD, AuditTargetType.TICKET, "ticket-1", Map.of("tagId", "tag-1"))
+                .withCompare(false);
+        runner.run(call, () -> null);
     }
 
     private void ticketStored() {

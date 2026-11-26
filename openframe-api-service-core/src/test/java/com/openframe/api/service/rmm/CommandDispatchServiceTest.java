@@ -8,16 +8,23 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.command.CommandDispatchService;
 import com.openframe.api.service.rmm.command.CommandExecutionService;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -25,7 +32,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.EXECUTION_CANCEL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +60,12 @@ class CommandDispatchServiceTest {
     private CommandExecutionService commandExecutionService;
     @Mock
     private TestRunPolicy testRunPolicy;
+    @Mock
+    private ScriptExecutionRepository scriptExecutionRepository;
+    @Mock
+    private CommandExecutionRepository commandExecutionRepository;
+    @Mock(answer = Answers.CALLS_REAL_METHODS)
+    private AuditedMethodRunner auditedMethodRunner;
 
     @InjectMocks
     private CommandDispatchService commandDispatchService;
@@ -184,6 +199,38 @@ class CommandDispatchServiceTest {
         ArgumentCaptor<CancelMessage> captor = ArgumentCaptor.forClass(CancelMessage.class);
         verify(commandNatsPublisher).publishCancel(eq(MACHINE_ID), captor.capture());
         assertThat(captor.getValue().getExecutionId()).isEqualTo("exec-abc-123");
+    }
+
+    @Test
+    void cancelExecution_recordsTheCancelAgainstThatMachinesExecutionRow() {
+        CancelExecutionInput cancelInput = new CancelExecutionInput();
+        cancelInput.setMachineId(MACHINE_ID);
+        cancelInput.setExecutionId("exec-abc-123");
+        when(scriptExecutionRepository.findAllByMachineIdAndExecutionId(MACHINE_ID, "exec-abc-123"))
+                .thenReturn(List.of(ScriptExecution.builder().id("row-1").build()));
+
+        commandDispatchService.cancelExecution(cancelInput);
+
+        ArgumentCaptor<AuditCall> call = ArgumentCaptor.forClass(AuditCall.class);
+        verify(auditedMethodRunner).run(call.capture(), any());
+        assertThat(call.getValue().action()).isEqualTo(EXECUTION_CANCEL);
+        assertThat(call.getValue().targetIdBeforeCall().get()).isEqualTo("row-1");
+        assertThat(call.getValue().deviceIdOf().apply(null)).isEqualTo(MACHINE_ID);
+    }
+
+    @Test
+    void cancelExecution_commandRun_recordsTheCancelAgainstTheCommandRow() {
+        CancelExecutionInput cancelInput = new CancelExecutionInput();
+        cancelInput.setMachineId(MACHINE_ID);
+        cancelInput.setExecutionId("exec-abc-123");
+        when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, "exec-abc-123"))
+                .thenReturn(Optional.of(CommandExecution.builder().id("command-row-1").build()));
+
+        commandDispatchService.cancelExecution(cancelInput);
+
+        ArgumentCaptor<AuditCall> call = ArgumentCaptor.forClass(AuditCall.class);
+        verify(auditedMethodRunner).run(call.capture(), any());
+        assertThat(call.getValue().targetIdBeforeCall().get()).isEqualTo("command-row-1");
     }
 
     @Test

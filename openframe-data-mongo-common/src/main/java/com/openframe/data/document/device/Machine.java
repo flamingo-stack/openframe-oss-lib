@@ -41,6 +41,11 @@ public class Machine implements TenantScoped {
     private TelemetryStatus telemetryStatus;
     private Instant lastSeen;
     private Instant firstConnectedAt;
+    /**
+     * Device access tokens issued before this instant are rejected by the gateway; set when the
+     * tenant is blocked, so its tokens stay dead after an unblock. Whole seconds, as JWT iat is.
+     */
+    private Instant tokensRevokedAt;
     @Indexed
     private String organizationId;
     private Instant organizationAssignedAt;
@@ -52,6 +57,7 @@ public class Machine implements TenantScoped {
     private String serialNumber;
     private String manufacturer;
     private String model;
+    private Instant fetchedLogKeyCreatedAt;
     private Instant hostFactsCheckedAt;   // last time the Fleet host facts backfill tried this machine; null = never
     @Indexed
     private DeviceType type;
@@ -79,6 +85,8 @@ public class Machine implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
+    private String enrollmentId;
+
     @Version
     private Long version;
 

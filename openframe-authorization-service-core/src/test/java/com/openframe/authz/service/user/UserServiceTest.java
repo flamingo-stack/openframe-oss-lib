@@ -175,6 +175,20 @@ class UserServiceTest {
     }
 
     @Test
+    void reactivateUser_deletedUser_revokesTokensOfPreviousLife() {
+        // setup
+        AuthUser user = deleted("a@acme.com");
+        Instant before = Instant.now().minusSeconds(1);
+
+        // execution
+        AuthUser reactivated = service.reactivateUser(user, "Ada", "Lovelace", "secret", List.of(UserRole.ADMIN));
+
+        // verifications
+        assertThat(reactivated.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(reactivated.getTokensRevokedAt()).isAfter(before);
+    }
+
+    @Test
     void shouldFailPasswordUpdateForUnknownUser() {
         when(repository.findById("ghost")).thenReturn(Optional.empty());
 

@@ -38,6 +38,7 @@ class DeviceOsReportMetricsTest {
     private static final String REPORT_HISTORY_ENTRIES_SUMMARY = "openframe.rmm.os_update.report.history_entries";
     private static final String DEVICE_FIRST_REPORT_COUNTER = "openframe.rmm.os_update.device.first_report";
     private static final String CATALOGUE_SAVED_COUNTER = "openframe.rmm.os_update.catalogue.saved";
+    private static final String CATALOGUE_RECLASSIFIED_COUNTER = "openframe.rmm.os_update.catalogue.reclassified";
     private static final String PENDING_UPDATES_WRITTEN_COUNTER = "openframe.rmm.os_update.pending_updates.written";
     private static final String HISTORY_SAVED_COUNTER = "openframe.rmm.os_update.history.saved";
     private static final String HISTORY_OUTSIDE_RETENTION_COUNTER = "openframe.rmm.os_update.history.outside_retention";
@@ -195,6 +196,18 @@ class DeviceOsReportMetricsTest {
 
         // verifications
         assertThat(registry.get(CATALOGUE_SAVED_COUNTER).tags("platform", "WINDOWS").counter().count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
+    void recordOsUpdateReclassified_platform_countedUnderThePlatform() {
+        // setup
+
+        // execution
+        metrics.recordOsUpdateReclassified(OsPlatform.WINDOWS);
+
+        // verifications
+        assertThat(registry.get(CATALOGUE_RECLASSIFIED_COUNTER).tags("platform", "WINDOWS").counter().count())
                 .isEqualTo(1.0);
     }
 

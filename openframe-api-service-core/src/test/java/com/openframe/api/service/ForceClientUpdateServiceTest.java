@@ -1,5 +1,8 @@
 package com.openframe.api.service;
 
+import com.openframe.data.nats.delivery.route.DeviceCommandSender;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponse;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponseItem;
@@ -16,13 +19,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -39,13 +43,15 @@ class ForceClientUpdateServiceTest {
     @Mock private MachineRepository machineRepository;
     @Mock private DeliveryRouter deliveryRouter;
     @Captor private ArgumentCaptor<ClientUpdateDeliverySeed> seedCaptor;
-    @InjectMocks private ForceClientUpdateService service;
+    private ForceClientUpdateService service;
 
     private OpenFrameClientConfiguration configuration;
     private ForceClientUpdateRequest request;
 
     @BeforeEach
     void setUp() {
+        service = new ForceClientUpdateService(clientConfigurationRepository, machineRepository,
+                new DeviceCommandSender(deliveryRouter, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class)));
         configuration = OpenFrameClientConfiguration.builder().version("1.5.40").build();
         request = new ForceClientUpdateRequest();
         request.setMachineId(List.of(MACHINE_ID));

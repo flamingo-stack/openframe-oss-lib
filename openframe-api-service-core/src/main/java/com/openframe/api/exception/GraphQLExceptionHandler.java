@@ -8,6 +8,8 @@ import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.loki.client.LokiQueryRejectedException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.security.authentication.AccessDeniedErrorCode;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
@@ -19,10 +21,12 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 @Component
@@ -30,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
 public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
 
     private static final String CONFLICT_MESSAGE = "This item was changed by someone else. Reload it and try again.";
+    private static final String FLEET_UNAVAILABLE = "Device management is temporarily unavailable. Please try again later.";
 
     @Override
     public CompletableFuture<DataFetcherExceptionHandlerResult> handleException(
@@ -45,6 +50,10 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
         if (exception instanceof OptimisticLockingFailureException) {
             log.warn("GraphQL conflict: {}", exception.getMessage());
             return result(buildError(CONFLICT_MESSAGE, ErrorCode.CONFLICT), path);
+        }
+        if (exception instanceof FleetMdmApiException fleetRefusal && isRefusal(fleetRefusal)) {
+            log.warn("GraphQL Fleet refusal: {}", fleetRefusal.getMessage());
+            return result(fleetRefusalError(fleetRefusal), path);
         }
         if (exception instanceof InvalidRelayIdException) {
             String message = exception.getMessage();
@@ -63,6 +72,8 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
                     ErrorCode.LOKI_QUERY_REJECTED);
         } else if (exception instanceof LokiQueryException) {
             error = buildError("Logs are temporarily unavailable. Please try again later.", ErrorCode.LOKI_QUERY_ERROR);
+        } else if (exception instanceof FleetMdmException) {
+            error = buildError(FLEET_UNAVAILABLE, ErrorCode.FLEET_ERROR);
         } else if (exception instanceof DataAccessException) {
             error = buildError("Database operation failed. Please try again later.", ErrorCode.DATABASE_ERROR);
         } else if (exception instanceof NotFoundException nfe) {
@@ -92,6 +103,23 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
                         .error(error.path(path).build())
                         .build()
         );
+    }
+
+    private static boolean isRefusal(FleetMdmApiException exception) {
+        HttpStatus status = HttpStatus.resolve(exception.getStatusCode());
+        return status != null && status.is4xxClientError()
+                && status != HttpStatus.UNAUTHORIZED && status != HttpStatus.FORBIDDEN;
+    }
+
+    private GraphQLError.Builder<?> fleetRefusalError(FleetMdmApiException exception) {
+        HttpStatus status = HttpStatus.valueOf(exception.getStatusCode());
+        String reason = Objects.requireNonNullElse(exception.getReason(), "Device management refused the request.");
+        return switch (status) {
+            case NOT_FOUND -> buildError("Not found in device management.", ErrorCode.NOT_FOUND);
+            case CONFLICT -> buildError(reason, ErrorCode.CONFLICT);
+            case PAYMENT_REQUIRED -> buildError("This action is not available yet.", ErrorCode.BAD_REQUEST);
+            default -> buildError(reason, ErrorCode.BAD_REQUEST);
+        };
     }
 
     private static String validationMessage(ConstraintViolationException exception) {

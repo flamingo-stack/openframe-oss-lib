@@ -154,7 +154,9 @@ interface GridRowActionProps {
 /**
  * The add / remove control in the grid: a bare 40px icon button, the action cell being its frame (the design's
  * `action-button`). A card row draws it outlined, with a fill for "added" and the disabled reason as text beside it;
- * here "added" is the accent check and the reason is the button's tooltip.
+ * here "added" is the accent check and the button's tooltip says what it does to which device ("Add <device>"), with
+ * the reason after it. The column is pinned right at every width while the Device column scrolls away where the table
+ * is narrow (a tablet, a phone, a desktop's narrow content column), so the tooltip is what names a scrolled row's device.
  */
 function GridRowAction({ label, icon, tone = 'default', onClick, disabled, reason }: GridRowActionProps) {
   const button = (
@@ -175,18 +177,19 @@ function GridRowAction({ label, icon, tone = 'default', onClick, disabled, reaso
       disabled={disabled}
     />
   );
+  const tooltip = reason ? `${label}: ${reason}` : label;
   return (
     <div data-no-row-click className="pointer-events-auto flex items-center justify-center">
-      {reason ? (
-        // A disabled button takes no hover or focus: the wrapper is what the tooltip listens on.
-        <FloatingTooltip content={reason} side="left" as="span" triggerClassName="inline-flex">
-          <span tabIndex={0} aria-label={`${label}: ${reason}`} className="inline-flex rounded-md outline-none">
+      <FloatingTooltip content={tooltip} side="left" as="span" triggerClassName="inline-flex">
+        {reason ? (
+          // A disabled button takes no hover or focus: the wrapper is what the tooltip listens on.
+          <span tabIndex={0} aria-label={tooltip} className="inline-flex rounded-md outline-none">
             {button}
           </span>
-        </FloatingTooltip>
-      ) : (
-        button
-      )}
+        ) : (
+          button
+        )}
+      </FloatingTooltip>
     </div>
   );
 }
@@ -633,6 +636,8 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         header: 'DEVICE',
         cell: ({ row }: { row: Row<T> }) => <DeviceCell device={row.original} />,
         enableSorting: false,
+        // The name says which device a row adds: the grid's settings menu cannot hide it.
+        enableHiding: false,
         size: 280,
         minSize: GRID_MIN_WIDTH.icon,
         meta: {

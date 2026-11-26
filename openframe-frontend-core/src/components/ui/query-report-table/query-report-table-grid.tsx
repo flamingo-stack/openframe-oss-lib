@@ -3,7 +3,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMemo } from 'react';
 import { DataTable } from '../data-table';
-import { GRID_MIN_WIDTH } from '../data-table/data-table-grid-resize';
+import { GRID_MIN_WIDTH } from '../data-table/data-table-grid-columns';
 import { useDataTable } from '../data-table/use-data-table';
 import type { QueryResultRow } from './types';
 

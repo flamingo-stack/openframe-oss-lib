@@ -3,12 +3,15 @@ package com.openframe.client.service.rmm.osupdate.parser;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRebootBehavior;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
+import com.openframe.data.document.rmm.osupdate.OsUpdateType;
 import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage;
+import com.openframe.data.nats.rmm.model.MachineOsUpdatesMessage.WindowsUpdateCategory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 @Component
 @RequiredArgsConstructor
@@ -38,7 +41,9 @@ public class OsUpdateParser {
         return osUpdate
                 .kbArticleIds(orEmpty(windows.getKbArticleIds()))
                 .severity(reportedEnumParser.parse(OsUpdateSeverity.class, windows.getMsrcSeverity()))
-                .categories(parseCategoryNames(windows.getCategories()))
+                .categories(parseCategoryValues(windows.getCategories(), WindowsUpdateCategory::getName))
+                .categoryIds(parseCategoryValues(windows.getCategories(), WindowsUpdateCategory::getId))
+                .updateType(reportedEnumParser.parse(OsUpdateType.class, windows.getUpdateType()))
                 .cveIds(orEmpty(windows.getCveIds()))
                 .publishedAt(windows.getPublishedAt())
                 .sizeBytes(windows.getMaxDownloadBytes())
@@ -47,13 +52,14 @@ public class OsUpdateParser {
                 .build();
     }
 
-    private static List<String> parseCategoryNames(List<MachineOsUpdatesMessage.WindowsUpdateCategory> categories) {
+    private static List<String> parseCategoryValues(List<WindowsUpdateCategory> categories,
+                                                    Function<WindowsUpdateCategory, String> categoryValue) {
         if (categories == null) {
             return List.of();
         }
         return categories.stream()
                 .filter(Objects::nonNull)
-                .map(MachineOsUpdatesMessage.WindowsUpdateCategory::getName)
+                .map(categoryValue)
                 .filter(Objects::nonNull)
                 .toList();
     }

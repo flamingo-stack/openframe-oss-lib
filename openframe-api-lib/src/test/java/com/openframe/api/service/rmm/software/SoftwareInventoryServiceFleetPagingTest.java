@@ -6,6 +6,7 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.service.rmm.software.SoftwareInventoryService.AutoUpdateTurnedOff;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.PageResult;
@@ -181,7 +182,7 @@ class SoftwareInventoryServiceFleetPagingTest {
         when(autoUpdateService.titleFromPolicies("3522")).thenReturn(fromPolicy);
 
         // execution
-        SoftwareResponse result = service.turnOffAutoUpdate("3522", "admin@x");
+        SoftwareResponse result = service.turnOffAutoUpdate("3522", "admin@x").software();
 
         // verifications
         assertThat(result).isSameAs(fromPolicy);
@@ -194,13 +195,14 @@ class SoftwareInventoryServiceFleetPagingTest {
         // setup
         SoftwareTitle chrome = fleetTitle("Chrome", 42L, 7);
         when(fleet.getSoftwareTitle(42L)).thenReturn(chrome);
+        when(autoUpdateService.turnOff("42", "admin@x")).thenReturn(List.of("m-1"));
 
         // execution
-        SoftwareResponse result = service.turnOffAutoUpdate("42", "admin@x");
+        AutoUpdateTurnedOff result = service.turnOffAutoUpdate("42", "admin@x");
 
         // verifications
-        assertThat(result.getName()).isEqualTo("Chrome");
-        verify(autoUpdateService).turnOff("42", "admin@x");
+        assertThat(result.software().getName()).isEqualTo("Chrome");
+        assertThat(result.machineIds()).containsExactly("m-1");
         verify(autoUpdateService, never()).titleFromPolicies(anyString());
     }
 
@@ -216,9 +218,11 @@ class SoftwareInventoryServiceFleetPagingTest {
             return null;
         }).when(catalogStatus).apply(anyList());
         List<String> machineIds = List.of("m1", "m2");
+        when(autoUpdateService.turnOn("42", chrome, machineIds, WAIT, "admin@x"))
+                .thenReturn(new SoftwareAutoUpdateService.DevicesChanged(machineIds, List.of()));
 
         // execution
-        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x");
+        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x").software();
 
         // verifications
         assertThat(result.getName()).isEqualTo("Chrome");

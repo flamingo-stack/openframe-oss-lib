@@ -3,6 +3,7 @@ package com.openframe.api.service.ticket;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.ForbiddenException;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -82,13 +83,14 @@ class TicketServiceArchiveResolvedTest {
     }
 
     @Test
-    void archiveResolved_byNonAdmin_isRejectedBeforeAnyWork() {
+    void archiveResolved_byNonAdmin_isRejectedAndNotifiesNoListener() {
         AuthPrincipal agent = principal(ActorType.AGENT);
+        when(ticketLifecycleService.archiveResolvedTickets(agent, filter))
+                .thenThrow(new ForbiddenException(ErrorCode.FORBIDDEN, "Operation requires ADMIN access"));
 
         assertThatThrownBy(() -> service.archiveResolvedTickets(agent, filter))
                 .isInstanceOf(ForbiddenException.class);
 
-        verify(ticketLifecycleService, never()).archiveResolvedTickets(any(), any());
         verify(listener, never()).onTicketsArchived(any(), any());
     }
 

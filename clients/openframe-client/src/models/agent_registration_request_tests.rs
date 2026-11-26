@@ -7,8 +7,20 @@ fn request(user_id: &str) -> AgentRegistrationRequest {
         organization_id: "org-1".to_string(),
         user_id: user_id.to_string(),
         os_type: "WINDOWS".to_string(),
+        os_version: "10.0.22631".parse().ok(),
+        os_build: "22631.3007".to_string(),
         tags: Vec::new(),
     }
+}
+
+#[test]
+fn omits_unknown_os_version_and_build() {
+    let mut request = request("user-42");
+    request.os_version = None;
+    request.os_build = String::new();
+    let json = serde_json::to_value(request).unwrap();
+    assert!(json.get("osVersion").is_none());
+    assert!(json.get("osBuild").is_none());
 }
 
 #[test]

@@ -1,10 +1,12 @@
 package com.openframe.api.schema;
 
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceStatus;
 import com.openframe.data.document.rmm.osupdate.MacosUpdatePresence;
 import com.openframe.data.document.rmm.osupdate.OsPatchState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsRebootPending;
 import com.openframe.data.document.rmm.osupdate.OsUpdateAuthorization;
+import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
 import com.openframe.data.document.rmm.osupdate.OsUpdateInstallResult;
 import com.openframe.data.document.rmm.osupdate.OsUpdateListConfidence;
 import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
@@ -12,10 +14,12 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRebootBehavior;
 import com.openframe.data.document.rmm.osupdate.OsUpdateScanState;
 import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
+import com.openframe.data.document.rmm.osupdate.OsUpdateType;
 import graphql.language.AstPrinter;
 import graphql.language.EnumTypeDefinition;
 import graphql.language.EnumValueDefinition;
 import graphql.language.FieldDefinition;
+import graphql.language.InputObjectTypeDefinition;
 import graphql.language.InputValueDefinition;
 import graphql.language.ObjectTypeDefinition;
 import graphql.language.ObjectTypeExtensionDefinition;
@@ -100,6 +104,100 @@ class OsUpdateSchemaContractTest {
                 Map.of("node", "DeviceOsUpdateHistoryEntry!", "cursor", "String!"));
     }
 
+    @Test
+    void osUpdates_forwardPagedConnectionOfTheTenantsUpdatesWithAnOptionalFilter() {
+        // setup
+
+        // execution
+        Optional<FieldDefinition> query = queryField("osUpdates");
+
+        // verifications
+        assertThat(query).as("Query.osUpdates").isPresent();
+        assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(
+                Map.of("filter", "OsUpdateFilterInput", "first", "Int", "after", "String"));
+        assertThat(print(query.get().getType())).isEqualTo("OsUpdateConnection!");
+        assertThat(fields("OsUpdateConnection")).containsExactlyInAnyOrderEntriesOf(
+                Map.of("edges", "[OsUpdateEdge!]!", "pageInfo", "PageInfo!"));
+        assertThat(fields("OsUpdateEdge")).containsExactlyInAnyOrderEntriesOf(
+                Map.of("node", "OsUpdate!", "cursor", "String!"));
+        assertThat(inputFields("OsUpdateFilterInput")).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "platform", "OsPlatform",
+                "classifications", "[OsUpdateClassification!]",
+                "search", "String",
+                "organizationIds", "[String!]"));
+    }
+
+    @Test
+    void osUpdate_rootQueryById_nullableForAnUpdateTheTenantDoesNotHave() {
+        // setup
+
+        // execution
+        Optional<FieldDefinition> query = queryField("osUpdate");
+
+        // verifications
+        assertThat(query).as("Query.osUpdate").isPresent();
+        assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(Map.of("id", "ID!"));
+        assertThat(print(query.get().getType())).isEqualTo("OsUpdate");
+    }
+
+    @Test
+    void osUpdateDevices_forwardPagedConnectionOfTheDevicesOfOneRequiredStatus() {
+        // setup
+
+        // execution
+        Optional<FieldDefinition> query = queryField("osUpdateDevices");
+
+        // verifications
+        assertThat(query).as("Query.osUpdateDevices").isPresent();
+        assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "osUpdateId", "ID!", "status", "OsUpdateDeviceStatus!", "organizationIds", "[String!]", "first", "Int",
+                "after", "String"));
+        assertThat(print(query.get().getType())).isEqualTo("OsUpdateDeviceConnection!");
+        assertThat(fields("OsUpdateDeviceConnection")).containsExactlyInAnyOrderEntriesOf(
+                Map.of("edges", "[OsUpdateDeviceEdge!]!", "pageInfo", "PageInfo!"));
+        assertThat(fields("OsUpdateDeviceEdge")).containsExactlyInAnyOrderEntriesOf(
+                Map.of("node", "OsUpdateDevice!", "cursor", "String!"));
+        assertThat(fields("OsUpdateDevice")).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "machineId", "String!",
+                "status", "OsUpdateDeviceStatus!",
+                "discoveredAt", "Instant",
+                "installedAt", "Instant",
+                "machine", "Machine"));
+    }
+
+    @Test
+    void osUpdate_exactlyItsFieldsWithBothDeviceCounts() {
+        // setup
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("id", "ID!");
+        expected.put("platform", "OsPlatform!");
+        expected.put("identifier", "String!");
+        expected.put("displayName", "String");
+        expected.put("displayVersion", "String");
+        expected.put("kbArticleIds", "[String!]!");
+        expected.put("severity", "OsUpdateSeverity");
+        expected.put("categories", "[String!]!");
+        expected.put("categoryIds", "[String!]!");
+        expected.put("updateType", "OsUpdateType");
+        expected.put("classification", "OsUpdateClassification");
+        expected.put("cveIds", "[String!]!");
+        expected.put("publishedAt", "Instant");
+        expected.put("sizeBytes", "Long");
+        expected.put("rebootBehavior", "OsUpdateRebootBehavior");
+        expected.put("browseOnly", "Boolean");
+        expected.put("exploited", "Boolean");
+        expected.put("enrichedAt", "Instant");
+        expected.put("firstSeenAt", "Instant!");
+        expected.put("pendingDeviceCount", "Int!");
+        expected.put("installedDeviceCount", "Int!");
+
+        // execution
+        Map<String, String> osUpdate = fields("OsUpdate");
+
+        // verifications
+        assertThat(osUpdate).containsExactlyInAnyOrderEntriesOf(expected);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"deviceOsUpdates", "deviceOsReport"})
     void queriesOfTheEarlierDesign_notInTheSchema(String name) {
@@ -167,11 +265,16 @@ class OsUpdateSchemaContractTest {
         expected.put("kbArticleIds", "[String!]!");
         expected.put("severity", "OsUpdateSeverity");
         expected.put("categories", "[String!]!");
+        expected.put("categoryIds", "[String!]!");
+        expected.put("updateType", "OsUpdateType");
+        expected.put("classification", "OsUpdateClassification");
         expected.put("cveIds", "[String!]!");
         expected.put("publishedAt", "Instant");
         expected.put("sizeBytes", "Long");
         expected.put("rebootBehavior", "OsUpdateRebootBehavior");
         expected.put("browseOnly", "Boolean");
+        expected.put("exploited", "Boolean");
+        expected.put("enrichedAt", "Instant");
         expected.put("discoveredAt", "Instant!");
         expected.put("downloaded", "Boolean");
         expected.put("macosPresence", "MacosUpdatePresence");
@@ -227,7 +330,10 @@ class OsUpdateSchemaContractTest {
                 Arguments.of("OsUpdateRebootBehavior", OsUpdateRebootBehavior.class),
                 Arguments.of("MacosUpdatePresence", MacosUpdatePresence.class),
                 Arguments.of("OsUpdateOperation", OsUpdateOperation.class),
-                Arguments.of("OsUpdateInstallResult", OsUpdateInstallResult.class));
+                Arguments.of("OsUpdateInstallResult", OsUpdateInstallResult.class),
+                Arguments.of("OsUpdateType", OsUpdateType.class),
+                Arguments.of("OsUpdateClassification", OsUpdateClassification.class),
+                Arguments.of("OsUpdateDeviceStatus", OsUpdateDeviceStatus.class));
     }
 
     private static Map<String, String> fields(String typeName) {
@@ -235,6 +341,16 @@ class OsUpdateSchemaContractTest {
         assertThat(type).as("type %s in schema/*.graphqls", typeName).isPresent();
         Map<String, String> fields = new LinkedHashMap<>();
         for (FieldDefinition field : type.get().getFieldDefinitions()) {
+            fields.put(field.getName(), print(field.getType()));
+        }
+        return fields;
+    }
+
+    private static Map<String, String> inputFields(String typeName) {
+        Optional<InputObjectTypeDefinition> type = schema.getType(typeName, InputObjectTypeDefinition.class);
+        assertThat(type).as("input %s in schema/*.graphqls", typeName).isPresent();
+        Map<String, String> fields = new LinkedHashMap<>();
+        for (InputValueDefinition field : type.get().getInputValueDefinitions()) {
             fields.put(field.getName(), print(field.getType()));
         }
         return fields;
