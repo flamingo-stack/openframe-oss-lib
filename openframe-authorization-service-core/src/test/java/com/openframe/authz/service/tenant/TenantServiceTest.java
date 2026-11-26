@@ -3,6 +3,7 @@ package com.openframe.authz.service.tenant;
 import com.openframe.authz.service.validation.RegistrationValidationService;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.tenant.Tenant;
+import com.openframe.data.document.tenant.TenantDisplayId;
 import com.openframe.data.document.tenant.TenantStatus;
 import com.openframe.data.repository.tenant.TenantRepository;
 import org.junit.jupiter.api.Test;
@@ -18,10 +19,13 @@ import java.util.Optional;
 
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +90,37 @@ class TenantServiceTest {
     void refuseLoginUnlessActive_blankTenantId_isInactiveWithoutLookup(String tenantId) {
         assertThatThrownBy(() -> service.refuseLoginUnlessActive(tenantId)).isInstanceOf(AuthFlowException.class);
         verify(tenantRepository, never()).findById(anyString());
+    }
+
+    @Test
+    void createTenant_givesTheTenantAFreeDisplayId() {
+        when(tenantRepository.existsByDisplayId(anyString())).thenReturn(false);
+        when(tenantRepository.save(any(Tenant.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Tenant created = service.createTenant(TENANT_ID, "Acme", "acme.openframe.ai");
+
+        assertThat(created.getDisplayId()).matches("T-[0-9A-HJKMNP-TV-Z]{8}");
+    }
+
+    @Test
+    void createTenant_drawnDisplayIdTaken_drawsAnother() {
+        when(tenantRepository.existsByDisplayId(anyString())).thenReturn(true, true, false);
+        when(tenantRepository.save(any(Tenant.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Tenant created = service.createTenant(TENANT_ID, "Acme", "acme.openframe.ai");
+
+        assertThat(TenantDisplayId.isValid(created.getDisplayId())).isTrue();
+        verify(tenantRepository, times(3)).existsByDisplayId(anyString());
+    }
+
+    @Test
+    void createTenant_everyDrawTaken_failsWithoutSaving() {
+        when(tenantRepository.existsByDisplayId(anyString())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createTenant(TENANT_ID, "Acme", "acme.openframe.ai"))
+                .isInstanceOf(IllegalStateException.class);
+        verify(tenantRepository, times(5)).existsByDisplayId(anyString());
+        verify(tenantRepository, never()).save(any(Tenant.class));
     }
 
     private static Tenant tenant(TenantStatus status) {

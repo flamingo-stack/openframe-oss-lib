@@ -194,6 +194,7 @@ public interface SourceEventTypes {
         String LOCKED_HOST = "locked_host";
         String UNLOCKED_HOST = "unlocked_host";
         String WIPED_HOST = "wiped_host";
+        // TODO(CU-17tkuw6a582): failed_wipe and the fork's wipe result activity, handled to set the device WIPED or back
         
         // Declaration Profiles
         String CREATED_DECLARATION_PROFILE = "created_declaration_profile";

@@ -104,20 +104,3 @@ export const GridLoading: Story = { args: { layout: 'grid', devices: [], loading
 
 /** Nothing matches: the empty state inside the table's frame. */
 export const GridEmpty: Story = { args: { layout: 'grid', devices: [] } };
-
-/**
- * A desktop window with a narrow content column, as with the Mingo panel docked beside the page (open the story in a
- * window at least 1280px wide). The Device column stays pinned left beside the pinned add column while the table
- * scrolls sideways, at most 40% of the table's width, the long name cut with an ellipsis. On a tablet or a phone it
- * scrolls with the rest, like the first column of every other grid table.
- */
-export const GridNarrowContent: Story = {
-  args: { layout: 'grid' },
-  decorators: [
-    Story => (
-      <div className="ods-content-area w-[560px] max-w-full">
-        <Story />
-      </div>
-    ),
-  ],
-};

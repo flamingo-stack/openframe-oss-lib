@@ -18,18 +18,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MsrcCvrfDocumentParserTest {
 
-    private final MsrcCvrfDocumentParser parser = new MsrcCvrfDocumentParser(new JsonMapper());
+    private final MsrcCvrfDocumentParser parser =
+            new MsrcCvrfDocumentParser(new JsonMapper(), new MsrcWindowsBuildParser());
 
     @Test
-    void parse_novemberBulletin_kbWithItsCvesAndRatingNotExploited() throws IOException {
+    void parse_novemberBulletin_kbAndItsHotpatchKbWithTheirCvesAndRatingNotExploited() throws IOException {
         // execution
         Map<String, MsrcKbArticle> kbArticles;
         try (InputStream cvrfDocument = fixture("msrc-cvrf-2026-Nov.json")) {
-            kbArticles = parser.parse(cvrfDocument);
+            kbArticles = parser.parse(cvrfDocument).getKbArticles();
         }
 
         // verifications
-        assertThat(kbArticles).containsOnlyKeys("5132061");
+        assertThat(kbArticles).containsOnlyKeys("5132061", "5132043");
+        assertThat(kbArticles.get("5132043").getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
         MsrcKbArticle kbArticle = kbArticles.get("5132061");
         assertThat(kbArticle.getCveIds()).containsExactly("CVE-2026-113766", "CVE-2026-96157");
         assertThat(kbArticle.getSeverity()).isEqualTo(OsUpdateSeverity.IMPORTANT);
@@ -41,7 +43,7 @@ class MsrcCvrfDocumentParserTest {
         // execution
         Map<String, MsrcKbArticle> kbArticles;
         try (InputStream cvrfDocument = fixture("msrc-cvrf-2026-Oct.json")) {
-            kbArticles = parser.parse(cvrfDocument);
+            kbArticles = parser.parse(cvrfDocument).getKbArticles();
         }
 
         // verifications
@@ -62,7 +64,7 @@ class MsrcCvrfDocumentParserTest {
                                   {"Type":3}]}]}""";
 
         // execution
-        Map<String, MsrcKbArticle> kbArticles = parser.parse(stream(cvrfDocument));
+        Map<String, MsrcKbArticle> kbArticles = parser.parse(stream(cvrfDocument)).getKbArticles();
 
         // verifications
         assertThat(kbArticles).containsOnlyKeys("5000001");
@@ -72,7 +74,8 @@ class MsrcCvrfDocumentParserTest {
     @Test
     void parse_documentWithoutVulnerabilities_noKb() {
         // execution
-        Map<String, MsrcKbArticle> kbArticles = parser.parse(stream("{\"DocumentTitle\":{\"Value\":\"x\"}}"));
+        Map<String, MsrcKbArticle> kbArticles =
+                parser.parse(stream("{\"DocumentTitle\":{\"Value\":\"x\"}}")).getKbArticles();
 
         // verifications
         assertThat(kbArticles).isEmpty();
@@ -106,7 +109,7 @@ class MsrcCvrfDocumentParserTest {
                   "Remediations":[{"Type":2,"Description":{"Value":"5000001"}}]}]}""";
 
         // execution
-        Map<String, MsrcKbArticle> kbArticles = parser.parse(stream(cvrfDocument));
+        Map<String, MsrcKbArticle> kbArticles = parser.parse(stream(cvrfDocument)).getKbArticles();
 
         // verifications
         assertThat(kbArticles.get("5000001").isExploited()).isTrue();
