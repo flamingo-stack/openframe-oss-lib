@@ -85,6 +85,12 @@ unfenced and why: `openframe/docs/mysql-multitenancy-feature.md` in the fork ("D
 | `getEnrollSecret` | `GET /api/latest/fleet/spec/enroll_secret` | fenced | `GetEnrollSecrets` forced to the pinned team | |
 | `searchOsquerySchema` | `GET /api/v1/fleet/osquery/schema/search` | unpinned, global | none: in-memory osquery schema, no datastore | The path contains `/osquery/`, so Fleet's tenant middleware skips it. Safe while it holds no tenant data. |
 
+### Config
+
+| Method | Fleet endpoint | Status | Fence | Note |
+|---|---|---|---|---|
+| `setWindowsMdmServerUrl` | `PATCH /api/latest/fleet/config` | partial | `AppConfig` and `SaveAppConfig` on the tenant row (`id = team id`); the instance MDM flags stay on the instance row | Sends only `mdm.windows_server_url`. Other keys reach instance-wide tables (`SaveABMToken`, `UpdateVPPTokenTeams`, `ApplyYaraRules`, `DeleteIntegrationsFromTeams`): never add them. `ListABMTokens` is read on every call, but without ABM keys nothing from it is written or returned. A Fleet image older than the key answers 400 (strict decoding). |
+
 ## FleetMdmSetupClient
 
 Used once per tenant by management to create the tenant's Fleet API user. These endpoints touch

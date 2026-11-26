@@ -1,0 +1,75 @@
+package com.openframe.management.service;
+
+import com.openframe.data.document.tenant.Tenant;
+import com.openframe.data.document.tool.IntegratedTool;
+import com.openframe.data.document.tool.ToolApiKey;
+import com.openframe.data.document.tool.ToolCredentials;
+import com.openframe.data.repository.tenant.TenantRepository;
+import com.openframe.data.service.TenantIdProvider;
+import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Keeps the tenant's public Windows MDM address, {@code https://<tenant domain>/mdm}, on the tenant's Fleet config
+ * ({@code mdm.windows_server_url}). Fleet builds every Windows MDM URL of the tenant's devices from it.
+ * <p>
+ * The address is written once per pod, after the Fleet API token exists and the tenant's domain is known; until then
+ * every call is a no-op, so the next tick retries. Writing the same address again is harmless.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class FleetWindowsMdmAddressService {
+
+    static final String MDM_PATH = "/mdm";
+
+    private final TenantIdProvider tenantIdProvider;
+    private final TenantRepository tenantRepository;
+    private final AtomicReference<String> written = new AtomicReference<>();
+
+    public void syncIfNeeded(IntegratedTool tool) {
+        Optional<String> token = apiTokenOf(tool);
+        if (token.isEmpty()) {
+            log.debug("Fleet API token not set up yet; Fleet's Windows MDM address waits for it");
+            return;
+        }
+        if (!tenantIdProvider.isTenantRegistered()) {
+            log.debug("Tenant not registered yet; Fleet's Windows MDM address waits for it");
+            return;
+        }
+        String tenantId = tenantIdProvider.getTenantId();
+        Optional<String> domain = tenantRepository.findById(tenantId)
+                .map(Tenant::getDomain)
+                .filter(StringUtils::hasText);
+        if (domain.isEmpty()) {
+            log.warn("Tenant {} has no domain yet; Fleet's Windows MDM address is not set", tenantId);
+            return;
+        }
+
+        String address = "https://" + domain.get().trim().toLowerCase(Locale.ROOT) + MDM_PATH;
+        if (address.equals(written.get())) {
+            return;
+        }
+        newClient(FleetApiKeyResolver.apiUrlOf(tool), token.get(), tenantId).setWindowsMdmServerUrl(address);
+        written.set(address);
+        log.info("Fleet Windows MDM address set to {}", address);
+    }
+
+    FleetMdmClient newClient(String apiUrl, String apiToken, String tenantId) {
+        return new FleetMdmClient(apiUrl, apiToken, tenantId);
+    }
+
+    private static Optional<String> apiTokenOf(IntegratedTool tool) {
+        return Optional.ofNullable(tool.getCredentials())
+                .map(ToolCredentials::getApiKey)
+                .map(ToolApiKey::getKey)
+                .filter(StringUtils::hasText);
+    }
+}
