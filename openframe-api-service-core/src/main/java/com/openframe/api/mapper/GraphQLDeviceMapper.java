@@ -152,8 +152,8 @@ public class GraphQLDeviceMapper {
         PageInfo pageInfo = PageInfo.builder()
                 .hasNextPage(base != null && base.isHasNextPage())
                 .hasPreviousPage(base != null && base.isHasPreviousPage())
-                .startCursor(edges.isEmpty() ? null : edges.get(0).getCursor())
-                .endCursor(edges.isEmpty() ? null : edges.get(edges.size() - 1).getCursor())
+                .startCursor(base == null ? null : base.getStartCursor())
+                .endCursor(base == null ? null : base.getEndCursor())
                 .build();
 
         return CountedGenericConnection.<AvailableDeviceEdge>builder()

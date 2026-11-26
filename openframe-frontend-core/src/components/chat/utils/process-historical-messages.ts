@@ -12,7 +12,7 @@
  */
 
 import { applyChunkToMessages, createWireState } from '../../../chat-protocol/apply-chunk';
-import { isSourcePart, type ChatMessage } from '../../../chat-protocol/chat-message';
+import { isSourcePart, type ChatEmailEnvelope, type ChatMessage } from '../../../chat-protocol/chat-message';
 import { createMingoDecoder } from '../../../chat-protocol/message-decoder';
 import type { UiChunk } from '../../../chat-protocol/ui-chunks';
 import { isAnsweredStatus, knownApprovalAnswer, resolutionChunks } from '../stream/message-mutations';
@@ -20,13 +20,18 @@ import {
   MESSAGE_TYPE,
   OWNER_TYPE,
   type AuthorType,
+  type EmailAddressData,
+  type EmailMessageData,
   type HistoricalMessage,
   type MessageProcessingOptions,
   type MessageData,
   type MessageOwner,
+  type TextMessageData,
 } from '../types';
 
 function getOwnerDisplayName(owner?: MessageOwner): string {
+  // An email's sender: the name their email gave, else their address.
+  if (owner?.type === OWNER_TYPE.EMAIL) return owner.name?.trim() || owner.address || 'Email';
   if (owner?.type === OWNER_TYPE.ADMIN && owner.user) {
     const { firstName, lastName } = owner.user;
     const name = [firstName, lastName].filter(Boolean).join(' ');
@@ -45,8 +50,34 @@ function entriesOf(row: HistoricalMessage): MessageData[] {
   return row.parts ?? [];
 }
 
+/** A person's row: the end user's, a technician's, or an email's sender's (an email is a person writing, never an agent). */
 function isUserRow(row: HistoricalMessage | undefined): boolean {
-  return row?.owner?.type === OWNER_TYPE.CLIENT || row?.owner?.type === OWNER_TYPE.ADMIN;
+  const type = row?.owner?.type;
+  return type === OWNER_TYPE.CLIENT || type === OWNER_TYPE.ADMIN || type === OWNER_TYPE.EMAIL;
+}
+
+function emailAddressesOf(list: EmailAddressData[] | null | undefined): ChatEmailEnvelope['to'] {
+  return (list ?? [])
+    .filter(entry => typeof entry?.address === 'string' && entry.address !== '')
+    .map(entry => ({ address: entry.address, ...(entry.name ? { name: entry.name } : {}) }));
+}
+
+/** The row's EMAIL part as the envelope its message draws, or null when the row is not an email. */
+function emailEnvelopeOfEntries(entries: MessageData[]): ChatEmailEnvelope | null {
+  const email = entries.find((data): data is EmailMessageData => data.type === MESSAGE_TYPE.EMAIL);
+  if (!email) return null;
+  const [from] = emailAddressesOf(email.from ? [email.from] : []);
+  return {
+    direction: email.direction === 'OUTBOUND' ? 'OUTBOUND' : 'INBOUND',
+    from: from ?? null,
+    to: emailAddressesOf(email.to),
+    cc: emailAddressesOf(email.cc),
+    ...(email.subject ? { subject: email.subject } : {}),
+    ...(email.quotedText?.trim() ? { quotedText: email.quotedText } : {}),
+    ...(email.deliveryState ? { deliveryState: email.deliveryState } : {}),
+    ...(email.deliveryFailureReason ? { deliveryFailureReason: email.deliveryFailureReason } : {}),
+    ...(email.automatic ? { automatic: true } : {}),
+  };
 }
 
 function isoOf(createdAt: string): string {
@@ -188,8 +219,11 @@ export function processHistoricalMessages(
     if (isUserRow(row)) {
       flushTurn();
       const authorType: AuthorType = row.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user';
-      for (const data of entries) {
-        if (data.type !== MESSAGE_TYPE.TEXT || !data.text) continue;
+      const email = emailEnvelopeOfEntries(entries);
+      const texts = entries.filter((data): data is TextMessageData => data.type === MESSAGE_TYPE.TEXT && !!data.text);
+      // An email is a message whatever its body holds: one of attachments alone still says who wrote to whom.
+      const bodies: TextMessageData[] = email && texts.length === 0 ? [{ type: MESSAGE_TYPE.TEXT, text: '' }] : texts;
+      for (const data of bodies) {
         const contextItems = contextItemsOf(data);
         const avatar = getOwnerAvatar(row.owner);
         messages = [
@@ -203,7 +237,10 @@ export function processHistoricalMessages(
               ...(contextItems.length > 0 ? { contextItems } : {}),
               ...(typeof row.lastChunkStreamSeq === 'number' ? { streamSeq: row.lastChunkStreamSeq } : {}),
             },
-            parts: [{ type: 'text', text: data.text }],
+            parts: [
+              { type: 'text', text: data.text ?? '' },
+              ...(email ? [{ type: 'data-email' as const, data: email }] : []),
+            ],
           },
         ];
       }

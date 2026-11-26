@@ -1,5 +1,6 @@
 package com.openframe.data.repository.rmm;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
@@ -17,6 +18,7 @@ import java.util.Date;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -190,18 +192,21 @@ class CustomScheduleScriptRepositoryImplSortTest {
     }
 
     @Test
-    void invalidCursor_wrongPartCount_fallsBackToFirstPage_noKeyset() {
-        assertThat(hasKeysetStage(startAtPipeline(Sort.Direction.ASC, "not-a-valid-cursor"))).isFalse();
+    void invalidCursor_wrongPartCount_isRefused() {
+        assertThatThrownBy(() -> startAtPipeline(Sort.Direction.ASC, "not-a-valid-cursor"))
+                .isInstanceOf(InvalidCursorException.class);
     }
 
     @Test
-    void invalidCursor_badObjectId_fallsBackToFirstPage_noKeyset() {
-        assertThat(hasKeysetStage(startAtPipeline(Sort.Direction.ASC, "0|1735689600000|not-an-objectid"))).isFalse();
+    void invalidCursor_badObjectId_isRefused() {
+        assertThatThrownBy(() -> startAtPipeline(Sort.Direction.ASC, "0|1735689600000|not-an-objectid"))
+                .isInstanceOf(InvalidCursorException.class);
     }
 
     @Test
-    void invalidCursor_unparseableMillis_fallsBackToFirstPage_noKeyset() {
-        assertThat(hasKeysetStage(startAtPipeline(Sort.Direction.ASC, "0|abc|507f1f77bcf86cd799439011"))).isFalse();
+    void invalidCursor_unparseableMillis_isRefused() {
+        assertThatThrownBy(() -> startAtPipeline(Sort.Direction.ASC, "0|abc|507f1f77bcf86cd799439011"))
+                .isInstanceOf(InvalidCursorException.class);
     }
 
     @Test

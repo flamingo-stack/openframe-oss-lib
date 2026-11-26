@@ -21,3 +21,5 @@ package-lock.json
 
 # A verbatim snapshot of the ai-agent's federation subgraph (an empty `type Mutation {}` Prettier cannot parse).
 src/chat-protocol/__fixtures__/ai-agent-schema.graphqls
+# The same, for its email-to-ticket file (tag 1.7.60): kept verbatim, so a refresh is a plain copy.
+src/chat-protocol/__fixtures__/ai-agent-email-to-ticket-schema.graphqls
