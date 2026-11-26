@@ -150,6 +150,19 @@ class DeviceOsUpdateRolloutStateServiceTest {
     }
 
     @Test
+    void refreshMachines_policyWithoutAPilotTagAndDeviceWithoutTags_calculatesTheStateOfANonPilotDevice() {
+        // setup
+        osUpdatePolicy.setPilotTagId(null);
+
+        // execution
+        deviceOsUpdateRolloutStateService.refreshMachines(List.of("machine-1"));
+
+        // verifications
+        verify(deviceOsUpdateRolloutStateRepository).saveAll(savedRolloutStates.capture());
+        assertThat(savedRolloutStates.getValue()).containsExactly(rolloutState(null, "2026-11-03T17:00:00Z"));
+    }
+
+    @Test
     void refreshMachines_storedStateEqualsTheCalculatedOne_savesNothing() {
         // setup
         when(deviceOsUpdateRolloutStateRepository.findByTenantIdAndMachineIdIn(TENANT_ID, List.of("machine-1")))

@@ -22,13 +22,14 @@ public class OsUpdatePolicyResolver {
             OsUpdatePolicyTargetType.TENANT);
 
     // The policy that applies to the device: the most specific of those that cover it, the earliest created one
-    // of two equally specific.
-    public Optional<OsUpdatePolicy> resolve(Collection<OsUpdatePolicy> osUpdatePolicies, Machine machine,
-                                            Set<String> machineTagIds) {
+    // of two equally specific. Null = no policy covers the device.
+    public OsUpdatePolicy resolve(Collection<OsUpdatePolicy> osUpdatePolicies, Machine machine,
+                                  Set<String> machineTagIds) {
         return MOST_SPECIFIC_FIRST.stream()
                 .map(targetType -> findEarliestCovering(osUpdatePolicies, targetType, machine, machineTagIds))
                 .flatMap(Optional::stream)
-                .findFirst();
+                .findFirst()
+                .orElse(null);
     }
 
     private Optional<OsUpdatePolicy> findEarliestCovering(Collection<OsUpdatePolicy> osUpdatePolicies,
@@ -36,11 +37,11 @@ public class OsUpdatePolicyResolver {
                                                           Set<String> machineTagIds) {
         return osUpdatePolicies.stream()
                 .filter(osUpdatePolicy -> osUpdatePolicy.getTarget().getType() == targetType)
-                .filter(osUpdatePolicy -> covers(osUpdatePolicy.getTarget(), machine, machineTagIds))
+                .filter(osUpdatePolicy -> isCovering(osUpdatePolicy.getTarget(), machine, machineTagIds))
                 .min(Comparator.comparing(OsUpdatePolicy::getCreatedAt));
     }
 
-    private boolean covers(OsUpdatePolicyTarget target, Machine machine, Set<String> machineTagIds) {
+    private boolean isCovering(OsUpdatePolicyTarget target, Machine machine, Set<String> machineTagIds) {
         return switch (target.getType()) {
             case DEVICE -> target.getMachineIds().contains(machine.getMachineId());
             case DEVICE_TAG -> target.getTagIds().stream().anyMatch(machineTagIds::contains);

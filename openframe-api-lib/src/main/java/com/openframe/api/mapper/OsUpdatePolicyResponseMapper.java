@@ -2,10 +2,12 @@ package com.openframe.api.mapper;
 
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStateResponse;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStatus;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateOverrideResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateRestartDeadlineResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateRolloutRuleResponse;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOverride;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOverrideAction;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
@@ -30,6 +32,16 @@ public class OsUpdatePolicyResponseMapper {
                 .pilotTagId(osUpdatePolicy.getPilotTagId())
                 .createdAt(osUpdatePolicy.getCreatedAt())
                 .updatedAt(osUpdatePolicy.getUpdatedAt())
+                .build();
+    }
+
+    public OsUpdateOverrideResponse toResponse(OsUpdateOverride osUpdateOverride) {
+        return OsUpdateOverrideResponse.builder()
+                .action(osUpdateOverride.getAction())
+                .organizationId(osUpdateOverride.getOrganizationId())
+                .machineId(osUpdateOverride.getMachineId())
+                .actedBy(osUpdateOverride.getActedBy())
+                .actedAt(osUpdateOverride.getActedAt())
                 .build();
     }
 

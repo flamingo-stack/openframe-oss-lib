@@ -5,7 +5,6 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.Optional;
 
 @Component
 public class HoldRolloutStrategy implements OsUpdateRolloutStrategy {
@@ -16,8 +15,8 @@ public class HoldRolloutStrategy implements OsUpdateRolloutStrategy {
     }
 
     @Override
-    public Optional<Instant> findInstallFrom(OsUpdateRolloutRule osUpdateRolloutRule, Instant releasedAt,
-                                             boolean pilotDevice) {
-        return Optional.empty();
+    public Instant findInstallFrom(OsUpdateRolloutRule osUpdateRolloutRule, Instant releasedAt,
+                                   boolean pilotDevice) {
+        return null;
     }
 }

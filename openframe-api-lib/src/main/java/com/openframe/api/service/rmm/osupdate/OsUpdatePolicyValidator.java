@@ -102,23 +102,25 @@ public class OsUpdatePolicyValidator {
             fieldErrors.add(new ValidationException.FieldError(
                     "pilotTagId", "must be set when a rule uses PILOT_THEN_EVERYONE"));
         }
-        osUpdatePolicyCommand.getRolloutRules().forEach((urgency, osUpdateRolloutRule) -> {
-            String field = "rolloutRules." + urgency;
-            if (osUpdateRolloutRule.getMode() == null) {
-                fieldErrors.add(new ValidationException.FieldError(field + ".mode", "must be set"));
-                return;
-            }
-            if (osUpdateRolloutRule.getMode() != OsUpdateRolloutMode.HOLD
-                    && isNegativeOrMissing(osUpdateRolloutRule.getDaysAfterRelease())) {
-                fieldErrors.add(new ValidationException.FieldError(
-                        field + ".daysAfterRelease", "must be 0 or more"));
-            }
-            if (osUpdateRolloutRule.getMode() == OsUpdateRolloutMode.PILOT_THEN_EVERYONE
-                    && isNegativeOrMissing(osUpdateRolloutRule.getDaysLaterToEveryone())) {
-                fieldErrors.add(new ValidationException.FieldError(
-                        field + ".daysLaterToEveryone", "must be 0 or more"));
-            }
-        });
+        osUpdatePolicyCommand.getRolloutRules().forEach((urgency, osUpdateRolloutRule) ->
+                validateRolloutRule(urgency, osUpdateRolloutRule, fieldErrors));
+    }
+
+    private void validateRolloutRule(OsUpdateUrgency urgency, OsUpdateRolloutRule osUpdateRolloutRule,
+                                     List<ValidationException.FieldError> fieldErrors) {
+        String field = "rolloutRules." + urgency;
+        if (osUpdateRolloutRule.getMode() == null) {
+            fieldErrors.add(new ValidationException.FieldError(field + ".mode", "must be set"));
+            return;
+        }
+        if (osUpdateRolloutRule.getMode() != OsUpdateRolloutMode.HOLD
+                && isNegativeOrMissing(osUpdateRolloutRule.getDaysAfterRelease())) {
+            fieldErrors.add(new ValidationException.FieldError(field + ".daysAfterRelease", "must be 0 or more"));
+        }
+        if (osUpdateRolloutRule.getMode() == OsUpdateRolloutMode.PILOT_THEN_EVERYONE
+                && isNegativeOrMissing(osUpdateRolloutRule.getDaysLaterToEveryone())) {
+            fieldErrors.add(new ValidationException.FieldError(field + ".daysLaterToEveryone", "must be 0 or more"));
+        }
     }
 
     // Every urgency the policy rolls out needs its restart deadlines, in the order focus, soft, hard.
@@ -133,15 +135,19 @@ public class OsUpdatePolicyValidator {
             OsUpdateRestartDeadline osUpdateRestartDeadline = restartDeadlines.get(urgency);
             if (osUpdateRestartDeadline == null) {
                 fieldErrors.add(new ValidationException.FieldError(field, "must be set"));
-            } else if (isNegativeOrMissing(osUpdateRestartDeadline.getFocusDays())
-                    || isNegativeOrMissing(osUpdateRestartDeadline.getSoftDays())
-                    || isNegativeOrMissing(osUpdateRestartDeadline.getHardDays())
-                    || osUpdateRestartDeadline.getFocusDays() > osUpdateRestartDeadline.getSoftDays()
-                    || osUpdateRestartDeadline.getSoftDays() > osUpdateRestartDeadline.getHardDays()) {
+            } else if (hasMissingOrDecreasingDays(osUpdateRestartDeadline)) {
                 fieldErrors.add(new ValidationException.FieldError(
                         field, "focusDays, softDays and hardDays must be 0 or more and must not decrease"));
             }
         }
+    }
+
+    private boolean hasMissingOrDecreasingDays(OsUpdateRestartDeadline osUpdateRestartDeadline) {
+        return isNegativeOrMissing(osUpdateRestartDeadline.getFocusDays())
+                || isNegativeOrMissing(osUpdateRestartDeadline.getSoftDays())
+                || isNegativeOrMissing(osUpdateRestartDeadline.getHardDays())
+                || osUpdateRestartDeadline.getFocusDays() > osUpdateRestartDeadline.getSoftDays()
+                || osUpdateRestartDeadline.getSoftDays() > osUpdateRestartDeadline.getHardDays();
     }
 
     private boolean isNegativeOrMissing(Integer days) {
@@ -168,9 +174,13 @@ public class OsUpdatePolicyValidator {
         };
     }
 
+    private boolean hasSharedTag(List<String> tagIds, List<String> otherTagIds) {
+        return tagIds.stream().anyMatch(otherTagIds::contains);
+    }
+
     private Optional<String> findTagConflict(OsUpdatePolicyTarget target, OsUpdatePolicy other) {
         List<String> otherTagIds = other.getTarget().getTagIds();
-        if (target.getTagIds().stream().anyMatch(otherTagIds::contains)) {
+        if (hasSharedTag(target.getTagIds(), otherTagIds)) {
             return Optional.of("The policy '%s' already covers one of the tags".formatted(other.getName()));
         }
         List<String> taggedMachineIds = tagAssignmentRepository

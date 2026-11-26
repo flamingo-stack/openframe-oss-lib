@@ -12,7 +12,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-// A technician's decision on one update, for a customer or for one device, on top of what the policy says.
+// A technician's decision on one update, for one device, one customer or every customer, on top of what the
+// policy says.
 @Data
 @Builder
 @NoArgsConstructor
@@ -38,7 +39,7 @@ public class OsUpdateOverride implements TenantScoped {
 
     private OsUpdateOverrideAction action;
 
-    // Exactly one of the two is set. An override of a device wins over the one of its customer.
+    // At most one of the two is set; neither = every customer. The narrowest override that covers a device wins.
     private String organizationId;
 
     private String machineId;

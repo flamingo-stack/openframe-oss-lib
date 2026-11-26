@@ -6,22 +6,19 @@ import com.openframe.data.document.rmm.osupdate.OsUpdateSeverity;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 
 @Component
 public class OsUpdateUrgencyResolver {
 
-    // Empty = no policy rolls the update out: a preview, a new OS version, a driver.
-    public Optional<OsUpdateUrgency> resolve(OsUpdate osUpdate) {
+    // Null = no policy rolls the update out: a preview, a new OS version, a driver.
+    public OsUpdateUrgency resolve(OsUpdate osUpdate) {
         if (osUpdate.getClassification() == OsUpdateClassification.SECURITY) {
-            return Optional.of(isCritical(osUpdate)
-                    ? OsUpdateUrgency.CRITICAL_SECURITY
-                    : OsUpdateUrgency.OTHER_SECURITY);
+            return isCritical(osUpdate) ? OsUpdateUrgency.CRITICAL_SECURITY : OsUpdateUrgency.OTHER_SECURITY;
         }
         if (osUpdate.getClassification() == OsUpdateClassification.QUALITY) {
-            return Optional.of(OsUpdateUrgency.QUALITY);
+            return OsUpdateUrgency.QUALITY;
         }
-        return Optional.empty();
+        return null;
     }
 
     private boolean isCritical(OsUpdate osUpdate) {

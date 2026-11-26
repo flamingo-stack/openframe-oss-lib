@@ -22,6 +22,7 @@ import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
@@ -69,6 +70,7 @@ class DeletedMachineCleanupTest {
     @Mock private DeviceOsStateRepository deviceOsStateRepository;
     @Mock private DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
     @Mock private DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
+    @Mock private DeviceOsUpdateRolloutStateRepository deviceOsUpdateRolloutStateRepository;
 
     @InjectMocks private DeletedMachineCleanup cleanup;
 
@@ -99,7 +101,8 @@ class DeletedMachineCleanupTest {
 
         verifyNoInteractions(assignedRepository, softwareAssignedRepository, softwareOnlineDispatchRepository,
                 onlineDeviceDispatchRepository, deviceSoftwareRepository, projectionTrigger,
-                deviceOsStateRepository, deviceOsPendingUpdateRepository, deviceOsUpdateHistoryRepository);
+                deviceOsStateRepository, deviceOsPendingUpdateRepository, deviceOsUpdateHistoryRepository,
+                deviceOsUpdateRolloutStateRepository);
     }
 
     @Test
@@ -251,6 +254,17 @@ class DeletedMachineCleanupTest {
         verify(deviceOsStateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
         verify(deviceOsPendingUpdateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
         verify(deviceOsUpdateHistoryRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
+    }
+
+    @Test
+    void cleanUpDeletedMachine_deviceWithRolloutStates_rolloutStatesOfThatDeviceRemoved() {
+        // setup
+
+        // execution
+        cleanup.cleanUpDeletedMachine("t-1", "m-1");
+
+        // verifications
+        verify(deviceOsUpdateRolloutStateRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
     }
 
     @Test

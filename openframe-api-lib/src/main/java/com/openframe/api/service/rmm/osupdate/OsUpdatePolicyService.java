@@ -6,7 +6,6 @@ import com.openframe.api.exception.OsUpdatePolicyNotFoundException;
 import com.openframe.api.mapper.OsUpdatePolicyResponseMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.audit.Audited;
-import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -50,26 +48,24 @@ public class OsUpdatePolicyService {
         return findPolicies().stream().map(osUpdatePolicyResponseMapper::toResponse).toList();
     }
 
-    public Optional<OsUpdatePolicyResponse> findPolicy(String id) {
-        return osUpdatePolicyRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
-                .map(osUpdatePolicyResponseMapper::toResponse);
+    public OsUpdatePolicyResponse getPolicy(String id) {
+        return osUpdatePolicyResponseMapper.toResponse(requirePolicy(id));
     }
 
-    // Empty = no policy covers the device, or we cannot manage the device: no policy is applied to it then.
-    public Optional<OsUpdatePolicyResponse> findPolicyOfDevice(String machineId) {
+    // Null = no policy covers the device, or we cannot manage the device: no policy is applied to it then.
+    public OsUpdatePolicyResponse findPolicyOfDevice(String machineId) {
         deviceService.verifyExists(machineId);
         if (deviceOsStateService.isNotManageable(machineId)) {
-            return Optional.empty();
+            return null;
         }
         Set<String> machineTagIds = tagAssignmentRepository
                 .findByEntityIdAndEntityType(machineId, TagEntityType.DEVICE).stream()
                 .map(TagAssignment::getTagId)
                 .collect(Collectors.toSet());
-        Optional<Machine> machine =
-                machineRepository.findByTenantIdAndMachineId(tenantIdProvider.getTenantId(), machineId);
-        return machine
-                .flatMap(found -> osUpdatePolicyResolver.resolve(findPolicies(), found, machineTagIds))
-                .map(osUpdatePolicyResponseMapper::toResponse);
+        return machineRepository.findByTenantIdAndMachineId(tenantIdProvider.getTenantId(), machineId)
+                .map(machine -> osUpdatePolicyResolver.resolve(findPolicies(), machine, machineTagIds))
+                .map(osUpdatePolicyResponseMapper::toResponse)
+                .orElse(null);
     }
 
     @Audited(action = OS_UPDATE_POLICY_CREATE, targetId = "#result.id", targetName = "#osUpdatePolicyCommand.name")

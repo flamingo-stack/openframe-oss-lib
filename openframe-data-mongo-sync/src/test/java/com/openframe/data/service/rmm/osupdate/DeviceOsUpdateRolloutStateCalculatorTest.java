@@ -22,7 +22,6 @@ import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,11 +74,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
     @Test
     void calculate_deviceOutsideThePilotRing_installFromAfterBothDaysAndDeadlinesFromIt() {
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, Optional.empty());
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
-        assertThat(calculated).contains(DeviceOsUpdateRolloutState.builder()
+        assertThat(calculated).isEqualTo(DeviceOsUpdateRolloutState.builder()
                 .tenantId("tenant-1")
                 .machineId("machine-1")
                 .platform(OsPlatform.WINDOWS)
@@ -95,11 +94,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
     @Test
     void calculate_pilotDevice_installFromAfterTheFirstDays() {
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, Optional.empty());
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
-        assertThat(calculated).get().extracting(DeviceOsUpdateRolloutState::getInstallFrom)
+        assertThat(calculated).extracting(DeviceOsUpdateRolloutState::getInstallFrom)
                 .isEqualTo(Instant.parse("2026-10-14T17:00:00Z"));
     }
 
@@ -109,11 +108,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
         osUpdate.setPublishedAt(null);
 
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, Optional.empty());
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
-        assertThat(calculated).get().extracting(DeviceOsUpdateRolloutState::getInstallFrom)
+        assertThat(calculated).extracting(DeviceOsUpdateRolloutState::getInstallFrom)
                 .isEqualTo(Instant.parse("2026-10-14T20:00:00Z"));
     }
 
@@ -123,11 +122,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
         osUpdate.setClassification(OsUpdateClassification.QUALITY);
 
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, Optional.empty());
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
-        assertThat(calculated).contains(DeviceOsUpdateRolloutState.builder()
+        assertThat(calculated).isEqualTo(DeviceOsUpdateRolloutState.builder()
                 .tenantId("tenant-1")
                 .machineId("machine-1")
                 .platform(OsPlatform.WINDOWS)
@@ -144,11 +143,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
                 .action(OsUpdateOverrideAction.APPROVE).actedAt(Instant.parse("2026-10-20T09:00:00Z")).build();
 
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, Optional.of(approval));
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, approval);
 
         // verifications
-        assertThat(calculated).get().satisfies(deviceOsUpdateRolloutState -> {
+        assertThat(calculated).satisfies(deviceOsUpdateRolloutState -> {
             assertThat(deviceOsUpdateRolloutState.getOverrideAction()).isEqualTo(OsUpdateOverrideAction.APPROVE);
             assertThat(deviceOsUpdateRolloutState.getInstallFrom()).isEqualTo(Instant.parse("2026-10-20T09:00:00Z"));
             assertThat(deviceOsUpdateRolloutState.getHardAt()).isEqualTo(Instant.parse("2026-11-19T09:00:00Z"));
@@ -162,11 +161,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
                 .action(OsUpdateOverrideAction.APPROVE).actedAt(Instant.parse("2026-10-14T09:00:00Z")).build();
 
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, Optional.of(approval));
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, approval);
 
         // verifications
-        assertThat(calculated).get().extracting(DeviceOsUpdateRolloutState::getInstallFrom)
+        assertThat(calculated).extracting(DeviceOsUpdateRolloutState::getInstallFrom)
                 .isEqualTo(Instant.parse("2026-10-14T09:00:00Z"));
     }
 
@@ -177,11 +176,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
                 .action(OsUpdateOverrideAction.APPROVE).actedAt(Instant.parse("2026-10-25T09:00:00Z")).build();
 
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, Optional.of(approval));
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, approval);
 
         // verifications
-        assertThat(calculated).get().extracting(DeviceOsUpdateRolloutState::getInstallFrom)
+        assertThat(calculated).extracting(DeviceOsUpdateRolloutState::getInstallFrom)
                 .isEqualTo(Instant.parse("2026-10-17T17:00:00Z"));
     }
 
@@ -193,11 +192,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
                 .action(action).actedAt(Instant.parse("2026-10-14T09:00:00Z")).build();
 
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, Optional.of(osUpdateOverride));
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, osUpdateOverride);
 
         // verifications
-        assertThat(calculated).get().satisfies(deviceOsUpdateRolloutState -> {
+        assertThat(calculated).satisfies(deviceOsUpdateRolloutState -> {
             assertThat(deviceOsUpdateRolloutState.getOverrideAction()).isEqualTo(action);
             assertThat(deviceOsUpdateRolloutState.getInstallFrom()).isNull();
             assertThat(deviceOsUpdateRolloutState.getFocusAt()).isNull();
@@ -212,11 +211,11 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
         osUpdate.setSeverity(OsUpdateSeverity.IMPORTANT);
 
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, Optional.empty());
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
-        assertThat(calculated).isEmpty();
+        assertThat(calculated).isNull();
     }
 
     @Test
@@ -225,10 +224,10 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
         osUpdate.setClassification(OsUpdateClassification.PREVIEW);
 
         // execution
-        Optional<DeviceOsUpdateRolloutState> calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, Optional.empty());
+        DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
+                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
-        assertThat(calculated).isEmpty();
+        assertThat(calculated).isNull();
     }
 }

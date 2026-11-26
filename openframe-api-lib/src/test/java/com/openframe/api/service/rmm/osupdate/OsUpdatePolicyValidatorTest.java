@@ -116,6 +116,56 @@ class OsUpdatePolicyValidatorTest {
     }
 
     @Test
+    void validate_zeroDaysAndEqualRestartDeadlines_passes() {
+        // setup
+        command.pilotTagId("tag-pilot")
+                .rolloutRules(Map.of(OsUpdateUrgency.QUALITY, OsUpdateRolloutRule.builder()
+                        .mode(OsUpdateRolloutMode.PILOT_THEN_EVERYONE).daysAfterRelease(0).daysLaterToEveryone(0)
+                        .build()))
+                .restartDeadlines(Map.of(OsUpdateUrgency.QUALITY,
+                        OsUpdateRestartDeadline.builder().focusDays(0).softDays(0).hardDays(0).build()));
+
+        // execution, verifications
+        assertThatCode(() -> osUpdatePolicyValidator.validate(command.build(), List.of())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void validate_negativeDays_nameTheirFields() {
+        // setup
+        command.pilotTagId("tag-pilot")
+                .rolloutRules(Map.of(OsUpdateUrgency.QUALITY, OsUpdateRolloutRule.builder()
+                        .mode(OsUpdateRolloutMode.PILOT_THEN_EVERYONE).daysAfterRelease(-1).daysLaterToEveryone(-1)
+                        .build()))
+                .restartDeadlines(Map.of(OsUpdateUrgency.QUALITY,
+                        OsUpdateRestartDeadline.builder().focusDays(-1).softDays(5).hardDays(7).build()));
+
+        // execution, verifications
+        assertFieldErrors("rolloutRules.QUALITY.daysAfterRelease", "rolloutRules.QUALITY.daysLaterToEveryone",
+                "restartDeadlines.QUALITY");
+    }
+
+    @Test
+    void validate_focusDeadlineAfterTheSoftOne_namesTheUrgency() {
+        // setup
+        command.restartDeadlines(Map.of(OsUpdateUrgency.QUALITY,
+                OsUpdateRestartDeadline.builder().focusDays(6).softDays(5).hardDays(7).build()));
+
+        // execution, verifications
+        assertFieldErrors("restartDeadlines.QUALITY");
+    }
+
+    @Test
+    void validate_tenantPolicyNextToPoliciesOfOtherTargetTypes_passes() {
+        // setup
+        List<OsUpdatePolicy> others = List.of(
+                policy("Northwind", target(OsUpdatePolicyTargetType.CUSTOMER).organizationId("org-1").build()),
+                policy("Imaging PCs", target(OsUpdatePolicyTargetType.DEVICE).machineIds(List.of("m-1")).build()));
+
+        // execution, verifications
+        assertThatCode(() -> osUpdatePolicyValidator.validate(command.build(), others)).doesNotThrowAnyException();
+    }
+
+    @Test
     void validate_secondTenantPolicy_conflictNamingTheFirst() {
         // setup
         OsUpdatePolicy other = policy("Everyone", target(OsUpdatePolicyTargetType.TENANT).build());

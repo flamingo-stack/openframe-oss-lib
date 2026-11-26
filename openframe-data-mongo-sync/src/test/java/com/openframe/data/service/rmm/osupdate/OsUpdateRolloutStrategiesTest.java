@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,21 +19,21 @@ class OsUpdateRolloutStrategiesTest {
     @Test
     void pilotThenEveryone_pilotDevice_releasePlusTheFirstDays() {
         // execution
-        Optional<Instant> installFrom = new PilotThenEveryoneRolloutStrategy()
+        Instant installFrom = new PilotThenEveryoneRolloutStrategy()
                 .findInstallFrom(osUpdateRolloutRule, RELEASED_AT, true);
 
         // verifications
-        assertThat(installFrom).contains(Instant.parse("2026-10-14T17:00:00Z"));
+        assertThat(installFrom).isEqualTo(Instant.parse("2026-10-14T17:00:00Z"));
     }
 
     @Test
     void pilotThenEveryone_deviceOutsideThePilotRing_releasePlusBothDays() {
         // execution
-        Optional<Instant> installFrom = new PilotThenEveryoneRolloutStrategy()
+        Instant installFrom = new PilotThenEveryoneRolloutStrategy()
                 .findInstallFrom(osUpdateRolloutRule, RELEASED_AT, false);
 
         // verifications
-        assertThat(installFrom).contains(Instant.parse("2026-10-17T17:00:00Z"));
+        assertThat(installFrom).isEqualTo(Instant.parse("2026-10-17T17:00:00Z"));
     }
 
     @Test
@@ -43,14 +42,14 @@ class OsUpdateRolloutStrategiesTest {
         EveryoneAtOnceRolloutStrategy everyoneAtOnceRolloutStrategy = new EveryoneAtOnceRolloutStrategy();
 
         // execution
-        Optional<Instant> ofPilotDevice =
+        Instant ofPilotDevice =
                 everyoneAtOnceRolloutStrategy.findInstallFrom(osUpdateRolloutRule, RELEASED_AT, true);
-        Optional<Instant> ofOtherDevice =
+        Instant ofOtherDevice =
                 everyoneAtOnceRolloutStrategy.findInstallFrom(osUpdateRolloutRule, RELEASED_AT, false);
 
         // verifications
-        assertThat(ofPilotDevice).contains(Instant.parse("2026-10-14T17:00:00Z"));
-        assertThat(ofOtherDevice).contains(Instant.parse("2026-10-14T17:00:00Z"));
+        assertThat(ofPilotDevice).isEqualTo(Instant.parse("2026-10-14T17:00:00Z"));
+        assertThat(ofOtherDevice).isEqualTo(Instant.parse("2026-10-14T17:00:00Z"));
     }
 
     @Test
@@ -59,13 +58,13 @@ class OsUpdateRolloutStrategiesTest {
         HoldRolloutStrategy holdRolloutStrategy = new HoldRolloutStrategy();
 
         // execution
-        Optional<Instant> ofPilotDevice = holdRolloutStrategy.findInstallFrom(osUpdateRolloutRule, RELEASED_AT, true);
-        Optional<Instant> ofOtherDevice =
+        Instant ofPilotDevice = holdRolloutStrategy.findInstallFrom(osUpdateRolloutRule, RELEASED_AT, true);
+        Instant ofOtherDevice =
                 holdRolloutStrategy.findInstallFrom(osUpdateRolloutRule, RELEASED_AT, false);
 
         // verifications
-        assertThat(ofPilotDevice).isEmpty();
-        assertThat(ofOtherDevice).isEmpty();
+        assertThat(ofPilotDevice).isNull();
+        assertThat(ofOtherDevice).isNull();
     }
 
     @Test

@@ -82,6 +82,30 @@ class OsUpdatePolicyGraphQLMapperTest {
     }
 
     @Test
+    void toCommand_restartDeadlineUrgencyListedTwice_refused() {
+        // setup
+        input.setRestartDeadlines(
+                List.of(input.getRestartDeadlines().getFirst(), input.getRestartDeadlines().getFirst()));
+
+        // execution, verifications
+        assertThatThrownBy(() -> osUpdatePolicyGraphQLMapper.toCommand(input))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("restartDeadlines");
+    }
+
+    @Test
+    void toCommand_inputWithoutAPilotTag_noPilotTagAndNothingDecodedForIt() {
+        // setup
+        input.setPilotTagId(null);
+
+        // execution
+        OsUpdatePolicyCommand command = osUpdatePolicyGraphQLMapper.toCommand(input);
+
+        // verifications
+        assertThat(command.getPilotTagId()).isNull();
+    }
+
+    @Test
     void toGraphQL_response_tagsUnderTheirGlobalIds() {
         // setup
         OsUpdatePolicyResponse response = OsUpdatePolicyResponse.builder()

@@ -4,22 +4,22 @@ import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTarget;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRestartDeadline;
 import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
 import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.Map;
 
-@Value
+@Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OsUpdatePolicyCommand {
 
-    String name;
-
-    OsUpdatePolicyTarget target;
-
-    Map<OsUpdateUrgency, OsUpdateRolloutRule> rolloutRules;
-
-    Map<OsUpdateUrgency, OsUpdateRestartDeadline> restartDeadlines;
-
-    String pilotTagId;
+    private String name;
+    private OsUpdatePolicyTarget target;
+    private Map<OsUpdateUrgency, OsUpdateRolloutRule> rolloutRules;
+    private Map<OsUpdateUrgency, OsUpdateRestartDeadline> restartDeadlines;
+    private String pilotTagId;
 }

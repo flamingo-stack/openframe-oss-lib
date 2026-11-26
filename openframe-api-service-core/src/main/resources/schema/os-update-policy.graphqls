@@ -2,6 +2,7 @@ extend type Query {
     """The OS update policies of the tenant, the earliest created first."""
     osUpdatePolicies: [OsUpdatePolicy!]!
 
+    """Fails with OS_UPDATE_POLICY_NOT_FOUND when the tenant has no such policy."""
     osUpdatePolicy(id: ID!): OsUpdatePolicy
 
     """The policy the device follows: the most specific one that covers it, in the order device, device tag,

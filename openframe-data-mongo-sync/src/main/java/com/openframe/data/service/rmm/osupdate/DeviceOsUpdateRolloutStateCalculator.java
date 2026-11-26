@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -22,60 +21,57 @@ public class DeviceOsUpdateRolloutStateCalculator {
     private final OsUpdateRolloutStrategyResolver osUpdateRolloutStrategyResolver;
     private final OsUpdateRestartDeadlineCalculator osUpdateRestartDeadlineCalculator;
 
-    // Empty = the policy does not roll the update out: nothing is stored for the device and the update.
-    public Optional<DeviceOsUpdateRolloutState> calculate(OsUpdatePolicy osUpdatePolicy, boolean pilotDevice,
-                                                          OsUpdate osUpdate,
-                                                          DeviceOsPendingUpdate deviceOsPendingUpdate,
-                                                          Optional<OsUpdateOverride> osUpdateOverride) {
-        Optional<OsUpdateUrgency> osUpdateUrgency = osUpdateUrgencyResolver.resolve(osUpdate);
-        Optional<OsUpdateRolloutRule> osUpdateRolloutRule =
-                osUpdateUrgency.map(osUpdatePolicy.getRolloutRules()::get);
-        if (osUpdateRolloutRule.isEmpty()) {
-            return Optional.empty();
+    // Null = the policy does not roll the update out: nothing is stored for the device and the update.
+    // osUpdateOverride is null when no technician decided on the update for this device.
+    public DeviceOsUpdateRolloutState calculate(OsUpdatePolicy osUpdatePolicy, boolean pilotDevice, OsUpdate osUpdate,
+                                                DeviceOsPendingUpdate deviceOsPendingUpdate,
+                                                OsUpdateOverride osUpdateOverride) {
+        OsUpdateUrgency osUpdateUrgency = osUpdateUrgencyResolver.resolve(osUpdate);
+        OsUpdateRolloutRule osUpdateRolloutRule =
+                osUpdateUrgency == null ? null : osUpdatePolicy.getRolloutRules().get(osUpdateUrgency);
+        if (osUpdateRolloutRule == null) {
+            return null;
         }
-        Optional<Instant> installFromByPolicy = osUpdateRolloutStrategyResolver
-                .resolve(osUpdateRolloutRule.get().getMode())
-                .findInstallFrom(osUpdateRolloutRule.get(), findReleasedAt(osUpdate), pilotDevice);
-        Optional<Instant> installFrom = applyOverride(installFromByPolicy, osUpdateOverride);
-
+        Instant installFromByPolicy = osUpdateRolloutStrategyResolver
+                .resolve(osUpdateRolloutRule.getMode())
+                .findInstallFrom(osUpdateRolloutRule, findReleasedAt(osUpdate), pilotDevice);
+        Instant installFrom = applyOverride(installFromByPolicy, osUpdateOverride);
         DeviceOsUpdateRolloutState deviceOsUpdateRolloutState = DeviceOsUpdateRolloutState.builder()
                 .tenantId(deviceOsPendingUpdate.getTenantId())
                 .machineId(deviceOsPendingUpdate.getMachineId())
                 .platform(deviceOsPendingUpdate.getPlatform())
                 .identifier(deviceOsPendingUpdate.getIdentifier())
                 .policyId(osUpdatePolicy.getId())
-                .overrideAction(osUpdateOverride.map(OsUpdateOverride::getAction).orElse(null))
-                .installFrom(installFrom.orElse(null))
+                .overrideAction(osUpdateOverride == null ? null : osUpdateOverride.getAction())
+                .installFrom(installFrom)
                 .build();
-        installFrom
-                .map(from -> osUpdateRestartDeadlineCalculator.calculate(
-                        osUpdatePolicy.getRestartDeadlines().get(osUpdateUrgency.get()),
-                        deviceOsPendingUpdate.getDiscoveredAt(), from))
-                .ifPresent(osUpdateRestartDeadlineDates -> {
-                    deviceOsUpdateRolloutState.setFocusAt(osUpdateRestartDeadlineDates.getFocusAt());
-                    deviceOsUpdateRolloutState.setSoftAt(osUpdateRestartDeadlineDates.getSoftAt());
-                    deviceOsUpdateRolloutState.setHardAt(osUpdateRestartDeadlineDates.getHardAt());
-                });
-        return Optional.of(deviceOsUpdateRolloutState);
+        if (installFrom != null) {
+            OsUpdateRestartDeadlineDates osUpdateRestartDeadlineDates = osUpdateRestartDeadlineCalculator.calculate(
+                    osUpdatePolicy.getRestartDeadlines().get(osUpdateUrgency),
+                    deviceOsPendingUpdate.getDiscoveredAt(), installFrom);
+            deviceOsUpdateRolloutState.setFocusAt(osUpdateRestartDeadlineDates.getFocusAt());
+            deviceOsUpdateRolloutState.setSoftAt(osUpdateRestartDeadlineDates.getSoftAt());
+            deviceOsUpdateRolloutState.setHardAt(osUpdateRestartDeadlineDates.getHardAt());
+        }
+        return deviceOsUpdateRolloutState;
     }
 
     // The vendor does not date every update: such an update counts from the first report of it in the tenant.
     private Instant findReleasedAt(OsUpdate osUpdate) {
-        return Optional.ofNullable(osUpdate.getPublishedAt()).orElse(osUpdate.getFirstSeenAt());
+        return osUpdate.getPublishedAt() != null ? osUpdate.getPublishedAt() : osUpdate.getFirstSeenAt();
     }
 
     // An approval never delays what the policy already allows.
-    private Optional<Instant> applyOverride(Optional<Instant> installFromByPolicy,
-                                            Optional<OsUpdateOverride> osUpdateOverride) {
-        if (osUpdateOverride.isEmpty()) {
+    private Instant applyOverride(Instant installFromByPolicy, OsUpdateOverride osUpdateOverride) {
+        if (osUpdateOverride == null) {
             return installFromByPolicy;
         }
-        if (osUpdateOverride.get().getAction() != OsUpdateOverrideAction.APPROVE) {
-            return Optional.empty();
+        if (osUpdateOverride.getAction() != OsUpdateOverrideAction.APPROVE) {
+            return null;
         }
-        Instant approvedAt = osUpdateOverride.get().getActedAt();
-        return installFromByPolicy
-                .filter(byPolicy -> byPolicy.isBefore(approvedAt))
-                .or(() -> Optional.of(approvedAt));
+        Instant approvedAt = osUpdateOverride.getActedAt();
+        return installFromByPolicy != null && installFromByPolicy.isBefore(approvedAt)
+                ? installFromByPolicy
+                : approvedAt;
     }
 }

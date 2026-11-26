@@ -14,8 +14,8 @@ import java.util.stream.Stream;
 public class OsUpdateOverrideResolver {
 
     // The override of one update that applies to the device: its own, else the one of its customer, else the one
-    // set for every customer.
-    public Optional<OsUpdateOverride> resolve(Collection<OsUpdateOverride> overridesOfOsUpdate, Machine machine) {
+    // set for every customer. Null = no technician decided on the update for this device.
+    public OsUpdateOverride resolve(Collection<OsUpdateOverride> overridesOfOsUpdate, Machine machine) {
         Predicate<OsUpdateOverride> ofDevice = osUpdateOverride ->
                 Objects.equals(osUpdateOverride.getMachineId(), machine.getMachineId());
         Predicate<OsUpdateOverride> ofCustomer = osUpdateOverride -> osUpdateOverride.getMachineId() == null
@@ -26,6 +26,7 @@ public class OsUpdateOverrideResolver {
         return Stream.of(ofDevice, ofCustomer, ofEveryCustomer)
                 .map(scope -> overridesOfOsUpdate.stream().filter(scope).findFirst())
                 .flatMap(Optional::stream)
-                .findFirst();
+                .findFirst()
+                .orElse(null);
     }
 }

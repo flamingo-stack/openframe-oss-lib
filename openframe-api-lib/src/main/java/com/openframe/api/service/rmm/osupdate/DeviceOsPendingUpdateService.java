@@ -61,14 +61,18 @@ public class DeviceOsPendingUpdateService {
                 findRolloutStatesByIdentifier(machineId);
         return pendingUpdates.stream()
                 .filter(pendingUpdate -> osUpdatesByIdentifier.containsKey(pendingUpdate.getIdentifier()))
-                .map(pendingUpdate -> {
-                    DeviceOsPendingUpdateResponse pendingUpdateResponse = deviceOsResponseMapper.toResponse(
-                            pendingUpdate, osUpdatesByIdentifier.get(pendingUpdate.getIdentifier()));
-                    pendingUpdateResponse.setRolloutState(
-                            rolloutStatesByIdentifier.get(pendingUpdate.getIdentifier()));
-                    return pendingUpdateResponse;
-                })
+                .map(pendingUpdate -> toResponse(pendingUpdate,
+                        osUpdatesByIdentifier.get(pendingUpdate.getIdentifier()),
+                        rolloutStatesByIdentifier.get(pendingUpdate.getIdentifier())))
                 .toList();
+    }
+
+    private DeviceOsPendingUpdateResponse toResponse(DeviceOsPendingUpdate pendingUpdate, OsUpdate osUpdate,
+                                                     DeviceOsUpdateRolloutStateResponse rolloutState) {
+        DeviceOsPendingUpdateResponse pendingUpdateResponse =
+                deviceOsResponseMapper.toResponse(pendingUpdate, osUpdate);
+        pendingUpdateResponse.setRolloutState(rolloutState);
+        return pendingUpdateResponse;
     }
 
     private Map<String, DeviceOsUpdateRolloutStateResponse> findRolloutStatesByIdentifier(String machineId) {

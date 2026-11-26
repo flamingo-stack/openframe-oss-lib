@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm.osupdate;
 
+import com.openframe.api.dto.rmm.osupdate.OsUpdateOverrideResponse;
+import com.openframe.api.mapper.OsUpdatePolicyResponseMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.audit.Audited;
 import com.openframe.core.exception.ValidationException;
@@ -33,16 +35,19 @@ public class OsUpdateOverrideService {
     private final OsUpdateService osUpdateService;
     private final DeviceService deviceService;
     private final DeviceOsUpdateRolloutStateService deviceOsUpdateRolloutStateService;
+    private final OsUpdatePolicyResponseMapper osUpdatePolicyResponseMapper;
 
-    public List<OsUpdateOverride> listOverrides(String osUpdateId) {
-        return findOverrides(osUpdateService.getOsUpdate(osUpdateId));
+    public List<OsUpdateOverrideResponse> listOverrides(String osUpdateId) {
+        return findOverrides(osUpdateService.getOsUpdate(osUpdateId)).stream()
+                .map(osUpdatePolicyResponseMapper::toResponse)
+                .toList();
     }
 
     // Replaces the earlier override of the same scope.
     @Audited(action = OS_UPDATE_OVERRIDE_SET, targetId = "#osUpdateId", compare = false,
             organizationId = "#organizationId", deviceId = "#machineId", details = "action=#action")
-    public OsUpdateOverride setOverride(String osUpdateId, OsUpdateOverrideAction action, String organizationId,
-                                        String machineId, String actedBy) {
+    public OsUpdateOverrideResponse setOverride(String osUpdateId, OsUpdateOverrideAction action,
+                                                String organizationId, String machineId, String actedBy) {
         OsUpdate osUpdate = osUpdateService.getOsUpdate(osUpdateId);
         verifyScope(organizationId, machineId);
         OsUpdateOverride osUpdateOverride = findOverride(osUpdate, organizationId, machineId)
@@ -58,7 +63,7 @@ public class OsUpdateOverrideService {
         osUpdateOverride.setActedAt(Instant.now());
         OsUpdateOverride savedOsUpdateOverride = osUpdateOverrideRepository.save(osUpdateOverride);
         refreshRollout(machineId);
-        return savedOsUpdateOverride;
+        return osUpdatePolicyResponseMapper.toResponse(savedOsUpdateOverride);
     }
 
     // The policy decides again. False = there was no override of this scope.
@@ -66,11 +71,11 @@ public class OsUpdateOverrideService {
             organizationId = "#organizationId", deviceId = "#machineId", condition = "#result")
     public boolean removeOverride(String osUpdateId, String organizationId, String machineId) {
         OsUpdate osUpdate = osUpdateService.getOsUpdate(osUpdateId);
-        Optional<OsUpdateOverride> osUpdateOverride = findOverride(osUpdate, organizationId, machineId);
-        if (osUpdateOverride.isEmpty()) {
+        OsUpdateOverride osUpdateOverride = findOverride(osUpdate, organizationId, machineId).orElse(null);
+        if (osUpdateOverride == null) {
             return false;
         }
-        osUpdateOverrideRepository.delete(osUpdateOverride.get());
+        osUpdateOverrideRepository.delete(osUpdateOverride);
         refreshRollout(machineId);
         return true;
     }

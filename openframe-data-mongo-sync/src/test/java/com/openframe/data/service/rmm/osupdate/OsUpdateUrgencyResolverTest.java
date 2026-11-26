@@ -9,7 +9,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,10 +35,10 @@ class OsUpdateUrgencyResolverTest {
                 .classification(classification).severity(severity).exploited(exploited).build();
 
         // execution
-        Optional<OsUpdateUrgency> osUpdateUrgency = osUpdateUrgencyResolver.resolve(osUpdate);
+        OsUpdateUrgency osUpdateUrgency = osUpdateUrgencyResolver.resolve(osUpdate);
 
         // verifications
-        assertThat(osUpdateUrgency).contains(expected);
+        assertThat(osUpdateUrgency).isEqualTo(expected);
     }
 
     @ParameterizedTest
@@ -50,18 +49,18 @@ class OsUpdateUrgencyResolverTest {
                 .classification(classification).severity(OsUpdateSeverity.CRITICAL).exploited(true).build();
 
         // execution
-        Optional<OsUpdateUrgency> osUpdateUrgency = osUpdateUrgencyResolver.resolve(osUpdate);
+        OsUpdateUrgency osUpdateUrgency = osUpdateUrgencyResolver.resolve(osUpdate);
 
         // verifications
-        assertThat(osUpdateUrgency).isEmpty();
+        assertThat(osUpdateUrgency).isNull();
     }
 
     @Test
     void resolve_updateStoredBeforeClassificationExisted_empty() {
         // execution
-        Optional<OsUpdateUrgency> osUpdateUrgency = osUpdateUrgencyResolver.resolve(OsUpdate.builder().build());
+        OsUpdateUrgency osUpdateUrgency = osUpdateUrgencyResolver.resolve(OsUpdate.builder().build());
 
         // verifications
-        assertThat(osUpdateUrgency).isEmpty();
+        assertThat(osUpdateUrgency).isNull();
     }
 }

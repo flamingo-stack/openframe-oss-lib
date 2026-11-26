@@ -5,12 +5,12 @@ import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateOverrideInput;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateOverrideResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyResponse;
 import com.openframe.api.mapper.OsUpdatePolicyGraphQLMapper;
 import com.openframe.api.service.rmm.osupdate.OsUpdateOverrideService;
 import com.openframe.api.service.rmm.osupdate.OsUpdatePolicyService;
-import com.openframe.data.document.rmm.osupdate.OsUpdateOverride;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,18 +34,17 @@ public class OsUpdatePolicyDataFetcher {
 
     @DgsQuery
     public OsUpdatePolicyResponse osUpdatePolicy(@InputArgument String id) {
-        return osUpdatePolicyService.findPolicy(id).map(osUpdatePolicyGraphQLMapper::toGraphQL).orElse(null);
+        return osUpdatePolicyGraphQLMapper.toGraphQL(osUpdatePolicyService.getPolicy(id));
     }
 
     @DgsQuery
     public OsUpdatePolicyResponse deviceOsUpdatePolicy(@InputArgument String machineId) {
-        return osUpdatePolicyService.findPolicyOfDevice(machineId)
-                .map(osUpdatePolicyGraphQLMapper::toGraphQL)
-                .orElse(null);
+        OsUpdatePolicyResponse osUpdatePolicyResponse = osUpdatePolicyService.findPolicyOfDevice(machineId);
+        return osUpdatePolicyResponse == null ? null : osUpdatePolicyGraphQLMapper.toGraphQL(osUpdatePolicyResponse);
     }
 
     @DgsQuery
-    public List<OsUpdateOverride> osUpdateOverrides(@InputArgument String osUpdateId) {
+    public List<OsUpdateOverrideResponse> osUpdateOverrides(@InputArgument String osUpdateId) {
         return osUpdateOverrideService.listOverrides(osUpdateId);
     }
 
@@ -71,8 +70,8 @@ public class OsUpdatePolicyDataFetcher {
     }
 
     @DgsMutation
-    public OsUpdateOverride setOsUpdateOverride(@InputArgument OsUpdateOverrideInput input,
-                                                @AuthenticationPrincipal AuthPrincipal principal) {
+    public OsUpdateOverrideResponse setOsUpdateOverride(@InputArgument OsUpdateOverrideInput input,
+                                                        @AuthenticationPrincipal AuthPrincipal principal) {
         return osUpdateOverrideService.setOverride(input.getOsUpdateId(), input.getAction(),
                 input.getOrganizationId(), input.getMachineId(), principal.getId());
     }

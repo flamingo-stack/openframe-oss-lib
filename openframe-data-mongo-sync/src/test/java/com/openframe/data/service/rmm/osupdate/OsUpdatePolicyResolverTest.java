@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,31 +42,31 @@ class OsUpdatePolicyResolverTest {
     @Test
     void resolve_everyTargetTypeCoversTheDevice_policyOfTheDevice() {
         // execution
-        Optional<OsUpdatePolicy> resolved = osUpdatePolicyResolver.resolve(
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolve(
                 List.of(tenantPolicy, customerPolicy, tagPolicy, devicePolicy), machine, Set.of("tag-2"));
 
         // verifications
-        assertThat(resolved).containsSame(devicePolicy);
+        assertThat(resolved).isSameAs(devicePolicy);
     }
 
     @Test
     void resolve_noPolicyOfTheDevice_policyOfItsTag() {
         // execution
-        Optional<OsUpdatePolicy> resolved = osUpdatePolicyResolver.resolve(
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolve(
                 List.of(tenantPolicy, customerPolicy, tagPolicy), machine, Set.of("tag-2"));
 
         // verifications
-        assertThat(resolved).containsSame(tagPolicy);
+        assertThat(resolved).isSameAs(tagPolicy);
     }
 
     @Test
     void resolve_deviceWithoutTheTagsOfThePolicy_policyOfItsCustomer() {
         // execution
-        Optional<OsUpdatePolicy> resolved = osUpdatePolicyResolver.resolve(
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolve(
                 List.of(tenantPolicy, customerPolicy, tagPolicy), machine, Set.of("tag-9"));
 
         // verifications
-        assertThat(resolved).containsSame(customerPolicy);
+        assertThat(resolved).isSameAs(customerPolicy);
     }
 
     @Test
@@ -77,11 +76,11 @@ class OsUpdatePolicyResolverTest {
         devicePolicy.getTarget().setMachineIds(List.of("machine-0"));
 
         // execution
-        Optional<OsUpdatePolicy> resolved = osUpdatePolicyResolver.resolve(
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolve(
                 List.of(devicePolicy, customerPolicy, tenantPolicy), machine, Set.of());
 
         // verifications
-        assertThat(resolved).containsSame(tenantPolicy);
+        assertThat(resolved).isSameAs(tenantPolicy);
     }
 
     @Test
@@ -92,11 +91,11 @@ class OsUpdatePolicyResolverTest {
         laterTagPolicy.setCreatedAt(CREATED_AT.plusSeconds(60));
 
         // execution
-        Optional<OsUpdatePolicy> resolved = osUpdatePolicyResolver.resolve(
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolve(
                 List.of(laterTagPolicy, tagPolicy), machine, Set.of("tag-1", "tag-3"));
 
         // verifications
-        assertThat(resolved).containsSame(tagPolicy);
+        assertThat(resolved).isSameAs(tagPolicy);
     }
 
     @Test
@@ -105,11 +104,11 @@ class OsUpdatePolicyResolverTest {
         customerPolicy.getTarget().setOrganizationId("org-2");
 
         // execution
-        Optional<OsUpdatePolicy> resolved = osUpdatePolicyResolver.resolve(
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolve(
                 List.of(customerPolicy, tagPolicy), machine, Set.of());
 
         // verifications
-        assertThat(resolved).isEmpty();
+        assertThat(resolved).isNull();
     }
 
     private static OsUpdatePolicy policy(String name, OsUpdatePolicyTarget target) {

@@ -6,7 +6,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,10 +28,10 @@ class OsUpdateOverrideResolverTest {
     @Test
     void resolve_overridesOfTheDeviceAndOfItsCustomer_theOneOfTheDevice() {
         // execution
-        Optional<OsUpdateOverride> resolved = osUpdateOverrideResolver.resolve(List.of(ofCustomer, ofDevice), machine);
+        OsUpdateOverride resolved = osUpdateOverrideResolver.resolve(List.of(ofCustomer, ofDevice), machine);
 
         // verifications
-        assertThat(resolved).containsSame(ofDevice);
+        assertThat(resolved).isSameAs(ofDevice);
     }
 
     @Test
@@ -41,10 +40,10 @@ class OsUpdateOverrideResolverTest {
         ofDevice.setMachineId("machine-2");
 
         // execution
-        Optional<OsUpdateOverride> resolved = osUpdateOverrideResolver.resolve(List.of(ofDevice, ofCustomer), machine);
+        OsUpdateOverride resolved = osUpdateOverrideResolver.resolve(List.of(ofDevice, ofCustomer), machine);
 
         // verifications
-        assertThat(resolved).containsSame(ofCustomer);
+        assertThat(resolved).isSameAs(ofCustomer);
     }
 
     @Test
@@ -54,10 +53,10 @@ class OsUpdateOverrideResolverTest {
         ofCustomer.setOrganizationId("org-2");
 
         // execution
-        Optional<OsUpdateOverride> resolved = osUpdateOverrideResolver.resolve(List.of(ofDevice, ofCustomer), machine);
+        OsUpdateOverride resolved = osUpdateOverrideResolver.resolve(List.of(ofDevice, ofCustomer), machine);
 
         // verifications
-        assertThat(resolved).isEmpty();
+        assertThat(resolved).isNull();
     }
 
     @Test
@@ -66,11 +65,11 @@ class OsUpdateOverrideResolverTest {
         OsUpdateOverride ofEveryCustomer = OsUpdateOverride.builder().id("every-customer").build();
 
         // execution
-        Optional<OsUpdateOverride> resolved =
+        OsUpdateOverride resolved =
                 osUpdateOverrideResolver.resolve(List.of(ofEveryCustomer, ofCustomer), machine);
 
         // verifications
-        assertThat(resolved).containsSame(ofCustomer);
+        assertThat(resolved).isSameAs(ofCustomer);
     }
 
     @Test
@@ -81,10 +80,10 @@ class OsUpdateOverrideResolverTest {
         ofCustomer.setOrganizationId("org-2");
 
         // execution
-        Optional<OsUpdateOverride> resolved =
+        OsUpdateOverride resolved =
                 osUpdateOverrideResolver.resolve(List.of(ofDevice, ofCustomer, ofEveryCustomer), machine);
 
         // verifications
-        assertThat(resolved).containsSame(ofEveryCustomer);
+        assertThat(resolved).isSameAs(ofEveryCustomer);
     }
 }

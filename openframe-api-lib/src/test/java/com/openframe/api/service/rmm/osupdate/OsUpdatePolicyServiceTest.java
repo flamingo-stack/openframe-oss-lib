@@ -85,6 +85,7 @@ class OsUpdatePolicyServiceTest {
                         OsUpdateRolloutRule.builder().mode(OsUpdateRolloutMode.HOLD).build()))
                 .restartDeadlines(Map.of(OsUpdateUrgency.QUALITY,
                         OsUpdateRestartDeadline.builder().focusDays(1).softDays(5).hardDays(7).build()))
+                .pilotTagId("tag-pilot")
                 .build();
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(osUpdatePolicyRepository.findByTenantIdOrderByCreatedAtAsc(TENANT_ID))
@@ -106,6 +107,11 @@ class OsUpdatePolicyServiceTest {
                 .isEqualTo(savedOsUpdatePolicy.getValue().getUpdatedAt());
         assertThat(created.getName()).isEqualTo("Servers");
         assertThat(created.getTarget()).isEqualTo(command.getTarget());
+        assertThat(created.getPilotTagId()).isEqualTo("tag-pilot");
+        assertThat(created.getRolloutRules()).singleElement()
+                .satisfies(rule -> assertThat(rule.getMode()).isEqualTo(OsUpdateRolloutMode.HOLD));
+        assertThat(created.getRestartDeadlines()).singleElement()
+                .satisfies(deadline -> assertThat(deadline.getHardDays()).isEqualTo(7));
         verify(deviceOsUpdateRolloutStateService).refreshAll();
     }
 
@@ -163,22 +169,54 @@ class OsUpdatePolicyServiceTest {
                 .thenReturn(List.of(TagAssignment.builder().entityId("machine-1").tagId("tag-kiosk").build()));
 
         // execution
-        Optional<OsUpdatePolicyResponse> found = osUpdatePolicyService.findPolicyOfDevice("machine-1");
+        OsUpdatePolicyResponse found = osUpdatePolicyService.findPolicyOfDevice("machine-1");
 
         // verifications
-        assertThat(found).map(OsUpdatePolicyResponse::getId).contains("policy-tag");
+        assertThat(found.getId()).isEqualTo("policy-tag");
     }
 
     @Test
-    void findPolicyOfDevice_deviceWeCannotManage_empty() {
+    void findPolicyOfDevice_noPolicyCoversTheDevice_null() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("machine-1");
+        machine.setOrganizationId("org-1");
+        when(machineRepository.findByTenantIdAndMachineId(TENANT_ID, "machine-1")).thenReturn(Optional.of(machine));
+        when(osUpdatePolicyRepository.findByTenantIdOrderByCreatedAtAsc(TENANT_ID)).thenReturn(List.of());
+
+        // execution
+        OsUpdatePolicyResponse found = osUpdatePolicyService.findPolicyOfDevice("machine-1");
+
+        // verifications
+        assertThat(found).isNull();
+    }
+
+    @Test
+    void getPolicy_existingPolicy_itsResponse() {
+        // execution
+        OsUpdatePolicyResponse found = osUpdatePolicyService.getPolicy("policy-tag");
+
+        // verifications
+        assertThat(found.getId()).isEqualTo("policy-tag");
+    }
+
+    @Test
+    void getPolicy_unknownId_throwsNotFound() {
+        // execution, verifications
+        assertThatThrownBy(() -> osUpdatePolicyService.getPolicy("policy-x"))
+                .isInstanceOf(OsUpdatePolicyNotFoundException.class);
+    }
+
+    @Test
+    void findPolicyOfDevice_deviceWeCannotManage_null() {
         // setup
         when(deviceOsStateService.isNotManageable("machine-1")).thenReturn(true);
 
         // execution
-        Optional<OsUpdatePolicyResponse> found = osUpdatePolicyService.findPolicyOfDevice("machine-1");
+        OsUpdatePolicyResponse found = osUpdatePolicyService.findPolicyOfDevice("machine-1");
 
         // verifications
-        assertThat(found).isEmpty();
+        assertThat(found).isNull();
         verify(deviceService).verifyExists("machine-1");
     }
 

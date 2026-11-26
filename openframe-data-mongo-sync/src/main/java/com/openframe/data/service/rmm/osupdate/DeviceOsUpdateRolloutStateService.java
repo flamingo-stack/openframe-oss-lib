@@ -30,7 +30,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -126,24 +125,25 @@ public class DeviceOsUpdateRolloutStateService {
         List<DeviceOsUpdateRolloutState> calculatedRolloutStates = new ArrayList<>();
         for (Machine machine : machineRepository.findByTenantIdAndMachineIdIn(tenantId, machineIds)) {
             Set<String> machineTagIds = tagIdsByMachineId.getOrDefault(machine.getMachineId(), Set.of());
-            Optional<OsUpdatePolicy> osUpdatePolicy =
-                    osUpdatePolicyResolver.resolve(osUpdatePolicies, machine, machineTagIds);
-            if (osUpdatePolicy.isEmpty()) {
+            OsUpdatePolicy osUpdatePolicy = osUpdatePolicyResolver.resolve(osUpdatePolicies, machine, machineTagIds);
+            if (osUpdatePolicy == null) {
                 continue;
             }
-            boolean pilotDevice = machineTagIds.contains(osUpdatePolicy.get().getPilotTagId());
+            boolean pilotDevice = osUpdatePolicy.getPilotTagId() != null
+                    && machineTagIds.contains(osUpdatePolicy.getPilotTagId());
             for (DeviceOsPendingUpdate deviceOsPendingUpdate
                     : pendingUpdatesByMachineId.getOrDefault(machine.getMachineId(), List.of())) {
                 OsUpdate osUpdate = osUpdatesByIdentifier.get(deviceOsPendingUpdate.getIdentifier());
                 if (osUpdate == null) {
                     continue;
                 }
-                Optional<OsUpdateOverride> osUpdateOverride = osUpdateOverrideResolver.resolve(
+                OsUpdateOverride osUpdateOverride = osUpdateOverrideResolver.resolve(
                         overridesByIdentifier.getOrDefault(osUpdate.getIdentifier(), List.of()), machine);
-                deviceOsUpdateRolloutStateCalculator
-                        .calculate(osUpdatePolicy.get(), pilotDevice, osUpdate, deviceOsPendingUpdate,
-                                osUpdateOverride)
-                        .ifPresent(calculatedRolloutStates::add);
+                DeviceOsUpdateRolloutState calculatedRolloutState = deviceOsUpdateRolloutStateCalculator.calculate(
+                        osUpdatePolicy, pilotDevice, osUpdate, deviceOsPendingUpdate, osUpdateOverride);
+                if (calculatedRolloutState != null) {
+                    calculatedRolloutStates.add(calculatedRolloutState);
+                }
             }
         }
         return calculatedRolloutStates;
