@@ -17,5 +17,7 @@ public class AgentConfigurationProperties {
     private List<String> agentConfigurations = new ArrayList<>();
 
     private Map<String, Map<String, String>> agentMinOsVersions = new HashMap<>();
+
+    private Map<String, List<String>> agentExtraRunArgs = new HashMap<>();
 }
 

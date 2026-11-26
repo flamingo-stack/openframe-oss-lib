@@ -15,6 +15,8 @@ import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.repository.device.MachineNameMatches;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
@@ -30,6 +32,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 
@@ -45,6 +48,9 @@ import static org.mockito.Mockito.when;
 class DeviceServiceMachineSearchTest {
 
     private static final String TENANT_ID = "tenant-1";
+    private static final CursorPosition NO_POSITION = new CursorPosition.None();
+    private static final KeysetCursor ROW_CURSOR =
+            new KeysetCursor("_id", Sort.Direction.DESC, "", "65f1a2b3c4d5e6f708192a3b");
 
     @Mock private MachineRepository machineRepository;
     @Mock private DeletedMachineCleanup deletedMachineCleanup;
@@ -67,7 +73,7 @@ class DeviceServiceMachineSearchTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.getDefaultSortField()).thenReturn("_id");
         when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
-                isNull(), eq(11), eq("_id"), eq("DESC"))).thenReturn(List.of());
+                eq(NO_POSITION), eq(false), eq(11), eq("_id"), eq("DESC"))).thenReturn(List.of());
 
         // execution
         service.queryDevices(filter, pagination, null, null);
@@ -88,7 +94,7 @@ class DeviceServiceMachineSearchTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.getDefaultSortField()).thenReturn("_id");
         when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
-                isNull(), eq(11), eq("_id"), eq("DESC"))).thenReturn(List.of());
+                eq(NO_POSITION), eq(false), eq(11), eq("_id"), eq("DESC"))).thenReturn(List.of());
 
         // execution
         service.queryDevices(filter, pagination, null, null);
@@ -110,8 +116,9 @@ class DeviceServiceMachineSearchTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.getDefaultSortField()).thenReturn("_id");
         when(machineRepository.countMachines(TENANT_ID, expected, null)).thenReturn(1L);
-        when(machineRepository.findMachinesWithCursor(TENANT_ID, expected, null, null, 11, "_id", "DESC"))
+        when(machineRepository.findMachinesWithCursor(TENANT_ID, expected, null, NO_POSITION, false, 11, "_id", "DESC"))
                 .thenReturn(List.of(machine));
+        when(machineRepository.keysetCursor(machine, "_id", "DESC")).thenReturn(ROW_CURSOR);
         when(machineRepository.findMachinesAfter(TENANT_ID, expected, "previous-machine", 11))
                 .thenReturn(List.of(machine));
 
@@ -182,7 +189,7 @@ class DeviceServiceMachineSearchTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.getDefaultSortField()).thenReturn("_id");
         when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
-                isNull(), eq(11), eq("_id"), eq("DESC"))).thenReturn(List.of());
+                eq(NO_POSITION), eq(false), eq(11), eq("_id"), eq("DESC"))).thenReturn(List.of());
 
         // execution
         service.queryAssignedDevices(List.of("machine-1", "machine-2"), filter, pagination, null, null);

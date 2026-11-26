@@ -1,6 +1,11 @@
 extend type Query {
     deviceFilters(filter: DeviceFilterInput): DeviceFilters!
 
+    """Devices of the tenant. Sortable fields: _id, hostname, displayName, nickname, status, connectivity,
+    clientOutdated, lastSeen (default: _id DESC). first/after page forward, last/before page backward; when both
+    directions are sent, last/before wins. Only pageInfo.startCursor / endCursor are valid paging cursors.
+    Under the sorts lastSeen, status and connectivity a device whose value changes between two requests can
+    appear on two pages or on none."""
     devices(
         filter: DeviceFilterInput
         first: Int

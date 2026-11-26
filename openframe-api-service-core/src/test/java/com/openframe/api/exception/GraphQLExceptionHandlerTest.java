@@ -7,7 +7,9 @@ import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.loki.client.LokiQueryRejectedException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
@@ -194,6 +196,24 @@ class GraphQLExceptionHandlerTest {
                 .containsEntry("httpStatus", httpStatus);
     }
 
+    @Test
+    void handleException_invalidCursor_reportsTheInvalidCursorCodeWithAFixedMessageAndNoOtherError() {
+        // setup
+        InvalidCursorException exception = new InvalidCursorException();
+
+        // execution
+        List<GraphQLError> errors = handle(exception);
+
+        // verifications
+        assertThat(errors)
+                .singleElement()
+                .returns("Invalid cursor", GraphQLError::getMessage)
+                .extracting(GraphQLError::getExtensions, as(MAP))
+                .containsOnlyKeys("code", "httpStatus", "timestamp")
+                .containsEntry("code", "INVALID_CURSOR")
+                .containsEntry("httpStatus", 400);
+    }
+
     @ParameterizedTest
     @MethodSource("fleetFailures")
     void handleException_fleetFailure_reportsAnOpenFrameError(Throwable exception, String message, String code,
@@ -244,6 +264,9 @@ class GraphQLExceptionHandlerTest {
                 arguments(new ConflictException(ErrorCode.TAG_ALREADY_EXISTS, "Tag already exists: prod"),
                         "TAG_ALREADY_EXISTS", 409),
                 arguments(new BadRequestException("Unsupported image type"), "BAD_REQUEST", 400),
+                arguments(new InvalidCursorException(), "INVALID_CURSOR", 400),
+                arguments(new ValidationException("before is required with last on this list"),
+                        "VALIDATION_ERROR", 400),
                 arguments(new InvalidRelayIdException(WRONG_TYPE_ID), "INVALID_ID", 400),
                 arguments(new IllegalArgumentException("page size too large"), "VALIDATION_ERROR", 400),
                 arguments(new IllegalStateException("range too wide"), "VALIDATION_ERROR", 400));
