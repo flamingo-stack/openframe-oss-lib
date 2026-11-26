@@ -3,11 +3,28 @@ import {
   deepestTopic,
   isPagePathTopic,
   normalizeTopic,
+  pageAddressFor,
   pageTopicFor,
   sectionTopicFor,
   topicCandidates,
   topicMatchesPath,
 } from '../page-topics';
+
+describe('pageAddressFor: the address the stamp prints', () => {
+  it('keeps the mount, in the form topics are compared in', () => {
+    expect(pageAddressFor('/Help-Center/FAQs/?x=1#top')).toBe('/help-center/faqs');
+    expect(pageAddressFor('/help-center')).toBe('/help-center');
+    expect(pageAddressFor('/')).toBe('/');
+    expect(pageAddressFor('')).toBe('/');
+  });
+
+  it('differs from the topic only under a mount', () => {
+    expect(pageAddressFor('/help-center/roadmap')).not.toBe(
+      pageTopicFor('/help-center/roadmap', { basePath: '/help-center' }),
+    );
+    expect(pageAddressFor('/devices')).toBe(pageTopicFor('/devices', { basePath: '/help-center' }));
+  });
+});
 
 describe('pageTopicFor: a page asks with its path', () => {
   it('drops the query, the hash and a trailing slash, lowercased and decoded', () => {
