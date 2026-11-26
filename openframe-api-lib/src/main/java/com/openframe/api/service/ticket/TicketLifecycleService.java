@@ -24,6 +24,7 @@ import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.ticket.TicketStatusDefinitionRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -257,16 +258,19 @@ public class TicketLifecycleService {
         TicketQueryFilter queryFilter = buildArchiveFilter(resolvedId, filterInput);
         List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filterInput);
 
-        Query idsQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
-        List<Ticket> resolvedTickets = ticketRepository.findTicketsWithCursor(idsQuery, null, 0, "order", "ASC");
+        Query query = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
+        CursorPosition fromTheStart = new CursorPosition.None();
+        List<Ticket> resolvedTickets = ticketRepository.findTicketsWithCursor(query, fromTheStart, false, 0, "order", "ASC");
 
-        Query updateQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
-        ticketRepository.reassignTicketsToStatus(updateQuery, archived.getId(), archived.getKind());
-        log.info("Archived {} resolved tickets (lifecycle)", resolvedTickets.size());
-        auditRecorder.recordAllWithoutLoadingTargets(resolvedTickets.stream()
+        List<Ticket> archivedTickets = resolvedTickets.stream()
+                .map(ticket -> ticketRepository.moveFromStatus(ticket.getId(), resolvedId, archived.getId(), archived.getKind()))
+                .flatMap(Optional::stream)
+                .toList();
+        log.info("Archived {} of {} resolved tickets (lifecycle)", archivedTickets.size(), resolvedTickets.size());
+        auditRecorder.recordAllWithoutLoadingTargets(archivedTickets.stream()
                 .map(ticket -> statusChangeEventOf(ticket, archived))
                 .toList());
-        return resolvedTickets.stream().map(Ticket::getId).toList();
+        return archivedTickets.stream().map(Ticket::getId).toList();
     }
 
     private static AuditEntry statusChangeEventOf(Ticket ticket, TicketStatusDefinition archived) {

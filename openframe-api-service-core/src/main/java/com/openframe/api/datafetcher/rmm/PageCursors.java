@@ -4,6 +4,9 @@ import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.PageResult;
+import com.openframe.core.exception.InvalidCursorException;
+import com.openframe.core.exception.ValidationException;
+import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -13,6 +16,7 @@ final class PageCursors {
 
     static final int DEFAULT_PAGE_SIZE = 20;
     static final int MAX_PAGE_SIZE = 100;
+    private static final String BEFORE_REQUIRED_WITH_LAST = "before is required with last on this list";
 
     private PageCursors() {
     }
@@ -27,15 +31,36 @@ final class PageCursors {
         return Math.min(requested, MAX_PAGE_SIZE);
     }
 
-    static int decodePage(String cursor) {
-        if (cursor == null || cursor.isBlank()) {
+    static int resolvePage(Integer first, String after, Integer last, String before) {
+        boolean beforeSent = StringUtils.hasText(before);
+        if (last != null && !beforeSent) {
+            throw new ValidationException(BEFORE_REQUIRED_WITH_LAST);
+        }
+        if (beforeSent) {
+            int cursorPage = decodePage(before);
+            return Math.max(0, cursorPage - 1);
+        }
+        return decodePage(after);
+    }
+
+    private static int decodePage(String cursor) {
+        if (!StringUtils.hasText(cursor)) {
             return 0;
         }
+        int page = parsePage(cursor);
+        if (page < 0) {
+            throw new InvalidCursorException();
+        }
+        return page;
+    }
+
+    private static int parsePage(String cursor) {
         try {
-            return Math.max(0, Integer.parseInt(
-                    new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)));
+            byte[] decoded = Base64.getUrlDecoder().decode(cursor);
+            String pageIndex = new String(decoded, StandardCharsets.UTF_8);
+            return Integer.parseInt(pageIndex);
         } catch (IllegalArgumentException e) {
-            return 0;
+            throw new InvalidCursorException(e);
         }
     }
 
@@ -53,7 +78,7 @@ final class PageCursors {
         PageInfo pageInfo = PageInfo.builder()
                 .hasNextPage(page.hasNext())
                 .hasPreviousPage(page.hasPrevious())
-                .startCursor(edges.isEmpty() ? null : currentCursor)
+                .startCursor(edges.isEmpty() && page.page() == 0 ? null : currentCursor)
                 .endCursor(nextCursor != null ? nextCursor : (edges.isEmpty() ? null : currentCursor))
                 .build();
         return CountedGenericConnection.<GenericEdge<T>>builder()

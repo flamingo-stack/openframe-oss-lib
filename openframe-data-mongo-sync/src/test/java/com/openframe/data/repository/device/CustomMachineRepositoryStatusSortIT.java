@@ -7,6 +7,7 @@ import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.MachineIntegrationTestApplication;
+import com.openframe.data.repository.cursor.CursorPosition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -29,6 +30,7 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     private static final String TENANT = "tenant-1";
     private static final String OTHER_TENANT = "tenant-2";
     private static final MachineQueryFilter NO_FILTER = MachineQueryFilter.builder().build();
+    private static final CursorPosition NO_POSITION = new CursorPosition.None();
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -53,7 +55,7 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("status ASC: devices without a status, then PENDING_DELETION, PENDING, OFFLINE, ONLINE, MANAGED")
     void ascIsTheReverseOfTheDescOrder() {
-        List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, null, 50, "status", "ASC");
+        List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, NO_POSITION, false, 50, "status", "ASC");
 
         assertThat(machineIds(page)).containsExactly(
                 "none-1", "deleting-1", "pending-1", "offline-1", "offline-2", "online-1", "online-2", "managed-1");
@@ -62,7 +64,7 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("status DESC: MANAGED, ONLINE, OFFLINE, PENDING, PENDING_DELETION, then devices without a status (what the frontends ask for)")
     void descFollowsExplicitOrder() {
-        List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, null, 50, "status", "DESC");
+        List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, NO_POSITION, false, 50, "status", "DESC");
 
         assertThat(machineIds(page)).containsExactly(
                 "managed-1", "online-2", "online-1", "offline-2", "offline-1", "pending-1", "deleting-1", "none-1");
@@ -85,7 +87,7 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     @Test
     @DisplayName("status sort never leaks another tenant's devices")
     void statusSortStaysInsideTenant() {
-        List<Machine> page = repository.findMachinesWithCursor(OTHER_TENANT, NO_FILTER, null, null, 50, "status", "ASC");
+        List<Machine> page = repository.findMachinesWithCursor(OTHER_TENANT, NO_FILTER, null, NO_POSITION, false, 50, "status", "ASC");
 
         assertThat(machineIds(page)).containsExactly("online-other-tenant");
     }
@@ -96,22 +98,22 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
         MachineQueryFilter onlyOffline = MachineQueryFilter.builder()
                 .statuses(List.of("OFFLINE")).build();
 
-        List<Machine> page = repository.findMachinesWithCursor(TENANT, onlyOffline, "host-offline-2", null, 50, "status", "ASC");
+        List<Machine> page = repository.findMachinesWithCursor(TENANT, onlyOffline, "host-offline-2", NO_POSITION, false, 50, "status", "ASC");
 
         assertThat(machineIds(page)).containsExactly("offline-2");
     }
 
     private List<String> pageThrough(String direction, int pageSize) {
         List<String> seen = new ArrayList<>();
-        String cursor = null;
+        CursorPosition cursor = NO_POSITION;
         for (int guard = 0; guard < 10; guard++) {
-            List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, cursor, pageSize, "status", direction);
+            List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, cursor, false, pageSize, "status", direction);
             if (page.isEmpty()) {
                 return seen;
             }
             assertThat(page).hasSizeLessThanOrEqualTo(pageSize);
             seen.addAll(machineIds(page));
-            cursor = page.getLast().getId();
+            cursor = new CursorPosition.RowId(page.getLast().getId());
         }
         return seen;
     }

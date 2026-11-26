@@ -3,6 +3,7 @@ package com.openframe.data.repository.rmm;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.repository.cursor.CursorPosition;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.when;
 class CustomScriptRepositoryImplSystemShieldTest {
 
     private static final String TENANT_ID = "tenant-1";
+    private static final CursorPosition NO_POSITION = new CursorPosition.None();
 
     private final MongoTemplate mongoTemplate = mock(MongoTemplate.class);
     private final CustomScriptRepositoryImpl repo = new CustomScriptRepositoryImpl(mongoTemplate);
@@ -41,7 +43,7 @@ class CustomScriptRepositoryImplSystemShieldTest {
     void findPageForTenant_shieldsManagedScripts() {
         when(mongoTemplate.find(any(Query.class), eq(Script.class))).thenReturn(List.of());
 
-        repo.findPageForTenant(TENANT_ID, null, null, "_id", Sort.Direction.DESC, null, false, 10);
+        repo.findPageForTenant(TENANT_ID, null, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertShielded(captureFind());
     }
@@ -63,7 +65,7 @@ class CustomScriptRepositoryImplSystemShieldTest {
         ScriptQueryFilter filter = new ScriptQueryFilter();
         filter.setStatuses(List.of(com.openframe.data.document.rmm.script.ScriptStatus.ACTIVE));
 
-        repo.findPageForTenant(TENANT_ID, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+        repo.findPageForTenant(TENANT_ID, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertShielded(captureFind());
     }

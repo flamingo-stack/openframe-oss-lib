@@ -26,6 +26,7 @@ import type {
   TicketEscalatedData,
   TicketEventData,
 } from '../components/chat/types/message.types';
+import type { OpenFrameMessageAttachment } from './attachment-profiles';
 import type { ChatProgress } from './progress';
 import { normalizeRecordUris, normalizeSourceId, parseRecordHref } from './record-link';
 import { isRecord } from './wire-narrow';
@@ -352,6 +353,8 @@ export interface ChatMessageMetadata {
   progress?: ChatProgressRow[];
   author?: ChatMessageAuthor;
   contextItems?: ChatContextItem[];
+  /** The files an OpenFrame (Mingo, Fae) user message carries, as the host maps its backend parts into them. */
+  openframeAttachments?: OpenFrameMessageAttachment[];
   /** The highest chunk sequence consumed into this row: what the history merge decides coverage with. */
   streamSeq?: number;
 }

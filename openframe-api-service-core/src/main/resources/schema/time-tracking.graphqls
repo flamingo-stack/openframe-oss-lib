@@ -1,9 +1,20 @@
 extend type Query {
     currentTimer: TimeEntry
-    myTimeEntries(period: DateRangeInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
-    # Tenant-wide time entries. Filter groups all criteria: employeeIds (all users if null/empty),
-    # organizationIds (customer filter), startedFrom/startedTo (period).
-    employeeTimeEntries(filter: TimeEntryFilterInput, search: String, sort: SortInput, first: Int, after: String): TimeEntryConnection!
+    """
+    Completed time entries of the current user.
+    Sortable fields: date, _id, startedAt, endedAt, durationSeconds, createdAt, updatedAt (default: date DESC).
+    date orders by the day of startedAt, then createdAt.
+    first/after page forward, last/before page backward; when both directions are sent, last/before wins.
+    Only pageInfo.startCursor / endCursor are valid paging cursors.
+    """
+    myTimeEntries(period: DateRangeInput, search: String, sort: SortInput, first: Int, after: String, last: Int, before: String): TimeEntryConnection!
+    """
+    Tenant-wide completed time entries. Filter groups all criteria: employeeIds (all users if null/empty),
+    organizationIds (customer filter), startedFrom/startedTo (period).
+    Sortable fields, default order and paging as on myTimeEntries.
+    When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor are valid paging cursors.
+    """
+    employeeTimeEntries(filter: TimeEntryFilterInput, search: String, sort: SortInput, first: Int, after: String, last: Int, before: String): TimeEntryConnection!
     employeeTimeStats(filter: TimeEntryFilterInput): EmployeeTimeStats!
     timeEntry(id: ID!): TimeEntry
 }

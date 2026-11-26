@@ -1,5 +1,11 @@
 extend type Query {
     assignedItemCounts(itemId: ID!): [AssignedItemCount!]!
+    """
+    Targets of one type assigned to an item. search matches the display name.
+    Sortable fields: createdAt, displayName (default: createdAt DESC).
+    first/after page forward, last/before page backward; when both directions are sent, last/before wins.
+    Only pageInfo.startCursor / endCursor are valid paging cursors.
+    """
     assignedItems(
         itemId: ID!
         targetType: AssignmentTargetType!
@@ -7,6 +13,8 @@ extend type Query {
         sort: SortInput
         first: Int
         after: String
+        last: Int
+        before: String
     ): ItemAssignmentConnection!
 }
 

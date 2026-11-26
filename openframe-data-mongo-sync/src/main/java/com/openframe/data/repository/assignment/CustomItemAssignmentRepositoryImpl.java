@@ -1,10 +1,13 @@
 package com.openframe.data.repository.assignment;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.util.StringUtils;
@@ -19,6 +22,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -34,6 +38,7 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
     private static final String ID_FIELD = "_id";
     private static final String AGG_COUNT = "count";
     private static final String SORT_DESC = "DESC";
+    private static final String NO_SORT_VALUE = "";
 
     private static final String DEFAULT_SORT_FIELD = FIELD_CREATED_AT;
 
@@ -49,78 +54,137 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
     @Override
     public List<ItemAssignment> findAssignmentsWithCursor(String itemId, AssignmentTargetType targetType,
                                                           String search, String sortField, String sortDirection,
-                                                          String cursor, int limit) {
+                                                          CursorPosition position, boolean backward, int limit) {
+        Sort.Direction direction = directionOf(sortDirection);
+        boolean fetchDescending = direction.isDescending() != backward;
         Query query = buildAssignmentQuery(itemId, targetType, search);
-        boolean isDesc = SORT_DESC.equalsIgnoreCase(sortDirection);
-        Sort.Direction direction = isDesc ? Sort.Direction.DESC : Sort.Direction.ASC;
-
-        if (StringUtils.hasText(cursor)) {
-            try {
-                ObjectId cursorId = new ObjectId(cursor);
-                applyCursorCriteria(query, cursorId, sortField, isDesc);
-            } catch (IllegalArgumentException ex) {
-                log.warn("Invalid ObjectId cursor format: {}", cursor);
-            }
-        }
-
-        if (ID_FIELD.equals(sortField)) {
-            query.with(Sort.by(direction, ID_FIELD));
-        } else {
-            query.with(Sort.by(
-                    Sort.Order.by(sortField).with(direction),
-                    Sort.Order.by(ID_FIELD).with(direction)
-            ));
-        }
+        keysetAnchor(position, sortField, direction)
+                .map(anchor -> keysetCriteria(anchor, fetchDescending))
+                .map(pastAnchor -> new Criteria().andOperator(pastAnchor))
+                .ifPresent(query::addCriteria);
+        Sort sort = sortWithIdTieBreak(sortField, fetchDescending);
+        query.with(sort);
         query.limit(limit);
 
         return mongoTemplate.find(query, ItemAssignment.class);
     }
 
-    private void applyCursorCriteria(Query query, ObjectId cursorId, String sortField, boolean isDesc) {
-        if (ID_FIELD.equals(sortField)) {
-            query.addCriteria(isDesc
-                    ? Criteria.where(ID_FIELD).lt(cursorId)
-                    : Criteria.where(ID_FIELD).gt(cursorId));
-            return;
-        }
-
-        ItemAssignment cursorDoc = mongoTemplate.findById(cursorId, ItemAssignment.class);
-        if (cursorDoc == null) {
-            log.warn("Cursor document not found for id: {}", cursorId);
-            query.addCriteria(isDesc
-                    ? Criteria.where(ID_FIELD).lt(cursorId)
-                    : Criteria.where(ID_FIELD).gt(cursorId));
-            return;
-        }
-
-        Object cursorSortValue = getSortFieldValue(cursorDoc, sortField);
-        if (cursorSortValue == null) {
-            query.addCriteria(isDesc
-                    ? Criteria.where(ID_FIELD).lt(cursorId)
-                    : Criteria.where(ID_FIELD).gt(cursorId));
-            return;
-        }
-
-        Criteria pastSortValue = isDesc
-                ? Criteria.where(sortField).lt(cursorSortValue)
-                : Criteria.where(sortField).gt(cursorSortValue);
-
-        Criteria sameSortValuePastId = new Criteria().andOperator(
-                Criteria.where(sortField).is(cursorSortValue),
-                isDesc ? Criteria.where(ID_FIELD).lt(cursorId) : Criteria.where(ID_FIELD).gt(cursorId)
-        );
-
-        query.addCriteria(Criteria.where("$or").is(
-                List.of(pastSortValue.getCriteriaObject(), sameSortValuePastId.getCriteriaObject())
-        ));
+    @Override
+    public KeysetCursor keysetCursor(ItemAssignment assignment, String sortField, String sortDirection) {
+        Sort.Direction direction = directionOf(sortDirection);
+        return keysetOf(assignment, sortField, direction);
     }
 
-    private Object getSortFieldValue(ItemAssignment assignment, String sortField) {
-        return switch (sortField) {
-            case FIELD_DISPLAY_NAME -> assignment.getDisplayName();
-            case FIELD_CREATED_AT -> assignment.getCreatedAt();
-            default -> null;
+    private static Sort.Direction directionOf(String sortDirection) {
+        return SORT_DESC.equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
+    }
+
+    private static Sort sortWithIdTieBreak(String sortField, boolean fetchDescending) {
+        Sort.Direction fetchDirection = fetchDescending ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort byId = Sort.by(fetchDirection, ID_FIELD);
+        if (ID_FIELD.equals(sortField)) {
+            return byId;
+        }
+        return Sort.by(fetchDirection, sortField).and(byId);
+    }
+
+    private Optional<KeysetCursor> keysetAnchor(CursorPosition position, String sortField, Sort.Direction direction) {
+        return switch (position) {
+            case CursorPosition.None _ -> Optional.empty();
+            case KeysetCursor keyset -> {
+                keyset.requireSort(sortField, direction);
+                yield Optional.of(keyset);
+            }
+            case CursorPosition.RowId rowId -> {
+                KeysetCursor anchor = rowAnchor(rowId.id(), sortField, direction);
+                yield Optional.of(anchor);
+            }
+            case CursorPosition.Unrecognised _ -> throw new InvalidCursorException();
         };
+    }
+
+    private KeysetCursor rowAnchor(String rowId, String sortField, Sort.Direction direction) {
+        if (ID_FIELD.equals(sortField)) {
+            return idAnchor(rowId, direction);
+        }
+        return cursorRow(rowId)
+                .map(row -> keysetOf(row, sortField, direction))
+                .orElseGet(() -> missingRowAnchor(rowId, sortField, direction));
+    }
+
+    private static KeysetCursor idAnchor(String rowId, Sort.Direction direction) {
+        return new KeysetCursor(ID_FIELD, direction, NO_SORT_VALUE, rowId);
+    }
+
+    private static KeysetCursor missingRowAnchor(String rowId, String sortField, Sort.Direction direction) {
+        if (FIELD_CREATED_AT.equals(sortField)) {
+            return idAnchor(rowId, direction);
+        }
+        throw new InvalidCursorException();
+    }
+
+    private Optional<ItemAssignment> cursorRow(String rowId) {
+        ObjectId id = cursorObjectId(rowId);
+        Criteria byId = Criteria.where(ID_FIELD).is(id);
+        Query query = new Query(byId);
+        ItemAssignment row = mongoTemplate.findOne(query, ItemAssignment.class);
+        return Optional.ofNullable(row);
+    }
+
+    private static KeysetCursor keysetOf(ItemAssignment assignment, String sortField, Sort.Direction direction) {
+        String id = assignment.getId();
+        return switch (sortField) {
+            case FIELD_DISPLAY_NAME -> KeysetCursor.ofString(sortField, direction, assignment.getDisplayName(), id);
+            case FIELD_CREATED_AT -> KeysetCursor.ofInstant(sortField, direction, assignment.getCreatedAt(), id);
+            default -> new KeysetCursor(sortField, direction, NO_SORT_VALUE, id);
+        };
+    }
+
+    private static Criteria keysetCriteria(KeysetCursor cursor, boolean fetchDescending) {
+        String sortField = cursor.sortField();
+        ObjectId cursorId = cursorObjectId(cursor.id());
+        if (ID_FIELD.equals(sortField)) {
+            Criteria id = Criteria.where(ID_FIELD);
+            return pastId(id, cursorId, fetchDescending);
+        }
+        Object sortValue = FIELD_DISPLAY_NAME.equals(sortField) ? cursor.stringValue() : cursor.instantValue();
+        if (sortValue == null) {
+            return nullGroupKeyset(sortField, cursorId, fetchDescending);
+        }
+        return valueKeyset(sortField, sortValue, cursorId, fetchDescending);
+    }
+
+    private static Criteria nullGroupKeyset(String sortField, ObjectId cursorId, boolean fetchDescending) {
+        Criteria idInsideNullGroup = Criteria.where(sortField).is(null).and(ID_FIELD);
+        Criteria restOfNullGroup = pastId(idInsideNullGroup, cursorId, fetchDescending);
+        if (fetchDescending) {
+            return restOfNullGroup;
+        }
+        Criteria everyValue = Criteria.where(sortField).ne(null);
+        return new Criteria().orOperator(restOfNullGroup, everyValue);
+    }
+
+    private static Criteria valueKeyset(String sortField, Object sortValue, ObjectId cursorId, boolean fetchDescending) {
+        Criteria value = Criteria.where(sortField);
+        Criteria pastValue = fetchDescending ? value.lt(sortValue) : value.gt(sortValue);
+        Criteria idInsideSameValue = Criteria.where(sortField).is(sortValue).and(ID_FIELD);
+        Criteria sameValuePastId = pastId(idInsideSameValue, cursorId, fetchDescending);
+        if (fetchDescending) {
+            Criteria nullGroup = Criteria.where(sortField).is(null);
+            return new Criteria().orOperator(pastValue, sameValuePastId, nullGroup);
+        }
+        return new Criteria().orOperator(pastValue, sameValuePastId);
+    }
+
+    private static Criteria pastId(Criteria id, ObjectId cursorId, boolean fetchDescending) {
+        return fetchDescending ? id.lt(cursorId) : id.gt(cursorId);
+    }
+
+    private static ObjectId cursorObjectId(String value) {
+        if (!ObjectId.isValid(value)) {
+            throw new InvalidCursorException();
+        }
+        return new ObjectId(value);
     }
 
     @Override

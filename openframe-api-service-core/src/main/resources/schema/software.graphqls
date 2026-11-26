@@ -11,7 +11,9 @@ extend type Query {
     """Paginated list of software titles installed across the tenant's fleet.
     One row = one software title (aggregated across devices).
     Sortable fields: name, devicesCount, cveCount, highestSeverity (default: Fleet order by name).
-    An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error."""
+    An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     softwares(
         filter: SoftwareFilterInput,
         first: Int,
@@ -25,7 +27,9 @@ extend type Query {
     """Devices that have a given software title installed, with each device's own
     installed version and per-device software status (OUTDATED / SCHEDULED_UPDATE / …),
     who installed it, its adoption and auto-update. Powers the Software → Devices tab.
-    Sortable fields: softwareVersion."""
+    Sortable fields: softwareVersion.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     softwareDevices(
         softwareId: ID!,
         filter: SoftwareOnDeviceFilterInput,
@@ -39,7 +43,9 @@ extend type Query {
 
     """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab.
     Sortable fields: cveId, severity, cvssScore, discoveredAt, affectedVersion (version order, missing versions last).
-    An unknown sort field is rejected as a client error (BAD_REQUEST)."""
+    An unknown sort field is rejected as a client error (BAD_REQUEST).
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     softwareVulnerabilities(
         softwareId: ID!,
         filter: SoftwareVulnerabilityFilterInput,
@@ -68,7 +74,9 @@ extend type Query {
     vulnerability(cveId: String!): Vulnerability
 
     """Global list of CVEs across every software title in the tenant's fleet.
-    Powers the Vulnerabilities page. One row = one CVE (not one CVE × software)."""
+    Powers the Vulnerabilities page. One row = one CVE (not one CVE × software).
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     vulnerabilities(
         filter: VulnerabilityFilterInput,
         first: Int,
@@ -88,7 +96,10 @@ extend type Query {
     to their OpenFrame Machine. Powers the vulnerability-detail "Devices" table. Each node is a Machine
     (same shape as the top-level `devices` query). With the software read model on, `filter`, `search` and
     `sort` work as on `devices` (deleted devices hidden unless `filter.statuses` asks for them; sortable fields
-    as on `devices`, default hostname ASC). With it off, Fleet lists the devices: `filter` and `sort` are ignored."""
+    as on `devices`, default hostname ASC). With it off, Fleet lists the devices: `filter` and `sort` are ignored.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    With the software read model off, last requires before. Only pageInfo.startCursor / endCursor are valid
+    paging cursors."""
     vulnerabilityDevices(
         cveId: String!,
         filter: DeviceFilterInput,
@@ -108,7 +119,9 @@ extend type Query {
     """Software installed on one device. One row = one installed title, the same node as `softwares`.
     Version fields are read in this device's scope: `currentVersion` is the version installed here.
     Sortable fields: name, cveCount, highestSeverity (default: name).
-    Unknown machineId → NOT_FOUND; a known device with nothing installed → empty connection."""
+    Unknown machineId → NOT_FOUND; a known device with nothing installed → empty connection.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     deviceSoftware(
         machineId: String!,
         filter: SoftwareFilterInput,
@@ -128,7 +141,9 @@ extend type Query {
     `affectedSoftware` is scoped to this host and populated on every row; `devicesCount` is null here
     (the fleet-wide count would cost one Fleet call per row).
     Sortable fields: severity (by cvssScore, unrated last), discoveredAt (default: severity DESC, cveId ASC).
-    Unknown machineId → NOT_FOUND; a known device with no CVEs → empty connection."""
+    Unknown machineId → NOT_FOUND; a known device with no CVEs → empty connection.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     deviceVulnerabilities(
         machineId: String!,
         filter: VulnerabilityFilterInput,
