@@ -3,6 +3,7 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { OpenFrameAttachmentItem, OpenFrameAttachmentProfile } from '../../../chat-protocol/attachment-profiles';
 import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
@@ -447,6 +448,31 @@ export interface SlashCommandsProp {
   onAction?: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => void;
 }
 
+/**
+ * OpenFrame (Mingo, Fae) attachments in a composer: ONE opt-in prop on `ChatInput`, `ChatComposer` and
+ * `EmbeddableChat`. Absent, the composer draws and behaves exactly as without the feature (the hub's Guide mode keeps
+ * its own attachment props). Present, it adds the tray, the entry point of the profile, drop and paste, the counter and
+ * the Send gate. The host owns the items: the lib hands it the files people add and the ids they remove.
+ */
+export interface OpenFrameComposerAttachments {
+  /** Mingo's or Fae's (`OPENFRAME_MINGO_ATTACHMENT_PROFILE`, `OPENFRAME_FAE_ATTACHMENT_PROFILE`). */
+  profile: OpenFrameAttachmentProfile;
+  /** The files staged for this message, in tray order. */
+  items: readonly OpenFrameAttachmentItem[];
+  /** Files the chat already holds (sent before), for the counter and the chat limit. */
+  chatFileCount: number;
+  /** Files picked, dropped or pasted, unchecked: run `validateOpenFrameAttachments` and stage the results. */
+  onAddFiles: (files: File[]) => void;
+  /** Remove a ready file, cancel an upload, or dismiss a refused file. */
+  onRemove: (id: string) => void;
+}
+
+/** `EmbeddableChat`'s form of the prop: the composer's, plus the send's hook. */
+export interface OpenFrameChatAttachments extends OpenFrameComposerAttachments {
+  /** The composer sent a message: the host moves its ready items into it and clears the tray. */
+  onMessageSend?: (text: string) => void;
+}
+
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   /** Source-compatible widening: returning `false` (or a Promise resolving to
    *  `false`) tells the input to KEEP the draft (e.g. a failed send). `void` /
@@ -526,6 +552,8 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
    *  visually replaces the editor (even an in-progress draft); clearing it
    *  (undefined) restores whatever the user had — empty or typed — verbatim. */
   previewText?: string;
+  /** OpenFrame attachments (tray, attach button or `+` menu entry, drop, paste, Send gate). Off when absent. */
+  openframeAttachments?: OpenFrameComposerAttachments;
 }
 
 export interface ChatInputRef {

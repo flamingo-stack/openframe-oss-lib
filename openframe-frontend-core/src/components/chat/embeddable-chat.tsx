@@ -88,6 +88,7 @@ import { useChatDialogManager } from './hooks/use-chat-dialog-manager';
 import { useChatIdentity } from './hooks/use-chat-identity';
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation';
 import { useEmptyStateConfig } from './hooks/use-empty-state-config';
+import { useOpenFrameDropZone } from './hooks/use-openframe-file-intake';
 import {
   fetchSlashCommands,
   useSlashCommandRegistry,
@@ -106,6 +107,7 @@ import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onb
 import { MingoQuickActionWall } from './mingo-quick-action-wall';
 import { type MingoQuickAction, MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
+import { OpenFrameDropOverlay } from './openframe-attachment-tray';
 import {
   type QuickActionAccent,
   accentFromIdentityIcon,
@@ -119,6 +121,7 @@ import type {
   ChatInputRef,
   DialogItem,
   ModelDisplayProps,
+  OpenFrameChatAttachments,
   SlashCommandActionId,
 } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
@@ -526,6 +529,12 @@ export interface EmbeddableChatProps {
   /** The composer's side inset (`ChatComposer` `inset`). Default `'always'`. */
   composerInset?: 'always' | 'wide';
   /**
+   * OpenFrame (Mingo) attachments: the composer's tray, "Upload File" in the `+` menu, paste, drop over the thread or
+   * the composer, the Send gate, and the click on a sent file. Absent → the chat is unchanged (the hub's Guide mode
+   * keeps its own attachments).
+   */
+  openframeAttachments?: OpenFrameChatAttachments;
+  /**
    * Split layout: draw the chat's quick actions in a row over the composer, the very ones its empty state shows
    * (the page's own, read with the page's topic), with the page's topic stamp where the host asks for it. For a
    * composer that stands alone, its empty state not on screen: a host's composer dock under every page. Only the
@@ -889,6 +898,7 @@ function EmbeddableChatInner({
   threadHeaderLook = 'page',
   threadFadeEnd = false,
   composerInset = 'always',
+  openframeAttachments,
   threadContentClassName,
   showModel = true,
   onModelClick,
@@ -1307,6 +1317,11 @@ function EmbeddableChatInner({
     clear: clearAttachments,
   } = useChatAttachments();
   const { panelRef: galleryPanelRef, modal: galleryModal } = useChatAttachmentImageGallery();
+  // OpenFrame attachments: files dropped on the thread join the composer's tray (the composer is a drop zone too).
+  const onOpenFrameMessageSend = openframeAttachments?.onMessageSend;
+  const threadDropZone = useOpenFrameDropZone(
+    openframeAttachments && !composerLock ? openframeAttachments.onAddFiles : undefined,
+  );
 
   // ─── Entity-context picker state (host-driven via `contextPicker`) ─────────
   // The lib owns selection + open/mention UI state; the host owns the data
@@ -1648,8 +1663,10 @@ function EmbeddableChatInner({
       if (contextItems.length > 0) {
         setContextItems([]);
       }
+      // The OpenFrame tray is the host's: it moves its ready files into the message and clears them.
+      onOpenFrameMessageSend?.(text);
     },
-    [composerLock, sendMessage, readyAttachments, clearAttachments, contextItems],
+    [composerLock, sendMessage, readyAttachments, clearAttachments, contextItems, onOpenFrameMessageSend],
   );
 
   /**
@@ -2527,8 +2544,10 @@ function EmbeddableChatInner({
     <div
       ref={galleryPanelRef}
       data-testid="chat-content-panel"
+      {...threadDropZone.handlers}
       className={cn(
         'flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]',
+        openframeAttachments && 'relative',
         // With a host block above the composer the thread keeps room
         // for a line and the working status: the block gives way
         // instead (below), so the status never lands on it. Not when
@@ -2538,6 +2557,9 @@ function EmbeddableChatInner({
         hasAboveComposer && !splitMode && 'min-h-32',
       )}
     >
+      {openframeAttachments && (
+        <OpenFrameDropOverlay profile={openframeAttachments.profile} visible={threadDropZone.dragging} />
+      )}
       <div key={contentViewKey} className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0">
         {hasConversation ? (
           <div className="flex min-h-0 flex-1 flex-col">
@@ -2798,6 +2820,7 @@ function EmbeddableChatInner({
       safeAreaBottom={safeAreaBottom}
       edgeLight={composerEdgeLight}
       inset={composerInset}
+      openframeAttachments={openframeAttachments}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}
