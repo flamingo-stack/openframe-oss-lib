@@ -22,6 +22,9 @@ public class LoginController {
     @Value("${openframe.recaptcha.site-key:}")
     private String recaptchaSiteKey;
 
+    @Value("${openframe.recaptcha.session-site-key:}")
+    private String recaptchaSessionSiteKey;
+
     @GetMapping("/login")
     public String login(Model model,
                         @RequestParam(value = "error", required = false) String error) {
@@ -32,9 +35,12 @@ public class LoginController {
 
         if (!passwordResetPageUrl.isBlank()) {
             model.addAttribute("passwordResetUrl", passwordResetPageUrl);
-            if (!recaptchaSiteKey.isBlank()) {
-                model.addAttribute("recaptchaSiteKey", recaptchaSiteKey);
-            }
+        }
+
+        if (!recaptchaSessionSiteKey.isBlank()) {
+            model.addAttribute("recaptchaSessionSiteKey", recaptchaSessionSiteKey);
+        } else if (!passwordResetPageUrl.isBlank() && !recaptchaSiteKey.isBlank()) {
+            model.addAttribute("recaptchaSiteKey", recaptchaSiteKey);
         }
 
         return "login";
