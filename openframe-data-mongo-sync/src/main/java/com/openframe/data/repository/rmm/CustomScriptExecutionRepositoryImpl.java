@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.mongodb.ReadPreference;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
@@ -296,8 +297,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
 
         int sep = cursor.lastIndexOf('|');
         if (sep < 0) {
-            throw new com.openframe.core.exception.BadRequestException(
-                    "Invalid compound cursor for execution pagination (no separator): " + cursor);
+            throw new InvalidCursorException();
         }
         ObjectId cursorId = parseObjectId(cursor.substring(sep + 1));
         Instant cursorValue = parseInstantOrNull(cursor.substring(0, sep));
@@ -344,8 +344,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         try {
             return new ObjectId(hex);
         } catch (IllegalArgumentException ex) {
-            throw new com.openframe.core.exception.BadRequestException(
-                    "Invalid ObjectId in execution cursor: " + hex);
+            throw new InvalidCursorException(ex);
         }
     }
 
@@ -357,8 +356,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         try {
             return Instant.ofEpochMilli(Long.parseLong(millis));
         } catch (NumberFormatException ex) {
-            throw new com.openframe.core.exception.BadRequestException(
-                    "Unparseable Instant epoch millis in execution cursor: " + millis);
+            throw new InvalidCursorException(ex);
         }
     }
 

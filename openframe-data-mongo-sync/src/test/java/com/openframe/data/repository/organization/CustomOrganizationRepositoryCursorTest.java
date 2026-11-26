@@ -1,5 +1,7 @@
 package com.openframe.data.repository.organization;
 
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.organization.Organization;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -23,7 +25,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -45,6 +47,7 @@ class CustomOrganizationRepositoryCursorTest {
     private static final ObjectId CURSOR_ID = new ObjectId("665f1c2ab3e4d5f6a7b8c9e1");
     private static final String CURSOR_HEX = CURSOR_ID.toHexString();
     private static final String NAME_WITH_SEPARATOR = "Acme_Corp";
+    private static final String INVALID_CURSOR = "Invalid cursor";
 
     @Mock
     private MongoTemplate mongoTemplate;
@@ -176,7 +179,7 @@ class CustomOrganizationRepositoryCursorTest {
         // setup
         stubEmptyFind();
         Organization anchor = Organization.builder().id(CURSOR_HEX).name("Acme").build();
-        when(mongoTemplate.findById(CURSOR_HEX, Organization.class)).thenReturn(anchor);
+        when(mongoTemplate.findOne(any(Query.class), eq(Organization.class))).thenReturn(anchor);
 
         // execution
         repository.findOrganizationsWithCursor(new Query(), CURSOR_HEX, 3, NAME_FIELD, ASC);
@@ -189,32 +192,62 @@ class CustomOrganizationRepositoryCursorTest {
     }
 
     @Test
-    void findOrganizationsWithCursor_nameSortWithBareIdOfMissingRow_throwsIllegalArgument() {
+    void findOrganizationsWithCursor_nameSortWithBareIdCursor_readsTheCursorRowWithAQueryNotById() {
         // setup
-        when(mongoTemplate.findById(CURSOR_HEX, Organization.class)).thenReturn(null);
+        stubEmptyFind();
+        Organization anchor = Organization.builder().id(CURSOR_HEX).name("Acme").build();
+        when(mongoTemplate.findOne(any(Query.class), eq(Organization.class))).thenReturn(anchor);
+
+        // execution
+        repository.findOrganizationsWithCursor(new Query(), CURSOR_HEX, 3, NAME_FIELD, ASC);
+
+        // verifications
+        verify(mongoTemplate).findOne(queryCaptor.capture(), eq(Organization.class));
+        assertThat(queryCaptor.getValue().getQueryObject()).containsOnlyKeys(ID_FIELD).containsEntry(ID_FIELD, CURSOR_HEX);
+        verify(mongoTemplate, never()).findById(any(Object.class), eq(Organization.class));
+    }
+
+    @Test
+    void findOrganizationsWithCursor_idSortWithBareIdCursor_readsNoCursorRow() {
+        // setup
+        stubEmptyFind();
+
+        // execution
+        repository.findOrganizationsWithCursor(new Query(), CURSOR_HEX, 3, ID_FIELD, DESC);
+
+        // verifications
+        verify(mongoTemplate, never()).findOne(any(Query.class), eq(Organization.class));
+        verify(mongoTemplate, never()).findById(any(Object.class), eq(Organization.class));
+    }
+
+    @Test
+    void findOrganizationsWithCursor_nameSortWithBareIdOfMissingRow_throwsInvalidCursor() {
+        // setup
+        when(mongoTemplate.findOne(any(Query.class), eq(Organization.class))).thenReturn(null);
         Query query = new Query();
 
         // execution
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        Throwable thrown = catchThrowable(
                 () -> repository.findOrganizationsWithCursor(query, CURSOR_HEX, 3, NAME_FIELD, ASC));
 
         // verifications
-        assertThat(ex.getMessage()).contains("Invalid cursor");
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
         verify(mongoTemplate, never()).find(any(Query.class), eq(Organization.class));
     }
 
     @ParameterizedTest
     @MethodSource("unparsableCursors")
-    void findOrganizationsWithCursor_unparsableCursor_throwsIllegalArgument(String cursor, String sortField) {
+    void findOrganizationsWithCursor_unparsableCursor_throwsInvalidCursor(String cursor, String sortField) {
         // setup
         Query query = new Query();
 
         // execution
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        Throwable thrown = catchThrowable(
                 () -> repository.findOrganizationsWithCursor(query, cursor, 3, sortField, DESC));
 
         // verifications
-        assertThat(ex.getMessage()).contains("Invalid cursor");
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
+        assertThat((InvalidCursorException) thrown).returns(ErrorCode.INVALID_CURSOR, InvalidCursorException::getErrorCode);
         verify(mongoTemplate, never()).find(any(Query.class), eq(Organization.class));
     }
 

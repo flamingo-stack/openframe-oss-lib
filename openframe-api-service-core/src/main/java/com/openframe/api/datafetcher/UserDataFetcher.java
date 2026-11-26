@@ -49,10 +49,13 @@ public class UserDataFetcher {
             @InputArgument UserFilterInput filter,
             @InputArgument @Size(max = MAX_SEARCH_LENGTH) String search,
             @InputArgument Integer first,
-            @InputArgument String after) {
-        log.debug("Fetching users: filter={}, search={}, first={}, after={}", filter, search, first, after);
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
+        log.debug("Fetching users: filter={}, search={}, first={}, after={}, last={}, before={}",
+                filter, search, first, after, last, before);
         CursorPaginationCriteria pagination = CursorPaginationCriteria.fromConnectionArgs(
-                ConnectionArgs.builder().first(first).after(after).build());
+                ConnectionArgs.builder().first(first).after(after).last(last).before(before).build());
         return mapper.toUserConnection(userService.queryUsers(withRawIds(filter), search, pagination));
     }
 

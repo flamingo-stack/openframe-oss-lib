@@ -4,6 +4,7 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.organization.OrganizationCursors;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -63,13 +64,12 @@ public class OrganizationQueryService {
         boolean backward = normalizedPagination.isBackward();
         // A backward page (last/before) is the forward page in the opposite direction, read back in the requested order.
         SortDirection fetchDirection = backward ? sortDirection.opposite() : sortDirection;
-        List<Organization> raw = organizationRepository.findOrganizationsWithCursor(
+        List<Organization> fetched = organizationRepository.findOrganizationsWithCursor(
             query, normalizedPagination.getCursor(), limit + 1, sortField, fetchDirection.name());
-        boolean hasMore = raw.size() > limit;
-        List<Organization> fetched = hasMore ? raw.subList(0, limit) : raw;
-        List<Organization> pageItems = backward ? fetched.reversed() : fetched;
+        CursorPage<Organization> page = CursorPage.assemble(fetched, normalizedPagination);
+        List<Organization> pageItems = page.items();
 
-        PageInfo pageInfo = buildPageInfo(pageItems, hasMore, normalizedPagination, sortField);
+        PageInfo pageInfo = buildPageInfo(page, sortField);
 
         return CountedGenericQueryResult.<Organization>builder()
                 .items(pageItems)
@@ -78,16 +78,14 @@ public class OrganizationQueryService {
                 .build();
     }
 
-    private PageInfo buildPageInfo(List<Organization> pageItems, boolean hasMore,
-                                   CursorPaginationCriteria pagination, String sortField) {
-        boolean backward = pagination.isBackward();
-        boolean hasCursor = pagination.hasCursor();
+    private PageInfo buildPageInfo(CursorPage<Organization> page, String sortField) {
+        List<Organization> pageItems = page.items();
         String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(rawCursor(pageItems.getFirst(), sortField));
         String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(rawCursor(pageItems.getLast(), sortField));
 
         return PageInfo.builder()
-                .hasNextPage(backward ? hasCursor : hasMore)
-                .hasPreviousPage(backward ? hasMore : hasCursor)
+                .hasNextPage(page.hasNextPage())
+                .hasPreviousPage(page.hasPreviousPage())
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();

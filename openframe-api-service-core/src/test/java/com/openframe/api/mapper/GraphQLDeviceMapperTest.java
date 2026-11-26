@@ -3,10 +3,14 @@ package com.openframe.api.mapper;
 import com.openframe.api.dto.AvailableDeviceEdge;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
@@ -15,10 +19,12 @@ import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +44,8 @@ class GraphQLDeviceMapperTest {
     private static final Instant REGISTERED = Instant.parse("2026-10-12T10:00:00Z");
     private static final Instant CONNECTED = Instant.parse("2026-10-12T10:00:20Z");
     private static final Instant INVENTORY = Instant.parse("2026-10-12T10:02:30Z");
+    private static final String FIRST_ROW = "64f000000000000000000001";
+    private static final String LAST_ROW = "64f000000000000000000002";
 
     private final GraphQLDeviceMapper mapper = new GraphQLDeviceMapper();
 
@@ -144,6 +152,100 @@ class GraphQLDeviceMapperTest {
         assertThat(connection.getEdges())
                 .extracting(edge -> CursorCodec.decode(edge.getCursor()))
                 .containsExactly("1|64f000000000000000000001", "2|64f000000000000000000002");
+    }
+
+    @Test
+    void toDeviceConnection_pageInfoOfTheService_cursorsPassedOnAsTheyAreAndEdgeCursorsStayRowIds() {
+        // setup
+        Machine first = machine(CONNECTED);
+        first.setId(FIRST_ROW);
+        Machine last = machine(CONNECTED);
+        last.setId(LAST_ROW);
+        String startCursor = KeysetCursor.ofString("hostname", Sort.Direction.ASC, "host-a", FIRST_ROW).encode();
+        String endCursor = KeysetCursor.ofString("hostname", Sort.Direction.ASC, "host-b", LAST_ROW).encode();
+        PageInfo servicePageInfo = PageInfo.builder()
+                .hasNextPage(true).hasPreviousPage(true).startCursor(startCursor).endCursor(endCursor).build();
+        CountedGenericQueryResult<Machine> result = CountedGenericQueryResult.<Machine>builder()
+                .items(List.of(first, last)).pageInfo(servicePageInfo).filteredCount(7).build();
+
+        // execution
+        CountedGenericConnection<GenericEdge<Machine>> connection = mapper.toDeviceConnection(result);
+
+        // verifications
+        assertThat(connection.getPageInfo())
+                .returns(startCursor, PageInfo::getStartCursor)
+                .returns(endCursor, PageInfo::getEndCursor)
+                .returns(true, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+        assertThat(connection.getEdges())
+                .extracting(edge -> CursorCodec.decode(edge.getCursor()))
+                .containsExactly(FIRST_ROW, LAST_ROW);
+        assertThat(connection.getFilteredCount()).isEqualTo(7);
+    }
+
+    @Test
+    void toAvailableDeviceConnection_pageInfoOfTheService_cursorsPassedOnAsTheyAreAndEdgeCursorsStayBucketAndId() {
+        // setup
+        Machine first = machine(CONNECTED);
+        first.setId(FIRST_ROW);
+        first.setTelemetryStatus(TelemetryStatus.ONLINE);
+        Machine last = machine(CONNECTED);
+        last.setId(LAST_ROW);
+        last.setMachineId("m-2");
+        last.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        String startCursor = new KeysetCursor("bucket", Sort.Direction.ASC, "0", FIRST_ROW).encode();
+        String endCursor = new KeysetCursor("bucket", Sort.Direction.ASC, "3", LAST_ROW).encode();
+        PageInfo servicePageInfo = PageInfo.builder()
+                .hasNextPage(false).hasPreviousPage(true).startCursor(startCursor).endCursor(endCursor).build();
+        CountedGenericQueryResult<Machine> result = CountedGenericQueryResult.<Machine>builder()
+                .items(List.of(first, last)).pageInfo(servicePageInfo).filteredCount(2).build();
+
+        // execution
+        CountedGenericConnection<AvailableDeviceEdge> connection = mapper.toAvailableDeviceConnection(result, Set.of("m-1"));
+
+        // verifications
+        assertThat(connection.getPageInfo())
+                .returns(startCursor, PageInfo::getStartCursor)
+                .returns(endCursor, PageInfo::getEndCursor)
+                .returns(false, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+        assertThat(connection.getEdges())
+                .extracting(edge -> CursorCodec.decode(edge.getCursor()))
+                .containsExactly("0|" + FIRST_ROW, "3|" + LAST_ROW);
+    }
+
+    @Test
+    void toAvailableDeviceConnection_emptyPage_noCursors() {
+        // setup
+        PageInfo servicePageInfo = PageInfo.builder().hasNextPage(false).hasPreviousPage(true).build();
+        CountedGenericQueryResult<Machine> result = CountedGenericQueryResult.<Machine>builder()
+                .items(List.of()).pageInfo(servicePageInfo).filteredCount(0).build();
+
+        // execution
+        CountedGenericConnection<AvailableDeviceEdge> connection = mapper.toAvailableDeviceConnection(result, Set.of());
+
+        // verifications
+        assertThat(connection.getEdges()).isEmpty();
+        assertThat(connection.getPageInfo())
+                .returns(null, PageInfo::getStartCursor)
+                .returns(null, PageInfo::getEndCursor)
+                .returns(true, PageInfo::isHasPreviousPage);
+    }
+
+    @Test
+    void toCursorPaginationCriteria_lastAndBefore_backwardPageWithTheCursorDecodedOnce() {
+        // setup
+        KeysetCursor cursor = KeysetCursor.ofString("hostname", Sort.Direction.ASC, "host-a", FIRST_ROW);
+        ConnectionArgs args = ConnectionArgs.builder().last(7).before(cursor.encode()).build();
+
+        // execution
+        CursorPaginationCriteria criteria = mapper.toCursorPaginationCriteria(args);
+
+        // verifications
+        assertThat(criteria)
+                .returns(true, CursorPaginationCriteria::isBackward)
+                .returns(7, CursorPaginationCriteria::getLimit);
+        assertThat(KeysetCursor.parseDecoded(criteria.getCursor())).isEqualTo(cursor);
     }
 
     @Test
