@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LoginControllerTest {
 
     private static final String PASSWORD_RESET_URL = "https://openframe.ai/sas/password-reset/request";
+    private static final String SITE_KEY = "6LcSiteKey";
     private static final String SESSION_SITE_KEY = "6LcSessionSiteKey";
 
     private LoginController controller;
@@ -23,11 +24,12 @@ class LoginControllerTest {
         controller = new LoginController();
         model = new ConcurrentModel();
         ReflectionTestUtils.setField(controller, "passwordResetPageUrl", PASSWORD_RESET_URL);
+        ReflectionTestUtils.setField(controller, "recaptchaSiteKey", SITE_KEY);
         ReflectionTestUtils.setField(controller, "recaptchaSessionSiteKey", SESSION_SITE_KEY);
     }
 
     @Test
-    void login_resetAndSessionKeyConfigured_modelCarriesBoth() {
+    void login_sessionKeyConfigured_sessionKeyReplacesSiteKey() {
         // execution
         String view = controller.login(model, null);
 
@@ -36,12 +38,12 @@ class LoginControllerTest {
         assertThat(model.asMap())
                 .containsEntry("passwordResetUrl", PASSWORD_RESET_URL)
                 .containsEntry("recaptchaSessionSiteKey", SESSION_SITE_KEY)
-                .doesNotContainKey("errorMessage");
+                .doesNotContainKeys("recaptchaSiteKey", "errorMessage");
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"", " "})
-    void login_blankSessionKey_resetOfferedWithoutRecaptcha(String sessionSiteKey) {
+    void login_blankSessionKey_siteKeyUsedAsBefore(String sessionSiteKey) {
         // setup
         ReflectionTestUtils.setField(controller, "recaptchaSessionSiteKey", sessionSiteKey);
 
@@ -51,7 +53,23 @@ class LoginControllerTest {
         // verifications
         assertThat(model.asMap())
                 .containsEntry("passwordResetUrl", PASSWORD_RESET_URL)
+                .containsEntry("recaptchaSiteKey", SITE_KEY)
                 .doesNotContainKey("recaptchaSessionSiteKey");
+    }
+
+    @Test
+    void login_noKeys_resetOfferedWithoutRecaptcha() {
+        // setup
+        ReflectionTestUtils.setField(controller, "recaptchaSiteKey", "");
+        ReflectionTestUtils.setField(controller, "recaptchaSessionSiteKey", "");
+
+        // execution
+        controller.login(model, null);
+
+        // verifications
+        assertThat(model.asMap())
+                .containsEntry("passwordResetUrl", PASSWORD_RESET_URL)
+                .doesNotContainKeys("recaptchaSiteKey", "recaptchaSessionSiteKey");
     }
 
     @Test
@@ -64,8 +82,8 @@ class LoginControllerTest {
 
         // verifications
         assertThat(model.asMap())
-                .doesNotContainKey("passwordResetUrl")
-                .containsEntry("recaptchaSessionSiteKey", SESSION_SITE_KEY);
+                .containsEntry("recaptchaSessionSiteKey", SESSION_SITE_KEY)
+                .doesNotContainKeys("passwordResetUrl", "recaptchaSiteKey");
     }
 
     @Test
