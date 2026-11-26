@@ -1,0 +1,337 @@
+extend type Query {
+    """The OS update policies of the tenant, the earliest created first."""
+    osUpdatePolicies: [OsUpdatePolicy!]!
+
+    """Fails with OS_UPDATE_POLICY_NOT_FOUND when the tenant has no such policy."""
+    osUpdatePolicy(id: ID!): OsUpdatePolicy
+
+    """The policy the device follows: the most specific one that covers it, in the order device, device tag,
+    customer, tenant. Null = no policy covers the device, or the policies are not applied to it: a Mac, a device
+    that does not report its OS, a device that cannot be managed."""
+    deviceOsUpdatePolicy(machineId: String!): OsUpdatePolicy
+
+    """The technicians' decisions on one update that stand on top of the policies."""
+    osUpdateOverrides(osUpdateId: ID!): [OsUpdateOverride!]!
+
+    """One row per customer that has a device the update is pending on or installed by, in the order of the
+    organization ids. Empty for a macOS update. Unknown osUpdateId → OS_UPDATE_NOT_FOUND."""
+    osUpdateCustomers(osUpdateId: ID!): [OsUpdateCustomer!]!
+}
+
+extend type Mutation {
+    """Refused with OS_UPDATE_POLICY_CONFLICT when a device would fall under this policy and under another one of
+    the same target type; the message names the other policy and up to 10 of the devices. A saved, changed or
+    deleted policy reaches DeviceOsUpdateRolloutState of the devices with the next scheduled run, within about
+    a minute."""
+    createOsUpdatePolicy(input: OsUpdatePolicyInput!): OsUpdatePolicy!
+
+    """Replaces the policy as a whole. Refused like createOsUpdatePolicy."""
+    updateOsUpdatePolicy(id: ID!, input: OsUpdatePolicyInput!): OsUpdatePolicy!
+
+    deleteOsUpdatePolicy(id: ID!): ID!
+
+    """Approves, holds or rejects one update on top of the policies. Replaces the earlier decision of the same
+    scope. A decision for one device reaches DeviceOsUpdateRolloutState of that device with this call; one for
+    a customer or for every customer reaches the devices with the next scheduled run, within about a minute."""
+    setOsUpdateOverride(input: OsUpdateOverrideInput!): OsUpdateOverride!
+
+    """Takes the decision of that scope back, so the policy decides again, as fast as setOsUpdateOverride does.
+    False = there was none."""
+    removeOsUpdateOverride(osUpdateId: ID!, organizationId: String, machineId: String): Boolean!
+}
+
+type OsUpdatePolicy {
+    id: ID!
+    name: String!
+    target: OsUpdatePolicyTarget!
+    """One rule per urgency. An update of an urgency without a rule is not rolled out by the policy."""
+    rolloutRules: [OsUpdateRolloutRule!]!
+    """One per urgency that has a rollout rule."""
+    restartDeadlines: [OsUpdateRestartDeadline!]!
+    """The pilot ring: the devices with this tag are the first to get an update under PILOT_THEN_EVERYONE."""
+    pilotTagId: ID
+    """One per device class. Downloads happen any time; installs and restarts only inside the window."""
+    maintenanceWindows: [OsUpdateMaintenanceWindow!]!
+    """What a device that was offline during its window does."""
+    offlineRule: OsUpdateOfflineRule!
+    """What a device that is in use during its window does."""
+    inUseRule: OsUpdateInUseRule!
+    """True = a domain controller installs in the server window but never restarts on its own: a technician
+    presses Restart now."""
+    domainControllerRestartManual: Boolean!
+    """One per device class."""
+    restartModes: [OsUpdateDeviceClassRestartMode!]!
+    """The dialog the devices under DIALOG_THEN_DEADLINES show."""
+    restartDialog: OsUpdateRestartDialog!
+    createdAt: Instant!
+    updatedAt: Instant!
+}
+
+"""Which devices the policy covers. A device follows the most specific policy that covers it: DEVICE, then
+DEVICE_TAG, then CUSTOMER, then TENANT."""
+type OsUpdatePolicyTarget {
+    type: OsUpdatePolicyTargetType!
+    """Set for CUSTOMER."""
+    organizationId: String
+    """Set for DEVICE_TAG: a device with any of the tags."""
+    tagIds: [ID!]
+    """Set for DEVICE."""
+    machineIds: [String!]
+}
+
+enum OsUpdatePolicyTargetType {
+    TENANT
+    CUSTOMER
+    DEVICE_TAG
+    DEVICE
+}
+
+"""CRITICAL_SECURITY: a security update of Critical severity, or one with a CVE known to be exploited.
+OTHER_SECURITY: every other security update. QUALITY: a quality update."""
+enum OsUpdateUrgency {
+    CRITICAL_SECURITY
+    OTHER_SECURITY
+    QUALITY
+}
+
+type OsUpdateRolloutRule {
+    urgency: OsUpdateUrgency!
+    mode: OsUpdateRolloutMode!
+    """Days from the vendor's release to the first devices: the pilot ring under PILOT_THEN_EVERYONE, every device
+    under EVERYONE_AT_ONCE. Null under HOLD."""
+    daysAfterRelease: Int
+    """Days from the pilot ring to every other device. Set under PILOT_THEN_EVERYONE only."""
+    daysLaterToEveryone: Int
+}
+
+"""HOLD: nothing installs until a technician approves the update."""
+enum OsUpdateRolloutMode {
+    PILOT_THEN_EVERYONE
+    EVERYONE_AT_ONCE
+    HOLD
+}
+
+"""Days from the moment the device may install the update, or from the day it first reported the update when
+that is later."""
+type OsUpdateRestartDeadline {
+    urgency: OsUpdateUrgency!
+    """Until then the restart dialog waits while the user is in a meeting, presenting or has Do Not Disturb on."""
+    focusDays: Int!
+    """From then the user cannot defer the restart any more."""
+    softDays: Int!
+    """From then the device restarts on its own after a short notice."""
+    hardDays: Int!
+}
+
+"""WORKSTATION: workstations and laptops."""
+enum OsUpdateDeviceClass {
+    WORKSTATION
+    SERVER
+}
+
+enum DayOfWeek {
+    MONDAY
+    TUESDAY
+    WEDNESDAY
+    THURSDAY
+    FRIDAY
+    SATURDAY
+    SUNDAY
+}
+
+"""The hours in which the devices of one class install and restart, by the clock of the device."""
+type OsUpdateMaintenanceWindow {
+    deviceClass: OsUpdateDeviceClass!
+    daysOfWeek: [DayOfWeek!]!
+    """HH:mm, 24 hours."""
+    fromTime: String!
+    """HH:mm, 24 hours. Earlier than fromTime = the window ends on the next day."""
+    toTime: String!
+}
+
+"""INSTALL_AT_NEXT_CHECK_IN: install at the next check-in, outside the window too. WAIT_FOR_NEXT_WINDOW: wait
+for the next window."""
+enum OsUpdateOfflineRule {
+    INSTALL_AT_NEXT_CHECK_IN
+    WAIT_FOR_NEXT_WINDOW
+}
+
+"""INSTALL_ASK_BEFORE_RESTART: install, ask before the restart. INSTALL_RESTART_IN_NEXT_WINDOW: install, restart
+in the next window. SKIP_WINDOW: skip this window."""
+enum OsUpdateInUseRule {
+    INSTALL_ASK_BEFORE_RESTART
+    INSTALL_RESTART_IN_NEXT_WINDOW
+    SKIP_WINDOW
+}
+
+type OsUpdateDeviceClassRestartMode {
+    deviceClass: OsUpdateDeviceClass!
+    mode: OsUpdateRestartMode!
+}
+
+"""DIALOG_THEN_DEADLINES: show the dialog, then enforce at the restart deadlines; not for SERVER.
+MAINTENANCE_WINDOW_ONLY: restart only in the maintenance window, no dialog. NEVER: never restart automatically."""
+enum OsUpdateRestartMode {
+    DIALOG_THEN_DEADLINES
+    MAINTENANCE_WINDOW_ONLY
+    NEVER
+}
+
+type OsUpdateRestartDialog {
+    """The defer menu, in its order: the first option is what a dialog nobody answers picks. Empty = no
+    deferrals: the dialog only offers Restart now and Schedule."""
+    deferOptions: [OsUpdateDeferOption!]!
+    """Minutes after which the dialog answers itself, as a deferral."""
+    autoAnswerMinutes: Int!
+    """True = the user may schedule the restart from the dialog, up to the soft deadline."""
+    userMayScheduleRestart: Boolean!
+}
+
+"""TOMORROW_MORNING: tomorrow at 08:00 by the clock of the device."""
+enum OsUpdateDeferOption {
+    ONE_HOUR
+    FOUR_HOURS
+    TOMORROW_MORNING
+}
+
+input OsUpdatePolicyInput {
+    name: String!
+    target: OsUpdatePolicyTargetInput!
+    rolloutRules: [OsUpdateRolloutRuleInput!]!
+    restartDeadlines: [OsUpdateRestartDeadlineInput!]!
+    """Required when a rule uses PILOT_THEN_EVERYONE."""
+    pilotTagId: ID
+    """One for WORKSTATION and one for SERVER."""
+    maintenanceWindows: [OsUpdateMaintenanceWindowInput!]!
+    offlineRule: OsUpdateOfflineRule!
+    inUseRule: OsUpdateInUseRule!
+    domainControllerRestartManual: Boolean!
+    """One for WORKSTATION and one for SERVER. SERVER cannot use DIALOG_THEN_DEADLINES."""
+    restartModes: [OsUpdateDeviceClassRestartModeInput!]!
+    restartDialog: OsUpdateRestartDialogInput!
+}
+
+input OsUpdateMaintenanceWindowInput {
+    deviceClass: OsUpdateDeviceClass!
+    """At least one day, each day once."""
+    daysOfWeek: [DayOfWeek!]!
+    fromTime: String!
+    """Must differ from fromTime."""
+    toTime: String!
+}
+
+input OsUpdateDeviceClassRestartModeInput {
+    deviceClass: OsUpdateDeviceClass!
+    mode: OsUpdateRestartMode!
+}
+
+input OsUpdateRestartDialogInput {
+    """Without repeats."""
+    deferOptions: [OsUpdateDeferOption!]!
+    """1 or more."""
+    autoAnswerMinutes: Int!
+    userMayScheduleRestart: Boolean!
+}
+
+input OsUpdatePolicyTargetInput {
+    type: OsUpdatePolicyTargetType!
+    organizationId: String
+    tagIds: [ID!]
+    machineIds: [String!]
+}
+
+input OsUpdateRolloutRuleInput {
+    urgency: OsUpdateUrgency!
+    mode: OsUpdateRolloutMode!
+    daysAfterRelease: Int
+    daysLaterToEveryone: Int
+}
+
+input OsUpdateRestartDeadlineInput {
+    urgency: OsUpdateUrgency!
+    focusDays: Int!
+    softDays: Int!
+    hardDays: Int!
+}
+
+"""A technician's decision on one update. Its scope is one device (machineId), one customer (organizationId) or
+every customer (neither). For a device the narrowest scope wins."""
+type OsUpdateOverride {
+    action: OsUpdateOverrideAction!
+    organizationId: String
+    machineId: String
+    """The user who decided."""
+    actedBy: String
+    actedAt: Instant!
+}
+
+"""APPROVE: the devices may install now, ahead of the policy's days. HOLD and REJECT: the devices do not
+install."""
+enum OsUpdateOverrideAction {
+    APPROVE
+    HOLD
+    REJECT
+}
+
+input OsUpdateOverrideInput {
+    osUpdateId: ID!
+    action: OsUpdateOverrideAction!
+    """Give one of the two, or neither for every customer."""
+    organizationId: String
+    machineId: String
+}
+
+"""What the policy of the device and the technicians' decisions give for one pending update of the device."""
+type DeviceOsUpdateRolloutState {
+    policyId: ID!
+    status: DeviceOsUpdateRolloutStatus!
+    """The technician's decision behind the status. Null = the policy decided."""
+    overrideAction: OsUpdateOverrideAction
+    """From when the device may install the update. Null = it may not: HELD or REJECTED."""
+    installFrom: Instant
+    """The restart deadlines of this device for this update. Null while installFrom is null."""
+    focusAt: Instant
+    softAt: Instant
+    hardAt: Instant
+}
+
+"""SCHEDULED: installFrom is ahead. APPROVED: installFrom has come. HELD: waits for a technician. REJECTED: a
+technician rejected the update."""
+enum DeviceOsUpdateRolloutStatus {
+    SCHEDULED
+    APPROVED
+    HELD
+    REJECTED
+}
+
+"""One update at one customer. The status comes from the policy of the customer as a whole and from the decisions
+made for the customer or for every customer; devices under a device tag or device policy, and decisions made for
+one device, follow their own days and are not looked at here."""
+type OsUpdateCustomer {
+    organizationId: String!
+    status: OsUpdateCustomerStatus!
+    """The policy of the customer, else the one of the tenant. Null = neither exists."""
+    policyId: ID
+    policyName: String
+    """The rule of the update's urgency in that policy. Null = the policy does not roll the update out."""
+    rolloutRule: OsUpdateRolloutRule
+    """The decision for the customer, else the one for every customer. Null = no technician decided."""
+    override: OsUpdateOverride
+    """Counted like the two counts of OsUpdate, over the devices of the customer."""
+    pendingDeviceCount: Int!
+    installedDeviceCount: Int!
+}
+
+"""LISTED_ONLY: no policy rolls the update out: the customer and the tenant have no policy, or the policy has no
+rule for the update's urgency. SCHEDULED: the day of the first devices is still ahead; the product's list of
+statuses has no name for the days before it, this one is ours. PILOT: the pilot ring may install, the other
+devices not yet. APPROVED: every device may install, by the policy's days or by a technician. HELD: waits for a
+technician, by a HOLD rule or by a technician. REJECTED: a technician rejected the update."""
+enum OsUpdateCustomerStatus {
+    LISTED_ONLY
+    SCHEDULED
+    PILOT
+    APPROVED
+    HELD
+    REJECTED
+}

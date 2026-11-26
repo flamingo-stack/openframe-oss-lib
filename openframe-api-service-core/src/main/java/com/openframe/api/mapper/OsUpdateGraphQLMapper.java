@@ -29,6 +29,7 @@ public class OsUpdateGraphQLMapper {
                 .platform(osUpdateFilterInput.getPlatform())
                 .classifications(osUpdateFilterInput.getClassifications())
                 .search(osUpdateFilterInput.getSearch())
+                .customerStatuses(osUpdateFilterInput.getCustomerStatuses())
                 .build();
     }
 

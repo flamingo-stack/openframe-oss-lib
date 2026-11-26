@@ -2,16 +2,23 @@ package com.openframe.api.service.rmm.osupdate;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceStatus;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateSummaryResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.shared.CursorPageAssembler;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
+import com.openframe.data.repository.rmm.osupdate.ManageableOsDeviceCounts;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOverdueDeviceCounts;
+import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.function.Function;
 
@@ -27,6 +34,9 @@ public class OsUpdateDeviceService {
     private final DeviceOsUpdateHistoryService deviceOsUpdateHistoryService;
     private final DeviceService deviceService;
     private final CursorPageAssembler cursorPageAssembler;
+    private final DeviceOsStateService deviceOsStateService;
+    private final DeviceOsUpdateRolloutStateRepository deviceOsUpdateRolloutStateRepository;
+    private final TenantIdProvider tenantIdProvider;
 
     // Each status reads its own collection, so a page never mixes the two. Only Windows reports a history.
     // Organizations: only their devices. Empty = every organization.
@@ -52,5 +62,29 @@ public class OsUpdateDeviceService {
         }
         return cursorPageAssembler.toPage(fetchedDevices, normalizedPagination, Function.identity(),
                 OsUpdateDeviceResponse::getCursor);
+    }
+
+    // Windows only: the policies are not applied to Macs. Devices we cannot manage are not counted.
+    // No organizationIds = every customer.
+    public OsUpdateSummaryResponse getSummary(List<String> organizationIds) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<String> scopeOrganizationIds = organizationIds == null ? List.of() : organizationIds;
+        OsUpdateDeviceScope osUpdateDeviceScope = osUpdateService.findDeviceScope(scopeOrganizationIds);
+        ManageableOsDeviceCounts manageableOsDeviceCounts = deviceOsStateService.countManageableDevices(
+                OsPlatform.WINDOWS, osUpdateDeviceScope.getMachineIds());
+        Instant now = Instant.now();
+        long installDueDeviceCount =
+                deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(tenantId, scopeOrganizationIds, now);
+        OsUpdateOverdueDeviceCounts osUpdateOverdueDeviceCounts =
+                deviceOsUpdateRolloutStateRepository.countOverdueDevices(tenantId, scopeOrganizationIds, now);
+        long deviceCount = manageableOsDeviceCounts.getDeviceCount();
+        return OsUpdateSummaryResponse.builder()
+                .deviceCount(Math.toIntExact(deviceCount))
+                .currentDeviceCount(Math.toIntExact(Math.max(0, deviceCount - installDueDeviceCount)))
+                .overdueDeviceCount(Math.toIntExact(osUpdateOverdueDeviceCounts.getDeviceCount()))
+                .overdueOfflineDeviceCount(Math.toIntExact(osUpdateOverdueDeviceCounts.getOfflineDeviceCount()))
+                .restartPendingDeviceCount(Math.toIntExact(manageableOsDeviceCounts.getRebootPendingDeviceCount()))
+                .heldUpdateCount(osUpdateService.countHeldOsUpdates(osUpdateDeviceScope))
+                .build();
     }
 }
