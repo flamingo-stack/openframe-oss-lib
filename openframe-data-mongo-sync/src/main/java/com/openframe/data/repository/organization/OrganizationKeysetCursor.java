@@ -1,5 +1,6 @@
 package com.openframe.data.repository.organization;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.organization.Organization;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -20,7 +21,6 @@ public final class OrganizationKeysetCursor {
     public static final String ORGANIZATION_ID_FIELD = "organizationId";
     public static final String CREATED_AT_FIELD = "createdAt";
     public static final String UPDATED_AT_FIELD = "updatedAt";
-    public static final String INVALID_CURSOR_MESSAGE = "Invalid cursor";
 
     private static final String SEPARATOR = "_";
 
@@ -46,7 +46,7 @@ public final class OrganizationKeysetCursor {
         }
         int separator = raw.lastIndexOf(SEPARATOR);
         if (separator < 0) {
-            throw new IllegalArgumentException(INVALID_CURSOR_MESSAGE);
+            throw new InvalidCursorException();
         }
         String encodedValue = raw.substring(0, separator);
         String idPart = raw.substring(separator + 1);
@@ -57,7 +57,7 @@ public final class OrganizationKeysetCursor {
 
     private static ObjectId parseId(String raw) {
         if (!ObjectId.isValid(raw)) {
-            throw new IllegalArgumentException(INVALID_CURSOR_MESSAGE);
+            throw new InvalidCursorException();
         }
         return new ObjectId(raw);
     }
@@ -94,7 +94,7 @@ public final class OrganizationKeysetCursor {
             long millis = Long.parseLong(encoded);
             return Instant.ofEpochMilli(millis);
         } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(INVALID_CURSOR_MESSAGE, ex);
+            throw new InvalidCursorException(ex);
         }
     }
 
@@ -110,7 +110,7 @@ public final class OrganizationKeysetCursor {
             byte[] bytes = Base64.getDecoder().decode(encoded);
             return new String(bytes, StandardCharsets.UTF_8);
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException(INVALID_CURSOR_MESSAGE, ex);
+            throw new InvalidCursorException(ex);
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.openframe.data.integration.repository.rmm;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.ScriptShell;
@@ -7,6 +8,7 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +36,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
     private static final String TENANT_A = "tenant-a";
     private static final String TENANT_B = "tenant-b";
+    private static final CursorPosition NO_POSITION = new CursorPosition.None();
 
     @Autowired
     private ScriptRepository scriptRepository;
@@ -89,7 +92,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     void findPageForTenant_noCursor_returnsNewestFirst() {
         List<Script> seeded = seedSequentialForTenant(TENANT_A, 5);
 
-        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 10);
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).hasSize(5);
         assertThat(page.get(0).getId()).isEqualTo(seeded.get(4).getId());
@@ -103,7 +106,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         String cursor = seeded.get(2).getId();
 
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, null, null, "_id", Sort.Direction.DESC, cursor, false, 10);
+                TENANT_A, null, null, "_id", Sort.Direction.DESC, new CursorPosition.RowId(cursor), false, 10);
 
         assertThat(page).extracting(Script::getId)
                 .containsExactly(seeded.get(1).getId(), seeded.get(0).getId());
@@ -116,7 +119,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         String cursor = seeded.get(2).getId();
 
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, null, null, "_id", Sort.Direction.DESC, cursor, true, 10);
+                TENANT_A, null, null, "_id", Sort.Direction.DESC, new CursorPosition.RowId(cursor), true, 10);
 
         assertThat(page).extracting(Script::getId)
                 .containsExactly(seeded.get(3).getId(), seeded.get(4).getId());
@@ -128,7 +131,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         seedSequentialForTenant(TENANT_A, 3);
         seedSequentialForTenant(TENANT_B, 3);
 
-        List<Script> aPage = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 10);
+        List<Script> aPage = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(aPage).hasSize(3);
         assertThat(aPage).allSatisfy(s -> assertThat(s.getTenantId()).isEqualTo(TENANT_A));
@@ -140,7 +143,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         seedSequentialForTenant(TENANT_A, 5);
 
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 2);
+                TENANT_A, null, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 2);
 
         assertThat(page).hasSize(2);
     }
@@ -155,7 +158,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         doomed.setStatus(ScriptStatus.DELETED);
         scriptRepository.save(doomed);
 
-        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, null, false, 10);
+        List<Script> page = scriptRepository.findPageForTenant(TENANT_A, null, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getId)
                 .containsExactlyInAnyOrder(keep1.getId(), keep2.getId())
@@ -193,15 +196,15 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given an invalid (non-ObjectId) cursor, when findPageForTenant runs, then it gracefully falls back to the first page rather than throwing")
-    void findPageForTenant_invalidCursor_fallsBackToFirstPage() {
-        List<Script> seeded = seedSequentialForTenant(TENANT_A, 3);
+    @DisplayName("Given a cursor that is not a script position, when findPageForTenant runs, then it is refused with the invalid cursor error instead of serving the first page")
+    void findPageForTenant_invalidCursor_isRefused() {
+        seedSequentialForTenant(TENANT_A, 3);
+        CursorPosition unrecognised = new CursorPosition.Unrecognised("not-an-objectid");
 
-        List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, null, null, "_id", Sort.Direction.DESC, "not-an-objectid", false, 10);
-
-        assertThat(page).hasSize(3);
-        assertThat(page.get(0).getId()).isEqualTo(seeded.get(2).getId());
+        assertThatThrownBy(() -> scriptRepository.findPageForTenant(
+                TENANT_A, null, null, "_id", Sort.Direction.DESC, unrecognised, false, 10))
+                .isInstanceOf(InvalidCursorException.class)
+                .hasMessage("Invalid cursor");
     }
 
     private static final List<ScriptStatus> UNIQUE_STATUSES =
@@ -337,7 +340,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().shells(List.of(ScriptShell.BASH)).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getId)
                 .containsExactly(aBash.getId())
@@ -354,7 +357,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().statuses(List.of(ScriptStatus.DELETED)).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getId).containsExactly(gone.getId()).doesNotContain(kept.getId());
     }
@@ -369,7 +372,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().supportedPlatforms(List.of(OsType.MAC_OS)).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getId).containsExactly(crossPlatform.getId());
     }
@@ -385,7 +388,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().tagIds(List.of("tag-x")).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "c");
     }
@@ -397,7 +400,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().tagIds(List.of("absent-tag")).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).isEmpty();
     }
@@ -414,7 +417,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("user-1")).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "c");
     }
@@ -428,7 +431,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("user-1", "user-2")).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "b");
     }
@@ -441,7 +444,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of()).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "b");
     }
@@ -454,7 +457,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().build(); // createdByIds == null
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName).containsExactlyInAnyOrder("a", "b");
     }
@@ -466,7 +469,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("ghost-user")).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).isEmpty();
     }
@@ -486,7 +489,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
                 .shells(List.of(ScriptShell.BASH))
                 .build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName).containsExactly("a"); // user-1 AND BASH
     }
@@ -500,7 +503,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
 
         ScriptQueryFilter filter = ScriptQueryFilter.builder().createdByIds(List.of("user-1")).build();
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, filter, null, "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, filter, null, "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName).containsExactly("a");
     }
@@ -568,7 +571,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         scriptRepository.save(newScript(TENANT_A, "Restart printer spooler"));
 
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, null, "backup", "_id", Sort.Direction.DESC, null, false, 10);
+                TENANT_A, null, "backup", "_id", Sort.Direction.DESC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName)
                 .containsExactlyInAnyOrder("Backup nightly", "BACKUP weekly");
@@ -582,7 +585,7 @@ class ScriptRepositoryIT extends BaseMongoIntegrationTest {
         scriptRepository.save(newScript(TENANT_A, "mike"));
 
         List<Script> page = scriptRepository.findPageForTenant(
-                TENANT_A, null, null, "name", Sort.Direction.ASC, null, false, 10);
+                TENANT_A, null, null, "name", Sort.Direction.ASC, NO_POSITION, false, 10);
 
         assertThat(page).extracting(Script::getName).containsExactly("alpha", "mike", "zeta");
     }

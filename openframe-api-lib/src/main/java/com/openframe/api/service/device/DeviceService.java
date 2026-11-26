@@ -3,7 +3,7 @@ package com.openframe.api.service.device;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilters;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
@@ -23,6 +23,8 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.repository.device.MachineNameMatches;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
@@ -49,6 +51,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.openframe.data.document.audit.AuditAction.DEVICE_RENAME;
@@ -201,21 +204,17 @@ public class DeviceService {
         String tenantId = tenantIdProvider.getTenantId();
         MachineQueryFilter filter = scheduleDeviceFilter(filterOptions, platformNames, restrictToMachineIds);
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
+        CursorPosition position = KeysetCursor.parseDecoded(normalized.getCursor());
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
-        List<Machine> page = machineRepository.findAvailableForScheduleWithCursor(
-                tenantId, filter, search, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
-        boolean hasNextPage = page.size() > normalized.getLimit();
-        if (hasNextPage) {
-            page = page.subList(0, normalized.getLimit());
-        }
+        List<Machine> fetched = machineRepository.findAvailableForScheduleWithCursor(tenantId, filter, search,
+                assignedMachineIds, position, normalized.isBackward(), normalized.getLimit() + 1);
+        CursorPage<Machine> page = CursorPage.assemble(fetched, normalized);
 
-        PageInfo pageInfo = PageInfo.builder()
-                .hasNextPage(hasNextPage)
-                .hasPreviousPage(normalized.hasCursor())
-                .build();   // startCursor/endCursor (compound bucket|id) filled in by the mapper
+        PageInfo pageInfo = buildPageInfo(page,
+                machine -> machineRepository.availableForScheduleKeysetCursor(machine, assignedMachineIds));
         return CountedGenericQueryResult.<Machine>builder()
-                .items(page)
+                .items(page.items())
                 .pageInfo(pageInfo)
                 .filteredCount((int) totalFilteredCount)
                 .build();
@@ -291,30 +290,33 @@ public class DeviceService {
         String sortField = validateSortField(sort != null ? sort.getField() : null);
         SortDirection sortDirection = (sort != null && sort.getDirection() != null) ?
                 sort.getDirection() : SortDirection.DESC;
+        String direction = sortDirection.name();
+        CursorPosition position = KeysetCursor.parseDecoded(normalizedPagination.getCursor());
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
 
         int limit = normalizedPagination.getLimit();
-        List<Machine> raw = machineRepository.findMachinesWithCursor(tenantId, filter, search,
-                normalizedPagination.getCursor(), limit + 1, sortField, sortDirection.name());
-        boolean hasNextPage = raw.size() > limit;
-        List<Machine> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
+        List<Machine> fetched = machineRepository.findMachinesWithCursor(tenantId, filter, search,
+                position, normalizedPagination.isBackward(), limit + 1, sortField, direction);
+        CursorPage<Machine> page = CursorPage.assemble(fetched, normalizedPagination);
 
-        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
+        PageInfo pageInfo = buildPageInfo(page,
+                machine -> machineRepository.keysetCursor(machine, sortField, direction));
 
         return CountedGenericQueryResult.<Machine>builder()
-                .items(pageItems)
+                .items(page.items())
                 .pageInfo(pageInfo)
                 .filteredCount((int) totalFilteredCount)
                 .build();
     }
 
-    private PageInfo buildPageInfo(List<Machine> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getFirst().getId());
-        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getLast().getId());
+    private PageInfo buildPageInfo(CursorPage<Machine> page, Function<Machine, KeysetCursor> keysetCursor) {
+        List<Machine> items = page.items();
+        String startCursor = items.isEmpty() ? null : keysetCursor.apply(items.getFirst()).encode();
+        String endCursor = items.isEmpty() ? null : keysetCursor.apply(items.getLast()).encode();
         return PageInfo.builder()
-                .hasNextPage(hasNextPage)
-                .hasPreviousPage(hasPreviousPage)
+                .hasNextPage(page.hasNextPage())
+                .hasPreviousPage(page.hasPreviousPage())
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();

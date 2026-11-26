@@ -9,6 +9,7 @@ import {
   type ChatToolPart,
   approvalBatchIdOf,
   approvalStatusOf,
+  emailEnvelopeOf,
   isSourcePart,
   isToolPart,
   textOfParts,
@@ -47,11 +48,13 @@ import {
 import type { ChatRef } from './chat-ref.types';
 import { CitationChip } from './citation-chip';
 import { ContextCompactionDisplay } from './context-compaction-display';
+import { EmailMessageCard } from './email-message-card';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { chatCardLabel, RecordChip } from './entity-cards/dispatch';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
 import { MessageCitationsProvider, useMessageCitations } from './message-citations';
+import { OpenFrameMessageAttachments } from './openframe-message-attachments';
 import { MessageRecordLinkProvider } from './record-actions';
 import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
@@ -192,6 +195,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       progress,
       interrupted = false,
       NavLinkAnchor,
+      openframeAttachments,
+      onOpenAttachment,
       ...props
     },
     ref,
@@ -436,6 +441,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       (last, part, index) => (part.type === 'text' && part.text.trim() !== '' ? index : last),
       -1,
     );
+    // An email (email-to-ticket) draws as one card: its envelope over the whole body, at the first text part.
+    const email = useMemo(() => emailEnvelopeOf({ parts }), [parts]);
+    const firstTextIndex = bodyParts.findIndex(part => part.type === 'text');
+    const emailBody = email ? bodyParts.flatMap(part => (part.type === 'text' ? [part.text] : [])).join('\n\n') : '';
     // Under an approval that ran the words after it were cut, and "ask again" would run it twice.
     const approvalRan = holdsApprovalThatRan(bodyParts);
     // A stream cut before any text says so too: the notice is all that row has. Text of its own may say it already (a
@@ -528,6 +537,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     const partIsStreaming = index === bodyParts.length - 1 && !!isTyping;
                     switch (part.type) {
                       case 'text': {
+                        // An email draws as one card, its envelope over its whole body, whatever the body holds.
+                        if (email) {
+                          if (index !== firstTextIndex) return null;
+                          return <EmailMessageCard key={index} email={email} body={emailBody} self={isUser} />;
+                        }
                         // Whitespace between two cards draws nothing, not an empty block with its gap.
                         if (part.text.trim() === '') return null;
                         // The layout of Claude and ChatGPT: what the USER said is a
@@ -557,6 +571,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                           </div>
                         );
                       }
+                      case 'data-email':
+                        // Drawn with the body, in the text part's place.
+                        return null;
                       case 'file':
                         // In the bubble of the text beside it. A message of attachments alone has a bubble of its own.
                         if (lastTextIndex !== -1 || part !== files[0]) return null;
@@ -657,6 +674,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 </div>
               )}
 
+              {/* OpenFrame files (Figma `chat/user-message`): under the bubble, before the time. Hub file parts are
+              drawn inside the bubble above and never here. */}
+              {openframeAttachments && openframeAttachments.length > 0 && (
+                <OpenFrameMessageAttachments
+                  attachments={openframeAttachments}
+                  align={isUser ? 'end' : 'start'}
+                  onOpenAttachment={onOpenAttachment}
+                />
+              )}
+
               {timestamp && !showName && (
                 <span className={cn('text-ods-text-secondary text-h6', isUser && 'justify-self-end')}>
                   {formatMessageTimestamp(timestamp)}
@@ -715,7 +742,9 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.displayApprovalTypes === nextProps.displayApprovalTypes &&
     prevProps.progress === nextProps.progress &&
     prevProps.interrupted === nextProps.interrupted &&
-    prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
+    prevProps.NavLinkAnchor === nextProps.NavLinkAnchor &&
+    prevProps.openframeAttachments === nextProps.openframeAttachments &&
+    prevProps.onOpenAttachment === nextProps.onOpenAttachment
   );
 });
 

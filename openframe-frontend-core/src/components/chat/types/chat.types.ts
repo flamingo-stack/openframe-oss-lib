@@ -17,6 +17,8 @@ export const OWNER_TYPE = {
   CLIENT: 'CLIENT',
   ADMIN: 'ADMIN',
   ASSISTANT: 'ASSISTANT',
+  /** The sender of an inbound email (email-to-ticket): a person, by their address. */
+  EMAIL: 'EMAIL',
 } as const;
 
 export type OwnerType = (typeof OWNER_TYPE)[keyof typeof OWNER_TYPE];
@@ -126,6 +128,9 @@ export interface MessageOwner {
   model?: string;
   modelName?: string;
   providerName?: string;
+  /** An email sender's address and the name their email gave. */
+  address?: string;
+  name?: string | null;
   user?: {
     id: string;
     firstName?: string;

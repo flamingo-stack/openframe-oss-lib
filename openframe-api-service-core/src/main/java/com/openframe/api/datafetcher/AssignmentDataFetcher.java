@@ -66,12 +66,14 @@ public class AssignmentDataFetcher {
             @InputArgument String search,
             @InputArgument SortInput sort,
             @InputArgument Integer first,
-            @InputArgument String after) {
-        log.debug("Fetching assigned items for item: {}, targetType: {}, search: {}, sort: {}, first: {}, after: {}",
-                itemId, targetType, search, sort, first, after);
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
+        log.debug("Fetching assigned items for item: {}, targetType: {}, search: {}, sort: {}, first: {}, after: {}, "
+                        + "last: {}, before: {}", itemId, targetType, search, sort, first, after, last, before);
         String rawItemId = decodeAssignableItemId(itemId);
         CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(
-                ConnectionArgs.builder().first(first).after(after).build());
+                ConnectionArgs.builder().first(first).after(after).last(last).before(before).build());
 
         CountedGenericQueryResult<ItemAssignment> result =
                 assignmentService.queryAssignments(rawItemId, targetType, pagination, search, sort);

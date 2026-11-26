@@ -1,12 +1,12 @@
 package com.openframe.data.repository.rmm;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.filter.ScriptScheduleQueryFilter;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
@@ -37,9 +37,8 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * cursor — required because sort values repeat (many schedules share a {@code repeat}
  * interval) and an {@code _id}-only cursor would skip and duplicate rows across a tie
  * boundary. The comparison is flipped when paginating backward. All queries are
- * tenant-scoped. An invalid cursor is logged and treated as "no cursor" (first page).
+ * tenant-scoped. An invalid cursor is rejected with {@link InvalidCursorException}.
  */
-@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleRepository {
@@ -138,19 +137,14 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         }
         int separator = cursor.lastIndexOf(CURSOR_SEPARATOR);
         if (separator < 0) {
-            log.warn("Invalid deviceCount cursor (no separator): '{}' — falling back to first page", cursor);
-            return;
+            throw new InvalidCursorException();
         }
         ObjectId cursorId = parseObjectId(cursor.substring(separator + 1));
-        if (cursorId == null) {
-            return;
-        }
         int count;
         try {
             count = Integer.parseInt(cursor.substring(0, separator));
         } catch (NumberFormatException ex) {
-            log.warn("Unparseable deviceCount in cursor '{}' — falling back to first page", cursor);
-            return;
+            throw new InvalidCursorException(ex);
         }
 
         String cmp = effectiveDir == Sort.Direction.ASC ? "$gt" : "$lt";
@@ -198,21 +192,16 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         }
         String[] parts = cursor.split("\\" + CURSOR_SEPARATOR);
         if (parts.length != 3) {
-            log.warn("Invalid startAt cursor (expected bucket|millis|id): '{}' — falling back to first page", cursor);
-            return;
+            throw new InvalidCursorException();
         }
         ObjectId cursorId = parseObjectId(parts[2]);
-        if (cursorId == null) {
-            return;
-        }
         int bucket;
         Date startAt;   // null = the row's startAt was null; the whole bucket is null (DEVICE_ONLINE has no startAt)
         try {
             bucket = Integer.parseInt(parts[0]);
             startAt = parts[1].isEmpty() ? null : new Date(Long.parseLong(parts[1]));
         } catch (NumberFormatException ex) {
-            log.warn("Unparseable bucket/startAt in cursor '{}' — falling back to first page", cursor);
-            return;
+            throw new InvalidCursorException(ex);
         }
 
         String cmp = effectiveDir == Sort.Direction.ASC ? "$gt" : "$lt";
@@ -398,9 +387,6 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
 
     private static void applyIdCursor(Criteria criteria, String cursor, Sort.Direction effectiveDir) {
         ObjectId cursorId = parseObjectId(cursor);
-        if (cursorId == null) {
-            return;
-        }
         if (effectiveDir == Sort.Direction.DESC) {
             criteria.and(FIELD_ID).lt(cursorId);
         } else {
@@ -423,20 +409,15 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
                                             Sort.Direction effectiveDir, String sortField) {
         int separator = cursor.lastIndexOf(CURSOR_SEPARATOR);
         if (separator < 0) {
-            log.warn("Invalid compound cursor (no separator) for schedule pagination: '{}' — falling back to first page", cursor);
-            return;
+            throw new InvalidCursorException();
         }
         ObjectId cursorId = parseObjectId(cursor.substring(separator + 1));
-        if (cursorId == null) {
-            return;
-        }
 
         Object value;
         try {
             value = parseSortValue(cursor.substring(0, separator), sortField);
         } catch (RuntimeException ex) {
-            log.warn("Unparseable '{}' value in schedule cursor '{}' — falling back to first page", sortField, cursor);
-            return;
+            throw new InvalidCursorException(ex);
         }
 
         boolean ascending = effectiveDir == Sort.Direction.ASC;
@@ -476,8 +457,7 @@ public class CustomScriptScheduleRepositoryImpl implements CustomScriptScheduleR
         try {
             return new ObjectId(raw);
         } catch (IllegalArgumentException ex) {
-            log.warn("Invalid ObjectId in schedule cursor: '{}' — falling back to first page", raw);
-            return null;
+            throw new InvalidCursorException(ex);
         }
     }
 
