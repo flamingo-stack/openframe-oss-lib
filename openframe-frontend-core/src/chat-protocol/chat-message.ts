@@ -324,6 +324,31 @@ export interface ChatMessageAuthor {
   assistantType?: AssistantType;
 }
 
+/** One address on an email envelope. */
+export interface ChatEmailAddress {
+  address: string;
+  name?: string | null;
+}
+
+/**
+ * The envelope of a message that is an email (email-to-ticket): who it went from and to, and what the thread shows
+ * beside the body. Read from the message's stored EMAIL part; a live chunk does not carry it.
+ */
+export interface ChatEmailEnvelope {
+  direction: 'INBOUND' | 'OUTBOUND';
+  from: ChatEmailAddress | null;
+  to: ChatEmailAddress[];
+  cc: ChatEmailAddress[];
+  subject?: string;
+  /** The folded part: the quoted thread and the signature. */
+  quotedText?: string;
+  /** A reply's state at the provider; absent on an inbound email. */
+  deliveryState?: 'SENDING' | 'DELIVERED' | 'FAILED';
+  deliveryFailureReason?: string;
+  /** An automatic email (an out-of-office, a delivery report). */
+  automatic?: boolean;
+}
+
 /** JSON-serializable. */
 export interface ChatMessageMetadata {
   // A stored row.
@@ -352,6 +377,8 @@ export interface ChatMessageMetadata {
   progress?: ChatProgressRow[];
   author?: ChatMessageAuthor;
   contextItems?: ChatContextItem[];
+  /** The message is an email: its envelope. */
+  email?: ChatEmailEnvelope;
   /** The highest chunk sequence consumed into this row: what the history merge decides coverage with. */
   streamSeq?: number;
 }

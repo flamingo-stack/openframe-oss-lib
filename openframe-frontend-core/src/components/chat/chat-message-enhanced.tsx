@@ -47,6 +47,7 @@ import {
 import type { ChatRef } from './chat-ref.types';
 import { CitationChip } from './citation-chip';
 import { ContextCompactionDisplay } from './context-compaction-display';
+import { EmailMessageCard } from './email-message-card';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { chatCardLabel, RecordChip } from './entity-cards/dispatch';
 import { ErrorMessageDisplay } from './error-message-display';
@@ -183,6 +184,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       nameEveryTurn = false,
       assistantIcon,
       contextItems,
+      email,
       resolveContextIcon,
       renderContextItem,
       renderRecordChip,
@@ -528,6 +530,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     const partIsStreaming = index === bodyParts.length - 1 && !!isTyping;
                     switch (part.type) {
                       case 'text': {
+                        // An email draws as one, its envelope over its body, whatever the body holds.
+                        if (email) return <EmailMessageCard key={index} email={email} body={part.text} self={isUser} />;
                         // Whitespace between two cards draws nothing, not an empty block with its gap.
                         if (part.text.trim() === '') return null;
                         // The layout of Claude and ChatGPT: what the USER said is a
@@ -704,6 +708,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // Reference equality — the host re-uses the same array instance per
     // message (it's set once on the optimistic send and never mutated).
     prevProps.contextItems === nextProps.contextItems &&
+    prevProps.email === nextProps.email &&
     prevProps.resolveContextIcon === nextProps.resolveContextIcon &&
     prevProps.renderContextItem === nextProps.renderContextItem &&
     // Host keeps this stable (module const / useCallback), so reference

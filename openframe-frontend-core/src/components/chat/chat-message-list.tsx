@@ -1139,6 +1139,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                           nameEveryTurn={nameEveryTurn}
                           assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
                           contextItems={metadata?.contextItems}
+                          email={metadata?.email}
                           resolveContextIcon={resolveContextIcon}
                           renderContextItem={renderContextItem}
                           renderRecordChip={renderRecordChip}
