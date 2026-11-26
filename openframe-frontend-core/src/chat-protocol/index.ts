@@ -37,6 +37,8 @@ export type { DocSearchResult } from './doc-search';
 export * from './attachment';
 // OpenFrame (Mingo, Fae) chat attachments: each product's limits, types and composer layout, and the view models.
 export * from './attachment-profiles';
+// The OpenFrame chat-file uploader a host gives the lib: the upload URL and the status calls over its own client.
+export * from './attachment-uploader';
 // OpenFrame's chat history document (selecting `Message.parts`) and the read of its answer.
 export * from './mingo-graphql';
 // OpenFrame's record types: the kind a context item carries and the type its record link writes.

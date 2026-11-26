@@ -12,9 +12,9 @@
  *   - `embedAuthedFetch` carries bearer-act-as headers + Supabase
  *     session cookies — used both for minting the upload URL and as
  *     the auth path before falling through to the signed PUT.
- *   - The byte-PUT to the signed URL uses an inline `uploadWithProgress`
- *     XHR helper (ported from the hub `unified-upload-service`) so the
- *     lib-side chat hook is self-contained.
+ *   - The byte-PUT to the signed URL goes through `putFileWithProgress`
+ *     (`utils/put-file-with-progress.ts`), the XHR the OpenFrame uploader
+ *     shares.
  *
  * URL endpoint: `runtime.endpoints.attachmentUploadUrl` (hub default
  * `/api/storage/generate-upload-url`). Embedded apps override.
@@ -35,6 +35,7 @@ import {
 } from '../../../chat-protocol/attachment';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { putFileWithProgress } from '../../../utils/put-file-with-progress';
 import { randomId } from '../../../utils/random-id';
 
 /** Cache-Control header for content-addressed uploads — Storage paths
@@ -84,15 +85,9 @@ interface UseChatAttachmentsApi {
 }
 
 /**
- * Inline `uploadWithProgress` — XHR PUT to a Supabase signed-upload URL
- * with progress + abort support. Ported verbatim from the hub
- * `unified-upload-service.ts`. Maps the XHR 0-100 to the caller's 10-95
- * range (leaving 0-10 for the mint + 95-100 for state transitions).
- *
- * AbortSignal wiring: `signal?.addEventListener('abort', () => xhr.abort())`
- * — without this, calling `removeAttachment`/`clear()` aborts the
- * controller but the XHR runs to completion and bytes still land in
- * Supabase.
+ * PUT to a Supabase signed-upload URL. Maps the bytes sent to the caller's 10-95 range (leaving 0-10 for the mint and
+ * 95-100 for the state change). `x-upsert: true`: a signed upload token can target the same path more than once on
+ * retry; without it Storage answers 409 on the second attempt instead of overwriting.
  */
 function uploadWithProgress(
   url: string,
@@ -101,78 +96,15 @@ function uploadWithProgress(
   onProgress?: (progress: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new Error('Upload cancelled'));
-      return;
-    }
-    const xhr = new XMLHttpRequest();
-    let isCompleted = false;
-
-    // One `AbortController` detaches every listener at once, instead of a
-    // remove-list that named each handler. That list had to stay in lockstep
-    // with the add-list 40 lines below by hand — drift there leaks a listener
-    // on a completed upload — and naming the handlers here meant `cleanup`
-    // referenced six functions declared after it, in a cycle (they each call
-    // `cleanup`) that no reordering could untangle.
-    const listeners = new AbortController();
-    const cleanup = () => {
-      if (isCompleted) return;
-      isCompleted = true;
-      listeners.abort();
-      if (xhr.readyState !== XMLHttpRequest.DONE) xhr.abort();
-    };
-
-    const handleProgress = (event: ProgressEvent) => {
-      if (event.lengthComputable && onProgress) {
-        // Map 0-100 of network progress to 10-95.
-        const pct = 10 + (event.loaded / event.total) * 85;
-        onProgress(Math.round(pct));
-      }
-    };
-
-    const handleLoad = () => {
-      cleanup();
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-      } else {
-        reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText || xhr.statusText}`));
-      }
-    };
-
-    const handleError = () => {
-      cleanup();
-      reject(new Error('Network error during upload'));
-    };
-    const handleAbort = () => {
-      cleanup();
-      reject(new Error('Upload cancelled'));
-    };
-    const handleTimeout = () => {
-      cleanup();
-      reject(new Error('Upload timed out'));
-    };
-    const handleSignalAbort = () => {
-      xhr.abort();
-    };
-    signal?.addEventListener('abort', handleSignalAbort, { once: true, signal: listeners.signal });
-
-    xhr.upload.addEventListener('progress', handleProgress, { signal: listeners.signal });
-    xhr.addEventListener('load', handleLoad, { signal: listeners.signal });
-    xhr.addEventListener('error', handleError, { signal: listeners.signal });
-    xhr.addEventListener('abort', handleAbort, { signal: listeners.signal });
-    xhr.addEventListener('timeout', handleTimeout, { signal: listeners.signal });
-
-    xhr.open('PUT', url);
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    // `x-upsert: true` — signed upload tokens can target the same path
-    // more than once on retry; without this header, Storage returns 409
-    // on the second attempt instead of overwriting.
-    xhr.setRequestHeader('x-upsert', 'true');
-    xhr.setRequestHeader('Content-Type', file.type);
-    xhr.setRequestHeader('cache-control', STORAGE_CACHE_CONTROL_IMMUTABLE);
-    xhr.timeout = 30 * 60 * 1000;
-    xhr.send(file);
+  return putFileWithProgress(url, file, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'x-upsert': 'true',
+      'Content-Type': file.type,
+      'cache-control': STORAGE_CACHE_CONTROL_IMMUTABLE,
+    },
+    onProgress: onProgress ? fraction => onProgress(Math.round(10 + fraction * 85)) : undefined,
+    signal,
   });
 }
 
