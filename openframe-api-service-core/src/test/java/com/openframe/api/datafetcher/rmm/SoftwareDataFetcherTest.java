@@ -9,8 +9,10 @@ import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilters;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
+import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.service.rmm.software.SoftwareAutoUpdateService;
@@ -45,6 +47,11 @@ class SoftwareDataFetcherTest {
     private static final String ACTING_USER_ID = "user-1";
     private static final String SOFTWARE_ID = "42";
     private static final String RAW_BUNDLE_ID = "bundle-1";
+    private static final String MACHINE_ID = "machine-1";
+    private static final int PAGE_SIZE = 20;
+    private static final String AFTER_PAGE_FIVE = PageCursors.encodePage(5);
+    private static final String BEFORE_PAGE_TWO = PageCursors.encodePage(2);
+    private static final String PAGE_ONE = PageCursors.encodePage(1);
 
     @Mock private SoftwareInventoryService softwareInventoryService;
     @Mock private SoftwareAutoUpdateService softwareAutoUpdateService;
@@ -85,6 +92,74 @@ class SoftwareDataFetcherTest {
 
         // verifications
         assertThat(result.getEdges()).extracting(GenericEdge::getNode).containsExactly(node);
+    }
+
+    @Test
+    void softwares_afterAndBefore_thePageBeforeTheBeforeCursor() {
+        // setup
+        SoftwareResponse node = SoftwareResponse.builder().id(SOFTWARE_ID).build();
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(node), true, true, 60, 1);
+        when(softwareInventoryService.listSoftware(null, 1, PAGE_SIZE, null, null, null)).thenReturn(page);
+
+        // execution
+        CountedGenericConnection<GenericEdge<SoftwareResponse>> result =
+                dataFetcher.softwares(null, null, AFTER_PAGE_FIVE, PAGE_SIZE, BEFORE_PAGE_TWO, null, null);
+
+        // verifications
+        assertThat(result.getEdges()).extracting(GenericEdge::getNode).containsExactly(node);
+        assertThat(result.getPageInfo().getStartCursor()).isEqualTo(PAGE_ONE);
+    }
+
+    @Test
+    void deviceSoftware_afterAndBefore_thePageBeforeTheBeforeCursor() {
+        // setup
+        SoftwareResponse node = SoftwareResponse.builder().id(SOFTWARE_ID).build();
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(node), true, true, 60, 1);
+        when(softwareInventoryService.listSoftwareForDevice(MACHINE_ID, null, null, 1, PAGE_SIZE, null))
+                .thenReturn(page);
+
+        // execution
+        CountedGenericConnection<GenericEdge<SoftwareResponse>> result = dataFetcher.deviceSoftware(
+                MACHINE_ID, null, null, AFTER_PAGE_FIVE, PAGE_SIZE, BEFORE_PAGE_TWO, null, null);
+
+        // verifications
+        assertThat(result.getEdges()).extracting(GenericEdge::getNode).containsExactly(node);
+        assertThat(result.getPageInfo().getStartCursor()).isEqualTo(PAGE_ONE);
+    }
+
+    @Test
+    void softwareDevices_afterAndBefore_thePageBeforeTheBeforeCursor() {
+        // setup
+        SoftwareOnDeviceResponse node = SoftwareOnDeviceResponse.builder().softwareVersion("1.7").build();
+        PageResult<SoftwareOnDeviceResponse> page = new PageResult<>(List.of(node), true, true, 60, 1);
+        when(softwareInventoryService.listDevicesForSoftware(SOFTWARE_ID, null, null, 1, PAGE_SIZE, null))
+                .thenReturn(page);
+
+        // execution
+        CountedGenericConnection<GenericEdge<SoftwareOnDeviceResponse>> result = dataFetcher.softwareDevices(
+                SOFTWARE_ID, null, null, AFTER_PAGE_FIVE, PAGE_SIZE, BEFORE_PAGE_TWO, null, null);
+
+        // verifications
+        assertThat(result.getEdges()).extracting(GenericEdge::getNode).containsExactly(node);
+        assertThat(result.getPageInfo().getStartCursor()).isEqualTo(PAGE_ONE);
+    }
+
+    @Test
+    void softwareVulnerabilities_afterAndBefore_thePageBeforeTheBeforeCursor() {
+        // setup
+        SoftwareVulnerabilityResponse node = new SoftwareVulnerabilityResponse();
+        PageResult<SoftwareVulnerabilityResponse> page = new PageResult<>(List.of(node), true, true, 60, 1);
+        when(softwareInventoryService.listVulnerabilitiesForSoftware(SOFTWARE_ID, null, null, 1, PAGE_SIZE, null, false))
+                .thenReturn(page);
+
+        // execution
+        CountedGenericConnection<GenericEdge<SoftwareVulnerabilityResponse>> result =
+                dataFetcher.softwareVulnerabilities(
+                        SOFTWARE_ID, null, null, AFTER_PAGE_FIVE, PAGE_SIZE, BEFORE_PAGE_TWO, null, null);
+
+        // verifications
+        assertThat(result.getEdges()).extracting(GenericEdge::getNode).containsExactly(node);
+        assertThat(result.getPageInfo().getStartCursor()).isEqualTo(PAGE_ONE);
     }
 
     @Test

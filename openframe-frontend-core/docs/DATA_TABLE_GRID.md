@@ -115,7 +115,14 @@ its own card (the tabs and the search row) around the table; "Add All Devices" o
 table in `DataTable.Meta`. Its Device column (which cannot be hidden) is pinned by the shared rule, like every other
 grid table's first column: it scrolls away in a narrow content column, on a tablet and on a phone, while the add /
 remove column stays pinned right, so the button's tooltip names the device ("Add <device>", then the reason when it
-cannot be added).
+cannot be added). A touch screen opens no tooltip and a tap would apply at once, so a finger confirms: the first tap on
+the button shows its tooltip and applies nothing, a second tap on the same button applies (a second tap within 350 ms of
+the first is a double tap's ghost and is ignored). One button is armed at a time; a tap outside, Escape, a tab switch, a
+search, filter or page change, "Add All" / "Remove N", a criteria change or the row leaving the list clears it without
+applying. While armed, the button's `aria-describedby` names the bubble and a polite live region says "Tap again to add
+<device>". A mouse, a pen and the keyboard apply at once; a disabled row's tap shows the reason. The bubble is
+`FloatingTooltip` with `open` / `onOpenChange` controlled by the picker and `mouseOnly` hover, so a tap's compatibility
+`mouseenter` does not open it on its own.
 
 `PoliciesTable` and `LogsTableView` are ready too. Both put a card row's two lines on one with
 `GridTextWithDetailCell` (`features/feature-table-grid-cells.tsx`): the subject (a policy's name, a log's time, a

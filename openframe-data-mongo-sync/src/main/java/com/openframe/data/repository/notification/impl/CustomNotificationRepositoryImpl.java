@@ -1,5 +1,6 @@
 package com.openframe.data.repository.notification.impl;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationEntityType;
@@ -182,6 +183,9 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
     private static void applyCursor(Criteria criteria, String cursor, Sort.Direction effectiveDirection) {
         if (isBlank(cursor)) {
             return;
+        }
+        if (!ObjectId.isValid(cursor)) {
+            throw new InvalidCursorException();
         }
         if (effectiveDirection == Sort.Direction.DESC) {
             criteria.and(FIELD_NOTIFICATION_ID).lt(cursor);
