@@ -201,6 +201,28 @@ class GcsPresignedUrlServiceReadTest {
     }
 
     @Test
+    void signsPreviewsWithInlineDispositionAndExplicitContentType() throws Exception {
+        // setup
+        var previewUrl = URI.create("https://storage.example/preview").toURL();
+        when(storage.signUrl(any(BlobInfo.class), eq(15L), eq(TimeUnit.MINUTES),
+                any(Storage.SignUrlOption[].class))).thenReturn(previewUrl);
+
+        // execution
+        String result = service.generatePreviewUrl("ready/file", Duration.ofMinutes(15),
+                "agent log*.csv", "text/plain; charset=utf-8");
+
+        // verifications
+        assertThat(result).isEqualTo(previewUrl.toString());
+        verify(storage).signUrl(blobInfoCaptor.capture(), eq(15L), eq(TimeUnit.MINUTES),
+                signOptionsCaptor.capture());
+        assertThat(blobInfoCaptor.getValue().getName()).isEqualTo("tenant/ready/file");
+        assertThat(signOptionsCaptor.getValue()).usingRecursiveFieldByFieldElementComparator().contains(
+                Storage.SignUrlOption.withQueryParams(Map.of(
+                        "response-content-disposition", "inline; filename*=UTF-8''agent%20log%2A.csv",
+                        "response-content-type", "text/plain; charset=utf-8")));
+    }
+
+    @Test
     void acceptsRetryOnlyWhenImmutableBytesMatch() {
         // setup
         byte[] content = "sample".getBytes(UTF_8);

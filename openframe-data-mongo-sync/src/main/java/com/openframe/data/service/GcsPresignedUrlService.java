@@ -35,6 +35,10 @@ public class GcsPresignedUrlService {
 
     public static final String CONTENT_LENGTH_RANGE_HEADER = "x-goog-content-length-range";
     public static final String CUSTOM_TIME_HEADER = "x-goog-custom-time";
+    private static final String INLINE_DISPOSITION = "inline";
+    private static final String ATTACHMENT_DISPOSITION = "attachment";
+    private static final String RESPONSE_CONTENT_DISPOSITION = "response-content-disposition";
+    private static final String RESPONSE_CONTENT_TYPE = "response-content-type";
 
     private final Storage storage;
     private final String bucketName;
@@ -126,10 +130,19 @@ public class GcsPresignedUrlService {
     }
 
     public String generateDownloadUrl(String path, Duration expiration, String fileName, String contentType) {
-        String encodedName = URLEncoder.encode(fileName, UTF_8).replace("+", "%20");
+        return generateReadUrl(path, expiration, fileName, contentType, ATTACHMENT_DISPOSITION);
+    }
+
+    public String generatePreviewUrl(String path, Duration expiration, String fileName, String contentType) {
+        return generateReadUrl(path, expiration, fileName, contentType, INLINE_DISPOSITION);
+    }
+
+    private String generateReadUrl(String path, Duration expiration, String fileName, String contentType,
+                                   String disposition) {
+        String encodedName = URLEncoder.encode(fileName, UTF_8).replace("+", "%20").replace("*", "%2A");
         Map<String, String> responseHeaders = Map.of(
-                "response-content-disposition", "attachment; filename*=UTF-8''" + encodedName,
-                "response-content-type", contentType);
+                RESPONSE_CONTENT_DISPOSITION, disposition + "; filename*=UTF-8''" + encodedName,
+                RESPONSE_CONTENT_TYPE, contentType);
         return storage.signUrl(BlobInfo.newBuilder(bucketName, withPrefix(path)).build(),
                 expiration.toMinutes(), TimeUnit.MINUTES,
                 Storage.SignUrlOption.httpMethod(HttpMethod.GET),
