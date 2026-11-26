@@ -9,16 +9,16 @@ import java.time.LocalDate;
 @Builder
 public class OsVersionResponse {
 
-    String osVersion;
+    private String osVersion;
     int deviceCount;
     // Null = no latest security build is stored for the version.
-    Integer devicesBehindCount;
-    String currentBuild;
+    private Integer devicesBehindCount;
+    private String currentBuild;
     // Home and Pro editions.
-    LocalDate endOfSupportAt;
-    Boolean supportEnded;
+    private LocalDate endOfSupportAt;
+    private Boolean supportEnded;
     // Enterprise and Education editions.
-    LocalDate enterpriseEndOfSupportAt;
-    Boolean enterpriseSupportEnded;
-    String cursor;
+    private LocalDate enterpriseEndOfSupportAt;
+    private Boolean enterpriseSupportEnded;
+    private String cursor;
 }

@@ -9,8 +9,8 @@ import lombok.Value;
 public class MsrcWindowsBuild {
 
     // Of the latest cumulative security update.
-    String latestBuild;
+    private String latestBuild;
     // Of the hotpatch that fixes the same vulnerabilities as latestBuild without a restart. Null = the latest
     // cumulative update has no hotpatch: a baseline month, or a version without hotpatching.
-    String hotpatchBuild;
+    private String hotpatchBuild;
 }

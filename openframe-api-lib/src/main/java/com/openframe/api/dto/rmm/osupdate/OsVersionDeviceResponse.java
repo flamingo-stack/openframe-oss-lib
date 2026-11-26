@@ -9,13 +9,13 @@ import java.time.LocalDate;
 @Builder
 public class OsVersionDeviceResponse {
 
-    String machineId;
-    String osBuild;
-    String osProductName;
+    private String machineId;
+    private String osBuild;
+    private String osProductName;
     // Null = no latest security build is stored for the version, or the device reported no build.
-    Boolean upToDate;
+    private Boolean upToDate;
     // Of the edition group of the device.
-    LocalDate endOfSupportAt;
-    Boolean supportEnded;
-    String cursor;
+    private LocalDate endOfSupportAt;
+    private Boolean supportEnded;
+    private String cursor;
 }

@@ -10,7 +10,7 @@ import java.util.Map;
 @Builder
 public class MsrcCvrfBulletin {
 
-    Map<String, MsrcKbArticle> kbArticles;
+    private Map<String, MsrcKbArticle> kbArticles;
     // By the Windows version as the agent reports it: "11 24H2".
-    Map<String, MsrcWindowsBuild> windowsBuilds;
+    private Map<String, MsrcWindowsBuild> windowsBuilds;
 }

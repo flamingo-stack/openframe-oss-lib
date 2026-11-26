@@ -9,8 +9,8 @@ import java.time.LocalDate;
 @Builder
 public class WindowsRelease {
 
-    String cycle;
-    String releaseLabel;
-    String latestBuild;
-    LocalDate endOfSupportAt;
+    private String cycle;
+    private String releaseLabel;
+    private String latestBuild;
+    private LocalDate endOfSupportAt;
 }
