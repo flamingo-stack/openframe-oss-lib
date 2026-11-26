@@ -2,6 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
 import com.openframe.data.repository.ticket.TicketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+
+import static org.springframework.util.StringUtils.hasText;
 
 // TODO: Expand with full cursor pagination/sort methods when PSA migrates from ai-agent to OSS
 @Service
@@ -36,7 +39,10 @@ public class TicketQueryService {
     // beginning. The page order is (createdAt desc, _id desc), so that id alone resumes it.
     public List<Ticket> searchTickets(TicketQueryFilter filter, String search, String afterTicketId, int limit) {
         Query query = ticketRepository.buildTicketQuery(filter, search, null, null);
+        CursorPosition position = hasText(afterTicketId)
+                ? new CursorPosition.RowId(afterTicketId)
+                : new CursorPosition.None();
         return ticketRepository.findTicketsWithCursor(
-                query, afterTicketId, limit, SORT_FIELD_CREATED_AT, SORT_DIRECTION_DESC);
+                query, position, false, limit, SORT_FIELD_CREATED_AT, SORT_DIRECTION_DESC);
     }
 }

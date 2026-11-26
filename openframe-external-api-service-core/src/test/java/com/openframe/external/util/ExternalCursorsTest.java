@@ -3,10 +3,12 @@ package com.openframe.external.util;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 
 import java.nio.charset.StandardCharsets;
@@ -39,6 +41,15 @@ class ExternalCursorsTest {
         String raw = "2024-01-02T03:04:05.678Z_ticket/1?x=y";
 
         assertEquals(raw, ExternalCursors.decodeBase64(CursorCodec.encode(raw)));
+    }
+
+    @Test
+    void keysetCursorIssuedByAListDecodesToThePayloadThatParsesBackToTheSamePosition() {
+        KeysetCursor issued = KeysetCursor.ofString("hostname", Sort.Direction.ASC, "Acme|Host / 01", TICKET_ID);
+
+        String decoded = ExternalCursors.decodeBase64(issued.encode());
+
+        assertEquals(issued, KeysetCursor.parseDecoded(decoded));
     }
 
     @Test

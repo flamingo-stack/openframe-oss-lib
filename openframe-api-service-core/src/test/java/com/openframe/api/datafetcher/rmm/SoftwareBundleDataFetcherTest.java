@@ -4,17 +4,22 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dto.AvailableDeviceEdge;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.api.service.rmm.software.SoftwareInventoryService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -26,6 +31,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -39,6 +45,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,6 +60,12 @@ class SoftwareBundleDataFetcherTest {
     private static final int PAGE_SIZE = 20;
     private static final List<PackageManagerType> ENABLED_MANAGERS = List.of(PackageManagerType.BREW);
     private static final Set<String> ASSIGNED_MACHINE_IDS = Set.of(ASSIGNED_MACHINE_ID);
+    private static final int LAST = 5;
+    private static final String ROW_ID = "65f1a2b3c4d5e6f708192a3b";
+    private static final String ASSIGNED_ROW = "65f1a2b3c4d5e6f708192a01";
+    private static final String OTHER_ROW = "65f1a2b3c4d5e6f708192a02";
+    private static final SortInput BY_HOSTNAME = SortInput.builder()
+            .field("hostname").direction(SortDirection.DESC).build();
 
     @Mock private SoftwareBundleService softwareBundleService;
     @Mock private SoftwareInventoryService softwareInventoryService;
@@ -87,6 +100,62 @@ class SoftwareBundleDataFetcherTest {
     @AfterEach
     void signOut() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void assignedDevices_lastAndBefore_theAssignedDeviceQueryGetsTheBackwardPage() {
+        // setup
+        KeysetCursor cursor = KeysetCursor.ofString("hostname", Sort.Direction.DESC, "host-c", ROW_ID);
+        String before = cursor.encode();
+        ConnectionArgs lastBefore = ConnectionArgs.builder().last(LAST).before(before).build();
+        CursorPaginationCriteria backwardPage = CursorPaginationCriteria.fromConnectionArgs(lastBefore);
+        DeviceFilterCriteria noFilter = deviceMapper.toDeviceFilterCriteria(null);
+        List<String> assigned = List.of(ASSIGNED_MACHINE_ID);
+        CountedGenericQueryResult<Machine> page = page(machine(ASSIGNED_MACHINE_ID));
+        when(dfe.getSource()).thenReturn(bundle);
+        when(deviceService.queryAssignedDevices(assigned, noFilter, backwardPage, SEARCH, BY_HOSTNAME)).thenReturn(page);
+
+        // execution
+        CountedGenericConnection<GenericEdge<Machine>> result =
+                dataFetcher.assignedDevices(dfe, null, PAGE_SIZE, null, LAST, before, SEARCH, BY_HOSTNAME);
+
+        // verifications
+        assertThat(result.getEdges()).extracting(edge -> edge.getNode().getMachineId()).containsExactly(ASSIGNED_MACHINE_ID);
+        assertThat(backwardPage)
+                .returns(true, CursorPaginationCriteria::isBackward)
+                .returns(LAST, CursorPaginationCriteria::getLimit);
+        assertThat(KeysetCursor.parseDecoded(backwardPage.getCursor())).isEqualTo(cursor);
+    }
+
+    @Test
+    void availableDevices_lastAndBeforeWithASort_thePickerQueryGetsTheBackwardPageAndTheSortIsLeftOut() {
+        // setup
+        stubPicker();
+        KeysetCursor cursor = new KeysetCursor("bucket", Sort.Direction.ASC, "2", ROW_ID);
+        String before = cursor.encode();
+        ConnectionArgs lastBefore = ConnectionArgs.builder().last(LAST).before(before).build();
+        CursorPaginationCriteria backwardPage = CursorPaginationCriteria.fromConnectionArgs(lastBefore);
+        String startCursor = new KeysetCursor("bucket", Sort.Direction.ASC, "0", ASSIGNED_ROW).encode();
+        String endCursor = new KeysetCursor("bucket", Sort.Direction.ASC, "1", OTHER_ROW).encode();
+        CountedGenericQueryResult<Machine> page = pickerPage(startCursor, endCursor);
+        when(deviceService.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, manageableDevices, backwardPage,
+                SEARCH)).thenReturn(page);
+
+        // execution
+        CountedGenericConnection<AvailableDeviceEdge> result =
+                dataFetcher.availableDevices(dfe, null, PAGE_SIZE, null, LAST, before, SEARCH, BY_HOSTNAME, null);
+
+        // verifications
+        assertThat(result.getPageInfo())
+                .returns(startCursor, PageInfo::getStartCursor)
+                .returns(endCursor, PageInfo::getEndCursor)
+                .returns(true, PageInfo::isHasNextPage)
+                .returns(false, PageInfo::isHasPreviousPage);
+        assertThat(backwardPage.isBackward()).isTrue();
+        assertThat(KeysetCursor.parseDecoded(backwardPage.getCursor())).isEqualTo(cursor);
+        verify(deviceService).queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, manageableDevices,
+                backwardPage, SEARCH);
+        verifyNoMoreInteractions(deviceService);
     }
 
     @Test
@@ -299,6 +368,20 @@ class SoftwareBundleDataFetcherTest {
         return CountedGenericQueryResult.<Machine>builder()
                 .items(List.of(machines))
                 .filteredCount(machines.length)
+                .build();
+    }
+
+    private static CountedGenericQueryResult<Machine> pickerPage(String startCursor, String endCursor) {
+        Machine assigned = machine(ASSIGNED_MACHINE_ID);
+        assigned.setId(ASSIGNED_ROW);
+        Machine other = machine(OTHER_MACHINE_ID);
+        other.setId(OTHER_ROW);
+        PageInfo pageInfo = PageInfo.builder().hasNextPage(true).hasPreviousPage(false)
+                .startCursor(startCursor).endCursor(endCursor).build();
+        return CountedGenericQueryResult.<Machine>builder()
+                .items(List.of(assigned, other))
+                .pageInfo(pageInfo)
+                .filteredCount(2)
                 .build();
     }
 
