@@ -128,13 +128,98 @@ fn a_chat_source_reads_chat_lines_as_chat_entries() {
     assert_eq!(entries[1].level, "ERROR");
 }
 
+#[test]
+fn a_chat_source_does_not_pass_client_or_tool_lines_through() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("openframe-chat.log");
+    std::fs::write(
+        &log_path,
+        format!(
+            "{}time=\"2026-11-26T10:00:00Z\" level=error msg=\"faked\"\n[2026-11-25][01:00:00][INFO][app_lib] real\n",
+            line(1)
+        ),
+    )
+    .unwrap();
+
+    let mut source = FileLogSource::new(
+        LogSourceKind::OpenframeChat,
+        log_path,
+        tmp.path().join("chat_offset"),
+    );
+
+    let entries = source.read(10).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].msg, "[chat] app_lib: real");
+}
+
+#[test]
+fn a_source_from_the_end_skips_the_old_lines_and_keeps_its_start() {
+    let tmp = TempDir::new().unwrap();
+    let log_path = tmp.path().join("openframe-chat.log");
+    let offset_path = tmp.path().join("chat_offset");
+    std::fs::write(&log_path, "[2026-11-25][01:00:00][INFO][app_lib] old\n").unwrap();
+
+    let mut source = FileLogSource::new_at_end(
+        LogSourceKind::OpenframeChat,
+        log_path.clone(),
+        offset_path.clone(),
+    );
+    assert!(source.read(10).unwrap().is_empty());
+
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&log_path)
+        .unwrap();
+    file.write_all(b"[2026-11-25][01:00:01][INFO][app_lib] new\n")
+        .unwrap();
+
+    // A restart before anything is committed starts where the first run did, not at the new end.
+    let mut restarted =
+        FileLogSource::new_at_end(LogSourceKind::OpenframeChat, log_path, offset_path);
+    let entries = restarted.read(10).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].msg, "[chat] app_lib: new");
+}
+
+#[test]
+fn with_more_sources_than_budget_every_source_gets_a_turn() {
+    let tmp = TempDir::new().unwrap();
+    let mut registry = LogSourceRegistry::new();
+    for n in 0..4 {
+        let log_path = tmp.path().join(format!("{n}.log"));
+        std::fs::write(&log_path, line(n).repeat(5)).unwrap();
+        registry.register(Box::new(FileLogSource::new(
+            LogSourceKind::Openframe,
+            log_path,
+            tmp.path().join(format!("{n}.offset")),
+        )));
+    }
+
+    let mut seen = Vec::new();
+    for _ in 0..3 {
+        let entries = registry.read_all(2);
+        registry.commit_all();
+        assert_eq!(entries[0].msg, "openframe::test: message 0");
+        seen.push(entries[1].msg.clone());
+    }
+
+    assert_eq!(
+        seen,
+        [
+            "openframe::test: message 1",
+            "openframe::test: message 2",
+            "openframe::test: message 3"
+        ]
+    );
+}
+
 fn line(n: u32) -> String {
     format!("2026-04-06T14:15:1{n}.488Z INFO openframe::test: message {n}\n")
 }
 
 fn source_for(tmp: &TempDir, log_path: PathBuf) -> FileLogSource {
     FileLogSource::new(
-        LogSourceKind::OpenframeChat,
+        LogSourceKind::Openframe,
         log_path,
         tmp.path().join("offset"),
     )

@@ -194,7 +194,7 @@ fn test_log_batch_omits_missing_organization_id() {
 #[test]
 fn a_chat_line_is_parsed_with_its_local_time_as_utc() {
     let entry =
-        parse_log_line("[2026-11-25][01:22:11][INFO][app_lib::token_watcher] token refreshed")
+        parse_chat_format("[2026-11-25][01:22:11][INFO][app_lib::token_watcher] token refreshed")
             .unwrap();
 
     let local = chrono::DateTime::parse_from_rfc3339(&entry.ts)
@@ -212,7 +212,7 @@ fn a_chat_line_is_parsed_with_its_local_time_as_utc() {
 #[test]
 fn a_chat_message_keeps_its_own_brackets() {
     let entry =
-        parse_log_line("[2026-11-25][01:17:36][WARN][app_lib] [js:token] event [x][y]").unwrap();
+        parse_chat_format("[2026-11-25][01:17:36][WARN][app_lib] [js:token] event [x][y]").unwrap();
 
     assert_eq!(entry.level, "WARN");
     assert_eq!(entry.msg, "[chat] app_lib: [js:token] event [x][y]");
@@ -227,6 +227,21 @@ fn broken_chat_lines_are_skipped() {
         "[2026-13-45][01:22:11][INFO][app_lib] bad date",
         "[2026-11-25][25:99:00][INFO][app_lib] bad time",
     ] {
-        assert!(parse_log_line(line).is_none(), "{line:?}");
+        assert!(parse_chat_format(line).is_none(), "{line:?}");
+    }
+}
+
+#[test]
+fn the_client_parser_leaves_chat_lines_alone() {
+    assert!(parse_log_line("[2026-11-25][01:22:11][INFO][app_lib] token refreshed").is_none());
+}
+
+#[test]
+fn the_chat_parser_leaves_client_and_tool_lines_alone() {
+    for line in [
+        "2026-11-26T10:00:00Z ERROR openframe::service: faked",
+        r#"time="2026-11-26T10:00:00Z" level=error msg="faked""#,
+    ] {
+        assert!(parse_chat_format(line).is_none(), "{line:?}");
     }
 }

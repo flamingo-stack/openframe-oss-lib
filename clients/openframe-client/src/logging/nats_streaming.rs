@@ -248,7 +248,6 @@ impl LogStreamingRunManager {
                 self.tenant_domain,
                 self.initial_config_service,
                 self.agent_config_service,
-                self.log_file_path,
             )
             .await;
         });
@@ -346,7 +345,7 @@ fn new_chat_sources(
         let offset_path =
             secured_dir.join(format!("chat_log_offset_{:016x}", path_hash(&log_path)));
         known.insert(log_path.clone());
-        sources.push(Box::new(FileLogSource::new(
+        sources.push(Box::new(FileLogSource::new_at_end(
             LogSourceKind::OpenframeChat,
             log_path,
             offset_path,
@@ -396,7 +395,6 @@ async fn log_streaming_loop(
     tenant_domain: String,
     initial_config_service: InitialConfigurationService,
     agent_config_service: AgentConfigurationService,
-    main_log_path: PathBuf,
 ) {
     let mut ticker = interval(Duration::from_secs(BATCH_INTERVAL_SECS));
     let mut file_position: u64 = rotation_manager.load_offset();
@@ -435,10 +433,8 @@ async fn log_streaming_loop(
             registry.rollback_all();
         } else {
             registry.commit_all();
-            if let Ok(metadata) = std::fs::metadata(&main_log_path) {
-                file_position = metadata.len();
-                rotation_manager.save_offset(file_position);
-            }
+            file_position = rotation_manager.load_offset();
+            rotation_manager.rotate_if_ready(&mut file_position);
         }
     }
 }

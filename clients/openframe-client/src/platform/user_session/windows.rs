@@ -55,7 +55,7 @@ pub(crate) fn session_user(session: Option<u32>) -> Option<String> {
 
 const PROFILE_LIST: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList";
 
-/// Home folders of the local and domain user accounts (`S-1-5-21-*`) in the registry profile list.
+/// Home folders of the local, domain (`S-1-5-21-*`) and Entra ID (`S-1-12-1-*`) user accounts in the registry profile list.
 pub(crate) fn user_homes() -> Vec<PathBuf> {
     homes_in(&RegKey::predef(HKEY_LOCAL_MACHINE), PROFILE_LIST)
 }
@@ -66,7 +66,7 @@ fn homes_in(root: &RegKey, key_path: &str) -> Vec<PathBuf> {
     };
     list.enum_keys()
         .flatten()
-        .filter(|sid| sid.starts_with("S-1-5-21-"))
+        .filter(|sid| sid.starts_with("S-1-5-21-") || sid.starts_with("S-1-12-1-"))
         .filter_map(|sid| {
             let home: String = list
                 .open_subkey(&sid)

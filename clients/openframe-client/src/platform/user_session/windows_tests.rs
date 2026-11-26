@@ -48,10 +48,19 @@ fn homes_are_the_user_accounts_with_a_profile_path() {
         )
         .unwrap();
     list.create_subkey("S-1-5-21-1-2-3-1002").unwrap();
+    let (bob, _) = list.create_subkey("S-1-12-1-1-2-3-4").unwrap();
+    bob.set_value("ProfileImagePath", &r"C:\Users\bob").unwrap();
 
-    let homes = homes_in(&hkcu, &key_path);
+    let mut homes = homes_in(&hkcu, &key_path);
     hkcu.delete_subkey_all(&key_path).unwrap();
+    homes.sort();
 
-    assert_eq!(homes, [PathBuf::from(r"C:\Users\alice")]);
+    assert_eq!(
+        homes,
+        [
+            PathBuf::from(r"C:\Users\alice"),
+            PathBuf::from(r"C:\Users\bob")
+        ]
+    );
     assert!(homes_in(&hkcu, &key_path).is_empty());
 }

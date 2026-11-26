@@ -215,6 +215,7 @@ fn parse_json<T: DeserializeOwned>(path: &Path, bytes: &[u8]) -> Result<T, Corru
 
 /// Opens a file for reading only when it is a regular file reached without a symlink and,
 /// on unix, with no other hard link, so a user-writable path cannot point the service elsewhere.
+/// On Windows the hard-link count is not checked (std has no stable way to read it).
 pub(crate) fn open_regular_file(path: &Path) -> std::io::Result<std::fs::File> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
