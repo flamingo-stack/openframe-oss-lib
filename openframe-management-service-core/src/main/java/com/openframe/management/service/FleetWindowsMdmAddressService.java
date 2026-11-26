@@ -35,8 +35,8 @@ public class FleetWindowsMdmAddressService {
     private final AtomicReference<String> written = new AtomicReference<>();
 
     public void syncIfNeeded(IntegratedTool tool) {
-        Optional<String> token = apiTokenOf(tool);
-        if (token.isEmpty()) {
+        String apiToken = apiTokenOf(tool).orElse(null);
+        if (apiToken == null) {
             log.debug("Fleet API token not set up yet; Fleet's Windows MDM address waits for it");
             return;
         }
@@ -45,21 +45,28 @@ public class FleetWindowsMdmAddressService {
             return;
         }
         String tenantId = tenantIdProvider.getTenantId();
-        Optional<String> domain = tenantRepository.findById(tenantId)
+        String address = tenantRepository.findById(tenantId)
                 .map(Tenant::getDomain)
-                .filter(StringUtils::hasText);
-        if (domain.isEmpty()) {
+                .filter(StringUtils::hasText)
+                .map(FleetWindowsMdmAddressService::addressOf)
+                .orElse(null);
+        if (address == null) {
             log.warn("Tenant {} has no domain yet; Fleet's Windows MDM address is not set", tenantId);
             return;
         }
-
-        String address = "https://" + domain.get().trim().toLowerCase(Locale.ROOT) + MDM_PATH;
         if (address.equals(written.get())) {
             return;
         }
-        newClient(FleetApiKeyResolver.apiUrlOf(tool), token.get(), tenantId).setWindowsMdmServerUrl(address);
+
+        String apiUrl = FleetApiKeyResolver.apiUrlOf(tool);
+        FleetMdmClient client = newClient(apiUrl, apiToken, tenantId);
+        client.setWindowsMdmServerUrl(address);
         written.set(address);
         log.info("Fleet Windows MDM address set to {}", address);
+    }
+
+    static String addressOf(String domain) {
+        return "https://" + domain.trim().toLowerCase(Locale.ROOT) + MDM_PATH;
     }
 
     FleetMdmClient newClient(String apiUrl, String apiToken, String tenantId) {

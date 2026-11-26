@@ -139,6 +139,21 @@ class FleetWindowsMdmAddressServiceTest {
         verify(fleetClient, never()).setWindowsMdmServerUrl(any());
     }
 
+    @Test
+    void newClient_buildsARealFleetClient() {
+        // setup
+        FleetWindowsMdmAddressService real = new FleetWindowsMdmAddressService(tenantIdProvider, tenantRepository);
+
+        // execution / verifications
+        assertThat(real.newClient(FLEET_API_URL, "token-1", TENANT_ID)).isNotNull().isNotSameAs(fleetClient);
+    }
+
+    @Test
+    void addressOf_lowercasesAndTrimsTheDomain() {
+        // execution / verifications
+        assertThat(FleetWindowsMdmAddressService.addressOf(" Acme.OpenFrame.ai ")).isEqualTo("https://acme.openframe.ai/mdm");
+    }
+
     private static Tenant tenant(String domain) {
         Tenant tenant = new Tenant();
         tenant.setId(TENANT_ID);
