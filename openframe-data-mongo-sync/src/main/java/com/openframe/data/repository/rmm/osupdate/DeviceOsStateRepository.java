@@ -26,6 +26,12 @@ public interface DeviceOsStateRepository
     List<DeviceOsState> findByTenantIdAndManageabilityState(String tenantId,
                                                             OsUpdateManageabilityState manageabilityState);
 
+    @Query(value = "{ 'tenantId': ?0, 'platform': ?1, 'machineId': { $gt: ?2 } }", sort = "{ 'machineId': 1 }")
+    List<DeviceOsState> findDevicePage(String tenantId, OsPlatform platform, String afterMachineId, Limit limit);
+
+    List<DeviceOsState> findByTenantIdAndPlatformAndMachineIdIn(String tenantId, OsPlatform platform,
+                                                                Collection<String> machineIds);
+
     @Query(value = "{ 'tenantId': ?0, 'platform': ?1, 'osVersion': ?2, 'machineId': { $gt: ?3 } }",
             sort = "{ 'machineId': 1 }")
     List<DeviceOsState> findOsVersionDevicePage(String tenantId, OsPlatform platform, String osVersion,
