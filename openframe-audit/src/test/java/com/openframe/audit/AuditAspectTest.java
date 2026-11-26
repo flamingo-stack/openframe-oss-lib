@@ -130,7 +130,7 @@ class AuditAspectTest {
     void capture_noCondition_recordsEveryResult() {
         proxied(TicketEndpoints.class).archive("ticket-1");
 
-        assertThat(capturedCall().recordsResult().test("archived ticket-1")).isTrue();
+        assertThat(capturedCall().storeIf().test("archived ticket-1")).isTrue();
     }
 
     private <T> T proxied(Class<T> type) {

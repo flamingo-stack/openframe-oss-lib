@@ -1,6 +1,8 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.InternalException;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
@@ -23,6 +25,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,7 +55,7 @@ class TicketLifecycleServiceSystemStatusTest {
     void setUp() {
         service = new TicketLifecycleService(ticketRepository, statusRepository, transitionPolicy,
                 tenantIdProvider, ticketTagService, ticketIdsForFilter, ticketResolverStamp,
-                historyService, List.of(listener));
+                historyService, List.of(listener), mock(AuditedMethodRunner.class), mock(AuditRecorder.class));
         ticket = new Ticket();
         techRequired = definition(TECH_REQUIRED_ID, TicketStatusKind.TECH_REQUIRED);
     }

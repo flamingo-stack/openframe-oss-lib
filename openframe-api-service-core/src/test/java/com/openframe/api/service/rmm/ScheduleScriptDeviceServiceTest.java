@@ -552,19 +552,16 @@ class ScheduleScriptDeviceServiceTest {
     }
 
     @Test
-    void removeAssignedDevices_returnsCommittedDeleteCount() {
-        // setup
+    void removeDevices_someIdsNotAssigned_returnsOnlyTheRemovedOnes() {
         when(scheduleRepository.markSpecificAssignmentChange(TENANT_ID, SCHEDULE_ID, ScriptStatus.DELETED, ScheduleDeviceSelectionMode.CRITERIA)).thenReturn(1L);
-        when(assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(
-                TENANT_ID, SCHEDULE_ID, Set.of("m-1", "m-absent"))).thenReturn(1L, 0L);
+        when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT_ID, SCHEDULE_ID))
+                .thenReturn(List.of(pair("m-1")), List.of());
 
-        // execution
-        long removed = service.removeAssignedDevices(SCHEDULE_ID, List.of("m-1", "m-1", "m-absent"), "user-1");
-        long alreadyRemoved = service.removeAssignedDevices(SCHEDULE_ID, List.of("m-1", "m-absent"), "user-1");
+        List<String> removed = service.removeDevices(SCHEDULE_ID, List.of("m-1", "m-1", "m-absent"), "user-1");
+        List<String> alreadyRemoved = service.removeDevices(SCHEDULE_ID, List.of("m-1", "m-absent"), "user-1");
 
-        // verifications
-        assertThat(removed).isEqualTo(1L);
-        assertThat(alreadyRemoved).isZero();
+        assertThat(removed).containsExactly("m-1");
+        assertThat(alreadyRemoved).isEmpty();
     }
 
     @Test

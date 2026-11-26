@@ -11,21 +11,23 @@ import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
-import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
-import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
-import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
-import com.openframe.data.nats.rmm.model.ScriptMessage;
-import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.delivery.ScheduleOfflineRule;
 import com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
+import com.openframe.data.nats.rmm.model.ScriptMessage;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
@@ -39,12 +41,17 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_RUN;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_RUN;
 
 /**
  * Dispatches a <b>saved</b> script from the dashboard to the target agent over <b>core NATS</b>.
@@ -72,8 +79,15 @@ public class ScriptDispatchService {
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTimeoutValidator timeoutValidator;
     private final ObjectProvider<ScriptSecretSealer> secretSealer;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
+        AuditCall auditCall = auditCallOfRun(input.getScriptId(), List.of(input.getMachineId()),
+                input.getPrivilegeLevel(), source, input.getEnvVars(), Map.of());
+        return auditedMethodRunner.run(auditCall, () -> dispatchToDevice(input, initiatedBy, source)).response();
+    }
+
+    private Dispatched dispatchToDevice(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
         ScriptEnvVarMapper.validate(input.getEnvVars());
         deviceService.verifyDispatchable(input.getMachineId());
@@ -104,12 +118,17 @@ public class ScriptDispatchService {
 
         log.info("Dispatched script executionId={} scriptId={} machineId={} shell={} privilegeLevel={}",
                 executionId, input.getScriptId(), input.getMachineId(), script.getShell(), input.getPrivilegeLevel());
-        return DispatchResponse.builder()
-                .executionId(executionId)
-                .build();
+        return new Dispatched(DispatchResponse.builder().executionId(executionId).build(),
+                List.of(input.getMachineId()), detailsOfRun(executionId, script, input.getEnvVars(), input.getArgs()));
     }
 
     public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy, ExecutionSource source) {
+        AuditCall auditCall = auditCallOfRun(input.getScriptId(), input.getMachineIds(), input.getPrivilegeLevel(),
+                source, input.getEnvVars(), draftDetails(input));
+        return auditedMethodRunner.run(auditCall, () -> dispatchToDevices(input, initiatedBy, source)).response();
+    }
+
+    private Dispatched dispatchToDevices(BatchRunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
         ScriptEnvVarMapper.validate(input.getEnvVars());
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
@@ -123,8 +142,13 @@ public class ScriptDispatchService {
         ScriptResponse script = withDraft(scriptService.get(input.getScriptId()), input.getScriptBody(), input.getShell());
         String executionId = UUID.randomUUID().toString();
 
-        return dispatchBatch(executionId, script, machineIds, input.getPrivilegeLevel(),
+        DispatchResponse response = dispatchBatch(executionId, script, machineIds, input.getPrivilegeLevel(),
                 input.getArgs(), input.getTimeoutSeconds(), input.getEnvVars(), initiatedBy, source);
+        Map<String, Object> details = detailsOfRun(executionId, script, input.getEnvVars(), input.getArgs());
+        if (StringUtils.hasText(input.getScriptBody())) {
+            details.put("shell", script.getShell());
+        }
+        return new Dispatched(response, machineIds, details);
     }
 
     /**
@@ -144,6 +168,14 @@ public class ScriptDispatchService {
      * correlates to no execution rows.
      */
     public DispatchResponse runSchedule(String scheduleId, String initiatedBy) {
+        AuditCall auditCall = AuditCall.of(SCRIPT_SCHEDULE_RUN, scheduleId)
+                .withCompare(false)
+                .withDeviceIdOf(result -> result instanceof Dispatched run ? onlyDevice(run.machineIds()) : null)
+                .withDetailsFromResult(result -> result instanceof Dispatched run ? run.auditDetails() : Map.of());
+        return auditedMethodRunner.run(auditCall, () -> dispatchSchedule(scheduleId, initiatedBy)).response();
+    }
+
+    private Dispatched dispatchSchedule(String scheduleId, String initiatedBy) {
         // Tenant-scoped lookup; throws if the schedule is missing or soft-deleted.
         ScriptScheduleResponse schedule = scheduleScriptService.get(scheduleId);
 
@@ -171,7 +203,7 @@ public class ScriptDispatchService {
         // Preserve run order; dedup (a shared executionId can't carry the same
         // scriptId twice on one machine — the leaf unique key would collide).
         List<ScriptResponse> runnableScripts = scriptIds.stream().distinct()
-                .map(scriptsById::get).filter(java.util.Objects::nonNull).toList();
+                .map(scriptsById::get).filter(Objects::nonNull).toList();
         List<String> skippedIds = scriptIds.stream().distinct().filter(id -> !scriptsById.containsKey(id)).toList();
         if (!skippedIds.isEmpty()) {
             log.warn("Schedule run scheduleId={} skipping non-runnable scripts (missing/deleted/archived): {}",
@@ -248,7 +280,70 @@ public class ScriptDispatchService {
 
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
                 scheduleId, executionId, runnableScripts.size(), machineIds.size());
-        return DispatchResponse.builder().executionId(executionId).build();
+        return new Dispatched(DispatchResponse.builder().executionId(executionId).build(), machineIds,
+                Map.of("executionIds", List.of(executionId), "machineIds", machineIds,
+                        "scriptIds", runnableScripts.stream().map(ScriptResponse::getId).toList()));
+    }
+
+    private static AuditCall auditCallOfRun(String scriptId, List<String> machineIds, PrivilegeLevel privilegeLevel,
+                                            ExecutionSource source, List<ScriptEnvVarInput> envVars,
+                                            Map<String, Object> draft) {
+        Map<String, Object> asked = new HashMap<>(draft);
+        asked.put("machineIds", machineIds);
+        asked.put("privilegeLevel", privilegeLevel);
+        asked.put("source", source);
+        return AuditCall.of(SCRIPT_RUN, scriptId)
+                .withCompare(false)
+                .withDeviceIdOf(result -> onlyDevice(result instanceof Dispatched run ? run.machineIds() : machineIds))
+                .withDetailsFromResult(result -> {
+                    Map<String, Object> details = new HashMap<>(asked);
+                    details.putAll(result instanceof Dispatched run
+                            ? run.auditDetails() : Map.of("envVarNames", overriddenEnvVarNames(null, envVars)));
+                    return details;
+                });
+    }
+
+    private static Map<String, Object> draftDetails(BatchRunScriptInput input) {
+        Map<String, Object> details = new HashMap<>();
+        if (StringUtils.hasText(input.getScriptBody())) {
+            details.put("unsavedDraft", true);
+            details.put("shell", input.getShell());
+        }
+        return details;
+    }
+
+    private static String onlyDevice(List<String> machineIds) {
+        return machineIds.size() == 1 ? machineIds.getFirst() : null;
+    }
+
+    private static Map<String, Object> detailsOfRun(String executionId, ScriptResponse script,
+                                                    List<ScriptEnvVarInput> envVars, List<String> args) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("executionIds", List.of(executionId));
+        details.put("envVarNames", overriddenEnvVarNames(script.getEnvVars(), envVars));
+        boolean argsOverridden = args != null && !ScriptArgsTokenizer.tokenize(args)
+                .equals(ScriptArgsTokenizer.tokenize(Objects.requireNonNullElse(script.getDefaultArgs(), List.of())));
+        details.put("argsOverridden", argsOverridden ? true : null);
+        return details;
+    }
+
+    private static List<String> overriddenEnvVarNames(List<ScriptEnvVarInput> stored, List<ScriptEnvVarInput> asked) {
+        if (asked == null) {
+            return List.of();
+        }
+        Map<String, ScriptEnvVarInput> storedByName = stored == null ? Map.of() : stored.stream()
+                .collect(Collectors.toMap(ScriptEnvVarInput::getName, Function.identity(), (_, last) -> last));
+        return asked.stream()
+                .filter(envVar -> envVar.getName() != null && !(envVar.isSecret() && envVar.getValue() == null))
+                .filter(envVar -> overrides(storedByName.get(envVar.getName()), envVar))
+                .map(ScriptEnvVarInput::getName)
+                .distinct()
+                .toList();
+    }
+
+    private static boolean overrides(ScriptEnvVarInput stored, ScriptEnvVarInput asked) {
+        return stored == null || stored.isSecret() != asked.isSecret()
+                || !Objects.equals(stored.getValue(), asked.getValue());
     }
 
     // the delivery engine stores the batch: its secrets stay encrypted until the wire form
@@ -328,6 +423,9 @@ public class ScriptDispatchService {
         putEnvVars(byName, base);
         putEnvVars(byName, overrides);
         return byName.isEmpty() ? null : new ArrayList<>(byName.values());
+    }
+
+    private record Dispatched(DispatchResponse response, List<String> machineIds, Map<String, Object> auditDetails) {
     }
 
     private static void putEnvVars(Map<String, ScriptEnvVar> target, List<ScriptEnvVarInput> envVars) {

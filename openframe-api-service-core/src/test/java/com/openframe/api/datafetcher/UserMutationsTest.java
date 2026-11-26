@@ -38,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -86,15 +87,24 @@ class UserMutationsTest {
     }
 
     @Test
-    @DisplayName("deleteUser: deletes as the caller and returns the user re-read after the delete")
+    @DisplayName("deleteUser: deletes another user and returns the user re-read after the delete")
     void deleteUser() {
         UserResponse deleted = UserResponse.builder().id("u-2").status("DELETED").build();
         when(userService.getUserById("u-2")).thenReturn(deleted);
 
         UserResponse user = users().deleteUser(new DeleteUserInput(CODEC.encode(USER, "u-2")), ADMIN).getUser();
 
-        verify(userService).softDeleteUser("u-2", "me");
+        verify(userService).deleteUser("u-2");
+        verify(userService, never()).deleteOwnAccount(any());
         assertThat(user).isSameAs(deleted);
+    }
+
+    @Test
+    void deleteUser_callerDeletesTheirOwnAccount_deletesTheOwnAccount() {
+        users().deleteUser(new DeleteUserInput(CODEC.encode(USER, "me")), ADMIN);
+
+        verify(userService).deleteOwnAccount("me");
+        verify(userService, never()).deleteUser(any());
     }
 
     @Test

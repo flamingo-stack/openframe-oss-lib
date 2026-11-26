@@ -4,7 +4,10 @@ use crate::platform::file_lock::log_file_lock_info;
 #[cfg(target_os = "macos")]
 use crate::platform::remove_app_bundle;
 use crate::platform::system_service;
-use crate::platform::DirectoryManager;
+use crate::platform::{orbit_dir, remove_directory_with_retry, DirectoryManager};
+use crate::services::tool_connection_service::ToolConnectionService;
+use crate::services::tool_ops::ToolOpGuard;
+use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::InstalledToolsService;
 use crate::services::ToolCommandParamsResolver;
 use crate::services::ToolKillService;
@@ -90,6 +93,7 @@ pub struct ToolUninstallService {
     command_params_resolver: ToolCommandParamsResolver,
     tool_kill_service: ToolKillService,
     directory_manager: DirectoryManager,
+    tool_connection_service: ToolConnectionService,
 }
 
 impl ToolUninstallService {
@@ -98,13 +102,67 @@ impl ToolUninstallService {
         command_params_resolver: ToolCommandParamsResolver,
         tool_kill_service: ToolKillService,
         directory_manager: DirectoryManager,
+        tool_connection_service: ToolConnectionService,
     ) -> Self {
         Self {
             installed_tools_service,
             command_params_resolver,
             tool_kill_service,
             directory_manager,
+            tool_connection_service,
         }
+    }
+
+    #[tracing::instrument(skip_all, fields(tool_id = %tool_agent_id))]
+    pub async fn uninstall_reserved(
+        &self,
+        tool_agent_id: &str,
+        _op: ToolOpGuard,
+        tool_run_manager: &ToolRunManager,
+    ) -> Result<()> {
+        let Some(tool) = self
+            .installed_tools_service
+            .get_by_tool_agent_id(tool_agent_id)
+            .await?
+        else {
+            info!(
+                "Tool {} is not installed, nothing to uninstall",
+                tool_agent_id
+            );
+            return Ok(());
+        };
+
+        self.uninstall_tool_and_service(&tool).await?;
+
+        let tool_folder = self.directory_manager.get_tool_folder(tool_agent_id);
+        self.tool_kill_service
+            .stop_tool_by_path(&tool_folder.to_string_lossy())
+            .await
+            .with_context(|| {
+                format!(
+                    "Processes under {} could not be stopped",
+                    tool_folder.display()
+                )
+            })?;
+        remove_directory_with_retry(&tool_folder, 5)
+            .await
+            .with_context(|| format!("Failed to remove {}", tool_folder.display()))?;
+        remove_fleet_orbit_state(&self.tool_kill_service, tool_agent_id).await;
+
+        if let Err(e) = self
+            .tool_connection_service
+            .delete_by_tool_agent_id(tool_agent_id)
+            .await
+        {
+            warn!("Failed to remove tool connection: {:#}", e);
+        }
+        self.installed_tools_service
+            .delete_by_tool_agent_id(tool_agent_id)
+            .await
+            .context("Failed to remove the installed tool record")?;
+        tool_run_manager.clear_running_tool(tool_agent_id).await;
+        info!("Tool {} uninstalled", tool_agent_id);
+        Ok(())
     }
 
     /// Uninstall all installed tools by running their uninstallation commands
@@ -130,18 +188,7 @@ impl ToolUninstallService {
         for tool in installed_tools {
             info!("Processing uninstallation for tool: {}", tool.tool_agent_id);
 
-            let result = self.uninstall_tool(&tool).await;
-
-            if let Installation::Service { service_name, .. } = &tool.installation {
-                if let Err(e) = system_service::remove_service(service_name).await {
-                    warn!(
-                        "Failed to remove leftover service {} of tool {}: {:#}",
-                        service_name, tool.tool_agent_id, e
-                    );
-                }
-            }
-
-            if let Err(e) = result {
+            if let Err(e) = self.uninstall_tool_and_service(&tool).await {
                 warn!(
                     "Failed to uninstall tool {} (continuing with remaining tools): {:#}",
                     tool.tool_agent_id, e
@@ -154,6 +201,19 @@ impl ToolUninstallService {
 
         info!("All tools uninstalled successfully");
         Ok(())
+    }
+
+    async fn uninstall_tool_and_service(&self, tool: &InstalledTool) -> Result<()> {
+        let result = self.uninstall_tool(tool).await;
+        if let Installation::Service { service_name, .. } = &tool.installation {
+            if let Err(e) = system_service::remove_service(service_name).await {
+                warn!(
+                    "Failed to remove leftover service {} of tool {}: {:#}",
+                    service_name, tool.tool_agent_id, e
+                );
+            }
+        }
+        result
     }
 
     /// Uninstall a single tool by running its uninstallation command
@@ -374,5 +434,43 @@ impl ToolUninstallService {
         {
             crate::utils::windows_helpers::unregister_autorun(&tool.tool_agent_id);
         }
+    }
+}
+
+pub(crate) async fn remove_fleet_orbit_state(
+    tool_kill_service: &ToolKillService,
+    tool_agent_id: &str,
+) {
+    if !tool_agent_id.to_lowercase().contains("fleet") {
+        return;
+    }
+    info!("Cleaning up leftover Orbit state for {}", tool_agent_id);
+    if let Err(e) = tool_kill_service
+        .stop_asset("osqueryd", tool_agent_id)
+        .await
+    {
+        warn!("Failed to stop osqueryd before Orbit cleanup: {:#}", e);
+    }
+    let orbit_dir = orbit_dir();
+    if !orbit_dir.exists() {
+        return;
+    }
+    if let Err(e) = tool_kill_service
+        .stop_tool_by_path(&orbit_dir.to_string_lossy())
+        .await
+    {
+        warn!(
+            "Failed to stop processes under Orbit directory {}: {:#}",
+            orbit_dir.display(),
+            e
+        );
+    }
+    info!("Removing leftover Orbit directory: {}", orbit_dir.display());
+    if let Err(e) = remove_directory_with_retry(&orbit_dir, 5).await {
+        warn!(
+            "Failed to remove Orbit directory {}: {:#}",
+            orbit_dir.display(),
+            e
+        );
     }
 }

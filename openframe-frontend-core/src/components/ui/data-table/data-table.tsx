@@ -252,11 +252,10 @@ function DataTableGridRoot({
   // `storageKey`.
   const settingsEnabled = settings !== undefined;
   const storageKey = settings?.storageKey;
-  const prefsContext = useMemo<GridPrefsContextValue>(
-    () => ({ store: createGridPrefsStore(storageKey), settingsEnabled }),
-    [storageKey, settingsEnabled],
-  );
-  const { store } = prefsContext;
+  // The store follows the key alone: a table that turns its settings on or off keeps the layout it holds
+  // (with no `storageKey`, the session's widths and order live only in this store).
+  const store = useMemo(() => createGridPrefsStore(storageKey), [storageKey]);
+  const prefsContext = useMemo<GridPrefsContextValue>(() => ({ store, settingsEnabled }), [store, settingsEnabled]);
   const prefs = useSyncExternalStore(store.subscribe, store.get, store.getServer);
 
   // The geometry: rebuilt when a column is resized, hidden or moved, set as variables so no row renders for a resize.

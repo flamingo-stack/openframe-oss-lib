@@ -1,5 +1,6 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemAttachmentRepository;
@@ -27,7 +28,7 @@ class KnowledgeBaseAttachmentServiceOwnershipTest {
     private final KnowledgeBaseItemAttachmentRepository attachments = mock(KnowledgeBaseItemAttachmentRepository.class);
     private final GcsPresignedUrlService storage = mock(GcsPresignedUrlService.class);
     private final KnowledgeBaseAttachmentService service = new KnowledgeBaseAttachmentService(
-            attachments, mock(KnowledgeBaseItemRepository.class), storage);
+            attachments, mock(KnowledgeBaseItemRepository.class), storage, mock(AuditedMethodRunner.class));
 
     @Test
     @DisplayName("an attachment of another article is refused, so a save cannot delete someone else's file")

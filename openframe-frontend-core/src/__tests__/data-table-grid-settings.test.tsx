@@ -59,8 +59,17 @@ const store = (layout: { order?: string[]; hidden?: string[]; sizing?: Record<st
     JSON.stringify({ version: 1, order: [], hidden: [], sizing: {}, ...layout }),
   );
 
-function Grid({ settings, columns = COLUMNS }: { settings?: DataTableSettings; columns?: ColumnDef<Item>[] }) {
-  const table = useDataTable<Item>({ data: ITEMS, columns, getRowId: item => item.id });
+function Grid({
+  settings,
+  columns = COLUMNS,
+  enableHiding,
+}: {
+  settings?: DataTableSettings;
+  columns?: ColumnDef<Item>[];
+  /** The table-level TanStack option; the grid reads only each column's own flag. */
+  enableHiding?: boolean;
+}) {
+  const table = useDataTable<Item>({ data: ITEMS, columns, getRowId: item => item.id, enableHiding });
   return (
     <DataTable table={table} layout="grid" settings={settings}>
       <DataTable.Header />
@@ -279,6 +288,22 @@ describe('<DataTable layout="grid" settings>', () => {
     expect(menuRows()).toEqual(['Name ✓', 'Owner', 'City']);
   });
 
+  it('keeps a column the table never hides (`enableHiding: false`): its row hides nothing, a stored layout neither', () => {
+    const kept = COLUMNS.map(column => (column.id === 'name' ? { ...column, enableHiding: false } : column));
+    store({ hidden: ['name'] });
+    const { container } = render(<Grid settings={{ storageKey: STORAGE_KEY }} columns={kept} />);
+    expect(headerColumns(container)).toEqual(['name', 'owner', 'city']);
+    openMenu();
+    expect(menuRows()).toEqual(['Name ✓', 'Owner ✓', 'City ✓']);
+    const name = screen.getByRole('menuitemcheckbox', { name: 'Name' });
+    expect(name).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(name);
+    expect(headerColumns(container)).toEqual(['name', 'owner', 'city']);
+    // It still moves: only hiding is off.
+    fireEvent.keyDown(name, { key: 'ArrowDown', altKey: true });
+    expect(headerColumns(container)).toEqual(['owner', 'name', 'city']);
+  });
+
   it('moves a shown column with Alt + Arrow, in the table and in storage; a hidden column keeps its place', () => {
     const { container } = render(<Grid settings={{ storageKey: STORAGE_KEY }} />);
     openMenu();
@@ -317,6 +342,27 @@ describe('<DataTable layout="grid" settings>', () => {
     const body = gridBodyMarkup(container);
     expect(body.indexOf('Kyiv')).toBeLessThan(body.indexOf('Alpha'));
     expect(body).not.toContain('Ada');
+  });
+
+  it('reads only the column’s own `enableHiding`: a table-level `enableHiding: false` changes neither the menu nor the layout', () => {
+    store({ hidden: ['owner'] });
+    const { container } = render(<Grid settings={{ storageKey: STORAGE_KEY }} enableHiding={false} />);
+    expect(headerColumns(container)).toEqual(['name', 'city']);
+    openMenu();
+    expect(menuRows()).toEqual(['Name ✓', 'City ✓', 'Owner']);
+    const city = screen.getByRole('menuitemcheckbox', { name: 'City' });
+    expect(city).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(city);
+    expect(headerColumns(container)).toEqual(['name']);
+  });
+
+  it('keeps the session’s layout when the table turns its settings off (no key: the layout lives in the store alone)', () => {
+    const { container, rerender } = render(<Grid settings={{}} />);
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Owner' }));
+    expect(headerColumns(container)).toEqual(['name', 'city']);
+    rerender(<Grid />);
+    expect(headerColumns(container)).toEqual(['name', 'city']);
   });
 
   it('keeps a resized width in the browser', () => {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
+import { useComposerDockHeight } from '../../components/navigation/app-layout-context';
 
 /**
  * The `collisionPadding` (px) a Radix popper needs to stay clear of what the
@@ -32,6 +33,12 @@ import { useSyncExternalStore } from 'react';
  * const collisionPadding = useViewportCollisionPadding()
  * <PopoverPrimitive.Content collisionPadding={collisionPadding} />
  * ```
+ *
+ * The bottom also clears the Mingo composer dock where `AppLayout` has one: it lies
+ * over the page's end, and the page fades out to transparent under it, so a list
+ * that opens downwards into it is covered and faded instead of flipping above its
+ * trigger. The dock's height is `useComposerDockHeight()`; the larger of the two
+ * bottoms wins (a keyboard rises over the dock).
  *
  * Pair it with `max-h-[var(--radix-popper-available-height)]` on the content:
  * padding alone flips a dropdown above its trigger, but a list taller than what
@@ -138,9 +145,12 @@ export function withViewportPadding(
 }
 
 export function useViewportCollisionPadding(): ViewportCollisionPadding {
-  return useSyncExternalStore(
+  const shell = useSyncExternalStore(
     subscribe,
     () => padding,
     () => NONE,
   );
+  const dock = useComposerDockHeight();
+  // Memoized for its identity: Radix gets the same object until a value changes.
+  return useMemo(() => (dock > shell.bottom ? { top: shell.top, bottom: dock } : shell), [shell, dock]);
 }

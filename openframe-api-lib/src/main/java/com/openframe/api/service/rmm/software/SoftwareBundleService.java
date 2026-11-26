@@ -10,8 +10,12 @@ import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
+import com.openframe.api.service.rmm.software.SoftwareInventoryService.AutoUpdateDevicesChanged;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
@@ -38,6 +42,7 @@ import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
@@ -45,13 +50,20 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_ADOPT;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_AUTO_UPDATE_ENABLE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -72,6 +84,7 @@ public class SoftwareBundleService {
     private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
     private final SoftwareInventoryService softwareInventoryService;
     private final PackageCatalogVersions packageCatalogVersions;
+    private final AuditedMethodRunner auditedMethodRunner;
 
     @Value("${openframe.rmm.software.bundle.pending-ttl}")
     private Duration pendingTtl;
@@ -138,6 +151,14 @@ public class SoftwareBundleService {
             return toResponse(entity);
         }
         List<String> machineIds = currentMachineIds(entity);
+        Map<String, Object> details = askedDetailsOf(input, machineIds);
+        return auditedMethodRunner.run(auditCallOfSubmit(input, machineIds, details),
+                () -> submitPending(entity, input, actor, details));
+    }
+
+    private SoftwareBundleResponse submitPending(SoftwareBundle entity, SubmitSoftwareBundleInput input, String actor,
+                                                 Map<String, Object> auditDetails) {
+        List<String> machineIds = currentMachineIds(entity);
         if (machineIds.isEmpty()) {
             throw new BadRequestException("Cannot submit software bundle " + input.getId() + ": no devices assigned");
         }
@@ -147,6 +168,8 @@ public class SoftwareBundleService {
         Map<String, OsType> deviceOsTypes = requireEligibleDeviceOsTypes(machineIds, packages);
         PackageUpdateSettings updateSettings = PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings());
         SoftwareAutoUpdate autoUpdate = PackageUpdateSettingsMapper.autoUpdate(input.getAction(), input.getAutoUpdate());
+        auditDetails.putAll(settingsDetails(updateSettings));
+        auditDetails.put("autoUpdate", autoUpdate != null && autoUpdate.isEnabled() ? true : null);
 
         entity.setAction(input.getAction());
         entity.setPackages(packages);
@@ -158,11 +181,15 @@ public class SoftwareBundleService {
             entity.setMode(SoftwareBundleMode.SCHEDULED);
             entity.setStartAt(input.getSchedule().getStartAt());
             submitScheduled(entity, input, actor);
+            auditDetails.put("packages", packageNamesOf(packages));
         } else {
             entity.setMode(SoftwareBundleMode.NOW);
             packages.forEach(this::fillLatestVersion);
             armOnlineDispatch(entity, now);
-            entity.setExecutionIds(executionIds(entity));
+            entity.setExecutionIds(executionIds(entity.getId(), entity.getPackages()));
+            List<SoftwareBundlePackage> sent = withTargetDevice(packages, deviceOsTypes);
+            auditDetails.put("packages", packageNamesOf(sent));
+            auditDetails.put("executionIds", executionIds(entity.getId(), sent));
         }
 
         saveCompleted(entity, now);
@@ -174,10 +201,88 @@ public class SoftwareBundleService {
         return toResponse(entity);
     }
 
+    private static Map<String, Object> askedDetailsOf(SubmitSoftwareBundleInput input, List<String> machineIds) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("bundleIds", List.of(input.getId()));
+        if (input.getSchedule() != null) {
+            details.put("softwareAction", input.getAction());
+        }
+        details.put("machineIds", machineIds);
+        details.put("packages", input.getPackages().stream()
+                .map(softwarePackage -> hasText(softwarePackage.getPackageName())
+                        ? softwarePackage.getPackageName() : softwarePackage.getSoftwareId())
+                .filter(Objects::nonNull)
+                .toList());
+        return details;
+    }
+
+    private static AuditCall auditCallOfSubmit(SubmitSoftwareBundleInput input, List<String> machineIds,
+                                               Map<String, Object> details) {
+        if (input.getSchedule() != null) {
+            return AuditCall.of(SOFTWARE_SCHEDULE_CREATE, null, details)
+                    .withCompare(false)
+                    .withTargetNameOf(_ -> input.getSchedule().getName())
+                    .withTargetIdInResult(true)
+                    .withTargetIdFromResult(result -> ((SoftwareBundleResponse) result).getScheduleId())
+                    .withDetailsFromResult(submitted -> submitted == null
+                            ? withAskedTiming(details, input.getSchedule()) : details);
+        }
+        String machineId = machineIds.size() == 1 ? machineIds.getFirst() : null;
+        AuditAction action = switch (input.getAction()) {
+            case INSTALL -> SOFTWARE_INSTALL;
+            case UPDATE -> SOFTWARE_UPDATE;
+            case ADOPT -> SOFTWARE_ADOPT;
+        };
+        return AuditCall.of(action, machineId, details).withCompare(false);
+    }
+
+    private static Map<String, Object> withAskedTiming(Map<String, Object> details, SoftwareBundleScheduleInput schedule) {
+        details.put("startAt", schedule.getStartAt());
+        details.put("repeat", schedule.getRepeat());
+        return details;
+    }
+
+    private static List<String> packageNamesOf(List<SoftwareBundlePackage> packages) {
+        return packages.stream()
+                .map(bundlePackage -> ObjectUtils.firstNonNull(bundlePackage.getPackageName(),
+                        bundlePackage.getSoftwareId()))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private List<SoftwareBundlePackage> withTargetDevice(List<SoftwareBundlePackage> packages,
+                                                         Map<String, OsType> deviceOsTypes) {
+        Set<PackageManagerType> supported = managersOf(packages).stream()
+                .filter(manager -> !packageManagerAvailability.supporting(
+                        devicesWithOs(deviceOsTypes, osTypeOf(manager)), manager).isEmpty())
+                .collect(Collectors.toSet());
+        return packages.stream()
+                .filter(bundlePackage -> supported.contains(bundlePackage.getPackageManager()))
+                .toList();
+    }
+
+    private static List<String> devicesWithOs(Map<String, OsType> deviceOsTypes, OsType osType) {
+        return deviceOsTypes.entrySet().stream()
+                .filter(device -> device.getValue() == osType)
+                .map(Map.Entry::getKey)
+                .toList();
+    }
+
     public SoftwareResponse turnOnAutoUpdate(TurnOnSoftwareAutoUpdateInput input, String actor) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("bundleIds", List.of(input.getBundleId()));
+        AuditCall auditCall = AuditCall.of(SOFTWARE_AUTO_UPDATE_ENABLE, input.getSoftwareId(), details)
+                .withCompare(false)
+                .withTargetNameOf(result -> result instanceof SoftwareResponse software ? software.getName() : null);
+        return auditedMethodRunner.run(auditCall, () -> enableAutoUpdate(input, actor, details));
+    }
+
+    private SoftwareResponse enableAutoUpdate(TurnOnSoftwareAutoUpdateInput input, String actor,
+                                              Map<String, Object> auditDetails) {
         String bundleId = input.getBundleId();
         SoftwareBundle entity = loadPendingOrThrow(bundleId);
         List<String> machineIds = currentMachineIds(entity);
+        auditDetails.put("machineIds", machineIds);
         if (machineIds.isEmpty()) {
             throw new BadRequestException("Cannot turn on auto-update from software bundle " + bundleId
                     + ": no devices assigned");
@@ -189,12 +294,27 @@ public class SoftwareBundleService {
         requireDeviceEligibility(machineIds, packages);
         PackageUpdateSettingsInput settingsInput = input.getSettings();
         PackageUpdateSettings settings = PackageUpdateSettingsMapper.updateSettings(SoftwareAction.UPDATE, settingsInput);
-        SoftwareResponse software = softwareInventoryService.turnOnAutoUpdate(softwareId, machineIds, settings, actor);
+        auditDetails.putAll(settingsDetails(settings));
+        AutoUpdateDevicesChanged changed =
+                softwareInventoryService.turnOnAutoUpdate(softwareId, machineIds, settings, actor);
+        auditDetails.put("added", changed.added());
+        auditDetails.put("removed", changed.removed());
         Instant now = Instant.now();
         saveCompleted(entity, now);
         log.info("Turned on auto-update from software bundle id={} softwareId={} devices={} actor={}",
                 bundleId, softwareId, machineIds.size(), actor);
-        return software;
+        return changed.software();
+    }
+
+    private static Map<String, Object> settingsDetails(PackageUpdateSettings settings) {
+        if (settings == null) {
+            return Map.of();
+        }
+        Map<String, Object> details = new HashMap<>();
+        details.put("updateMode", settings.getMode());
+        details.put("deadlineSeconds", settings.getDeadlineSeconds());
+        details.put("countdownSeconds", settings.getCountdownSeconds());
+        return details;
     }
 
     private void saveCompleted(SoftwareBundle entity, Instant now) {
@@ -311,9 +431,9 @@ public class SoftwareBundleService {
         }
     }
 
-    private static List<String> executionIds(SoftwareBundle bundle) {
-        return bundle.getPackages().stream()
-                .map(p -> SoftwareExecutionId.forBundle(bundle.getId(), p.getPackageManager(), p.getPackageName()))
+    private static List<String> executionIds(String bundleId, List<SoftwareBundlePackage> packages) {
+        return packages.stream()
+                .map(p -> SoftwareExecutionId.forBundle(bundleId, p.getPackageManager(), p.getPackageName()))
                 .toList();
     }
 

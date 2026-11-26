@@ -11,6 +11,121 @@ extend type Query {
     """OS updates the device installed or failed to install, newest first. Windows only: a Mac reports no history.
     `first`: 1-100, default 20. Unknown machineId → DEVICE_NOT_FOUND."""
     deviceOsUpdateHistory(machineId: String!, first: Int, after: String): DeviceOsUpdateHistoryConnection!
+
+    """OS updates the devices of the tenant reported, one row per update, the latest first seen first.
+    `first`: 1-100, default 20."""
+    osUpdates(filter: OsUpdateFilterInput, first: Int, after: String): OsUpdateConnection!
+
+    """One OS update. Null = the tenant has no such update."""
+    osUpdate(id: ID!): OsUpdate
+
+    """Devices of one OS update in one status. PENDING: newest discovered first. INSTALLED: latest installed first,
+    Windows only. `organizationIds`: only devices of these organizations; omitted or empty = every organization.
+    `first`: 1-100, default 20. Unknown osUpdateId → OS_UPDATE_NOT_FOUND."""
+    osUpdateDevices(osUpdateId: ID!, status: OsUpdateDeviceStatus!, organizationIds: [String!], first: Int,
+        after: String): OsUpdateDeviceConnection!
+}
+
+input OsUpdateFilterInput {
+    platform: OsPlatform
+    """Any of these. An update stored before classification existed has none and matches no value."""
+    classifications: [OsUpdateClassification!]
+    """Part of the display name, of a KB article id or of a CVE id. Case-insensitive."""
+    search: String
+    """Only updates pending on or installed by a device of these organizations, and both device counts count only
+    those devices. Omitted or empty = every organization; organizations without devices = no update."""
+    organizationIds: [String!]
+}
+
+type OsUpdateConnection {
+    edges: [OsUpdateEdge!]!
+    pageInfo: PageInfo!
+}
+
+type OsUpdateEdge {
+    node: OsUpdate!
+    cursor: String!
+}
+
+"""An OS update as the first device of the tenant that reported it described it."""
+type OsUpdate {
+    id: ID!
+    platform: OsPlatform!
+    """Opaque id of the update, as the OS names it."""
+    identifier: String!
+    displayName: String
+    displayVersion: String
+    kbArticleIds: [String!]!
+    """The vendor's own severity, as the device reported it or else from Microsoft's bulletin. Null = the vendor
+    gave none; always null on macOS for now."""
+    severity: OsUpdateSeverity
+    """The vendor's category names, verbatim, in the language of the reporting device."""
+    categories: [String!]!
+    """The vendor's category ids. The same on every device, whatever its language."""
+    categoryIds: [String!]!
+    """Windows only."""
+    updateType: OsUpdateType
+    """Our class of the update. Null = stored before classification existed."""
+    classification: OsUpdateClassification
+    """As the device reported them, or else from Microsoft's bulletin."""
+    cveIds: [String!]!
+    publishedAt: Instant
+    sizeBytes: Long
+    rebootBehavior: OsUpdateRebootBehavior
+    """An optional or preview update."""
+    browseOnly: Boolean
+    """A CVE of the update is known to be exploited, by Microsoft's bulletin or the CISA KEV catalog. Null = no CVE
+    of the update is known."""
+    exploited: Boolean
+    """When the update was last checked against the vendor's bulletin, with or without data. Null = not checked yet."""
+    enrichedAt: Instant
+    """When a device of the tenant first reported the update."""
+    firstSeenAt: Instant!
+
+    """Devices that list the update as pending now. Devices we cannot manage (manageability NOT_MANAGEABLE) are
+    not counted."""
+    pendingDeviceCount: Int!
+    """Devices that installed the update successfully. Windows only, and only installs of the last 30 days: the
+    stored history goes no further. A device that installed the update and waits for a restart may be counted
+    as pending too."""
+    installedDeviceCount: Int!
+}
+
+"""Set once, when the update is first stored. The rule is a first draft and Windows only: every macOS update is
+OTHER."""
+enum OsUpdateClassification {
+    SECURITY
+    QUALITY
+    PREVIEW
+    OS_VERSION
+    DRIVER
+    OTHER
+}
+
+enum OsUpdateDeviceStatus {
+    PENDING
+    INSTALLED
+}
+
+type OsUpdateDeviceConnection {
+    edges: [OsUpdateDeviceEdge!]!
+    pageInfo: PageInfo!
+}
+
+type OsUpdateDeviceEdge {
+    node: OsUpdateDevice!
+    cursor: String!
+}
+
+type OsUpdateDevice {
+    machineId: String!
+    status: OsUpdateDeviceStatus!
+    """PENDING only: when the device first reported the update."""
+    discoveredAt: Instant
+    """INSTALLED only: the device's latest successful install of the update."""
+    installedAt: Instant
+    """Null = the device is no longer in the tenant."""
+    machine: Machine
 }
 
 type DeviceOsState {
@@ -106,7 +221,8 @@ type DeviceOsPendingUpdate {
     displayName: String
     displayVersion: String
     kbArticleIds: [String!]!
-    """The vendor's own severity. Null = the vendor gave none; always null on macOS for now."""
+    """The vendor's own severity, as the device reported it or else from Microsoft's bulletin. Null = the vendor
+    gave none; always null on macOS for now."""
     severity: OsUpdateSeverity
     """The vendor's category names, verbatim."""
     categories: [String!]!
@@ -114,12 +230,20 @@ type DeviceOsPendingUpdate {
     categoryIds: [String!]!
     """Windows only."""
     updateType: OsUpdateType
+    """Our class of the update. Null = stored before classification existed."""
+    classification: OsUpdateClassification
+    """As the device reported them, or else from Microsoft's bulletin."""
     cveIds: [String!]!
     publishedAt: Instant
     sizeBytes: Long
     rebootBehavior: OsUpdateRebootBehavior
     """An optional or preview update."""
     browseOnly: Boolean
+    """A CVE of the update is known to be exploited, by Microsoft's bulletin or the CISA KEV catalog. Null = no CVE
+    of the update is known."""
+    exploited: Boolean
+    """When the update was last checked against the vendor's bulletin, with or without data. Null = not checked yet."""
+    enrichedAt: Instant
 
     """When this device first reported the update. Does not move while the update stays pending."""
     discoveredAt: Instant!

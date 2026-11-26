@@ -9,7 +9,9 @@ import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateHistoryEntryResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceOsGraphQLMapper;
-import com.openframe.api.service.rmm.osupdate.DeviceOsQueryService;
+import com.openframe.api.service.rmm.osupdate.DeviceOsPendingUpdateService;
+import com.openframe.api.service.rmm.osupdate.DeviceOsStateService;
+import com.openframe.api.service.rmm.osupdate.DeviceOsUpdateHistoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,7 +31,9 @@ class DeviceOsDataFetcherTest {
     private static final String AFTER = "after-cursor";
     private static final String NOT_FOUND = "Device not found: " + MACHINE_ID;
 
-    @Mock private DeviceOsQueryService deviceOsQueryService;
+    @Mock private DeviceOsStateService deviceOsStateService;
+    @Mock private DeviceOsPendingUpdateService deviceOsPendingUpdateService;
+    @Mock private DeviceOsUpdateHistoryService deviceOsUpdateHistoryService;
     @Mock private DeviceOsGraphQLMapper deviceOsGraphQLMapper;
 
     @InjectMocks private DeviceOsDataFetcher dataFetcher;
@@ -38,7 +42,7 @@ class DeviceOsDataFetcherTest {
     void deviceOsState_deviceThatReported_stateOfTheService() {
         // setup
         DeviceOsStateResponse state = DeviceOsStateResponse.builder().osVersion("11 24H2").build();
-        when(deviceOsQueryService.findOsState(MACHINE_ID)).thenReturn(state);
+        when(deviceOsStateService.findOsState(MACHINE_ID)).thenReturn(state);
 
         // execution
         DeviceOsStateResponse found = dataFetcher.deviceOsState(MACHINE_ID);
@@ -50,7 +54,7 @@ class DeviceOsDataFetcherTest {
     @Test
     void deviceOsState_deviceThatNeverReported_null() {
         // setup
-        when(deviceOsQueryService.findOsState(MACHINE_ID)).thenReturn(null);
+        when(deviceOsStateService.findOsState(MACHINE_ID)).thenReturn(null);
 
         // execution
         DeviceOsStateResponse found = dataFetcher.deviceOsState(MACHINE_ID);
@@ -62,7 +66,7 @@ class DeviceOsDataFetcherTest {
     @Test
     void deviceOsState_unknownDevice_deviceNotFoundPassedOn() {
         // setup
-        when(deviceOsQueryService.findOsState(MACHINE_ID)).thenThrow(new DeviceNotFoundException(NOT_FOUND));
+        when(deviceOsStateService.findOsState(MACHINE_ID)).thenThrow(new DeviceNotFoundException(NOT_FOUND));
 
         // execution
         DeviceNotFoundException ex = assertThrows(DeviceNotFoundException.class,
@@ -77,7 +81,7 @@ class DeviceOsDataFetcherTest {
         // setup
         List<DeviceOsPendingUpdateResponse> pendingUpdates =
                 List.of(DeviceOsPendingUpdateResponse.builder().identifier("kb-1").build());
-        when(deviceOsQueryService.listPendingUpdates(MACHINE_ID)).thenReturn(pendingUpdates);
+        when(deviceOsPendingUpdateService.listPendingUpdates(MACHINE_ID)).thenReturn(pendingUpdates);
 
         // execution
         List<DeviceOsPendingUpdateResponse> found = dataFetcher.deviceOsPendingUpdates(MACHINE_ID);
@@ -89,7 +93,7 @@ class DeviceOsDataFetcherTest {
     @Test
     void deviceOsPendingUpdates_unknownDevice_deviceNotFoundPassedOn() {
         // setup
-        when(deviceOsQueryService.listPendingUpdates(MACHINE_ID)).thenThrow(new DeviceNotFoundException(NOT_FOUND));
+        when(deviceOsPendingUpdateService.listPendingUpdates(MACHINE_ID)).thenThrow(new DeviceNotFoundException(NOT_FOUND));
 
         // execution
         DeviceNotFoundException ex = assertThrows(DeviceNotFoundException.class,
@@ -108,7 +112,7 @@ class DeviceOsDataFetcherTest {
         GenericConnection<GenericEdge<DeviceOsUpdateHistoryEntryResponse>> connection =
                 GenericConnection.<GenericEdge<DeviceOsUpdateHistoryEntryResponse>>builder().edges(List.of()).build();
         when(deviceOsGraphQLMapper.toCursorPaginationCriteria(5, AFTER)).thenReturn(pagination);
-        when(deviceOsQueryService.listUpdateHistory(MACHINE_ID, pagination)).thenReturn(updateHistory);
+        when(deviceOsUpdateHistoryService.listUpdateHistory(MACHINE_ID, pagination)).thenReturn(updateHistory);
         when(deviceOsGraphQLMapper.toConnection(updateHistory)).thenReturn(connection);
 
         // execution
@@ -124,7 +128,7 @@ class DeviceOsDataFetcherTest {
         // setup
         CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().build();
         when(deviceOsGraphQLMapper.toCursorPaginationCriteria(null, null)).thenReturn(pagination);
-        when(deviceOsQueryService.listUpdateHistory(MACHINE_ID, pagination))
+        when(deviceOsUpdateHistoryService.listUpdateHistory(MACHINE_ID, pagination))
                 .thenThrow(new DeviceNotFoundException(NOT_FOUND));
 
         // execution

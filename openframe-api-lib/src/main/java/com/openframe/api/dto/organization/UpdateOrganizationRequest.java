@@ -2,6 +2,7 @@ package com.openframe.api.dto.organization;
 
 import com.openframe.api.validation.ContractPeriod;
 import com.openframe.api.validation.ValidContractPeriod;
+import com.openframe.api.validation.ValidationPatterns;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -19,7 +20,7 @@ import java.time.LocalDate;
 @ValidContractPeriod
 public record UpdateOrganizationRequest(
         // null leaves the name unchanged; a value must contain at least one non-whitespace character
-        @Pattern(regexp = NOT_BLANK, message = "Name must not be blank")
+        @Pattern(regexp = ValidationPatterns.NOT_BLANK, message = "Name must not be blank")
         String name,
 
         String category,
@@ -41,6 +42,4 @@ public record UpdateOrganizationRequest(
 
         LocalDate contractEndDate
 ) implements ContractPeriod {
-
-    public static final String NOT_BLANK = "(?s).*\\S.*";
 }

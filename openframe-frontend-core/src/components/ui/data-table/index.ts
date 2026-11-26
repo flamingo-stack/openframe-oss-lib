@@ -85,9 +85,9 @@ export {
   actionColumn,
   selectionColumn,
   GRID_ACTION_COLUMN_SIZE,
+  GRID_MIN_WIDTH,
   GRID_UTILITY_COLUMN_SIZE,
 } from './data-table-grid-columns';
-export { GRID_MIN_WIDTH } from './data-table-grid-resize';
 export { gridPrefsStorageKey } from './data-table-grid-prefs';
 export type { DataTableSettings } from './data-table-grid-prefs';
 export type { UseDataTableOptions } from './use-data-table';
