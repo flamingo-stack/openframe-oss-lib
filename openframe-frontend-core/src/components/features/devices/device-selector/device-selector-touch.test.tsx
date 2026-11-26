@@ -144,6 +144,28 @@ describe('DeviceSelector grid, two-step tap', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it('does not let a cancelled touch make the next plain click a tap', () => {
+    const onChange = vi.fn<(ids: Set<string>) => void>();
+    render(<Picker onChange={onChange} />);
+    const add = addButton('reception-01');
+    // A finger that went down and turned into a scroll: the browser cancels the pointer, no click follows.
+    fireEvent.pointerDown(add, { pointerType: 'touch' });
+    fireEvent.pointerCancel(add, { pointerType: 'touch' });
+    // A later click whose press was not seen, sent as a plain MouseEvent with no `pointerType`.
+    fireEvent.click(add, { detail: 1 });
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let a touch from long ago make the next plain click a tap', () => {
+    const onChange = vi.fn<(ids: Set<string>) => void>();
+    render(<Picker onChange={onChange} />);
+    const add = addButton('reception-01');
+    fireEvent.pointerDown(add, { pointerType: 'touch' });
+    wait(1500);
+    fireEvent.click(add, { detail: 1 });
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the desktop hover tooltip, on a row that is not armed too', () => {
     render(<Picker />);
     // A mouse hover, nothing armed.

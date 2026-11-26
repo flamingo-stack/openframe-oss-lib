@@ -1,18 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  type MouseEvent,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { cn } from '../../../../utils/cn';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatRelativeTime } from '../../../../utils/date-utils';
 import { CheckCircleIcon, MonitorIcon, PlusCircleIcon, TrashIcon } from '../../../icons-v2-generated';
 import {
@@ -32,7 +20,6 @@ import {
   useDataTable,
 } from '../../../ui';
 import { DATA_TABLE_SKELETON_ROWS } from '../../../ui/data-table/utils';
-import { FloatingTooltip } from '../../../ui/floating-tooltip';
 import { InertWhileLoading, useLoadingScope } from '../../../ui/loading-scope';
 import { dataTableLayoutProps } from '../../feature-table-layout';
 import { OSTypeBadge } from '../../os-type-badge';
@@ -57,6 +44,8 @@ import type { DeviceFilters, DeviceRow } from '../types';
 import { useTagFilterModal } from '../use-tag-filter-modal';
 import { DeviceSelectionModeRadio } from './device-selection-mode-radio';
 import type { DeviceSelectionMode, DeviceSelectorProps, SubTab } from './device-selector.types';
+import { type ArmedGridAction, type GridActionArming, GridActionArmingContext } from './grid-action-arming';
+import { GridRowAction } from './grid-row-action';
 import { useDeviceSelector } from './use-device-selector';
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
@@ -149,176 +138,6 @@ function StatusGridCell({ device }: { device: DeviceRow }) {
 
 /** The add / remove control's icon in the grid: 20px, the size of every icon in a 48px row. */
 const GRID_ACTION_ICON_SIZE = 20;
-
-/** How long after the first tap a second one is still the same tap (a double tap's ghost), not a confirmation. */
-const TOUCH_CONFIRM_GUARD_MS = 350;
-
-/**
- * The grid's armed add / remove button. On a touch screen the first tap on it shows its tooltip ("Add <device>") and
- * applies nothing; the second tap applies. One at a time, held by the picker.
- */
-interface ArmedGridAction {
-  /** The table's row id. */
-  rowId: string;
-  /** What the button does to which device, "Add <device>": a row whose action flipped is no longer armed. */
-  label: string;
-  /** What a screen reader hears once it is armed ("Tap again to add <device>"). None for a disabled row's reason. */
-  hint?: string;
-  /** When it was armed (`Date.now()`), for {@link TOUCH_CONFIRM_GUARD_MS}. */
-  at: number;
-}
-
-interface GridActionArming {
-  armed: ArmedGridAction | null;
-  arm: (next: ArmedGridAction) => void;
-  /** Clears the armed button: any, or only `match` (a bubble closing clears its own row, never another). */
-  disarm: (match?: Pick<ArmedGridAction, 'rowId' | 'label'>) => void;
-}
-
-const GridActionArmingContext = createContext<GridActionArming>({ armed: null, arm: NOOP, disarm: NOOP });
-
-/**
- * Whether a click came from a finger: the click's own `pointerType` where the browser sends it as a PointerEvent, else
- * the last `pointerdown`'s (older WebKit sends a tap's click as a plain MouseEvent). A keyboard's click (`detail` 0) is
- * never a tap.
- */
-function isTouchClick(event: MouseEvent<HTMLElement>, lastPointerType: string | undefined): boolean {
-  if (event.detail === 0) return false;
-  const native = event.nativeEvent;
-  const own = typeof PointerEvent !== 'undefined' && native instanceof PointerEvent ? native.pointerType : '';
-  return (own || lastPointerType) === 'touch';
-}
-
-interface GridRowActionProps {
-  /** The table's row id: which button is armed. */
-  rowId: string;
-  /** `add` or `remove`, and the device's name: the control's name for a screen reader ("Add <device>"). */
-  action: 'add' | 'remove';
-  deviceName: string;
-  icon: ReactNode;
-  /** `added`: the device is in the selection (the accent check). `remove`: the Selected tab's trash. */
-  tone?: 'default' | 'added' | 'remove';
-  onClick?: () => void;
-  disabled?: boolean;
-  /** Why the device cannot be added: shown on hover and focus, since a 56px cell has no room for the text. */
-  reason?: string;
-}
-
-/**
- * The add / remove control in the grid: a bare 40px icon button, the action cell being its frame (the design's
- * `action-button`). A card row draws it outlined, with a fill for "added" and the disabled reason as text beside it;
- * here "added" is the accent check and the button's tooltip says what it does to which device ("Add <device>"), with
- * the reason after it. The column is pinned right at every width while the Device column scrolls away where the table
- * is narrow (a tablet, a phone, a desktop's narrow content column), so the tooltip is what names a scrolled row's device.
- *
- * A touch screen opens no tooltip on hover and a tap would apply at once, so a finger confirms instead: the first tap
- * shows the tooltip and applies nothing, a second tap on the same button applies (one within
- * {@link TOUCH_CONFIRM_GUARD_MS} of the first is ignored). A mouse, a pen and the keyboard apply at once. A disabled
- * row's tap shows the reason; there is nothing to confirm.
- */
-function GridRowAction({
-  rowId,
-  action,
-  deviceName,
-  icon,
-  tone = 'default',
-  onClick,
-  disabled,
-  reason,
-}: GridRowActionProps) {
-  const { armed, arm, disarm } = useContext(GridActionArmingContext);
-  // The last `pointerdown`'s pointer, read by the click that follows it (see `isTouchClick`).
-  const pointerTypeRef = useRef<string | undefined>(undefined);
-  const bubbleId = useId();
-
-  const label = `${action === 'add' ? 'Add' : 'Remove'} ${deviceName}`;
-  const tooltip = reason ? `${label}: ${reason}` : label;
-  const isArmed = armed?.rowId === rowId && armed.label === label;
-
-  const handleClick = (event: MouseEvent<HTMLElement>) => {
-    const touch = isTouchClick(event, pointerTypeRef.current);
-    pointerTypeRef.current = undefined;
-    if (!touch) {
-      if (!onClick) return;
-      disarm({ rowId, label });
-      onClick();
-      return;
-    }
-    if (!isArmed) {
-      arm({ rowId, label, hint: reason ? undefined : `Tap again to ${action} ${deviceName}`, at: Date.now() });
-      return;
-    }
-    if (!onClick || Date.now() - armed.at < TOUCH_CONFIRM_GUARD_MS) return;
-    disarm({ rowId, label });
-    onClick();
-  };
-
-  const handleOpenChange = (open: boolean) => {
-    // Escape, a press outside or the pointer leaving closes the armed bubble; a mouse opening another row's tooltip
-    // takes the place of the armed one: one bubble at a time.
-    if (open) {
-      if (armed && !isArmed) disarm();
-    } else if (isArmed) {
-      disarm({ rowId, label });
-    }
-  };
-
-  const describedBy = isArmed ? bubbleId : undefined;
-  const button = (
-    <Button
-      variant="transparent"
-      size="icon"
-      type="button"
-      aria-label={label}
-      aria-pressed={tone === 'added' ? true : undefined}
-      aria-describedby={reason ? undefined : describedBy}
-      onClick={reason ? undefined : handleClick}
-      leftIcon={icon}
-      className={cn(
-        'size-10 border-0 md:size-10',
-        tone === 'added' && 'text-ods-accent hover:text-ods-accent',
-        tone === 'remove' && 'text-ods-error hover:opacity-80',
-        tone === 'default' && 'text-ods-text-secondary hover:text-ods-text-primary',
-      )}
-      disabled={disabled}
-    />
-  );
-  return (
-    <div
-      data-no-row-click
-      className="pointer-events-auto flex items-center justify-center"
-      onPointerDown={event => {
-        pointerTypeRef.current = event.pointerType;
-      }}
-    >
-      <FloatingTooltip
-        content={tooltip}
-        side="left"
-        as="span"
-        triggerClassName="inline-flex"
-        open={isArmed || undefined}
-        onOpenChange={handleOpenChange}
-        mouseOnly
-        contentId={bubbleId}
-      >
-        {reason ? (
-          // A disabled button takes no hover, focus or tap: the wrapper is what the tooltip listens on.
-          <span
-            tabIndex={0}
-            aria-label={tooltip}
-            aria-describedby={describedBy}
-            className="inline-flex rounded-md outline-none"
-            onClick={handleClick}
-          >
-            {button}
-          </span>
-        ) : (
-          button
-        )}
-      </FloatingTooltip>
-    </div>
-  );
-}
 
 /** A device still being read: a row the table keys, nothing a cell can show (every cell draws its loading form). */
 function loadingDevices<T extends DeviceRow>(count: number): T[] {
