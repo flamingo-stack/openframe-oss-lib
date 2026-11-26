@@ -45,3 +45,23 @@ fn only_a_login_account_counts_as_the_console_user() {
         assert_eq!(is_login_user(user), expected, "{user:?}");
     }
 }
+
+#[test]
+fn homes_are_the_login_account_folders() {
+    let root = tempfile::TempDir::new().unwrap();
+    for dir in ["alice", "bob", "Shared", ".hidden", "_spotlight", "root"] {
+        fs::create_dir(root.path().join(dir)).unwrap();
+    }
+    fs::write(root.path().join(".localized"), "").unwrap();
+
+    let mut homes = homes_under(root.path());
+    homes.sort();
+
+    assert_eq!(homes, [root.path().join("alice"), root.path().join("bob")]);
+}
+
+#[test]
+fn a_missing_users_folder_has_no_homes() {
+    let root = tempfile::TempDir::new().unwrap();
+    assert!(homes_under(&root.path().join("missing")).is_empty());
+}
