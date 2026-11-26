@@ -219,6 +219,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       actions,
       displayApprovalTypes,
       NavLinkAnchor,
+      onOpenAttachment,
       ...props
     },
     ref,
@@ -1148,6 +1149,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                           progress={metadata?.progress}
                           interrupted={metadata?.finishReason === 'interrupted'}
                           NavLinkAnchor={NavLinkAnchor}
+                          openframeAttachments={metadata?.openframeAttachments}
+                          onOpenAttachment={onOpenAttachment}
                         />
                         {ownedContent}
                       </div>

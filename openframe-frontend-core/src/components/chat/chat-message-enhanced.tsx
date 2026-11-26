@@ -52,6 +52,7 @@ import { chatCardLabel, RecordChip } from './entity-cards/dispatch';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
 import { MessageCitationsProvider, useMessageCitations } from './message-citations';
+import { OpenFrameMessageAttachments } from './openframe-message-attachments';
 import { MessageRecordLinkProvider } from './record-actions';
 import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
@@ -192,6 +193,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       progress,
       interrupted = false,
       NavLinkAnchor,
+      openframeAttachments,
+      onOpenAttachment,
       ...props
     },
     ref,
@@ -657,6 +660,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                 </div>
               )}
 
+              {/* OpenFrame files (Figma `chat/user-message`): under the bubble, before the time. Hub file parts are
+              drawn inside the bubble above and never here. */}
+              {openframeAttachments && openframeAttachments.length > 0 && (
+                <OpenFrameMessageAttachments
+                  attachments={openframeAttachments}
+                  align={isUser ? 'end' : 'start'}
+                  onOpenAttachment={onOpenAttachment}
+                />
+              )}
+
               {timestamp && !showName && (
                 <span className={cn('text-ods-text-secondary text-h6', isUser && 'justify-self-end')}>
                   {formatMessageTimestamp(timestamp)}
@@ -715,7 +728,9 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.displayApprovalTypes === nextProps.displayApprovalTypes &&
     prevProps.progress === nextProps.progress &&
     prevProps.interrupted === nextProps.interrupted &&
-    prevProps.NavLinkAnchor === nextProps.NavLinkAnchor
+    prevProps.NavLinkAnchor === nextProps.NavLinkAnchor &&
+    prevProps.openframeAttachments === nextProps.openframeAttachments &&
+    prevProps.onOpenAttachment === nextProps.onOpenAttachment
   );
 });
 
