@@ -5,7 +5,7 @@ import { AutoRefreshControl } from '../components/ui/auto-refresh-control';
 import { type ColumnDef, DataTable } from '../components/ui/data-table';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
 import { LoadingScope } from '../components/ui/loading-scope';
-import { TABLE_PAGINATION_PENDING, type TablePaginationProps } from '../components/ui/table-pagination';
+import { TABLE_PAGINATION_PENDING, type TablePagerState } from '../components/ui/table-pagination';
 
 /**
  * A paged table's pager sits in the row above it (`DataTable.Meta`): the range on the left, the pager and the
@@ -26,7 +26,7 @@ const ITEMS: Item[] = [
 
 const COLUMNS: ColumnDef<Item>[] = [{ id: 'name', accessorKey: 'name', header: 'Name', size: 280 }];
 
-const PAGE_3: TablePaginationProps = {
+const PAGE_3: TablePagerState = {
   hasNextPage: true,
   hasPreviousPage: true,
   isFirstPage: false,
@@ -44,19 +44,22 @@ function PagedTable({
   rangeStart = 41,
   refresh = true,
   loading = false,
+  pagerLoading = false,
 }: {
   items?: Item[];
-  pager?: TablePaginationProps;
+  pager?: TablePagerState;
   totalCount?: number;
   rangeStart?: number;
   refresh?: boolean;
   loading?: boolean;
+  /** The pager's own wait (the next page, or the first, is being read). */
+  pagerLoading?: boolean;
 }) {
   const table = useDataTable<Item>({ data: items, columns: COLUMNS, getRowId: item => item.id });
   return (
     <DataTable table={table} layout="grid" maxHeight={400}>
       <DataTable.Meta
-        pagination={<DataTable.Pagination {...pager} />}
+        pagination={<DataTable.Pagination pager={pager} loading={pagerLoading} />}
         actions={refresh && <AutoRefreshControl value="off" onChange={vi.fn()} />}
       >
         <DataTable.PageRange rangeStart={rangeStart} totalCount={totalCount} loading={loading} />
@@ -164,7 +167,7 @@ describe('DataTable.Pagination', () => {
   });
 
   it('keeps the pending pager of a first page still being read', () => {
-    render(<PagedTable items={[]} pager={TABLE_PAGINATION_PENDING} />);
+    render(<PagedTable items={[]} pager={TABLE_PAGINATION_PENDING} pagerLoading />);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Go to next page' }).disabled).toBe(true);
   });
 });

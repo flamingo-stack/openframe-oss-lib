@@ -17,7 +17,7 @@
  * const pager = useCursorPager({ prefix: 'cve', pageSize: 20, resetOn: filtersKey });
  * const data = useLazyLoadQuery(query, { ...filters, ...pager.variables });
  * const footer = pager.footerProps(data.list.pageInfo);
- * <DataTable.Meta pagination={<DataTable.Pagination {...footer} />}>
+ * <DataTable.Meta pagination={<DataTable.Pagination pager={footer} />}>
  *   <DataTable.PageRange rangeStart={footer.rangeStart} totalCount={data.list.filteredCount} />
  * </DataTable.Meta>
  */

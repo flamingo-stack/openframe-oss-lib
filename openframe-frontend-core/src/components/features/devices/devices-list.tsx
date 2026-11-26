@@ -14,12 +14,8 @@ import { useLoadingScope } from '../../ui/loading-scope';
 import { useDeviceStatusDisplay } from './device-status-display';
 import { deviceStatusFilterGroups, joinStatusFilterValue, splitStatusFilterValue } from './device-statuses';
 import { DevicesFilterToolbar } from './devices-filter-toolbar';
-import {
-  DevicesTableBody,
-  type DevicesTableMetaRow,
-  getDeviceActionsColumn,
-  getDeviceFilterColumns,
-} from './devices-table-columns';
+import { DevicesTableBody, type DevicesTableMetaRow } from './devices-table-body';
+import { getDeviceActionsColumn, getDeviceFilterColumns } from './devices-table-columns';
 import type { DeviceFilters, DeviceRow } from './types';
 import { useTagFilterModal } from './use-tag-filter-modal';
 

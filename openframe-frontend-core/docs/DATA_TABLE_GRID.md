@@ -64,7 +64,7 @@ the pager takes its own line under the range.
 const footer = pager.footerProps(data.list.pageInfo); // useCursorPager
 <DataTable table={table} layout="grid" maxHeight="fill">
   <DataTable.Meta
-    pagination={<DataTable.Pagination {...footer} loading={isPending} />}
+    pagination={<DataTable.Pagination pager={footer} loading={isPending} />}
     actions={<AutoRefreshControl {...refresh} />}
   >
     <DataTable.PageRange itemName="device" rangeStart={footer.rangeStart} totalCount={totalCount} />

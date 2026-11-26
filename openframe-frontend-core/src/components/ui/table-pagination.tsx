@@ -11,7 +11,11 @@ import { TableRowsPerPage } from './table-rows-per-page';
 /** The rows-per-page choices when the caller names none. */
 export const DEFAULT_PAGE_SIZE_OPTIONS: readonly number[] = [20, 50, 100];
 
-export interface TablePaginationProps {
+/**
+ * Where the table is and how it moves: `useCursorPager`'s `footerProps` fit as they are (`<DataTable.Pagination
+ * pager={footer} />`).
+ */
+export interface TablePagerState {
   hasNextPage: boolean;
   /** Previous can go somewhere (browser history, page 2's way to the first page, or the server). */
   hasPreviousPage?: boolean;
@@ -24,40 +28,43 @@ export interface TablePaginationProps {
   page?: number;
   startCursor?: string | null;
   endCursor?: string | null;
-
-  /** The page is being read: every button waits (disabled), so a second Next cannot resend the same cursor. */
-  loading?: boolean;
-
   onNext?: (cursor: string) => void;
   /** Called with `startCursor` (an empty string when there is none: a pager that pages back through history). */
   onPrevious?: (cursor: string) => void;
   /** Go to the first page: the quiet button before Previous. Without it there is no First. */
   onFirst?: () => void;
+}
 
-  /** Rows per page: the current size, shown as "20 per page". */
+/** The rows-per-page menu: drawn only when the host can change the page size (off by default). */
+export interface TablePaginationRowsPerPage {
+  /** The current size, shown as "20 per page". Default: the first option. */
   pageSize?: number;
-  /** The rows-per-page choices. Default 20 / 50 / 100. */
-  pageSizeOptions?: readonly number[];
-  /**
-   * Change the rows per page (the table goes back to its first page). The rows-per-page menu is drawn only with this
-   * handler: it is off by default.
-   */
-  onPageSizeChange?: (pageSize: number) => void;
+  /** The choices. Default 20 / 50 / 100. */
+  options?: readonly number[];
+  /** Change the rows per page (the table goes back to its first page). */
+  onChange: (pageSize: number) => void;
+}
 
+export interface TablePaginationProps {
+  /** Where the table is and how it moves. */
+  pager: TablePagerState;
+  /** The page is being read: every button waits (disabled), so a second Next cannot resend the same cursor. */
+  loading?: boolean;
+  /** The rows-per-page menu, on the left of the arrows. Omitted: no menu. */
+  rowsPerPage?: TablePaginationRowsPerPage;
   className?: string;
 }
 
 const noop = () => {};
 
 /**
- * The pager of a paged table whose first page is being read (the host has no `pageInfo` yet): Previous and Next drawn
- * and waiting, so the row above the table keeps its layout when the page answers.
+ * The pager of a paged table whose first page is being read (the host has no `pageInfo` yet): Previous and Next drawn,
+ * so the row above the table keeps its layout when the page answers. Pass it with `loading`, which makes them wait.
  */
-export const TABLE_PAGINATION_PENDING: TablePaginationProps = {
+export const TABLE_PAGINATION_PENDING: TablePagerState = {
   hasNextPage: false,
   hasPreviousPage: false,
   isFirstPage: true,
-  loading: true,
   onNext: noop,
   onPrevious: noop,
 };
@@ -76,24 +83,12 @@ const ARROW_CLASS = 'disabled:bg-ods-bg-base aria-disabled:bg-ods-bg-base';
  *
  * Below the content's md width the row spans the width: rows-per-page on the left, the arrows on the right.
  */
-export function TablePagination({
-  hasNextPage,
-  hasPreviousPage = false,
-  isFirstPage = true,
-  page,
-  startCursor,
-  endCursor,
-  loading: loadingProp = false,
-  onNext,
-  onPrevious,
-  onFirst,
-  pageSize,
-  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
-  onPageSizeChange,
-  className,
-}: TablePaginationProps) {
+export function TablePagination({ pager, loading: loadingProp = false, rowsPerPage, className }: TablePaginationProps) {
+  const { hasNextPage, hasPreviousPage = false, isFirstPage = true, page, startCursor, endCursor } = pager;
+  const { onNext, onPrevious, onFirst } = pager;
   const loading = useLoadingScope() || loadingProp;
   const firstShown = !!onFirst && !isFirstPage && page !== 2;
+  const pageSizeOptions = rowsPerPage?.options ?? DEFAULT_PAGE_SIZE_OPTIONS;
 
   const handleNext = () => {
     if (hasNextPage && endCursor && onNext) onNext(endCursor);
@@ -109,11 +104,11 @@ export function TablePagination({
       data-table-pagination
       className={cn('flex min-w-0 items-center gap-[var(--spacing-system-xsf)]', className)}
     >
-      {onPageSizeChange && (
+      {rowsPerPage && (
         <TableRowsPerPage
-          pageSize={pageSize ?? pageSizeOptions[0] ?? 0}
+          pageSize={rowsPerPage.pageSize ?? pageSizeOptions[0] ?? 0}
           options={pageSizeOptions}
-          onChange={onPageSizeChange}
+          onChange={rowsPerPage.onChange}
           disabled={loading}
         />
       )}

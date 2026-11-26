@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DevicesTableBody } from './devices-table-columns';
+import { DevicesTableBody } from './devices-table-body';
 import type { DeviceRow } from './types';
 
 /**

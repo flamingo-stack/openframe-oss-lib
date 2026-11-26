@@ -12,7 +12,7 @@ export type DataTablePaginationProps = TablePaginationProps;
  *
  * @example
  * <DataTable.Meta
- *   pagination={<DataTable.Pagination {...pager} loading={isPending} />}
+ *   pagination={<DataTable.Pagination pager={pager} loading={isPending} />}
  *   actions={<AutoRefreshControl {...refresh} />}
  * >
  *   <DataTable.PageRange rangeStart={pager.rangeStart} totalCount={total} />
@@ -23,7 +23,7 @@ export function DataTablePagination(props: DataTablePaginationProps) {
   const loadingScope = useLoadingScope();
   const rowsCount = table.getRowModel().rows.length;
 
-  if (rowsCount === 0 && !(props.loading || loadingScope) && (props.isFirstPage ?? true)) return null;
+  if (rowsCount === 0 && !(props.loading || loadingScope) && (props.pager.isFirstPage ?? true)) return null;
 
   return <TablePagination {...props} />;
 }

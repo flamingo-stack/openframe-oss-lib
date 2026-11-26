@@ -182,7 +182,7 @@ export type {
 export { CursorPagination, CursorPaginationSimple, cursorPaginationText } from './cursor-pagination';
 export type { CursorPaginationProps } from './cursor-pagination';
 export { DEFAULT_PAGE_SIZE_OPTIONS, TABLE_PAGINATION_PENDING, TablePagination } from './table-pagination';
-export type { TablePaginationProps } from './table-pagination';
+export type { TablePagerState, TablePaginationProps, TablePaginationRowsPerPage } from './table-pagination';
 export {
   AUTO_REFRESH_OFF,
   AutoRefreshControl,
