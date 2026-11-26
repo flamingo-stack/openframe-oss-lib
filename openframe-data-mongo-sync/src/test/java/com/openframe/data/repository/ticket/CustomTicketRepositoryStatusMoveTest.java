@@ -28,8 +28,8 @@ class CustomTicketRepositoryStatusMoveTest {
             ticketSpec);
 
     @Test
-    void moveToStatusIfStillIn_anyTicket_changesItOnlyWhileItIsStillInTheFromStatus() {
-        repository.moveToStatusIfStillIn("ticket-1", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED);
+    void moveFromStatus_anyTicket_changesItOnlyWhileItIsStillInTheFromStatus() {
+        repository.moveFromStatus("ticket-1", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED);
 
         ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).findAndModify(query.capture(), any(Update.class), eq(Ticket.class));

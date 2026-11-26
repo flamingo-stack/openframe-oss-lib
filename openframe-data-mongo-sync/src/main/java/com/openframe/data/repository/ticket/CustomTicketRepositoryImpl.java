@@ -479,8 +479,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     @Override
-    public Optional<Ticket> moveToStatusIfStillIn(String ticketId, String fromStatusId, String toStatusId,
-                                                  TicketStatusKind toKind) {
+    public Optional<Ticket> moveFromStatus(String ticketId, String fromStatusId, String toStatusId,
+                                           TicketStatusKind toKind) {
         Query query = new Query(Criteria.where(ID_FIELD).is(ticketId).and(FIELD_STATUS_ID).is(fromStatusId));
         query.fields().include(FIELD_TITLE, FIELD_TICKET_NUMBER, FIELD_ORGANIZATION_ID, FIELD_DEVICE_ID, FIELD_STATUS_ID,
                 FIELD_STATUS_KIND);

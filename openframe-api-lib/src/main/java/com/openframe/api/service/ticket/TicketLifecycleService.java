@@ -261,8 +261,7 @@ public class TicketLifecycleService {
         List<Ticket> resolvedTickets = ticketRepository.findTicketsWithCursor(query, null, 0, "order", "ASC");
 
         List<Ticket> archivedTickets = resolvedTickets.stream()
-                .map(ticket -> ticketRepository.moveToStatusIfStillIn(ticket.getId(), resolvedId, archived.getId(),
-                        archived.getKind()))
+                .map(ticket -> ticketRepository.moveFromStatus(ticket.getId(), resolvedId, archived.getId(), archived.getKind()))
                 .flatMap(Optional::stream)
                 .toList();
         log.info("Archived {} of {} resolved tickets (lifecycle)", archivedTickets.size(), resolvedTickets.size());

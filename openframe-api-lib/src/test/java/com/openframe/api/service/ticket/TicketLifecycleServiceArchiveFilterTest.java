@@ -87,7 +87,7 @@ class TicketLifecycleServiceArchiveFilterTest {
         resolvedTickets = List.of(resolvedTicket("t-1", "Printer offline"));
         Ticket asArchived = Ticket.builder().id("t-1").title("Printer offline on floor 2").organizationId("org-2")
                 .deviceId("machine-2").statusId("st-resolved").statusKind(TicketStatusKind.RESOLVED).build();
-        when(ticketRepository.moveToStatusIfStillIn("t-1", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
+        when(ticketRepository.moveFromStatus("t-1", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
                 .thenReturn(Optional.of(asArchived));
 
         List<String> archivedIds = service.archiveResolvedTickets(admin, null);
@@ -110,9 +110,9 @@ class TicketLifecycleServiceArchiveFilterTest {
         Ticket printer = resolvedTicket("t-1", "Printer offline");
         Ticket vpn = resolvedTicket("t-2", "VPN drops");
         resolvedTickets = List.of(printer, vpn);
-        when(ticketRepository.moveToStatusIfStillIn("t-1", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
+        when(ticketRepository.moveFromStatus("t-1", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
                 .thenReturn(Optional.of(printer));
-        when(ticketRepository.moveToStatusIfStillIn("t-2", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
+        when(ticketRepository.moveFromStatus("t-2", "st-resolved", "st-archived", TicketStatusKind.ARCHIVED))
                 .thenReturn(Optional.empty());
 
         List<String> archivedIds = service.archiveResolvedTickets(admin, null);

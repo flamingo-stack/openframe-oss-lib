@@ -50,10 +50,10 @@ class TicketStatusMoveIT {
     }
 
     @Test
-    void moveToStatusIfStillIn_ticketStillInTheStatus_returnsItAsItWasWithTheFieldsItsAuditRecordNeeds() {
+    void moveFromStatus_ticketStillInTheStatus_returnsItAsItWasWithTheFieldsItsAuditRecordNeeds() {
         Ticket resolved = ticketRepository.save(ticketIn("st-resolved", TicketStatusKind.RESOLVED));
 
-        Optional<Ticket> moved = ticketRepository.moveToStatusIfStillIn(resolved.getId(), "st-resolved", "st-archived",
+        Optional<Ticket> moved = ticketRepository.moveFromStatus(resolved.getId(), "st-resolved", "st-archived",
                 TicketStatusKind.ARCHIVED);
 
         assertThat(moved).get()
@@ -67,10 +67,10 @@ class TicketStatusMoveIT {
     }
 
     @Test
-    void moveToStatusIfStillIn_ticketStillInTheStatus_storesTheNewStatusAsAnUpdateOfTheTicket() {
+    void moveFromStatus_ticketStillInTheStatus_storesTheNewStatusAsAnUpdateOfTheTicket() {
         Ticket resolved = ticketRepository.save(ticketIn("st-resolved", TicketStatusKind.RESOLVED));
 
-        ticketRepository.moveToStatusIfStillIn(resolved.getId(), "st-resolved", "st-archived", TicketStatusKind.ARCHIVED);
+        ticketRepository.moveFromStatus(resolved.getId(), "st-resolved", "st-archived", TicketStatusKind.ARCHIVED);
 
         assertThat(ticketRepository.findById(resolved.getId())).get()
                 .returns("st-archived", Ticket::getStatusId)
@@ -80,10 +80,10 @@ class TicketStatusMoveIT {
     }
 
     @Test
-    void moveToStatusIfStillIn_ticketLeftTheStatus_changesNothing() {
+    void moveFromStatus_ticketLeftTheStatus_changesNothing() {
         Ticket reopened = ticketRepository.save(ticketIn("st-tech", TicketStatusKind.TECH_REQUIRED));
 
-        Optional<Ticket> moved = ticketRepository.moveToStatusIfStillIn(reopened.getId(), "st-resolved", "st-archived",
+        Optional<Ticket> moved = ticketRepository.moveFromStatus(reopened.getId(), "st-resolved", "st-archived",
                 TicketStatusKind.ARCHIVED);
 
         assertThat(moved).isEmpty();
@@ -93,12 +93,12 @@ class TicketStatusMoveIT {
     }
 
     @Test
-    void moveToStatusIfStillIn_ticketOfAnotherTenant_changesNothing() {
+    void moveFromStatus_ticketOfAnotherTenant_changesNothing() {
         mongoTemplate.getCollection("tickets").insertOne(new Document("_id", "ticket-of-tenant-2")
                 .append("tenantId", "tenant-2")
                 .append("statusId", "st-resolved"));
 
-        Optional<Ticket> moved = ticketRepository.moveToStatusIfStillIn("ticket-of-tenant-2", "st-resolved",
+        Optional<Ticket> moved = ticketRepository.moveFromStatus("ticket-of-tenant-2", "st-resolved",
                 "st-archived", TicketStatusKind.ARCHIVED);
 
         assertThat(moved).isEmpty();
