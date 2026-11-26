@@ -63,17 +63,15 @@ function Grid({
   settings,
   columns = COLUMNS,
   enableHiding,
-  pinFirstColumn,
 }: {
   settings?: DataTableSettings;
   columns?: ColumnDef<Item>[];
   /** The table-level TanStack option; the grid reads only each column's own flag. */
   enableHiding?: boolean;
-  pinFirstColumn?: 'wide' | 'desktop';
 }) {
   const table = useDataTable<Item>({ data: ITEMS, columns, getRowId: item => item.id, enableHiding });
   return (
-    <DataTable table={table} layout="grid" settings={settings} pinFirstColumn={pinFirstColumn}>
+    <DataTable table={table} layout="grid" settings={settings}>
       <DataTable.Header />
       <DataTable.Body<Item> />
     </DataTable>
@@ -358,14 +356,13 @@ describe('<DataTable layout="grid" settings>', () => {
     expect(headerColumns(container)).toEqual(['name']);
   });
 
-  it('keeps the session’s layout when the table changes its pin rule (no key: the layout lives in the store alone)', () => {
+  it('keeps the session’s layout when the table turns its settings off (no key: the layout lives in the store alone)', () => {
     const { container, rerender } = render(<Grid settings={{}} />);
     openMenu();
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Owner' }));
     expect(headerColumns(container)).toEqual(['name', 'city']);
-    rerender(<Grid settings={{}} pinFirstColumn="desktop" />);
+    rerender(<Grid />);
     expect(headerColumns(container)).toEqual(['name', 'city']);
-    expect(container.innerHTML).toContain('lg:sticky');
   });
 
   it('keeps a resized width in the browser', () => {
