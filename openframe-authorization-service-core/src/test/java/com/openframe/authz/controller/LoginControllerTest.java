@@ -2,6 +2,8 @@ package com.openframe.authz.controller;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -12,6 +14,7 @@ class LoginControllerTest {
 
     private static final String PASSWORD_RESET_URL = "https://openframe.ai/sas/password-reset/request";
     private static final String SITE_KEY = "6LcSiteKey";
+    private static final String SESSION_SITE_KEY = "6LcSessionSiteKey";
 
     private LoginController controller;
     private Model model;
@@ -22,34 +25,55 @@ class LoginControllerTest {
         model = new ConcurrentModel();
         ReflectionTestUtils.setField(controller, "passwordResetPageUrl", PASSWORD_RESET_URL);
         ReflectionTestUtils.setField(controller, "recaptchaSiteKey", SITE_KEY);
+        ReflectionTestUtils.setField(controller, "recaptchaSessionSiteKey", SESSION_SITE_KEY);
     }
 
     @Test
-    void login_resetAndSiteKeyConfigured_modelCarriesBoth() {
+    void login_sessionKeyConfigured_sessionKeyReplacesSiteKey() {
         // execution
         String view = controller.login(model, null);
 
         // verifications
         assertThat(view).isEqualTo("login");
-        assertThat(model.getAttribute("passwordResetUrl")).isEqualTo(PASSWORD_RESET_URL);
-        assertThat(model.getAttribute("recaptchaSiteKey")).isEqualTo(SITE_KEY);
+        assertThat(model.asMap())
+                .containsEntry("passwordResetUrl", PASSWORD_RESET_URL)
+                .containsEntry("recaptchaSessionSiteKey", SESSION_SITE_KEY)
+                .doesNotContainKeys("recaptchaSiteKey", "errorMessage");
     }
 
-    @Test
-    void login_noSiteKey_resetOfferedWithoutRecaptcha() {
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    void login_blankSessionKey_siteKeyUsedAsBefore(String sessionSiteKey) {
         // setup
-        ReflectionTestUtils.setField(controller, "recaptchaSiteKey", "");
+        ReflectionTestUtils.setField(controller, "recaptchaSessionSiteKey", sessionSiteKey);
 
         // execution
         controller.login(model, null);
 
         // verifications
-        assertThat(model.getAttribute("passwordResetUrl")).isEqualTo(PASSWORD_RESET_URL);
-        assertThat(model.containsAttribute("recaptchaSiteKey")).isFalse();
+        assertThat(model.asMap())
+                .containsEntry("passwordResetUrl", PASSWORD_RESET_URL)
+                .containsEntry("recaptchaSiteKey", SITE_KEY)
+                .doesNotContainKey("recaptchaSessionSiteKey");
     }
 
     @Test
-    void login_noResetPage_noRecaptchaEither() {
+    void login_noKeys_resetOfferedWithoutRecaptcha() {
+        // setup
+        ReflectionTestUtils.setField(controller, "recaptchaSiteKey", "");
+        ReflectionTestUtils.setField(controller, "recaptchaSessionSiteKey", "");
+
+        // execution
+        controller.login(model, null);
+
+        // verifications
+        assertThat(model.asMap())
+                .containsEntry("passwordResetUrl", PASSWORD_RESET_URL)
+                .doesNotContainKeys("recaptchaSiteKey", "recaptchaSessionSiteKey");
+    }
+
+    @Test
+    void login_noResetPage_sessionKeyStillOnModel() {
         // setup
         ReflectionTestUtils.setField(controller, "passwordResetPageUrl", "");
 
@@ -57,7 +81,30 @@ class LoginControllerTest {
         controller.login(model, null);
 
         // verifications
-        assertThat(model.containsAttribute("passwordResetUrl")).isFalse();
-        assertThat(model.containsAttribute("recaptchaSiteKey")).isFalse();
+        assertThat(model.asMap())
+                .containsEntry("recaptchaSessionSiteKey", SESSION_SITE_KEY)
+                .doesNotContainKeys("passwordResetUrl", "recaptchaSiteKey");
+    }
+
+    @Test
+    void login_noResetPageAndNoSessionKey_modelStaysEmpty() {
+        // setup
+        ReflectionTestUtils.setField(controller, "passwordResetPageUrl", "");
+        ReflectionTestUtils.setField(controller, "recaptchaSessionSiteKey", "");
+
+        // execution
+        controller.login(model, null);
+
+        // verifications
+        assertThat(model.asMap()).isEmpty();
+    }
+
+    @Test
+    void login_errorParameter_modelCarriesInvalidCredentials() {
+        // execution
+        controller.login(model, "");
+
+        // verifications
+        assertThat(model.asMap()).containsEntry("errorMessage", "Invalid credentials");
     }
 }
