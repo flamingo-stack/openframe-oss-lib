@@ -26,7 +26,7 @@ export { EMPTY_NARROWING, narrowingToFilter } from './device-selector/narrowing'
 export { DeviceConnectivityIcon, type DeviceConnectivityIconProps } from './device-connectivity-icon';
 export { DeviceLifecycleTag, type DeviceLifecycleTagProps, deviceLifecycleTagProps } from './device-lifecycle-tag';
 export { type DeviceStatusDisplay, DeviceStatusDisplayProvider, useDeviceStatusDisplay } from './device-status-display';
-export { DeviceOutdatedIcon, type DeviceOutdatedIconProps } from './device-status-hint';
+export { DeviceOutdatedIcon, type DeviceOutdatedIconProps } from './device-outdated-icon';
 export {
   type DeviceCardStatus,
   type DeviceConnectivityConfig,

@@ -104,7 +104,7 @@ describe('DataTableColumnFilter with a filter key', () => {
 
   it('reads and writes the key through the table, never the column', () => {
     const { column, table, setFilterValue, setColumnFilters } = fixture([{ id: 'kind', value: ['a'] }]);
-    render(<DataTableColumnFilter column={column} table={table} filterId="kind" label="NAME" options={OPTIONS} />);
+    render(<DataTableColumnFilter column={column} storedAs={{ table, id: 'kind' }} label="NAME" options={OPTIONS} />);
     // No title: the label names the funnel.
     fireEvent.click(screen.getByLabelText('Filter by NAME'));
     fireEvent.click(screen.getByRole('button', { name: /Kind B/ }));
@@ -116,7 +116,15 @@ describe('DataTableColumnFilter with a filter key', () => {
 
   it("keeps the column's own API when the key is the column's id", () => {
     const { column, table, setFilterValue, setColumnFilters } = fixture([]);
-    render(<DataTableColumnFilter column={column} table={table} label="NAME" title="Name" options={OPTIONS} />);
+    render(
+      <DataTableColumnFilter
+        column={column}
+        storedAs={{ table, id: 'name' }}
+        label="NAME"
+        title="Name"
+        options={OPTIONS}
+      />,
+    );
     fireEvent.click(screen.getByLabelText('Filter by Name'));
     fireEvent.click(screen.getByRole('button', { name: /Kind A/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { DeviceOutdatedIcon } from '../components/features/devices/device-status-hint';
+import { DeviceOutdatedIcon } from '../components/features/devices/device-outdated-icon';
 import { DeviceCard, type Device } from '../components/ui/device-card';
 
 const meta = {

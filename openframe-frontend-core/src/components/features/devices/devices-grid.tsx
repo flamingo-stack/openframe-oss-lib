@@ -8,10 +8,11 @@ import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { formatDeviceDateTime } from './device-last-online';
 import { deviceLifecycleTagProps } from './device-lifecycle-tag';
 import { getDeviceName } from './device-name';
+import { DeviceOutdatedIcon } from './device-outdated-icon';
 import { getDeviceOperatingSystem } from './device-status';
 import { type DeviceStatusDisplay, useDeviceStatusDisplay } from './device-status-display';
-import { DeviceOutdatedIcon, devicePendingHint } from './device-status-hint';
-import { isArchiveLifecycleStatus, isManagedStatus } from './device-statuses';
+import { devicePendingHint } from './device-status-hint';
+import { isManagedStatus, showsOutdatedAgentMark } from './device-statuses';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDevicesViewConfig } from './devices-view-config';
 import type { DeviceRow } from './types';
@@ -49,7 +50,6 @@ const GRID_CARD_ACTIONS = { moreButton: { visible: false } };
 function deviceCardStatusLine(device: DeviceRow, display: DeviceStatusDisplay): DeviceCardStatusLine | undefined {
   if (display !== 'lifecycle') return undefined;
   const lastSeen = device.last_seen ?? device.lastSeen;
-  const outdated = device.clientOutdated === true && !isArchiveLifecycleStatus(device.status);
   return {
     text: isManagedStatus(device.status)
       ? lastSeen
@@ -57,7 +57,7 @@ function deviceCardStatusLine(device: DeviceRow, display: DeviceStatusDisplay): 
         : 'Managed'
       : undefined,
     tagHint: devicePendingHint(device.status, display),
-    adornment: outdated ? (
+    adornment: showsOutdatedAgentMark(device.clientOutdated, device.status) ? (
       <DeviceOutdatedIcon clientOutdated={device.clientOutdated} status={device.status} />
     ) : undefined,
   };

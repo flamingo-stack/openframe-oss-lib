@@ -18,18 +18,22 @@ import { alignJustify, getColumnFilterValueByKey, setColumnFilterValueByKey } fr
 // invalidate `currentFilters` useMemo every render.
 const EMPTY_ARRAY: string[] = [];
 
+/**
+ * Where a filter stored under another key than its column's id lives (`meta.filter.id`): the key, and the table whose
+ * column filters hold it. One object, so a key never comes without the table it is read and written through.
+ */
+export interface DataTableColumnFilterStore {
+  table: Table<unknown>;
+  id: string;
+}
+
 export interface DataTableColumnFilterProps {
   column: Column<unknown, unknown>;
   /**
-   * The table the column is in. Needed for a filter stored under another key (`filterId`): the column's own API can
-   * only reach its own id.
+   * A filter stored under another key than the column's id (`meta.filter.id`), read and written through that table;
+   * the column's own API only reaches its own id. Omitted, or with the column's own id, the filter is the column's.
    */
-  table?: Table<unknown>;
-  /**
-   * The key the filter is stored under in the table's column filters (`meta.filter.id`). Default: the column's id. Read
-   * and written through `table`; without one, the filter stays under the column's id.
-   */
-  filterId?: string;
+  storedAs?: DataTableColumnFilterStore;
   /** The dropdown's title and the funnel's accessible name, "Filter by <title>" (`meta.filter.title`). Default `label`. */
   title?: string;
   options: DataTableFilterOption[];
@@ -50,8 +54,7 @@ export interface DataTableColumnFilterProps {
 /** Filter dropdown wrapper that reads/writes TanStack column filter state. */
 export function DataTableColumnFilter({
   column,
-  table,
-  filterId,
+  storedAs,
   title: titleProp,
   options,
   extraSections,
@@ -63,8 +66,8 @@ export function DataTableColumnFilter({
 }: DataTableColumnFilterProps) {
   // A filter stored under another key than the column's id is read and written through the table, under that key
   // alone; one under the column's id through the column's own API, as always.
-  const key = filterId ?? column.id;
-  const keyedTable = key !== column.id ? table : undefined;
+  const key = storedAs?.id ?? column.id;
+  const keyedTable = storedAs && storedAs.id !== column.id ? storedAs.table : undefined;
   const currentValue = (keyedTable ? getColumnFilterValueByKey(keyedTable, key) : column.getFilterValue()) as
     string[] | undefined;
   const activeCount = currentValue?.length ?? 0;

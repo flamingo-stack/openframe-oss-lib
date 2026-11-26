@@ -270,8 +270,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   const filterTrigger = filter ? (
     <DataTableColumnFilter
       column={column}
-      table={table}
-      filterId={filter.id}
+      storedAs={filter.id ? { table, id: filter.id } : undefined}
       title={filter.title}
       options={filter.options}
       extraSections={filter.sections}

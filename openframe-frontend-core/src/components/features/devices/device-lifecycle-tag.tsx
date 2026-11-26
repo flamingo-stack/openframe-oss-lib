@@ -3,8 +3,9 @@
 import { Tag, type TagProps } from '../../ui/tag';
 import { getDeviceLifecycleConfig, getDeviceStatusConfig, getLegacyDeviceStatusConfig } from './device-status';
 import { type DeviceStatusDisplay, useDeviceStatusDisplay } from './device-status-display';
-import { DeviceTagHint, devicePendingHint } from './device-status-hint';
+import { devicePendingHint } from './device-status-hint';
 import { DEVICE_FILTER_OUTDATED } from './device-statuses';
+import { DeviceTagHint } from './device-tag-hint';
 
 export interface DeviceLifecycleTagProps extends Omit<TagProps, 'label' | 'variant' | 'icon'> {
   status: string | null | undefined;

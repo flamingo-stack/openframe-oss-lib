@@ -215,6 +215,18 @@ export function isArchiveLifecycle(device: { status?: string | null }): boolean 
 }
 
 /**
+ * Whether a device shows the outdated-agent mark (`DeviceOutdatedIcon`): the server flags its client as outdated, and
+ * the device is not an archive or about to become one, where a reinstall would bring it back. The one rule every view
+ * reads, the mark itself included.
+ */
+export function showsOutdatedAgentMark(
+  clientOutdated: boolean | null | undefined,
+  status: string | null | undefined,
+): boolean {
+  return clientOutdated === true && !isArchiveLifecycleStatus(status);
+}
+
+/**
  * Statuses that are hidden by default (for documentation/reference)
  */
 export const HIDDEN_DEVICE_STATUSES = [DEVICE_STATUS.ARCHIVED, DEVICE_STATUS.DELETED] as const;

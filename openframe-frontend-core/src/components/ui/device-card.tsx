@@ -6,7 +6,7 @@ import { formatDate, formatTime } from '../../utils/format-date';
 import type { OSPlatformId } from '../../utils/os-platforms';
 import { DeviceConnectivityIcon } from '../features/devices/device-connectivity-icon';
 import { useDeviceStatusDisplay } from '../features/devices/device-status-display';
-import { DeviceTagHint } from '../features/devices/device-status-hint';
+import { DeviceTagHint } from '../features/devices/device-tag-hint';
 import { OSTypeIcon } from '../features/os-type-badge';
 import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
 import { Ellipsis01Icon } from '../icons-v2-generated/interface';

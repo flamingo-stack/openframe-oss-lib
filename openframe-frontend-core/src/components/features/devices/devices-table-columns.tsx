@@ -34,22 +34,25 @@ import { OSTypeBadge } from '../os-type-badge';
 import { DeviceConnectivityIcon } from './device-connectivity-icon';
 import { directorySourceLabel, directoryUserLines, directoryUserLinkLabel } from './device-directory';
 import { formatDeviceDateTime } from './device-last-online';
+import { DeviceLastSeenCell } from './device-last-seen-cell';
 import { DeviceLifecycleTag } from './device-lifecycle-tag';
 import { getDeviceName } from './device-name';
+import { DeviceOutdatedIcon } from './device-outdated-icon';
 import { getDeviceConnectivityConfig, getDeviceLifecycleConfig, getDeviceStatusConfig } from './device-status';
 import { type DeviceStatusDisplay, useDeviceStatusDisplay } from './device-status-display';
-import { DeviceOutdatedIcon, DeviceTagHint, devicePendingHint } from './device-status-hint';
+import { devicePendingHint } from './device-status-hint';
 import {
   DEFAULT_VISIBLE_STATUSES,
   DEVICE_CONNECTIVITY_FILTER_SECTION,
   DEVICE_CONNECTIVITY_VALUES,
   DEVICE_FILTER_OUTDATED,
   DEVICE_STATUS,
-  isArchiveLifecycleStatus,
   isManagedStatus,
   joinStatusFilterValue,
   mergeStatusFacets,
+  showsOutdatedAgentMark,
 } from './device-statuses';
+import { DeviceTagHint } from './device-tag-hint';
 import { renderDeviceTypeIcon } from './device-type-icon';
 import { DeviceTypeTile } from './device-type-tile';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
@@ -413,7 +416,6 @@ const DEVICE_COLUMN_SIZE = { lifecycle: 380, legacy: 280 } as const;
  */
 function deviceNameStatus(device: DeviceRow): { tag: ReactNode; mark: ReactNode } {
   const hasTag = !!device.status && !isManagedStatus(device.status);
-  const outdated = device.clientOutdated === true && !isArchiveLifecycleStatus(device.status);
   const tagElement = hasTag ? (
     <DeviceLifecycleTag
       status={device.status}
@@ -433,7 +435,9 @@ function deviceNameStatus(device: DeviceRow): { tag: ReactNode; mark: ReactNode 
       ) : (
         tagElement
       ),
-    mark: outdated ? <DeviceOutdatedIcon clientOutdated={device.clientOutdated} status={device.status} /> : null,
+    mark: showsOutdatedAgentMark(device.clientOutdated, device.status) ? (
+      <DeviceOutdatedIcon clientOutdated={device.clientOutdated} status={device.status} />
+    ) : null,
   };
 }
 
@@ -533,27 +537,6 @@ export function DeviceNameGridCell({
       trailing={unread ? <DeviceUnreadIndicator device={device} /> : undefined}
     />
   );
-}
-
-/**
- * When the device was last seen, as the LAST SEEN column prints it: its date and time, the empty mark for a device
- * never seen, nothing while the row is read (the text's own skeleton).
- */
-function useDeviceLastSeenText(device: DeviceRow): string {
-  const loading = useLoadingScope();
-  const lastSeen = device.last_seen ?? device.lastSeen;
-  if (lastSeen) return formatDeviceDateTime(lastSeen);
-  return loading ? '' : '—';
-}
-
-/** The LAST SEEN cell of a card row. */
-function DeviceLastSeenCell({ device }: { device: DeviceRow }) {
-  return <TruncateText>{useDeviceLastSeenText(device)}</TruncateText>;
-}
-
-/** The LAST SEEN cell in the grid. */
-function DeviceLastSeenGridCell({ device }: { device: DeviceRow }) {
-  return <DataTable.Cell text={useDeviceLastSeenText(device)} />;
 }
 
 /** The status tag with when the device was last seen beside it. */
@@ -868,7 +851,7 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
     size: 180,
     meta: {
       label: 'Last seen',
-      gridCell: ({ row }) => <DeviceLastSeenGridCell device={row.original} />,
+      gridCell: ({ row }) => <DeviceLastSeenCell device={row.original} grid />,
       // The STATUS column's share, so the columns around it keep theirs; below `md` a card row has no room for it.
       width: directoryColumns ? 'w-auto shrink-0 content-md:w-[14%]' : 'w-auto shrink-0 content-md:w-1/5',
       hideAt: 'md',
