@@ -43,6 +43,7 @@ import java.util.stream.Stream;
 public class DeviceOsUpdateRolloutStateService {
 
     private static final OsPlatform PLATFORM = OsPlatform.WINDOWS;
+    private static final int BATCH_SIZE = 500;
 
     private final TenantIdProvider tenantIdProvider;
     private final DeviceOsStateRepository deviceOsStateRepository;
@@ -58,7 +59,11 @@ public class DeviceOsUpdateRolloutStateService {
     private final DeviceOsUpdateRolloutStateCalculator deviceOsUpdateRolloutStateCalculator;
 
     // Every device that reports its OS, batchSize at a time by machine id.
-    public void refreshAll(int batchSize) {
+    public void refreshAll() {
+        refreshAll(BATCH_SIZE);
+    }
+
+    void refreshAll(int batchSize) {
         String tenantId = tenantIdProvider.getTenantId();
         String afterMachineId = "";
         List<DeviceOsState> deviceOsStates;

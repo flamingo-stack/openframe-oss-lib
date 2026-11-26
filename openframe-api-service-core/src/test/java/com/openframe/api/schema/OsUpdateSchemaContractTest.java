@@ -27,6 +27,11 @@ import graphql.language.Type;
 import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
 import org.junit.jupiter.api.BeforeAll;
+import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStatus;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTargetType;
+import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutMode;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOverrideAction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -278,6 +283,7 @@ class OsUpdateSchemaContractTest {
         expected.put("discoveredAt", "Instant!");
         expected.put("downloaded", "Boolean");
         expected.put("macosPresence", "MacosUpdatePresence");
+        expected.put("rolloutState", "DeviceOsUpdateRolloutState");
 
         // execution
         Map<String, String> pendingUpdate = fields("DeviceOsPendingUpdate");
@@ -301,6 +307,87 @@ class OsUpdateSchemaContractTest {
                 "operation", "OsUpdateOperation",
                 "result", "OsUpdateInstallResult",
                 "errorCode", "String"));
+    }
+
+    @Test
+    void osUpdatePolicy_exactlyItsFieldsAndTheFieldsOfItsInput() {
+        // setup
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("id", "ID!");
+        expected.put("name", "String!");
+        expected.put("target", "OsUpdatePolicyTarget!");
+        expected.put("rolloutRules", "[OsUpdateRolloutRule!]!");
+        expected.put("restartDeadlines", "[OsUpdateRestartDeadline!]!");
+        expected.put("pilotTagId", "ID");
+        expected.put("createdAt", "Instant!");
+        expected.put("updatedAt", "Instant!");
+        Map<String, String> expectedInput = new LinkedHashMap<>();
+        expectedInput.put("name", "String!");
+        expectedInput.put("target", "OsUpdatePolicyTargetInput!");
+        expectedInput.put("rolloutRules", "[OsUpdateRolloutRuleInput!]!");
+        expectedInput.put("restartDeadlines", "[OsUpdateRestartDeadlineInput!]!");
+        expectedInput.put("pilotTagId", "ID");
+
+        // execution, verifications
+        assertThat(fields("OsUpdatePolicy")).containsExactlyInAnyOrderEntriesOf(expected);
+        assertThat(inputFields("OsUpdatePolicyInput")).containsExactlyInAnyOrderEntriesOf(expectedInput);
+    }
+
+    @Test
+    void rolloutRuleAndRestartDeadline_sameFieldsInTheTypeAndInItsInput() {
+        // setup
+        Map<String, String> expectedRule = new LinkedHashMap<>();
+        expectedRule.put("urgency", "OsUpdateUrgency!");
+        expectedRule.put("mode", "OsUpdateRolloutMode!");
+        expectedRule.put("daysAfterRelease", "Int");
+        expectedRule.put("daysLaterToEveryone", "Int");
+        Map<String, String> expectedDeadline = new LinkedHashMap<>();
+        expectedDeadline.put("urgency", "OsUpdateUrgency!");
+        expectedDeadline.put("focusDays", "Int!");
+        expectedDeadline.put("softDays", "Int!");
+        expectedDeadline.put("hardDays", "Int!");
+
+        // execution, verifications
+        assertThat(fields("OsUpdateRolloutRule")).containsExactlyInAnyOrderEntriesOf(expectedRule);
+        assertThat(inputFields("OsUpdateRolloutRuleInput")).containsExactlyInAnyOrderEntriesOf(expectedRule);
+        assertThat(fields("OsUpdateRestartDeadline")).containsExactlyInAnyOrderEntriesOf(expectedDeadline);
+        assertThat(inputFields("OsUpdateRestartDeadlineInput")).containsExactlyInAnyOrderEntriesOf(expectedDeadline);
+    }
+
+    @Test
+    void deviceOsUpdateRolloutState_exactlyItsFields() {
+        // setup
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("policyId", "ID!");
+        expected.put("status", "DeviceOsUpdateRolloutStatus!");
+        expected.put("overrideAction", "OsUpdateOverrideAction");
+        expected.put("installFrom", "Instant");
+        expected.put("focusAt", "Instant");
+        expected.put("softAt", "Instant");
+        expected.put("hardAt", "Instant");
+
+        // execution, verifications
+        assertThat(fields("DeviceOsUpdateRolloutState")).containsExactlyInAnyOrderEntriesOf(expected);
+    }
+
+    @Test
+    void osUpdateOverride_scopeIsOptionalInTheTypeAndInItsInput() {
+        // setup
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("action", "OsUpdateOverrideAction!");
+        expected.put("organizationId", "String");
+        expected.put("machineId", "String");
+        expected.put("actedBy", "String");
+        expected.put("actedAt", "Instant!");
+        Map<String, String> expectedInput = new LinkedHashMap<>();
+        expectedInput.put("osUpdateId", "ID!");
+        expectedInput.put("action", "OsUpdateOverrideAction!");
+        expectedInput.put("organizationId", "String");
+        expectedInput.put("machineId", "String");
+
+        // execution, verifications
+        assertThat(fields("OsUpdateOverride")).containsExactlyInAnyOrderEntriesOf(expected);
+        assertThat(inputFields("OsUpdateOverrideInput")).containsExactlyInAnyOrderEntriesOf(expectedInput);
     }
 
     @ParameterizedTest
@@ -333,7 +420,12 @@ class OsUpdateSchemaContractTest {
                 Arguments.of("OsUpdateInstallResult", OsUpdateInstallResult.class),
                 Arguments.of("OsUpdateType", OsUpdateType.class),
                 Arguments.of("OsUpdateClassification", OsUpdateClassification.class),
-                Arguments.of("OsUpdateDeviceStatus", OsUpdateDeviceStatus.class));
+                Arguments.of("OsUpdateDeviceStatus", OsUpdateDeviceStatus.class),
+                Arguments.of("OsUpdatePolicyTargetType", OsUpdatePolicyTargetType.class),
+                Arguments.of("OsUpdateUrgency", OsUpdateUrgency.class),
+                Arguments.of("OsUpdateRolloutMode", OsUpdateRolloutMode.class),
+                Arguments.of("OsUpdateOverrideAction", OsUpdateOverrideAction.class),
+                Arguments.of("DeviceOsUpdateRolloutStatus", DeviceOsUpdateRolloutStatus.class));
     }
 
     private static Map<String, String> fields(String typeName) {

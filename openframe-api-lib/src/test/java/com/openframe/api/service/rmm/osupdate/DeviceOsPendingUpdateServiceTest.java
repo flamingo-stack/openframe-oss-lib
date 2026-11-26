@@ -15,6 +15,10 @@ import com.openframe.data.repository.rmm.osupdate.OsUpdateDeviceCount;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateIdentifiersOfPlatform;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStateResponse;
+import com.openframe.api.mapper.OsUpdatePolicyResponseMapper;
+import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +29,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -51,6 +56,8 @@ class DeviceOsPendingUpdateServiceTest {
     @Mock private DeviceOsResponseMapper deviceOsResponseMapper;
     @Mock private OsUpdateResponseMapper osUpdateResponseMapper;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private DeviceOsUpdateRolloutStateRepository deviceOsUpdateRolloutStateRepository;
+    @Mock private OsUpdatePolicyResponseMapper osUpdatePolicyResponseMapper;
 
     @InjectMocks private DeviceOsPendingUpdateService deviceOsPendingUpdateService;
 
@@ -78,6 +85,41 @@ class DeviceOsPendingUpdateServiceTest {
 
         // verifications
         assertThat(found).containsExactly(newerResponse, olderResponse);
+    }
+
+    @Test
+    void listPendingUpdates_pendingUpdateWithARolloutState_carriesIt() {
+        // setup
+        DeviceOsPendingUpdate rolledOut = pendingUpdate(MACHINE_ID, "kb-2", NEWEST);
+        DeviceOsPendingUpdate notRolledOut = pendingUpdate(MACHINE_ID, "kb-1", OLDER);
+        OsUpdate osUpdateOne = osUpdate("kb-1");
+        OsUpdate osUpdateTwo = osUpdate("kb-2");
+        DeviceOsUpdateRolloutState deviceOsUpdateRolloutState =
+                DeviceOsUpdateRolloutState.builder().machineId(MACHINE_ID).identifier("kb-2").build();
+        DeviceOsUpdateRolloutStateResponse rolloutStateResponse =
+                DeviceOsUpdateRolloutStateResponse.builder().policyId("policy-1").build();
+        stubManageableDevice();
+        when(deviceOsPendingUpdateRepository
+                .findByTenantIdAndMachineIdOrderByDiscoveredAtDescIdentifierAsc(TENANT_ID, MACHINE_ID))
+                .thenReturn(List.of(rolledOut, notRolledOut));
+        when(osUpdateRepository.findByTenantIdAndPlatformAndIdentifierIn(
+                TENANT_ID, OsPlatform.WINDOWS, List.of("kb-2", "kb-1")))
+                .thenReturn(List.of(osUpdateOne, osUpdateTwo));
+        when(deviceOsResponseMapper.toResponse(rolledOut, osUpdateTwo))
+                .thenReturn(DeviceOsPendingUpdateResponse.builder().identifier("kb-2").build());
+        when(deviceOsResponseMapper.toResponse(notRolledOut, osUpdateOne))
+                .thenReturn(DeviceOsPendingUpdateResponse.builder().identifier("kb-1").build());
+        when(deviceOsUpdateRolloutStateRepository.findByTenantIdAndMachineId(TENANT_ID, MACHINE_ID))
+                .thenReturn(List.of(deviceOsUpdateRolloutState));
+        when(osUpdatePolicyResponseMapper.toResponse(eq(deviceOsUpdateRolloutState), any(Instant.class)))
+                .thenReturn(rolloutStateResponse);
+
+        // execution
+        List<DeviceOsPendingUpdateResponse> found = deviceOsPendingUpdateService.listPendingUpdates(MACHINE_ID);
+
+        // verifications
+        assertThat(found).extracting(DeviceOsPendingUpdateResponse::getRolloutState)
+                .containsExactly(rolloutStateResponse, null);
     }
 
     @Test

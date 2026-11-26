@@ -249,6 +249,9 @@ type DeviceOsPendingUpdate {
     discoveredAt: Instant!
     downloaded: Boolean
     macosPresence: MacosUpdatePresence
+    """Null = no policy rolls the update out to this device: no policy covers the device, or the policy has no rule
+    for the urgency of the update."""
+    rolloutState: DeviceOsUpdateRolloutState
 }
 
 enum OsUpdateSeverity {

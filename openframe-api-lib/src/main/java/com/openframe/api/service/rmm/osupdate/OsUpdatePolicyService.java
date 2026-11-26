@@ -1,0 +1,125 @@
+package com.openframe.api.service.rmm.osupdate;
+
+import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyCommand;
+import com.openframe.api.dto.rmm.osupdate.OsUpdatePolicyResponse;
+import com.openframe.api.exception.OsUpdatePolicyNotFoundException;
+import com.openframe.api.mapper.OsUpdatePolicyResponseMapper;
+import com.openframe.api.service.device.DeviceService;
+import com.openframe.audit.Audited;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdatePolicyRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
+import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.osupdate.DeviceOsUpdateRolloutStateService;
+import com.openframe.data.service.rmm.osupdate.OsUpdatePolicyResolver;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static com.openframe.data.document.audit.AuditAction.OS_UPDATE_POLICY_CREATE;
+import static com.openframe.data.document.audit.AuditAction.OS_UPDATE_POLICY_DELETE;
+import static com.openframe.data.document.audit.AuditAction.OS_UPDATE_POLICY_UPDATE;
+
+@Service
+@ConditionalOnProperty(name = "openframe.rmm.os-update.enabled", havingValue = "true")
+@RequiredArgsConstructor
+public class OsUpdatePolicyService {
+
+    private final TenantIdProvider tenantIdProvider;
+    private final OsUpdatePolicyRepository osUpdatePolicyRepository;
+    private final OsUpdatePolicyValidator osUpdatePolicyValidator;
+    private final OsUpdatePolicyResponseMapper osUpdatePolicyResponseMapper;
+    private final OsUpdatePolicyResolver osUpdatePolicyResolver;
+    private final DeviceOsUpdateRolloutStateService deviceOsUpdateRolloutStateService;
+    private final DeviceOsStateService deviceOsStateService;
+    private final DeviceService deviceService;
+    private final MachineRepository machineRepository;
+    private final TagAssignmentRepository tagAssignmentRepository;
+
+    public List<OsUpdatePolicyResponse> listPolicies() {
+        return findPolicies().stream().map(osUpdatePolicyResponseMapper::toResponse).toList();
+    }
+
+    public Optional<OsUpdatePolicyResponse> findPolicy(String id) {
+        return osUpdatePolicyRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
+                .map(osUpdatePolicyResponseMapper::toResponse);
+    }
+
+    // Empty = no policy covers the device, or we cannot manage the device: no policy is applied to it then.
+    public Optional<OsUpdatePolicyResponse> findPolicyOfDevice(String machineId) {
+        deviceService.verifyExists(machineId);
+        if (deviceOsStateService.isNotManageable(machineId)) {
+            return Optional.empty();
+        }
+        Set<String> machineTagIds = tagAssignmentRepository
+                .findByEntityIdAndEntityType(machineId, TagEntityType.DEVICE).stream()
+                .map(TagAssignment::getTagId)
+                .collect(Collectors.toSet());
+        Optional<Machine> machine =
+                machineRepository.findByTenantIdAndMachineId(tenantIdProvider.getTenantId(), machineId);
+        return machine
+                .flatMap(found -> osUpdatePolicyResolver.resolve(findPolicies(), found, machineTagIds))
+                .map(osUpdatePolicyResponseMapper::toResponse);
+    }
+
+    @Audited(action = OS_UPDATE_POLICY_CREATE, targetId = "#result.id", targetName = "#osUpdatePolicyCommand.name")
+    public OsUpdatePolicyResponse createPolicy(OsUpdatePolicyCommand osUpdatePolicyCommand) {
+        osUpdatePolicyValidator.validate(osUpdatePolicyCommand, findPolicies());
+        Instant now = Instant.now();
+        OsUpdatePolicy osUpdatePolicy = OsUpdatePolicy.builder()
+                .tenantId(tenantIdProvider.getTenantId())
+                .createdAt(now)
+                .build();
+        return saveAndRefreshRollout(osUpdatePolicy, osUpdatePolicyCommand, now);
+    }
+
+    // Replaces the policy as a whole.
+    @Audited(action = OS_UPDATE_POLICY_UPDATE, targetId = "#id")
+    public OsUpdatePolicyResponse updatePolicy(String id, OsUpdatePolicyCommand osUpdatePolicyCommand) {
+        OsUpdatePolicy osUpdatePolicy = requirePolicy(id);
+        List<OsUpdatePolicy> otherOsUpdatePolicies = findPolicies().stream()
+                .filter(other -> !other.getId().equals(id))
+                .toList();
+        osUpdatePolicyValidator.validate(osUpdatePolicyCommand, otherOsUpdatePolicies);
+        return saveAndRefreshRollout(osUpdatePolicy, osUpdatePolicyCommand, Instant.now());
+    }
+
+    @Audited(action = OS_UPDATE_POLICY_DELETE, targetId = "#id")
+    public void deletePolicy(String id) {
+        osUpdatePolicyRepository.delete(requirePolicy(id));
+        deviceOsUpdateRolloutStateService.refreshAll();
+    }
+
+    // The devices follow the saved policy at once, not with the next scheduled run.
+    private OsUpdatePolicyResponse saveAndRefreshRollout(OsUpdatePolicy osUpdatePolicy,
+                                                         OsUpdatePolicyCommand osUpdatePolicyCommand, Instant now) {
+        osUpdatePolicy.setName(osUpdatePolicyCommand.getName());
+        osUpdatePolicy.setTarget(osUpdatePolicyCommand.getTarget());
+        osUpdatePolicy.setRolloutRules(osUpdatePolicyCommand.getRolloutRules());
+        osUpdatePolicy.setRestartDeadlines(osUpdatePolicyCommand.getRestartDeadlines());
+        osUpdatePolicy.setPilotTagId(osUpdatePolicyCommand.getPilotTagId());
+        osUpdatePolicy.setUpdatedAt(now);
+        OsUpdatePolicy savedOsUpdatePolicy = osUpdatePolicyRepository.save(osUpdatePolicy);
+        deviceOsUpdateRolloutStateService.refreshAll();
+        return osUpdatePolicyResponseMapper.toResponse(savedOsUpdatePolicy);
+    }
+
+    private List<OsUpdatePolicy> findPolicies() {
+        return osUpdatePolicyRepository.findByTenantIdOrderByCreatedAtAsc(tenantIdProvider.getTenantId());
+    }
+
+    private OsUpdatePolicy requirePolicy(String id) {
+        return osUpdatePolicyRepository.findByTenantIdAndId(tenantIdProvider.getTenantId(), id)
+                .orElseThrow(() -> new OsUpdatePolicyNotFoundException("OS update policy not found: " + id));
+    }
+}

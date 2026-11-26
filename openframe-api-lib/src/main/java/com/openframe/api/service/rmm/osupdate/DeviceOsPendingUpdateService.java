@@ -1,15 +1,19 @@
 package com.openframe.api.service.rmm.osupdate;
 
 import com.openframe.api.dto.rmm.osupdate.DeviceOsPendingUpdateResponse;
+import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStateResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.mapper.DeviceOsResponseMapper;
+import com.openframe.api.mapper.OsUpdatePolicyResponseMapper;
 import com.openframe.api.mapper.OsUpdateResponseMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.rmm.osupdate.DeviceOsPendingUpdate;
+import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateDeviceCount;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateIdentifiersOfPlatform;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
@@ -18,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +44,8 @@ public class DeviceOsPendingUpdateService {
     private final DeviceOsResponseMapper deviceOsResponseMapper;
     private final OsUpdateResponseMapper osUpdateResponseMapper;
     private final TenantIdProvider tenantIdProvider;
+    private final DeviceOsUpdateRolloutStateRepository deviceOsUpdateRolloutStateRepository;
+    private final OsUpdatePolicyResponseMapper osUpdatePolicyResponseMapper;
 
     // Updates of a device we cannot manage are not shown as pending: nobody can act on them from here.
     // The stored ones stay, for the day the device becomes manageable.
@@ -50,11 +57,27 @@ public class DeviceOsPendingUpdateService {
         List<DeviceOsPendingUpdate> pendingUpdates = deviceOsPendingUpdateRepository
                 .findByTenantIdAndMachineIdOrderByDiscoveredAtDescIdentifierAsc(tenantIdProvider.getTenantId(), machineId);
         Map<String, OsUpdate> osUpdatesByIdentifier = findOsUpdatesByIdentifier(pendingUpdates);
+        Map<String, DeviceOsUpdateRolloutStateResponse> rolloutStatesByIdentifier =
+                findRolloutStatesByIdentifier(machineId);
         return pendingUpdates.stream()
                 .filter(pendingUpdate -> osUpdatesByIdentifier.containsKey(pendingUpdate.getIdentifier()))
-                .map(pendingUpdate -> deviceOsResponseMapper.toResponse(
-                        pendingUpdate, osUpdatesByIdentifier.get(pendingUpdate.getIdentifier())))
+                .map(pendingUpdate -> {
+                    DeviceOsPendingUpdateResponse pendingUpdateResponse = deviceOsResponseMapper.toResponse(
+                            pendingUpdate, osUpdatesByIdentifier.get(pendingUpdate.getIdentifier()));
+                    pendingUpdateResponse.setRolloutState(
+                            rolloutStatesByIdentifier.get(pendingUpdate.getIdentifier()));
+                    return pendingUpdateResponse;
+                })
                 .toList();
+    }
+
+    private Map<String, DeviceOsUpdateRolloutStateResponse> findRolloutStatesByIdentifier(String machineId) {
+        Instant now = Instant.now();
+        return deviceOsUpdateRolloutStateRepository
+                .findByTenantIdAndMachineId(tenantIdProvider.getTenantId(), machineId).stream()
+                .collect(Collectors.toMap(DeviceOsUpdateRolloutState::getIdentifier,
+                        deviceOsUpdateRolloutState ->
+                                osUpdatePolicyResponseMapper.toResponse(deviceOsUpdateRolloutState, now)));
     }
 
     // Devices we cannot manage are not counted. scopeMachineIds null = every device.

@@ -18,6 +18,18 @@ import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.api.mapper.OsUpdatePolicyGraphQLMapper;
+import com.openframe.api.mapper.OsUpdatePolicyResponseMapper;
+import com.openframe.api.service.rmm.osupdate.OsUpdateOverrideService;
+import com.openframe.api.service.rmm.osupdate.OsUpdatePolicyService;
+import com.openframe.api.service.rmm.osupdate.OsUpdatePolicyValidator;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOverrideRepository;
+import com.openframe.data.repository.rmm.osupdate.OsUpdatePolicyRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
+import com.openframe.data.service.rmm.osupdate.DeviceOsUpdateRolloutStateService;
+import com.openframe.data.service.rmm.osupdate.OsUpdatePolicyResolver;
+import com.openframe.graphql.relay.RelayIdCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -38,11 +50,22 @@ class DeviceOsWiringTest {
             .withBean(DeviceOsUpdateHistoryRepository.class, () -> mock(DeviceOsUpdateHistoryRepository.class))
             .withBean(DeviceService.class, () -> mock(DeviceService.class))
             .withBean(TenantIdProvider.class, () -> mock(TenantIdProvider.class))
+            .withBean(DeviceOsUpdateRolloutStateRepository.class,
+                    () -> mock(DeviceOsUpdateRolloutStateRepository.class))
+            .withBean(OsUpdatePolicyRepository.class, () -> mock(OsUpdatePolicyRepository.class))
+            .withBean(OsUpdateOverrideRepository.class, () -> mock(OsUpdateOverrideRepository.class))
+            .withBean(TagAssignmentRepository.class, () -> mock(TagAssignmentRepository.class))
+            .withBean(DeviceOsUpdateRolloutStateService.class, () -> mock(DeviceOsUpdateRolloutStateService.class))
+            .withBean(OsUpdatePolicyResolver.class, OsUpdatePolicyResolver::new)
+            .withBean(RelayIdCodec.class, () -> mock(RelayIdCodec.class))
             .withUserConfiguration(DeviceOsDataFetcher.class, DeviceOsStateService.class,
                     DeviceOsPendingUpdateService.class, DeviceOsUpdateHistoryService.class, CursorPageAssembler.class,
                     DeviceOsResponseMapper.class, DeviceOsGraphQLMapper.class,
                     OsUpdateDataFetcher.class, OsUpdateService.class, OsUpdateDeviceService.class, OsUpdateResponseMapper.class,
-                    OsUpdateGraphQLMapper.class, OsUpdateDeviceCountsDataLoader.class);
+                    OsUpdateGraphQLMapper.class, OsUpdateDeviceCountsDataLoader.class,
+                    OsUpdatePolicyDataFetcher.class, OsUpdatePolicyService.class, OsUpdateOverrideService.class,
+                    OsUpdatePolicyValidator.class, OsUpdatePolicyResponseMapper.class,
+                    OsUpdatePolicyGraphQLMapper.class);
 
     @Test
     void osUpdateFlagAbsent_nothingOfTheReadSideRuns() {
@@ -59,7 +82,13 @@ class DeviceOsWiringTest {
                 .doesNotHaveBean(OsUpdateDeviceService.class)
                 .doesNotHaveBean(OsUpdateResponseMapper.class)
                 .doesNotHaveBean(OsUpdateGraphQLMapper.class)
-                .doesNotHaveBean(OsUpdateDeviceCountsDataLoader.class));
+                .doesNotHaveBean(OsUpdateDeviceCountsDataLoader.class)
+                .doesNotHaveBean(OsUpdatePolicyDataFetcher.class)
+                .doesNotHaveBean(OsUpdatePolicyService.class)
+                .doesNotHaveBean(OsUpdateOverrideService.class)
+                .doesNotHaveBean(OsUpdatePolicyValidator.class)
+                .doesNotHaveBean(OsUpdatePolicyResponseMapper.class)
+                .doesNotHaveBean(OsUpdatePolicyGraphQLMapper.class));
     }
 
     @ParameterizedTest
@@ -78,7 +107,13 @@ class DeviceOsWiringTest {
                 .doesNotHaveBean(OsUpdateDeviceService.class)
                 .doesNotHaveBean(OsUpdateResponseMapper.class)
                 .doesNotHaveBean(OsUpdateGraphQLMapper.class)
-                .doesNotHaveBean(OsUpdateDeviceCountsDataLoader.class));
+                .doesNotHaveBean(OsUpdateDeviceCountsDataLoader.class)
+                .doesNotHaveBean(OsUpdatePolicyDataFetcher.class)
+                .doesNotHaveBean(OsUpdatePolicyService.class)
+                .doesNotHaveBean(OsUpdateOverrideService.class)
+                .doesNotHaveBean(OsUpdatePolicyValidator.class)
+                .doesNotHaveBean(OsUpdatePolicyResponseMapper.class)
+                .doesNotHaveBean(OsUpdatePolicyGraphQLMapper.class));
     }
 
     @Test
@@ -97,7 +132,13 @@ class DeviceOsWiringTest {
                 .hasSingleBean(OsUpdateDeviceService.class)
                 .hasSingleBean(OsUpdateResponseMapper.class)
                 .hasSingleBean(OsUpdateGraphQLMapper.class)
-                .hasSingleBean(OsUpdateDeviceCountsDataLoader.class));
+                .hasSingleBean(OsUpdateDeviceCountsDataLoader.class)
+                .hasSingleBean(OsUpdatePolicyDataFetcher.class)
+                .hasSingleBean(OsUpdatePolicyService.class)
+                .hasSingleBean(OsUpdateOverrideService.class)
+                .hasSingleBean(OsUpdatePolicyValidator.class)
+                .hasSingleBean(OsUpdatePolicyResponseMapper.class)
+                .hasSingleBean(OsUpdatePolicyGraphQLMapper.class));
     }
 
     @Test
