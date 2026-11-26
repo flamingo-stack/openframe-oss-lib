@@ -37,6 +37,8 @@ export const MESSAGE_TYPE = {
   DIRECT_MESSAGE: 'DIRECT_MESSAGE',
   SYSTEM: 'SYSTEM',
   DIALOG_CLOSED: 'DIALOG_CLOSED',
+  /** An email's envelope (email-to-ticket): the second part of an email message, after the TEXT part of its body. */
+  EMAIL: 'EMAIL',
 } as const;
 
 export type MessageType = (typeof MESSAGE_TYPE)[keyof typeof MESSAGE_TYPE];
@@ -454,7 +456,34 @@ export interface ContextCompactionEndMessageData extends MessageDataBase {
   summary?: string;
 }
 
+/** One address of an email: its name when the email gave one. */
+export interface EmailAddressData {
+  address: string;
+  name?: string | null;
+}
+
+/**
+ * An email's envelope, the second part of an email message (the first is the TEXT of its body, quotes stripped). Only an
+ * email-to-ticket backend has it, and a host asks for it with the history's `email` option.
+ */
+export interface EmailMessageData extends MessageDataBase {
+  type: 'EMAIL';
+  direction?: 'INBOUND' | 'OUTBOUND' | null;
+  from?: EmailAddressData | null;
+  to?: EmailAddressData[] | null;
+  cc?: EmailAddressData[] | null;
+  subject?: string | null;
+  /** The folded part: the quoted thread and the signature. */
+  quotedText?: string | null;
+  /** A reply's state at the provider; null on an inbound email. */
+  deliveryState?: 'SENDING' | 'DELIVERED' | 'FAILED' | null;
+  deliveryFailureReason?: string | null;
+  /** An automatic email (an out-of-office, a delivery report). */
+  automatic?: boolean | null;
+}
+
 export type MessageData =
+  | EmailMessageData
   | TextMessageData
   | ThinkingMessageData
   | AskMessageData

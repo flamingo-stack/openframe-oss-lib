@@ -10,6 +10,7 @@ import {
   historicalMessageOfNode,
   MINGO_MESSAGES_QUERY,
   mingoMessagesPage,
+  mingoMessagesQuery,
   mingoMessagesVariables,
 } from '../mingo-graphql';
 
@@ -37,6 +38,22 @@ describe('the document', () => {
     const sdl = readFileSync(resolve(__dirname, '../__fixtures__/ai-agent-schema.graphqls'), 'utf8');
     const errors = validate(subgraphSchema(sdl), parse(MINGO_MESSAGES_QUERY));
     expect(errors.map(error => error.message)).toEqual([]);
+  });
+
+  // The email selections name types only a backend with email-to-ticket on has: never in the default document, and
+  // valid once the feature's schema file is loaded on top.
+  it('asks for email messages only on request, and then against the email-to-ticket schema', () => {
+    expect(MINGO_MESSAGES_QUERY).not.toMatch(/EmailData|EmailOwner/);
+    const email = mingoMessagesQuery({ email: true });
+    expect(email).toMatch(/\.\.\. on EmailData \{/);
+    expect(email).toMatch(/\.\.\. on EmailOwner \{/);
+    const base = readFileSync(resolve(__dirname, '../__fixtures__/ai-agent-schema.graphqls'), 'utf8');
+    const feature = readFileSync(
+      resolve(__dirname, '../__fixtures__/ai-agent-email-to-ticket-schema.graphqls'),
+      'utf8',
+    );
+    expect(validate(subgraphSchema(`${base}\n${feature}`), parse(email)).map(error => error.message)).toEqual([]);
+    expect(validate(subgraphSchema(base), parse(email)).length).toBeGreaterThan(0);
   });
 
   it('asks for one page newest first', () => {
