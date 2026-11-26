@@ -56,9 +56,10 @@ export interface GuideWelcomeProps {
    *  topic): with none to show yet the wall draws its own loading form. A
    *  loading scope draws it too. */
   quickActionsLoading?: boolean;
-  /** Print the page's topic (`PageTopicLabel`, the label the FAQ block prints
-   *  under its heading) above the chips, so whoever edits quick actions sees
-   *  which topic's chips the page asked for. Default: the host's choice
+  /** Print the page's stamp (`PageTopicLabel`, the label the FAQ block prints
+   *  under its heading: the page's address, and on hover the topic it asks
+   *  with where the two differ) by the chips, so whoever edits quick actions
+   *  sees which topic's chips the page asked for. Default: the host's choice
    *  (`PageTopicsProvider showTopic`), else off. */
   showTopic?: boolean;
   /** Fired when a quick-action chip is activated (click). */

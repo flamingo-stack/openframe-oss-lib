@@ -8,6 +8,7 @@ import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLInputObjectType;
 import graphql.schema.GraphQLList;
 import graphql.schema.GraphQLNonNull;
+import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLScalarType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLType;
@@ -47,6 +48,13 @@ class MdmSchemaTest {
                 machineId: String!
                 osType: OsType!
             }
+            type DeviceFilterOption {
+                value: String!
+                label: String!
+                count: Int!
+            }
+            type DeviceFilters { filteredCount: Int! }
+            input DeviceFilterInput { osTypes: [String!] }
             type MutationError {
                 field: [String!]
                 message: String!
@@ -167,6 +175,164 @@ class MdmSchemaTest {
         // verifications
         assertThat(query.getType()).isInstanceOf(GraphQLNonNull.class);
         assertThat(type).isInstanceOf(GraphQLList.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"APPLE", "ANDROID", "WINDOWS"})
+    void mdmPlatform_coversWindows(String value) {
+        // setup
+        GraphQLEnumType platform = schema.getTypeAs("MdmPlatform");
+
+        // execution
+        GraphQLEnumValueDefinition definition = platform.getValue(value);
+
+        // verifications
+        assertThat(definition).isNotNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MANAGED", "UNENROLLED", "PENDING", "LEAVING", "REMOVED", "NOT_IN_SCOPE", "NOT_SUPPORTED",
+            "OTHER_MDM", "WIPED"})
+    void mdmEnrollmentState_coversWindowsStates(String value) {
+        // setup
+        GraphQLEnumType state = schema.getTypeAs("MdmEnrollmentState");
+
+        // execution
+        GraphQLEnumValueDefinition definition = state.getValue(value);
+
+        // verifications
+        assertThat(definition).isNotNull();
+    }
+
+    @Test
+    void deviceMdm_windowsPartsNullableActionsNonNull() {
+        // setup
+        GraphQLObjectType deviceMdm = schema.getObjectType("DeviceMdm");
+
+        // execution
+        String actions = GraphQLTypeUtil.simplePrint(deviceMdm.getFieldDefinition("availableActions").getType());
+        GraphQLType diskEncryption = deviceMdm.getFieldDefinition("diskEncryption").getType();
+        GraphQLType lock = deviceMdm.getFieldDefinition("lock").getType();
+        GraphQLType wipe = deviceMdm.getFieldDefinition("wipe").getType();
+
+        // verifications
+        assertThat(actions).isEqualTo("[MdmDeviceAction!]!");
+        assertThat(diskEncryption).isNotInstanceOf(GraphQLNonNull.class);
+        assertThat(lock).isNotInstanceOf(GraphQLNonNull.class);
+        assertThat(wipe).isNotInstanceOf(GraphQLNonNull.class);
+    }
+
+    @Test
+    void diskEncryption_neverCarriesTheRecoveryKey() {
+        // setup
+        GraphQLObjectType diskEncryption = schema.getObjectType("DiskEncryption");
+
+        // execution
+        GraphQLFieldDefinition key = diskEncryption.getFieldDefinition("key");
+        GraphQLFieldDefinition stored = diskEncryption.getFieldDefinition("recoveryKeyStored");
+
+        // verifications
+        assertThat(key).isNull();
+        assertThat(GraphQLTypeUtil.simplePrint(stored.getType())).isEqualTo("Boolean!");
+    }
+
+    @Test
+    void revealRecoveryKey_isAMutationPerDevice() {
+        // setup
+        GraphQLFieldDefinition mutation = schema.getMutationType().getFieldDefinition("revealRecoveryKey");
+
+        // execution
+        String type = GraphQLTypeUtil.simplePrint(mutation.getType());
+
+        // verifications
+        assertThat(type).isEqualTo("RecoveryKey!");
+        assertThat(GraphQLTypeUtil.simplePrint(mutation.getArgument("machineId").getType())).isEqualTo("String!");
+        assertThat(schema.getQueryType().getFieldDefinition("revealRecoveryKey")).isNull();
+    }
+
+    @Test
+    void wipeWindowsDeviceInput_requiresConfirmation() {
+        // setup
+        GraphQLInputObjectType input = schema.getTypeAs("WipeWindowsDeviceInput");
+
+        // execution
+        GraphQLType confirmation = input.getField("confirmation").getType();
+
+        // verifications
+        assertThat(GraphQLTypeUtil.simplePrint(confirmation)).isEqualTo("String!");
+    }
+
+    @Test
+    void lockWindowsDeviceInput_messageOptional() {
+        // setup
+        GraphQLInputObjectType input = schema.getTypeAs("LockWindowsDeviceInput");
+
+        // execution
+        GraphQLType message = input.getField("message").getType();
+
+        // verifications
+        assertThat(message).isNotInstanceOf(GraphQLNonNull.class);
+        assertThat(input.getField("machineId").getType()).isInstanceOf(GraphQLNonNull.class);
+    }
+
+    @Test
+    void deviceFilters_extendedWithMdmAndEncryption() {
+        // setup
+        GraphQLObjectType filters = schema.getObjectType("DeviceFilters");
+        GraphQLInputObjectType input = schema.getTypeAs("DeviceFilterInput");
+
+        // execution
+        String mdmOptions = GraphQLTypeUtil.simplePrint(filters.getFieldDefinition("mdmStates").getType());
+        String encOptions = GraphQLTypeUtil.simplePrint(filters.getFieldDefinition("diskEncryptionStates").getType());
+        String mdmInput = GraphQLTypeUtil.simplePrint(input.getField("mdmStates").getType());
+        String encInput = GraphQLTypeUtil.simplePrint(input.getField("diskEncryptionStates").getType());
+
+        // verifications
+        assertThat(mdmOptions).isEqualTo("[DeviceFilterOption!]!");
+        assertThat(encOptions).isEqualTo("[DeviceFilterOption!]!");
+        assertThat(mdmInput).isEqualTo("[MdmEnrollmentState!]");
+        assertThat(encInput).isEqualTo("[DiskEncryptionState!]");
+    }
+
+    @Test
+    void windowsMdmSettingsImpact_takesTheSameInputAsTheUpdate() {
+        // setup
+        GraphQLFieldDefinition impact = schema.getQueryType().getFieldDefinition("windowsMdmSettingsImpact");
+        GraphQLFieldDefinition update = schema.getMutationType().getFieldDefinition("updateWindowsMdmSettings");
+
+        // execution
+        String impactInput = GraphQLTypeUtil.simplePrint(impact.getArgument("input").getType());
+        String updateInput = GraphQLTypeUtil.simplePrint(update.getArgument("input").getType());
+
+        // verifications
+        assertThat(impactInput).isEqualTo("UpdateWindowsMdmSettingsInput!");
+        assertThat(updateInput).isEqualTo(impactInput);
+    }
+
+    @Test
+    void mdmProfileDevices_pagedPerProfile() {
+        // setup
+        GraphQLFieldDefinition query = schema.getQueryType().getFieldDefinition("mdmProfileDevices");
+
+        // execution
+        String type = GraphQLTypeUtil.simplePrint(query.getType());
+
+        // verifications
+        assertThat(type).isEqualTo("MdmProfileDeviceConnection!");
+        assertThat(GraphQLTypeUtil.simplePrint(query.getArgument("profileId").getType())).isEqualTo("ID!");
+    }
+
+    @Test
+    void mdmDeviceEvents_pagedPerDevice() {
+        // setup
+        GraphQLFieldDefinition query = schema.getQueryType().getFieldDefinition("mdmDeviceEvents");
+
+        // execution
+        String type = GraphQLTypeUtil.simplePrint(query.getType());
+
+        // verifications
+        assertThat(type).isEqualTo("MdmDeviceEventConnection!");
+        assertThat(query.getArgument("machineId").getType()).isInstanceOf(GraphQLNonNull.class);
     }
 
     private static GraphQLScalarType passThroughScalar(String name) {

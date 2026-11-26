@@ -16,6 +16,7 @@ import {
   GRID_FILLER_ID,
   gridCellClass,
   type GridColumn,
+  type GridLayoutOptions,
 } from '../components/ui/data-table/data-table-grid';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
 import { LoadingScope } from '../components/ui/loading-scope';
@@ -148,10 +149,10 @@ function gridRowCheckbox(index: number): HTMLElement {
 }
 
 describe('buildGridLayout', () => {
-  function layoutOf(columns: ColumnDef<Item>[]) {
+  function layoutOf(columns: ColumnDef<Item>[], options?: GridLayoutOptions) {
     return renderHook(() => {
       const table = useDataTable<Item>({ data: ITEMS, columns });
-      return buildGridLayout(table.getVisibleFlatColumns());
+      return buildGridLayout(table.getVisibleFlatColumns(), options);
     }).result.current;
   }
 
@@ -203,6 +204,15 @@ describe('buildGridLayout', () => {
     const layout = layoutOf(COLUMNS.filter(column => column.id !== 'select'));
     expect(layout.columns[0]).toMatchObject({ id: 'name', pin: 'left', offset: 0 });
     expect(layout.pinnedLeft).toBe(280);
+  });
+
+  it('keeps a column that cannot be hidden, whatever the stored layout hides', () => {
+    const kept = COLUMNS.map(column => (column.id === 'name' ? { ...column, enableHiding: false } : column));
+    expect(layoutOf(kept, { hidden: ['name', 'owner'] }).columns.map(column => column.id)).toEqual([
+      'select',
+      'name',
+      'more',
+    ]);
   });
 });
 

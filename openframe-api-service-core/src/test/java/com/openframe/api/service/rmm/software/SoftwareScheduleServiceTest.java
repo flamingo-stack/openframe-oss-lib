@@ -7,6 +7,7 @@ import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
 import com.openframe.api.service.rmm.software.SoftwareScheduleService;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -90,7 +91,7 @@ class SoftwareScheduleServiceTest {
         when(transaction.run(any())).thenAnswer(invocation -> invocation.<Transaction<?>>getArgument(0).execute());
         service = new SoftwareScheduleService(scheduleRepository, assignedRepository, targetResolver, tenantIdProvider,
                 packageManagerAvailability, new SoftwarePackageSelectionResolver(softwareInventoryService), machineRepository,
-                transaction);
+                transaction, mock(AuditRecorder.class));
 
         when(machineRepository.findOnPrimaryByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(invocation ->
                 invocation.<Collection<String>>getArgument(1).stream().map(SoftwareScheduleServiceTest::managedMachine).toList());

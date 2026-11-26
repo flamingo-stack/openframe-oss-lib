@@ -8,7 +8,7 @@ import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
-import com.openframe.data.nats.delivery.route.DeliveryRouter;
+import com.openframe.data.nats.delivery.route.DeviceCommandSender;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import com.openframe.delivery.config.DeliveryProperties;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_FEATURE_FLAGS_SET;
 import static java.util.Objects.requireNonNullElse;
 import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 
@@ -29,7 +30,7 @@ public class ForceClientFeatureFlagsService {
 
     private final OpenFrameClientConfigurationService clientConfigurationService;
     private final DeliveryProperties deliveryProperties;
-    private final DeliveryRouter deliveryRouter;
+    private final DeviceCommandSender deviceCommandSender;
 
     public ForceClientFeatureFlagsResponse process(ForceClientFeatureFlagsRequest request) {
         List<String> machineIds = request.getMachineIds();
@@ -53,14 +54,21 @@ public class ForceClientFeatureFlagsService {
 
     private ForceClientFeatureFlagsResponseItem processMachine(String machineId, Map<String, ClientFeatureFlag> flags) {
         try {
-            ClientFeatureFlagsDeliverySeed seed = ClientFeatureFlagsDeliverySeed.forMachine(machineId, flags);
-            boolean carried = deliveryRouter.dispatch(seed);
+            boolean carried = deviceCommandSender.send(DEVICE_FEATURE_FLAGS_SET, machineId,
+                    Map.of("flags", flagStates(flags)), () -> ClientFeatureFlagsDeliverySeed.forMachine(machineId, flags));
             ForceAgentStatus outcome = outcomeOf(carried);
             return buildResponseItem(machineId, outcome);
         } catch (Exception e) {
             log.error("Failed to send the client feature flags to machine {}", machineId, e);
             return buildResponseItem(machineId, ForceAgentStatus.FAILED);
         }
+    }
+
+    private static List<String> flagStates(Map<String, ClientFeatureFlag> flags) {
+        return flags.entrySet().stream()
+                .map(flag -> flag.getKey() + ":" + flag.getValue().isEnabled())
+                .sorted()
+                .toList();
     }
 
     private Map<String, ClientFeatureFlag> currentFlags() {

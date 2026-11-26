@@ -1,6 +1,7 @@
 package com.openframe.audit;
 
 import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditChange;
 import com.openframe.data.document.audit.AuditTargetType;
 import lombok.With;
 
@@ -16,8 +17,11 @@ public record AuditCall(AuditAction action,
                         Function<Object, String> targetIdFromResult,
                         boolean targetIdInResult,
                         Function<Object, Map<String, Object>> detailsFromResult,
+                        Function<Object, Map<String, AuditChange>> changesFromResult,
                         boolean compare,
-                        Predicate<Object> recordsResult,
+                        Predicate<Object> storeIfUnchanged,
+                        boolean ignoresTargetOrganizationAndDevice,
+                        Predicate<Object> storeIf,
                         Function<Object, String> tenantIdOf,
                         Function<Object, String> targetNameOf,
                         Function<Object, String> organizationIdOf,
@@ -33,7 +37,7 @@ public record AuditCall(AuditAction action,
 
     public static AuditCall of(AuditAction action, AuditTargetType targetType, String targetId,
                                Map<String, Object> details) {
-        return new AuditCall(action, targetType, () -> targetId, _ -> null, false, _ -> details, true, _ -> true,
-                _ -> null, _ -> null, _ -> null, _ -> null);
+        return new AuditCall(action, targetType, () -> targetId, _ -> null, false, _ -> details, null, true, _ -> false,
+                false, _ -> true, _ -> null, _ -> null, _ -> null, _ -> null);
     }
 }

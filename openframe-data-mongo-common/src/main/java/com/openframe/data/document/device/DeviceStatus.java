@@ -9,6 +9,7 @@ public enum DeviceStatus {
     PENDING_DELETION,
     DELETED,
     ARCHIVED,
+    // TODO(CU-17tkuw6a582): WIPED, set from the Fleet wipe result that arrives through CDC; frozen like DELETED
     // transitional until phase 3 of CU-86akb8vvf: ONLINE/OFFLINE are migrated to MANAGED, the rest are unused
     ACTIVE,
     INACTIVE,

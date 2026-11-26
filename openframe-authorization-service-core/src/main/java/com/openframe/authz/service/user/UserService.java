@@ -156,6 +156,7 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user.setRoles(roles);
         user.setStatus(ACTIVE);
+        revokeEarlierTokens(user);
         return userRepository.save(user);
     }
 
@@ -189,11 +190,19 @@ public class UserService {
     public void updatePassword(String userId, String rawPassword) {
         userRepository.findById(userId).ifPresentOrElse(user -> {
             user.setPasswordHash(passwordEncoder.encode(rawPassword));
-            user.setTokensRevokedAt(Instant.now().truncatedTo(ChronoUnit.SECONDS));
+            revokeEarlierTokens(user);
             userRepository.save(user);
         }, () -> {
             throw new IllegalArgumentException("User not found: " + userId);
         });
+    }
+
+    /**
+     * Rejects every access token issued before now. A reactivated user must not get back the tokens
+     * of the account's previous life, which the deleted status alone was keeping out.
+     */
+    private static void revokeEarlierTokens(AuthUser user) {
+        user.setTokensRevokedAt(Instant.now().truncatedTo(ChronoUnit.SECONDS));
     }
 
     /**
@@ -250,6 +259,7 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(randomPassword));
         user.setRoles(roles);
         user.setStatus(ACTIVE);
+        revokeEarlierTokens(user);
         user.setEmailVerified(true);
         user.setLoginProvider(providerRegistrationId);
         return userRepository.save(user);

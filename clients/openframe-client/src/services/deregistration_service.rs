@@ -120,6 +120,7 @@ fn load_credentials(config_service: &AgentConfigurationService) -> Option<Persis
                 machine_id,
                 client_secret,
                 user_id: None,
+                local_machine_id: None,
             });
         }
         Ok(_) => {}

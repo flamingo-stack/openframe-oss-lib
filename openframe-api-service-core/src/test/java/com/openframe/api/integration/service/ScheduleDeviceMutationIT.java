@@ -9,6 +9,7 @@ import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.api.service.rmm.software.SoftwareScheduleService;
 import com.openframe.api.service.rmm.software.SoftwarePackageSelectionResolver;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.service.rmm.ScheduleMutationTransaction;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -32,6 +33,7 @@ import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
+import com.openframe.data.repository.rmm.osupdate.CustomDeviceOsPendingUpdateRepositoryImpl;
 import com.openframe.data.repository.rmm.osupdate.CustomDeviceOsUpdateHistoryRepositoryImpl;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
@@ -138,12 +140,12 @@ class ScheduleDeviceMutationIT {
         ScheduleScript legacy = seedScriptSchedule(null);
 
         // execution
-        long removedWithEmptyList = service.removeAssignedDevices(criteria.getId(), List.of(), ACTOR);
-        long removedWithNullList = service.removeAssignedDevices(criteria.getId(), null, ACTOR);
+        List<String> removedWithEmptyList = service.removeDevices(criteria.getId(), List.of(), ACTOR);
+        List<String> removedWithNullList = service.removeDevices(criteria.getId(), null, ACTOR);
 
         // verifications
-        assertThat(removedWithEmptyList).isZero();
-        assertThat(removedWithNullList).isZero();
+        assertThat(removedWithEmptyList).isEmpty();
+        assertThat(removedWithNullList).isEmpty();
         assertThatThrownBy(() -> service.removeDevices("missing-schedule", List.of(), ACTOR))
                 .isInstanceOf(NotFoundException.class);
         assertThatThrownBy(() -> service.removeDevices(criteria.getId(), List.of(MACHINE), ACTOR))
@@ -152,8 +154,8 @@ class ScheduleDeviceMutationIT {
         assertThat(assignments.findByTenantIdAndScriptScheduleId(TENANT, criteria.getId())).hasSize(1);
         assertThat(dispatches.findByTenantIdAndMachineIdAndScheduleId(TENANT, MACHINE, criteria.getId())).isPresent();
 
-        assertThat(service.removeAssignedDevices(legacy.getId(), List.of(MACHINE, MACHINE, "missing"), ACTOR)).isEqualTo(1);
-        assertThat(service.removeAssignedDevices(legacy.getId(), List.of(MACHINE), ACTOR)).isZero();
+        assertThat(service.removeDevices(legacy.getId(), List.of(MACHINE, MACHINE, "missing"), ACTOR)).containsExactly(MACHINE);
+        assertThat(service.removeDevices(legacy.getId(), List.of(MACHINE), ACTOR)).isEmpty();
         assertThat(assignments.findByTenantIdAndScriptScheduleId(TENANT, legacy.getId())).isEmpty();
         assertThat(dispatches.findByTenantIdAndMachineIdAndScheduleId(TENANT, MACHINE, legacy.getId())).isEmpty();
     }
@@ -227,14 +229,16 @@ class ScheduleDeviceMutationIT {
         MachineRepository machines = mock(MachineRepository.class);
         when(machines.findOnPrimaryByMachineId(machineId)).thenReturn(Optional.of(managed));
         DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
-                scriptAssignments, repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments,
+                scriptAssignments, scriptSchedules(), repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class),
+                assignments, softwareSchedules(),
                 repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class),
                 inventory, mock(SoftwareProjectionTrigger.class), mock(MachineWriter.class),
                 new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory()),
                 repositoryFactory.getRepository(DeviceOsStateRepository.class),
-                repositoryFactory.getRepository(DeviceOsPendingUpdateRepository.class),
+                osPendingUpdateRepository(),
                 osUpdateHistoryRepository());
-        DeviceService service = new DeviceService(machines, cleanup, mock(DeviceSoftwareConnectivitySync.class),
+        DeviceService service = new DeviceService(machines, cleanup, mock(AuditRecorder.class),
+                mock(DeviceSoftwareConnectivitySync.class),
                 mock(MachineWriter.class), mock(TagRepository.class), mock(TagAssignmentRepository.class),
                 mock(DeviceStatusProcessor.class), mock(DeviceFilterOptionMapper.class), () -> TENANT,
                 mock(ApplicationEventPublisher.class));
@@ -270,13 +274,13 @@ class ScheduleDeviceMutationIT {
         doThrow(new IllegalStateException("simulated inventory projection failure")).doNothing()
                 .when(projection).titlesChanged(TENANT, Set.of(102L));
         DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
-                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class),
-                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments,
+                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class), scriptSchedules(),
+                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments, softwareSchedules(),
                 repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class), inventory, projection,
                 new MachineWriter(mongoTemplate, absent(), absent()),
                 new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory()),
                 repositoryFactory.getRepository(DeviceOsStateRepository.class),
-                repositoryFactory.getRepository(DeviceOsPendingUpdateRepository.class),
+                osPendingUpdateRepository(),
                 osUpdateHistoryRepository());
 
         // execution
@@ -288,7 +292,7 @@ class ScheduleDeviceMutationIT {
         assertThat(mongoTemplate.findById(machine.getId(), Machine.class)).extracting(Machine::getStatus)
                 .isEqualTo(DeviceStatus.MANAGED);
 
-        assertThat(cleanup.markDeleted(machine).getStatus()).isEqualTo(DeviceStatus.DELETED);
+        assertThat(cleanup.markDeleted(machine).machine().getStatus()).isEqualTo(DeviceStatus.DELETED);
         assertThat(inventory.findById(installed.getId())).isEmpty();
         assertThat(assignments.findById(assignment.getId())).isEmpty();
     }
@@ -304,12 +308,13 @@ class ScheduleDeviceMutationIT {
                 repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class);
         MachineWriter writer = new MachineWriter(mongoTemplate, absent(), absent());
         DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
-                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class),
-                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments, reconnects,
+                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class), scriptSchedules(),
+                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments, softwareSchedules(),
+                reconnects,
                 mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), writer,
                 new ScheduleMutationTransaction(mongoTemplate.getMongoDatabaseFactory()),
                 repositoryFactory.getRepository(DeviceOsStateRepository.class),
-                repositoryFactory.getRepository(DeviceOsPendingUpdateRepository.class),
+                osPendingUpdateRepository(),
                 osUpdateHistoryRepository());
         String deviceId = "restored-schedule-device";
         Machine machine = new Machine();
@@ -357,12 +362,12 @@ class ScheduleDeviceMutationIT {
         SoftwareScheduleMachineAssignedRepository assignments =
                 repositoryFactory.getRepository(SoftwareScheduleMachineAssignedRepository.class);
         DeletedMachineCleanup cleanup = new DeletedMachineCleanup(
-                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class),
-                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments,
+                repositoryFactory.getRepository(ScriptScheduleMachineAssignedRepository.class), scriptSchedules(),
+                repositoryFactory.getRepository(DeviceOnlineDispatchRepository.class), assignments, softwareSchedules(),
                 repositoryFactory.getRepository(SoftwareScheduleOnlineDispatchRepository.class),
                 mock(DeviceSoftwareRepository.class), mock(SoftwareProjectionTrigger.class), writer, transaction,
                 repositoryFactory.getRepository(DeviceOsStateRepository.class),
-                repositoryFactory.getRepository(DeviceOsPendingUpdateRepository.class),
+                osPendingUpdateRepository(),
                 osUpdateHistoryRepository());
         SoftwareScheduleRepository schedules = repositoryFactory.getRepository(SoftwareScheduleRepository.class);
         SoftwareSchedule schedule = schedules.save(SoftwareSchedule.builder().tenantId(TENANT)
@@ -378,7 +383,7 @@ class ScheduleDeviceMutationIT {
                 .when(interleavingMachines).findOnPrimaryByTenantIdAndMachineIdIn(TENANT, Set.copyOf(ids));
         SoftwareScheduleService service = new SoftwareScheduleService(schedules, assignments,
                 mock(SoftwareScheduleTargetResolver.class), () -> TENANT, mock(PackageManagerAvailability.class),
-                mock(SoftwarePackageSelectionResolver.class), interleavingMachines, transaction);
+                mock(SoftwarePackageSelectionResolver.class), interleavingMachines, transaction, mock(AuditRecorder.class));
 
         // execution
         assertThatThrownBy(() -> service.addDevices(schedule.getId(), ids, ACTOR)).isInstanceOf(ConflictException.class);
@@ -402,6 +407,20 @@ class ScheduleDeviceMutationIT {
     @SuppressWarnings("unchecked")
     private static <T> ObjectProvider<T> absent() {
         return mock(ObjectProvider.class);
+    }
+
+    private static ScriptScheduleRepository scriptSchedules() {
+        return repositoryFactory.getRepository(ScriptScheduleRepository.class,
+                RepositoryFragments.just(new CustomScriptScheduleRepositoryImpl(mongoTemplate)));
+    }
+
+    private static SoftwareScheduleRepository softwareSchedules() {
+        return repositoryFactory.getRepository(SoftwareScheduleRepository.class);
+    }
+
+    private static DeviceOsPendingUpdateRepository osPendingUpdateRepository() {
+        return repositoryFactory.getRepository(DeviceOsPendingUpdateRepository.class,
+                RepositoryFragments.just(new CustomDeviceOsPendingUpdateRepositoryImpl(mongoTemplate)));
     }
 
     private static DeviceOsUpdateHistoryRepository osUpdateHistoryRepository() {

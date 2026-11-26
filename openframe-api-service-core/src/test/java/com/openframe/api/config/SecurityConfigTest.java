@@ -1,5 +1,7 @@
 package com.openframe.api.config;
 
+import org.mockito.Answers;
+import com.openframe.audit.AuditedMethodRunner;
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWEAlgorithm;
@@ -65,6 +67,9 @@ class SecurityConfigTest {
     @MockitoBean
     private UserService userService;
 
+    @MockitoBean(answers = Answers.CALLS_REAL_METHODS)
+    private AuditedMethodRunner auditedMethodRunner;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -109,11 +114,19 @@ class SecurityConfigTest {
     }
 
     @Test
-    void deleteUser_adminToken_actsAsTheUserInTheToken() throws Exception {
+    void deleteUser_anotherUsersId_deletesThatUser() throws Exception {
         mockMvc.perform(delete("/users/user-2").header(HttpHeaders.AUTHORIZATION, bearer("ADMIN")))
                 .andExpect(status().isNoContent());
 
-        verify(userService).softDeleteUser("user-2", "user-1");
+        verify(userService).deleteUser("user-2");
+    }
+
+    @Test
+    void deleteUser_idOfTheUserInTheToken_deletesTheOwnAccount() throws Exception {
+        mockMvc.perform(delete("/users/user-1").header(HttpHeaders.AUTHORIZATION, bearer("ADMIN")))
+                .andExpect(status().isNoContent());
+
+        verify(userService).deleteOwnAccount("user-1");
     }
 
     @Test
