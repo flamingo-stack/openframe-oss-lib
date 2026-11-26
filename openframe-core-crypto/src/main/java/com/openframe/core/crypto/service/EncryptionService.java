@@ -66,6 +66,11 @@ public class EncryptionService {
         return isLegacy(ciphertext) ? decryptLegacy(ciphertext) : decryptTink(ciphertext, context);
     }
 
+    /** Whether {@link #encrypt} produces Tink values; migrations decide by this, not by the flag. */
+    public boolean writesTink() {
+        return tinkWrite;
+    }
+
     public boolean isLegacy(String ciphertext) {
         return !ciphertext.startsWith(TINK_PREFIX);
     }

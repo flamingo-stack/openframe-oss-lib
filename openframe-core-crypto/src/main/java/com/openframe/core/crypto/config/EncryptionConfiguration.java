@@ -21,7 +21,8 @@ import java.security.GeneralSecurityException;
  * Builds {@link EncryptionService}. With {@code security.encryption.keyset} it decrypts the keyset through
  * Cloud KMS ({@code kms-key-uri}); a cleartext keyset is accepted only with {@code cleartext-keyset-allowed},
  * for local runs and tests, never with {@code required}. Without a keyset it stays in the legacy mode, unless
- * {@code required} is set. {@code legacy-read.enabled=false} drops the legacy password, so unmarked values are refused.
+ * {@code required} or {@code tink-write.enabled} is set. {@code legacy-read.enabled=false} drops the legacy
+ * password, so unmarked values are refused.
  */
 @Slf4j
 @Configuration
@@ -43,6 +44,10 @@ public class EncryptionConfiguration {
         if (!StringUtils.hasText(keyset)) {
             if (required) {
                 throw new IllegalStateException("security.encryption.keyset is required but not set");
+            }
+            if (tinkWrite) {
+                throw new IllegalStateException(
+                        "security.encryption.tink-write.enabled=true needs security.encryption.keyset");
             }
             log.warn("No encryption keyset configured: running in the legacy encryption mode");
             return new EncryptionService(legacyPassword, legacySalt);
