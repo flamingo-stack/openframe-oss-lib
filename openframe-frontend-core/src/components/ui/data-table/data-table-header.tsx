@@ -249,6 +249,9 @@ function getCellVisibilityClasses(
  * table's load.
  */
 function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
+  // The table's fresh handle (`useDataTable`), not the header's own instance: a filter stored under another key is read
+  // through it, and a handle that never changes would let a compiled filter keep its first value.
+  const table = useDataTableContext();
   if (header.isPlaceholder) return null;
 
   const column = header.column;
@@ -267,6 +270,9 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   const filterTrigger = filter ? (
     <DataTableColumnFilter
       column={column}
+      table={table}
+      filterId={filter.id}
+      title={filter.title}
       options={filter.options}
       extraSections={filter.sections}
       placement={filter.placement}

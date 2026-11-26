@@ -22,6 +22,15 @@ export interface DataTableCellProps {
   tone?: 'primary' | 'secondary';
   /** The cell's tag (a status). Never cut: the text beside it gives way first. */
   tag?: ReactNode;
+  /**
+   * The main text takes only its own width, so the tag and the secondary text sit right after it instead of at the
+   * line's end (a name with its status beside it). On a short line the main text gives way first, down to about 5rem
+   * (or its own width, if shorter); past that the tag gives way, cut by its own label's ellipsis, so neither ever
+   * vanishes. Default `false`: the main text takes the line and the tag is never cut.
+   */
+  hugText?: boolean;
+  /** A small mark right after the tags (an outdated-agent icon). Never cut, with or without `hugText`. */
+  mark?: ReactNode;
   /** Labels of the tags that do not fit: drawn as one grey `+N` tag that lists them on hover. */
   moreTags?: string[];
   /**
@@ -53,6 +62,16 @@ const MAIN_TEXT_SHRINK_CLASS = 'flex-[1_9999_auto] min-w-[9ch]';
  */
 const SECONDARY_WHOLE_CHARS = 8;
 
+/** `hugText`: the main text gives way before anything beside it (the tag's own floor below is what stops it). */
+export const DATA_TABLE_CELL_HUG_TEXT_CLASS = 'flex-[0_9999_auto]';
+
+/**
+ * `hugText`: the tag's box. It may shrink (its label cuts itself), but never so far that it takes more than the line
+ * less about 5rem: that is the main text's floor. A main text shorter than that keeps its own width; the room it leaves
+ * goes to the end of the line, never between the text and the tag.
+ */
+export const DATA_TABLE_CELL_HUG_TAG_CLASS = 'flex min-w-0 max-w-[calc(100%_-_5rem_-_var(--spacing-system-xxs))]';
+
 /**
  * The content of one grid-table cell (the design's `table/cell`): ONE line, whatever it holds. The cell's box (its 48px
  * height, inset, dividers and fill) is the table's; this is what goes in it.
@@ -66,6 +85,8 @@ export function DataTableCell({
   text,
   tone = 'primary',
   tag,
+  hugText = false,
+  mark,
   moreTags,
   secondary,
   secondaryTone = 'secondary',
@@ -78,7 +99,9 @@ export function DataTableCell({
   // already that short does not shrink at all). In every other shape the main text takes the line and is the one cut.
   const cutSecondary = hasText && secondary !== undefined && secondary.length > SECONDARY_WHOLE_CHARS;
   const mainTextClass = !cutSecondary
-    ? 'flex-1'
+    ? hugText
+      ? DATA_TABLE_CELL_HUG_TEXT_CLASS
+      : 'flex-1'
     : (text?.length ?? 0) > MAIN_TEXT_MIN_CHARS
       ? MAIN_TEXT_SHRINK_CLASS
       : 'flex-[1_0_auto]';
@@ -93,7 +116,7 @@ export function DataTableCell({
           </TruncateText>
         )}
         {tag != null && tag !== false && (
-          <span data-part="tag" className="flex shrink-0">
+          <span data-part="tag" className={hugText ? DATA_TABLE_CELL_HUG_TAG_CLASS : 'flex shrink-0'}>
             {tag}
           </span>
         )}
@@ -112,6 +135,11 @@ export function DataTableCell({
           >
             <Tag as="span" variant="grey" data-part="more" label={`+${hiddenTags.length}`} />
           </FloatingTooltip>
+        )}
+        {mark != null && mark !== false && (
+          <span data-part="mark" className="flex shrink-0">
+            {mark}
+          </span>
         )}
         {secondary !== undefined &&
           (cutSecondary ? (

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { DeviceOutdatedIcon } from '../components/features/devices/device-status-hint';
 import { DeviceCard, type Device } from '../components/ui/device-card';
 
 const meta = {
@@ -188,6 +189,34 @@ export const OfflineDevice: Story = {
       lastSeen: new Date(Date.now() - 86400000 * 7).toISOString(), // 7 days ago
     },
     statusTag: { label: 'Offline', variant: 'grey' },
+  },
+};
+
+/**
+ * The lifecycle display's status row (Figma 5108-199992): a managed device reads "Managed · Last seen …" in place of
+ * a tag, and an outdated agent's mark follows. A tap on the mark shows its tooltip and does not open the card.
+ */
+export const ManagedOutdated: Story = {
+  args: {
+    device: baseDevice,
+    statusLine: {
+      text: 'Managed · Last seen 11/24/26 11:58 AM',
+      adornment: <DeviceOutdatedIcon clientOutdated status="MANAGED" />,
+    },
+  },
+};
+
+/**
+ * Any other status keeps its tag in the lifecycle display, with no "Last seen"; the PENDING tag carries its hint.
+ */
+export const PendingOutdated: Story = {
+  args: {
+    device: baseDevice,
+    statusTag: { label: 'PENDING', variant: 'warning' },
+    statusLine: {
+      tagHint: 'Not managed yet: OpenFrame is still connecting this device. It turns Managed when setup finishes.',
+      adornment: <DeviceOutdatedIcon clientOutdated status="PENDING" />,
+    },
   },
 };
 

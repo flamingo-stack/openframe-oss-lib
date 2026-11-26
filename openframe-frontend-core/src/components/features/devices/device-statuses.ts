@@ -193,6 +193,28 @@ export type DefaultVisibleStatus = (typeof DEFAULT_VISIBLE_STATUSES)[number];
 export const DEVICE_FILTER_OUTDATED = 'OUTDATED';
 
 /**
+ * The statuses of a device record that is an archive, or about to become one. Nothing on such a device asks for its
+ * agent to be (re)installed: a missing tool connection there is teardown, not a first install, and reinstalling would
+ * bring a deleted device back. Upper case; compare with `isArchiveLifecycleStatus`, which ignores case.
+ */
+export const ARCHIVE_LIFECYCLE_STATUSES = [
+  DEVICE_STATUS.ARCHIVED,
+  DEVICE_STATUS.DELETED,
+  DEVICE_STATUS.PENDING_DELETION,
+  DEVICE_STATUS.DECOMMISSIONED,
+] as const satisfies string[];
+
+/** Whether a lifecycle status is one of `ARCHIVE_LIFECYCLE_STATUSES`, in any case. Absent reads as not. */
+export function isArchiveLifecycleStatus(status: string | null | undefined): boolean {
+  return (ARCHIVE_LIFECYCLE_STATUSES as readonly string[]).includes((status ?? '').toUpperCase());
+}
+
+/** The device record is an archive, or about to become one (`ARCHIVE_LIFECYCLE_STATUSES`). */
+export function isArchiveLifecycle(device: { status?: string | null }): boolean {
+  return isArchiveLifecycleStatus(device.status);
+}
+
+/**
  * Statuses that are hidden by default (for documentation/reference)
  */
 export const HIDDEN_DEVICE_STATUSES = [DEVICE_STATUS.ARCHIVED, DEVICE_STATUS.DELETED] as const;

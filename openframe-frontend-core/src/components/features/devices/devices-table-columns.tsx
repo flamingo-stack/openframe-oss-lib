@@ -4,7 +4,6 @@ import type React from 'react';
 import { type MouseEvent, type ReactNode, useMemo, useState } from 'react';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
 import { cn } from '../../../utils/cn';
-import { formatDate, formatTime } from '../../../utils/format-date';
 import { executeNewTabNavigation } from '../../chat/utils/execute-navigation';
 import { ArrowRightUpIcon, MonitorIcon } from '../../icons-v2-generated';
 import { MediaSkeleton, TextLineSkeleton } from '../../loading/unified-skeleton';
@@ -29,20 +28,25 @@ import {
   useDataTable,
   useLoadingScope,
 } from '../../ui';
+import { DATA_TABLE_CELL_HUG_TAG_CLASS, DATA_TABLE_CELL_HUG_TEXT_CLASS } from '../../ui/data-table/data-table-cell';
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { OSTypeBadge } from '../os-type-badge';
 import { DeviceConnectivityIcon } from './device-connectivity-icon';
 import { directorySourceLabel, directoryUserLines, directoryUserLinkLabel } from './device-directory';
+import { formatDeviceDateTime } from './device-last-online';
 import { DeviceLifecycleTag } from './device-lifecycle-tag';
 import { getDeviceName } from './device-name';
 import { getDeviceConnectivityConfig, getDeviceLifecycleConfig, getDeviceStatusConfig } from './device-status';
 import { type DeviceStatusDisplay, useDeviceStatusDisplay } from './device-status-display';
+import { DeviceOutdatedIcon, DeviceTagHint, devicePendingHint } from './device-status-hint';
 import {
   DEFAULT_VISIBLE_STATUSES,
   DEVICE_CONNECTIVITY_FILTER_SECTION,
   DEVICE_CONNECTIVITY_VALUES,
   DEVICE_FILTER_OUTDATED,
   DEVICE_STATUS,
+  isArchiveLifecycleStatus,
+  isManagedStatus,
   joinStatusFilterValue,
   mergeStatusFacets,
 } from './device-statuses';
@@ -51,12 +55,6 @@ import { DeviceTypeTile } from './device-type-tile';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDeviceImageUrl, useDevicesViewConfig } from './devices-view-config';
 import type { DeviceFilters, DeviceRow } from './types';
-
-/** Date then time in the viewer's locale; the empty mark for an instant that does not parse. */
-function formatDateTime(input: string): string {
-  const date = formatDate(input);
-  return date === '—' ? date : `${date} ${formatTime(input)}`;
-}
 
 /** Filter options by id, first one wins: the backend can repeat a customer. */
 function uniqueById<T extends { id: string }>(options: T[]): T[] {
@@ -161,7 +159,11 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   hideColumns?: string[];
   /** Adds the USER and SOURCES columns, for a host whose tenant has directories. Default: neither. */
   directoryColumns?: boolean;
-  /** Column ids whose header filter is dropped while the column stays visible (e.g. ['status'] on the archive page). */
+  /**
+   * Header filters to drop while their column stays visible, by column id or by the key the filter is stored under
+   * (`meta.filter.id`): ['status'] on the archive page drops the status filter wherever it is, on the STATUS column
+   * (legacy display) or on DEVICE (lifecycle display).
+   */
   disableColumnFilters?: string[];
   /** The facet query is still in flight, see `getDeviceTableColumns`. */
   filtersPending?: boolean;
@@ -203,6 +205,12 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
    */
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+}
+
+/** Whether a column's header filter is one of `disabled`: by the column's id, or by the key its filter is stored under. */
+function filterDisabled<T>(column: ColumnDef<T>, disabled: ReadonlySet<string>): boolean {
+  const key = column.meta?.filter?.id;
+  return (column.id !== undefined && disabled.has(column.id)) || (key !== undefined && disabled.has(key));
 }
 
 /** One page of rows still being read: an id each, and nothing a cell can show (every cell draws its loading form). */
@@ -254,7 +262,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
       statusDisplay,
     })
       .filter(c => !c.id || !hidden.has(c.id))
-      .map(c => (c.id && unfiltered.has(c.id) ? { ...c, meta: { ...c.meta, filter: undefined } } : c));
+      .map(c => (filterDisabled(c, unfiltered) ? { ...c, meta: { ...c.meta, filter: undefined } } : c));
     const open = getDeviceOpenColumn<T>();
     const data = actionsColumn ? [...base, actionsColumn, open] : [...base, open];
     // The checkbox column is the grid table's first column.
@@ -353,7 +361,7 @@ function DeviceLastSeen({ lastSeen }: { lastSeen: string | undefined }) {
   if (useLoadingScope() && !lastSeen) return <TextLineSkeleton type="h6" className="hidden w-24 content-md:block" />;
   return (
     <span className="hidden text-ods-text-secondary text-h6 content-md:flex">
-      {lastSeen ? formatDateTime(lastSeen) : 'Never'}
+      {lastSeen ? formatDeviceDateTime(lastSeen) : 'Never'}
     </span>
   );
 }
@@ -392,9 +400,51 @@ function DirectorySourcesCell({ sources }: { sources: readonly string[] | undefi
 
 const GRID_DEVICE_ICON_CLASS = 'size-5';
 
-/** The table's DEVICE cell: the connectivity icon (the type tile in the legacy display), the name, the unread mark. */
+/** The DEVICE column's width in the grid: the lifecycle display's name carries its tag and mark (Figma 5262:159608). */
+const DEVICE_COLUMN_SIZE = { lifecycle: 380, legacy: 280 } as const;
+
+/**
+ * What follows a device's name in the lifecycle display (Figma 5262-160005): its lifecycle `tag` unless it is managed
+ * (most devices are, and need no word), with the PENDING tag's hint, then the outdated-agent `mark`. Either is null when
+ * it does not show; a row still being read has no status, so it draws neither.
+ *
+ * On a short line the name gives way first, down to its floor; then the tag does, cutting its own label (its full
+ * label in its tooltip), so it never spills over the mark (`DATA_TABLE_CELL_HUG_TAG_CLASS`). The mark never shrinks.
+ */
+function deviceNameStatus(device: DeviceRow): { tag: ReactNode; mark: ReactNode } {
+  const hasTag = !!device.status && !isManagedStatus(device.status);
+  const outdated = device.clientOutdated === true && !isArchiveLifecycleStatus(device.status);
+  const tagElement = hasTag ? (
+    <DeviceLifecycleTag
+      status={device.status}
+      connectivity={device.connectivity}
+      size="compact"
+      className="min-w-0 overflow-hidden"
+      data-device-name-status
+    />
+  ) : null;
+  const hint = hasTag ? devicePendingHint(device.status, 'lifecycle') : null;
+  return {
+    tag:
+      tagElement && hint ? (
+        <DeviceTagHint hint={hint} shrink>
+          {tagElement}
+        </DeviceTagHint>
+      ) : (
+        tagElement
+      ),
+    mark: outdated ? <DeviceOutdatedIcon clientOutdated={device.clientOutdated} status={device.status} /> : null,
+  };
+}
+
+/**
+ * The table's DEVICE cell: the connectivity icon (the type tile in the legacy display), the name, the unread mark. In
+ * the lifecycle display the name's tag and outdated mark follow it on its line (`deviceNameStatus`), by the grid cell's
+ * rule (`DataTable.Cell` `hugText`): the name gives way first, down to its floor, then the tag.
+ */
 function DeviceNameTableCell({ device }: { device: DeviceRow }) {
   const legacy = useDeviceStatusDisplay() === 'legacy';
+  const { tag, mark } = legacy ? { tag: null, mark: null } : deviceNameStatus(device);
   return (
     <div
       className={cn(
@@ -408,9 +458,23 @@ function DeviceNameTableCell({ device }: { device: DeviceRow }) {
         lastSeen={device.last_seen ?? device.lastSeen}
         legacyIcon={<DeviceTypeTile type={device.type} />}
       />
-      <div className="min-w-0 flex-1">
-        <TruncateText>{getDeviceName(device)}</TruncateText>
-      </div>
+      {tag || mark ? (
+        <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xxs)]">
+          <div className={cn('min-w-0', DATA_TABLE_CELL_HUG_TEXT_CLASS)}>
+            <TruncateText>{getDeviceName(device)}</TruncateText>
+          </div>
+          {tag && (
+            <div data-device-name-tag className={DATA_TABLE_CELL_HUG_TAG_CLASS}>
+              {tag}
+            </div>
+          )}
+          {mark && <div className="flex shrink-0">{mark}</div>}
+        </div>
+      ) : (
+        <div className="min-w-0 flex-1">
+          <TruncateText>{getDeviceName(device)}</TruncateText>
+        </div>
+      )}
       {/* In the name's cell, not the open column: that one is dropped on a narrow page. */}
       <DeviceUnreadIndicator device={device} />
     </div>
@@ -429,12 +493,25 @@ function DeviceTypeGridIcon({ type }: { type: string | null | undefined }) {
 }
 
 /**
- * The device's connectivity icon (its type icon in the legacy display), its name, and its unread mark at the end.
+ * The device's connectivity icon (its type icon in the legacy display), its name, and its unread mark at the end. In
+ * the lifecycle display the name's tag and outdated mark follow it (`deviceNameStatus`), right after the name: the name
+ * gives way first, down to its floor, then the tag; the mark and the unread mark never do.
  * `unreadMark={false}` leaves the mark out: a list a device is picked from (`DeviceSelector`) is not where its
- * notifications are read.
+ * notifications are read. `statusAdornments={false}` leaves the tag and the outdated mark out: a list with a status
+ * column of its own (`DeviceSelector`) would show the tag twice.
  */
-export function DeviceNameGridCell({ device, unreadMark = true }: { device: DeviceRow; unreadMark?: boolean }) {
+export function DeviceNameGridCell({
+  device,
+  unreadMark = true,
+  statusAdornments = true,
+}: {
+  device: DeviceRow;
+  unreadMark?: boolean;
+  statusAdornments?: boolean;
+}) {
+  const lifecycle = useDeviceStatusDisplay() === 'lifecycle';
   const unread = unreadMark && (device.unreadNotificationCount ?? 0) > 0;
+  const { tag, mark } = statusAdornments && lifecycle ? deviceNameStatus(device) : { tag: null, mark: null };
   return (
     <DataTable.Cell
       leading={{
@@ -450,9 +527,33 @@ export function DeviceNameGridCell({ device, unreadMark = true }: { device: Devi
         ),
       }}
       text={getDeviceName(device)}
+      tag={tag ?? undefined}
+      mark={mark ?? undefined}
+      hugText={tag != null || mark != null}
       trailing={unread ? <DeviceUnreadIndicator device={device} /> : undefined}
     />
   );
+}
+
+/**
+ * When the device was last seen, as the LAST SEEN column prints it: its date and time, the empty mark for a device
+ * never seen, nothing while the row is read (the text's own skeleton).
+ */
+function useDeviceLastSeenText(device: DeviceRow): string {
+  const loading = useLoadingScope();
+  const lastSeen = device.last_seen ?? device.lastSeen;
+  if (lastSeen) return formatDeviceDateTime(lastSeen);
+  return loading ? '' : '—';
+}
+
+/** The LAST SEEN cell of a card row. */
+function DeviceLastSeenCell({ device }: { device: DeviceRow }) {
+  return <TruncateText>{useDeviceLastSeenText(device)}</TruncateText>;
+}
+
+/** The LAST SEEN cell in the grid. */
+function DeviceLastSeenGridCell({ device }: { device: DeviceRow }) {
+  return <DataTable.Cell text={useDeviceLastSeenText(device)} />;
 }
 
 /** The status tag with when the device was last seen beside it. */
@@ -460,7 +561,7 @@ function DeviceStatusGridCell({ device }: { device: DeviceRow }) {
   const loading = useLoadingScope();
   // While the row is read there is no "last seen" to print: the tag's own skeleton is the cell.
   const lastSeen =
-    loading && !device.last_seen ? undefined : device.last_seen ? formatDateTime(device.last_seen) : 'Never';
+    loading && !device.last_seen ? undefined : device.last_seen ? formatDeviceDateTime(device.last_seen) : 'Never';
   return (
     <DataTable.Cell
       tag={
@@ -717,6 +818,63 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
       ]
     : [];
 
+  // Declared unconditionally, empty options and all. `meta.filter` is what keeps a header cell visible below `lg`, so
+  // dropping it until the options query resolves made every header on a tablet disappear on reload, and reserving the
+  // funnel from the start keeps the label from shifting when they arrive. The dropdown stays shut while it is empty.
+  const statusFilter = {
+    options: statusFilterOptions,
+    sections: connectivitySections(connectivityFilterOptions),
+    pending: filtersPending,
+  };
+  // The lifecycle display (Figma 5262-159608) has no STATUS column: the status is the tag after the name, the status
+  // funnel sits on DEVICE (stored as `status`, so the hosts' filters and URL do not change), and LAST SEEN takes the
+  // STATUS column's place. The legacy display keeps the STATUS column as it was.
+  const lifecycle = statusDisplay === 'lifecycle';
+
+  const statusColumn: ColumnDef<T> = {
+    accessorKey: 'status',
+    id: 'status',
+    header: 'STATUS',
+    cell: ({ row }: { row: Row<T> }) => {
+      const device = row.original;
+      return (
+        <div className="flex shrink-0 flex-col items-start gap-1">
+          <div className="inline-flex">
+            <DeviceLifecycleTag
+              status={device.status}
+              connectivity={device.connectivity}
+              clientOutdated={device.clientOutdated}
+            />
+          </div>
+          <DeviceLastSeen lastSeen={device.last_seen} />
+        </div>
+      );
+    },
+    // The design's 200 holds a relative time ("1 hour ago"); the absolute date and time shown today needs 240.
+    size: 240,
+    meta: {
+      label: 'Status',
+      gridCell: ({ row }) => <DeviceStatusGridCell device={row.original} />,
+      width: directoryColumns ? 'w-auto shrink-0 content-md:w-[14%]' : 'w-auto shrink-0 content-md:w-1/5',
+      filter: statusFilter,
+    },
+  };
+
+  const lastSeenColumn: ColumnDef<T> = {
+    id: 'lastSeen',
+    header: 'LAST SEEN',
+    cell: ({ row }: { row: Row<T> }) => <DeviceLastSeenCell device={row.original} />,
+    // Holds a day-first date and time ("26/11/2026 15:27") whole.
+    size: 180,
+    meta: {
+      label: 'Last seen',
+      gridCell: ({ row }) => <DeviceLastSeenGridCell device={row.original} />,
+      // The STATUS column's share, so the columns around it keep theirs; below `md` a card row has no room for it.
+      width: directoryColumns ? 'w-auto shrink-0 content-md:w-[14%]' : 'w-auto shrink-0 content-md:w-1/5',
+      hideAt: 'md',
+    },
+  };
+
   return [
     {
       accessorKey: 'device',
@@ -724,52 +882,20 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
       header: 'DEVICE',
       cell: ({ row }: { row: Row<T> }) => <DeviceNameTableCell device={row.original} />,
       // The name takes what the other columns leave: with two more of them, their shares below shrink to leave some.
-      size: 280,
+      // The grid draws it wider in the lifecycle display, where the tag and the mark share the name's line.
+      size: DEVICE_COLUMN_SIZE[statusDisplay],
       minSize: GRID_MIN_WIDTH.icon,
+      // It carries the status funnel in the lifecycle display: the gear menu cannot hide it.
+      ...(lifecycle ? { enableHiding: false } : {}),
       meta: {
         label: 'Device',
         width: directoryColumns ? 'flex-1 min-w-0' : 'flex-1 content-md:w-1/4',
         gridCell: ({ row }) => <DeviceNameGridCell device={row.original} />,
+        ...(lifecycle ? { filter: { ...statusFilter, id: 'status', title: 'Status' } } : {}),
       },
     },
     ...directory,
-    {
-      accessorKey: 'status',
-      id: 'status',
-      header: 'STATUS',
-      cell: ({ row }: { row: Row<T> }) => {
-        const device = row.original;
-        return (
-          <div className="flex shrink-0 flex-col items-start gap-1">
-            <div className="inline-flex">
-              <DeviceLifecycleTag
-                status={device.status}
-                connectivity={device.connectivity}
-                clientOutdated={device.clientOutdated}
-              />
-            </div>
-            <DeviceLastSeen lastSeen={device.last_seen} />
-          </div>
-        );
-      },
-      // The design's 200 holds a relative time ("1 hour ago"); the absolute date and time shown today needs 240.
-      size: 240,
-      meta: {
-        label: 'Status',
-        gridCell: ({ row }) => <DeviceStatusGridCell device={row.original} />,
-        width: directoryColumns ? 'w-auto shrink-0 content-md:w-[14%]' : 'w-auto shrink-0 content-md:w-1/5',
-        // Declared unconditionally, empty options and all. `meta.filter` is what
-        // keeps a header cell visible below `lg`, so dropping it until the
-        // options query resolves made every header on a tablet disappear on
-        // reload, and reserving the funnel from the start keeps the label from
-        // shifting when they arrive. The dropdown stays shut while it is empty.
-        filter: {
-          options: statusFilterOptions,
-          sections: connectivitySections(connectivityFilterOptions),
-          pending: filtersPending,
-        },
-      },
-    },
+    lifecycle ? lastSeenColumn : statusColumn,
     {
       accessorKey: 'os',
       id: 'os',

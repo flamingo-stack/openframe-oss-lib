@@ -26,6 +26,7 @@ export { EMPTY_NARROWING, narrowingToFilter } from './device-selector/narrowing'
 export { DeviceConnectivityIcon, type DeviceConnectivityIconProps } from './device-connectivity-icon';
 export { DeviceLifecycleTag, type DeviceLifecycleTagProps, deviceLifecycleTagProps } from './device-lifecycle-tag';
 export { type DeviceStatusDisplay, DeviceStatusDisplayProvider, useDeviceStatusDisplay } from './device-status-display';
+export { DeviceOutdatedIcon, type DeviceOutdatedIconProps } from './device-status-hint';
 export {
   type DeviceCardStatus,
   type DeviceConnectivityConfig,
@@ -41,6 +42,7 @@ export {
   getLegacyDeviceStatusConfig,
 } from './device-status';
 export {
+  ARCHIVE_LIFECYCLE_STATUSES,
   DEFAULT_DASHBOARD_STATUSES,
   DEFAULT_DEVICES_LIST_STATUSES,
   DEFAULT_VISIBLE_STATUSES,
@@ -58,6 +60,8 @@ export {
   expandDeviceStatuses,
   HIDDEN_DEVICE_STATUSES,
   type HiddenDeviceStatus,
+  isArchiveLifecycle,
+  isArchiveLifecycleStatus,
   isDeviceConnected,
   isManagedStatus,
   joinStatusFilterValue,

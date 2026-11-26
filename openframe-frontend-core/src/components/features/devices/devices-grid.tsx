@@ -3,12 +3,15 @@
 import type React from 'react';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { LoadingRegion } from '../../loading/loading-region';
-import { DeviceCard } from '../../ui';
+import { DeviceCard, type DeviceCardStatusLine } from '../../ui';
 import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { formatDeviceDateTime } from './device-last-online';
 import { deviceLifecycleTagProps } from './device-lifecycle-tag';
 import { getDeviceName } from './device-name';
 import { getDeviceOperatingSystem } from './device-status';
-import { useDeviceStatusDisplay } from './device-status-display';
+import { type DeviceStatusDisplay, useDeviceStatusDisplay } from './device-status-display';
+import { DeviceOutdatedIcon, devicePendingHint } from './device-status-hint';
+import { isArchiveLifecycleStatus, isManagedStatus } from './device-statuses';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDevicesViewConfig } from './devices-view-config';
 import type { DeviceRow } from './types';
@@ -37,6 +40,28 @@ export const DEVICES_GRID_SKELETON_CARDS = 12;
 
 /** The grid's cards carry no "more" button (the card opens the device), loaded and loading alike. */
 const GRID_CARD_ACTIONS = { moreButton: { visible: false } };
+
+/**
+ * A card's status row in the lifecycle display (Figma 5108-199992): a managed device reads "Managed · Last seen <date>"
+ * (just "Managed" if never seen) in place of the tag, any other status keeps its tag (the PENDING one with its hint),
+ * and an outdated agent's mark follows either. The legacy display keeps the tag and "Last Seen:" (`undefined`).
+ */
+function deviceCardStatusLine(device: DeviceRow, display: DeviceStatusDisplay): DeviceCardStatusLine | undefined {
+  if (display !== 'lifecycle') return undefined;
+  const lastSeen = device.last_seen ?? device.lastSeen;
+  const outdated = device.clientOutdated === true && !isArchiveLifecycleStatus(device.status);
+  return {
+    text: isManagedStatus(device.status)
+      ? lastSeen
+        ? `Managed · Last seen ${formatDeviceDateTime(lastSeen)}`
+        : 'Managed'
+      : undefined,
+    tagHint: devicePendingHint(device.status, display),
+    adornment: outdated ? (
+      <DeviceOutdatedIcon clientOutdated={device.clientOutdated} status={device.status} />
+    ) : undefined,
+  };
+}
 
 /** A page of the grid's own cards while they are read (the first page and the next one alike), each a list item. */
 function DeviceCardLoadingPage({ count }: { count: number }) {
@@ -97,7 +122,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                     operatingSystem: getDeviceOperatingSystem(device.osType),
                   }}
                   statusTag={
-                    device.status || device.clientOutdated
+                    device.status || (display === 'legacy' && device.clientOutdated)
                       ? deviceLifecycleTagProps(device.status, {
                           connectivity: device.connectivity,
                           display,
@@ -105,6 +130,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                         })
                       : undefined
                   }
+                  statusLine={deviceCardStatusLine(device, display)}
                   connectivity={device.connectivity ?? null}
                   onDeviceClick={() => handleDeviceClick(device)}
                   actions={

@@ -6,6 +6,7 @@ import { formatDate, formatTime } from '../../utils/format-date';
 import type { OSPlatformId } from '../../utils/os-platforms';
 import { DeviceConnectivityIcon } from '../features/devices/device-connectivity-icon';
 import { useDeviceStatusDisplay } from '../features/devices/device-status-display';
+import { DeviceTagHint } from '../features/devices/device-status-hint';
 import { OSTypeIcon } from '../features/os-type-badge';
 import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
 import { Ellipsis01Icon } from '../icons-v2-generated/interface';
@@ -24,6 +25,10 @@ const DEVICE_CARD_NAME_STACK_CLASS = 'flex min-w-0 flex-1 flex-col justify-cente
 const DEVICE_CARD_NAME_LINE_CLASS = 'flex items-center gap-1 text-h4';
 /** The card's status row: the status tag and the "Last Seen:" line. */
 const DEVICE_CARD_STATUS_ROW_CLASS = 'flex w-full items-center gap-2';
+/** The status row in its `statusLine` form: the tag's 32px whether it holds the tag or a line of text. */
+const DEVICE_CARD_STATUS_LINE_ROW_CLASS = 'h-8';
+/** The status row's line of text ("Managed · Last seen …"): grey, one line, cut when the card is narrow. */
+const DEVICE_CARD_STATUS_TEXT_CLASS = 'min-w-0 truncate text-ods-text-secondary text-h6';
 /** The bordered box of the device-type icon. */
 const DEVICE_CARD_ICON_BOX_CLASS =
   'flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border p-2';
@@ -58,6 +63,16 @@ export interface ActionButton {
   visible?: boolean;
 }
 
+/** The card's status row in the lifecycle display's form (Figma 5108-199992): see `DeviceCardProps.statusLine`. */
+export interface DeviceCardStatusLine {
+  /** A line of grey text in place of the tag ("Managed · Last seen 11/24/26 11:58 AM"). */
+  text?: React.ReactNode;
+  /** The tag's tooltip on hover, focus and tap (the PENDING tag's); its click never opens the card. */
+  tagHint?: React.ReactNode;
+  /** Drawn after the tag or the text (the outdated-agent mark). */
+  adornment?: React.ReactNode;
+}
+
 export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
   device: Device;
   actions?: {
@@ -72,6 +87,12 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
     customActions?: ActionButton[];
   };
   statusTag?: TagProps;
+  /**
+   * The status row in the lifecycle display's form (Figma 5108-199992), with no "Last Seen:" line: `text` in place of
+   * the tag, else `statusTag` (with `tagHint`), then `adornment`. The row is 32px in either form. Omitted, the row is
+   * the tag and "Last Seen:" as before. The loading card draws the row as before either way.
+   */
+  statusLine?: DeviceCardStatusLine;
   /**
    * Whether the device is online right now (ONLINE / OFFLINE; null = never reported, offline). Given, the device icon
    * says so (Figma 3324-6819: a green or grey dot on the monitor, the state and last seen on hover). Omitted, the icon
@@ -92,12 +113,43 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
   showTags?: boolean;
 }
 
+/** The status row's `statusLine` form: nothing when it has nothing to show. */
+function DeviceCardStatusLineRow({
+  statusTag,
+  statusLine: { text, tagHint, adornment },
+}: {
+  statusTag: TagProps | undefined;
+  statusLine: DeviceCardStatusLine;
+}) {
+  const hasText = text != null && text !== false && text !== '';
+  const tag =
+    !hasText && statusTag ? (
+      <Tag
+        variant={statusTag.variant}
+        icon={statusTag.icon}
+        onClose={statusTag.onClose}
+        className={statusTag.className}
+        label={statusTag.label ?? ''}
+      />
+    ) : null;
+  const hasAdornment = adornment != null && adornment !== false;
+  if (!hasText && !tag && !hasAdornment) return null;
+  return (
+    <div className={cn(DEVICE_CARD_STATUS_ROW_CLASS, DEVICE_CARD_STATUS_LINE_ROW_CLASS)} data-device-card-status>
+      {hasText && <span className={DEVICE_CARD_STATUS_TEXT_CLASS}>{text}</span>}
+      {tag && (tagHint ? <DeviceTagHint hint={tagHint}>{tag}</DeviceTagHint> : tag)}
+      {adornment}
+    </div>
+  );
+}
+
 export function DeviceCard({
   device,
   actions = {
     moreButton: { visible: true },
   },
   statusTag,
+  statusLine,
   connectivity,
   onDeviceClick,
   loading: loadingProp,
@@ -109,6 +161,8 @@ export function DeviceCard({
   // skeletons, in the same boxes; its static parts stay real and the whole card is inert.
   const loading = useLoadingScope() || !!loadingProp;
   const display = useDeviceStatusDisplay();
+  // The loading card keeps its one form (the tag's and the time's bars) whatever form the loaded row takes.
+  const statusLineForm = statusLine !== undefined && !loading;
   // "Last seen" is read as "your local time", the same way the devices table
   // column renders it: the viewer's zone and locale, never UTC.
   const formatLastSeen = (lastSeen?: string | Date) => {
@@ -212,8 +266,11 @@ export function DeviceCard({
         )}
       </div>
 
+      {/* Row 2, the lifecycle display's form: the tag or a line of text, then the adornment; no "Last Seen:" line. */}
+      {statusLineForm && <DeviceCardStatusLineRow statusTag={statusTag} statusLine={statusLine} />}
+
       {/* Row 2: Status badge | Last seen (both drawn while loading: the tag and the time are read) */}
-      {(loading || statusTag || device.lastSeen) && (
+      {!statusLineForm && (loading || statusTag || device.lastSeen) && (
         <div className={DEVICE_CARD_STATUS_ROW_CLASS}>
           {(loading || statusTag) && (
             <Tag
