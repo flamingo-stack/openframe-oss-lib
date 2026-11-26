@@ -207,6 +207,21 @@ class EncryptionServiceTest {
         }
 
         @Test
+        void writesTinkWithKeysetAndTinkWriteOn() {
+            assertThat(EncryptionService.withKeyset(keyset, true, PASSWORD, SALT).writesTink()).isTrue();
+        }
+
+        @Test
+        void doesNotWriteTinkWithKeysetButTinkWriteOff() {
+            assertThat(EncryptionService.withKeyset(keyset, false, PASSWORD, SALT).writesTink()).isFalse();
+        }
+
+        @Test
+        void doesNotWriteTinkInLegacyMode() {
+            assertThat(new EncryptionService(PASSWORD, SALT).writesTink()).isFalse();
+        }
+
+        @Test
         void shouldRefuseTinkWriteOffWithoutLegacyPassword() {
             assertThatThrownBy(() -> EncryptionService.withKeyset(keyset, false, null, null))
                     .isInstanceOf(IllegalArgumentException.class);

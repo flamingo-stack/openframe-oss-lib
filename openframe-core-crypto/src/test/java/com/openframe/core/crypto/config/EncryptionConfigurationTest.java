@@ -213,6 +213,19 @@ class EncryptionConfigurationTest {
                 .hasMessageContaining("legacy-read");
     }
 
+    @Test
+    void refusesTinkWriteWithoutKeyset() {
+        // setup
+        EncryptionConfiguration configuration = new EncryptionConfiguration();
+        ObjectProvider<KmsClient> noKms = noKmsClient();
+
+        // execution / verifications
+        assertThatThrownBy(() -> configuration.encryptionService(
+                "", "", false, false, true, true, PASSWORD, SALT, noKms))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("security.encryption.tink-write.enabled=true needs security.encryption.keyset");
+    }
+
     private static ObjectProvider<KmsClient> noKmsClient() {
         return new StaticListableBeanFactory().getBeanProvider(KmsClient.class);
     }
