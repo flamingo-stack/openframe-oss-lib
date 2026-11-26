@@ -146,10 +146,7 @@ impl Helper {
 
 fn place_test_binary(dest: &Path) {
     std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
-    let this = std::env::current_exe().unwrap();
-    if std::fs::hard_link(&this, dest).is_err() {
-        std::fs::copy(&this, dest).unwrap();
-    }
+    std::fs::copy(std::env::current_exe().unwrap(), dest).unwrap();
 }
 
 #[tokio::test]
