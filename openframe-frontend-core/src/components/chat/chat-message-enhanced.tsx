@@ -9,6 +9,7 @@ import {
   type ChatToolPart,
   approvalBatchIdOf,
   approvalStatusOf,
+  emailEnvelopeOf,
   isSourcePart,
   isToolPart,
   textOfParts,
@@ -184,7 +185,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       nameEveryTurn = false,
       assistantIcon,
       contextItems,
-      email,
       resolveContextIcon,
       renderContextItem,
       renderRecordChip,
@@ -438,6 +438,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       (last, part, index) => (part.type === 'text' && part.text.trim() !== '' ? index : last),
       -1,
     );
+    // An email (email-to-ticket) draws as one card: its envelope over the whole body, at the first text part.
+    const email = useMemo(() => emailEnvelopeOf({ parts }), [parts]);
+    const firstTextIndex = bodyParts.findIndex(part => part.type === 'text');
+    const emailBody = email ? bodyParts.flatMap(part => (part.type === 'text' ? [part.text] : [])).join('\n\n') : '';
     // Under an approval that ran the words after it were cut, and "ask again" would run it twice.
     const approvalRan = holdsApprovalThatRan(bodyParts);
     // A stream cut before any text says so too: the notice is all that row has. Text of its own may say it already (a
@@ -530,8 +534,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     const partIsStreaming = index === bodyParts.length - 1 && !!isTyping;
                     switch (part.type) {
                       case 'text': {
-                        // An email draws as one, its envelope over its body, whatever the body holds.
-                        if (email) return <EmailMessageCard key={index} email={email} body={part.text} self={isUser} />;
+                        // An email draws as one card, its envelope over its whole body, whatever the body holds.
+                        if (email) {
+                          if (index !== firstTextIndex) return null;
+                          return <EmailMessageCard key={index} email={email} body={emailBody} self={isUser} />;
+                        }
                         // Whitespace between two cards draws nothing, not an empty block with its gap.
                         if (part.text.trim() === '') return null;
                         // The layout of Claude and ChatGPT: what the USER said is a
@@ -561,6 +568,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                           </div>
                         );
                       }
+                      case 'data-email':
+                        // Drawn with the body, in the text part's place.
+                        return null;
                       case 'file':
                         // In the bubble of the text beside it. A message of attachments alone has a bubble of its own.
                         if (lastTextIndex !== -1 || part !== files[0]) return null;
@@ -708,7 +718,6 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // Reference equality — the host re-uses the same array instance per
     // message (it's set once on the optimistic send and never mutated).
     prevProps.contextItems === nextProps.contextItems &&
-    prevProps.email === nextProps.email &&
     prevProps.resolveContextIcon === nextProps.resolveContextIcon &&
     prevProps.renderContextItem === nextProps.renderContextItem &&
     // Host keeps this stable (module const / useCallback), so reference

@@ -63,7 +63,7 @@ function emailAddressesOf(list: EmailAddressData[] | null | undefined): ChatEmai
 }
 
 /** The row's EMAIL part as the envelope its message draws, or null when the row is not an email. */
-function emailEnvelopeOf(entries: MessageData[]): ChatEmailEnvelope | null {
+function emailEnvelopeOfEntries(entries: MessageData[]): ChatEmailEnvelope | null {
   const email = entries.find((data): data is EmailMessageData => data.type === MESSAGE_TYPE.EMAIL);
   if (!email) return null;
   const [from] = emailAddressesOf(email.from ? [email.from] : []);
@@ -219,7 +219,7 @@ export function processHistoricalMessages(
     if (isUserRow(row)) {
       flushTurn();
       const authorType: AuthorType = row.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user';
-      const email = emailEnvelopeOf(entries);
+      const email = emailEnvelopeOfEntries(entries);
       const texts = entries.filter((data): data is TextMessageData => data.type === MESSAGE_TYPE.TEXT && !!data.text);
       // An email is a message whatever its body holds: one of attachments alone still says who wrote to whom.
       const bodies: TextMessageData[] = email && texts.length === 0 ? [{ type: MESSAGE_TYPE.TEXT, text: '' }] : texts;
@@ -235,10 +235,12 @@ export function processHistoricalMessages(
               createdAt: isoOf(row.createdAt),
               author: { name: getOwnerDisplayName(row.owner), authorType, ...(avatar !== undefined ? { avatar } : {}) },
               ...(contextItems.length > 0 ? { contextItems } : {}),
-              ...(email ? { email } : {}),
               ...(typeof row.lastChunkStreamSeq === 'number' ? { streamSeq: row.lastChunkStreamSeq } : {}),
             },
-            parts: [{ type: 'text', text: data.text ?? '' }],
+            parts: [
+              { type: 'text', text: data.text ?? '' },
+              ...(email ? [{ type: 'data-email' as const, data: email }] : []),
+            ],
           },
         ];
       }

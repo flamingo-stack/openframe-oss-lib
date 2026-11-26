@@ -181,7 +181,18 @@ export interface ChatSuggestionsPart {
   data: { groups: ChatSuggestionGroup[]; note?: string };
 }
 
+/**
+ * The message is an email (email-to-ticket): its envelope, beside the text part of its body, as the backend stores it
+ * (an `EmailData` part after the `TextData`). Drawn with the body as one email card.
+ */
+export interface ChatEmailPart {
+  type: 'data-email';
+  id?: string;
+  data: ChatEmailEnvelope;
+}
+
 export type ChatDataPart =
+  | ChatEmailPart
   | ChatRecordCardsPart
   | ChatAskPart
   | ChatEscalationOfferPart
@@ -377,8 +388,6 @@ export interface ChatMessageMetadata {
   progress?: ChatProgressRow[];
   author?: ChatMessageAuthor;
   contextItems?: ChatContextItem[];
-  /** The message is an email: its envelope. */
-  email?: ChatEmailEnvelope;
   /** The highest chunk sequence consumed into this row: what the history merge decides coverage with. */
   streamSeq?: number;
 }
@@ -396,6 +405,11 @@ export interface ChatMessage {
 
 export function isSourcePart(part: ChatPart): part is ChatSourcePart {
   return part.type === 'source-url' || part.type === 'source-document';
+}
+
+/** The message's email envelope, when it is an email (email-to-ticket). */
+export function emailEnvelopeOf(message: Pick<ChatMessage, 'parts'>): ChatEmailEnvelope | undefined {
+  return message.parts.find((part): part is ChatEmailPart => part.type === 'data-email')?.data;
 }
 
 export function isToolPart(part: ChatPart): part is ChatToolPart {

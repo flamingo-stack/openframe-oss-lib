@@ -21,10 +21,12 @@ function renderEmail(email: ChatEmailEnvelope, text: string, authorType: 'user' 
     <ChatMessageEnhanced
       role="user"
       name="Priya Raman"
-      parts={[{ type: 'text', text }]}
+      parts={[
+        { type: 'text', text },
+        { type: 'data-email', data: email },
+      ]}
       authorType={authorType}
       selfAuthorType="admin"
-      email={email}
     />,
   );
 }
@@ -60,6 +62,24 @@ describe('an email message', () => {
       'admin',
     );
     expect(screen.getByText('Not delivered: Mailbox full')).toBeTruthy();
+  });
+
+  it('is one card for a body in several parts', () => {
+    render(
+      <ChatMessageEnhanced
+        role="user"
+        parts={[
+          { type: 'text', text: 'First' },
+          { type: 'text', text: 'Second' },
+          { type: 'data-email', data: INBOUND },
+        ]}
+        authorType="user"
+        selfAuthorType="admin"
+      />,
+    );
+    expect(screen.getAllByTestId('chat-email-message')).toHaveLength(1);
+    expect(screen.getByTestId('chat-email-message').textContent).toContain('First');
+    expect(screen.getByTestId('chat-email-message').textContent).toContain('Second');
   });
 
   it('is drawn when its body is empty', () => {

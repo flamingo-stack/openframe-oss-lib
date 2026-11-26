@@ -3,12 +3,7 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
-import type {
-  ChatEmailEnvelope,
-  ChatMessage,
-  ChatMessageMetadata,
-  ChatPart,
-} from '../../../chat-protocol/chat-message';
+import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
@@ -168,8 +163,6 @@ export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement>
    * 31:28709). Resolved from `metadata.contextItems` by the host.
    */
   contextItems?: ChatContextItem[];
-  /** The message is an email (`metadata.email`): it draws as one, its envelope over its body. */
-  email?: ChatEmailEnvelope;
   /**
    * Lead-icon resolver for the context chips (maps an item to its entity-type
    * glyph). Optional — chips render label-only when omitted.

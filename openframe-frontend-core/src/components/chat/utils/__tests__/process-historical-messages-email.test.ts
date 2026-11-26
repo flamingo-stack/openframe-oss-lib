@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { emailEnvelopeOf } from '../../../../chat-protocol/chat-message';
 import type { EmailMessageData, HistoricalMessage } from '../../types';
 import { processHistoricalMessages } from '../process-historical-messages';
 
@@ -42,8 +43,8 @@ describe('an email in the history', () => {
     const [message] = messages;
     expect(message.role).toBe('user');
     expect(message.metadata?.author).toEqual({ name: 'Priya Raman', authorType: 'user' });
-    expect(message.parts).toEqual([{ type: 'text', text: 'Hi team' }]);
-    expect(message.metadata?.email).toEqual({
+    expect(message.parts[0]).toEqual({ type: 'text', text: 'Hi team' });
+    expect(emailEnvelopeOf(message)).toEqual({
       direction: 'INBOUND',
       from: { address: 'p.raman@mail.com', name: 'Priya Raman' },
       to: [{ address: 'support@brightpath-it.com' }],
@@ -65,7 +66,7 @@ describe('an email in the history', () => {
     expect(messages).toHaveLength(1);
     expect(messages[0].role).toBe('user');
     expect(messages[0].metadata?.author?.authorType).toBe('user');
-    expect(messages[0].metadata?.email).toBeUndefined();
+    expect(emailEnvelopeOf(messages[0])).toBeUndefined();
   });
 
   it('is a message when its body is empty (attachments alone)', () => {
@@ -73,8 +74,8 @@ describe('an email in the history', () => {
       inbound([{ type: 'TEXT', text: '' }, ENVELOPE], { type: 'EMAIL', address: 'p.raman@mail.com' }),
     ]);
     expect(messages).toHaveLength(1);
-    expect(messages[0].parts).toEqual([{ type: 'text', text: '' }]);
-    expect(messages[0].metadata?.email?.from?.address).toBe('p.raman@mail.com');
+    expect(messages[0].parts[0]).toEqual({ type: 'text', text: '' });
+    expect(emailEnvelopeOf(messages[0])?.from?.address).toBe('p.raman@mail.com');
   });
 
   it("is the technician's when it is a reply they sent, with its delivery state", () => {
@@ -88,7 +89,7 @@ describe('an email in the history', () => {
       ),
     ]);
     expect(messages[0].metadata?.author).toEqual({ name: 'Roman Smith', authorType: 'admin' });
-    expect(messages[0].metadata?.email).toMatchObject({
+    expect(emailEnvelopeOf(messages[0])).toMatchObject({
       direction: 'OUTBOUND',
       deliveryState: 'FAILED',
       deliveryFailureReason: 'Mailbox full',
@@ -99,6 +100,6 @@ describe('an email in the history', () => {
     const { messages } = processHistoricalMessages([
       inbound([{ type: 'TEXT', text: 'Hello' }], { type: 'CLIENT', machineId: 'm' }),
     ]);
-    expect(messages[0].metadata?.email).toBeUndefined();
+    expect(emailEnvelopeOf(messages[0])).toBeUndefined();
   });
 });
