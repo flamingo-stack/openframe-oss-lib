@@ -1,5 +1,8 @@
 package com.openframe.authz.security;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.openframe.authz.config.SecurityConfig;
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.metrics.PasswordLoginMetrics;
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -56,17 +60,22 @@ class AuthSuccessHandlerTest {
     private AuthSuccessHandler handler;
     private final MockHttpServletRequest request = new MockHttpServletRequest();
     private final MockHttpServletResponse response = new MockHttpServletResponse();
+    private final Logger logger = (Logger) LoggerFactory.getLogger(AuthSuccessHandler.class);
+    private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
 
     @BeforeEach
     void setUp() {
         handler = new AuthSuccessHandler(userService, ssoFlowSuccessHandler, registry, passwordLoginMetrics);
         TenantContext.setTenantId(TENANT);
+        appender.start();
+        logger.addAppender(appender);
         lenient().when(registry.isSupported(anyString())).thenReturn(true);
     }
 
     @AfterEach
     void clear() {
         TenantContext.clear();
+        logger.detachAppender(appender);
     }
 
     @Test
@@ -139,6 +148,43 @@ class AuthSuccessHandlerTest {
         // verifications
         verify(passwordLoginMetrics, never()).recordSucceeded(true);
         verify(passwordLoginMetrics, never()).recordSucceeded(false);
+    }
+
+    @Test
+    void onAuthenticationSuccess_passwordLogin_recordedStateLogged() throws Exception {
+        // setup
+        Authentication auth = passwordAuthentication();
+        when(passwordLoginMetrics.recordSucceeded(false)).thenReturn("absent");
+
+        // execution
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        // verifications
+        assertThat(appender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .singleElement()
+                .asString()
+                .startsWith("Login success")
+                .contains("provider=password")
+                .endsWith("recaptchaSession=absent");
+    }
+
+    @Test
+    void onAuthenticationSuccess_ssoLogin_notApplicableLogged() throws Exception {
+        // setup
+        Authentication auth = authentication("google", oidcUser(Map.of("email", "a@acme.com", "email_verified", false)));
+
+        // execution
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        // verifications
+        assertThat(appender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .singleElement()
+                .asString()
+                .startsWith("Login success")
+                .contains("provider=google")
+                .endsWith("recaptchaSession=n/a");
     }
 
     @Test
