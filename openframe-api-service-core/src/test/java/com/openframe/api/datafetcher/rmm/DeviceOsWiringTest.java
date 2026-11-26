@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher.rmm;
 
+import com.openframe.api.dataloader.OsUpdateCustomerStatusesDataLoader;
 import com.openframe.api.dataloader.OsUpdateDeviceCountsDataLoader;
 import com.openframe.api.mapper.DeviceOsGraphQLMapper;
 import com.openframe.api.mapper.DeviceOsResponseMapper;
@@ -28,6 +29,7 @@ import com.openframe.data.repository.rmm.osupdate.OsUpdateOverrideRepository;
 import com.openframe.data.repository.rmm.osupdate.OsUpdatePolicyRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.rmm.osupdate.DeviceOsUpdateRolloutStateService;
+import com.openframe.data.service.rmm.osupdate.OsUpdateCustomerStatusResolver;
 import com.openframe.data.service.rmm.osupdate.OsUpdatePolicyResolver;
 import com.openframe.graphql.relay.RelayIdCodec;
 import org.junit.jupiter.api.Test;
@@ -57,12 +59,14 @@ class DeviceOsWiringTest {
             .withBean(TagAssignmentRepository.class, () -> mock(TagAssignmentRepository.class))
             .withBean(DeviceOsUpdateRolloutStateService.class, () -> mock(DeviceOsUpdateRolloutStateService.class))
             .withBean(OsUpdatePolicyResolver.class, OsUpdatePolicyResolver::new)
+            .withBean(OsUpdateCustomerStatusResolver.class, () -> mock(OsUpdateCustomerStatusResolver.class))
             .withBean(RelayIdCodec.class, () -> mock(RelayIdCodec.class))
             .withUserConfiguration(DeviceOsDataFetcher.class, DeviceOsStateService.class,
                     DeviceOsPendingUpdateService.class, DeviceOsUpdateHistoryService.class, CursorPageAssembler.class,
                     DeviceOsResponseMapper.class, DeviceOsGraphQLMapper.class,
                     OsUpdateDataFetcher.class, OsUpdateService.class, OsUpdateDeviceService.class, OsUpdateResponseMapper.class,
                     OsUpdateGraphQLMapper.class, OsUpdateDeviceCountsDataLoader.class,
+                    OsUpdateCustomerStatusesDataLoader.class,
                     OsUpdatePolicyDataFetcher.class, OsUpdatePolicyService.class, OsUpdateOverrideService.class,
                     OsUpdatePolicyValidator.class, OsUpdatePolicyResponseMapper.class,
                     OsUpdatePolicyGraphQLMapper.class);
@@ -83,6 +87,7 @@ class DeviceOsWiringTest {
                 .doesNotHaveBean(OsUpdateResponseMapper.class)
                 .doesNotHaveBean(OsUpdateGraphQLMapper.class)
                 .doesNotHaveBean(OsUpdateDeviceCountsDataLoader.class)
+                .doesNotHaveBean(OsUpdateCustomerStatusesDataLoader.class)
                 .doesNotHaveBean(OsUpdatePolicyDataFetcher.class)
                 .doesNotHaveBean(OsUpdatePolicyService.class)
                 .doesNotHaveBean(OsUpdateOverrideService.class)
@@ -108,6 +113,7 @@ class DeviceOsWiringTest {
                 .doesNotHaveBean(OsUpdateResponseMapper.class)
                 .doesNotHaveBean(OsUpdateGraphQLMapper.class)
                 .doesNotHaveBean(OsUpdateDeviceCountsDataLoader.class)
+                .doesNotHaveBean(OsUpdateCustomerStatusesDataLoader.class)
                 .doesNotHaveBean(OsUpdatePolicyDataFetcher.class)
                 .doesNotHaveBean(OsUpdatePolicyService.class)
                 .doesNotHaveBean(OsUpdateOverrideService.class)
@@ -133,6 +139,7 @@ class DeviceOsWiringTest {
                 .hasSingleBean(OsUpdateResponseMapper.class)
                 .hasSingleBean(OsUpdateGraphQLMapper.class)
                 .hasSingleBean(OsUpdateDeviceCountsDataLoader.class)
+                .hasSingleBean(OsUpdateCustomerStatusesDataLoader.class)
                 .hasSingleBean(OsUpdatePolicyDataFetcher.class)
                 .hasSingleBean(OsUpdatePolicyService.class)
                 .hasSingleBean(OsUpdateOverrideService.class)

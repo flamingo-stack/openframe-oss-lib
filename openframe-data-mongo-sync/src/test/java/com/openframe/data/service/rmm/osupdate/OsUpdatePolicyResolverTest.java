@@ -111,6 +111,50 @@ class OsUpdatePolicyResolverTest {
         assertThat(resolved).isNull();
     }
 
+    @Test
+    void resolveOfCustomer_customerWithItsOwnPolicy_thatOneNotTheTenantsAndNeverATagOrDeviceOne() {
+        // execution
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolveOfCustomer(
+                List.of(devicePolicy, tagPolicy, tenantPolicy, customerPolicy), "org-1");
+
+        // verifications
+        assertThat(resolved).isSameAs(customerPolicy);
+    }
+
+    @Test
+    void resolveOfCustomer_customerWithoutItsOwnPolicy_theOneOfTheTenant() {
+        // execution
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolveOfCustomer(
+                List.of(devicePolicy, tagPolicy, tenantPolicy, customerPolicy), "org-2");
+
+        // verifications
+        assertThat(resolved).isSameAs(tenantPolicy);
+    }
+
+    @Test
+    void resolveOfCustomer_twoPoliciesOfTheCustomer_theEarlierCreatedOne() {
+        // setup
+        OsUpdatePolicy earlierCustomerPolicy = policy("earlier", OsUpdatePolicyTarget.builder()
+                .type(OsUpdatePolicyTargetType.CUSTOMER).organizationId("org-1").build());
+        earlierCustomerPolicy.setCreatedAt(CREATED_AT.minusSeconds(60));
+
+        // execution
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolveOfCustomer(
+                List.of(customerPolicy, earlierCustomerPolicy), "org-1");
+
+        // verifications
+        assertThat(resolved).isSameAs(earlierCustomerPolicy);
+    }
+
+    @Test
+    void resolveOfCustomer_onlyTagAndDevicePolicies_null() {
+        // execution
+        OsUpdatePolicy resolved = osUpdatePolicyResolver.resolveOfCustomer(List.of(devicePolicy, tagPolicy), "org-1");
+
+        // verifications
+        assertThat(resolved).isNull();
+    }
+
     private static OsUpdatePolicy policy(String name, OsUpdatePolicyTarget target) {
         return OsUpdatePolicy.builder().id(name).name(name).target(target).createdAt(CREATED_AT).build();
     }

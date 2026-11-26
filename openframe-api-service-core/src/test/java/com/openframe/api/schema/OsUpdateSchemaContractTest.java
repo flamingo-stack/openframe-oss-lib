@@ -7,6 +7,7 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsRebootPending;
 import com.openframe.data.document.rmm.osupdate.OsUpdateAuthorization;
 import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
+import com.openframe.data.document.rmm.osupdate.OsUpdateCustomerStatus;
 import com.openframe.data.document.rmm.osupdate.OsUpdateDeferOption;
 import com.openframe.data.document.rmm.osupdate.OsUpdateDeviceClass;
 import com.openframe.data.document.rmm.osupdate.OsUpdateInUseRule;
@@ -135,7 +136,8 @@ class OsUpdateSchemaContractTest {
                 "platform", "OsPlatform",
                 "classifications", "[OsUpdateClassification!]",
                 "search", "String",
-                "organizationIds", "[String!]"));
+                "organizationIds", "[String!]",
+                "customerStatuses", "[OsUpdateCustomerStatus!]"));
     }
 
     @Test
@@ -177,7 +179,7 @@ class OsUpdateSchemaContractTest {
     }
 
     @Test
-    void osUpdate_exactlyItsFieldsWithBothDeviceCounts() {
+    void osUpdate_exactlyItsFieldsWithBothDeviceCountsAndTheCustomerStatuses() {
         // setup
         Map<String, String> expected = new LinkedHashMap<>();
         expected.put("id", "ID!");
@@ -201,12 +203,51 @@ class OsUpdateSchemaContractTest {
         expected.put("firstSeenAt", "Instant!");
         expected.put("pendingDeviceCount", "Int!");
         expected.put("installedDeviceCount", "Int!");
+        expected.put("customerStatuses", "[OsUpdateCustomerStatus!]!");
 
         // execution
         Map<String, String> osUpdate = fields("OsUpdate");
 
         // verifications
         assertThat(osUpdate).containsExactlyInAnyOrderEntriesOf(expected);
+    }
+
+    @Test
+    void osUpdateCustomers_listOfTheCustomersOfOneUpdate_eachWithItsStatusPolicyRuleDecisionAndCounts() {
+        // execution
+        Optional<FieldDefinition> query = queryField("osUpdateCustomers");
+
+        // verifications
+        assertThat(query).as("Query.osUpdateCustomers").isPresent();
+        assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(Map.of("osUpdateId", "ID!"));
+        assertThat(print(query.get().getType())).isEqualTo("[OsUpdateCustomer!]!");
+        assertThat(fields("OsUpdateCustomer")).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "organizationId", "String!",
+                "status", "OsUpdateCustomerStatus!",
+                "policyId", "ID",
+                "policyName", "String",
+                "rolloutRule", "OsUpdateRolloutRule",
+                "override", "OsUpdateOverride",
+                "pendingDeviceCount", "Int!",
+                "installedDeviceCount", "Int!"));
+    }
+
+    @Test
+    void osUpdateSummary_countsOfTheTenantOrOfOneOptionalCustomer() {
+        // execution
+        Optional<FieldDefinition> query = queryField("osUpdateSummary");
+
+        // verifications
+        assertThat(query).as("Query.osUpdateSummary").isPresent();
+        assertThat(arguments(query.get())).containsExactlyInAnyOrderEntriesOf(Map.of("organizationId", "String"));
+        assertThat(print(query.get().getType())).isEqualTo("OsUpdateSummary!");
+        assertThat(fields("OsUpdateSummary")).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "deviceCount", "Int!",
+                "currentDeviceCount", "Int!",
+                "overdueDeviceCount", "Int!",
+                "overdueOfflineDeviceCount", "Int!",
+                "restartPendingDeviceCount", "Int!",
+                "heldUpdateCount", "Int!"));
     }
 
     @ParameterizedTest
@@ -475,7 +516,8 @@ class OsUpdateSchemaContractTest {
                 Arguments.of("OsUpdateRestartMode", OsUpdateRestartMode.class),
                 Arguments.of("OsUpdateDeferOption", OsUpdateDeferOption.class),
                 Arguments.of("OsUpdateOverrideAction", OsUpdateOverrideAction.class),
-                Arguments.of("DeviceOsUpdateRolloutStatus", DeviceOsUpdateRolloutStatus.class));
+                Arguments.of("DeviceOsUpdateRolloutStatus", DeviceOsUpdateRolloutStatus.class),
+                Arguments.of("OsUpdateCustomerStatus", OsUpdateCustomerStatus.class));
     }
 
     private static Map<String, String> fields(String typeName) {

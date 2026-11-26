@@ -8,7 +8,8 @@ import java.util.Collection;
 import java.util.List;
 
 @Repository
-public interface DeviceOsUpdateRolloutStateRepository extends MongoRepository<DeviceOsUpdateRolloutState, String> {
+public interface DeviceOsUpdateRolloutStateRepository
+        extends MongoRepository<DeviceOsUpdateRolloutState, String>, CustomDeviceOsUpdateRolloutStateRepository {
 
     List<DeviceOsUpdateRolloutState> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
 

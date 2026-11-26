@@ -5,12 +5,14 @@ import com.openframe.api.dataloader.OsUpdateDeviceCountsKey;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateCustomerResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceStatus;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateFilterInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateSummaryResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.exception.OsUpdateNotFoundException;
 import com.openframe.api.mapper.OsUpdateGraphQLMapper;
@@ -18,6 +20,7 @@ import com.openframe.api.service.rmm.osupdate.OsUpdateDeviceService;
 import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
+import com.openframe.data.document.rmm.osupdate.OsUpdateCustomerStatus;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateFilter;
 import graphql.execution.DataFetcherResult;
 import org.dataloader.DataLoader;
@@ -57,6 +60,7 @@ class OsUpdateDataFetcherTest {
     @Mock private DgsDataFetchingEnvironment dfe;
     @Mock private DataLoader<OsUpdateDeviceCountsKey, OsUpdateDeviceCounts> deviceCountsDataLoader;
     @Mock private DataLoader<String, Machine> machineDataLoader;
+    @Mock private DataLoader<OsUpdateDeviceCountsKey, List<OsUpdateCustomerStatus>> customerStatusesDataLoader;
 
     @InjectMocks private OsUpdateDataFetcher dataFetcher;
 
@@ -197,6 +201,82 @@ class OsUpdateDataFetcherTest {
 
         // verifications
         assertThat(pendingDeviceCount).isCompletedWithValue(2);
+    }
+
+    @Test
+    void osUpdateCustomers_update_customersOfTheService() {
+        // setup
+        List<OsUpdateCustomerResponse> customers =
+                List.of(OsUpdateCustomerResponse.builder().organizationId("org-1").build());
+        when(osUpdateService.listCustomers(OS_UPDATE_ID)).thenReturn(customers);
+
+        // execution
+        List<OsUpdateCustomerResponse> found = dataFetcher.osUpdateCustomers(OS_UPDATE_ID);
+
+        // verifications
+        assertThat(found).isSameAs(customers);
+    }
+
+    @Test
+    void osUpdateCustomers_noSuchUpdate_osUpdateNotFoundPassedOn() {
+        // setup
+        when(osUpdateService.listCustomers(OS_UPDATE_ID)).thenThrow(new OsUpdateNotFoundException(NOT_FOUND));
+
+        // execution, verifications
+        OsUpdateNotFoundException thrown =
+                assertThrows(OsUpdateNotFoundException.class, () -> dataFetcher.osUpdateCustomers(OS_UPDATE_ID));
+        assertThat(thrown).hasMessage(NOT_FOUND);
+    }
+
+    @Test
+    void osUpdateSummary_customer_summaryOfTheServiceForIt() {
+        // setup
+        OsUpdateSummaryResponse summary = OsUpdateSummaryResponse.builder().deviceCount(142).build();
+        when(osUpdateDeviceService.getSummary("org-1")).thenReturn(summary);
+
+        // execution
+        OsUpdateSummaryResponse found = dataFetcher.osUpdateSummary("org-1");
+
+        // verifications
+        assertThat(found).isSameAs(summary);
+    }
+
+    @Test
+    void customerStatuses_updateListedForOrganizations_statusesLoadedForTheirDevices() {
+        // setup
+        List<OsUpdateCustomerStatus> statuses = List.of(OsUpdateCustomerStatus.HELD);
+        OsUpdateDeviceCountsKey osUpdateDeviceCountsKey =
+                OsUpdateDeviceCountsKey.builder().osUpdateId(OS_UPDATE_ID).osUpdateDeviceScope(ORGANIZATION_DEVICES).build();
+        doReturn(osUpdate).when(dfe).getSource();
+        doReturn(ORGANIZATION_DEVICES).when(dfe).getLocalContext();
+        doReturn(customerStatusesDataLoader).when(dfe).getDataLoader("osUpdateCustomerStatusesDataLoader");
+        when(customerStatusesDataLoader.load(osUpdateDeviceCountsKey))
+                .thenReturn(CompletableFuture.completedFuture(statuses));
+
+        // execution
+        CompletableFuture<List<OsUpdateCustomerStatus>> customerStatuses = dataFetcher.customerStatuses(dfe);
+
+        // verifications
+        assertThat(customerStatuses).isCompletedWithValue(statuses);
+        verifyNoInteractions(osUpdateService);
+    }
+
+    @Test
+    void customerStatuses_updateReadOnItsOwn_statusesLoadedForEveryDevice() {
+        // setup
+        List<OsUpdateCustomerStatus> statuses = List.of(OsUpdateCustomerStatus.APPROVED);
+        OsUpdateDeviceCountsKey osUpdateDeviceCountsKey = OsUpdateDeviceCountsKey.builder()
+                .osUpdateId(OS_UPDATE_ID).osUpdateDeviceScope(OsUpdateDeviceScope.EVERY_DEVICE).build();
+        doReturn(osUpdate).when(dfe).getSource();
+        doReturn(customerStatusesDataLoader).when(dfe).getDataLoader("osUpdateCustomerStatusesDataLoader");
+        when(customerStatusesDataLoader.load(osUpdateDeviceCountsKey))
+                .thenReturn(CompletableFuture.completedFuture(statuses));
+
+        // execution
+        CompletableFuture<List<OsUpdateCustomerStatus>> customerStatuses = dataFetcher.customerStatuses(dfe);
+
+        // verifications
+        assertThat(customerStatuses).isCompletedWithValue(statuses);
     }
 
     @Test

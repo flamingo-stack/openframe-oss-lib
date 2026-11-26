@@ -9,17 +9,20 @@ import com.openframe.api.dataloader.OsUpdateDeviceCountsKey;
 import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateCustomerResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceCounts;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceStatus;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateFilterInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateSummaryResponse;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.OsUpdateGraphQLMapper;
 import com.openframe.api.service.rmm.osupdate.OsUpdateDeviceService;
 import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.osupdate.OsUpdateCustomerStatus;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateFilter;
 import graphql.execution.DataFetcherResult;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,7 @@ import java.util.concurrent.CompletableFuture;
 public class OsUpdateDataFetcher {
 
     private static final String DEVICE_COUNTS_DATA_LOADER = "osUpdateDeviceCountsDataLoader";
+    private static final String CUSTOMER_STATUSES_DATA_LOADER = "osUpdateCustomerStatusesDataLoader";
     private static final String MACHINE_DATA_LOADER = "machineDataLoader";
 
     private final OsUpdateService osUpdateService;
@@ -75,6 +79,23 @@ public class OsUpdateDataFetcher {
         return osUpdateGraphQLMapper.toDeviceConnection(devices);
     }
 
+    @DgsQuery
+    public List<OsUpdateCustomerResponse> osUpdateCustomers(@InputArgument String osUpdateId) {
+        return osUpdateService.listCustomers(osUpdateId);
+    }
+
+    @DgsQuery
+    public OsUpdateSummaryResponse osUpdateSummary(@InputArgument String organizationId) {
+        return osUpdateDeviceService.getSummary(organizationId);
+    }
+
+    @DgsData(parentType = "OsUpdate", field = "customerStatuses")
+    public CompletableFuture<List<OsUpdateCustomerStatus>> customerStatuses(DgsDataFetchingEnvironment dfe) {
+        DataLoader<OsUpdateDeviceCountsKey, List<OsUpdateCustomerStatus>> customerStatusesDataLoader =
+                dfe.getDataLoader(CUSTOMER_STATUSES_DATA_LOADER);
+        return customerStatusesDataLoader.load(toDeviceCountsKey(dfe));
+    }
+
     @DgsData(parentType = "OsUpdate", field = "pendingDeviceCount")
     public CompletableFuture<Integer> pendingDeviceCount(DgsDataFetchingEnvironment dfe) {
         return loadDeviceCounts(dfe).thenApply(OsUpdateDeviceCounts::getPendingDeviceCount);
@@ -94,15 +115,19 @@ public class OsUpdateDataFetcher {
 
     // Asking for both counts of one update loads them once: the loader keeps what it loaded for the request.
     private static CompletableFuture<OsUpdateDeviceCounts> loadDeviceCounts(DgsDataFetchingEnvironment dfe) {
+        DataLoader<OsUpdateDeviceCountsKey, OsUpdateDeviceCounts> deviceCountsDataLoader =
+                dfe.getDataLoader(DEVICE_COUNTS_DATA_LOADER);
+        return deviceCountsDataLoader.load(toDeviceCountsKey(dfe));
+    }
+
+    // The update of the row within the device scope of the list it came with.
+    private static OsUpdateDeviceCountsKey toDeviceCountsKey(DgsDataFetchingEnvironment dfe) {
         OsUpdateResponse osUpdate = dfe.getSource();
         OsUpdateDeviceScope osUpdateDeviceScope =
                 Objects.requireNonNullElse(dfe.getLocalContext(), OsUpdateDeviceScope.EVERY_DEVICE);
-        OsUpdateDeviceCountsKey osUpdateDeviceCountsKey = OsUpdateDeviceCountsKey.builder()
+        return OsUpdateDeviceCountsKey.builder()
                 .osUpdateId(osUpdate.getId())
                 .osUpdateDeviceScope(osUpdateDeviceScope)
                 .build();
-        DataLoader<OsUpdateDeviceCountsKey, OsUpdateDeviceCounts> deviceCountsDataLoader =
-                dfe.getDataLoader(DEVICE_COUNTS_DATA_LOADER);
-        return deviceCountsDataLoader.load(osUpdateDeviceCountsKey);
     }
 }

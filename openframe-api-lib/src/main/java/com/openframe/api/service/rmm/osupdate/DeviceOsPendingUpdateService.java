@@ -16,6 +16,7 @@ import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepositor
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateDeviceCount;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateIdentifiersOfPlatform;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOrganizationDeviceCount;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -99,6 +101,15 @@ public class DeviceOsPendingUpdateService {
                 .toList();
         return deviceOsPendingUpdateRepository.countDevicesByIdentifierOnMachines(
                 platform, identifiers, manageableScopeMachineIds, tenantId);
+    }
+
+    // Devices we cannot manage are not counted. identifiers null = every update; scopeMachineIds null = every
+    // device.
+    public List<OsUpdateOrganizationDeviceCount> countDevicesByIdentifierAndOrganization(
+            OsPlatform platform, Collection<String> identifiers, List<String> scopeMachineIds) {
+        return deviceOsPendingUpdateRepository.countDevicesByIdentifierAndOrganization(
+                tenantIdProvider.getTenantId(), platform, identifiers,
+                deviceOsStateService.listNotManageableMachineIds(), scopeMachineIds);
     }
 
     public List<OsUpdateIdentifiersOfPlatform> listIdentifiersByPlatform(List<String> machineIds) {

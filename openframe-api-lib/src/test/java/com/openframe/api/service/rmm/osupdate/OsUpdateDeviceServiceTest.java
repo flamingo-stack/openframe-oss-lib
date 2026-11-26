@@ -2,7 +2,9 @@ package com.openframe.api.service.rmm.osupdate;
 
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceStatus;
+import com.openframe.api.dto.rmm.osupdate.OsUpdateSummaryResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -11,6 +13,10 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.shared.CursorPageAssembler;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateRolloutStateRepository;
+import com.openframe.data.repository.rmm.osupdate.ManageableOsDeviceCounts;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOverdueDeviceCounts;
+import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -24,12 +30,16 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OsUpdateDeviceServiceTest {
 
+    private static final String TENANT_ID = "tenant-1";
     private static final String WINDOWS_ID = "id-windows";
     private static final String MAC_ID = "id-mac";
     private static final String WINDOWS_IDENTIFIER = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
@@ -43,6 +53,9 @@ class OsUpdateDeviceServiceTest {
     @Mock private DeviceOsUpdateHistoryService deviceOsUpdateHistoryService;
     @Mock private DeviceService deviceService;
     @Spy private CursorPageAssembler cursorPageAssembler = new CursorPageAssembler();
+    @Mock private DeviceOsStateService deviceOsStateService;
+    @Mock private DeviceOsUpdateRolloutStateRepository deviceOsUpdateRolloutStateRepository;
+    @Mock private TenantIdProvider tenantIdProvider;
 
     @InjectMocks private OsUpdateDeviceService osUpdateDeviceService;
 
@@ -129,6 +142,51 @@ class OsUpdateDeviceServiceTest {
         // verifications
         assertThat(ex.getMessage()).isEqualTo("OS update not found: " + WINDOWS_ID);
         verifyNoInteractions(deviceOsPendingUpdateService, deviceOsUpdateHistoryService, deviceService);
+    }
+
+    @Test
+    void getSummary_oneCustomer_countsOfItsDevicesAndOfItsRolloutStates() {
+        // setup
+        OsUpdateDeviceScope devicesOfCustomer = new OsUpdateDeviceScope(ORGANIZATION_MACHINE_IDS);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(osUpdateService.findDeviceScope(ORGANIZATIONS)).thenReturn(devicesOfCustomer);
+        when(deviceOsStateService.countManageableDevices(OsPlatform.WINDOWS, ORGANIZATION_MACHINE_IDS))
+                .thenReturn(new ManageableOsDeviceCounts(142, 7));
+        when(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(eq(TENANT_ID), eq("org-1"), any()))
+                .thenReturn(25L);
+        when(deviceOsUpdateRolloutStateRepository.countOverdueDevices(eq(TENANT_ID), eq("org-1"), any()))
+                .thenReturn(new OsUpdateOverdueDeviceCounts(12, 3));
+        when(osUpdateService.countHeldOsUpdates(devicesOfCustomer)).thenReturn(3);
+
+        // execution
+        OsUpdateSummaryResponse summary = osUpdateDeviceService.getSummary("org-1");
+
+        // verifications
+        assertThat(summary).isEqualTo(OsUpdateSummaryResponse.builder()
+                .deviceCount(142).currentDeviceCount(117).overdueDeviceCount(12).overdueOfflineDeviceCount(3)
+                .restartPendingDeviceCount(7).heldUpdateCount(3)
+                .build());
+    }
+
+    @Test
+    void getSummary_everyCustomer_everyDeviceAndNoCustomerInTheRolloutReads() {
+        // setup
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(osUpdateService.findDeviceScope(EVERY_ORGANIZATION)).thenReturn(OsUpdateDeviceScope.EVERY_DEVICE);
+        when(deviceOsStateService.countManageableDevices(OsPlatform.WINDOWS, EVERY_DEVICE))
+                .thenReturn(new ManageableOsDeviceCounts(2, 0));
+        when(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(eq(TENANT_ID), isNull(), any()))
+                .thenReturn(3L);
+        when(deviceOsUpdateRolloutStateRepository.countOverdueDevices(eq(TENANT_ID), isNull(), any()))
+                .thenReturn(OsUpdateOverdueDeviceCounts.NONE);
+
+        // execution
+        OsUpdateSummaryResponse summary = osUpdateDeviceService.getSummary(null);
+
+        // verifications
+        assertThat(summary.getDeviceCount()).isEqualTo(2);
+        assertThat(summary.getCurrentDeviceCount()).isZero();
+        assertThat(summary.getOverdueDeviceCount()).isZero();
     }
 
     private static OsUpdateDeviceResponse device(String machineId, String rawCursor) {

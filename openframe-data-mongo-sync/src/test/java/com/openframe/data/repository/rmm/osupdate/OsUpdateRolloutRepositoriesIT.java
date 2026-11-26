@@ -1,8 +1,17 @@
 package com.openframe.data.repository.rmm.osupdate;
 
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.rmm.osupdate.DeviceOsPendingUpdate;
 import com.openframe.data.document.rmm.osupdate.DeviceOsState;
+import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
+import com.openframe.data.document.rmm.osupdate.OsRebootPending;
+import com.openframe.data.document.rmm.osupdate.OsUpdateInstallResult;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManageability;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOperation;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOverride;
 import com.openframe.data.document.rmm.osupdate.OsUpdateOverrideAction;
 import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
@@ -20,6 +29,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexResolver;
+import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
 import java.util.List;
@@ -42,6 +52,8 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
     @Autowired private OsUpdatePolicyRepository osUpdatePolicyRepository;
     @Autowired private OsUpdateOverrideRepository osUpdateOverrideRepository;
     @Autowired private DeviceOsUpdateRolloutStateRepository deviceOsUpdateRolloutStateRepository;
+    @Autowired private DeviceOsPendingUpdateRepository deviceOsPendingUpdateRepository;
+    @Autowired private DeviceOsUpdateHistoryRepository deviceOsUpdateHistoryRepository;
 
     @BeforeEach
     void setUp() {
@@ -55,6 +67,9 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
         osUpdatePolicyRepository.deleteAll();
         osUpdateOverrideRepository.deleteAll();
         deviceOsUpdateRolloutStateRepository.deleteAll();
+        deviceOsPendingUpdateRepository.deleteAll();
+        deviceOsUpdateHistoryRepository.deleteAll();
+        mongoTemplate.remove(new Query(), Machine.class);
     }
 
     @Test
@@ -166,6 +181,194 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
                 TENANT_ID, List.of("machine-1", "machine-2"))).hasSize(3);
         assertThat(deviceOsUpdateRolloutStateRepository.deleteByTenantIdAndMachineId(TENANT_ID, "machine-1")).isEqualTo(2);
         assertThat(deviceOsUpdateRolloutStateRepository.findAll()).hasSize(2);
+    }
+
+    @Test
+    void countDevicesByIdentifierAndOrganization_pendingUpdatesOfTwoCustomers_devicesPerUpdateAndCustomer() {
+        // setup
+        saveMachines();
+        deviceOsPendingUpdateRepository.saveAll(List.of(
+                pendingUpdate(TENANT_ID, "machine-1", "kb-1"), pendingUpdate(TENANT_ID, "machine-2", "kb-1"),
+                pendingUpdate(TENANT_ID, "machine-3", "kb-1"), pendingUpdate(TENANT_ID, "machine-3", "kb-2"),
+                pendingUpdate(TENANT_ID, "machine-4", "kb-1"), pendingUpdate(TENANT_ID, "machine-5", "kb-1"),
+                pendingUpdate(OTHER_TENANT_ID, "machine-9", "kb-1")));
+
+        // execution
+        List<OsUpdateOrganizationDeviceCount> ofEveryUpdate =
+                deviceOsPendingUpdateRepository.countDevicesByIdentifierAndOrganization(
+                        TENANT_ID, OsPlatform.WINDOWS, null, List.of("machine-5"), null);
+        List<OsUpdateOrganizationDeviceCount> ofOneUpdate =
+                deviceOsPendingUpdateRepository.countDevicesByIdentifierAndOrganization(
+                        TENANT_ID, OsPlatform.WINDOWS, List.of("kb-2"), List.of(), null);
+        List<OsUpdateOrganizationDeviceCount> ofOneDevice =
+                deviceOsPendingUpdateRepository.countDevicesByIdentifierAndOrganization(
+                        TENANT_ID, OsPlatform.WINDOWS, null, List.of(), List.of("machine-1"));
+
+        // verifications
+        assertThat(ofEveryUpdate).containsExactlyInAnyOrder(
+                new OsUpdateOrganizationDeviceCount("kb-1", "org-1", 2),
+                new OsUpdateOrganizationDeviceCount("kb-1", "org-2", 1),
+                new OsUpdateOrganizationDeviceCount("kb-2", "org-2", 1));
+        assertThat(ofOneUpdate).containsExactly(new OsUpdateOrganizationDeviceCount("kb-2", "org-2", 1));
+        assertThat(ofOneDevice).containsExactly(new OsUpdateOrganizationDeviceCount("kb-1", "org-1", 1));
+    }
+
+    @Test
+    void countInstalledDevicesByIdentifierAndOrganization_repeatedFailedAndUninstalledEntries_devicesThatInstalled() {
+        // setup
+        saveMachines();
+        deviceOsUpdateHistoryRepository.saveAll(List.of(
+                historyEntry("machine-1", "kb-1", 1, OsUpdateOperation.INSTALL, OsUpdateInstallResult.SUCCEEDED),
+                historyEntry("machine-1", "kb-1", 2, OsUpdateOperation.INSTALL, OsUpdateInstallResult.SUCCEEDED),
+                historyEntry("machine-2", "kb-1", 3, OsUpdateOperation.INSTALL, OsUpdateInstallResult.FAILED),
+                historyEntry("machine-2", "kb-2", 4, OsUpdateOperation.UNINSTALL, OsUpdateInstallResult.SUCCEEDED),
+                historyEntry("machine-3", "kb-1", 5, OsUpdateOperation.INSTALL,
+                        OsUpdateInstallResult.SUCCEEDED_WITH_ERRORS),
+                historyEntry("machine-4", "kb-1", 6, OsUpdateOperation.INSTALL, OsUpdateInstallResult.SUCCEEDED)));
+
+        // execution
+        List<OsUpdateOrganizationDeviceCount> ofEveryUpdate =
+                deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifierAndOrganization(TENANT_ID, null, null);
+        List<OsUpdateOrganizationDeviceCount> ofOneDevice =
+                deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifierAndOrganization(
+                        TENANT_ID, List.of("kb-1"), List.of("machine-3"));
+
+        // verifications
+        assertThat(ofEveryUpdate).containsExactlyInAnyOrder(
+                new OsUpdateOrganizationDeviceCount("kb-1", "org-1", 1),
+                new OsUpdateOrganizationDeviceCount("kb-1", "org-2", 1));
+        assertThat(ofOneDevice).containsExactly(new OsUpdateOrganizationDeviceCount("kb-1", "org-2", 1));
+    }
+
+    @Test
+    void countDevicesWithInstallDue_rowsDueAheadAndHeld_theDevicesWithADueRowOnceEach() {
+        // setup
+        Instant now = Instant.parse("2026-11-01T00:00:00Z");
+        deviceOsUpdateRolloutStateRepository.saveAll(List.of(
+                rolloutState("machine-1", "org-1", "kb-1", now.minusSeconds(60), null),
+                rolloutState("machine-1", "org-1", "kb-2", now, null),
+                rolloutState("machine-2", "org-1", "kb-1", now.plusSeconds(60), null),
+                rolloutState("machine-3", "org-2", "kb-1", now.minusSeconds(60), null),
+                rolloutState("machine-4", "org-2", "kb-1", null, null),
+                rolloutState(OTHER_TENANT_ID, "machine-9", "kb-1")));
+
+        // execution, verifications
+        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, null, now))
+                .isEqualTo(2);
+        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, "org-1", now))
+                .isEqualTo(1);
+        assertThat(deviceOsUpdateRolloutStateRepository.countDevicesWithInstallDue(TENANT_ID, "org-3", now)).isZero();
+    }
+
+    @Test
+    void countOverdueDevices_devicesOnlineOfflineAndWithoutAHeartbeat_everyOverdueOneAndTheNotOnlineOnes() {
+        // setup
+        saveMachines();
+        Instant now = Instant.parse("2026-11-01T00:00:00Z");
+        Instant installFrom = now.minusSeconds(86400);
+        deviceOsUpdateRolloutStateRepository.saveAll(List.of(
+                rolloutState("machine-1", "org-1", "kb-1", installFrom, now.minusSeconds(60)),
+                rolloutState("machine-1", "org-1", "kb-2", installFrom, now.minusSeconds(30)),
+                rolloutState("machine-2", "org-1", "kb-1", installFrom, now.minusSeconds(60)),
+                rolloutState("machine-3", "org-2", "kb-1", installFrom, now.minusSeconds(60)),
+                rolloutState("machine-5", "org-1", "kb-1", installFrom, now)));
+
+        // execution
+        OsUpdateOverdueDeviceCounts ofTenant =
+                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, null, now);
+        OsUpdateOverdueDeviceCounts ofCustomer =
+                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, "org-1", now);
+        OsUpdateOverdueDeviceCounts ofCustomerWithoutDevices =
+                deviceOsUpdateRolloutStateRepository.countOverdueDevices(TENANT_ID, "org-3", now);
+
+        // verifications
+        assertThat(ofTenant).isEqualTo(new OsUpdateOverdueDeviceCounts(3, 2));
+        assertThat(ofCustomer).isEqualTo(new OsUpdateOverdueDeviceCounts(2, 1));
+        assertThat(ofCustomerWithoutDevices).isEqualTo(new OsUpdateOverdueDeviceCounts(0, 0));
+    }
+
+    @Test
+    void countManageableDevices_windowsDevicesOfTheTenantWeCanManage_allOfThemAndTheOnesWaitingForARestart() {
+        // setup
+        deviceOsStateRepository.saveAll(List.of(
+                deviceOsState("machine-1", OsPlatform.WINDOWS, OsUpdateManageabilityState.MANAGEABLE,
+                        OsRebootPending.YES),
+                deviceOsState("machine-2", OsPlatform.WINDOWS, OsUpdateManageabilityState.MANAGEABLE,
+                        OsRebootPending.NO),
+                deviceOsState("machine-3", OsPlatform.WINDOWS, OsUpdateManageabilityState.NOT_MANAGEABLE,
+                        OsRebootPending.YES),
+                deviceOsState("machine-4", OsPlatform.MACOS, OsUpdateManageabilityState.MANAGEABLE,
+                        OsRebootPending.YES),
+                deviceOsState(OTHER_TENANT_ID, "machine-9", OsPlatform.WINDOWS)));
+
+        // execution
+        ManageableOsDeviceCounts ofTenant =
+                deviceOsStateRepository.countManageableDevices(TENANT_ID, OsPlatform.WINDOWS, null);
+        ManageableOsDeviceCounts ofOneDevice =
+                deviceOsStateRepository.countManageableDevices(TENANT_ID, OsPlatform.WINDOWS, List.of("machine-2"));
+        ManageableOsDeviceCounts ofNoDevice =
+                deviceOsStateRepository.countManageableDevices(TENANT_ID, OsPlatform.WINDOWS, List.of());
+
+        // verifications
+        assertThat(ofTenant).isEqualTo(new ManageableOsDeviceCounts(2, 1));
+        assertThat(ofOneDevice).isEqualTo(new ManageableOsDeviceCounts(1, 0));
+        assertThat(ofNoDevice).isEqualTo(new ManageableOsDeviceCounts(0, 0));
+    }
+
+    // machine-1 and machine-2 of org-1, online and offline; machine-3 of org-2, no heartbeat yet; machine-4 without
+    // a customer; machine-5 of org-1; machine-9 of the other tenant.
+    private void saveMachines() {
+        mongoTemplate.insertAll(List.of(
+                machine(TENANT_ID, "machine-1", "org-1", TelemetryStatus.ONLINE),
+                machine(TENANT_ID, "machine-2", "org-1", TelemetryStatus.OFFLINE),
+                machine(TENANT_ID, "machine-3", "org-2", null),
+                machine(TENANT_ID, "machine-4", null, TelemetryStatus.ONLINE),
+                machine(TENANT_ID, "machine-5", "org-1", TelemetryStatus.ONLINE),
+                machine(OTHER_TENANT_ID, "machine-9", "org-9", TelemetryStatus.ONLINE)));
+    }
+
+    private static Machine machine(String tenantId, String machineId, String organizationId,
+                                   TelemetryStatus telemetryStatus) {
+        Machine machine = new Machine();
+        machine.setTenantId(tenantId);
+        machine.setMachineId(machineId);
+        machine.setOrganizationId(organizationId);
+        machine.setTelemetryStatus(telemetryStatus);
+        return machine;
+    }
+
+    private static DeviceOsPendingUpdate pendingUpdate(String tenantId, String machineId, String identifier) {
+        return DeviceOsPendingUpdate.builder()
+                .tenantId(tenantId).machineId(machineId).platform(OsPlatform.WINDOWS).identifier(identifier)
+                .build();
+    }
+
+    private static DeviceOsUpdateHistoryEntry historyEntry(String machineId, String identifier, int number,
+                                                           OsUpdateOperation operation,
+                                                           OsUpdateInstallResult result) {
+        return DeviceOsUpdateHistoryEntry.builder()
+                .tenantId(TENANT_ID).machineId(machineId).entryKey("entry-" + number).identifier(identifier)
+                .installedAt(CREATED_AT.plusSeconds(number)).operation(operation).result(result)
+                .build();
+    }
+
+    private static DeviceOsState deviceOsState(String machineId, OsPlatform platform,
+                                               OsUpdateManageabilityState manageabilityState,
+                                               OsRebootPending rebootPending) {
+        return DeviceOsState.builder()
+                .tenantId(TENANT_ID).machineId(machineId).platform(platform)
+                .manageability(OsUpdateManageability.builder().state(manageabilityState).build())
+                .rebootPending(rebootPending)
+                .build();
+    }
+
+    private static DeviceOsUpdateRolloutState rolloutState(String machineId, String organizationId,
+                                                           String identifier, Instant installFrom, Instant hardAt) {
+        return DeviceOsUpdateRolloutState.builder()
+                .tenantId(TENANT_ID).machineId(machineId).organizationId(organizationId)
+                .platform(OsPlatform.WINDOWS).identifier(identifier).policyId("policy-1")
+                .installFrom(installFrom).hardAt(hardAt)
+                .build();
     }
 
     private static DeviceOsState deviceOsState(String tenantId, String machineId, OsPlatform platform) {

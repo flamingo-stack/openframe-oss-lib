@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm.osupdate;
 
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.DeviceOsPendingUpdate;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
@@ -34,6 +35,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
     private OsUpdatePolicy osUpdatePolicy;
     private OsUpdate osUpdate;
     private DeviceOsPendingUpdate deviceOsPendingUpdate;
+    private Machine machine;
 
     @BeforeEach
     void setUp() {
@@ -41,7 +43,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
                 new OsUpdateUrgencyResolver(),
                 new OsUpdateRolloutStrategyResolver(List.of(new PilotThenEveryoneRolloutStrategy(),
                         new EveryoneAtOnceRolloutStrategy(), new HoldRolloutStrategy())),
-                new OsUpdateRestartDeadlineCalculator());
+                new OsUpdateRestartDeadlineCalculator(), new OsUpdateReleasedAtResolver());
         Map<OsUpdateUrgency, OsUpdateRolloutRule> rolloutRules = new EnumMap<>(OsUpdateUrgency.class);
         rolloutRules.put(OsUpdateUrgency.CRITICAL_SECURITY, OsUpdateRolloutRule.builder()
                 .mode(OsUpdateRolloutMode.PILOT_THEN_EVERYONE).daysAfterRelease(1).daysLaterToEveryone(3).build());
@@ -62,6 +64,9 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
                 .publishedAt(PUBLISHED_AT)
                 .firstSeenAt(DISCOVERED_AT)
                 .build();
+        machine = new Machine();
+        machine.setMachineId("machine-1");
+        machine.setOrganizationId("org-1");
         deviceOsPendingUpdate = DeviceOsPendingUpdate.builder()
                 .tenantId("tenant-1")
                 .machineId("machine-1")
@@ -75,12 +80,13 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
     void calculate_deviceOutsideThePilotRing_installFromAfterBothDaysAndDeadlinesFromIt() {
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, null);
+                osUpdatePolicy, machine, false, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
         assertThat(calculated).isEqualTo(DeviceOsUpdateRolloutState.builder()
                 .tenantId("tenant-1")
                 .machineId("machine-1")
+                .organizationId("org-1")
                 .platform(OsPlatform.WINDOWS)
                 .identifier("update-1")
                 .policyId("policy-1")
@@ -95,7 +101,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
     void calculate_pilotDevice_installFromAfterTheFirstDays() {
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, null);
+                osUpdatePolicy, machine, true, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
         assertThat(calculated).extracting(DeviceOsUpdateRolloutState::getInstallFrom)
@@ -109,7 +115,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
 
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, null);
+                osUpdatePolicy, machine, true, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
         assertThat(calculated).extracting(DeviceOsUpdateRolloutState::getInstallFrom)
@@ -123,12 +129,13 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
 
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, true, osUpdate, deviceOsPendingUpdate, null);
+                osUpdatePolicy, machine, true, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
         assertThat(calculated).isEqualTo(DeviceOsUpdateRolloutState.builder()
                 .tenantId("tenant-1")
                 .machineId("machine-1")
+                .organizationId("org-1")
                 .platform(OsPlatform.WINDOWS)
                 .identifier("update-1")
                 .policyId("policy-1")
@@ -144,7 +151,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
 
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, approval);
+                osUpdatePolicy, machine, false, osUpdate, deviceOsPendingUpdate, approval);
 
         // verifications
         assertThat(calculated).satisfies(deviceOsUpdateRolloutState -> {
@@ -162,7 +169,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
 
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, approval);
+                osUpdatePolicy, machine, false, osUpdate, deviceOsPendingUpdate, approval);
 
         // verifications
         assertThat(calculated).extracting(DeviceOsUpdateRolloutState::getInstallFrom)
@@ -177,7 +184,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
 
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, approval);
+                osUpdatePolicy, machine, false, osUpdate, deviceOsPendingUpdate, approval);
 
         // verifications
         assertThat(calculated).extracting(DeviceOsUpdateRolloutState::getInstallFrom)
@@ -193,7 +200,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
 
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, osUpdateOverride);
+                osUpdatePolicy, machine, false, osUpdate, deviceOsPendingUpdate, osUpdateOverride);
 
         // verifications
         assertThat(calculated).satisfies(deviceOsUpdateRolloutState -> {
@@ -212,7 +219,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
 
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, null);
+                osUpdatePolicy, machine, false, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
         assertThat(calculated).isNull();
@@ -225,7 +232,7 @@ class DeviceOsUpdateRolloutStateCalculatorTest {
 
         // execution
         DeviceOsUpdateRolloutState calculated = deviceOsUpdateRolloutStateCalculator.calculate(
-                osUpdatePolicy, false, osUpdate, deviceOsPendingUpdate, null);
+                osUpdatePolicy, machine, false, osUpdate, deviceOsPendingUpdate, null);
 
         // verifications
         assertThat(calculated).isNull();

@@ -13,6 +13,7 @@ import com.openframe.data.document.rmm.osupdate.OsUpdate;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsPendingUpdateRepository;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateDeviceCount;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateIdentifiersOfPlatform;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOrganizationDeviceCount;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.api.dto.rmm.osupdate.DeviceOsUpdateRolloutStateResponse;
@@ -224,6 +225,26 @@ class DeviceOsPendingUpdateServiceTest {
         // verifications
         assertThat(found).isSameAs(deviceCounts);
         verify(deviceOsPendingUpdateRepository, never()).countDevicesByIdentifier(any(), any(), any(), any());
+    }
+
+    @Test
+    void countDevicesByIdentifierAndOrganization_scopeOfMachines_groupedReadWithoutTheNotManageableDevices() {
+        // setup
+        List<OsUpdateOrganizationDeviceCount> deviceCounts =
+                List.of(new OsUpdateOrganizationDeviceCount(IDENTIFIER, "org-1", 7));
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(deviceOsStateService.listNotManageableMachineIds()).thenReturn(NOT_MANAGEABLE_MACHINE_IDS);
+        when(deviceOsPendingUpdateRepository.countDevicesByIdentifierAndOrganization(
+                TENANT_ID, OsPlatform.WINDOWS, List.of(IDENTIFIER), NOT_MANAGEABLE_MACHINE_IDS, List.of(MACHINE_ID)))
+                .thenReturn(deviceCounts);
+
+        // execution
+        List<OsUpdateOrganizationDeviceCount> found =
+                deviceOsPendingUpdateService.countDevicesByIdentifierAndOrganization(
+                        OsPlatform.WINDOWS, List.of(IDENTIFIER), List.of(MACHINE_ID));
+
+        // verifications
+        assertThat(found).isSameAs(deviceCounts);
     }
 
     @Test

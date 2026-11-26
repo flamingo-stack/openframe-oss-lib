@@ -86,4 +86,39 @@ class OsUpdateOverrideResolverTest {
         // verifications
         assertThat(resolved).isSameAs(ofEveryCustomer);
     }
+
+    @Test
+    void resolveOfCustomer_overridesOfADeviceOfTheCustomerAndOfEveryCustomer_theOneOfTheCustomer() {
+        // setup
+        OsUpdateOverride ofEveryCustomer = OsUpdateOverride.builder().id("every-customer").build();
+
+        // execution
+        OsUpdateOverride resolved =
+                osUpdateOverrideResolver.resolveOfCustomer(List.of(ofDevice, ofEveryCustomer, ofCustomer), "org-1");
+
+        // verifications
+        assertThat(resolved).isSameAs(ofCustomer);
+    }
+
+    @Test
+    void resolveOfCustomer_overridesOfAnotherCustomerAndOfEveryCustomer_theOneOfEveryCustomer() {
+        // setup
+        OsUpdateOverride ofEveryCustomer = OsUpdateOverride.builder().id("every-customer").build();
+
+        // execution
+        OsUpdateOverride resolved =
+                osUpdateOverrideResolver.resolveOfCustomer(List.of(ofDevice, ofCustomer, ofEveryCustomer), "org-2");
+
+        // verifications
+        assertThat(resolved).isSameAs(ofEveryCustomer);
+    }
+
+    @Test
+    void resolveOfCustomer_onlyAnOverrideOfADevice_null() {
+        // execution
+        OsUpdateOverride resolved = osUpdateOverrideResolver.resolveOfCustomer(List.of(ofDevice), "org-1");
+
+        // verifications
+        assertThat(resolved).isNull();
+    }
 }

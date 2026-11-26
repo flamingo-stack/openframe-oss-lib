@@ -29,4 +29,19 @@ public class OsUpdateOverrideResolver {
                 .findFirst()
                 .orElse(null);
     }
+
+    // The override of one update that applies to the customer as a whole: its own, else the one set for every
+    // customer. The ones of single devices are not looked at. Null = no technician decided for the customer.
+    public OsUpdateOverride resolveOfCustomer(Collection<OsUpdateOverride> overridesOfOsUpdate,
+                                              String organizationId) {
+        Predicate<OsUpdateOverride> ofCustomer = osUpdateOverride -> osUpdateOverride.getMachineId() == null
+                && organizationId.equals(osUpdateOverride.getOrganizationId());
+        Predicate<OsUpdateOverride> ofEveryCustomer = osUpdateOverride ->
+                osUpdateOverride.getMachineId() == null && osUpdateOverride.getOrganizationId() == null;
+        return Stream.of(ofCustomer, ofEveryCustomer)
+                .map(scope -> overridesOfOsUpdate.stream().filter(scope).findFirst())
+                .flatMap(Optional::stream)
+                .findFirst()
+                .orElse(null);
+    }
 }

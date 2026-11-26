@@ -97,7 +97,7 @@ class DeviceOsUpdateRolloutStateServiceTest {
                         new OsUpdateUrgencyResolver(),
                         new OsUpdateRolloutStrategyResolver(List.of(new PilotThenEveryoneRolloutStrategy(),
                                 new EveryoneAtOnceRolloutStrategy(), new HoldRolloutStrategy())),
-                        new OsUpdateRestartDeadlineCalculator()));
+                        new OsUpdateRestartDeadlineCalculator(), new OsUpdateReleasedAtResolver()));
         osUpdatePolicy = OsUpdatePolicy.builder()
                 .id("policy-1")
                 .target(OsUpdatePolicyTarget.builder().type(OsUpdatePolicyTargetType.TENANT).build())
@@ -345,6 +345,7 @@ class DeviceOsUpdateRolloutStateServiceTest {
                 .id(id)
                 .tenantId(TENANT_ID)
                 .machineId("machine-1")
+                .organizationId("org-1")
                 .platform(OsPlatform.WINDOWS)
                 .identifier("update-1")
                 .policyId("policy-1")

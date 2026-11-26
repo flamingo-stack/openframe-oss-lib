@@ -5,9 +5,11 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceOsResponseMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.rmm.osupdate.DeviceOsState;
+import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdateManageability;
 import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsStateRepository;
+import com.openframe.data.repository.rmm.osupdate.ManageableOsDeviceCounts;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -130,6 +132,22 @@ class DeviceOsStateServiceTest {
 
         // verifications
         assertThat(machineIds).containsExactly("machine-9");
+    }
+
+    @Test
+    void countManageableDevices_scopeOfMachines_countsOfTheRepositoryForTheTenant() {
+        // setup
+        ManageableOsDeviceCounts manageableOsDeviceCounts = new ManageableOsDeviceCounts(142, 7);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(deviceOsStateRepository.countManageableDevices(TENANT_ID, OsPlatform.WINDOWS, List.of(MACHINE_ID)))
+                .thenReturn(manageableOsDeviceCounts);
+
+        // execution
+        ManageableOsDeviceCounts found =
+                deviceOsStateService.countManageableDevices(OsPlatform.WINDOWS, List.of(MACHINE_ID));
+
+        // verifications
+        assertThat(found).isSameAs(manageableOsDeviceCounts);
     }
 
     private static Stream<Arguments> statesNotKnownToBeNotManageable() {

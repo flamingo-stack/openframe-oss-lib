@@ -148,7 +148,7 @@ public class DeviceOsUpdateRolloutStateService {
                 OsUpdateOverride osUpdateOverride = osUpdateOverrideResolver.resolve(
                         overridesByIdentifier.getOrDefault(osUpdate.getIdentifier(), List.of()), machine);
                 DeviceOsUpdateRolloutState calculatedRolloutState = deviceOsUpdateRolloutStateCalculator.calculate(
-                        osUpdatePolicy, pilotDevice, osUpdate, deviceOsPendingUpdate, osUpdateOverride);
+                        osUpdatePolicy, machine, pilotDevice, osUpdate, deviceOsPendingUpdate, osUpdateOverride);
                 if (calculatedRolloutState != null) {
                     calculatedRolloutStates.add(calculatedRolloutState);
                 }

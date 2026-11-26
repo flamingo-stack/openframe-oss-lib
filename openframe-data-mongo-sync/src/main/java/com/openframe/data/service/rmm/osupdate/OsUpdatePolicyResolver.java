@@ -11,6 +11,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 @Component
 public class OsUpdatePolicyResolver {
@@ -27,6 +29,22 @@ public class OsUpdatePolicyResolver {
                                   Set<String> machineTagIds) {
         return MOST_SPECIFIC_FIRST.stream()
                 .map(targetType -> findEarliestCovering(osUpdatePolicies, targetType, machine, machineTagIds))
+                .flatMap(Optional::stream)
+                .findFirst()
+                .orElse(null);
+    }
+
+    // The policy the customer as a whole follows: its own, else the one of the tenant, the earliest created one of
+    // two. Device tag and device policies are not looked at. Null = neither exists.
+    public OsUpdatePolicy resolveOfCustomer(Collection<OsUpdatePolicy> osUpdatePolicies, String organizationId) {
+        Predicate<OsUpdatePolicy> ofCustomer = osUpdatePolicy ->
+                osUpdatePolicy.getTarget().getType() == OsUpdatePolicyTargetType.CUSTOMER
+                        && osUpdatePolicy.getTarget().getOrganizationId().equals(organizationId);
+        Predicate<OsUpdatePolicy> ofTenant = osUpdatePolicy ->
+                osUpdatePolicy.getTarget().getType() == OsUpdatePolicyTargetType.TENANT;
+        return Stream.of(ofCustomer, ofTenant)
+                .map(target -> osUpdatePolicies.stream().filter(target)
+                        .min(Comparator.comparing(OsUpdatePolicy::getCreatedAt)))
                 .flatMap(Optional::stream)
                 .findFirst()
                 .orElse(null);

@@ -12,6 +12,10 @@ extend type Query {
 
     """The technicians' decisions on one update that stand on top of the policies."""
     osUpdateOverrides(osUpdateId: ID!): [OsUpdateOverride!]!
+
+    """One row per customer that has a device the update is pending on or installed by, in the order of the
+    organization ids. Empty for a macOS update. Unknown osUpdateId → OS_UPDATE_NOT_FOUND."""
+    osUpdateCustomers(osUpdateId: ID!): [OsUpdateCustomer!]!
 }
 
 extend type Mutation {
@@ -296,6 +300,38 @@ type DeviceOsUpdateRolloutState {
 technician rejected the update."""
 enum DeviceOsUpdateRolloutStatus {
     SCHEDULED
+    APPROVED
+    HELD
+    REJECTED
+}
+
+"""One update at one customer. The status comes from the policy of the customer as a whole and from the decisions
+made for the customer or for every customer; devices under a device tag or device policy, and decisions made for
+one device, follow their own days and are not looked at here."""
+type OsUpdateCustomer {
+    organizationId: String!
+    status: OsUpdateCustomerStatus!
+    """The policy of the customer, else the one of the tenant. Null = neither exists."""
+    policyId: ID
+    policyName: String
+    """The rule of the update's urgency in that policy. Null = the policy does not roll the update out."""
+    rolloutRule: OsUpdateRolloutRule
+    """The decision for the customer, else the one for every customer. Null = no technician decided."""
+    override: OsUpdateOverride
+    """Counted like the two counts of OsUpdate, over the devices of the customer."""
+    pendingDeviceCount: Int!
+    installedDeviceCount: Int!
+}
+
+"""LISTED_ONLY: no policy rolls the update out: the customer and the tenant have no policy, or the policy has no
+rule for the update's urgency. SCHEDULED: the day of the first devices is still ahead; the product's list of
+statuses has no name for the days before it, this one is ours. PILOT: the pilot ring may install, the other
+devices not yet. APPROVED: every device may install, by the policy's days or by a technician. HELD: waits for a
+technician, by a HOLD rule or by a technician. REJECTED: a technician rejected the update."""
+enum OsUpdateCustomerStatus {
+    LISTED_ONLY
+    SCHEDULED
+    PILOT
     APPROVED
     HELD
     REJECTED

@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm.osupdate;
 
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.osupdate.DeviceOsPendingUpdate;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
 import com.openframe.data.document.rmm.osupdate.OsUpdate;
@@ -20,11 +21,12 @@ public class DeviceOsUpdateRolloutStateCalculator {
     private final OsUpdateUrgencyResolver osUpdateUrgencyResolver;
     private final OsUpdateRolloutStrategyResolver osUpdateRolloutStrategyResolver;
     private final OsUpdateRestartDeadlineCalculator osUpdateRestartDeadlineCalculator;
+    private final OsUpdateReleasedAtResolver osUpdateReleasedAtResolver;
 
     // Null = the policy does not roll the update out: nothing is stored for the device and the update.
     // osUpdateOverride is null when no technician decided on the update for this device.
-    public DeviceOsUpdateRolloutState calculate(OsUpdatePolicy osUpdatePolicy, boolean pilotDevice, OsUpdate osUpdate,
-                                                DeviceOsPendingUpdate deviceOsPendingUpdate,
+    public DeviceOsUpdateRolloutState calculate(OsUpdatePolicy osUpdatePolicy, Machine machine, boolean pilotDevice,
+                                                OsUpdate osUpdate, DeviceOsPendingUpdate deviceOsPendingUpdate,
                                                 OsUpdateOverride osUpdateOverride) {
         OsUpdateUrgency osUpdateUrgency = osUpdateUrgencyResolver.resolve(osUpdate);
         OsUpdateRolloutRule osUpdateRolloutRule =
@@ -34,11 +36,12 @@ public class DeviceOsUpdateRolloutStateCalculator {
         }
         Instant installFromByPolicy = osUpdateRolloutStrategyResolver
                 .resolve(osUpdateRolloutRule.getMode())
-                .findInstallFrom(osUpdateRolloutRule, findReleasedAt(osUpdate), pilotDevice);
+                .findInstallFrom(osUpdateRolloutRule, osUpdateReleasedAtResolver.resolve(osUpdate), pilotDevice);
         Instant installFrom = applyOverride(installFromByPolicy, osUpdateOverride);
         DeviceOsUpdateRolloutState deviceOsUpdateRolloutState = DeviceOsUpdateRolloutState.builder()
                 .tenantId(deviceOsPendingUpdate.getTenantId())
                 .machineId(deviceOsPendingUpdate.getMachineId())
+                .organizationId(machine.getOrganizationId())
                 .platform(deviceOsPendingUpdate.getPlatform())
                 .identifier(deviceOsPendingUpdate.getIdentifier())
                 .policyId(osUpdatePolicy.getId())
@@ -54,11 +57,6 @@ public class DeviceOsUpdateRolloutStateCalculator {
             deviceOsUpdateRolloutState.setHardAt(osUpdateRestartDeadlineDates.getHardAt());
         }
         return deviceOsUpdateRolloutState;
-    }
-
-    // The vendor does not date every update: such an update counts from the first report of it in the tenant.
-    private Instant findReleasedAt(OsUpdate osUpdate) {
-        return osUpdate.getPublishedAt() != null ? osUpdate.getPublishedAt() : osUpdate.getFirstSeenAt();
     }
 
     // An approval never delays what the policy already allows.
