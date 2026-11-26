@@ -179,3 +179,7 @@ export { resolveCardDestination, type CardDestination, type CardDestinationInput
 export { buildDiscussPrompt, type DiscussPromptRef, type BuildDiscussPromptOptions } from './discuss-ref-prompt';
 
 export * from './scripted-stream';
+
+// OpenFrame (Mingo, Fae) attachments: the client's checks, and what the tiles and tray say (copy, counter, Send gate).
+export * from './openframe-attachment-validation';
+export * from './openframe-attachment-view';

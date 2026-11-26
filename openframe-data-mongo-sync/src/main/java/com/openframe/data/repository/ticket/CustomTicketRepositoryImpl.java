@@ -564,20 +564,26 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     @Override
     public int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind) {
         Query query = new Query(Criteria.where(FIELD_STATUS_ID).is(fromStatusId));
-        return reassignTicketsToStatus(query, toStatusId, toKind);
+        long modifiedCount = mongoTemplate.updateMulti(query, statusUpdate(toStatusId, toKind), Ticket.class)
+                .getModifiedCount();
+        log.info("Reassigned {} tickets to statusId {} (kind {})", modifiedCount, toStatusId, toKind);
+        return (int) modifiedCount;
     }
 
     @Override
-    public int reassignTicketsToStatus(Query query, String toStatusId, TicketStatusKind toKind) {
-        Update update = new Update()
+    public Optional<Ticket> moveFromStatus(String ticketId, String fromStatusId, String toStatusId,
+                                           TicketStatusKind toKind) {
+        Query query = new Query(Criteria.where(ID_FIELD).is(ticketId).and(FIELD_STATUS_ID).is(fromStatusId));
+        query.fields().include(FIELD_TITLE, FIELD_TICKET_NUMBER, FIELD_ORGANIZATION_ID, FIELD_DEVICE_ID, FIELD_STATUS_ID,
+                FIELD_STATUS_KIND);
+        return Optional.ofNullable(mongoTemplate.findAndModify(query, statusUpdate(toStatusId, toKind), Ticket.class));
+    }
+
+    private static Update statusUpdate(String toStatusId, TicketStatusKind toKind) {
+        return new Update()
                 .set(FIELD_STATUS_ID, toStatusId)
                 .set(FIELD_STATUS_KIND, toKind)
                 .set(FIELD_UPDATED_AT, Instant.now());
-
-        long modifiedCount = mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
-        log.info("Reassigned {} tickets to statusId {} (kind {})", modifiedCount, toStatusId, toKind);
-
-        return (int) modifiedCount;
     }
 
     @Override
