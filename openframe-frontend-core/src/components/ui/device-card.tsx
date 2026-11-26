@@ -267,7 +267,7 @@ export function DeviceCard({
       </div>
 
       {/* Row 2, the lifecycle display's form: the tag or a line of text, then the adornment; no "Last Seen:" line. */}
-      {statusLineForm && <DeviceCardStatusLineRow statusTag={statusTag} statusLine={statusLine} />}
+      {statusLine && !loading && <DeviceCardStatusLineRow statusTag={statusTag} statusLine={statusLine} />}
 
       {/* Row 2: Status badge | Last seen (both drawn while loading: the tag and the time are read) */}
       {!statusLineForm && (loading || statusTag || device.lastSeen) && (
