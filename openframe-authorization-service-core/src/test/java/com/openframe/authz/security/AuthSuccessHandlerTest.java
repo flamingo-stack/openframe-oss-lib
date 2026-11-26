@@ -2,8 +2,11 @@ package com.openframe.authz.security;
 
 import com.openframe.authz.config.SecurityConfig;
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.metrics.PasswordLoginMetrics;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.authz.web.RecaptchaSessionCookie;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +50,8 @@ class AuthSuccessHandlerTest {
     private SsoFlowSuccessHandler ssoFlowSuccessHandler;
     @Mock
     private SsoProviderRegistry registry;
+    @Mock
+    private PasswordLoginMetrics passwordLoginMetrics;
 
     private AuthSuccessHandler handler;
     private final MockHttpServletRequest request = new MockHttpServletRequest();
@@ -54,7 +59,7 @@ class AuthSuccessHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new AuthSuccessHandler(userService, ssoFlowSuccessHandler, registry);
+        handler = new AuthSuccessHandler(userService, ssoFlowSuccessHandler, registry, passwordLoginMetrics);
         TenantContext.setTenantId(TENANT);
         lenient().when(registry.isSupported(anyString())).thenReturn(true);
     }
@@ -98,6 +103,58 @@ class AuthSuccessHandlerTest {
     }
 
     @Test
+    void onAuthenticationSuccess_passwordLoginWithSessionCookie_countedAsPresent() throws Exception {
+        // setup
+        Authentication auth = passwordAuthentication();
+        request.setCookies(new Cookie(RecaptchaSessionCookie.NAME, "token"));
+
+        // execution
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        // verifications
+        verify(passwordLoginMetrics).recordSucceeded(true);
+    }
+
+    @Test
+    void onAuthenticationSuccess_passwordLoginWithoutSessionCookie_countedAsAbsent() throws Exception {
+        // setup
+        Authentication auth = passwordAuthentication();
+
+        // execution
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        // verifications
+        verify(passwordLoginMetrics).recordSucceeded(false);
+    }
+
+    @Test
+    void onAuthenticationSuccess_ssoLoginWithSessionCookie_notCounted() throws Exception {
+        // setup
+        Authentication auth = authentication("google", oidcUser(Map.of("email", "a@acme.com", "email_verified", false)));
+        request.setCookies(new Cookie(RecaptchaSessionCookie.NAME, "token"));
+
+        // execution
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        // verifications
+        verify(passwordLoginMetrics, never()).recordSucceeded(true);
+        verify(passwordLoginMetrics, never()).recordSucceeded(false);
+    }
+
+    @Test
+    void onAuthenticationSuccess_metricsFail_stillDelegated() throws Exception {
+        // setup
+        Authentication auth = passwordAuthentication();
+        doThrow(new IllegalStateException("registry")).when(passwordLoginMetrics).recordSucceeded(false);
+
+        // execution
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        // verifications
+        verify(ssoFlowSuccessHandler).onAuthenticationSuccess(request, response, auth);
+    }
+
+    @Test
     void shouldAlwaysDelegateEvenWhenSideEffectsFail() throws Exception {
         Authentication auth = authentication("google", oidcUser(Map.of("email", "a@acme.com")));
         doThrow(new IllegalStateException("db")).when(userService).touchLastLogin(anyString(), anyString());
@@ -118,6 +175,11 @@ class AuthSuccessHandlerTest {
 
         assertThat(acme).isSameAs(acmeAgain);
         assertThat(globex).isNotSameAs(acme);
+    }
+
+    private static Authentication passwordAuthentication() {
+        return new UsernamePasswordAuthenticationToken(
+                User.withUsername("ada@acme.com").password("x").roles("ADMIN").build(), null, List.of());
     }
 
     private static ClientRegistration googleApp(String clientId) {
