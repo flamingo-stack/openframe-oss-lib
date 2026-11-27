@@ -245,12 +245,15 @@ describe('useJetStreamDialogSubscription caughtUpCount', () => {
   });
 
   it('reads the publish time to the exact millisecond where nanoseconds lose precision', async () => {
-    // 1795780428002 * 1e6 is past the doubles' exact integers: dividing back lands just under 1795780428002, which a floor read as 1 ms early.
-    const now = vi.spyOn(Date, 'now').mockReturnValue(1795780428002);
+    // The first millisecond from now whose nanoseconds, divided back, land just under it: a floor read it 1 ms early.
+    // Taken from now, not fixed, so the fake stream's max age does not drop the message.
+    let precise = Date.now();
+    while (Math.floor((precise * 1e6) / 1e6) === precise) precise += 1;
+    const now = vi.spyOn(Date, 'now').mockReturnValue(precise);
     const seq = publish('precise');
     now.mockRestore();
     render(<Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seq - 1} />);
     await until(() => payloads.length === 1);
-    expect(payloads[0].streamPublishedAt).toBe(1795780428002);
+    expect(payloads[0].streamPublishedAt).toBe(precise);
   });
 });
