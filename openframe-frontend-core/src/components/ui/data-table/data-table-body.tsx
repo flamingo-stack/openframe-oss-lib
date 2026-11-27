@@ -92,6 +92,8 @@ export interface DataTableBodyProps<T = unknown> {
   /**
    * Keep table height stable by padding with invisible rows when data is short.
    * Typically set to the same value as `skeletonRows`. Pass `0` to disable.
+   * In the grid layout nothing is drawn for them: the bordered block ends at its last row (or at the empty state's
+   * own height) and the missing height is room under it. A fixed-height grid table (`maxHeight`) reserves nothing.
    */
   minRows?: number;
   /**
