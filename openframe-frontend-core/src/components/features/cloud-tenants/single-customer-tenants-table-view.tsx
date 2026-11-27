@@ -29,13 +29,17 @@ import { TenantCell } from './tenant-cell';
 import { TenantAccessGridCell, TenantCustomerGridCell, TenantGridCell } from './tenant-grid-cells';
 import { accessStateTag, formatLastRead, usersCountLabel } from './tenant-presentation';
 import type { TenantRow } from './tenant-row';
-import type { TenantsTableColumn } from './tenants-table-columns';
+import { TENANT_COLUMN_WIDTH, type TenantsTableColumn } from './tenants-table-columns';
 
-/** Column layout of the single-customer list (Figma 1699-8249: Tenant, Customers, Access, open). */
+/**
+ * Column layout of the single-customer list (Figma 1699-8249: Tenant, Customers, Access, open). A phone keeps the
+ * tenant and the access tag alone, as the multi-customer list's phone design does (3033-9343): the access column is the
+ * tag's width there and gives way to the tenant's floor.
+ */
 const SINGLE_CUSTOMER_TENANT_COLUMNS = {
-  tenant: { id: 'tenant', header: 'Tenant', width: 'flex-1 min-w-0' },
+  tenant: { id: 'tenant', header: 'Tenant', width: TENANT_COLUMN_WIDTH },
   customer: { id: 'customer', header: 'Customers', width: 'w-[220px] content-lg:w-[340px]', hideAt: 'md' },
-  access: { id: 'access', header: 'Access', width: 'w-[200px] content-lg:w-[216px]' },
+  access: { id: 'access', header: 'Access', width: 'min-w-0 content-md:w-[200px] content-lg:w-[216px]' },
   open: { id: 'open', width: 'w-12 shrink-0 flex-none', hideAt: 'md', align: 'right' },
 } satisfies Record<string, TenantsTableColumn>;
 
@@ -77,7 +81,7 @@ function SingleCustomerTenantCustomerCell({
   );
 }
 
-/** ACCESS column: the access tag over "Last read: ...". */
+/** ACCESS column: the access tag over "Last read: ..."; a phone keeps the tag alone, cut by its label's "…" if need be. */
 function SingleCustomerTenantAccessCell({
   accessState,
   lastReadAt,
@@ -91,10 +95,12 @@ function SingleCustomerTenantAccessCell({
   const loading = useLoadingScope();
   return (
     <div className="flex min-w-0 flex-col justify-center gap-[var(--spacing-system-xxs)]">
-      <Tag {...accessStateTag(accessState)} loading={loading} className="self-start" />
-      <TruncateText variant="h6" tone="secondary" loading={loading}>
-        {`Last read: ${formatLastRead(lastReadAt, now)}`}
-      </TruncateText>
+      <Tag {...accessStateTag(accessState)} loading={loading} className="max-w-full self-start" />
+      <div className="hidden min-w-0 content-md:block">
+        <TruncateText variant="h6" tone="secondary" loading={loading}>
+          {`Last read: ${formatLastRead(lastReadAt, now)}`}
+        </TruncateText>
+      </div>
     </div>
   );
 }
