@@ -200,6 +200,7 @@ class AgentRegistrationServiceTest {
         assertEquals("1.0.0", savedMachine.getAgentVersion());
         assertEquals(ORGANIZATION_ID, savedMachine.getOrganizationId());
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus());
+        assertNotNull(savedMachine.getPendingSince());
         assertNotNull(savedMachine.getLastSeen());
         assertNotNull(savedMachine.getOrganizationAssignedAt());
 
@@ -275,6 +276,9 @@ class AgentRegistrationServiceTest {
         existingMachine.setHostname("old-host");
         existingMachine.setAgentVersion("0.9.0");
         existingMachine.setOrganizationId("old-org");
+        Instant firstRegistration = Instant.now().minusSeconds(3600);
+        existingMachine.setRegisteredAt(firstRegistration);
+        existingMachine.setStuckNotifiedAt(Instant.now().minusSeconds(1800));
         when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
         stubWriterOver(existingMachine);
         when(organizationIdResolver.resolve("org-1")).thenReturn("new-org");
@@ -302,6 +306,10 @@ class AgentRegistrationServiceTest {
         assertEquals("new-org", savedMachine.getOrganizationId()); // organization can change on reinstall
         assertEquals(DeviceStatus.PENDING, savedMachine.getStatus()); // reset to PENDING on reinstall
         assertNotNull(savedMachine.getLastSeen());
+        // the stuck-in-PENDING clock restarts and the alert is re-armed; the first registration date stays
+        assertNotNull(savedMachine.getPendingSince());
+        assertNull(savedMachine.getStuckNotifiedAt());
+        assertEquals(firstRegistration, savedMachine.getRegisteredAt());
 
         verify(organizationIdResolver).resolve("org-1");
 

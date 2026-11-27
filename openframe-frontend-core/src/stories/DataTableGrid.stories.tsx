@@ -283,6 +283,11 @@ interface GridDemoProps {
   initialDateRange?: DateRange;
   /** A block under every third row (`renderSubRow`). */
   subRows?: boolean;
+  /**
+   * A page's height (`minRows`, and as many loading rows): a short or empty page keeps it without drawing the missing
+   * rows. A bar under the table stands in for the pagination, which must not move.
+   */
+  minRows?: number;
 }
 
 function GridDemo({
@@ -298,6 +303,7 @@ function GridDemo({
   dateColumn = false,
   initialDateRange,
   subRows = false,
+  minRows,
 }: GridDemoProps) {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [data] = useState(() => makeDevices(rowCount));
@@ -347,7 +353,7 @@ function GridDemo({
     onRowSelectionChange: setRowSelection,
   });
 
-  return (
+  const grid = (
     <DataTable
       table={table}
       layout="grid"
@@ -366,11 +372,24 @@ function GridDemo({
       />
       <DataTable.Body<Device>
         loading={loading}
-        skeletonRows={6}
+        skeletonRows={minRows ?? 6}
+        minRows={minRows}
         rowHref={device => `#${device.id}`}
         renderSubRow={subRows ? renderDeviceSubRow : undefined}
       />
     </DataTable>
+  );
+  if (minRows === undefined) return grid;
+  return (
+    <div className="flex flex-col gap-[var(--spacing-system-mf)]">
+      {grid}
+      <div
+        data-story-under-table
+        className="rounded-md border border-dashed border-ods-border p-[var(--spacing-system-s)] text-ods-text-secondary text-h6"
+      >
+        Pagination
+      </div>
+    </div>
   );
 }
 
@@ -416,6 +435,18 @@ export const Loading: Story = { args: { loading: true } };
 
 /** No rows: the empty state inside the bordered block, under the header. */
 export const Empty: Story = { args: { rowCount: 0 } };
+
+/** A ten-row page while it is read: ten loading rows. Short, empty and full pages keep this height. */
+export const PageLoading: Story = { args: { loading: true, minRows: 10 } };
+
+/** Three rows of a ten-row page: the block ends at the last row, the missing rows are empty room, not drawn rows. */
+export const ShortPage: Story = { args: { rowCount: 3, minRows: 10 } };
+
+/** No rows on a ten-row page: the message at the top of a block of its own height, the rest of the page empty room. */
+export const EmptyPage: Story = { args: { rowCount: 0, minRows: 10 } };
+
+/** A full ten-row page. */
+export const FullPage: Story = { args: { rowCount: 10, minRows: 10 } };
 
 /**
  * The gear in the header of the last column opens the settings menu: auto-refresh, the shown columns (click to hide,

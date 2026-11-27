@@ -85,6 +85,7 @@ public class Machine implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
+    private Instant pendingSince;    // When the device last entered PENDING: first registration or latest reinstall
     private String enrollmentId;
 
     @Version
