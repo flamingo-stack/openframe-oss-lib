@@ -7218,7 +7218,7 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
           class="relative flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]"
         >
           <div
-            class="items-stretch hidden content-lg:flex flex-1 min-w-0"
+            class="items-stretch hidden content-lg:flex flex-1 min-w-[5rem]"
           >
             <div
               class="flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200 justify-start text-left"
@@ -7244,7 +7244,7 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
             </div>
           </div>
           <div
-            class="items-stretch hidden content-lg:flex w-[200px] content-lg:w-[216px]"
+            class="items-stretch hidden content-lg:flex min-w-0 content-md:w-[200px] content-lg:w-[216px]"
           >
             <div
               class="flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200 justify-start text-left"
@@ -7335,7 +7335,7 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
           class="relative flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]"
         >
           <div
-            class="items-stretch hidden content-lg:flex flex-1 min-w-0"
+            class="items-stretch hidden content-lg:flex flex-1 min-w-[5rem]"
           >
             <div
               class="flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200 justify-start text-left"
@@ -7361,7 +7361,7 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
             </div>
           </div>
           <div
-            class="items-stretch hidden content-lg:flex w-[200px] content-lg:w-[216px]"
+            class="items-stretch hidden content-lg:flex min-w-0 content-md:w-[200px] content-lg:w-[216px]"
           >
             <div
               class="flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200 justify-start text-left"
@@ -7405,7 +7405,7 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
             class="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-0 h-[66px] content-md:h-[78px]"
           >
             <div
-              class="flex flex-col overflow-hidden justify-start text-left flex-1 min-w-0"
+              class="flex flex-col overflow-hidden justify-start text-left flex-1 min-w-[5rem]"
             >
               <div
                 class="flex min-w-0 flex-col justify-center"
@@ -7489,13 +7489,13 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
               </div>
             </div>
             <div
-              class="flex flex-col overflow-hidden justify-start text-left w-[200px] content-lg:w-[216px]"
+              class="flex flex-col overflow-hidden justify-start text-left min-w-0 content-md:w-[200px] content-lg:w-[216px]"
             >
               <div
                 class="flex min-w-0 flex-col justify-center gap-[var(--spacing-system-xxs)]"
               >
                 <div
-                  class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-success-secondary text-ods-success hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active self-start"
+                  class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-success-secondary text-ods-success hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active max-w-full self-start"
                 >
                   <span
                     class="min-w-0 max-w-full"
@@ -7508,13 +7508,17 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
                   </span>
                 </div>
                 <div
-                  class="min-w-0 max-w-full"
+                  class="hidden min-w-0 content-md:block"
                 >
-                  <span
-                    class="text-h6 text-ods-text-secondary truncate block"
+                  <div
+                    class="min-w-0 max-w-full"
                   >
-                    Last read: —
-                  </span>
+                    <span
+                      class="text-h6 text-ods-text-secondary truncate block"
+                    >
+                      Last read: —
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -7568,7 +7572,7 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
             class="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-0 h-[66px] content-md:h-[78px]"
           >
             <div
-              class="flex flex-col overflow-hidden justify-start text-left flex-1 min-w-0"
+              class="flex flex-col overflow-hidden justify-start text-left flex-1 min-w-[5rem]"
             >
               <div
                 class="flex min-w-0 flex-col justify-center"
@@ -7664,13 +7668,13 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
               </div>
             </div>
             <div
-              class="flex flex-col overflow-hidden justify-start text-left w-[200px] content-lg:w-[216px]"
+              class="flex flex-col overflow-hidden justify-start text-left min-w-0 content-md:w-[200px] content-lg:w-[216px]"
             >
               <div
                 class="flex min-w-0 flex-col justify-center gap-[var(--spacing-system-xxs)]"
               >
                 <div
-                  class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-error-secondary text-ods-error hover:bg-ods-error-secondary-hover active:bg-ods-error-secondary-active self-start"
+                  class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-error-secondary text-ods-error hover:bg-ods-error-secondary-hover active:bg-ods-error-secondary-active max-w-full self-start"
                 >
                   <span
                     class="min-w-0 max-w-full"
@@ -7683,13 +7687,17 @@ exports[`feature tables, card layout (the default) > 'SingleCustomerTenantsTable
                   </span>
                 </div>
                 <div
-                  class="min-w-0 max-w-full"
+                  class="hidden min-w-0 content-md:block"
                 >
-                  <span
-                    class="text-h6 text-ods-text-secondary truncate block"
+                  <div
+                    class="min-w-0 max-w-full"
                   >
-                    Last read: —
-                  </span>
+                    <span
+                      class="text-h6 text-ods-text-secondary truncate block"
+                    >
+                      Last read: —
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -7763,7 +7771,7 @@ exports[`feature tables, card layout (the default) > 'TenantsTableView (multi-cu
           class="relative flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]"
         >
           <div
-            class="items-stretch hidden content-lg:flex flex-1 min-w-0"
+            class="items-stretch hidden content-lg:flex flex-1 min-w-[5rem]"
           >
             <div
               class="flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200 justify-start text-left"
@@ -7802,7 +7810,7 @@ exports[`feature tables, card layout (the default) > 'TenantsTableView (multi-cu
             </div>
           </div>
           <div
-            class="items-stretch hidden content-lg:flex flex-none content-md:w-[200px] content-lg:w-[216px]"
+            class="items-stretch hidden content-lg:flex min-w-0 content-md:flex-none content-md:w-[200px] content-lg:w-[216px]"
           >
             <div
               class="flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200 justify-start text-left"
@@ -7893,7 +7901,7 @@ exports[`feature tables, card layout (the default) > 'TenantsTableView (multi-cu
           class="relative flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]"
         >
           <div
-            class="items-stretch hidden content-lg:flex flex-1 min-w-0"
+            class="items-stretch hidden content-lg:flex flex-1 min-w-[5rem]"
           >
             <div
               class="flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200 justify-start text-left"
@@ -7932,7 +7940,7 @@ exports[`feature tables, card layout (the default) > 'TenantsTableView (multi-cu
             </div>
           </div>
           <div
-            class="items-stretch hidden content-lg:flex flex-none content-md:w-[200px] content-lg:w-[216px]"
+            class="items-stretch hidden content-lg:flex min-w-0 content-md:flex-none content-md:w-[200px] content-lg:w-[216px]"
           >
             <div
               class="flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200 justify-start text-left"
@@ -7976,7 +7984,7 @@ exports[`feature tables, card layout (the default) > 'TenantsTableView (multi-cu
             class="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-0 h-[66px] content-md:h-[78px]"
           >
             <div
-              class="flex flex-col overflow-hidden justify-start text-left flex-1 min-w-0"
+              class="flex flex-col overflow-hidden justify-start text-left flex-1 min-w-[5rem]"
             >
               <div
                 class="flex min-w-0 flex-col justify-center"
@@ -8097,13 +8105,13 @@ exports[`feature tables, card layout (the default) > 'TenantsTableView (multi-cu
               </div>
             </div>
             <div
-              class="flex flex-col overflow-hidden justify-start text-left flex-none content-md:w-[200px] content-lg:w-[216px]"
+              class="flex flex-col overflow-hidden justify-start text-left min-w-0 content-md:flex-none content-md:w-[200px] content-lg:w-[216px]"
             >
               <div
                 class="flex min-w-0 flex-col justify-center gap-[var(--spacing-system-xxs)]"
               >
                 <div
-                  class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-success-secondary text-ods-success hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active self-start"
+                  class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-success-secondary text-ods-success hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active max-w-full self-start"
                 >
                   <span
                     class="min-w-0 max-w-full"
@@ -8167,7 +8175,7 @@ exports[`feature tables, card layout (the default) > 'TenantsTableView (multi-cu
             class="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-0 h-[66px] content-md:h-[78px]"
           >
             <div
-              class="flex flex-col overflow-hidden justify-start text-left flex-1 min-w-0"
+              class="flex flex-col overflow-hidden justify-start text-left flex-1 min-w-[5rem]"
             >
               <div
                 class="flex min-w-0 flex-col justify-center"
@@ -8267,13 +8275,13 @@ exports[`feature tables, card layout (the default) > 'TenantsTableView (multi-cu
               </div>
             </div>
             <div
-              class="flex flex-col overflow-hidden justify-start text-left flex-none content-md:w-[200px] content-lg:w-[216px]"
+              class="flex flex-col overflow-hidden justify-start text-left min-w-0 content-md:flex-none content-md:w-[200px] content-lg:w-[216px]"
             >
               <div
                 class="flex min-w-0 flex-col justify-center gap-[var(--spacing-system-xxs)]"
               >
                 <div
-                  class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-error-secondary text-ods-error hover:bg-ods-error-secondary-hover active:bg-ods-error-secondary-active self-start"
+                  class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-error-secondary text-ods-error hover:bg-ods-error-secondary-hover active:bg-ods-error-secondary-active max-w-full self-start"
                 >
                   <span
                     class="min-w-0 max-w-full"

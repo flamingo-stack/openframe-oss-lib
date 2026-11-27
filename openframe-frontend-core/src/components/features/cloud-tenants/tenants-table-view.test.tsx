@@ -80,9 +80,9 @@ describe('TenantsTableView, single-customer (the default)', () => {
     expect(
       seen.columns.map(column => [column.id, column.meta?.width, column.meta?.hideAt, column.meta?.filter]),
     ).toEqual([
-      ['tenant', 'flex-1 min-w-0', undefined, undefined],
+      ['tenant', 'flex-1 min-w-[5rem]', undefined, undefined],
       ['customer', 'w-[220px] content-lg:w-[340px]', 'md', undefined],
-      ['access', 'w-[200px] content-lg:w-[216px]', undefined, undefined],
+      ['access', 'min-w-0 content-md:w-[200px] content-lg:w-[216px]', undefined, undefined],
       ['open', 'w-12 shrink-0 flex-none', 'md', undefined],
     ]);
   });
@@ -160,10 +160,10 @@ describe('TenantsTableView in the grid layout', () => {
     expect(
       seen.columns.map(column => [column.id, column.meta?.width, column.meta?.hideAt, column.meta?.align]),
     ).toEqual([
-      ['tenant', 'flex-1 min-w-0', undefined, undefined],
+      ['tenant', 'flex-1 min-w-[5rem]', undefined, undefined],
       ['customer', 'w-[220px] content-lg:w-[280px]', 'md', undefined],
       ['licenses', 'w-[150px]', 'lg', undefined],
-      ['access', 'flex-none content-md:w-[200px] content-lg:w-[216px]', undefined, undefined],
+      ['access', 'min-w-0 content-md:flex-none content-md:w-[200px] content-lg:w-[216px]', undefined, undefined],
       ['open', 'w-12 shrink-0 flex-none', undefined, 'right'],
     ]);
   });

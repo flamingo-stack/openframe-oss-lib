@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { isValidElement, type ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { useDataTableLayout } from './data-table-grid';
 
@@ -52,4 +52,21 @@ export function DataTableMeta({ children, pagination, actions, className }: Data
       {actions && <div className="order-2 flex shrink-0 items-center content-md:order-4">{actions}</div>}
     </div>
   );
+}
+
+/**
+ * The components a grid with a height keeps above its scroll viewport, so the row never scrolls with the rows: this
+ * row, and a component that draws nothing but it (`DataTableMetaRow`), which registers itself with
+ * {@link hoistAsTableMeta}.
+ */
+const TABLE_META_TYPES = new Set<unknown>([DataTableMeta]);
+
+/** Keep this component, a wrapper that draws only `DataTableMeta`, above a grid's scroll viewport too. */
+export function hoistAsTableMeta(type: unknown): void {
+  TABLE_META_TYPES.add(type);
+}
+
+/** The child is the row above the table (the table root keeps it out of a grid's scroll viewport). */
+export function isTableMetaElement(child: ReactNode): boolean {
+  return isValidElement(child) && TABLE_META_TYPES.has(child.type);
 }

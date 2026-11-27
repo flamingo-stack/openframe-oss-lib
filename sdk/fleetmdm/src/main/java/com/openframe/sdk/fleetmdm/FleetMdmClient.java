@@ -69,6 +69,7 @@ public class FleetMdmClient {
     private static final String SOFTWARE_VERSIONS_URL = "/api/latest/fleet/software/versions/";
     private static final String VULNERABILITY_DETAIL_URL = "/api/latest/fleet/vulnerabilities/";
     private static final String INCLUDE_MANAGED_QUERY = "?include_openframe_managed=1";
+    private static final String CONFIG_URL = "/api/latest/fleet/config";
 
     static final String TENANT_ID_HEADER = "X-Tenant-Id";
 
@@ -202,6 +203,19 @@ public class FleetMdmClient {
             if (response.statusCode() == 404) {
                 throw new FleetMdmNotFoundException("Fleet host not found: " + hostId, response.body());
             }
+            checkResponse(response, action);
+            return null;
+        });
+    }
+
+    public void setWindowsMdmServerUrl(String windowsServerUrl) {
+        if (windowsServerUrl == null || windowsServerUrl.isBlank()) {
+            throw new FleetMdmArgumentException("Windows MDM server URL cannot be blank");
+        }
+        String action = "set the Fleet Windows MDM address";
+        call(action, () -> {
+            String body = MAPPER.writeValueAsString(Map.of("mdm", Map.of("windows_server_url", windowsServerUrl)));
+            HttpResponse<String> response = sendRequest(CONFIG_URL, "PATCH", body);
             checkResponse(response, action);
             return null;
         });
