@@ -243,4 +243,17 @@ describe('useJetStreamDialogSubscription caughtUpCount', () => {
     expect(payloads[0].streamPublishedAt).toBeGreaterThanOrEqual(before);
     expect(payloads[0].streamPublishedAt).toBeLessThanOrEqual(Date.now());
   });
+
+  it('reads the publish time to the millisecond, also on a millisecond whose nanoseconds are not exact in a Number', async () => {
+    // The latest millisecond whose whole-millisecond nanoseconds a Number stores rounded down (about 1 in 8): such a
+    // millisecond read 1 ms early before the fake stamped the middle of the millisecond. Recent, so it is in the stream.
+    let pinned = Date.now();
+    while (Math.floor((pinned * 1e6) / 1e6) === pinned) pinned -= 1;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(pinned);
+    const seq = publish('pinned');
+    clock.mockRestore();
+    render(<Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seq - 1} />);
+    await until(() => payloads.length === 1);
+    expect(payloads[0]).toMatchObject({ streamSeq: seq, streamPublishedAt: pinned });
+  });
 });
