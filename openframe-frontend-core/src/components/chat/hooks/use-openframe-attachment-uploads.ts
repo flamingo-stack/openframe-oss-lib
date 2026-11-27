@@ -19,6 +19,7 @@ import {
   type OpenFrameAttachmentErrorCode,
   type OpenFrameAttachmentItem,
   type OpenFrameAttachmentProfile,
+  type OpenFrameMessageAttachment,
 } from '../../../chat-protocol/attachment-profiles';
 import type {
   OpenFrameAttachmentServerStatus,
@@ -29,7 +30,6 @@ import {
   applyOpenFrameServerStatus,
   failOpenFrameItem,
   isFinalOpenFrameStatus,
-  isOpenFrameTrayPending,
   type OpenFrameReadyAttachment,
   type OpenFrameTrayEntry,
   openFrameReadyAttachments,
@@ -40,6 +40,7 @@ import {
 } from '../utils/openframe-attachment-tray';
 import { OpenFrameUploadQueue, uploadOpenFrameAttachment } from '../utils/openframe-attachment-upload';
 import { validateOpenFrameAttachments } from '../utils/openframe-attachment-validation';
+import { isOpenFrameSendBlocked } from '../utils/openframe-attachment-view';
 import { useOpenFrameAttachmentStatusPoll } from './use-openframe-attachment-status-poll';
 
 /** How often the server is asked about the files being checked. */
@@ -78,6 +79,11 @@ export interface OpenFrameAttachmentUploads {
    * message can keep drawing them.
    */
   takeForSend: () => OpenFrameReadyAttachment[];
+  /**
+   * The last send failed and the draft came back (`OpenFrameChatAttachments.onMessageSendFailed`): its files, by server
+   * id, return to the tray as they were. Files of an earlier send, or already back, are ignored.
+   */
+  restore: (sent: readonly OpenFrameMessageAttachment[]) => void;
   /** Empty the tray and cancel everything (a new chat, a switched conversation). */
   clear: () => void;
 }
@@ -260,11 +266,36 @@ export function useOpenFrameAttachmentUploads({
     commit(prev => (prev.length > 0 ? [] : prev)); // an empty tray stays the same array, so React skips the render
   }, [cancelRead, commit, drop]);
 
+  // The last send's files with what the tray kept for them, so a send that fails can put them back (`restore`).
+  const lastTaken = useRef(new Map<string, { item: OpenFrameAttachmentItem; entry: OpenFrameTrayEntry }>());
+
   const takeForSend = useCallback(() => {
     const taken = openFrameReadyAttachments(itemsRef.current, entries.current);
+    lastTaken.current = new Map(
+      taken.flatMap(({ attachmentId, item }) => {
+        const entry = entries.current.get(item.id);
+        return entry ? [[attachmentId, { item, entry }] as const] : [];
+      }),
+    );
     clear();
     return taken;
   }, [clear]);
+
+  /** The last send failed: its files (by server id) go back into the tray as they were, ready, ahead of newer ones. */
+  const restore = useCallback(
+    (sent: readonly OpenFrameMessageAttachment[]) => {
+      const back = sent.flatMap(file => {
+        const kept = lastTaken.current.get(file.id);
+        if (!kept) return [];
+        lastTaken.current.delete(file.id);
+        return [kept];
+      });
+      if (back.length === 0) return;
+      for (const { item, entry } of back) entries.current.set(item.id, entry);
+      commit(prev => [...back.map(({ item }) => item).filter(item => !prev.some(p => p.id === item.id)), ...prev]);
+    },
+    [commit],
+  );
 
   useEffect(() => {
     mounted.current = true;
@@ -277,5 +308,5 @@ export function useOpenFrameAttachmentUploads({
   }, []);
 
   const { items, ready } = view;
-  return { items, addFiles, remove, ready, pending: isOpenFrameTrayPending(items), takeForSend, clear };
+  return { items, addFiles, remove, ready, pending: isOpenFrameSendBlocked(items), takeForSend, restore, clear };
 }

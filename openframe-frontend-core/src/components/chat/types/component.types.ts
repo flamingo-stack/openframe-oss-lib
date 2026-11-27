@@ -500,6 +500,11 @@ export interface OpenFrameChatAttachments extends OpenFrameComposerAttachments {
    * `takeForSend()`) ride on the send as `openframeAttachments`: the bubble draws them and the publish sends their ids.
    */
   onMessageSend?: (text: string) => readonly OpenFrameMessageAttachment[] | void;
+  /**
+   * The send failed and the composer put the draft back: these are the files `onMessageSend` returned for it. The host
+   * puts them back in its tray (`useOpenFrameAttachmentUploads().restore`), so they go with the draft when it is resent.
+   */
+  onMessageSendFailed?: (files: readonly OpenFrameMessageAttachment[]) => void;
 }
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {

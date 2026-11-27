@@ -1323,6 +1323,7 @@ function EmbeddableChatInner({
   const { panelRef: galleryPanelRef, modal: galleryModal } = useChatAttachmentImageGallery();
   // OpenFrame attachments: files dropped on the thread join the composer's tray (the composer is a drop zone too).
   const onOpenFrameMessageSend = openframeAttachments?.onMessageSend;
+  const onOpenFrameMessageSendFailed = openframeAttachments?.onMessageSendFailed;
   // The context the chat has used, as the token readout shows it; what is left of the budget gates the staged files.
   const usedContextTokens =
     currentContextTokens ?? (currentInputTokens != null ? currentInputTokens + (currentOutputTokens ?? 0) : undefined);
@@ -1697,6 +1698,8 @@ function EmbeddableChatInner({
           // switch since), its box still empty.
           const restores =
             !ok && composerKeyRef.current === sentComposerKey && (chatInputRef.current?.getValue() ?? '') === '';
+          // The files the host handed over come back with the draft, into its tray.
+          if (restores && sentFiles && sentFiles.length > 0) onOpenFrameMessageSendFailed?.(sentFiles);
           if (restores && sentContext.length > 0) {
             for (const key of sentMentionKeys) mentionKeysRef.current.add(key);
             setContextItems(prev => {
@@ -1724,6 +1727,7 @@ function EmbeddableChatInner({
       contextItems,
       contextMaxItems,
       onOpenFrameMessageSend,
+      onOpenFrameMessageSendFailed,
     ],
   );
 
@@ -2615,9 +2619,7 @@ function EmbeddableChatInner({
         hasAboveComposer && !splitMode && 'min-h-32',
       )}
     >
-      {openframeAttachments && (
-        <OpenFrameDropOverlay profile={openframeAttachments.profile} visible={threadDropZone.dragging} />
-      )}
+      {openframeAttachments && <OpenFrameDropOverlay visible={threadDropZone.dragging} />}
       <div key={contentViewKey} className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0">
         {hasConversation ? (
           <div className="flex min-h-0 flex-1 flex-col">

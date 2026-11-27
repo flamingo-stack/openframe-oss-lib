@@ -3,11 +3,8 @@
 /** The OpenFrame (Mingo, Fae) drop overlay: covers a composer or a thread while files are dragged over it. */
 
 import type { ReactNode } from 'react';
-import type { OpenFrameAttachmentProfile } from '../../chat-protocol/attachment-profiles';
 
 export interface OpenFrameDropOverlayProps {
-  /** The product's profile. The default copy no longer reads it; kept so every caller stays the same. */
-  profile: OpenFrameAttachmentProfile;
   /** Shown while files are dragged over the zone. */
   visible: boolean;
   /** Overrides the default copy. */

@@ -172,6 +172,18 @@ describe('useOpenFrameAttachmentUploads', () => {
     await waitFor(() => expect(result.current.items[0]?.error).toBe('UPLOAD_FAILED'));
   });
 
+  it('never asks about a file again once it failed for taking too long, so a late ready cannot revive it', async () => {
+    const { uploader, setStatus } = fakeUploader();
+    const { result } = setup(uploader, { statusMaxWaitMs: 20 });
+    act(() => result.current.addFiles([text()]));
+    await waitFor(() => expect(result.current.items[0]?.error).toBe('UPLOAD_FAILED'));
+    const askedBefore = uploader.getStatuses.mock.calls.length;
+    setStatus({ attachmentId: 'att_1', state: 'ready' });
+    await new Promise(resolve => setTimeout(resolve, 40));
+    expect(uploader.getStatuses.mock.calls.slice(askedBefore).flatMap(([ids]) => [...ids])).not.toContain('att_1');
+    expect(result.current.items[0]).toMatchObject({ state: 'error', error: 'UPLOAD_FAILED' });
+  });
+
   it('cancels an upload when its file is removed', async () => {
     const { uploader } = fakeUploader();
     let signal: AbortSignal | undefined;
@@ -228,6 +240,38 @@ describe('useOpenFrameAttachmentUploads', () => {
       taken = result.current.takeForSend();
     });
     expect(taken.map(t => [t.attachmentId, t.item.name])).toEqual([['att_1', 'ok.txt']]);
+    expect(result.current.items).toEqual([]);
+  });
+
+  it('puts the files of a failed send back, ready, and sends them again', async () => {
+    const { uploader, setStatus } = fakeUploader();
+    setStatus({ attachmentId: 'att_1', state: 'ready', tokenEstimate: 7 });
+    const { result } = setup(uploader);
+    act(() => result.current.addFiles([text('ok.txt')]));
+    await waitFor(() => expect(result.current.items[0]?.state).toBe('ready'));
+    act(() => {
+      result.current.takeForSend();
+    });
+    expect(result.current.items).toEqual([]);
+
+    act(() => result.current.restore([{ id: 'att_1', name: 'ok.txt', mediaType: 'text/plain', size: 5 }]));
+    expect(result.current.items).toEqual([
+      expect.objectContaining({ name: 'ok.txt', state: 'ready', tokenEstimate: 7 }),
+    ]);
+    act(() => result.current.restore([{ id: 'att_1', name: 'ok.txt', mediaType: 'text/plain' }]));
+    expect(result.current.items).toHaveLength(1);
+
+    let again: ReturnType<typeof result.current.takeForSend> = [];
+    act(() => {
+      again = result.current.takeForSend();
+    });
+    expect(again.map(t => t.attachmentId)).toEqual(['att_1']);
+  });
+
+  it('ignores files it did not take for the last send', () => {
+    const { uploader } = fakeUploader();
+    const { result } = setup(uploader);
+    act(() => result.current.restore([{ id: 'att_9', name: 'x.txt', mediaType: 'text/plain' }]));
     expect(result.current.items).toEqual([]);
   });
 

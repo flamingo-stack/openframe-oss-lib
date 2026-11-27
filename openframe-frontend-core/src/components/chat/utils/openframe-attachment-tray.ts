@@ -79,11 +79,6 @@ export function openFrameStagedCount(items: readonly OpenFrameAttachmentItem[]):
   return items.filter(item => item.state !== 'error').length;
 }
 
-/** Whether a file is still uploading or being checked (Send waits for it). */
-export function isOpenFrameTrayPending(items: readonly OpenFrameAttachmentItem[]): boolean {
-  return items.some(item => item.state === 'uploading' || item.state === 'scanning');
-}
-
 /** Turn a pick's checks into tray items. `makeId` names each file; `previewOf` makes an accepted image's picture. */
 export function stageOpenFrameChecks(
   checks: readonly OpenFrameAttachmentCheck[],
@@ -137,7 +132,8 @@ export function isFinalOpenFrameStatus(status: OpenFrameAttachmentServerStatus):
 }
 
 /**
- * Apply the server's status to a file. Ready keeps the local picture over the server's thumbnail; blocked and failed
+ * Apply the server's status to a file. Ready keeps the local picture over the server's thumbnail, and the token
+ * estimate an earlier status gave when ready does not repeat it; blocked and failed
  * refuse it; a status still in progress only updates the token estimate. Returns `items` itself when nothing changes.
  */
 export function applyOpenFrameServerStatus(
@@ -150,7 +146,7 @@ export function applyOpenFrameServerStatus(
     return patchOpenFrameItem(items, id, {
       state: 'ready',
       progress: undefined,
-      tokenEstimate: status.tokenEstimate,
+      tokenEstimate: status.tokenEstimate ?? current?.tokenEstimate,
       thumbnailUrl: current?.thumbnailUrl ?? status.thumbnailUrl,
     });
   }

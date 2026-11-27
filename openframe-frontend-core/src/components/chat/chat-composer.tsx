@@ -324,9 +324,7 @@ export function ChatComposer({
       )}
       {...cardDropZone.handlers}
     >
-      {openframeAttachments && cardOwnsDrop && (
-        <OpenFrameDropOverlay profile={openframeAttachments.profile} visible={cardDropZone.dragging} />
-      )}
+      {openframeAttachments && cardOwnsDrop && <OpenFrameDropOverlay visible={cardDropZone.dragging} />}
       {/* Ambient navigation-history context — always the same items, so
          it sits furthest from the textarea. Self-hides when empty. */}
       <ChatContextMemoryBar

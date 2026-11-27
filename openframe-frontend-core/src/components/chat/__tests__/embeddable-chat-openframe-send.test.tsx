@@ -6,7 +6,7 @@
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
@@ -147,6 +147,26 @@ describe('EmbeddableChat with OpenFrame files', () => {
     expect(order).toEqual(['take', 'send']);
     expect(onMessageSend).toHaveBeenCalledWith('');
     expect(sendMessage).toHaveBeenCalledWith('', { openframeAttachments: [SENT] });
+  });
+
+  it('hands the files back to the host when the send fails and the draft comes back', async () => {
+    const onMessageSendFailed = vi.fn<NonNullable<OpenFrameChatAttachments['onMessageSendFailed']>>();
+    renderPanel(
+      createState({ sendMessage: () => Promise.resolve(false) }),
+      attachments({ onMessageSend: () => [SENT], onMessageSendFailed }),
+    );
+    fireEvent.click(sendButton());
+    await waitFor(() => expect(onMessageSendFailed).toHaveBeenCalledWith([SENT]));
+  });
+
+  it('keeps the files with the message when the send goes through', async () => {
+    const onMessageSendFailed = vi.fn<NonNullable<OpenFrameChatAttachments['onMessageSendFailed']>>();
+    const sendMessage = vi.fn<UnifiedChatState['sendMessage']>(() => Promise.resolve());
+    renderPanel(createState({ sendMessage }), attachments({ onMessageSend: () => [SENT], onMessageSendFailed }));
+    fireEvent.click(sendButton());
+    await waitFor(() => expect(sendMessage).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(onMessageSendFailed).not.toHaveBeenCalled();
   });
 
   it('sends no files key when the host hands over none', () => {

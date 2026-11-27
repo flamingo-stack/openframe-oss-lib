@@ -10,7 +10,6 @@ import {
   applyOpenFrameServerStatus,
   countOpenFrameStatusFailure,
   isFinalOpenFrameStatus,
-  isOpenFrameTrayPending,
   OPENFRAME_STATUS_FAILURES_ALLOWED,
   type OpenFrameTrayEntry,
   openFrameReadyAttachments,
@@ -89,6 +88,16 @@ describe('applyOpenFrameServerStatus', () => {
     expect(next[1].thumbnailUrl).toBe('https://server/thumb');
   });
 
+  it('ready keeps the token estimate an earlier status gave when it does not repeat it', () => {
+    const scanning = applyOpenFrameServerStatus(tray, 'b', {
+      attachmentId: 'att_b',
+      state: 'scanning',
+      tokenEstimate: 120,
+    });
+    const ready = applyOpenFrameServerStatus(scanning, 'b', { attachmentId: 'att_b', state: 'ready' });
+    expect(ready[1]).toMatchObject({ state: 'ready', tokenEstimate: 120 });
+  });
+
   it('blocked and failed refuse the file, failed with its own code or UPLOAD_FAILED', () => {
     expect(applyOpenFrameServerStatus(tray, 'a', { attachmentId: 'x', state: 'blocked' })[0]).toMatchObject({
       state: 'error',
@@ -164,11 +173,9 @@ describe('the tray read-outs', () => {
     expect(openFrameReadyAttachments(items, entries).map(ready => ready.attachmentId)).toEqual(['att_a', 'att_c']);
   });
 
-  it('counts staged files without the refused ones and waits on uploading or scanning files', () => {
+  it('counts staged files without the refused ones', () => {
     const items = [item('a', { state: 'error' }), item('b', { state: 'ready' }), item('c', { state: 'uploading' })];
     expect(openFrameStagedCount(items)).toBe(2);
-    expect(isOpenFrameTrayPending(items)).toBe(true);
-    expect(isOpenFrameTrayPending(items.slice(0, 2))).toBe(false);
   });
 
   it('shows whole percents and never 100 before the answer', () => {

@@ -689,9 +689,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
         </div>
       ) : (
         <div className="relative" {...dropZone.handlers}>
-          {attachments && openframeDropZone && (
-            <OpenFrameDropOverlay profile={attachments.profile} visible={dropZone.dragging} />
-          )}
+          {attachments && openframeDropZone && <OpenFrameDropOverlay visible={dropZone.dragging} />}
           {filePicker.input}
           <SlashCommandSuggestions
             commands={slashPrefix !== null ? slashSuggestions : []}
