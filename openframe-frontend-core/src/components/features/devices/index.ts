@@ -95,11 +95,10 @@ export {
   type DevicesViewMode,
   IDLE_DEVICES_TOOLBAR,
 } from './devices-panel-view';
+export { DevicesTableBody, type DevicesTableBodyProps, type DevicesTableMetaRow } from './devices-table-body';
 export {
   type DeviceFilterColumn,
   type DeviceFilterOption,
-  DevicesTableBody,
-  type DevicesTableBodyProps,
   getDeviceActionsColumn,
   getDeviceFilterColumns,
   getDeviceOpenColumn,

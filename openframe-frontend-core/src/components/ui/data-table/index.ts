@@ -8,13 +8,16 @@ import { DataTableEmpty } from './data-table-empty';
 import { DataTableHeader } from './data-table-header';
 import { DataTableInfiniteFooter } from './data-table-infinite-footer';
 import { DataTableMeta } from './data-table-meta';
+import { DataTablePageRange } from './data-table-page-range';
+import { DataTablePagination } from './data-table-pagination';
 import { DataTableRow } from './data-table-row';
 import { DataTableRowCount } from './data-table-row-count';
 
 /**
  * Compound table primitive. Use `useDataTable` to build the table instance,
  * then compose `<DataTable>` + `<DataTable.Header/>` + `<DataTable.Body/>`
- * + `<DataTable.InfiniteFooter/>` or `<DataTable.CursorFooter/>` as needed.
+ * + `<DataTable.InfiniteFooter/>` as needed. A cursor-paged table puts its pager in the row above it:
+ * `<DataTable.Meta pagination={<DataTable.Pagination/>}><DataTable.PageRange/></DataTable.Meta>`.
  *
  * @example
  * const table = useDataTable({ data, columns, ... })
@@ -34,6 +37,8 @@ export const DataTable = Object.assign(DataTableRoot, {
   CursorFooter: DataTableCursorFooter,
   RowCount: DataTableRowCount,
   Meta: DataTableMeta,
+  PageRange: DataTablePageRange,
+  Pagination: DataTablePagination,
 });
 
 // Also export each piece by name for consumers that prefer named imports.
@@ -48,6 +53,8 @@ export {
   DataTableCursorFooter,
   DataTableRowCount,
   DataTableMeta,
+  DataTablePageRange,
+  DataTablePagination,
 };
 
 export { useDataTableContext } from './data-table';
@@ -78,6 +85,8 @@ export type { DataTableCellLeading, DataTableCellProps } from './data-table-cell
 export type { DataTableEmptyProps } from './data-table-empty';
 export type { DataTableInfiniteFooterProps } from './data-table-infinite-footer';
 export type { DataTableCursorFooterProps } from './data-table-cursor-footer';
+export type { DataTablePageRangeProps } from './data-table-page-range';
+export type { DataTablePaginationProps } from './data-table-pagination';
 export type { DataTableRowCountProps } from './data-table-row-count';
 export type { DataTableMetaProps } from './data-table-meta';
 export type { DataTableLayout } from './data-table-grid';

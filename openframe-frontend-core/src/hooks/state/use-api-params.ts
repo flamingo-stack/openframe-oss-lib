@@ -130,6 +130,36 @@ export interface UseApiParamsOptions {
    * contract the server produces for the same URL.
    */
   absent?: 'undefined' | 'null';
+  /**
+   * Prefix every URL key with this word, camelCased (`prefix: 'cve'` → `search` lives at `?cveSearch=`), so two tables
+   * on one page (a detail page's tabs) keep their own state. `params` and the setters keep the schema's own keys.
+   */
+  prefix?: string;
+  /**
+   * Keys (schema-style names, prefixed like the rest) that this hook CLEARS in the same URL write whenever it changes
+   * any of its own params: a table's filters pass the pager's `cursor` / `page` here, so a filter change and the cursor
+   * drop are ONE navigation. The keys need not be in this hook's schema.
+   */
+  resetKeys?: readonly string[];
+  /**
+   * How a write that cleared a present `resetKeys` key enters history (default `replace`). `push` makes a filter change
+   * on page 3 a new entry, so Back returns to page 3 under the old filter.
+   */
+  resetHistory?: ApiParamsHistory;
+}
+
+/** How a URL write enters browser history. */
+export type ApiParamsHistory = 'push' | 'replace';
+
+/** Options of one write. */
+export interface ApiParamsWriteOptions {
+  /** `push` adds a history entry (a page move); default `replace`. */
+  history?: ApiParamsHistory;
+}
+
+/** The URL name of a schema key under `prefix`: `cve` + `search` → `cveSearch`. */
+export function prefixedParamName(prefix: string | undefined, name: string): string {
+  return prefix ? `${prefix}${name[0]?.toUpperCase() ?? ''}${name.slice(1)}` : name;
 }
 
 /**
@@ -185,15 +215,19 @@ export interface UseApiParamsReturn<TSchema extends ParamSchema, TParams = Infer
   urlSearchParams: URLSearchParams;
 
   /** Set a single parameter with type-safe key and value */
-  setParam: <K extends keyof TSchema & string>(key: K, value: InferInputParamsFromSchema<Pick<TSchema, K>>[K]) => void;
+  setParam: <K extends keyof TSchema & string>(
+    key: K,
+    value: InferInputParamsFromSchema<Pick<TSchema, K>>[K],
+    options?: ApiParamsWriteOptions,
+  ) => void;
 
   /** Set multiple parameters at once */
-  setParams: (updates: Partial<InferInputParamsFromSchema<TSchema>>) => void;
+  setParams: (updates: Partial<InferInputParamsFromSchema<TSchema>>, options?: ApiParamsWriteOptions) => void;
 
   /** Clear specific parameters */
-  clearParams: (keys: (keyof TSchema & string)[]) => void;
+  clearParams: (keys: (keyof TSchema & string)[], options?: ApiParamsWriteOptions) => void;
 
-  /** Reset all parameters (clear URL) */
+  /** Reset all parameters: the whole URL, or with a `prefix` only this hook's keys */
   resetParams: () => void;
 }
 
@@ -248,6 +282,29 @@ export function useApiParams<TSchema extends ParamSchema>(
   const schemaKey = useMemo(() => JSON.stringify(schema), [schema]);
   const stableSchema = useContentStable(schema, schemaKey);
 
+  // 3. Prefix and reset keys. The parser and the writer speak URL names (`cveSearch`); `params`, the setters and
+  //    `urlSearchParams` speak the schema's own names (`search`).
+  const prefix = options.prefix ?? '';
+  const resetKeysKey = (options.resetKeys ?? []).join('\u0000');
+  const resetKeys = useMemo(() => (resetKeysKey ? resetKeysKey.split('\u0000') : []), [resetKeysKey]);
+  const resetHistory = options.resetHistory ?? 'replace';
+  const urlSchema = useMemo((): ParamSchema => {
+    if (!prefix) return stableSchema;
+    return Object.fromEntries<ParamSchema[string]>(
+      Object.entries(stableSchema).map(([key, config]) => [prefixedParamName(prefix, key), config]),
+    );
+  }, [stableSchema, prefix]);
+  const parseSearch = useCallback(
+    (search: string): Record<string, unknown> => {
+      const parsed = parseSchemaParams(urlSchema, new URLSearchParams(search), {
+        absent: options.absent === 'null' ? 'null' : 'undefined',
+      }) as Record<string, unknown>;
+      if (!prefix) return parsed;
+      return Object.fromEntries(Object.keys(stableSchema).map(key => [key, parsed[prefixedParamName(prefix, key)]]));
+    },
+    [urlSchema, prefix, stableSchema, options.absent],
+  );
+
   // ──────────────────────────────────────────────────────────────────────
 
   // Convert schema to flattened format for reuse
@@ -278,16 +335,14 @@ export function useApiParams<TSchema extends ParamSchema>(
   // `?page=abc` as `null` here and `1` there, which is enough to desynchronize
   // any adapter that compares the two.
   const rawParams = useMemo((): Record<string, unknown> => {
-    const result = parseSchemaParams(stableSchema, new URLSearchParams(searchString), {
-      absent: options.absent === 'null' ? 'null' : 'undefined',
-    }) as Record<string, unknown>;
+    const result = parseSearch(searchString);
 
     if (debug) {
       console.log('[useApiParams] Parsed params:', result);
     }
 
     return result;
-  }, [searchString, debug, stableSchema, options.absent]);
+  }, [searchString, debug, parseSearch]);
 
   // Carry the previously COMMITTED array instances forward when their content
   // is unchanged, so `params.<arrayField>` stays reference-stable across a URL
@@ -343,7 +398,7 @@ export function useApiParams<TSchema extends ParamSchema>(
   // or schema — important for consumers that put `setParam`/`setParams` in
   // `useEffect` deps.
   const updateUrl = useCallback(
-    (newParams: URLSearchParams, keysToRemove: string[] = []) => {
+    (newParams: URLSearchParams, keysToRemove: string[] = [], writeOptions?: ApiParamsWriteOptions) => {
       // Base the write on the LAST WRITE WE ISSUED, not on the committed URL.
       // Next commits each `router.replace` as its own navigation, so two writes
       // fired before the first commits would both rebase on the pre-first URL
@@ -351,10 +406,12 @@ export function useApiParams<TSchema extends ParamSchema>(
       const base = pendingRef.current[pendingRef.current.length - 1] ?? searchString;
       const finalParams = new URLSearchParams(base);
 
+      const urlName = (key: string) => prefixedParamName(prefix, key);
+
       // Remove keys that are explicitly marked for removal
       keysToRemove.forEach(key => {
         if (key in stableSchema) {
-          finalParams.delete(key);
+          finalParams.delete(urlName(key));
         }
       });
 
@@ -363,7 +420,7 @@ export function useApiParams<TSchema extends ParamSchema>(
       newParams.forEach((_, key) => {
         // Only remove keys that are in our schema
         if (key in stableSchema) {
-          finalParams.delete(key);
+          finalParams.delete(urlName(key));
         }
       });
 
@@ -372,15 +429,37 @@ export function useApiParams<TSchema extends ParamSchema>(
       newParams.forEach((value, key) => {
         // Only process keys that are in our schema
         if (key in stableSchema) {
-          if (finalParams.has(key)) {
+          const name = urlName(key);
+          if (finalParams.has(name)) {
             // Key already exists (from array params), append
-            finalParams.append(key, value);
+            finalParams.append(name, value);
           } else {
             // First value for this key, use set
-            finalParams.set(key, value);
+            finalParams.set(name, value);
           }
         }
       });
+
+      // The reset keys leave in THIS write when any of our own params changed: a filter change and the cursor drop
+      // are one navigation, so no history entry (and no request) ever pairs the new filter with the old cursor.
+      let clearedReset = false;
+      if (resetKeys.length > 0) {
+        const before = new URLSearchParams(base);
+        const ownChanged = Object.keys(stableSchema).some(key => {
+          if (resetKeys.includes(key)) return false;
+          const name = urlName(key);
+          return before.getAll(name).join('\u0000') !== finalParams.getAll(name).join('\u0000');
+        });
+        if (ownChanged) {
+          for (const key of resetKeys) {
+            const name = urlName(key);
+            if (finalParams.has(name)) {
+              finalParams.delete(name);
+              clearedReset = true;
+            }
+          }
+        }
+      }
 
       const merged = finalParams.toString();
 
@@ -399,10 +478,13 @@ export function useApiParams<TSchema extends ParamSchema>(
         console.log('[useApiParams] Updating URL:', url);
       }
 
-      // Use replace for shallow routing (no page reload, no history spam)
-      router.replace(url, { scroll: false });
+      // Replace by default (shallow routing, no history spam); a page move, or a reset the caller wants undoable,
+      // pushes.
+      const history = writeOptions?.history ?? (clearedReset ? resetHistory : 'replace');
+      if (history === 'push') router.push(url, { scroll: false });
+      else router.replace(url, { scroll: false });
     },
-    [router, debug, searchString, stableSchema, syncPendingTail],
+    [router, debug, searchString, stableSchema, syncPendingTail, prefix, resetKeys, resetHistory],
   );
 
   // Drain the queue as commits arrive. A commit EQUAL to a queued write drops
@@ -419,7 +501,11 @@ export function useApiParams<TSchema extends ParamSchema>(
 
   // Set a single parameter
   const setParam = useCallback(
-    <K extends keyof TSchema & string>(key: K, value: InferInputParamsFromSchema<Pick<TSchema, K>>[K]) => {
+    <K extends keyof TSchema & string>(
+      key: K,
+      value: InferInputParamsFromSchema<Pick<TSchema, K>>[K],
+      writeOptions?: ApiParamsWriteOptions,
+    ) => {
       const config = stableSchema[key];
 
       if (!config) {
@@ -436,9 +522,9 @@ export function useApiParams<TSchema extends ParamSchema>(
       // `?page=1` on a URL `setParams({ page: 1 })` left clean.
       if (shouldIncludeInUrl(value, config)) {
         addParamToSearchParams(newParams, key, value);
-        updateUrl(newParams);
+        updateUrl(newParams, [], writeOptions);
       } else {
-        updateUrl(newParams, [key]);
+        updateUrl(newParams, [key], writeOptions);
       }
     },
     [updateUrl, addParamToSearchParams, stableSchema],
@@ -446,7 +532,7 @@ export function useApiParams<TSchema extends ParamSchema>(
 
   // Set multiple parameters
   const setParams = useCallback(
-    (updates: Partial<InferInputParamsFromSchema<TSchema>>) => {
+    (updates: Partial<InferInputParamsFromSchema<TSchema>>, writeOptions?: ApiParamsWriteOptions) => {
       const newParams = new URLSearchParams();
       const keysToRemove: string[] = [];
 
@@ -469,16 +555,16 @@ export function useApiParams<TSchema extends ParamSchema>(
         }
       }
 
-      updateUrl(newParams, keysToRemove);
+      updateUrl(newParams, keysToRemove, writeOptions);
     },
     [updateUrl, addParamToSearchParams, stableSchema, flattenedSchema],
   );
 
   // Clear specific parameters
   const clearParams = useCallback(
-    (keys: (keyof TSchema & string)[]) => {
+    (keys: (keyof TSchema & string)[], writeOptions?: ApiParamsWriteOptions) => {
       const newParams = new URLSearchParams();
-      updateUrl(newParams, keys);
+      updateUrl(newParams, keys, writeOptions);
     },
     [updateUrl],
   );
@@ -489,8 +575,14 @@ export function useApiParams<TSchema extends ParamSchema>(
       console.log('[useApiParams] Resetting params');
     }
 
+    // A prefixed hook shares the query string with other tables: it clears only its own keys.
+    if (prefix) {
+      updateUrl(new URLSearchParams(), Object.keys(stableSchema));
+      return;
+    }
+
     router.replace(window.location.pathname, { scroll: false });
-  }, [router, debug]);
+  }, [router, debug, prefix, updateUrl, stableSchema]);
 
   // The params of the LAST write we issued, or `params` when nothing is in
   // flight. Adapters read this as "the user's latest intent" so a decision made
@@ -498,10 +590,8 @@ export function useApiParams<TSchema extends ParamSchema>(
   // stale URL.
   const pendingParams = useMemo((): InferParamsFromSchema<TSchema> => {
     if (pendingTail === undefined || pendingTail === searchString) return params;
-    return parseSchemaParams(stableSchema, new URLSearchParams(pendingTail), {
-      absent: options.absent === 'null' ? 'null' : 'undefined',
-    }) as InferParamsFromSchema<TSchema>;
-  }, [pendingTail, searchString, params, stableSchema, options.absent]);
+    return parseSearch(pendingTail) as InferParamsFromSchema<TSchema>;
+  }, [pendingTail, searchString, params, parseSearch]);
 
   return {
     params,

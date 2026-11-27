@@ -567,6 +567,13 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   previewText?: string;
   /** OpenFrame attachments (tray, attach button or `+` menu entry, drop, paste, Send gate). Off when absent. */
   openframeAttachments?: OpenFrameComposerAttachments;
+  /**
+   * The most characters a message may have, counted as it is sent: the trimmed draft, a mention chip as its record
+   * link. Past 90% of it the composer shows the count; over it, it says the limit and refuses to send (the button,
+   * Enter and `submit`). Unlike a textarea's `maxLength` nothing is cut: typing and pasting go on, so a long paste is
+   * never lost. Omit for no limit.
+   */
+  maxLength?: number;
 }
 
 export interface ChatInputRef {
