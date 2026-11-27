@@ -11,7 +11,8 @@ import { DeviceSelector } from './device-selector/device-selector';
 import { DeviceStatusDisplayProvider } from './device-status-display';
 import { ARCHIVE_LIFECYCLE_STATUSES } from './device-statuses';
 import { DevicesGrid } from './devices-grid';
-import { DevicesTableBody, getDeviceTableColumns } from './devices-table-columns';
+import { DevicesTableBody } from './devices-table-body';
+import { getDeviceTableColumns } from './devices-table-columns';
 import { DevicesViewConfigProvider } from './devices-view-config';
 import type { DeviceFilters, DeviceRow } from './types';
 
