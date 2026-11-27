@@ -8,11 +8,11 @@ public class InternalException extends BaseException {
         super(ErrorCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, message);
     }
 
-    public InternalException(ErrorCode errorCode, String message) {
+    public InternalException(ApiErrorCode errorCode, String message) {
         super(errorCode, HttpStatus.INTERNAL_SERVER_ERROR, message);
     }
 
-    public InternalException(ErrorCode errorCode, String message, Throwable cause) {
+    public InternalException(ApiErrorCode errorCode, String message, Throwable cause) {
         super(errorCode, HttpStatus.INTERNAL_SERVER_ERROR, message, cause);
     }
 }
