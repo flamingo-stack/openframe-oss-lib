@@ -43,7 +43,7 @@ unfenced and why: `openframe/docs/mysql-multitenancy-feature.md` in the fork ("D
 | `getHostVulnerabilityInventoryById` | `GET /api/v1/fleet/hosts/{id}` | fenced | as above, plus `LoadHostSoftware` keyed by the fenced host | |
 | `listHostSoftware` | `GET /api/v1/fleet/hosts/{id}/software` | fenced | `HostLite` (404 for a foreign host); `ListHostSoftware` keyed by the fenced host | Installer and VPP availability joins use the host's own team. |
 | `runQuery`, `runQueryAsync` | `POST /api/v1/fleet/hosts/{id}/query` | fenced | `HostLiteByID`; ad-hoc query re-homed to the pinned team by `NewQuery`; `HostIDsInTargets`, `CountHostsInTargets` | |
-| `wipeHost` | `POST /api/v1/fleet/hosts/{id}/wipe` | fenced | `Host`; lock/wipe reads and `WipeHostViaWindowsMDM` keyed by the fenced host | 422: no MDM or an action pending; 409: already wiped. |
+| `wipeHost` | `POST /api/v1/fleet/hosts/{id}/wipe` | fenced | `Host`; lock/wipe reads keyed by the fenced host. Windows: `WipeHostViaWindowsMDM` queues the command by the host's UUID, not its id, and resolves it only to an enrollment of the pinned tenant | 422: no MDM or an action pending; 409: already wiped. A host UUID is not unique across tenants: on a Fleet image without that enrollment fence (fleetmdm #285), a Windows wipe can reach another tenant's device with the same UUID. |
 
 ### Queries and live queries
 
