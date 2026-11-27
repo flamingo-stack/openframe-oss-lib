@@ -259,8 +259,8 @@ public class PinotConfigInitializer {
     // A column added to the schema only materialises in already-persisted segments when they are
     // reloaded; without this, queries selecting the new column see it missing on historical data.
     private void reloadSegments(String tableConfig) {
+        String tableName = resolveTableNameWithType(tableConfig);
         try {
-            String tableName = resolveTableNameWithType(tableConfig);
             String url = String.format("http://%s/segments/%s/reload", pinotControllerUrl, tableName);
 
             HttpHeaders headers = createHeaders();
@@ -274,6 +274,8 @@ public class PinotConfigInitializer {
                 throw new RuntimeException("Failed to trigger segment reload. Status: " + response.getStatusCode());
             }
 
+        } catch (HttpClientErrorException.NotFound e) {
+            log.info("No segments in {} yet, nothing to reload", tableName);
         } catch (Exception e) {
             log.error("Error triggering segment reload", e);
             throw new RuntimeException("Failed to trigger segment reload", e);

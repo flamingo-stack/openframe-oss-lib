@@ -40,6 +40,7 @@ class PinotConfigInitializerTest {
     private static final String DEVICES_SCHEMA_URL = "http://" + CONTROLLER + "/schemas/devices";
     private static final String DEVICES_FORCE_COMMIT_URL = "http://" + CONTROLLER + "/tables/devices/forceCommit";
     private static final String AUDIT_EVENTS_TABLE_URL = "http://" + CONTROLLER + "/tables/audit_events_REALTIME";
+    private static final String AUDIT_EVENTS_RELOAD_URL = "http://" + CONTROLLER + "/segments/audit_events_REALTIME/reload";
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}:]+)(:[^}]*)?}");
     private static final Map<String, String> TABLE_NAMES = Map.of(
             "pinot.tables.devices.name", "devices",
@@ -156,6 +157,20 @@ class PinotConfigInitializerTest {
         initializer.init();
 
         verify(restTemplate).exchange(eq(AUDIT_EVENTS_TABLE_URL), eq(HttpMethod.PUT), any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    void init_newTableWithNoSegmentsYet_deploymentCompletes(CapturedOutput output) {
+        ReflectionTestUtils.setField(initializer, "auditEnabled", true);
+        when(restTemplate.exchange(eq(AUDIT_EVENTS_RELOAD_URL), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found", null,
+                        "{\"code\":404,\"error\":\"Failed to find any segments in table: audit_events_REALTIME on every instance\"}"
+                                .getBytes(), null));
+
+        initializer.init();
+
+        assertThat(output).contains("Pinot configuration deployment completed successfully")
+                .doesNotContain("Pinot configuration deployment FAILED");
     }
 
     @Test
