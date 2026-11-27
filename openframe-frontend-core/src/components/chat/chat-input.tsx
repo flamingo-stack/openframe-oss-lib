@@ -227,7 +227,14 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const attachments = openframeAttachments;
   const attachmentSummary = useMemo(
     () =>
-      attachments ? summarizeOpenFrameTray(attachments.items, attachments.profile, attachments.chatFileCount) : null,
+      attachments
+        ? summarizeOpenFrameTray(
+            attachments.items,
+            attachments.profile,
+            attachments.chatFileCount,
+            attachments.contextTokensLeft,
+          )
+        : null,
     [attachments],
   );
   const addAttachmentFiles = attachments?.onAddFiles;

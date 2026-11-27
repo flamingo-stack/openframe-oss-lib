@@ -472,6 +472,11 @@ export interface OpenFrameComposerAttachments {
   items: readonly OpenFrameAttachmentItem[];
   /** Files the chat already holds (sent before), for the counter and the chat limit. */
   chatFileCount: number;
+  /**
+   * The model's tokens left in the chat's context: Send waits while the staged files' estimates need more. Unknown:
+   * no gate. `EmbeddableChat` fills it from the chat's usage and budget when the host does not.
+   */
+  contextTokensLeft?: number;
   /** Files picked, dropped or pasted, unchecked: run `validateOpenFrameAttachments` and stage the results. */
   onAddFiles: (files: File[]) => void;
   /** Remove a ready file, cancel an upload, or dismiss a refused file. */
@@ -482,8 +487,12 @@ export interface OpenFrameComposerAttachments {
 export interface OpenFrameChatAttachments extends OpenFrameComposerAttachments {
   /** A sent file (not an image with a picture) was clicked: the host signs and opens it. */
   onOpenAttachment?: (attachment: OpenFrameMessageAttachment) => void;
-  /** The composer sent a message: the host moves its ready items into it and clears the tray. */
-  onMessageSend?: (text: string) => void;
+  /**
+   * The composer is sending a message: the host moves its ready items into it and clears the tray. Called before the
+   * send; the files it returns (each `id` the server's attachment id, e.g. `openFrameSentAttachmentOf` over
+   * `takeForSend()`) ride on the send as `openframeAttachments`: the bubble draws them and the publish sends their ids.
+   */
+  onMessageSend?: (text: string) => readonly OpenFrameMessageAttachment[] | void;
 }
 
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {

@@ -1,0 +1,19 @@
+# The ai-agent's chat attachments additions, loaded on top of ai-agent-schema.graphqls: the lines of
+# openframe/federation/src/test/resources/snapshots/ai-agent.graphqls that flamingo-stack/openframe-saas-tenant#4778
+# (CU-86agmkyyu, open on 2026-11-27) adds, written as `extend` definitions. Verbatim fields.
+
+type ChatFileAttachment {
+  contentType: String!
+  estimatedTokens: Int
+  fileName: String!
+  fileSize: Long!
+  id: ID!
+}
+
+extend type Message {
+  attachments: [ChatFileAttachment!]
+}
+
+extend input SendMessageInput {
+  attachmentIds: [ID!]
+}

@@ -142,6 +142,10 @@ export interface OpenFrameTraySummary {
   pendingNote: string | null;
   /** "1 file won't be sent" while refused files remain. */
   leftOutNote: string | null;
+  /** The model's tokens the staged files are expected to cost (their estimates; files without one count 0). */
+  stagedTokens: number;
+  /** The files need more of the context than is left: Send waits until some are removed. */
+  overContextNote: string | null;
 }
 
 /** The tray's counter, notes and Send gate for the items staged now and the files the chat already holds. */
@@ -149,8 +153,14 @@ export function summarizeOpenFrameTray(
   items: readonly OpenFrameAttachmentItem[],
   profile: OpenFrameAttachmentProfile,
   chatFileCount: number,
+  contextTokensLeft?: number,
 ): OpenFrameTraySummary {
   const errored = items.filter(item => item.state === 'error');
+  const stagedTokens = items.reduce(
+    (sum, item) => (item.state === 'error' ? sum : sum + Math.max(0, item.tokenEstimate ?? 0)),
+    0,
+  );
+  const overContext = contextTokensLeft !== undefined && stagedTokens > Math.max(0, contextTokensLeft);
   const messageCount = items.length - errored.length;
   const chatCount = chatFileCount + messageCount;
   const pendingCount = items.filter(item => item.state === 'uploading' || item.state === 'scanning').length;
@@ -160,7 +170,7 @@ export function summarizeOpenFrameTray(
     counter: `${messageCount}/${profile.maxFilesPerMessage} · ${chatCount}/${profile.maxFilesPerChat} in chat`,
     pendingCount,
     erroredCount: errored.length,
-    sendBlocked: pendingCount > 0,
+    sendBlocked: pendingCount > 0 || overContext,
     errorNotes: errored.map(item => ({
       id: item.id,
       name: item.name,
@@ -171,6 +181,10 @@ export function summarizeOpenFrameTray(
         ? `Send is available when ${files(pendingCount)} ${pendingCount === 1 ? 'finishes' : 'finish'} uploading and scanning.`
         : null,
     leftOutNote: errored.length > 0 ? `${files(errored.length)} won't be sent` : null,
+    stagedTokens,
+    overContextNote: overContext
+      ? `These files need ${formatTokenEstimate(stagedTokens)} tokens, but only ${formatTokenEstimate(Math.max(0, contextTokensLeft ?? 0))} are left in this chat. Remove a file to send.`
+      : null,
   };
 }
 
