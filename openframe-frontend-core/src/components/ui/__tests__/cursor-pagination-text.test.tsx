@@ -29,6 +29,7 @@ describe('autoRefreshIntervalMs', () => {
   it('reads seconds and minutes, and nothing else', () => {
     expect(autoRefreshIntervalMs('10s')).toBe(10_000);
     expect(autoRefreshIntervalMs('1m')).toBe(60_000);
+    expect(autoRefreshIntervalMs('5m')).toBe(300_000);
     expect(autoRefreshIntervalMs('off')).toBeNull();
     expect(autoRefreshIntervalMs('0s')).toBeNull();
     expect(autoRefreshIntervalMs('5h')).toBeNull();

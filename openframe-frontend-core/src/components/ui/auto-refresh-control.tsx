@@ -14,12 +14,16 @@ export interface AutoRefreshOption {
 /** The value meaning "no auto-refresh". */
 export const AUTO_REFRESH_OFF = 'off';
 
-/** The table default: off, 10 s, 30 s, 1 min. */
+/**
+ * The table default: off, 10 s, 30 s, 1 min, 5 min. Nothing under 10 s, which only adds load; 5 min for a screen left
+ * open.
+ */
 export const DEFAULT_AUTO_REFRESH_OPTIONS: readonly AutoRefreshOption[] = [
   { value: AUTO_REFRESH_OFF, label: 'Off' },
   { value: '10s', label: '10s' },
   { value: '30s', label: '30s' },
   { value: '1m', label: '1m' },
+  { value: '5m', label: '5m' },
 ];
 
 /**

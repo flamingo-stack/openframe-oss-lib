@@ -8,6 +8,7 @@ import { DataTableEmpty } from './data-table-empty';
 import { DataTableHeader } from './data-table-header';
 import { DataTableInfiniteFooter } from './data-table-infinite-footer';
 import { DataTableMeta } from './data-table-meta';
+import { DataTableMetaRow } from './data-table-meta-row';
 import { DataTablePageRange } from './data-table-page-range';
 import { DataTablePagination } from './data-table-pagination';
 import { DataTableRow } from './data-table-row';
@@ -37,6 +38,7 @@ export const DataTable = Object.assign(DataTableRoot, {
   CursorFooter: DataTableCursorFooter,
   RowCount: DataTableRowCount,
   Meta: DataTableMeta,
+  MetaRow: DataTableMetaRow,
   PageRange: DataTablePageRange,
   Pagination: DataTablePagination,
 });
@@ -53,11 +55,18 @@ export {
   DataTableCursorFooter,
   DataTableRowCount,
   DataTableMeta,
+  DataTableMetaRow,
   DataTablePageRange,
   DataTablePagination,
 };
 
 export { useDataTableContext } from './data-table';
+export {
+  type DataTableMetaRowProps,
+  type TableMetaRow,
+  type TableMetaRowLayout,
+  tableMetaRowLayout,
+} from './data-table-meta-row';
 export { useDataTable } from './use-data-table';
 export {
   DATA_TABLE_ROW_FRAME_CLASS,
