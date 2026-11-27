@@ -20,6 +20,7 @@ import { Send01Icon, StopCircleIcon } from '../icons-v2-generated';
 import { AvatarStack } from '../ui/avatar-stack';
 import { Button } from '../ui/button';
 import { Tag } from '../ui/tag';
+import { ChatInputLengthNote, showsLengthNote } from './chat-input-length-note';
 import { ChatTypingIndicator } from './chat-typing-indicator';
 import { useOpenFrameDropZone, useOpenFrameFilePicker } from './hooks/use-openframe-file-intake';
 import { OpenFrameAttachButton } from './openframe-attach-button';
@@ -193,6 +194,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     hideBorder,
     previewText,
     openframeAttachments,
+    maxLength,
     // Remaining textarea-only attrs are intentionally dropped — the editor is a
     // contenteditable div, not a <textarea>, so spreading them would warn.
   } = rest as typeof rest & { rows?: number };
@@ -302,11 +304,15 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   // ── send ──────────────────────────────────────────────────────────────────
   const fire = useCallback(
     (message: string) => {
+      // Over the limit nothing goes out, whichever way the send came (the button, Enter, the imperative `submit`):
+      // the backend would refuse it. The draft stays as it is, untrimmed and uncut, for the user to shorten.
+      const overLimit = maxLength !== undefined && message.length > maxLength;
       const can =
         (message.length > 0 || allowEmptySend || hasSendableAttachments) &&
         !sending &&
         !disabled &&
-        !attachmentsBlockSend;
+        !attachmentsBlockSend &&
+        !overLimit;
       if (!can || !onSend) return;
       // Clear FIRST and put it back only if the host refuses, rather than
       // clearing once the send settles. The editor stays typable while `sending`
@@ -335,7 +341,17 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
         restore();
       }
     },
-    [allowEmptySend, hasSendableAttachments, attachmentsBlockSend, sending, disabled, onSend, focusEditor, applyValue],
+    [
+      allowEmptySend,
+      hasSendableAttachments,
+      attachmentsBlockSend,
+      sending,
+      disabled,
+      maxLength,
+      onSend,
+      focusEditor,
+      applyValue,
+    ],
   );
 
   const handleSubmit = useCallback(() => {
@@ -589,8 +605,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   }, [onStop, isStopping]);
 
   const isStopMode = sending && !!onStop;
-  const hasContent = value.trim().length > 0 || allowEmptySend || hasSendableAttachments;
-  const sendDisabled = sending || disabled || !hasContent || attachmentsBlockSend;
+  // The length the backend counts: the trimmed draft as `fire` sends it, a mention chip as its record link.
+  const sendLength = value.trim().length;
+  const overLimit = maxLength !== undefined && sendLength > maxLength;
+  const hasContent = sendLength > 0 || allowEmptySend || hasSendableAttachments;
+  const sendDisabled = sending || disabled || !hasContent || attachmentsBlockSend || overLimit;
   const isEmpty = value.length === 0;
   // Non-destructive ghost preview (e.g. a hovered quick-action's full prompt).
   // Shown whenever a `previewText` is set (even over an existing draft): the
@@ -840,8 +859,22 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
               </Button>
             </div>,
           )}
-          {attachmentSummary && (
-            <OpenFrameAttachmentNotes summary={attachmentSummary} className="pt-[var(--spacing-system-xxs)]" />
+          {(showsLengthNote(sendLength, maxLength) || attachmentSummary) && (
+            <div
+              data-testid="chat-input-notes"
+              className={cn(
+                // `empty:hidden`: an attachment summary with nothing to say renders no notes.
+                'flex flex-col gap-[var(--spacing-system-xxs)] pt-[var(--spacing-system-xxs)] empty:hidden',
+                // With `hideBorder` the input sits in its host's card (ChatComposer's context mode), so the
+                // notes take the row's inset instead of touching the card's border.
+                hideBorder && 'px-[var(--spacing-system-sf)] pb-[var(--spacing-system-xsf)]',
+              )}
+            >
+              {showsLengthNote(sendLength, maxLength) && (
+                <ChatInputLengthNote length={sendLength} maxLength={maxLength} />
+              )}
+              {attachmentSummary && <OpenFrameAttachmentNotes summary={attachmentSummary} />}
+            </div>
           )}
         </div>
       )}

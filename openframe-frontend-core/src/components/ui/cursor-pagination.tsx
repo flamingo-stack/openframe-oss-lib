@@ -34,6 +34,31 @@ export interface CursorPaginationProps {
   resetButtonIcon?: 'home' | 'rotate';
 }
 
+/** The info line of a paged list: the range when the page's position is known, the count otherwise. */
+export function cursorPaginationText({
+  currentCount,
+  totalCount,
+  hasNextPage,
+  itemName,
+  rangeStart,
+}: Partial<Pick<CursorPaginationProps, 'currentCount' | 'totalCount' | 'hasNextPage'>> & {
+  itemName: string;
+  /**
+   * 1-based position of the page's first row: "21–40 of 340 devices" ("21–40 devices" with no total). Without it, the
+   * count ("Showing 20 of 340 devices").
+   */
+  rangeStart?: number;
+}): string | null {
+  if (!currentCount) return null;
+  if (rangeStart !== undefined && rangeStart > 0) {
+    const range = `${rangeStart}–${rangeStart + currentCount - 1}`;
+    return totalCount ? `${range} of ${totalCount} ${itemName}` : `${range} ${itemName}`;
+  }
+  if (totalCount) return `Showing ${currentCount} of ${totalCount} ${itemName}`;
+  if (hasNextPage) return `Showing ${currentCount}+ ${itemName}`;
+  return `Showing ${currentCount} ${itemName}`;
+}
+
 export function CursorPagination({
   hasNextPage,
   hasPreviousPage,
@@ -77,19 +102,7 @@ export function CursorPagination({
 
   const ResetIcon = resetButtonIcon === 'rotate' ? RotateCcw : Home;
 
-  const getDisplayText = () => {
-    if (!showInfo || !currentCount) return null;
-
-    if (totalCount) {
-      return `Showing ${currentCount} of ${totalCount} ${itemName}`;
-    } else if (hasNextPage) {
-      return `Showing ${currentCount}+ ${itemName}`;
-    } else {
-      return `Showing ${currentCount} ${itemName}`;
-    }
-  };
-
-  const displayText = getDisplayText();
+  const displayText = showInfo ? cursorPaginationText({ currentCount, totalCount, hasNextPage, itemName }) : null;
 
   return (
     <div className={cn('flex items-center justify-between gap-4', compact ? 'py-2' : 'py-3', className)}>

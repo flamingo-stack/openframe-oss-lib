@@ -24,7 +24,13 @@ export type { UseQueryParamsOptions, UseQueryParamsReturn } from './use-query-pa
 
 export { useApiParams } from './use-api-params';
 export { createSearchParams } from '../../utils/search-params';
-export type { UseApiParamsOptions, UseApiParamsReturn } from './use-api-params';
+export { prefixedParamName } from './use-api-params';
+export type {
+  ApiParamsHistory,
+  ApiParamsWriteOptions,
+  UseApiParamsOptions,
+  UseApiParamsReturn,
+} from './use-api-params';
 export type { ParamSchema } from '../../utils/search-params';
 
 // Introspection
@@ -63,3 +69,21 @@ export {
   clearParams as clearVariablesParams,
   validateVariables,
 } from './url-converter';
+
+// A cursor-paged table whose position lives in the URL
+export {
+  CURSOR_PAGER_KEYS,
+  isPreviousPageEntry,
+  isStaleCursorPage,
+  previousHistoryEntryUrl,
+  previousRoute,
+  useCursorPager,
+} from './use-cursor-pager';
+export type {
+  CursorPageInfo,
+  CursorPagerFooterProps,
+  CursorPagerVariables,
+  PreviousRoute,
+  UseCursorPagerOptions,
+  UseCursorPagerReturn,
+} from './use-cursor-pager';
