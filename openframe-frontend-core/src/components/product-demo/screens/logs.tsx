@@ -30,14 +30,22 @@ const NO_FILTERS: Record<string, string[]> = {};
 const ACTION_COLUMNS: LogsTableColumnId[] = ['copy', 'quickView', 'open'];
 /**
  * Beside the open drawer the table keeps when, how bad and what happened: the
- * tool and the device are in the drawer, and their fixed widths would leave
- * the message no room.
+ * tool and the device are in the drawer, and their widths would push the
+ * message past the frame's edge. The three kept columns need 880px of grid,
+ * which the screen's layout width (1360, `product-screen.tsx`) leaves beside
+ * the drawer.
  */
 const BESIDE_DRAWER_HIDDEN: LogsTableColumnId[] = [...ACTION_COLUMNS, 'tool', 'source'];
 const logHref = () => '#';
 const copyAction = () => <LogCopyIconButton />;
 
-/** The product's Logs page with one entry open in the Log Details drawer; the narrow rendering is the table alone. */
+/**
+ * The product's Logs page with one entry open in the Log Details drawer; the narrow rendering is the table alone.
+ *
+ * The wide table is the product's grid. The narrow rendering (a carousel card, a phone's or a tablet's width) keeps
+ * the card rows: the grid's message column would start some 880px in, past the card's edge, and a picture cannot
+ * scroll.
+ */
 export default function LogsScreen({ compact = false }: ProductScreenViewProps) {
   // The drawer portals into this box, so it stays inside the screen, docked beside the table.
   const [dock, setDock] = useState<HTMLDivElement | null>(null);
@@ -64,6 +72,7 @@ export default function LogsScreen({ compact = false }: ProductScreenViewProps) 
             renderCopyAction={copyAction}
             onQuickView={noop}
             hiddenColumns={compact ? ACTION_COLUMNS : BESIDE_DRAWER_HIDDEN}
+            layout={compact ? 'cards' : 'grid'}
           />
         </LogsPageView>
       </div>

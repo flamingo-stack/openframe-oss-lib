@@ -9,6 +9,11 @@ import type { ProductScreenViewProps } from '../types';
  * The product's fleet-wide Policies page without its title row and its empty
  * search field (the job is named above the picture): the compliance counters
  * and the table. The narrow rendering is the table alone.
+ *
+ * The wide table is the product's grid, its count in the grid's line above
+ * it. The narrow rendering (a carousel card, a phone's or a tablet's width)
+ * keeps the card rows: the grid would be cut past the card's edge, and a
+ * picture cannot scroll.
  */
 export default function PoliciesScreen({ compact = false }: ProductScreenViewProps) {
   const table = (
@@ -17,6 +22,7 @@ export default function PoliciesScreen({ compact = false }: ProductScreenViewPro
       rowAsLink
       rightSlot={compact ? undefined : <DataTable.RowCount />}
       emptyMessage="No policies found."
+      layout={compact ? 'cards' : 'grid'}
     />
   );
 
