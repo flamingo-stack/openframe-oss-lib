@@ -4,6 +4,8 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.repository.device.model.MachineIdView;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -91,4 +93,17 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     // Only the names of a reconcile batch's machines, across tenants; only the shared stream calls it.
     @Query(fields = "{ 'tenantId': 1, 'machineId': 1, 'hostname': 1, 'nickname': 1 }")
     List<Machine> findByTenantIdInAndMachineIdIn(Collection<String> tenantIds, Collection<String> machineIds);
+
+    // An insight check's devices inside one customer or a set of machines: counts and bare machine ids only.
+    long countByStatusInAndOsTypeInAndOrganizationId(Collection<DeviceStatus> statuses, Collection<OsType> osTypes,
+                                                     String organizationId);
+
+    long countByStatusInAndOsTypeInAndMachineIdIn(Collection<DeviceStatus> statuses, Collection<OsType> osTypes,
+                                                  Collection<String> machineIds);
+
+    List<MachineIdView> findByStatusInAndOsTypeInAndOrganizationId(Collection<DeviceStatus> statuses,
+                                                                   Collection<OsType> osTypes, String organizationId);
+
+    List<MachineIdView> findByStatusInAndOsTypeInAndMachineIdIn(Collection<DeviceStatus> statuses,
+                                                                Collection<OsType> osTypes, Collection<String> machineIds);
 }
