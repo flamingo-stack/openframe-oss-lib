@@ -8,11 +8,11 @@ public class NotFoundException extends BaseException {
         super(ErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, message);
     }
 
-    public NotFoundException(ErrorCode errorCode, String message) {
+    public NotFoundException(ApiErrorCode errorCode, String message) {
         super(errorCode, HttpStatus.NOT_FOUND, message);
     }
 
-    public NotFoundException(ErrorCode errorCode, String message, Throwable cause) {
+    public NotFoundException(ApiErrorCode errorCode, String message, Throwable cause) {
         super(errorCode, HttpStatus.NOT_FOUND, message, cause);
     }
 }

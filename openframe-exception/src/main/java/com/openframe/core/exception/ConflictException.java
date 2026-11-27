@@ -8,11 +8,11 @@ public class ConflictException extends BaseException {
         super(ErrorCode.CONFLICT, HttpStatus.CONFLICT, message);
     }
 
-    public ConflictException(ErrorCode errorCode, String message) {
+    public ConflictException(ApiErrorCode errorCode, String message) {
         super(errorCode, HttpStatus.CONFLICT, message);
     }
 
-    public ConflictException(ErrorCode errorCode, String message, Throwable cause) {
+    public ConflictException(ApiErrorCode errorCode, String message, Throwable cause) {
         super(errorCode, HttpStatus.CONFLICT, message, cause);
     }
 }

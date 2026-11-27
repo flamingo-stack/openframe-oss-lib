@@ -1,6 +1,7 @@
 package com.openframe.api.exception;
 
 import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.core.exception.ApiErrorCode;
 import com.openframe.core.exception.BaseException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -129,7 +130,7 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
                 .collect(Collectors.joining("; "));
     }
 
-    private GraphQLError.Builder<?> buildError(String message, ErrorCode errorCode) {
+    private GraphQLError.Builder<?> buildError(String message, ApiErrorCode errorCode) {
         return GraphQLError.newError()
                 .message(message)
                 .extensions(Map.of(

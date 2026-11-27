@@ -8,11 +8,11 @@ public class BadRequestException extends BaseException {
         super(ErrorCode.BAD_REQUEST, HttpStatus.BAD_REQUEST, message);
     }
 
-    public BadRequestException(ErrorCode errorCode, String message) {
+    public BadRequestException(ApiErrorCode errorCode, String message) {
         super(errorCode, HttpStatus.BAD_REQUEST, message);
     }
 
-    public BadRequestException(ErrorCode errorCode, String message, Throwable cause) {
+    public BadRequestException(ApiErrorCode errorCode, String message, Throwable cause) {
         super(errorCode, HttpStatus.BAD_REQUEST, message, cause);
     }
 }
