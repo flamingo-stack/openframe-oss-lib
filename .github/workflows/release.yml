@@ -224,6 +224,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
+      checks: read
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'rust' && !inputs.snapshot
 
     steps:
@@ -251,6 +253,17 @@ jobs:
             *) echo "Invalid version bump: $OLD_VERSION → $NEW_VERSION"; exit 1 ;;
           esac
           echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+
+      # The merge queue doesn't wait for the Rust jobs, so tag only after build.yml's run on main passed (paths as the rust filter in changes.yaml).
+      - name: Check the Rust jobs on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha=$(git log -1 --format=%H -- clients .github/steps/rust-setup .github/workflows/build.yml)
+          run=$(gh run list --workflow build.yml --event push --commit "$sha" --json databaseId --jq '.[0].databaseId // empty')
+          [ -n "$run" ] || { echo "::error::No build.yml run on main for ${sha::9}"; exit 1; }
+          gh run watch "$run" --exit-status --compact --interval 30 || { echo "::error::Rust jobs on ${sha::9} failed"; exit 1; }
 
       - name: Push Tag ${{ env.NEW_VERSION }}
         run: |

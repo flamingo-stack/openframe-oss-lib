@@ -9,9 +9,13 @@ on:
     types: [opened, synchronize, ready_for_review, reopened, labeled, closed]
     branches: [main]
   merge_group:
+  # Saves the Rust cache that pull requests and the merge queue restore.
+  push:
+    branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # By event and commit, so a push run cancels neither the merge-queue run of its commit nor the previous push's cache save.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 env:
@@ -27,14 +31,14 @@ jobs:
   changes:
     name: Changes
     uses: ./.github/workflows/changes.yaml
-    # PR builds (and snapshots) only with the build label; the merge queue always builds.
-    if: github.event_name == 'merge_group' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build'))
+    # PR builds (and snapshots) only with the build label; the merge queue and main always build.
+    if: github.event_name != 'pull_request' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build'))
 
   build-java:
     name: Build Java
     runs-on: ubuntu-latest
     needs: [changes]
-    if: fromJSON(needs.changes.outputs.changes || '{}').java == 'true'
+    if: github.event_name != 'push' && fromJSON(needs.changes.outputs.changes || '{}').java == 'true'
     permissions:
       contents: read
       packages: write
@@ -85,7 +89,7 @@ jobs:
     name: Build Node (openframe-frontend-core)
     runs-on: ubuntu-latest
     needs: [changes]
-    if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
+    if: github.event_name != 'push' && fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
     # npm's defaults allow 970s of silence per hung registry socket; these bound it to 115s
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
