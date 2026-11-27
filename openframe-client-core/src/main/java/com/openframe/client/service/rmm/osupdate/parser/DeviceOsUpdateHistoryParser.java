@@ -50,6 +50,7 @@ public class DeviceOsUpdateHistoryParser {
         return DeviceOsUpdateHistoryEntry.builder()
                 .tenantId(reportingDevice.getTenantId())
                 .machineId(reportingDevice.getMachineId())
+                .organizationId(reportingDevice.getOrganizationId())
                 .entryKey(parseEntryKey(identifier, reportedEntry, operation))
                 .identifier(identifier)
                 .title(reportedEntry.getTitle())

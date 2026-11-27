@@ -25,6 +25,7 @@ class DeviceOsPendingUpdateParserTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String MACHINE_ID = "machine-1";
+    private static final String ORGANIZATION_ID = "org-1";
     private static final Instant RECEIVED_AT = Instant.parse("2026-11-20T09:14:03.120Z");
 
     @Spy private ReportedEnumParser reportedEnumParser = new ReportedEnumParser(mock(DeviceOsReportMetrics.class));
@@ -41,6 +42,7 @@ class DeviceOsPendingUpdateParserTest {
         DeviceOsPendingUpdate expected = DeviceOsPendingUpdate.builder()
                 .tenantId(TENANT_ID)
                 .machineId(MACHINE_ID)
+                .organizationId(ORGANIZATION_ID)
                 .platform(OsPlatform.WINDOWS)
                 .identifier("a1b2c3d4-0000-4444-8888-99aabbccddee:201")
                 .discoveredAt(RECEIVED_AT)
@@ -129,6 +131,7 @@ class DeviceOsPendingUpdateParserTest {
         return ReportingDevice.builder()
                 .tenantId(TENANT_ID)
                 .machineId(MACHINE_ID)
+                .organizationId(ORGANIZATION_ID)
                 .platform(platform)
                 .receivedAt(RECEIVED_AT)
                 .build();

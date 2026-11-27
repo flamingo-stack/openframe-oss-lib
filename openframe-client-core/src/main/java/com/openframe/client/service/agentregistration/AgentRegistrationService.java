@@ -67,8 +67,10 @@ import static com.openframe.data.service.machine.MachineFields.OS_BUILD;
 import static com.openframe.data.service.machine.MachineFields.OS_TYPE;
 import static com.openframe.data.service.machine.MachineFields.OS_UUID;
 import static com.openframe.data.service.machine.MachineFields.OS_VERSION;
+import static com.openframe.data.service.machine.MachineFields.PENDING_SINCE;
 import static com.openframe.data.service.machine.MachineFields.SERIAL_NUMBER;
 import static com.openframe.data.service.machine.MachineFields.STATUS;
+import static com.openframe.data.service.machine.MachineFields.STUCK_NOTIFIED_AT;
 import static com.openframe.data.service.machine.MachineFields.TIMEZONE;
 import static com.openframe.data.service.machine.MachineFields.USER_ID;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
@@ -182,8 +184,9 @@ public class AgentRegistrationService {
     private Machine createMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
-        registrationRequestFields(request).applyTo(machine);
-        machine.setStatus(DeviceStatus.PENDING);
+        MachineUpdate update = registrationRequestFields(request);
+        backToPending(update);
+        update.applyTo(machine);
         machine.setOrganizationId(organizationId);
         machine.setOrganizationAssignedAt(Instant.now());
         machine.setType(DeviceType.DESKTOP);
@@ -281,7 +284,8 @@ public class AgentRegistrationService {
     private Machine updateMachine(String machineId, AgentRegistrationRequest request,
                                   Map<String, Object> auditDetails) {
         Optional<Machine> existing = machineRepository.findOnPrimaryByMachineId(machineId);
-        MachineUpdate update = registrationRequestFields(request).set(STATUS, DeviceStatus.PENDING);
+        MachineUpdate update = registrationRequestFields(request);
+        backToPending(update);
         String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
         addClaimedOrganization(auditDetails, request, organizationId);
         update.set(ORGANIZATION_ID, organizationId);
@@ -353,6 +357,13 @@ public class AgentRegistrationService {
         }
         copyHardwareFacts(update, request);
         return update;
+    }
+
+    // The stuck-in-PENDING clock restarts and the alert re-arms; registeredAt stays the first registration the UI shows
+    private static void backToPending(MachineUpdate update) {
+        update.set(STATUS, DeviceStatus.PENDING)
+                .set(PENDING_SINCE, Instant.now())
+                .set(STUCK_NOTIFIED_AT, null);
     }
 
     // Optional like userId: a fact the agent does not send keeps the stored value, and Fleet fills what is still

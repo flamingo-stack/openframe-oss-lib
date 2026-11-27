@@ -29,6 +29,7 @@ public class DeviceOsPendingUpdateParser {
         return DeviceOsPendingUpdate.builder()
                 .tenantId(reportingDevice.getTenantId())
                 .machineId(reportingDevice.getMachineId())
+                .organizationId(reportingDevice.getOrganizationId())
                 .platform(reportingDevice.getPlatform())
                 .identifier(item.getIdentifier())
                 .discoveredAt(reportingDevice.getReceivedAt())

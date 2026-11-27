@@ -67,7 +67,7 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withDeviceId(Machine::getMachineId)
                         .withIgnoredFields(Set.of("lastSeen", "telemetryStatus", "packageManagers", "securityState",
                                 "complianceState", "securityAlerts", "lastSecurityScan", "lastComplianceScan",
-                                "stuckNotifiedAt", "hostFactsCheckedAt", "computerName", "directorySources",
+                                "stuckNotifiedAt", "pendingSince", "hostFactsCheckedAt", "computerName", "directorySources",
                                 "directoryUserLink", "directoryUserIds", "directoryUserName",
                                 "organizationAssignedAt", "agentVersionKey")),
                 AuditTarget.of(USER, User.class, User::nameOrEmail)
@@ -79,7 +79,8 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(TENANT, Tenant.class, Tenant::getName)
                         .withTenantId(Tenant::getId),
                 AuditTarget.of(SCRIPT, Script.class, Script::getName)
-                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs", "contentHash")),
+                        .withIgnoredFields(Set.of("contentHash"))
+                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs")),
                 AuditTarget.of(OS_UPDATE, OsUpdate.class, OsUpdate::getDisplayName),
                 AuditTarget.of(OS_UPDATE_POLICY, OsUpdatePolicy.class, OsUpdatePolicy::getName)
                         .withIgnoredFields(Set.of("updatedAt")),
