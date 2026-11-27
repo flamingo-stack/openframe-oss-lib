@@ -41,6 +41,8 @@ runs:
         shared-key: ${{ inputs.shared-key }}
         cache-targets: true
         cache-on-failure: true
+        # Entries saved elsewhere are seen only by the same ref, and filled the 10 GB repository cache.
+        save-if: ${{ github.ref == 'refs/heads/main' }}
 
     - name: Add Rust targets, if needed
       shell: bash
