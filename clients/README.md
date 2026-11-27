@@ -68,6 +68,10 @@ OPENFRAME_VERSION=0.0.0-dev cargo build --features bin --bin openframe-client
 OPENFRAME_VERSION=0.0.0-dev cargo run   --features bin --bin openframe-client -- --help
 ```
 
+For a local dev server with mkcert certificates, add the dev-only `local-mode`
+feature (`--features bin,local-mode`): it brings back `install --localMode`,
+which turns off TLS certificate checks. Release builds never include it.
+
 ## Consuming the library from a tenant repo
 
 Tenant bin crates depend on this library via a git dependency pinned to a
