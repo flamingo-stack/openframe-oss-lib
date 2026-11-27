@@ -208,12 +208,6 @@ public class FleetMdmClient {
         });
     }
 
-    /**
-     * Sets the tenant's public Windows MDM address, {@code mdm.windows_server_url} on the tenant's Fleet config.
-     * Only this key is sent: other config keys reach instance-wide tables.
-     *
-     * @throws FleetMdmApiException with status 400 from a Fleet image that does not know the key yet
-     */
     public void setWindowsMdmServerUrl(String windowsServerUrl) {
         if (windowsServerUrl == null || windowsServerUrl.isBlank()) {
             throw new FleetMdmArgumentException("Windows MDM server URL cannot be blank");

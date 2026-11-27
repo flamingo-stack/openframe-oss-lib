@@ -8,10 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * Writes the tenant's public Windows MDM address to its Fleet config. Needs a Fleet image that knows
- * {@code mdm.windows_server_url}: turn it on only where that image runs.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

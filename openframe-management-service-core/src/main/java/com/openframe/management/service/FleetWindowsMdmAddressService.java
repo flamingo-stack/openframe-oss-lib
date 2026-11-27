@@ -16,13 +16,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Keeps the tenant's public Windows MDM address, {@code https://<tenant domain>/mdm}, on the tenant's Fleet config
- * ({@code mdm.windows_server_url}). Fleet builds every Windows MDM URL of the tenant's devices from it.
- * <p>
- * The address is written once per pod, after the Fleet API token exists and the tenant's domain is known; until then
- * every call is a no-op, so the next tick retries. Writing the same address again is harmless.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
