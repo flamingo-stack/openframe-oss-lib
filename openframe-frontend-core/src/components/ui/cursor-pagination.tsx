@@ -41,10 +41,7 @@ export function cursorPaginationText({
   hasNextPage,
   itemName,
   rangeStart,
-}: {
-  currentCount?: number;
-  totalCount?: number | null;
-  hasNextPage?: boolean;
+}: Partial<Pick<CursorPaginationProps, 'currentCount' | 'totalCount' | 'hasNextPage'>> & {
   itemName: string;
   /**
    * 1-based position of the page's first row: "21–40 of 340 devices" ("21–40 devices" with no total). Without it, the
