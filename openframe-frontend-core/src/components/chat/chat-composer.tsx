@@ -12,7 +12,12 @@ import { ChatInput } from './chat-input';
 import { useOpenFrameFilePicker } from './hooks/use-openframe-file-intake';
 import { MingoEdgeLight } from './mingo-edge-light';
 import { ModelDisplay } from './model-display';
-import type { ChatInputRef, ModelDisplayProps, OpenFrameComposerAttachments } from './types/component.types';
+import type {
+  ChatInputProps,
+  ChatInputRef,
+  ModelDisplayProps,
+  OpenFrameComposerAttachments,
+} from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 
 /**
@@ -37,7 +42,10 @@ export interface ChatComposerProps {
    *  prompt's place, and the `+` menu, the chips and Send are inert. */
   lock?: ChatComposerLock | null;
   inputRef: Ref<ChatInputRef>;
-  onSend: (text: string) => void;
+  /** `false` (or a Promise of it) means the send failed: the input puts the draft back (`ChatInputProps.onSend`). */
+  onSend: NonNullable<ChatInputProps['onSend']>;
+  /** The most characters a message may have (`ChatInputProps.maxLength`). Omit for no limit. */
+  maxLength?: number;
   onStop: () => void;
   sending: boolean;
   placeholder: string;
@@ -136,6 +144,7 @@ export function ChatComposer({
   lock = null,
   inputRef,
   onSend,
+  maxLength,
   onStop,
   sending,
   placeholder,
@@ -242,6 +251,7 @@ export function ChatComposer({
     <ChatInput
       ref={inputRef}
       onSend={onSend}
+      maxLength={maxLength}
       onStop={onStop}
       sending={sending}
       placeholder={placeholder}
