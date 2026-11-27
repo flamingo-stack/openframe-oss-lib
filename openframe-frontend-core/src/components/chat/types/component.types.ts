@@ -8,7 +8,12 @@ import type {
   OpenFrameAttachmentProfile,
   OpenFrameMessageAttachment,
 } from '../../../chat-protocol/attachment-profiles';
-import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
+import type {
+  ChatMessage,
+  ChatMessageMetadata,
+  ChatPart,
+  OpenFrameTicketFilesReceipt,
+} from '../../../chat-protocol/chat-message';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
@@ -232,6 +237,8 @@ export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement>
   openframeAttachments?: readonly OpenFrameMessageAttachment[];
   /** A sent OpenFrame file was clicked (any file that does not open in the lightbox). */
   onOpenAttachment?: (attachment: OpenFrameMessageAttachment) => void;
+  /** The row is a ticket receipt (`metadata.openframeTicketFiles`): one centred chip, in both appearances. */
+  openframeTicketFiles?: OpenFrameTicketFilesReceipt;
 }
 
 // ========== Chat Message List Props ==========
@@ -576,6 +583,11 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   previewText?: string;
   /** OpenFrame attachments (tray, attach button or `+` menu entry, drop, paste, Send gate). Off when absent. */
   openframeAttachments?: OpenFrameComposerAttachments;
+  /**
+   * With `openframeAttachments`: whether the input is its own drop zone (and draws the drop overlay). Default `true`.
+   * `false` when a card around it owns the drop (`ChatComposer`'s context card), so only one overlay shows.
+   */
+  openframeDropZone?: boolean;
 }
 
 export interface ChatInputRef {

@@ -114,16 +114,28 @@ describe('validateOpenFrameAttachments: real type', () => {
     expect(await verdict(file('run.ps1', 'Get-Process'))).toBe('TYPE_NOT_ALLOWED');
   });
 
-  it('refuses archives and video (v1), also renamed', async () => {
-    expect(await verdict(file('bundle.zip', ZIP))).toBe('TYPE_NOT_ALLOWED');
-    expect(await verdict(file('bundle.log', ZIP))).toBe('TYPE_NOT_ALLOWED');
+  it('refuses archives (v1) as archives, by name or by content, on both products', async () => {
+    for (const profile of [OPENFRAME_MINGO_ATTACHMENT_PROFILE, OPENFRAME_FAE_ATTACHMENT_PROFILE]) {
+      expect(await verdict(file('bundle.zip', ZIP), profile)).toBe('ARCHIVE_NOT_ALLOWED');
+      // By extension alone, whatever the content.
+      expect(await verdict(file('logs.7z', 'not really 7z'), profile)).toBe('ARCHIVE_NOT_ALLOWED');
+      expect(await verdict(file('logs.rar', PNG), profile)).toBe('ARCHIVE_NOT_ALLOWED');
+      // By the sniffed type: a zip renamed .log is still an archive.
+      expect(await verdict(file('bundle.log', ZIP), profile)).toBe('ARCHIVE_NOT_ALLOWED');
+    }
+  });
+
+  it('refuses video (v1) as a type, also renamed', async () => {
     expect(await verdict(file('screen.mp4', MP4))).toBe('TYPE_NOT_ALLOWED');
+    expect(await verdict(file('screen.log', MP4))).toBe('TYPE_NOT_ALLOWED');
   });
 
   it('lets archives in when the profile switch is on', async () => {
-    expect(await verdict(file('bundle.zip', ZIP), { ...OPENFRAME_MINGO_ATTACHMENT_PROFILE, allowArchives: true })).toBe(
-      'ok:application/zip',
-    );
+    const allowArchives = { ...OPENFRAME_MINGO_ATTACHMENT_PROFILE, allowArchives: true };
+    expect(await verdict(file('bundle.zip', ZIP), allowArchives)).toBe('ok:application/zip');
+    expect(await verdict(file('bundle.log', ZIP), allowArchives)).toBe('ok:application/zip');
+    // Allowed archives leave other types as they were: an executable is still refused as a type.
+    expect(await verdict(file('setup.exe', ZIP), allowArchives)).toBe('TYPE_NOT_ALLOWED');
   });
 
   it('accepts text types by extension when the content reads as text', async () => {
@@ -149,8 +161,8 @@ describe('validateOpenFrameAttachments: real type', () => {
       'ok:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
     expect(await verdict(file('report.docx', docx), OPENFRAME_FAE_ATTACHMENT_PROFILE)).toBe('TYPE_NOT_ALLOWED');
-    // A zip that is not an Office document is a zip on both.
-    expect(await verdict(file('report.docx', ZIP), OPENFRAME_MINGO_ATTACHMENT_PROFILE)).toBe('TYPE_NOT_ALLOWED');
+    // A zip that is not an Office document is a zip on Mingo (its content is read); Fae refuses the name first.
+    expect(await verdict(file('report.docx', ZIP), OPENFRAME_MINGO_ATTACHMENT_PROFILE)).toBe('ARCHIVE_NOT_ALLOWED');
     expect(await verdict(file('report.docx', ZIP), OPENFRAME_FAE_ATTACHMENT_PROFILE)).toBe('TYPE_NOT_ALLOWED');
   });
 });

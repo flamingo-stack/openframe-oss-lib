@@ -1151,6 +1151,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                           NavLinkAnchor={NavLinkAnchor}
                           openframeAttachments={metadata?.openframeAttachments}
                           onOpenAttachment={onOpenAttachment}
+                          openframeTicketFiles={metadata?.openframeTicketFiles}
                         />
                         {ownedContent}
                       </div>

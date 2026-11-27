@@ -4,7 +4,7 @@
  * React state, and calls these for every change, so the state machine is tested without rendering.
  *
  *   picked → checks → uploading (%) → scanning → ready
- *                 ↘ error (TOO_LARGE, TYPE_NOT_ALLOWED, MESSAGE_LIMIT, CHAT_LIMIT, BLOCKED, UPLOAD_FAILED)
+ *                 ↘ error (TOO_LARGE, TYPE_NOT_ALLOWED, ARCHIVE_NOT_ALLOWED, MESSAGE_LIMIT, CHAT_LIMIT, BLOCKED, UPLOAD_FAILED)
  */
 
 import type {

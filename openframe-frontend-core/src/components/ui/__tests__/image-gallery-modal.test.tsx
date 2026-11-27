@@ -26,4 +26,29 @@ describe('ImageGalleryModal', () => {
     expect(screen.queryByLabelText('Previous image')).toBeNull();
     expect(screen.queryByLabelText('Next image')).toBeNull();
   });
+
+  it('has no Close or Download button by default', () => {
+    render(<ImageGalleryModal images={IMAGES} isOpen onClose={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
+  });
+
+  it('opts in to a Close button', () => {
+    const onClose = vi.fn();
+    render(<ImageGalleryModal images={IMAGES} isOpen onClose={onClose} showCloseButton />);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
+  });
+
+  it('opts in to a Download button, called with the index of the image shown', () => {
+    const onDownload = vi.fn();
+    render(<ImageGalleryModal images={IMAGES} isOpen onClose={vi.fn()} initialIndex={1} onDownload={onDownload} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    expect(onDownload).toHaveBeenLastCalledWith(1);
+    fireEvent.click(screen.getByLabelText('Next image'));
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    expect(onDownload).toHaveBeenLastCalledWith(2);
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+  });
 });

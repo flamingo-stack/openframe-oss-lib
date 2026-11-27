@@ -11,7 +11,7 @@ export interface OpenFrameAttachmentNotesProps {
 }
 
 /**
- * One note per refused file ("Larger than 20 MB"), "Send is available when 2 files finish uploading and scanning."
+ * One note per refused file ("Larger than 20 MB"), "Send is available when 2 files finish uploading and scanning"
  * while any is on its way, the context the files would overrun, and "1 file won't be sent" while refused files
  * remain. Nothing when there is nothing to say.
  */

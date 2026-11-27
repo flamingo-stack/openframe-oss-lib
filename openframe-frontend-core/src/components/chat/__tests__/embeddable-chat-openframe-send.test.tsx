@@ -160,7 +160,7 @@ describe('EmbeddableChat with OpenFrame files', () => {
     renderPanel(createState({ currentContextWindowMaxTokens: 1000, currentContextTokens: 800 }), attachments());
     expect(sendButton()).toBeDisabled();
     expect(screen.getByTestId('openframe-attachment-notes')).toHaveTextContent(
-      'These files need ~500 tokens, but only ~200 are left in this chat. Remove a file to send.',
+      'These files need ~500 tokens, but only ~200 are left in this chat. Remove a file to send',
     );
   });
 
