@@ -253,7 +253,7 @@ jobs:
           esac
           echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
 
-      # The merge queue doesn't wait for the Rust jobs; build.yml runs them again on main. Paths as the rust filter in changes.yaml.
+      # The merge queue doesn't wait for the Rust jobs, so tag only after build.yml's run on main passed (paths as the rust filter in changes.yaml).
       - name: Check the Rust jobs on main
         env:
           GH_TOKEN: ${{ github.token }}
