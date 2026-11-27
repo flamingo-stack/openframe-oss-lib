@@ -10,6 +10,8 @@ export interface TicketAttachment {
   fileName: string;
   fileSize: string;
   thumbnailSrc?: string;
+  /** Where the file came from, beside its size ("Added from chat"). */
+  sourceLabel?: string;
   onDownload?: () => void;
   /** When set, a trash button is rendered before the download button. */
   onDelete?: () => void;
@@ -63,7 +65,11 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
             >
               {attachment.fileName}
             </p>
-            {attachment.fileSize && <p className="text-ods-text-secondary text-h6">{attachment.fileSize}</p>}
+            {(attachment.fileSize || attachment.sourceLabel) && (
+              <p className="truncate text-ods-text-secondary text-h6">
+                {[attachment.fileSize, attachment.sourceLabel].filter(Boolean).join(' · ')}
+              </p>
+            )}
           </div>
           {attachment.onDelete && (
             <Button

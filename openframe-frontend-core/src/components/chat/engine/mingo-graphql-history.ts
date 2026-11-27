@@ -66,15 +66,22 @@ export interface MingoGraphqlHistoryOptions {
    * email-to-ticket on: any other refuses the whole history. A function is asked on every page.
    */
   email?: boolean | (() => boolean);
+  /**
+   * Each message's files are read too (`Message.attachments`), drawn under its bubble. Only for a backend with chat
+   * attachments: any other refuses the whole history. A function is asked on every page.
+   */
+  attachments?: boolean | (() => boolean);
 }
+
+const asked = (option: boolean | (() => boolean)): boolean => (typeof option === 'function' ? option() : option);
 
 export function createMingoGraphqlHistory(
   post: MingoGraphqlPost,
-  { chatType, email = false }: MingoGraphqlHistoryOptions = {},
+  { chatType, email = false, attachments = false }: MingoGraphqlHistoryOptions = {},
 ): (params: FetchDialogMessagesParams) => Promise<FetchDialogMessagesResult> {
   return async ({ dialogId, cursor, limit = 50 }) => {
     const data = await post<{ messages: MingoMessagesConnection | null }>(
-      mingoMessagesQuery({ email: typeof email === 'function' ? email() : email }),
+      mingoMessagesQuery({ email: asked(email), attachments: asked(attachments) }),
       mingoMessagesVariables({ dialogId, chatType, cursor, limit }),
     );
     if (!data.messages) return { messages: [], nextCursor: null };

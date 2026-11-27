@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
 import { IMAGE_SLOT } from '../../styles/image-sizes';
+import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
+import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from './button';
 import { Modal } from './modal';
 
@@ -12,6 +14,10 @@ interface ImageGalleryModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialIndex?: number;
+  /** Opt-in: a visible × ("Close") in the top corner. Off by default: Escape and the backdrop close the gallery. */
+  showCloseButton?: boolean;
+  /** Opt-in: a Download button in the top corner, called with the index of the image shown. Absent → no button. */
+  onDownload?: (index: number) => void;
 }
 
 /**
@@ -19,7 +25,14 @@ interface ImageGalleryModalProps {
  * Reusable component extracted from TMCG event detail page
  * Features: Keyboard navigation, prev/next buttons, image counter
  */
-export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }: ImageGalleryModalProps) {
+export function ImageGalleryModal({
+  images,
+  isOpen,
+  onClose,
+  initialIndex = 0,
+  showCloseButton = false,
+  onDownload,
+}: ImageGalleryModalProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(initialIndex);
 
   // Reset to initial index when the modal opens. Adjusted while rendering
@@ -85,6 +98,29 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[95vw]">
       <div className="relative flex items-center justify-center rounded-lg bg-black">
+        {(showCloseButton || onDownload) && (
+          <div className="absolute right-4 top-4 z-[10000] flex items-center gap-[var(--spacing-system-xs)]">
+            {onDownload && (
+              <Button
+                variant="overlay"
+                size="small"
+                onClick={() => onDownload(selectedImageIndex)}
+                leftIcon={<Download01Icon aria-hidden="true" />}
+              >
+                Download
+              </Button>
+            )}
+            {showCloseButton && (
+              <Button
+                variant="overlay"
+                size="icon-sm"
+                aria-label="Close"
+                onClick={onClose}
+                leftIcon={<XmarkIcon aria-hidden="true" />}
+              />
+            )}
+          </div>
+        )}
         {/* Navigation Buttons */}
         {images.length > 1 && (
           <>

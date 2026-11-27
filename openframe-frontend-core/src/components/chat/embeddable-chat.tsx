@@ -1323,6 +1323,14 @@ function EmbeddableChatInner({
   const { panelRef: galleryPanelRef, modal: galleryModal } = useChatAttachmentImageGallery();
   // OpenFrame attachments: files dropped on the thread join the composer's tray (the composer is a drop zone too).
   const onOpenFrameMessageSend = openframeAttachments?.onMessageSend;
+  // The context the chat has used, as the token readout shows it; what is left of the budget gates the staged files.
+  const usedContextTokens =
+    currentContextTokens ?? (currentInputTokens != null ? currentInputTokens + (currentOutputTokens ?? 0) : undefined);
+  const composerAttachments = useMemo(() => {
+    if (!openframeAttachments || openframeAttachments.contextTokensLeft !== undefined) return openframeAttachments;
+    if (currentContextWindowMaxTokens == null) return openframeAttachments;
+    return { ...openframeAttachments, contextTokensLeft: currentContextWindowMaxTokens - (usedContextTokens ?? 0) };
+  }, [openframeAttachments, currentContextWindowMaxTokens, usedContextTokens]);
   const threadDropZone = useOpenFrameDropZone(
     openframeAttachments && !composerLock ? openframeAttachments.onAddFiles : undefined,
   );
@@ -1655,6 +1663,9 @@ function EmbeddableChatInner({
       // stale ref call still lands here — refused at the seam, not by luck.
       // `false` keeps the draft (`ChatInputProps.onSend`): nothing went out.
       if (composerLock) return false;
+      // The OpenFrame tray is the host's: it moves its ready files into the message (and clears its tray) before the
+      // send, so the bubble and the publish carry them.
+      const sentFiles = onOpenFrameMessageSend?.(text) ?? undefined;
       // What the send takes from the composer, for a failed send to put back (below).
       const sentContext = contextItems;
       const sentMentionKeys = new Set(mentionKeysRef.current);
@@ -1668,6 +1679,7 @@ function EmbeddableChatInner({
       const sent = sendMessage(text, {
         ...(readyAttachments.length > 0 ? { attachments: readyAttachments } : {}),
         ...(contextItems.length > 0 ? { contextItems } : {}),
+        ...(sentFiles && sentFiles.length > 0 ? { openframeAttachments: sentFiles } : {}),
       })
         .then(
           result => result !== false,
@@ -1702,8 +1714,6 @@ function EmbeddableChatInner({
       if (contextItems.length > 0) {
         setContextItems([]);
       }
-      // The OpenFrame tray is the host's: it moves its ready files into the message and clears them.
-      onOpenFrameMessageSend?.(text);
       return sent;
     },
     [
@@ -2870,7 +2880,7 @@ function EmbeddableChatInner({
       safeAreaBottom={safeAreaBottom}
       edgeLight={composerEdgeLight}
       inset={composerInset}
-      openframeAttachments={openframeAttachments}
+      openframeAttachments={composerAttachments}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}
@@ -2896,9 +2906,7 @@ function EmbeddableChatInner({
           ? {
               provider: currentProvider ?? 'anthropic',
               modelName: currentModelLabel ?? 'Claude',
-              usedTokens:
-                currentContextTokens ??
-                (currentInputTokens != null ? currentInputTokens + (currentOutputTokens ?? 0) : undefined),
+              usedTokens: usedContextTokens,
               contextWindow: currentContextWindowMaxTokens ?? undefined,
               inputTokens: currentInputTokens ?? undefined,
               outputTokens: currentOutputTokens ?? undefined,

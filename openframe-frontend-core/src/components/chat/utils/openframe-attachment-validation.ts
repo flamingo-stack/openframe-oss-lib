@@ -9,6 +9,7 @@
 
 import { fileTypeFromBuffer } from 'file-type';
 import {
+  OPENFRAME_ARCHIVE_ATTACHMENT_TYPES,
   type OpenFrameAttachmentErrorCode,
   type OpenFrameAttachmentProfile,
   type OpenFrameAttachmentType,
@@ -53,27 +54,43 @@ function looksLikeText(bytes: Uint8Array): boolean {
   }
 }
 
-/** The real type of a file among the allowed ones, or null when it is not allowed. */
-async function allowedTypeOf(file: File, allowed: readonly OpenFrameAttachmentType[]): Promise<string | null> {
+/** The real type of an allowed file, or why it is refused. */
+type TypeVerdict = { mediaType: string } | { error: 'TYPE_NOT_ALLOWED' | 'ARCHIVE_NOT_ALLOWED' };
+
+const TYPE_NOT_ALLOWED: TypeVerdict = { error: 'TYPE_NOT_ALLOWED' };
+const ARCHIVE_NOT_ALLOWED: TypeVerdict = { error: 'ARCHIVE_NOT_ALLOWED' };
+
+/** The real type of a file among the allowed ones. A refused archive (by extension or content) is told apart. */
+async function allowedTypeOf(
+  file: File,
+  allowed: readonly OpenFrameAttachmentType[],
+  allowArchives: boolean,
+): Promise<TypeVerdict> {
   const extension = openFrameFileExtension(file.name);
   // A known extension that is not allowed is refused whatever the content (a PNG renamed `.exe` stays out).
-  if (extension && !allowed.some(type => type.extensions.includes(extension))) return null;
+  if (extension && !allowed.some(type => type.extensions.includes(extension))) {
+    const archive =
+      !allowArchives && OPENFRAME_ARCHIVE_ATTACHMENT_TYPES.some(type => type.extensions.includes(extension));
+    return archive ? ARCHIVE_NOT_ALLOWED : TYPE_NOT_ALLOWED;
+  }
 
   let bytes: Uint8Array;
   try {
     bytes = await readBytes(file);
   } catch {
-    return null;
+    return TYPE_NOT_ALLOWED;
   }
   const sniffed = await fileTypeFromBuffer(bytes);
   if (sniffed) {
-    // A signature matched: that is the type, and it has to be on the list.
-    return allowed.some(type => type.mediaType === sniffed.mime) ? sniffed.mime : null;
+    // A signature matched: that is the type, and it has to be on the list. A zip renamed `.log` is still an archive.
+    if (allowed.some(type => type.mediaType === sniffed.mime)) return { mediaType: sniffed.mime };
+    const archive = !allowArchives && OPENFRAME_ARCHIVE_ATTACHMENT_TYPES.some(type => type.mediaType === sniffed.mime);
+    return archive ? ARCHIVE_NOT_ALLOWED : TYPE_NOT_ALLOWED;
   }
   // No signature: only a text type of the profile, by extension, whose content reads as text.
   const textType = allowed.find(type => type.kind === 'text' && type.extensions.includes(extension));
-  if (!textType || !looksLikeText(bytes.subarray(0, TEXT_PROBE_BYTES))) return null;
-  return textType.mediaType;
+  if (!textType || !looksLikeText(bytes.subarray(0, TEXT_PROBE_BYTES))) return TYPE_NOT_ALLOWED;
+  return { mediaType: textType.mediaType };
 }
 
 /**
@@ -95,9 +112,9 @@ export async function validateOpenFrameAttachments(
       results.push({ file, ok: false, error: 'TOO_LARGE' });
       continue;
     }
-    const mediaType = await allowedTypeOf(file, allowed);
-    if (!mediaType) {
-      results.push({ file, ok: false, error: 'TYPE_NOT_ALLOWED' });
+    const type = await allowedTypeOf(file, allowed, profile.allowArchives);
+    if ('error' in type) {
+      results.push({ file, ok: false, error: type.error });
     } else if (inChat >= profile.maxFilesPerChat) {
       results.push({ file, ok: false, error: 'CHAT_LIMIT' });
     } else if (inMessage >= profile.maxFilesPerMessage) {
@@ -105,7 +122,7 @@ export async function validateOpenFrameAttachments(
     } else {
       inMessage += 1;
       inChat += 1;
-      results.push({ file, ok: true, mediaType });
+      results.push({ file, ok: true, mediaType: type.mediaType });
     }
   }
   return results;

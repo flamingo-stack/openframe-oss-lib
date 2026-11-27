@@ -27,6 +27,7 @@
  * applies itself, so ordering is preserved.
  */
 
+import type { OpenFrameMessageAttachment } from '../../../chat-protocol/attachment-profiles';
 import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import { createMingoDecoder, type MingoDecoder } from '../../../chat-protocol/message-decoder';
 import type { ChatStreamEntry } from '../../../chat-protocol/ui-chunks';
@@ -126,6 +127,8 @@ export interface ChatOptimisticSend {
   message?: ChatMessage;
   /** A hidden send draws no bubble. */
   hidden?: boolean;
+  /** The OpenFrame files the message carries, drawn under the reducer's own bubble. */
+  openframeAttachments?: readonly OpenFrameMessageAttachment[];
 }
 
 export interface ChatThreadStore<K extends string> {
@@ -481,7 +484,7 @@ export function createChatThreadStore<K extends string>(config: ChatThreadStoreC
   function pushOptimisticSend(key: K, text: string, send: ChatOptimisticSend = {}): void {
     mutate(key, reducer => {
       const { messages, streamingPhase } = reducer.state;
-      reducer.pushOptimisticSend(text, send.hidden ?? false);
+      reducer.pushOptimisticSend(text, send.hidden ?? false, send.openframeAttachments);
       if (!send.message) return;
       reducer.setMessages(send.hidden ? messages : [...messages, send.message]);
       reducer.setPhase(streamingPhase);

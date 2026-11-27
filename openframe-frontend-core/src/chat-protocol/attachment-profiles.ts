@@ -159,11 +159,18 @@ export function openFrameMaxFileMegabytes(profile: OpenFrameAttachmentProfile): 
 }
 
 /**
- * Why a file cannot be sent. The first four are the client's checks; `BLOCKED` (the malware scan) and `UPLOAD_FAILED`
- * come from the upload.
+ * Why a file cannot be sent. The first five are the client's checks (`ARCHIVE_NOT_ALLOWED`: a zip / 7z / rar, by name or
+ * content, while the profile's `allowArchives` is off); `BLOCKED` (the malware scan) and `UPLOAD_FAILED` come from the
+ * upload.
  */
 export type OpenFrameAttachmentErrorCode =
-  'TOO_LARGE' | 'TYPE_NOT_ALLOWED' | 'CHAT_LIMIT' | 'MESSAGE_LIMIT' | 'BLOCKED' | 'UPLOAD_FAILED';
+  | 'TOO_LARGE'
+  | 'TYPE_NOT_ALLOWED'
+  | 'ARCHIVE_NOT_ALLOWED'
+  | 'CHAT_LIMIT'
+  | 'MESSAGE_LIMIT'
+  | 'BLOCKED'
+  | 'UPLOAD_FAILED';
 
 /** Where a staged file is: on its way up, being scanned, ready to send, or refused (`error` names why). */
 export type OpenFrameAttachmentState = 'uploading' | 'scanning' | 'ready' | 'error';

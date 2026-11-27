@@ -32,6 +32,7 @@ const states: OpenFrameAttachmentItem[] = [
   { id: '4', name: 'outlook-error-screenshot-0921-2026.png', size: 412 * KB, mediaType: 'image/png', state: 'ready' },
   { id: '5', name: 'sv.log', size: 34 * MB, state: 'error', error: 'TOO_LARGE' },
   { id: '6', name: 'CleanMyPC_setup.exe', size: 2 * MB, state: 'error', error: 'TYPE_NOT_ALLOWED' },
+  { id: '9', name: 'full-diagnostic-bundle.zip', size: 3 * MB, state: 'error', error: 'ARCHIVE_NOT_ALLOWED' },
   { id: '7', name: 'sv.log', size: 24 * KB, state: 'error', error: 'BLOCKED' },
   { id: '8', name: 'sv.log', size: 24 * KB, state: 'error', error: 'UPLOAD_FAILED' },
 ];

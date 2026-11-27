@@ -4,12 +4,14 @@
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type OpenFrameAttachmentItem,
   OPENFRAME_FAE_ATTACHMENT_PROFILE,
   OPENFRAME_MINGO_ATTACHMENT_PROFILE,
 } from '../../../chat-protocol/attachment-profiles';
+import { FileContentIcon, FileImageIcon } from '../../icons-v2-generated/documents';
 import { OpenFrameAttachmentNotes } from '../openframe-attachment-notes';
 import { OpenFrameAttachmentTile } from '../openframe-attachment-tile';
 import { OpenFrameAttachmentTray } from '../openframe-attachment-tray';
@@ -46,6 +48,21 @@ describe('OpenFrameAttachmentTile', () => {
     expect(screen.getByRole('group', { name: 'sv.log, file, 412 KB, ready' })).toBeInTheDocument();
   });
 
+  it('leads an image with no picture with the image icon, and any other file with the file icon', () => {
+    const markup = (icon: ReactElement) => render(icon).container.innerHTML;
+    const imageIcon = markup(<FileImageIcon size={24} className="text-ods-text-secondary" />);
+    const fileIcon = markup(<FileContentIcon size={24} className="text-ods-text-secondary" />);
+    const view = render(<OpenFrameAttachmentTile item={item()} profile={fae} />);
+    expect(view.container.innerHTML).toContain(imageIcon);
+    expect(view.container.innerHTML).not.toContain(fileIcon);
+    view.unmount();
+    const { container } = render(
+      <OpenFrameAttachmentTile item={item({ name: 'sv.log', mediaType: 'text/plain' })} profile={fae} />,
+    );
+    expect(container.innerHTML).toContain(fileIcon);
+    expect(container.innerHTML).not.toContain(imageIcon);
+  });
+
   it('shows the × of a ready tile on hover only, and always on uploads and errors', () => {
     const { rerender } = render(<OpenFrameAttachmentTile item={item()} profile={fae} onRemove={() => {}} />);
     expect(screen.getByRole('button', { name: 'Remove outlook-error.png' })).toHaveClass(
@@ -69,6 +86,7 @@ describe('OpenFrameAttachmentTile', () => {
     [{ state: 'error', error: 'UPLOAD_FAILED' }, 'Upload failed', 'Upload failed'],
     [{ state: 'error', error: 'TOO_LARGE' }, 'Over 20 MB', 'Over 20 MB'],
     [{ state: 'error', error: 'TYPE_NOT_ALLOWED' }, 'Format not allowed', 'Format not allowed'],
+    [{ state: 'error', error: 'ARCHIVE_NOT_ALLOWED' }, 'Format not allowed', 'Format not allowed'],
   ] as const)('state %o reads "%s"', (over, caption, spoken) => {
     render(<OpenFrameAttachmentTile item={item(over)} profile={fae} />);
     const tile = screen.getByRole('group', { name: `outlook-error.png, image, 412 KB, ${spoken}` });
@@ -145,7 +163,7 @@ describe('tray summary and notes', () => {
   const items: OpenFrameAttachmentItem[] = [
     item({ id: '1', state: 'ready' }),
     item({ id: '2', name: 'b.png', state: 'uploading', progress: 10 }),
-    item({ id: '3', name: 'full-diagnostic-bundle.zip', state: 'error', error: 'TYPE_NOT_ALLOWED' }),
+    item({ id: '3', name: 'full-diagnostic-bundle.zip', state: 'error', error: 'ARCHIVE_NOT_ALLOWED' }),
     item({ id: '4', name: 'mailbox-audit-export.csv', state: 'error', error: 'TOO_LARGE' }),
   ];
 
@@ -164,9 +182,10 @@ describe('tray summary and notes', () => {
   it('writes one note per refused file, the pending note and the left-out note, pluralised', () => {
     render(<OpenFrameAttachmentNotes summary={summarizeOpenFrameTray(items, mingo, 0)} />);
     const notes = screen.getByTestId('openframe-attachment-notes');
-    expect(notes).toHaveTextContent("full-diagnostic-bundle.zip This file type can't be sent");
+    expect(notes).toHaveTextContent("full-diagnostic-bundle.zip Archives can't be sent yet. Attach the files inside");
     expect(notes).toHaveTextContent('mailbox-audit-export.csv Larger than 20 MB');
-    expect(notes).toHaveTextContent('Send is available when 1 file finishes uploading and scanning.');
+    expect(notes).toHaveTextContent('Send is available when 1 file finishes uploading and scanning');
+    expect(notes.textContent).not.toContain('scanning.');
     expect(notes).toHaveTextContent("2 files won't be sent");
   });
 
@@ -180,9 +199,21 @@ describe('tray summary and notes', () => {
       fae,
       18,
     );
-    expect(summary.pendingNote).toBe('Send is available when 2 files finish uploading and scanning.');
+    expect(summary.pendingNote).toBe('Send is available when 2 files finish uploading and scanning');
     expect(summary.leftOutNote).toBe("1 file won't be sent");
     expect(summary.errorNotes[0].text).toBe('This chat has reached 20 files');
+  });
+
+  it('says why the files do not fit: the numbers with token estimates (Mingo), words without (Fae)', () => {
+    const big = [item({ id: '1', name: 'sv.log', mediaType: 'text/plain', tokenEstimate: 500 })];
+    expect(summarizeOpenFrameTray(big, mingo, 0, 200).overContextNote).toBe(
+      'These files need ~500 tokens, but only ~200 are left in this chat. Remove a file to send',
+    );
+    expect(summarizeOpenFrameTray(big, fae, 0, 200).overContextNote).toBe(
+      "There's not enough room in this chat for these files. Remove a file or start a new chat",
+    );
+    expect(summarizeOpenFrameTray(big, fae, 0, 200).sendBlocked).toBe(true);
+    expect(summarizeOpenFrameTray(big, fae, 0, 600).overContextNote).toBeNull();
   });
 
   it('says nothing when every file is ready', () => {

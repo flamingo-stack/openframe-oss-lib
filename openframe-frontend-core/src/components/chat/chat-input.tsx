@@ -195,6 +195,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     previewText,
     openframeAttachments,
     maxLength,
+    openframeDropZone = true,
     // Remaining textarea-only attrs are intentionally dropped — the editor is a
     // contenteditable div, not a <textarea>, so spreading them would warn.
   } = rest as typeof rest & { rows?: number };
@@ -229,14 +230,22 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const attachments = openframeAttachments;
   const attachmentSummary = useMemo(
     () =>
-      attachments ? summarizeOpenFrameTray(attachments.items, attachments.profile, attachments.chatFileCount) : null,
+      attachments
+        ? summarizeOpenFrameTray(
+            attachments.items,
+            attachments.profile,
+            attachments.chatFileCount,
+            attachments.contextTokensLeft,
+          )
+        : null,
     [attachments],
   );
   const addAttachmentFiles = attachments?.onAddFiles;
   // Fae's one-click `+`; also any host with no `+` menu of its own to hold "Upload File".
   const showAttachButton = !!attachments && (attachments.profile.entryPoint === 'attach-button' || !startIcon);
   const filePicker = useOpenFrameFilePicker(showAttachButton ? attachments.profile : undefined, addAttachmentFiles);
-  const dropZone = useOpenFrameDropZone(attachments && !disabled ? addAttachmentFiles : undefined);
+  // A card around the input may own the drop instead (`openframeDropZone={false}`): then the input is no zone at all.
+  const dropZone = useOpenFrameDropZone(attachments && openframeDropZone && !disabled ? addAttachmentFiles : undefined);
   // Send waits while a file is uploading or scanning; a message of ready files alone may go out with no text.
   const attachmentsBlockSend = attachmentSummary?.sendBlocked ?? false;
   const hasSendableAttachments = (attachmentSummary?.messageCount ?? 0) > 0;
@@ -680,7 +689,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
         </div>
       ) : (
         <div className="relative" {...dropZone.handlers}>
-          {attachments && <OpenFrameDropOverlay profile={attachments.profile} visible={dropZone.dragging} />}
+          {attachments && openframeDropZone && (
+            <OpenFrameDropOverlay profile={attachments.profile} visible={dropZone.dragging} />
+          )}
           {filePicker.input}
           <SlashCommandSuggestions
             commands={slashPrefix !== null ? slashSuggestions : []}

@@ -4,10 +4,14 @@
  * React state, and calls these for every change, so the state machine is tested without rendering.
  *
  *   picked → checks → uploading (%) → scanning → ready
- *                 ↘ error (TOO_LARGE, TYPE_NOT_ALLOWED, MESSAGE_LIMIT, CHAT_LIMIT, BLOCKED, UPLOAD_FAILED)
+ *                 ↘ error (TOO_LARGE, TYPE_NOT_ALLOWED, ARCHIVE_NOT_ALLOWED, MESSAGE_LIMIT, CHAT_LIMIT, BLOCKED, UPLOAD_FAILED)
  */
 
-import type { OpenFrameAttachmentErrorCode, OpenFrameAttachmentItem } from '../../../chat-protocol/attachment-profiles';
+import type {
+  OpenFrameAttachmentErrorCode,
+  OpenFrameAttachmentItem,
+  OpenFrameMessageAttachment,
+} from '../../../chat-protocol/attachment-profiles';
 import {
   type OpenFrameAttachmentServerStatus,
   OpenFrameAttachmentUploadError,
@@ -38,6 +42,20 @@ export interface OpenFrameWaitingFile {
 export interface OpenFrameReadyAttachment {
   attachmentId: string;
   item: OpenFrameAttachmentItem;
+}
+
+/** The type of a file whose type the checks did not settle. */
+const UNKNOWN_MEDIA_TYPE = 'application/octet-stream';
+
+/**
+ * A ready file as the sent message carries it (`OpenFrameChatAttachments.onMessageSend`): the server's id, name, type
+ * and size. Not the tile's picture: a local preview dies with the tray, the message lives on.
+ */
+export function openFrameSentAttachmentOf({
+  attachmentId,
+  item,
+}: OpenFrameReadyAttachment): OpenFrameMessageAttachment {
+  return { id: attachmentId, name: item.name, mediaType: item.mediaType ?? UNKNOWN_MEDIA_TYPE, size: item.size };
 }
 
 /** A pick's checks turned into tray items, the entries to keep and the files to upload, in pick order. */

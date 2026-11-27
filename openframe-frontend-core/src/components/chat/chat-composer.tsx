@@ -9,9 +9,10 @@ import { ChatFooter } from './chat-container';
 import { ChatContextMemoryBar } from './chat-context-memory-bar';
 import { ChatComposerPlusMenu, ChatContextChipStrip, ChatContextPicker } from './chat-context-picker';
 import { ChatInput } from './chat-input';
-import { useOpenFrameFilePicker } from './hooks/use-openframe-file-intake';
+import { useOpenFrameDropZone, useOpenFrameFilePicker } from './hooks/use-openframe-file-intake';
 import { MingoEdgeLight } from './mingo-edge-light';
 import { ModelDisplay } from './model-display';
+import { OpenFrameDropOverlay } from './openframe-drop-overlay';
 import type {
   ChatInputProps,
   ChatInputRef,
@@ -202,6 +203,11 @@ export function ChatComposer({
     openframeAttachments?.onAddFiles,
   );
   const openMenuFilePicker = menuFilePicker.open;
+  // The context card (strips + input) is the drop zone when it is drawn, so a file dropped on a chip strip lands too;
+  // the input then draws no zone of its own. Without the card the input is the zone (and so in a host that renders
+  // `ChatInput` alone).
+  const cardOwnsDrop = contextEnabled && !!openframeAttachments;
+  const cardDropZone = useOpenFrameDropZone(cardOwnsDrop && !locked ? openframeAttachments.onAddFiles : undefined);
   const pickerConfig = useMemo<ChatContextPickerConfig | undefined>(
     () =>
       uploadFromMenu && contextPicker
@@ -270,6 +276,7 @@ export function ChatComposer({
       hideBorder={contextEnabled}
       endIcon={menu}
       openframeAttachments={openframeAttachments}
+      openframeDropZone={!cardOwnsDrop}
       // `+` lives INSIDE the input (start adornment, Figma 31:28275) and opens
       // the single context dropdown directly. The picker is passed as the
       // button's `dropdown` so it anchors to the `+`, not the input row.
@@ -309,7 +316,17 @@ export function ChatComposer({
     // input or item buttons, which also live inside this card. The editor
     // is a `contentEditable` div (`data-editor`), not a `<textarea>`, so we
     // target its data attribute rather than the element name.
-    <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent">
+    <div
+      className={cn(
+        'rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent',
+        // The drop overlay's box. The strips' popovers anchor to their own `relative` elements, not to this card.
+        cardOwnsDrop && 'relative',
+      )}
+      {...cardDropZone.handlers}
+    >
+      {openframeAttachments && cardOwnsDrop && (
+        <OpenFrameDropOverlay profile={openframeAttachments.profile} visible={cardDropZone.dragging} />
+      )}
       {/* Ambient navigation-history context — always the same items, so
          it sits furthest from the textarea. Self-hides when empty. */}
       <ChatContextMemoryBar

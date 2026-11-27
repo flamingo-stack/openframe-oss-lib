@@ -13,6 +13,7 @@
  */
 
 import type { ChatApprovalStatus } from '../components/chat/types/chat.types';
+import type { OpenFrameMessageAttachment } from './attachment-profiles';
 import {
   APPROVAL_CANCELLED,
   parseCitations,
@@ -61,6 +62,8 @@ export interface ChatParticipantChunk {
     displayName?: string;
     userId?: string;
     contextItems?: Array<{ type: string; id: string; label: string }>;
+    /** The files the message carries (OpenFrame chat attachments), drawn under its bubble. */
+    attachments?: OpenFrameMessageAttachment[];
   };
 }
 

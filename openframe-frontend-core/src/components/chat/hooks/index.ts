@@ -15,7 +15,7 @@ export * from './use-chat-attachment-image-gallery';
 export * from './use-openframe-file-intake';
 // OpenFrame attachments: the staged files from the pick to ready (checks, upload, server status).
 export * from './use-openframe-attachment-uploads';
-export type { OpenFrameReadyAttachment } from '../utils/openframe-attachment-tray';
+export { openFrameSentAttachmentOf, type OpenFrameReadyAttachment } from '../utils/openframe-attachment-tray';
 export * from './use-chat-identity';
 export * from './use-chat-card-item';
 export * from './use-close-on-navigation';

@@ -1259,6 +1259,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       const { createDialog } = portsRef.current.history;
       if (!createDialog) return null;
       setIsCreatingDialog(true);
+      // A first message of files alone is a send too, though its text is empty.
+      const sends = !!create.prompt || (create.sendOptions?.openframeAttachments?.length ?? 0) > 0;
       try {
         const { dialogId: newId } = await createDialog({
           ...(create.title ? { title: create.title } : {}),
@@ -1271,7 +1273,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         // An intent dialog's greeting is the server's, written as the dialog is created: it is read from history like
         // any opened dialog. A dialog this chat starts with a send skips that read, an intent one included: its thread
         // already holds the send, which entering through the history would clear before the server has it.
-        if (create.intent && !create.prompt) freshIntentDialogsRef.current.add(newId);
+        if (create.intent && !sends) freshIntentDialogsRef.current.add(newId);
         else {
           createdDialogsRef.current.add(newId);
           // No history to read: a send into it goes out at once.
@@ -1279,7 +1281,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         }
         openDialog(newId);
         currentDialogIdRef.current = newId;
-        if (create.prompt && newDialogGreeting) {
+        if (sends && newDialogGreeting) {
           store.upsertMessage(keyOfDialogRef.current(newId), {
             id: `welcome-${newId}`,
             role: 'assistant',
@@ -1422,18 +1424,20 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       if (isStream) return sendTurn(text, sendOptions);
       const hidden = sendOptions?.hidden ?? false;
       const send = { ...sendOptions, hidden };
+      // The bubble draws the files the message carries; the host's publish sends their ids.
+      const optimistic = { hidden, openframeAttachments: sendOptions?.openframeAttachments };
       // A send with no dialog open creates one first, when the backend can: the message goes into it.
       if (!dialogId && !isControlled && portsRef.current.history.createDialog) {
         const newId = await createAndOpenDialog({ prompt: text, sendOptions: send });
         if (!newId) return false;
         const newKey = keyOfDialogRef.current(newId);
-        store.pushOptimisticSend(newKey, text, { hidden });
+        store.pushOptimisticSend(newKey, text, optimistic);
         return publishInto(newKey, newId, text, send);
       }
       // A send held for the first page resolves the cards that page brings when it goes out (`publishInto`).
       supersedePending(dialogKey);
       // The bubble, its placeholder, the echo it expects and the phase: all the reducer's.
-      store.pushOptimisticSend(dialogKey, text, { hidden });
+      store.pushOptimisticSend(dialogKey, text, optimistic);
       return publishInto(dialogKey, dialogId, text, send);
     },
     [store, dialogKey, dialogId, isControlled, createAndOpenDialog, publishInto, supersedePending, isStream, sendTurn],

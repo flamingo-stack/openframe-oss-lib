@@ -518,4 +518,7 @@ export interface HistoricalMessage {
    *  only by a persisted row of its OWN role reaching its seq). Optional: absent for rows the backend doesn't stamp (e.g.
    *  user MESSAGE_REQUEST rows), which then don't participate in seq coverage. */
   lastChunkStreamSeq?: number | null;
+  /** The files the message carries (`Message.attachments`, asked for only with attachments on). Unvalidated wire data:
+   *  `openFrameMessageAttachmentsOf` reads it. */
+  attachments?: unknown;
 }
