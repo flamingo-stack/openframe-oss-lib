@@ -8,6 +8,7 @@ import com.openframe.api.dto.invitation.InvitationPageResponse;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.Role;
 import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.MutationError;
 import com.openframe.api.dto.shared.PageInfo;
@@ -204,17 +205,17 @@ public class InvitationService {
         InvitationListFilter listFilter = toListFilter(filter, search);
         Instant now = Instant.now();
         long filteredCount = invitationRepository.countOpenInvitations(listFilter, now);
-        List<Invitation> raw = invitationRepository.findOpenInvitationsPage(
-                listFilter, now, page.getCursor(), page.getLimit() + 1);
-        boolean hasNextPage = raw.size() > page.getLimit();
-        List<InvitationResponse> items = (hasNextPage ? raw.subList(0, page.getLimit()) : raw).stream()
+        List<Invitation> fetched = invitationRepository.findOpenInvitationsPage(
+                listFilter, now, page.getCursor(), page.isBackward(), page.getLimit() + 1);
+        CursorPage<Invitation> cursorPage = CursorPage.assemble(fetched, page);
+        List<InvitationResponse> items = cursorPage.items().stream()
                 .map(invitationMapper::toResponse)
                 .toList();
         return CountedGenericQueryResult.<InvitationResponse>builder()
                 .items(items)
                 .pageInfo(PageInfo.builder()
-                        .hasNextPage(hasNextPage)
-                        .hasPreviousPage(page.hasCursor())
+                        .hasNextPage(cursorPage.hasNextPage())
+                        .hasPreviousPage(cursorPage.hasPreviousPage())
                         .startCursor(items.isEmpty() ? null : cursorOf(items.getFirst()))
                         .endCursor(items.isEmpty() ? null : cursorOf(items.getLast()))
                         .build())

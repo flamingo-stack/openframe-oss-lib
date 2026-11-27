@@ -9,9 +9,15 @@ import { ChatFooter } from './chat-container';
 import { ChatContextMemoryBar } from './chat-context-memory-bar';
 import { ChatComposerPlusMenu, ChatContextChipStrip, ChatContextPicker } from './chat-context-picker';
 import { ChatInput } from './chat-input';
+import { useOpenFrameFilePicker } from './hooks/use-openframe-file-intake';
 import { MingoEdgeLight } from './mingo-edge-light';
 import { ModelDisplay } from './model-display';
-import type { ChatInputRef, ModelDisplayProps } from './types/component.types';
+import type {
+  ChatInputProps,
+  ChatInputRef,
+  ModelDisplayProps,
+  OpenFrameComposerAttachments,
+} from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 
 /**
@@ -36,7 +42,10 @@ export interface ChatComposerProps {
    *  prompt's place, and the `+` menu, the chips and Send are inert. */
   lock?: ChatComposerLock | null;
   inputRef: Ref<ChatInputRef>;
-  onSend: (text: string) => void;
+  /** `false` (or a Promise of it) means the send failed: the input puts the draft back (`ChatInputProps.onSend`). */
+  onSend: NonNullable<ChatInputProps['onSend']>;
+  /** The most characters a message may have (`ChatInputProps.maxLength`). Omit for no limit. */
+  maxLength?: number;
   onStop: () => void;
   sending: boolean;
   placeholder: string;
@@ -113,6 +122,12 @@ export interface ChatComposerProps {
    * content) — in a narrow column the host's own padding is the composer's edge.
    */
   inset?: 'always' | 'wide';
+  /**
+   * OpenFrame (Mingo, Fae) attachments: the tray, drop, paste, the counter and the Send gate (see `ChatInput`). With a
+   * `plus-menu` profile and the context picker, the `+` menu gains "Upload File", which opens the lib's file picker;
+   * otherwise the input shows the one-click attach button. Absent → the composer is unchanged.
+   */
+  openframeAttachments?: OpenFrameComposerAttachments;
 }
 
 /**
@@ -129,6 +144,7 @@ export function ChatComposer({
   lock = null,
   inputRef,
   onSend,
+  maxLength,
   onStop,
   sending,
   placeholder,
@@ -159,6 +175,7 @@ export function ChatComposer({
   safeAreaBottom = true,
   edgeLight = false,
   inset = 'always',
+  openframeAttachments,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived;
   const locked = lock != null;
@@ -176,6 +193,28 @@ export function ChatComposer({
     return map;
   }, [entityTypes]);
   const resolveContextIcon = useCallback((item: ChatContextItem) => iconByType.get(item.type), [iconByType]);
+
+  // Mingo's entry point: "Upload File" in the `+` menu, opening the lib's own file input. Only with the OpenFrame prop,
+  // a `plus-menu` profile and the picker on; the host's config is passed through untouched otherwise.
+  const uploadFromMenu = contextEnabled && openframeAttachments?.profile.entryPoint === 'plus-menu';
+  const menuFilePicker = useOpenFrameFilePicker(
+    uploadFromMenu ? openframeAttachments.profile : undefined,
+    openframeAttachments?.onAddFiles,
+  );
+  const openMenuFilePicker = menuFilePicker.open;
+  const pickerConfig = useMemo<ChatContextPickerConfig | undefined>(
+    () =>
+      uploadFromMenu && contextPicker
+        ? {
+            ...contextPicker,
+            onUploadFile: () => {
+              onCloseContextPicker?.();
+              openMenuFilePicker();
+            },
+          }
+        : contextPicker,
+    [uploadFromMenu, contextPicker, onCloseContextPicker, openMenuFilePicker],
+  );
 
   const menu =
     menuItems && menuItems.length > 0 ? (
@@ -212,6 +251,7 @@ export function ChatComposer({
     <ChatInput
       ref={inputRef}
       onSend={onSend}
+      maxLength={maxLength}
       onStop={onStop}
       sending={sending}
       placeholder={placeholder}
@@ -229,6 +269,7 @@ export function ChatComposer({
       onValueChange={contextEnabled ? onValueChange : undefined}
       hideBorder={contextEnabled}
       endIcon={menu}
+      openframeAttachments={openframeAttachments}
       // `+` lives INSIDE the input (start adornment, Figma 31:28275) and opens
       // the single context dropdown directly. The picker is passed as the
       // button's `dropdown` so it anchors to the `+`, not the input row.
@@ -239,10 +280,10 @@ export function ChatComposer({
             open={contextPickerOpen}
             disabled={attachmentsDisabled || locked}
             dropdown={
-              contextPicker ? (
+              pickerConfig ? (
                 <ChatContextPicker
                   open={contextPickerOpen}
-                  config={contextPicker}
+                  config={pickerConfig}
                   selectedItems={selected}
                   onToggleItem={item => onToggleContextItem?.(item)}
                   onClose={() => onCloseContextPicker?.()}
@@ -295,6 +336,7 @@ export function ChatComposer({
       )}
       {/* Picker is rendered inside the `+` button (its `dropdown` prop)
          so it anchors to the button, not this card. */}
+      {menuFilePicker.input}
       {inputNode}
     </div>
   ) : (

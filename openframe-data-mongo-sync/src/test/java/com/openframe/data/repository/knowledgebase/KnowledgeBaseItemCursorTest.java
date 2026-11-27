@@ -1,15 +1,19 @@
 package com.openframe.data.repository.knowledgebase;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 class KnowledgeBaseItemCursorTest {
 
@@ -75,6 +79,25 @@ class KnowledgeBaseItemCursorTest {
         KnowledgeBaseItemCursor parsed = KnowledgeBaseItemCursor.parse(KnowledgeBaseItemCursor.of(article).serialize());
 
         assertThat(parsed).isEqualTo(new KnowledgeBaseItemCursor(KnowledgeBaseItemType.ARTICLE, ID, null, null));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "A:65f000000000000000000001:not-a-number",
+            "A:65f000000000000000000001:12.5",
+            "A:65f000000000000000000001:1760000000123:9",
+            "F:65f000000000000000000001:%zz",
+            "F:65f000000000000000000001:Networking%2"
+    })
+    void parse_taggedCursorWithAnUnreadableSortKey_throwsInvalidCursor(String raw) {
+        // setup
+        String cursorText = raw;
+
+        // execution
+        Throwable thrown = catchThrowable(() -> KnowledgeBaseItemCursor.parse(cursorText));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage("Invalid cursor");
     }
 
     @Test

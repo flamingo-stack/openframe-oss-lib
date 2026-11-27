@@ -6,6 +6,8 @@ import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceResponse;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateFilterInput;
 import com.openframe.api.dto.rmm.osupdate.OsUpdateResponse;
+import com.openframe.api.dto.rmm.osupdate.OsVersionDeviceResponse;
+import com.openframe.api.dto.rmm.osupdate.OsVersionResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateFilter;
@@ -27,6 +29,7 @@ public class OsUpdateGraphQLMapper {
                 .platform(osUpdateFilterInput.getPlatform())
                 .classifications(osUpdateFilterInput.getClassifications())
                 .search(osUpdateFilterInput.getSearch())
+                .customerStatuses(osUpdateFilterInput.getCustomerStatuses())
                 .build();
     }
 
@@ -50,6 +53,16 @@ public class OsUpdateGraphQLMapper {
     public GenericConnection<GenericEdge<OsUpdateDeviceResponse>> toDeviceConnection(
             GenericQueryResult<OsUpdateDeviceResponse> devices) {
         return toConnection(devices, OsUpdateDeviceResponse::getCursor);
+    }
+
+    public GenericConnection<GenericEdge<OsVersionResponse>> toOsVersionConnection(
+            GenericQueryResult<OsVersionResponse> osVersions) {
+        return toConnection(osVersions, OsVersionResponse::getCursor);
+    }
+
+    public GenericConnection<GenericEdge<OsVersionDeviceResponse>> toOsVersionDeviceConnection(
+            GenericQueryResult<OsVersionDeviceResponse> devices) {
+        return toConnection(devices, OsVersionDeviceResponse::getCursor);
     }
 
     private static <T> GenericConnection<GenericEdge<T>> toConnection(GenericQueryResult<T> queryResult,

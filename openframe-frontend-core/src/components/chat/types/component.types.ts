@@ -3,6 +3,11 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type {
+  OpenFrameAttachmentItem,
+  OpenFrameAttachmentProfile,
+  OpenFrameMessageAttachment,
+} from '../../../chat-protocol/attachment-profiles';
 import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
@@ -222,6 +227,11 @@ export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement>
    * simply default to undefined on the receiver.
    */
   NavLinkAnchor?: NavLinkAnchorComponent;
+  /** The files an OpenFrame (Mingo, Fae) user message carries (`metadata.openframeAttachments`): file tiles, then an
+   *  image grid, under the bubble. Hub file parts are separate (drawn inside the bubble). */
+  openframeAttachments?: readonly OpenFrameMessageAttachment[];
+  /** A sent OpenFrame file was clicked (any file that does not open in the lightbox). */
+  onOpenAttachment?: (attachment: OpenFrameMessageAttachment) => void;
 }
 
 // ========== Chat Message List Props ==========
@@ -343,6 +353,8 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
   NavLinkAnchor?: NavLinkAnchorComponent;
+  /** A sent OpenFrame file was clicked: forwarded to every message (see `ChatMessageEnhancedProps`). */
+  onOpenAttachment?: (attachment: OpenFrameMessageAttachment) => void;
 }
 
 export interface ChatMessageListRef {
@@ -447,6 +459,33 @@ export interface SlashCommandsProp {
   onAction?: (cmd: SlashCommandSummary, actionId: SlashCommandActionId) => void;
 }
 
+/**
+ * OpenFrame (Mingo, Fae) attachments in a composer: ONE opt-in prop on `ChatInput`, `ChatComposer` and
+ * `EmbeddableChat`. Absent, the composer draws and behaves exactly as without the feature (the hub's Guide mode keeps
+ * its own attachment props). Present, it adds the tray, the entry point of the profile, drop and paste, the counter and
+ * the Send gate. The host owns the items: the lib hands it the files people add and the ids they remove.
+ */
+export interface OpenFrameComposerAttachments {
+  /** Mingo's or Fae's (`OPENFRAME_MINGO_ATTACHMENT_PROFILE`, `OPENFRAME_FAE_ATTACHMENT_PROFILE`). */
+  profile: OpenFrameAttachmentProfile;
+  /** The files staged for this message, in tray order. */
+  items: readonly OpenFrameAttachmentItem[];
+  /** Files the chat already holds (sent before), for the counter and the chat limit. */
+  chatFileCount: number;
+  /** Files picked, dropped or pasted, unchecked: run `validateOpenFrameAttachments` and stage the results. */
+  onAddFiles: (files: File[]) => void;
+  /** Remove a ready file, cancel an upload, or dismiss a refused file. */
+  onRemove: (id: string) => void;
+}
+
+/** `EmbeddableChat`'s form of the prop: the composer's, plus the thread's and the send's hooks. */
+export interface OpenFrameChatAttachments extends OpenFrameComposerAttachments {
+  /** A sent file (not an image with a picture) was clicked: the host signs and opens it. */
+  onOpenAttachment?: (attachment: OpenFrameMessageAttachment) => void;
+  /** The composer sent a message: the host moves its ready items into it and clears the tray. */
+  onMessageSend?: (text: string) => void;
+}
+
 export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onSubmit'> {
   /** Source-compatible widening: returning `false` (or a Promise resolving to
    *  `false`) tells the input to KEEP the draft (e.g. a failed send). `void` /
@@ -526,6 +565,15 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
    *  visually replaces the editor (even an in-progress draft); clearing it
    *  (undefined) restores whatever the user had — empty or typed — verbatim. */
   previewText?: string;
+  /** OpenFrame attachments (tray, attach button or `+` menu entry, drop, paste, Send gate). Off when absent. */
+  openframeAttachments?: OpenFrameComposerAttachments;
+  /**
+   * The most characters a message may have, counted as it is sent: the trimmed draft, a mention chip as its record
+   * link. Past 90% of it the composer shows the count; over it, it says the limit and refuses to send (the button,
+   * Enter and `submit`). Unlike a textarea's `maxLength` nothing is cut: typing and pasting go on, so a long paste is
+   * never lost. Omit for no limit.
+   */
+  maxLength?: number;
 }
 
 export interface ChatInputRef {

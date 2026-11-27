@@ -88,6 +88,7 @@ import { useChatDialogManager } from './hooks/use-chat-dialog-manager';
 import { useChatIdentity } from './hooks/use-chat-identity';
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation';
 import { useEmptyStateConfig } from './hooks/use-empty-state-config';
+import { useOpenFrameDropZone } from './hooks/use-openframe-file-intake';
 import {
   fetchSlashCommands,
   useSlashCommandRegistry,
@@ -106,6 +107,7 @@ import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onb
 import { MingoQuickActionWall } from './mingo-quick-action-wall';
 import { type MingoQuickAction, MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
+import { OpenFrameDropOverlay } from './openframe-drop-overlay';
 import {
   type QuickActionAccent,
   accentFromIdentityIcon,
@@ -119,6 +121,7 @@ import type {
   ChatInputRef,
   DialogItem,
   ModelDisplayProps,
+  OpenFrameChatAttachments,
   SlashCommandActionId,
 } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
@@ -526,6 +529,12 @@ export interface EmbeddableChatProps {
   /** The composer's side inset (`ChatComposer` `inset`). Default `'always'`. */
   composerInset?: 'always' | 'wide';
   /**
+   * OpenFrame (Mingo) attachments: the composer's tray, "Upload File" in the `+` menu, paste, drop over the thread or
+   * the composer, the Send gate, and the click on a sent file. Absent → the chat is unchanged (the hub's Guide mode
+   * keeps its own attachments).
+   */
+  openframeAttachments?: OpenFrameChatAttachments;
+  /**
    * Split layout: draw the chat's quick actions in a row over the composer, the very ones its empty state shows
    * (the page's own, read with the page's topic), with the page's topic stamp where the host asks for it. For a
    * composer that stands alone, its empty state not on screen: a host's composer dock under every page. Only the
@@ -568,6 +577,9 @@ export interface EmbeddableChatProps {
   /** The composer's prompt. Default: "Enter your Request..." (v2) /
    *  "Ask a question..." (classic). Uploads in flight still say so instead. */
   composerPlaceholder?: string;
+  /** The most characters a message may have — the host's backend limit (`ChatInputProps.maxLength`): the composer
+   *  counts down to it and refuses to send over it. Omit for no limit. */
+  composerMaxLength?: number;
   /** Mingo's AI edge light travelling around the composer's input card (the
    *  header launcher's, `MingoEdgeLight`). Default `false`. */
   composerEdgeLight?: boolean;
@@ -889,6 +901,7 @@ function EmbeddableChatInner({
   threadHeaderLook = 'page',
   threadFadeEnd = false,
   composerInset = 'always',
+  openframeAttachments,
   threadContentClassName,
   showModel = true,
   onModelClick,
@@ -898,6 +911,7 @@ function EmbeddableChatInner({
   composerFooterActions,
   composerContextLeading,
   composerPlaceholder,
+  composerMaxLength,
   composerEdgeLight = false,
   renameMode = 'modal',
   safeAreaBottom = true,
@@ -1307,6 +1321,11 @@ function EmbeddableChatInner({
     clear: clearAttachments,
   } = useChatAttachments();
   const { panelRef: galleryPanelRef, modal: galleryModal } = useChatAttachmentImageGallery();
+  // OpenFrame attachments: files dropped on the thread join the composer's tray (the composer is a drop zone too).
+  const onOpenFrameMessageSend = openframeAttachments?.onMessageSend;
+  const threadDropZone = useOpenFrameDropZone(
+    openframeAttachments && !composerLock ? openframeAttachments.onAddFiles : undefined,
+  );
 
   // ─── Entity-context picker state (host-driven via `contextPicker`) ─────────
   // The lib owns selection + open/mention UI state; the host owns the data
@@ -1374,6 +1393,11 @@ function EmbeddableChatInner({
     mentionKeysRef.current.clear();
     clearAttachments();
   }, [composerKey, clearAttachments]);
+  // The composer on screen, for a failed send to give its context back only to the composer it left (`handleSend`).
+  const composerKeyRef = useRef(composerKey);
+  useEffect(() => {
+    composerKeyRef.current = composerKey;
+  }, [composerKey]);
   // Told after the commit that shows the new dialog: the host typically
   // navigates on it, which must not happen while this panel renders. Keyed on
   // the id alone, so a host callback that changes identity is not re-told.
@@ -1626,21 +1650,51 @@ function EmbeddableChatInner({
   const messages = hostMessages;
 
   const handleSend = useCallback(
-    (text: string) => {
+    (text: string): Promise<boolean> | false => {
       // Locked: the disabled editor cannot submit, but a queued Enter or a
       // stale ref call still lands here — refused at the seam, not by luck.
-      if (composerLock) return;
-      // The unified `sendMessage` delegates to the ACTIVE adapter: the SSE one
-      // settles its own failures into an error row, but the Mingo/NATS one
-      // rejects on a failed publish. There is no composer promise for that
-      // rejection to surface through, so log it here the way the NATS
-      // adapter's `discussRef` does rather than leave it unhandled.
-      void sendMessage(text, {
+      // `false` keeps the draft (`ChatInputProps.onSend`): nothing went out.
+      if (composerLock) return false;
+      // What the send takes from the composer, for a failed send to put back (below).
+      const sentContext = contextItems;
+      const sentMentionKeys = new Set(mentionKeysRef.current);
+      const sentComposerKey = composerKeyRef.current;
+      // The unified `sendMessage` delegates to the ACTIVE adapter: the engine
+      // resolves `false` on a failed send (its row already says why), the SSE
+      // one settles its own failures, and a rejection is logged here the way
+      // the NATS adapter's `discussRef` does. Either way the composer gets the
+      // outcome: on `false` it puts the draft back, while its box is still
+      // empty, so a failed send never loses what the user typed.
+      const sent = sendMessage(text, {
         ...(readyAttachments.length > 0 ? { attachments: readyAttachments } : {}),
         ...(contextItems.length > 0 ? { contextItems } : {}),
-      }).catch((err: unknown) => {
-        console.error('[EmbeddableChat] handleSend failed:', err);
-      });
+      })
+        .then(
+          result => result !== false,
+          (err: unknown) => {
+            console.error('[EmbeddableChat] handleSend failed:', err);
+            return false;
+          },
+        )
+        .then(ok => {
+          // The draft's context comes back with it, and first: the composer
+          // restores the text after this resolves, and the draft's reconcile
+          // (`handleContextValueChange`) only ever drops items, so the restored
+          // mention chips need their keys and items back before they land. Only
+          // where the composer will restore: the same composer (no conversation
+          // switch since), its box still empty.
+          const restores =
+            !ok && composerKeyRef.current === sentComposerKey && (chatInputRef.current?.getValue() ?? '') === '';
+          if (restores && sentContext.length > 0) {
+            for (const key of sentMentionKeys) mentionKeysRef.current.add(key);
+            setContextItems(prev => {
+              const sentKeys = new Set(sentContext.map(item => `${item.type}:${item.id}`));
+              const added = prev.filter(item => !sentKeys.has(`${item.type}:${item.id}`));
+              return [...sentContext, ...added].slice(0, contextMaxItems);
+            });
+          }
+          return ok;
+        });
       if (readyAttachments.length > 0) {
         clearAttachments();
       }
@@ -1648,8 +1702,19 @@ function EmbeddableChatInner({
       if (contextItems.length > 0) {
         setContextItems([]);
       }
+      // The OpenFrame tray is the host's: it moves its ready files into the message and clears them.
+      onOpenFrameMessageSend?.(text);
+      return sent;
     },
-    [composerLock, sendMessage, readyAttachments, clearAttachments, contextItems],
+    [
+      composerLock,
+      sendMessage,
+      readyAttachments,
+      clearAttachments,
+      contextItems,
+      contextMaxItems,
+      onOpenFrameMessageSend,
+    ],
   );
 
   /**
@@ -2527,8 +2592,10 @@ function EmbeddableChatInner({
     <div
       ref={galleryPanelRef}
       data-testid="chat-content-panel"
+      {...threadDropZone.handlers}
       className={cn(
         'flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]',
+        openframeAttachments && 'relative',
         // With a host block above the composer the thread keeps room
         // for a line and the working status: the block gives way
         // instead (below), so the status never lands on it. Not when
@@ -2538,6 +2605,9 @@ function EmbeddableChatInner({
         hasAboveComposer && !splitMode && 'min-h-32',
       )}
     >
+      {openframeAttachments && (
+        <OpenFrameDropOverlay profile={openframeAttachments.profile} visible={threadDropZone.dragging} />
+      )}
       <div key={contentViewKey} className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0">
         {hasConversation ? (
           <div className="flex min-h-0 flex-1 flex-col">
@@ -2613,6 +2683,7 @@ function EmbeddableChatInner({
                 hasNextPage={hasMoreMessages}
                 isFetchingNextPage={isMessagesLoading}
                 onLoadMore={loadMoreMessages}
+                onOpenAttachment={openframeAttachments?.onOpenAttachment}
               />
             </RecordActionsProvider>
           </div>
@@ -2635,7 +2706,7 @@ function EmbeddableChatInner({
             quickActions={mingoWelcome?.quickActions?.map(action => ({
               ...action,
               onClick: () => {
-                handleSend(action.prompt ?? action.label);
+                void handleSend(action.prompt ?? action.label);
                 action.onClick?.();
                 focusComposer();
               },
@@ -2667,7 +2738,7 @@ function EmbeddableChatInner({
             quickActions={guideQuickActions}
             // A quick action sends its prompt at once.
             onQuickAction={action => {
-              handleSend(action.prompt ?? action.label);
+              void handleSend(action.prompt ?? action.label);
               focusComposer();
             }}
           >
@@ -2715,7 +2786,7 @@ function EmbeddableChatInner({
   // page's topic, drawn by the one row (`MingoQuickActionWall`, which keeps the topic stamp on a page with none).
   const sendQuickAction = (prompt: string) => {
     if (onQuickActionSend) onQuickActionSend(prompt);
-    else handleSend(prompt);
+    else void handleSend(prompt);
     focusComposer();
   };
   const composerQuickActions: MingoQuickAction[] =
@@ -2785,6 +2856,7 @@ function EmbeddableChatInner({
       lock={composerLock}
       inputRef={attachChatInput}
       onSend={handleSend}
+      maxLength={composerMaxLength}
       onStop={stopMessage}
       sending={chatLoading || hasInflightUploads}
       placeholder={
@@ -2798,6 +2870,7 @@ function EmbeddableChatInner({
       safeAreaBottom={safeAreaBottom}
       edgeLight={composerEdgeLight}
       inset={composerInset}
+      openframeAttachments={openframeAttachments}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}

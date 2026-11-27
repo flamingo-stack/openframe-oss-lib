@@ -6,6 +6,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
+import com.openframe.data.repository.cursor.CursorPosition;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
@@ -251,9 +252,11 @@ class CustomMachineRepositoryImplTest {
         CustomMachineRepositoryImpl r = new CustomMachineRepositoryImpl(tpl, new ClientVersionThreshold("1.6.0"));
         Machine cursorDoc = new Machine();
         cursorDoc.setNickname(cursorNickname);
-        when(tpl.findById(any(ObjectId.class), eq(Machine.class))).thenReturn(cursorDoc);
+        ObjectId cursorId = new ObjectId();
+        cursorDoc.setId(cursorId.toHexString());
+        when(tpl.findOne(any(Query.class), eq(Machine.class))).thenReturn(cursorDoc);
         when(tpl.find(any(Query.class), eq(Machine.class))).thenReturn(List.of());
-        r.findMachinesWithCursor(TENANT_ID, null, null, new ObjectId().toHexString(), 10,
+        r.findMachinesWithCursor(TENANT_ID, null, null, new CursorPosition.RowId(cursorId.toHexString()), false, 10,
                 "nickname", asc ? "ASC" : "DESC");
         ArgumentCaptor<Query> qc = ArgumentCaptor.forClass(Query.class);
         verify(tpl).find(qc.capture(), eq(Machine.class));

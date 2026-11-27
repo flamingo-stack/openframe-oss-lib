@@ -5,6 +5,8 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -52,6 +54,26 @@ public class CustomDeviceOsPendingUpdateRepositoryImpl implements CustomDeviceOs
         Criteria page = new Criteria().andOperator(conditions);
         Query query = Query.query(page).with(NEWEST_DISCOVERED_FIRST).limit(limit);
         return mongoTemplate.find(query, DeviceOsPendingUpdate.class);
+    }
+
+    @Override
+    public List<OsUpdateOrganizationDeviceCount> countDevicesByIdentifierAndOrganization(
+            String tenantId, OsPlatform platform, Collection<String> identifiers,
+            Collection<String> excludedMachineIds, Collection<String> machineIds) {
+        List<Criteria> conditions = new ArrayList<>();
+        conditions.add(Criteria.where(FIELD_TENANT_ID).is(tenantId).and(FIELD_PLATFORM).is(platform));
+        conditions.add(Criteria.where(FIELD_MACHINE_ID).nin(excludedMachineIds));
+        if (identifiers != null) {
+            conditions.add(Criteria.where(FIELD_IDENTIFIER).in(identifiers));
+        }
+        if (machineIds != null) {
+            conditions.add(Criteria.where(FIELD_MACHINE_ID).in(machineIds));
+        }
+        List<AggregationOperation> stages = new ArrayList<>();
+        stages.add(Aggregation.match(new Criteria().andOperator(conditions)));
+        stages.addAll(OsUpdateMachineStages.countDevicesByIdentifierAndOrganization(tenantId));
+        return mongoTemplate.aggregate(Aggregation.newAggregation(stages), DeviceOsPendingUpdate.class,
+                OsUpdateOrganizationDeviceCount.class).getMappedResults();
     }
 
     @Override

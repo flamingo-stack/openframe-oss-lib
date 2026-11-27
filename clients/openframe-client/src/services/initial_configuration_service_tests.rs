@@ -52,6 +52,19 @@ fn configured_when_server_host_is_present() {
 }
 
 #[test]
+fn local_mode_in_the_config_counts_only_in_a_local_mode_build() {
+    let dir = TempDir::new().unwrap();
+    write_config(
+        &dir,
+        r#"{"server_host":"acme.openframe.ai","initial_key":"k","local_mode":true}"#,
+    );
+    assert_eq!(
+        service_in(&dir).is_local_mode().unwrap(),
+        cfg!(feature = "local-mode")
+    );
+}
+
+#[test]
 fn a_config_written_before_log_keys_reads_as_empty() {
     let dir = TempDir::new().unwrap();
     write_config(

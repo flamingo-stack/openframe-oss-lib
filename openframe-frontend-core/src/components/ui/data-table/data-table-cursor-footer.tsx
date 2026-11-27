@@ -13,6 +13,9 @@ export interface DataTableCursorFooterProps extends Omit<CursorPaginationProps, 
 }
 
 /**
+ * @deprecated A paged table puts its pager in the row above it: `DataTable.Meta`'s `pagination` with
+ * `<DataTable.Pagination>`, and `<DataTable.PageRange>` as its text. Kept for consumers still on the footer.
+ *
  * Cursor-based prev/next footer for a `DataTable`. Place after `<DataTable.Body>`.
  * Thin wrapper around `<CursorPagination>` with a border-top separator above it.
  */

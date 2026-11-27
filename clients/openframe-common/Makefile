@@ -2,7 +2,7 @@
 
 CARGO ?= cargo
 
-.PHONY: fmt fmt-check clippy lint hack test clean
+.PHONY: fmt fmt-check clippy lint hack cross test clean
 
 fmt:
 	$(CARGO) fmt --all
@@ -17,6 +17,9 @@ lint: fmt-check clippy
 
 hack:
 	$(CARGO) hack --feature-powerset clippy --all-targets --locked -- -D warnings
+
+cross:
+	$(CARGO) clippy --all-targets --all-features --locked --target $(TARGET) -- -D warnings
 
 test:
 	$(CARGO) test --all-features --locked

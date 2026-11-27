@@ -7,6 +7,8 @@ import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.rmm.command.CommandExecution;
+import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.script.Script;
@@ -36,6 +38,8 @@ import static com.openframe.data.document.audit.AuditTargetType.KB_ARTICLE;
 import static com.openframe.data.document.audit.AuditTargetType.KB_FOLDER;
 import static com.openframe.data.document.audit.AuditTargetType.OAUTH_CLIENT;
 import static com.openframe.data.document.audit.AuditTargetType.ORGANIZATION;
+import static com.openframe.data.document.audit.AuditTargetType.OS_UPDATE;
+import static com.openframe.data.document.audit.AuditTargetType.OS_UPDATE_POLICY;
 import static com.openframe.data.document.audit.AuditTargetType.SCRIPT;
 import static com.openframe.data.document.audit.AuditTargetType.SCRIPT_SCHEDULE;
 import static com.openframe.data.document.audit.AuditTargetType.SOFTWARE_SCHEDULE;
@@ -63,7 +67,7 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withDeviceId(Machine::getMachineId)
                         .withIgnoredFields(Set.of("lastSeen", "telemetryStatus", "packageManagers", "securityState",
                                 "complianceState", "securityAlerts", "lastSecurityScan", "lastComplianceScan",
-                                "stuckNotifiedAt", "hostFactsCheckedAt", "computerName", "directorySources",
+                                "stuckNotifiedAt", "pendingSince", "hostFactsCheckedAt", "computerName", "directorySources",
                                 "directoryUserLink", "directoryUserIds", "directoryUserName",
                                 "organizationAssignedAt", "agentVersionKey")),
                 AuditTarget.of(USER, User.class, User::nameOrEmail)
@@ -77,6 +81,9 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(SCRIPT, Script.class, Script::getName)
                         .withIgnoredFields(Set.of("contentHash"))
                         .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs")),
+                AuditTarget.of(OS_UPDATE, OsUpdate.class, OsUpdate::getDisplayName),
+                AuditTarget.of(OS_UPDATE_POLICY, OsUpdatePolicy.class, OsUpdatePolicy::getName)
+                        .withIgnoredFields(Set.of("updatedAt")),
                 AuditTarget.of(SCRIPT_SCHEDULE, ScheduleScript.class, ScheduleScript::getName)
                         .withIgnoredFields(Set.of("nextRunAt", "lastRunAt"))
                         .withMaskedFields(Set.of("scriptCustomParams.args", "scriptCustomParams.value")),

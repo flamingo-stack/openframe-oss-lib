@@ -33,21 +33,6 @@ A data column with `enableHiding: false` stays in the table: its row in the gear
 layout that hides it is not applied to it. It can still be moved. Only the column's own flag counts (`gridCanHide`):
 the table-level TanStack option does not change the grid.
 
-## Pinning the first column on every desktop window
-
-`pinFirstColumn` on `<DataTable>` says when the left block (the checkbox column and the first data column) is pinned:
-
-| Value | Pinned |
-|---|---|
-| `wide` (default) | On a desktop with room for it: the window at 1280px and the content area at 720px. |
-| `desktop` | On every desktop window (1280px), also in a narrow content column (the Mingo panel docked beside the page). The first data column is then drawn at most 40% of the table's width, never below its `minSize`. A tablet and a phone still scroll it. |
-
-Keep the default. `desktop` is for a table whose pinned action needs the row's name beside it: the device picker, where
-the add button is pinned right and a sideways scroll would otherwise leave a plus with no device name. Pass it on
-`<DataTable>` itself, inside that table's component, not through `FeatureTableLayoutProps`: it is the table's own
-decision, not the host's. The option pins the first data column the viewer SHOWS (the gear menu reorders columns, with
-no lock); give the column that must stay `enableHiding: false` so at least it cannot be hidden.
-
 ## Switching
 
 Through the web app's `LiveTable`:
@@ -71,6 +56,25 @@ With `DataTable` directly, the results count goes in `<DataTable.Meta>`, a direc
   </DataTable.Meta>
   <DataTable.Header loading={loading} />
   <DataTable.Body loading={loading} loadingCells />
+</DataTable>
+```
+
+A cursor-paged table puts its pager in the same row (the design's meta row): the page's range in place of the count,
+`<DataTable.Pagination>` (First from page 3, Previous, Next) and the auto-refresh picker after a divider. The row is
+outside the table's scroll viewport, so the pager never scrolls with the rows or the columns; below 720px of content
+the pager takes its own line under the range.
+
+```tsx
+const footer = pager.footerProps(data.list.pageInfo); // useCursorPager
+<DataTable table={table} layout="grid" maxHeight="fill">
+  <DataTable.Meta
+    pagination={<DataTable.Pagination pager={footer} loading={isPending} />}
+    actions={<AutoRefreshControl {...refresh} />}
+  >
+    <DataTable.PageRange itemName="device" rangeStart={footer.rangeStart} totalCount={totalCount} />
+  </DataTable.Meta>
+  <DataTable.Header />
+  <DataTable.Body />
 </DataTable>
 ```
 
@@ -127,9 +131,17 @@ hand, with a grid form of its own: a bare icon button (a plus, the accent check 
 the Selected tab), each named for a screen reader ("Add <device>"), and the reason a device cannot be added as the
 control's tooltip, since a 56px cell has no room for the text a card row prints beside the button. The picker keeps
 its own card (the tabs and the search row) around the table; "Add All Devices" or the device count sits above the
-table in `DataTable.Meta`. With its add / remove column it passes `pinFirstColumn="desktop"`: the Device column (which
-cannot be hidden) stays pinned beside the add button on every desktop window, also with the Mingo panel docked; in
-criteria mode, with no add column, it keeps the shared rule.
+table in `DataTable.Meta`. Its Device column (which cannot be hidden) is pinned by the shared rule, like every other
+grid table's first column: it scrolls away in a narrow content column, on a tablet and on a phone, while the add /
+remove column stays pinned right, so the button's tooltip names the device ("Add <device>", then the reason when it
+cannot be added). A touch screen opens no tooltip and a tap would apply at once, so a finger confirms: the first tap on
+the button shows its tooltip and applies nothing, a second tap on the same button applies (a second tap within 350 ms of
+the first is a double tap's ghost and is ignored). One button is armed at a time; a tap outside, Escape, a tab switch, a
+search, filter or page change, "Add All" / "Remove N", a criteria change or the row leaving the list clears it without
+applying. While armed, the button's `aria-describedby` names the bubble and a polite live region says "Tap again to add
+<device>". A mouse, a pen and the keyboard apply at once; a disabled row's tap shows the reason. The bubble is
+`FloatingTooltip` with `open` / `onOpenChange` controlled by the picker and `mouseOnly` hover, so a tap's compatibility
+`mouseenter` does not open it on its own.
 
 `PoliciesTable` and `LogsTableView` are ready too. Both put a card row's two lines on one with
 `GridTextWithDetailCell` (`features/feature-table-grid-cells.tsx`): the subject (a policy's name, a log's time, a

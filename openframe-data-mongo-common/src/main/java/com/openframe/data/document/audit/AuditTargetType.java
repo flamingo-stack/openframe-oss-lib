@@ -33,6 +33,8 @@ public enum AuditTargetType {
     KB_FOLDER,
     OAUTH_CLIENT,
     ORGANIZATION,
+    OS_UPDATE,
+    OS_UPDATE_POLICY,
     POLICY_TEMPLATE,
     PROMO_CODE,
     RECORDING,

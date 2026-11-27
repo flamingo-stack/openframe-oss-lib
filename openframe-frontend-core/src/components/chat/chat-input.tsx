@@ -20,10 +20,18 @@ import { Send01Icon, StopCircleIcon } from '../icons-v2-generated';
 import { AvatarStack } from '../ui/avatar-stack';
 import { Button } from '../ui/button';
 import { Tag } from '../ui/tag';
+import { ChatInputLengthNote, showsLengthNote } from './chat-input-length-note';
 import { ChatTypingIndicator } from './chat-typing-indicator';
+import { useOpenFrameDropZone, useOpenFrameFilePicker } from './hooks/use-openframe-file-intake';
+import { OpenFrameAttachButton } from './openframe-attach-button';
+import { OpenFrameAttachmentCounter } from './openframe-attachment-counter';
+import { OpenFrameAttachmentNotes } from './openframe-attachment-notes';
+import { OpenFrameAttachmentTray } from './openframe-attachment-tray';
+import { OpenFrameDropOverlay } from './openframe-drop-overlay';
 import { SlashCommandSuggestions } from './slash-command-suggestions';
 import type { ChatInputProps, ChatInputRef, MentionMeta, SlashCommandSummary } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
+import { summarizeOpenFrameTray } from './utils/openframe-attachment-view';
 
 /** SHARED with `lib/config/slash-commands-config.ts` AND the chat-route slash
  *  dispatch parser. Keep all three in sync. */
@@ -185,6 +193,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     endIcon,
     hideBorder,
     previewText,
+    openframeAttachments,
+    maxLength,
     // Remaining textarea-only attrs are intentionally dropped — the editor is a
     // contenteditable div, not a <textarea>, so spreading them would warn.
   } = rest as typeof rest & { rows?: number };
@@ -212,6 +222,24 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const valueRef = useRef(value);
   valueRef.current = value;
   const metaRef = useRef<Map<string, MentionMeta>>(new Map());
+
+  // ── OpenFrame attachments (opt-in through `openframeAttachments`) ──────────
+  // Every hook runs whether or not the prop is set; without it they hand back
+  // nothing (no input, no drag handlers), so the composer is the one it was.
+  const attachments = openframeAttachments;
+  const attachmentSummary = useMemo(
+    () =>
+      attachments ? summarizeOpenFrameTray(attachments.items, attachments.profile, attachments.chatFileCount) : null,
+    [attachments],
+  );
+  const addAttachmentFiles = attachments?.onAddFiles;
+  // Fae's one-click `+`; also any host with no `+` menu of its own to hold "Upload File".
+  const showAttachButton = !!attachments && (attachments.profile.entryPoint === 'attach-button' || !startIcon);
+  const filePicker = useOpenFrameFilePicker(showAttachButton ? attachments.profile : undefined, addAttachmentFiles);
+  const dropZone = useOpenFrameDropZone(attachments && !disabled ? addAttachmentFiles : undefined);
+  // Send waits while a file is uploading or scanning; a message of ready files alone may go out with no text.
+  const attachmentsBlockSend = attachmentSummary?.sendBlocked ?? false;
+  const hasSendableAttachments = (attachmentSummary?.messageCount ?? 0) > 0;
 
   const focusEditor = useCallback(() => {
     if (disabled) return;
@@ -276,7 +304,15 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   // ── send ──────────────────────────────────────────────────────────────────
   const fire = useCallback(
     (message: string) => {
-      const can = (message.length > 0 || allowEmptySend) && !sending && !disabled;
+      // Over the limit nothing goes out, whichever way the send came (the button, Enter, the imperative `submit`):
+      // the backend would refuse it. The draft stays as it is, untrimmed and uncut, for the user to shorten.
+      const overLimit = maxLength !== undefined && message.length > maxLength;
+      const can =
+        (message.length > 0 || allowEmptySend || hasSendableAttachments) &&
+        !sending &&
+        !disabled &&
+        !attachmentsBlockSend &&
+        !overLimit;
       if (!can || !onSend) return;
       // Clear FIRST and put it back only if the host refuses, rather than
       // clearing once the send settles. The editor stays typable while `sending`
@@ -305,7 +341,17 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
         restore();
       }
     },
-    [allowEmptySend, sending, disabled, onSend, focusEditor, applyValue],
+    [
+      allowEmptySend,
+      hasSendableAttachments,
+      attachmentsBlockSend,
+      sending,
+      disabled,
+      maxLength,
+      onSend,
+      focusEditor,
+      applyValue,
+    ],
   );
 
   const handleSubmit = useCallback(() => {
@@ -434,12 +480,15 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const handlePaste = useCallback(
     (e: ClipboardEvent<HTMLDivElement>) => {
       e.preventDefault();
+      // Files (a screenshot, files copied in a file manager) go to the tray; only with the OpenFrame prop set.
+      const pastedFiles = addAttachmentFiles ? Array.from(e.clipboardData.files ?? []) : [];
+      if (addAttachmentFiles && pastedFiles.length > 0) addAttachmentFiles(pastedFiles);
       const text = e.clipboardData.getData('text/plain');
       if (!text) return;
       insertTextAtCaret(text);
       syncFromDom();
     },
-    [syncFromDom],
+    [syncFromDom, addAttachmentFiles],
   );
 
   const handleKeyDown = useCallback(
@@ -556,8 +605,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   }, [onStop, isStopping]);
 
   const isStopMode = sending && !!onStop;
-  const hasContent = value.trim().length > 0 || allowEmptySend;
-  const sendDisabled = sending || disabled || !hasContent;
+  // The length the backend counts: the trimmed draft as `fire` sends it, a mention chip as its record link.
+  const sendLength = value.trim().length;
+  const overLimit = maxLength !== undefined && sendLength > maxLength;
+  const hasContent = sendLength > 0 || allowEmptySend || hasSendableAttachments;
+  const sendDisabled = sending || disabled || !hasContent || attachmentsBlockSend || overLimit;
   const isEmpty = value.length === 0;
   // Non-destructive ghost preview (e.g. a hovered quick-action's full prompt).
   // Shown whenever a `previewText` is set (even over an existing draft): the
@@ -566,6 +618,33 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   // Declarative, no `setValue` / draft save-restore. Suppressed the moment the
   // user edits the draft (`previewDismissed`) so typing is never hidden.
   const showPreview = !sending && !disabled && !!previewText && !previewDismissed;
+
+  // The input's own chrome (border, fill, focus and hover). Without attachments it is the row's, as it always was;
+  // with them it moves to a box that holds the row and the tray (over it for Fae, under it for Mingo).
+  const boxChrome = [
+    !hideBorder && 'rounded-[6px] border border-ods-border bg-ods-card',
+    !hideBorder && (focused ? 'border-ods-accent' : !disabled && 'hover:border-ods-border-hover hover:bg-ods-bg-hover'),
+    !hideBorder && disabled && '!cursor-not-allowed bg-ods-bg',
+    hideBorder && 'bg-transparent',
+  ];
+  const renderBox = (row: ReactNode): ReactNode => {
+    if (!attachments) return row;
+    const tray = (
+      <OpenFrameAttachmentTray
+        items={attachments.items}
+        profile={attachments.profile}
+        onRemove={attachments.onRemove}
+      />
+    );
+    const above = attachments.profile.trayPlacement === 'above';
+    return (
+      <div data-openframe-attachments={attachments.profile.product} className={cn('flex w-full flex-col', boxChrome)}>
+        {above && tray}
+        {row}
+        {!above && tray}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -600,7 +679,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
           <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-secondary" />
         </div>
       ) : (
-        <div className="relative">
+        <div className="relative" {...dropZone.handlers}>
+          {attachments && <OpenFrameDropOverlay profile={attachments.profile} visible={dropZone.dragging} />}
+          {filePicker.input}
           <SlashCommandSuggestions
             commands={slashPrefix !== null ? slashSuggestions : []}
             highlightedIdx={highlightedIdx}
@@ -611,55 +692,58 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
           />
           {/* Mouse-only focus proxy for the contenteditable — deliberately has
               no key handler: keyboard users tab straight into the editor. */}
-          <div
-            onMouseDown={e => {
-              if (e.target === e.currentTarget) {
-                e.preventDefault();
-                focusEditor();
-              }
-            }}
-            className={cn(
-              // `items-center` keeps the empty single-line text AND a mention chip
-              // vertically centered the same way. With a chip in the box, `py-1.5`
-              // (6px) pairs with the editor's `leading-9` (36px) → that row is
-              // 36 + 2*6 = 48px. The 36px line box is just barely above the 32px
-              // chip (incl. its ~3.5px vertical-align overhead), so there's almost
-              // no slack for the chip to drift in → it reads as centered.
-              // A chipless row is shorter than its content box and the `min-h-*`
-              // here is what sets its height: 48px from `md` up, 44px below.
-              'group flex min-h-11 w-full cursor-text items-center gap-2 px-3 py-1.5 transition-colors duration-200 md:min-h-12',
-              !hideBorder && 'rounded-[6px] border border-ods-border bg-ods-card',
-              !hideBorder &&
-                (focused ? 'border-ods-accent' : !disabled && 'hover:border-ods-border-hover hover:bg-ods-bg-hover'),
-              !hideBorder && disabled && '!cursor-not-allowed bg-ods-bg',
-              hideBorder && 'bg-transparent',
-            )}
-          >
-            {startIcon && <span className="flex h-6 shrink-0 items-center">{startIcon}</span>}
+          {renderBox(
+            <div
+              onMouseDown={e => {
+                if (e.target === e.currentTarget) {
+                  e.preventDefault();
+                  focusEditor();
+                }
+              }}
+              className={cn(
+                // `items-center` keeps the empty single-line text AND a mention chip
+                // vertically centered the same way. With a chip in the box, `py-1.5`
+                // (6px) pairs with the editor's `leading-9` (36px) → that row is
+                // 36 + 2*6 = 48px. The 36px line box is just barely above the 32px
+                // chip (incl. its ~3.5px vertical-align overhead), so there's almost
+                // no slack for the chip to drift in → it reads as centered.
+                // A chipless row is shorter than its content box and the `min-h-*`
+                // here is what sets its height: 48px from `md` up, 44px below.
+                'group flex min-h-11 w-full cursor-text items-center gap-2 px-3 py-1.5 transition-colors duration-200 md:min-h-12',
+                // With attachments the box around the row and its tray draws the chrome instead.
+                attachments ? 'bg-transparent' : boxChrome,
+              )}
+            >
+              {showAttachButton && (
+                <span className="flex h-6 shrink-0 items-center">
+                  <OpenFrameAttachButton onClick={filePicker.open} disabled={disabled} />
+                </span>
+              )}
+              {startIcon && <span className="flex h-6 shrink-0 items-center">{startIcon}</span>}
 
-            <div className="relative min-w-0 flex-1">
-              {/* No chip-line override on the placeholder: it only renders while
+              <div className="relative min-w-0 flex-1">
+                {/* No chip-line override on the placeholder: it only renders while
                   the draft is EMPTY, so the editor is always on its plain line
                   box here. `data-editor-ghost` (here and on the preview) pins
                   both overlays to 16px on phones alongside `data-editor` — the
                   iOS focus-zoom rule in app-globals.css. */}
-              {isEmpty && !showPreview && (
-                <span
-                  data-editor-ghost
-                  className={cn(
-                    // One line, clipped with an ellipsis (Figma 954:28455): the
-                    // disabled copy is a sentence, and the panel's narrowest
-                    // width does not fit it — wrapped, it ran under the row.
-                    'pointer-events-none absolute left-0 top-0 w-full select-none truncate text-h4',
-                    // Disabled reads as disabled (Figma 954:28455): the copy says
-                    // why, and the colour says it is not an invitation to type.
-                    disabled ? 'text-ods-text-disabled' : 'text-ods-text-secondary',
-                  )}
-                >
-                  {disabled ? disabledPlaceholder : placeholder}
-                </span>
-              )}
-              {/* Ghost preview of a hovered quick-action's prompt. Overlaid like
+                {isEmpty && !showPreview && (
+                  <span
+                    data-editor-ghost
+                    className={cn(
+                      // One line, clipped with an ellipsis (Figma 954:28455): the
+                      // disabled copy is a sentence, and the panel's narrowest
+                      // width does not fit it — wrapped, it ran under the row.
+                      'pointer-events-none absolute left-0 top-0 w-full select-none truncate text-h4',
+                      // Disabled reads as disabled (Figma 954:28455): the copy says
+                      // why, and the colour says it is not an invitation to type.
+                      disabled ? 'text-ods-text-disabled' : 'text-ods-text-secondary',
+                    )}
+                  >
+                    {disabled ? disabledPlaceholder : placeholder}
+                  </span>
+                )}
+                {/* Ghost preview of a hovered quick-action's prompt. Overlaid like
                   the placeholder and CLAMPED to one line (truncate): the row's
                   height must not change on hover. An in-flow multi-line preview
                   would grow the composer → shift the chip strip up → move the
@@ -669,106 +753,129 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   the chips instead. Muted color reads as a preview, not typed
                   text; clearing `previewText` restores the (opacity-hidden)
                   editor. */}
-              {showPreview && (
-                <p
-                  data-editor-ghost
-                  className={cn(
-                    'pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-ods-text-secondary text-h4',
-                    hasChips && '!leading-9',
-                  )}
-                >
-                  {previewText}
-                </p>
-              )}
-              {/* UNCONTROLLED contenteditable: React renders it WITHOUT children
+                {showPreview && (
+                  <p
+                    data-editor-ghost
+                    className={cn(
+                      'pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-ods-text-secondary text-h4',
+                      hasChips && '!leading-9',
+                    )}
+                  >
+                    {previewText}
+                  </p>
+                )}
+                {/* UNCONTROLLED contenteditable: React renders it WITHOUT children
                   and never reconciles its content — all text/chips are managed
                   imperatively (browser owns typing/delete; we own chip insert). */}
-              {/* `role="textbox"` on a contenteditable div: it IS focusable,
+                {/* `role="textbox"` on a contenteditable div: it IS focusable,
                   and a rich text input with inline chips has no native
                   element to use instead. */}
-              <div
-                ref={editorRef}
-                data-editor
-                role="textbox"
-                aria-multiline="true"
-                // Named by what it shows: locked, the lock's copy is the name.
-                aria-label={disabled ? disabledPlaceholder : typeof placeholder === 'string' ? placeholder : 'Message'}
-                // `sending` blocks SENDING, never typing. Taking
-                // `contentEditable` away under a focused editor blurs it, and
-                // iOS dismisses the keyboard on blur; restoring it re-establishes
-                // the input session (and the refocus-after-send effect below
-                // re-presents the keyboard once more), so on a phone the keyboard
-                // flashed shut and open again around every send — repeatedly,
-                // because a host's `sending` toggles once per phase of a turn
-                // (`chatLoading` in `embeddable-chat` is `isTyping ||
-                // isCompacting`, and the legacy Mingo page adds dialog creation).
-                // Nothing is lost by staying editable: `fire()` and the send
-                // button are both gated on `sending` already, so a draft typed
-                // while a turn streams simply waits for its turn — Enter is a
-                // no-op until the send button lights back up. Only `disabled` —
-                // the transport is gone — takes the editor out of service.
-                contentEditable={!disabled}
-                suppressContentEditableWarning
-                spellCheck
-                onInput={handleInput}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                onMouseDown={handleEditorMouseDown}
-                onCompositionStart={() => {
-                  isComposingRef.current = true;
-                }}
-                onCompositionEnd={() => {
-                  isComposingRef.current = false;
-                  syncFromDom();
-                }}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                className={cn(
-                  'max-h-[160px] overflow-y-auto overscroll-contain whitespace-pre-wrap break-words outline-none',
-                  // While a ghost preview shows, the editor stays IN FLOW (it
-                  // alone drives the row height, which must NOT change on hover —
-                  // see the preview comment above) and is only made transparent;
-                  // the absolutely-positioned single-line preview paints over it.
-                  showPreview && 'opacity-0',
-                  // WITH chips, `leading-9` (36px) sits just above the 32px chip's
-                  // line-box need (~35.5px incl. vertical-align overhead): the LINE
-                  // drives row height (deterministic 48px, no overflow) AND the
-                  // near-zero slack keeps the chip centered against the `align-top`
-                  // `h-9` wrapper `buildChipEl` gives it. ~4px gap between wrapped
-                  // chip rows.
-                  // WITHOUT chips there is nothing tall to center, and forcing the
-                  // same 36px box on 14px phone text (`text-h4`) put a blank line's
-                  // worth of air between every wrapped row — so plain drafts keep
-                  // `text-h4`'s own responsive line-height (20px / 24px at md).
-                  // `min-h-*` pins the single-line box even when EMPTY: a
-                  // non-editable (`contentEditable=false`, i.e. `disabled`) empty div
-                  // would otherwise collapse to 0px, and `items-center` would
-                  // re-center the shorter wrapper in the row — dropping the `top-0`
-                  // placeholder down.
-                  'text-ods-text-primary text-h4',
-                  hasChips ? 'min-h-9 !leading-9' : 'min-h-[var(--font-line-space-h4-body)]',
-                  'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30',
-                  disabled && 'cursor-not-allowed',
-                )}
-              />
-            </div>
+                <div
+                  ref={editorRef}
+                  data-editor
+                  role="textbox"
+                  aria-multiline="true"
+                  // Named by what it shows: locked, the lock's copy is the name.
+                  aria-label={
+                    disabled ? disabledPlaceholder : typeof placeholder === 'string' ? placeholder : 'Message'
+                  }
+                  // `sending` blocks SENDING, never typing. Taking
+                  // `contentEditable` away under a focused editor blurs it, and
+                  // iOS dismisses the keyboard on blur; restoring it re-establishes
+                  // the input session (and the refocus-after-send effect below
+                  // re-presents the keyboard once more), so on a phone the keyboard
+                  // flashed shut and open again around every send — repeatedly,
+                  // because a host's `sending` toggles once per phase of a turn
+                  // (`chatLoading` in `embeddable-chat` is `isTyping ||
+                  // isCompacting`, and the legacy Mingo page adds dialog creation).
+                  // Nothing is lost by staying editable: `fire()` and the send
+                  // button are both gated on `sending` already, so a draft typed
+                  // while a turn streams simply waits for its turn — Enter is a
+                  // no-op until the send button lights back up. Only `disabled` —
+                  // the transport is gone — takes the editor out of service.
+                  contentEditable={!disabled}
+                  suppressContentEditableWarning
+                  spellCheck
+                  onInput={handleInput}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  onMouseDown={handleEditorMouseDown}
+                  onCompositionStart={() => {
+                    isComposingRef.current = true;
+                  }}
+                  onCompositionEnd={() => {
+                    isComposingRef.current = false;
+                    syncFromDom();
+                  }}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  className={cn(
+                    'max-h-[160px] overflow-y-auto overscroll-contain whitespace-pre-wrap break-words outline-none',
+                    // While a ghost preview shows, the editor stays IN FLOW (it
+                    // alone drives the row height, which must NOT change on hover —
+                    // see the preview comment above) and is only made transparent;
+                    // the absolutely-positioned single-line preview paints over it.
+                    showPreview && 'opacity-0',
+                    // WITH chips, `leading-9` (36px) sits just above the 32px chip's
+                    // line-box need (~35.5px incl. vertical-align overhead): the LINE
+                    // drives row height (deterministic 48px, no overflow) AND the
+                    // near-zero slack keeps the chip centered against the `align-top`
+                    // `h-9` wrapper `buildChipEl` gives it. ~4px gap between wrapped
+                    // chip rows.
+                    // WITHOUT chips there is nothing tall to center, and forcing the
+                    // same 36px box on 14px phone text (`text-h4`) put a blank line's
+                    // worth of air between every wrapped row — so plain drafts keep
+                    // `text-h4`'s own responsive line-height (20px / 24px at md).
+                    // `min-h-*` pins the single-line box even when EMPTY: a
+                    // non-editable (`contentEditable=false`, i.e. `disabled`) empty div
+                    // would otherwise collapse to 0px, and `items-center` would
+                    // re-center the shorter wrapper in the row — dropping the `top-0`
+                    // placeholder down.
+                    'text-ods-text-primary text-h4',
+                    hasChips ? 'min-h-9 !leading-9' : 'min-h-[var(--font-line-space-h4-body)]',
+                    'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30',
+                    disabled && 'cursor-not-allowed',
+                  )}
+                />
+              </div>
 
-            {endIcon && <span className="flex h-6 shrink-0 items-center">{endIcon}</span>}
+              {attachmentSummary && attachments && attachments.items.length > 0 && (
+                <OpenFrameAttachmentCounter summary={attachmentSummary} />
+              )}
+              {endIcon && <span className="flex h-6 shrink-0 items-center">{endIcon}</span>}
 
-            <Button
-              variant="bare"
-              size="icon-sm"
-              type="button"
-              aria-label={isStopMode ? 'Stop generation' : 'Send message'}
-              // Send is armed (the accent) while the editor has focus. Stop stays neutral wherever focus sits.
-              data-state={focused && !isStopMode ? 'active' : undefined}
-              onClick={isStopMode ? handleStop : handleSubmit}
-              disabled={isStopMode ? isStopping : sendDisabled}
-              className="shrink-0"
+              <Button
+                variant="bare"
+                size="icon-sm"
+                type="button"
+                aria-label={isStopMode ? 'Stop generation' : 'Send message'}
+                // Send is armed (the accent) while the editor has focus. Stop stays neutral wherever focus sits.
+                data-state={focused && !isStopMode ? 'active' : undefined}
+                onClick={isStopMode ? handleStop : handleSubmit}
+                disabled={isStopMode ? isStopping : sendDisabled}
+                className="shrink-0"
+              >
+                {isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
+              </Button>
+            </div>,
+          )}
+          {(showsLengthNote(sendLength, maxLength) || attachmentSummary) && (
+            <div
+              data-testid="chat-input-notes"
+              className={cn(
+                // `empty:hidden`: an attachment summary with nothing to say renders no notes.
+                'flex flex-col gap-[var(--spacing-system-xxs)] pt-[var(--spacing-system-xxs)] empty:hidden',
+                // With `hideBorder` the input sits in its host's card (ChatComposer's context mode), so the
+                // notes take the row's inset instead of touching the card's border.
+                hideBorder && 'px-[var(--spacing-system-sf)] pb-[var(--spacing-system-xsf)]',
+              )}
             >
-              {isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
-            </Button>
-          </div>
+              {showsLengthNote(sendLength, maxLength) && (
+                <ChatInputLengthNote length={sendLength} maxLength={maxLength} />
+              )}
+              {attachmentSummary && <OpenFrameAttachmentNotes summary={attachmentSummary} />}
+            </div>
+          )}
         </div>
       )}
     </div>

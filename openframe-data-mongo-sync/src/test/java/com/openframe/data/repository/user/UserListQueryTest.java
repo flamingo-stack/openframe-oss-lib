@@ -1,5 +1,6 @@
 package com.openframe.data.repository.user;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.InvitationStatus;
 import com.openframe.data.document.user.User;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -35,7 +37,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: sorted by email asc / id asc, limited, continued after the (email, id) cursor")
     void usersArePagedByEmailThenId() {
-        users.findUsersPage(new UserListFilter(null, null, null, null), UserPageCursor.of("jane_doe@acme.io", USER_ID), 21);
+        users.findUsersPage(new UserListFilter(null, null, null, null), UserPageCursor.of("jane_doe@acme.io", USER_ID), false, 21);
 
         Query query = captured(User.class);
         assertThat(query.getLimit()).isEqualTo(21);
@@ -53,7 +55,7 @@ class UserListQueryTest {
     @DisplayName("users: statuses become $in, and every search word must match a name or a non-placeholder email")
     void usersFilterByStatusAndEverySearchWord() {
         users.findUsersPage(
-                new UserListFilter(List.of(UserStatus.ACTIVE, UserStatus.DELETED), null, null, "  Jane   Doe "), null, 21);
+                new UserListFilter(List.of(UserStatus.ACTIVE, UserStatus.DELETED), null, null, "  Jane   Doe "), null, false, 21);
 
         List<Document> and = and(captured(User.class));
         assertThat(and).hasSize(3);
@@ -70,7 +72,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: no filter, no search and no cursor query the whole tenant")
     void usersWithoutConstraintsHaveAnEmptyFilter() {
-        users.findUsersPage(new UserListFilter(List.of(), List.of(), List.of(), " "), null, 21);
+        users.findUsersPage(new UserListFilter(List.of(), List.of(), List.of(), " "), null, false, 21);
 
         assertThat(captured(User.class).getQueryObject()).isEmpty();
     }
@@ -78,7 +80,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: excluded ids become a $nin on the id")
     void usersLeaveOutExcludedIds() {
-        users.findUsersPage(new UserListFilter(List.of(UserStatus.ACTIVE), null, List.of(USER_ID), null), null, 21);
+        users.findUsersPage(new UserListFilter(List.of(UserStatus.ACTIVE), null, List.of(USER_ID), null), null, false, 21);
 
         List<Document> and = and(captured(User.class));
         assertThat(and).hasSize(2);
@@ -88,7 +90,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: granted roles become $in on roles")
     void usersFilterByRole() {
-        users.findUsersPage(new UserListFilter(null, List.of(UserRole.ADMIN, UserRole.OWNER), null, null), null, 21);
+        users.findUsersPage(new UserListFilter(null, List.of(UserRole.ADMIN, UserRole.OWNER), null, null), null, false, 21);
 
         List<Document> and = and(captured(User.class));
         assertThat(and).hasSize(1);
@@ -114,7 +116,8 @@ class UserListQueryTest {
     void invitationsArePagedByCreatedAtThenId() {
         Instant createdAt = Instant.ofEpochMilli(1_750_000_000_000L);
 
-        invitations.findOpenInvitationsPage(NO_INVITATION_FILTER, NOW, InvitationPageCursor.of(createdAt, "inv-1"), 21);
+        invitations.findOpenInvitationsPage(
+                NO_INVITATION_FILTER, NOW, InvitationPageCursor.of(createdAt, "inv-1"), false, 21);
 
         Query query = captured(Invitation.class);
         assertThat(query.getLimit()).isEqualTo(21);
@@ -136,7 +139,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("invitations: past a cursor without createdAt only the rest of that group follows")
     void invitationsAfterACursorWithoutCreatedAt() {
-        invitations.findOpenInvitationsPage(NO_INVITATION_FILTER, NOW, InvitationPageCursor.of(null, "inv-1"), 21);
+        invitations.findOpenInvitationsPage(NO_INVITATION_FILTER, NOW, InvitationPageCursor.of(null, "inv-1"), false, 21);
 
         List<?> tie = (List<?>) and(captured(Invitation.class)).get(1).get("$and");
         assertThat((Document) tie.get(0)).containsEntry("createdAt", null);
@@ -179,12 +182,22 @@ class UserListQueryTest {
     }
 
     @Test
-    @DisplayName("cursors: malformed values are ignored instead of failing the query")
-    void malformedCursorsAreIgnored() {
-        assertThat(UserPageCursor.parse("no-separator")).isEmpty();
-        assertThat(UserPageCursor.parse("jane@acme.io_")).isEmpty();
-        assertThat(InvitationPageCursor.parse("yesterday_inv-1")).isEmpty();
-        assertThat(InvitationPageCursor.parse("123_")).isEmpty();
+    @DisplayName("cursors: malformed values are rejected with the invalid cursor error")
+    void malformedCursorsAreRejected() {
+        assertThatThrownBy(() -> UserPageCursor.parse("no-separator")).isInstanceOf(InvalidCursorException.class);
+        assertThatThrownBy(() -> UserPageCursor.parse("jane@acme.io_")).isInstanceOf(InvalidCursorException.class);
+        assertThatThrownBy(() -> InvitationPageCursor.parse("yesterday_inv-1"))
+                .isInstanceOf(InvalidCursorException.class);
+        assertThatThrownBy(() -> InvitationPageCursor.parse("123_")).isInstanceOf(InvalidCursorException.class);
+    }
+
+    @Test
+    @DisplayName("cursors: no cursor text is no position")
+    void missingCursorsAreNoPosition() {
+        assertThat(UserPageCursor.parse(null)).isEmpty();
+        assertThat(UserPageCursor.parse(" ")).isEmpty();
+        assertThat(InvitationPageCursor.parse(null)).isEmpty();
+        assertThat(InvitationPageCursor.parse(" ")).isEmpty();
     }
 
     private Query captured(Class<?> type) {

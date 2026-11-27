@@ -1,6 +1,6 @@
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { type UIEvent, useState } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ComposerDockHeightContext } from '../components/navigation/app-layout-context';
 import {
   actionColumn,
@@ -17,7 +17,6 @@ import {
   gridCellClass,
   type GridColumn,
   type GridLayoutOptions,
-  type GridPinFirstColumn,
 } from '../components/ui/data-table/data-table-grid';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
 import { LoadingScope } from '../components/ui/loading-scope';
@@ -65,13 +64,15 @@ function Grid({
   layout = 'grid',
   loading = false,
   maxHeight,
-  pinFirstColumn,
+  minRows,
+  header = true,
 }: {
   items?: Item[];
   layout?: 'grid' | 'cards';
   loading?: boolean;
   maxHeight?: number | 'fill';
-  pinFirstColumn?: GridPinFirstColumn;
+  minRows?: number;
+  header?: boolean;
 }) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sort, setSort] = useState<DataTableSortState | null>(null);
@@ -84,16 +85,23 @@ function Grid({
     onRowSelectionChange: setRowSelection,
   });
   return (
-    <DataTable table={table} layout={layout} maxHeight={maxHeight} pinFirstColumn={pinFirstColumn}>
+    <DataTable table={table} layout={layout} maxHeight={maxHeight}>
       <DataTable.Meta>
         <DataTable.RowCount />
       </DataTable.Meta>
-      <DataTable.Header
-        sort={sort}
-        onSortChange={id => setSort({ id, desc: sort?.id === id ? !sort.desc : false })}
+      {header && (
+        <DataTable.Header
+          sort={sort}
+          onSortChange={id => setSort({ id, desc: sort?.id === id ? !sort.desc : false })}
+          loading={loading}
+        />
+      )}
+      <DataTable.Body<Item>
         loading={loading}
+        skeletonRows={2}
+        minRows={minRows}
+        rowHref={item => `/items/${item.id}`}
       />
-      <DataTable.Body<Item> loading={loading} skeletonRows={2} rowHref={item => `/items/${item.id}`} />
     </DataTable>
   );
 }
@@ -207,74 +215,6 @@ describe('buildGridLayout', () => {
     const layout = layoutOf(COLUMNS.filter(column => column.id !== 'select'));
     expect(layout.columns[0]).toMatchObject({ id: 'name', pin: 'left', offset: 0 });
     expect(layout.pinnedLeft).toBe(280);
-  });
-
-  describe('pinFirstColumn', () => {
-    const pinsOf = (options?: GridLayoutOptions) =>
-      layoutOf(COLUMNS, options).columns.map(column => [column.id, column.pinAt]);
-
-    it('marks the left block with the shared rule by default, and the right block with none', () => {
-      expect(pinsOf()).toEqual([
-        ['select', 'wide'],
-        ['name', 'wide'],
-        ['owner', undefined],
-        ['more', undefined],
-      ]);
-    });
-
-    it('marks the left block `desktop` when asked: the checkbox column and the first data column', () => {
-      expect(pinsOf({ pinFirstColumn: 'desktop' })).toEqual([
-        ['select', 'desktop'],
-        ['name', 'desktop'],
-        ['owner', undefined],
-        ['more', undefined],
-      ]);
-    });
-
-    it('pins a `desktop` cell on the window alone, and a `wide` one on the window and the content area', () => {
-      const name = (pinFirstColumn: GridPinFirstColumn) =>
-        gridCellClass(
-          layoutOf(COLUMNS, { pinFirstColumn }).columns.find(column => column.id === 'name') as GridColumn,
-          'body',
-        ).split(' ');
-      expect(name('desktop')).toEqual(expect.arrayContaining(['lg:sticky', 'lg:z-[1]']));
-      expect(name('desktop').join(' ')).not.toMatch(/content-md:|(^| )sticky( |$)/);
-      expect(name('wide')).toEqual(expect.arrayContaining(['lg:content-md:sticky', 'lg:content-md:z-[1]']));
-      expect(name('wide')).not.toContain('lg:sticky');
-    });
-  });
-
-  describe('pinnedCap', () => {
-    // `name` is 280px with no `minSize` of its own: its least width is a text column's 120.
-    const byId = (options: GridLayoutOptions, columns = COLUMNS) =>
-      Object.fromEntries(layoutOf(columns, options).columns.map(column => [column.id, column]));
-
-    it('draws the first data column at the cap and counts the pinned block from it', () => {
-      const layout = layoutOf(COLUMNS, { pinFirstColumn: 'desktop', pinnedCap: 230.7 });
-      const columns = Object.fromEntries(layout.columns.map(column => [column.id, column]));
-      expect(columns.name?.size).toBe(230);
-      // The gradient, the filters panel and the header read this number: it is the block as drawn.
-      expect(layout.pinnedLeft).toBe(48 + 230);
-      // Only the pinned column is capped: `owner` keeps its designed 200 under a cap of 230.
-      expect(columns.owner?.size).toBe(200);
-      expect(columns.select?.size).toBe(48);
-    });
-
-    it('never draws the column below its own least width, nor above its designed one', () => {
-      expect(byId({ pinnedCap: 60 }).name?.size).toBe(120);
-      const withMin = COLUMNS.map(column => (column.id === 'name' ? { ...column, minSize: 148 } : column));
-      expect(byId({ pinnedCap: 60 }, withMin).name?.size).toBe(148);
-      expect(byId({ pinnedCap: 900 }).name?.size).toBe(280);
-    });
-
-    it('caps the width the viewer gave the column too', () => {
-      expect(byId({ sizing: { name: 400 }, pinnedCap: 250 }).name?.size).toBe(250);
-      expect(byId({ sizing: { name: 180 }, pinnedCap: 250 }).name?.size).toBe(180);
-    });
-
-    it('caps the first data column the viewer shows, whatever the designed order', () => {
-      expect(byId({ order: ['owner', 'name'], pinnedCap: 150 }).owner).toMatchObject({ pin: 'left', size: 150 });
-    });
   });
 
   it('keeps a column that cannot be hidden, whatever the stored layout hides', () => {
@@ -398,6 +338,107 @@ describe('DataTable grid layout', () => {
     const shades = gradientStyles(container);
     expect(shades).toHaveLength(4);
     expect(shades.every(shade => shade.includes('var(--color-bg) 100%'))).toBe(true);
+  });
+
+  // CU-17tkuw69x1m: an empty body only one viewport wide could not scroll, and the header (kept at the body's scroll
+  // position) left the columns past the right edge, an applied filter included, out of reach.
+  it.each([
+    ['page', undefined],
+    ['fixed-height', 360],
+  ] as const)('keeps an empty body as wide as its columns, with the message in view (%s mode)', (_mode, maxHeight) => {
+    const { container } = render(<Grid items={[]} maxHeight={maxHeight} />);
+    const body = gridBodyMarkup(container);
+    expect(screen.getByText('No results found')).toBeTruthy();
+    // One box as wide as its widest child: a sticky message moves only inside its parent.
+    expect(openingTag(container, 'data-grid-empty')).toMatch(/class="w-max min-w-full"/);
+    // A zero-high row of every column, in the grid's order, each at its column's width.
+    const start = body.indexOf('data-grid-blank-row');
+    const blankRow = body.slice(start, body.indexOf('</div></div>', start));
+    expect([...blankRow.matchAll(/width: var\(--dtc(\d)-w\)/g)].map(match => match[1])).toEqual(['0', '1', '2', '3']);
+    expect(blankRow).not.toContain('h-12');
+    // The message: one viewport wide, kept at the left edge, under the gradients (no z-index of its own).
+    const message = openingTag(container, 'sticky left-0 w-0');
+    expect(message).toContain('min-w-[min(100%,var(--dt-viewport-w,100%))]');
+    expect(message).not.toMatch(/\bz-\[/);
+  });
+
+  // Hosts leave the header out of an empty table (LiveTable `showHeader`): with nothing past the edge to reach, the box
+  // must not scroll or shade.
+  it.each([
+    ['page', undefined],
+    ['fixed-height', 360],
+  ] as const)('keeps an empty body one viewport wide when no header is drawn (%s mode)', (_mode, maxHeight) => {
+    const { container } = render(<Grid items={[]} maxHeight={maxHeight} header={false} />);
+    expect(screen.getByText('No results found')).toBeTruthy();
+    expect(container.innerHTML).not.toContain('data-grid-header');
+    expect(openingTag(container, 'data-grid-empty')).toMatch(/class="w-max min-w-full"/);
+    expect(container.innerHTML).not.toContain('data-grid-blank-row');
+  });
+
+  // CU-17tkuw6af0q: `minRows` reserves a short page's height without drawing it. The grid drew the missing rows as
+  // empty 48px rows with dividers, so a short page showed a block of blank rows under its real ones.
+  it('reserves a short page’s missing rows as room under the block, drawing no row for them', () => {
+    const { container } = render(<Grid minRows={5} />);
+    expect(rowSlots(container)).toBe(3);
+    // No blank row of cells: the only blank row the body may hold is the empty state's zero-high one.
+    expect(container.innerHTML).not.toContain('data-grid-blank-row');
+    // The block closes at the last real row; the two missing rows (2 × 48px) are room under it, on the bordered
+    // element itself, so it stays the header's peer (a wrapper would bring back its top edge and corners).
+    const body = openingTag(container, 'data-grid-body');
+    expect(body).toContain('margin-bottom: 96px');
+    expect(body).toContain('peer-data-[grid-header]/gridheader:border-t-0');
+  });
+
+  it('adds no room under a full page', () => {
+    const { container } = render(<Grid minRows={3} />);
+    expect(openingTag(container, 'data-grid-body')).not.toContain('margin-bottom');
+  });
+
+  it('pads nothing in fixed-height mode: the table’s height is the host’s', () => {
+    const { container } = render(<Grid minRows={5} maxHeight={360} />);
+    expect(rowSlots(container)).toBe(3);
+    expect(container.innerHTML).not.toContain('data-grid-blank-row');
+    expect(container.innerHTML).not.toContain('margin-bottom');
+  });
+
+  describe('an empty body with minRows', () => {
+    const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    afterEach(() => {
+      if (offsetHeight) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight);
+    });
+
+    /** jsdom lays nothing out: the empty state's box measures `height`, everything else 0. */
+    function measureEmptyBox(height: number) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+        configurable: true,
+        get(this: HTMLElement) {
+          return this.hasAttribute('data-grid-empty') ? height : 0;
+        },
+      });
+    }
+
+    it('draws the message at its own height and keeps the rest of the page as room under the block', () => {
+      measureEmptyBox(100);
+      const { container } = render(<Grid items={[]} minRows={5} />);
+      expect(screen.getByText('No results found')).toBeTruthy();
+      // No box the page's height around the message: it sits at the top of a block of its own height.
+      expect(container.innerHTML).not.toContain('min-height');
+      // 5 × 48px = 240px reserved in all: 100px of block, 140px of room under it.
+      expect(openingTag(container, 'data-grid-body')).toContain('margin-bottom: 140px');
+    });
+
+    it('adds no room when the message is taller than the page', () => {
+      measureEmptyBox(300);
+      const { container } = render(<Grid items={[]} minRows={5} />);
+      expect(openingTag(container, 'data-grid-body')).not.toContain('margin-bottom');
+    });
+
+    it('reserves nothing in fixed-height mode', () => {
+      measureEmptyBox(100);
+      const { container } = render(<Grid items={[]} minRows={5} maxHeight={360} />);
+      expect(container.innerHTML).not.toContain('min-height');
+      expect(container.innerHTML).not.toContain('margin-bottom');
+    });
   });
 
   it('draws loading rows as grid rows: one bar per data cell, none in the utility cells', () => {
@@ -597,156 +638,6 @@ describe('DataTable grid layout', () => {
     // One line, never wrapped.
     expect(label().className).toContain('whitespace-nowrap');
     expect(container.innerHTML).toContain('text-ods-accent');
-  });
-});
-
-describe('DataTable grid layout, pinFirstColumn="desktop"', () => {
-  /** The pin of each body cell of the first row and of the header row: `window`, `window and content`, `always` or `none`. */
-  function pins(markup: string): string[] {
-    const [row] = markup.split('group/gridrow').slice(1);
-    return [...(row ?? '').matchAll(/class="([^"]*\bh-12\b[^"]*)"/g)].map(match => pinOf(match[1]));
-  }
-  function pinOf(cell: string | undefined): string {
-    const classes = (cell ?? '').split(' ');
-    if (classes.includes('sticky')) return 'always';
-    if (classes.includes('lg:sticky')) return 'window';
-    if (classes.includes('lg:content-md:sticky')) return 'window and content';
-    return 'none';
-  }
-
-  it('pins the left block on a desktop window whatever the content width: header, body and loading rows', () => {
-    const { container } = render(<Grid pinFirstColumn="desktop" />);
-    expect(pins(gridBodyMarkup(container))).toEqual(['window', 'window', 'none', 'always']);
-    const header = [...gridHeaderMarkup(container).matchAll(/class="([^"]*\bh-12\b[^"]*)"/g)].map(match =>
-      pinOf(match[1]),
-    );
-    expect(header).toEqual(['window', 'window', 'none', 'always']);
-    const root = openingTag(container, 'data-grid-root');
-    expect(root).toMatch(/ lg:\[--dt-pin-l:var\(--dt-pin-l-wide\)\]/);
-    expect(root).not.toContain('content-md:');
-
-    // The loading rows draw the same pins, or their first cell would scroll away under a pinned header.
-    const { container: loading } = render(<Grid pinFirstColumn="desktop" loading />);
-    const skeleton = gridBodyMarkup(loading).split('data-loading-item')[1] ?? '';
-    const cells = [...skeleton.matchAll(/class="([^"]*\bh-12\b[^"]*)"/g)].map(match => pinOf(match[1]));
-    expect(cells).toEqual(['window', 'window', 'none', 'always']);
-  });
-
-  describe('the cap on a desktop window', () => {
-    let rootWidth = 500;
-    let desktop = true;
-    const observers: Array<() => void> = [];
-    const originals = {
-      matchMedia: window.matchMedia,
-      ResizeObserver: window.ResizeObserver,
-      clientWidth: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth'),
-    };
-
-    beforeEach(() => {
-      rootWidth = 500;
-      desktop = true;
-      observers.length = 0;
-      window.matchMedia = (query: string) =>
-        ({
-          matches: desktop,
-          media: query,
-          addEventListener: () => undefined,
-          removeEventListener: () => undefined,
-        }) as unknown as MediaQueryList;
-      window.ResizeObserver = class {
-        constructor(private readonly callback: () => void) {}
-        observe() {
-          observers.push(() => this.callback());
-        }
-        unobserve() {}
-        disconnect() {}
-      } as unknown as typeof ResizeObserver;
-      Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
-        configurable: true,
-        get(this: HTMLElement) {
-          return this.hasAttribute('data-grid-root') ? rootWidth : 0;
-        },
-      });
-    });
-
-    afterEach(() => {
-      window.matchMedia = originals.matchMedia;
-      window.ResizeObserver = originals.ResizeObserver;
-      if (originals.clientWidth) Object.defineProperty(HTMLElement.prototype, 'clientWidth', originals.clientWidth);
-    });
-
-    const rootStyle = (container: HTMLElement) => openingTag(container, 'data-grid-root');
-
-    it('draws the first data column at 40% of the table, header and body from one variable, before the first paint', () => {
-      const { container } = render(<Grid pinFirstColumn="desktop" />);
-      // 40% of 500. Measured in a layout effect, so this is the first markup the browser would paint.
-      expect(rootStyle(container)).toContain('--dtc1-w: 200px');
-      expect(rootStyle(container)).toContain('--dt-pin-l-wide: 248px');
-      // Header and body cells read the column's width from the root, never a number of their own.
-      expect(gridHeaderMarkup(container)).toContain('width: var(--dtc1-w)');
-      expect(gridBodyMarkup(container)).toContain('width: var(--dtc1-w)');
-    });
-
-    it('follows the table width without rendering a row again', () => {
-      let gridCellRenders = 0;
-      const counted: ColumnDef<Item>[] = COLUMNS.map(column =>
-        column.id === 'owner'
-          ? {
-              ...column,
-              meta: {
-                gridCell: ({ row }) => {
-                  gridCellRenders += 1;
-                  return `grid:${row.original.owner}`;
-                },
-              },
-            }
-          : column,
-      );
-      function CountedGrid() {
-        const table = useDataTable<Item>({ data: ITEMS, columns: counted, getRowId: item => item.id });
-        return (
-          <DataTable table={table} layout="grid" pinFirstColumn="desktop">
-            <DataTable.Header />
-            <DataTable.Body<Item> />
-          </DataTable>
-        );
-      }
-      const { container } = render(<CountedGrid />);
-      const rendersAfterMount = gridCellRenders;
-
-      rootWidth = 600;
-      act(() => {
-        for (const notify of observers) notify();
-      });
-      expect(rootStyle(container)).toContain('--dtc1-w: 240px');
-      // The geometry changed on the root alone: no row was drawn again for it.
-      expect(gridCellRenders).toBe(rendersAfterMount);
-
-      // A wide table: the column is at its designed width, and a wider table changes nothing.
-      rootWidth = 1000;
-      act(() => {
-        for (const notify of observers) notify();
-      });
-      expect(rootStyle(container)).toContain('--dtc1-w: 280px');
-      rootWidth = 1400;
-      act(() => {
-        for (const notify of observers) notify();
-      });
-      expect(rootStyle(container)).toContain('--dtc1-w: 280px');
-      expect(gridCellRenders).toBe(rendersAfterMount);
-    });
-
-    it('leaves the width alone on a tablet and a phone, where the column scrolls', () => {
-      desktop = false;
-      const { container } = render(<Grid pinFirstColumn="desktop" />);
-      expect(rootStyle(container)).toContain('--dtc1-w: 280px');
-      expect(rootStyle(container)).toContain('--dt-pin-l-wide: 328px');
-    });
-
-    it('never caps a table on the shared rule', () => {
-      const { container } = render(<Grid />);
-      expect(rootStyle(container)).toContain('--dtc1-w: 280px');
-    });
   });
 });
 

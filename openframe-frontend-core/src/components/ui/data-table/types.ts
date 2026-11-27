@@ -103,6 +103,18 @@ declare module '@tanstack/react-table' {
     filter?: {
       options: DataTableFilterOption[];
       /**
+       * The key the filter is stored under in the table's column filters, when it is not the column's own id: a column
+       * that carries another column's filter (the devices DEVICE column's `status` filter, once STATUS is gone). The
+       * host's `columnFilters` then see only this key, from a value and from a functional updater alike, and the
+       * column's own id is never written. Default: the column's id.
+       */
+      id?: string;
+      /**
+       * The dropdown's title and the funnel's accessible name ("Filter by Status"), when they are not the header's
+       * label: what the filter picks rather than what the column shows. Default: the header's label.
+       */
+      title?: string;
+      /**
        * More groups in the same dropdown, under their own titles (the devices STATUS funnel's "Connectivity").
        * They share the column's filter value: a picked option of a section is stored as `<section id>:<value>`
        * (`filterSectionValue`), so the host splits them back out with `splitFilterSectionValues`.

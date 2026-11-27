@@ -76,7 +76,9 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     long countByStatusInAndTelemetryStatus(Collection<DeviceStatus> statuses, TelemetryStatus telemetryStatus);
 
-    List<Machine> findByStatusInAndRegisteredAtBefore(Collection<DeviceStatus> statuses, Instant before);
+    // A device from before pendingSince existed is PENDING since its registration
+    @Query("{ 'status': 'PENDING', '$or': [ { 'pendingSince': { '$lt': ?0 } }, { 'pendingSince': null, 'registeredAt': { '$lt': ?0 } } ] }")
+    List<Machine> findPendingSinceBefore(Instant before);
 
     List<Machine> findByTelemetryStatusAndLastSeenBefore(TelemetryStatus telemetryStatus, Instant lastSeenBefore);
 

@@ -72,7 +72,8 @@ jobs:
               ],
               "rust": [
                 "clients/**",
-                ".github/steps/rust-setup/**"
+                ".github/steps/rust-setup/**",
+                ".github/workflows/build.yml"
               ],
               "cargo": [
                 "clients/**/Cargo.lock"

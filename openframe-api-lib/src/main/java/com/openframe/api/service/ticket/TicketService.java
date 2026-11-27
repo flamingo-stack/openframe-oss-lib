@@ -1,8 +1,10 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.PositionPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.ticket.CreateTicketInput;
@@ -39,6 +41,8 @@ import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.model.ClientOwnerScope;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -59,6 +63,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 import static com.openframe.api.util.AuthPrincipalUtils.*;
 import static com.openframe.data.document.audit.AuditAction.TICKET_ASSIGN;
@@ -109,6 +114,38 @@ public class TicketService {
                                                         CursorPaginationCriteria pagination,
                                                         String search,
                                                         SortInput sort) {
+        CursorPaginationCriteria requested = pagination != null ? pagination : new CursorPaginationCriteria();
+        CursorPosition position = requested.hasCursor()
+                ? new CursorPosition.RowId(requested.getCursor())
+                : new CursorPosition.None();
+        PositionPaginationCriteria fromRow = PositionPaginationCriteria.builder()
+                .position(position)
+                .limit(requested.getLimit())
+                .backward(requested.isBackward())
+                .build();
+
+        return queryTickets(principal, filter, fromRow, search, sort,
+                (ticket, sortField, sortDirection) -> ticket.getId());
+    }
+
+    public CountedGenericQueryResult<Ticket> getTicketsByPosition(AuthPrincipal principal,
+                                                                  TicketFilterInput filter,
+                                                                  PositionPaginationCriteria pagination,
+                                                                  String search,
+                                                                  SortInput sort) {
+        PositionPaginationCriteria requested = pagination != null
+                ? pagination
+                : PositionPaginationCriteria.builder().build();
+
+        return queryTickets(principal, filter, requested, search, sort, this::keysetCursor);
+    }
+
+    private CountedGenericQueryResult<Ticket> queryTickets(AuthPrincipal principal,
+                                                           TicketFilterInput filter,
+                                                           PositionPaginationCriteria pagination,
+                                                           String search,
+                                                           SortInput sort,
+                                                           PageCursorIssuer cursors) {
         ClientOwnerScope ownerScope = clientOwnerScopeResolver.isOwnerScoped(principal)
                 ? clientOwnerScopeResolver.scopeOf(principal)
                 : null;
@@ -116,7 +153,7 @@ public class TicketService {
         log.debug("Querying tickets for {} with filter: {}, pagination: {}, search: '{}', sort: {}",
                 principal.getActorType(), filter, pagination, search, sort);
 
-        CursorPaginationCriteria paging = (pagination != null ? pagination : new CursorPaginationCriteria()).normalize();
+        PositionPaginationCriteria paging = pagination.normalize();
         Query query = buildTicketQuery(principal, filter, search, ownerScope);
         long filteredCount = ticketRepository.countTickets(query);
 
@@ -125,16 +162,21 @@ public class TicketService {
                 ? sort.getDirection().name()
                 : SortDirection.DESC.name();
         int limit = paging.getLimit();
-        List<Ticket> raw = ticketRepository.findTicketsWithCursor(
-                query, paging.getCursor(), limit + 1, sortField, sortDirection);
-        boolean hasNextPage = raw.size() > limit;
-        List<Ticket> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
+        List<Ticket> fetched = ticketRepository.findTicketsWithCursor(
+                query, paging.getPosition(), paging.isBackward(), limit + 1, sortField, sortDirection);
+        CursorPage<Ticket> page = CursorPage.assemble(fetched, paging);
+        PageInfo pageInfo = buildPageInfo(page, ticket -> cursors.cursorOf(ticket, sortField, sortDirection));
 
         return CountedGenericQueryResult.<Ticket>builder()
-                .items(pageItems)
-                .pageInfo(buildPageInfo(pageItems, hasNextPage, paging.hasCursor()))
+                .items(page.items())
+                .pageInfo(pageInfo)
                 .filteredCount((int) filteredCount)
                 .build();
+    }
+
+    private String keysetCursor(Ticket ticket, String sortField, String sortDirection) {
+        KeysetCursor cursor = ticketRepository.keysetCursor(ticket, sortField, sortDirection);
+        return cursor.encode();
     }
 
     public Optional<Ticket> getTicket(AuthPrincipal principal, @NotBlank String ticketId) {
@@ -534,13 +576,14 @@ public class TicketService {
         log.debug("Ticket {} pending-approval flag set to {}", ticketId, pending);
     }
 
-    private PageInfo buildPageInfo(List<Ticket> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = pageItems.isEmpty() ? null : pageItems.getFirst().getId();
-        String endCursor = pageItems.isEmpty() ? null : pageItems.getLast().getId();
+    private PageInfo buildPageInfo(CursorPage<Ticket> page, Function<Ticket, String> cursorOf) {
+        List<Ticket> pageItems = page.items();
+        String startCursor = pageItems.isEmpty() ? null : cursorOf.apply(pageItems.getFirst());
+        String endCursor = pageItems.isEmpty() ? null : cursorOf.apply(pageItems.getLast());
 
         return PageInfo.builder()
-                .hasNextPage(hasNextPage)
-                .hasPreviousPage(hasPreviousPage)
+                .hasNextPage(page.hasNextPage())
+                .hasPreviousPage(page.hasPreviousPage())
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
@@ -668,5 +711,11 @@ public class TicketService {
             return;
         }
         targetIds.forEach(targetId -> assignmentService.assignItem(ticketId, AssignmentItemType.TICKET, targetType, targetId));
+    }
+
+    @FunctionalInterface
+    private interface PageCursorIssuer {
+
+        String cursorOf(Ticket ticket, String sortField, String sortDirection);
     }
 }

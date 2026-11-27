@@ -13,7 +13,9 @@ class ErrorCodeTest {
 
     private static final String EMAIL_PREFIX = "EMAIL_";
     private static final String MAILBOX_PREFIX = "MAILBOX_";
+    private static final String HELD_EMAIL_PREFIX = "HELD_EMAIL_";
 
+    // OSS-1..OSS-5: the five HELD_EMAIL_* rows
     @ParameterizedTest
     @CsvSource({
             "MAILBOX_NOT_FOUND, MAILBOX_NOT_FOUND, 404",
@@ -27,7 +29,12 @@ class ErrorCodeTest {
             "EMAIL_SEND_AS_ALREADY_SIGNED_IN, EMAIL_SEND_AS_ALREADY_SIGNED_IN, 409",
             "EMAIL_BLOCK_LIST_INVALID_VALUE, EMAIL_BLOCK_LIST_INVALID_VALUE, 400",
             "EMAIL_BLOCK_LIST_DUPLICATE, EMAIL_BLOCK_LIST_DUPLICATE, 409",
-            "EMAIL_BLOCK_LIST_ENTRY_NOT_FOUND, EMAIL_BLOCK_LIST_ENTRY_NOT_FOUND, 404"
+            "EMAIL_BLOCK_LIST_ENTRY_NOT_FOUND, EMAIL_BLOCK_LIST_ENTRY_NOT_FOUND, 404",
+            "HELD_EMAIL_NOT_FOUND, HELD_EMAIL_NOT_FOUND, 404",
+            "HELD_EMAIL_ALREADY_RESOLVED, HELD_EMAIL_ALREADY_RESOLVED, 409",
+            "HELD_EMAIL_DMARC_DISCARD_ONLY, HELD_EMAIL_DMARC_DISCARD_ONLY, 409",
+            "HELD_EMAIL_REQUESTER_NOT_FOUND, HELD_EMAIL_REQUESTER_NOT_FOUND, 404",
+            "HELD_EMAIL_REQUESTER_REQUIRED, HELD_EMAIL_REQUESTER_REQUIRED, 409"
     })
     void valueOf_emailToTicketCode_codeStringAndHttpStatus(String name, String code, int httpStatus) {
         // execution
@@ -36,6 +43,16 @@ class ErrorCodeTest {
         // verifications
         assertThat(errorCode.getCode()).isEqualTo(code);
         assertThat(errorCode.getHttpStatus()).isEqualTo(httpStatus);
+    }
+
+    @Test
+    void valueOf_invalidCursor_codeStringAndBadRequestStatus() {
+        // execution
+        ErrorCode errorCode = ErrorCode.valueOf("INVALID_CURSOR");
+
+        // verifications
+        assertThat(errorCode.getCode()).isEqualTo("INVALID_CURSOR");
+        assertThat(errorCode.getHttpStatus()).isEqualTo(400);
     }
 
     @Test
@@ -60,5 +77,23 @@ class ErrorCodeTest {
                 "EMAIL_BLOCK_LIST_INVALID_VALUE",
                 "EMAIL_BLOCK_LIST_DUPLICATE",
                 "EMAIL_BLOCK_LIST_ENTRY_NOT_FOUND");
+    }
+
+    // OSS-6
+    @Test
+    void values_heldEmailPrefix_exactlyTheFiveCodes() {
+        // execution
+        List<String> heldEmailCodes = Arrays.stream(ErrorCode.values())
+                .map(ErrorCode::name)
+                .filter(name -> name.startsWith(HELD_EMAIL_PREFIX))
+                .toList();
+
+        // verifications
+        assertThat(heldEmailCodes).containsExactlyInAnyOrder(
+                "HELD_EMAIL_NOT_FOUND",
+                "HELD_EMAIL_ALREADY_RESOLVED",
+                "HELD_EMAIL_DMARC_DISCARD_ONLY",
+                "HELD_EMAIL_REQUESTER_NOT_FOUND",
+                "HELD_EMAIL_REQUESTER_REQUIRED");
     }
 }

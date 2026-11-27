@@ -26,6 +26,7 @@ import type {
   TicketEscalatedData,
   TicketEventData,
 } from '../components/chat/types/message.types';
+import type { OpenFrameMessageAttachment } from './attachment-profiles';
 import type { ChatProgress } from './progress';
 import { normalizeRecordUris, normalizeSourceId, parseRecordHref } from './record-link';
 import { isRecord } from './wire-narrow';
@@ -181,7 +182,18 @@ export interface ChatSuggestionsPart {
   data: { groups: ChatSuggestionGroup[]; note?: string };
 }
 
+/**
+ * The message is an email (email-to-ticket): its envelope, beside the text part of its body, as the backend stores it
+ * (an `EmailData` part after the `TextData`). Drawn with the body as one email card.
+ */
+export interface ChatEmailPart {
+  type: 'data-email';
+  id?: string;
+  data: ChatEmailEnvelope;
+}
+
 export type ChatDataPart =
+  | ChatEmailPart
   | ChatRecordCardsPart
   | ChatAskPart
   | ChatEscalationOfferPart
@@ -324,6 +336,31 @@ export interface ChatMessageAuthor {
   assistantType?: AssistantType;
 }
 
+/** One address on an email envelope. */
+export interface ChatEmailAddress {
+  address: string;
+  name?: string | null;
+}
+
+/**
+ * The envelope of a message that is an email (email-to-ticket): who it went from and to, and what the thread shows
+ * beside the body. Read from the message's stored EMAIL part; a live chunk does not carry it.
+ */
+export interface ChatEmailEnvelope {
+  direction: 'INBOUND' | 'OUTBOUND';
+  from: ChatEmailAddress | null;
+  to: ChatEmailAddress[];
+  cc: ChatEmailAddress[];
+  subject?: string;
+  /** The folded part: the quoted thread and the signature. */
+  quotedText?: string;
+  /** A reply's state at the provider; absent on an inbound email. */
+  deliveryState?: 'SENDING' | 'DELIVERED' | 'FAILED';
+  deliveryFailureReason?: string;
+  /** An automatic email (an out-of-office, a delivery report). */
+  automatic?: boolean;
+}
+
 /** JSON-serializable. */
 export interface ChatMessageMetadata {
   // A stored row.
@@ -352,6 +389,8 @@ export interface ChatMessageMetadata {
   progress?: ChatProgressRow[];
   author?: ChatMessageAuthor;
   contextItems?: ChatContextItem[];
+  /** The files an OpenFrame (Mingo, Fae) user message carries, as the host maps its backend parts into them. */
+  openframeAttachments?: OpenFrameMessageAttachment[];
   /** The highest chunk sequence consumed into this row: what the history merge decides coverage with. */
   streamSeq?: number;
 }
@@ -369,6 +408,11 @@ export interface ChatMessage {
 
 export function isSourcePart(part: ChatPart): part is ChatSourcePart {
   return part.type === 'source-url' || part.type === 'source-document';
+}
+
+/** The message's email envelope, when it is an email (email-to-ticket). */
+export function emailEnvelopeOf(message: Pick<ChatMessage, 'parts'>): ChatEmailEnvelope | undefined {
+  return message.parts.find((part): part is ChatEmailPart => part.type === 'data-email')?.data;
 }
 
 export function isToolPart(part: ChatPart): part is ChatToolPart {

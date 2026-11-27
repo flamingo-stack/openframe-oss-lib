@@ -2,6 +2,7 @@ package com.openframe.api.dto.rmm.osupdate;
 
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
+import com.openframe.data.document.rmm.osupdate.OsUpdateCustomerStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,4 +20,5 @@ public class OsUpdateFilterInput {
     private List<OsUpdateClassification> classifications;
     private String search;
     private List<String> organizationIds;
+    private List<OsUpdateCustomerStatus> customerStatuses;
 }
