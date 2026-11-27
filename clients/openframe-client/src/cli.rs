@@ -37,6 +37,7 @@ struct InstallArgs {
     #[arg(long = "logKey")]
     log_key: Option<String>,
 
+    #[cfg(feature = "local-mode")]
     #[arg(long = "localMode", default_value_t = false)]
     local_mode: bool,
 
@@ -62,7 +63,10 @@ impl InstallArgs {
             log_key: self.log_key.clone(),
             org_id: self.org_id.clone(),
             user_id: self.user_id.clone(),
+            #[cfg(feature = "local-mode")]
             local_mode: self.local_mode,
+            #[cfg(not(feature = "local-mode"))]
+            local_mode: false,
             tags: self.tags.clone(),
             remote_access_mode: self.remote_access_mode,
         }
@@ -77,9 +81,6 @@ enum Commands {
     Auth(InstallArgs),
     /// Uninstall the OpenFrame client service
     Uninstall,
-    /// Run the OpenFrame client directly (not as a service)
-    #[command(hide = true)]
-    Run,
     /// Run as a service (used by service manager)
     #[command(hide = true)]
     RunAsService,
@@ -105,7 +106,6 @@ pub fn run() -> Result<()> {
         Some(Commands::Auth(args)) => auth::run(args, &rt),
         Some(Commands::Doctor) => healthcheck::run(&rt),
         Some(Commands::Uninstall) => uninstall::run(&rt),
-        Some(Commands::Run) => agent::run_direct(&rt),
         Some(Commands::RunAsService) => agent::run_as_service(),
         Some(Commands::CheckPermissions) => permissions::run(),
         Some(Commands::RestartService) => restart::run(&rt),
