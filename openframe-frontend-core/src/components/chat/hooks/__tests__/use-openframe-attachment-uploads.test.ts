@@ -268,7 +268,27 @@ describe('useOpenFrameAttachmentUploads', () => {
     expect(again.map(t => t.attachmentId)).toEqual(['att_1']);
   });
 
-  it('ignores files it did not take for the last send', () => {
+  it('puts back the files of a send that fails after a later send went out', async () => {
+    const { uploader, setStatus } = fakeUploader();
+    setStatus({ attachmentId: 'att_1', state: 'ready' });
+    setStatus({ attachmentId: 'att_2', state: 'ready' });
+    const { result } = setup(uploader);
+    act(() => result.current.addFiles([text('first.txt')]));
+    await waitFor(() => expect(result.current.items[0]?.state).toBe('ready'));
+    act(() => {
+      result.current.takeForSend();
+    });
+    act(() => result.current.addFiles([text('second.txt')]));
+    await waitFor(() => expect(result.current.items[0]?.state).toBe('ready'));
+    act(() => {
+      result.current.takeForSend();
+    });
+
+    act(() => result.current.restore([{ id: 'att_1', name: 'first.txt', mediaType: 'text/plain' }]));
+    expect(result.current.items.map(item => item.name)).toEqual(['first.txt']);
+  });
+
+  it('ignores files it did not take for a send', () => {
     const { uploader } = fakeUploader();
     const { result } = setup(uploader);
     act(() => result.current.restore([{ id: 'att_9', name: 'x.txt', mediaType: 'text/plain' }]));

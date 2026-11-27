@@ -80,13 +80,17 @@ export interface OpenFrameAttachmentUploads {
    */
   takeForSend: () => OpenFrameReadyAttachment[];
   /**
-   * The last send failed and the draft came back (`OpenFrameChatAttachments.onMessageSendFailed`): its files, by server
-   * id, return to the tray as they were. Files of an earlier send, or already back, are ignored.
+   * A send failed and the draft came back (`OpenFrameChatAttachments.onMessageSendFailed`): its files, by server id,
+   * return to the tray as they were, also when a later send went out first. Files it never took, or already back, are
+   * ignored.
    */
   restore: (sent: readonly OpenFrameMessageAttachment[]) => void;
   /** Empty the tray and cancel everything (a new chat, a switched conversation). */
   clear: () => void;
 }
+
+/** Sent files `restore` can still bring back: a chat holds at most 20, so this covers every send still in flight. */
+const SENT_FILES_KEPT = 50;
 
 interface View {
   items: readonly OpenFrameAttachmentItem[];
@@ -266,28 +270,33 @@ export function useOpenFrameAttachmentUploads({
     commit(prev => (prev.length > 0 ? [] : prev)); // an empty tray stays the same array, so React skips the render
   }, [cancelRead, commit, drop]);
 
-  // The last send's files with what the tray kept for them, so a send that fails can put them back (`restore`).
-  const lastTaken = useRef(new Map<string, { item: OpenFrameAttachmentItem; entry: OpenFrameTrayEntry }>());
+  // The files of recent sends with what the tray kept for them, by server id, so a send that fails can put them back
+  // (`restore`), also when a later send went out before it settled. The oldest go first past the cap.
+  const sentFiles = useRef(new Map<string, { item: OpenFrameAttachmentItem; entry: OpenFrameTrayEntry }>());
 
   const takeForSend = useCallback(() => {
     const taken = openFrameReadyAttachments(itemsRef.current, entries.current);
-    lastTaken.current = new Map(
-      taken.flatMap(({ attachmentId, item }) => {
-        const entry = entries.current.get(item.id);
-        return entry ? [[attachmentId, { item, entry }] as const] : [];
-      }),
-    );
+    for (const { attachmentId, item } of taken) {
+      const entry = entries.current.get(item.id);
+      if (entry) sentFiles.current.set(attachmentId, { item, entry });
+    }
+    for (const oldest of [...sentFiles.current.keys()].slice(
+      0,
+      Math.max(0, sentFiles.current.size - SENT_FILES_KEPT),
+    )) {
+      sentFiles.current.delete(oldest);
+    }
     clear();
     return taken;
   }, [clear]);
 
-  /** The last send failed: its files (by server id) go back into the tray as they were, ready, ahead of newer ones. */
+  /** A send failed: its files (by server id) go back into the tray as they were, ready, ahead of newer ones. */
   const restore = useCallback(
     (sent: readonly OpenFrameMessageAttachment[]) => {
       const back = sent.flatMap(file => {
-        const kept = lastTaken.current.get(file.id);
+        const kept = sentFiles.current.get(file.id);
         if (!kept) return [];
-        lastTaken.current.delete(file.id);
+        sentFiles.current.delete(file.id);
         return [kept];
       });
       if (back.length === 0) return;
