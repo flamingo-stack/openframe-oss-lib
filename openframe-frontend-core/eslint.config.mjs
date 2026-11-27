@@ -258,6 +258,14 @@ export default defineConfig([
       'src/__tests__/route-styles-client.test.tsx',
       // FadePreview's item mode: the contract is the height it measures onto its role-less clamp box.
       'src/components/ui/__tests__/fade-preview.test.tsx',
+      // A product screen is a picture: its frame is `role="img"` and the screen inside is `inert` and `aria-hidden`, so
+      // no `screen` query reaches a row. The contract is the grid's geometry (the column widths it sets on its root)
+      // against the frame's layout width (the frame's inner box style).
+      'src/__tests__/product-demo-tables-layout.test.tsx',
+      // What a tenants card row guarantees its tenant on a phone: the contract is the flex classes on the row's
+      // role-less cell boxes (a floor, a width, whether a cell gives way) and the box around the access tag, which
+      // jsdom does not lay out and no `screen` query reaches, so the test walks from the tenant's name and the tag.
+      'src/components/features/cloud-tenants/tenants-table-phone-row.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',

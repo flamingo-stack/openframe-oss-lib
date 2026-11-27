@@ -9,6 +9,7 @@ import com.openframe.client.service.rmm.PackageManagerBootstrapService;
 import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
@@ -45,8 +46,10 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = {
                 ".*\\.MachineRepository",
                 ".*\\.ScriptScheduleMachineAssignedRepository",
+                ".*\\.ScriptScheduleRepository",
                 ".*\\.DeviceOnlineDispatchRepository",
                 ".*\\.SoftwareScheduleMachineAssignedRepository",
+                ".*\\.SoftwareScheduleRepository",
                 ".*\\.SoftwareScheduleOnlineDispatchRepository",
                 ".*\\.DeviceSoftwareRepository",
                 ".*\\.osupdate\\..*"
@@ -103,6 +106,11 @@ public class OsReportIngestTestApplication {
     @Bean
     public SoftwareProjectionTrigger softwareProjectionTrigger() {
         return Mockito.mock(SoftwareProjectionTrigger.class);
+    }
+
+    @Bean
+    public TagAssignmentRepository tagAssignmentRepository() {
+        return Mockito.mock(TagAssignmentRepository.class);
     }
 
     @Bean

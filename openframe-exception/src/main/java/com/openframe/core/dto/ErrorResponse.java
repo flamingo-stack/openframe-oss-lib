@@ -1,7 +1,7 @@
 package com.openframe.core.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.ApiErrorCode;
 
 import java.time.Instant;
 import java.util.List;
@@ -36,7 +36,7 @@ public class ErrorResponse {
         this.fieldErrors = fieldErrors;
     }
 
-    public static ErrorResponse of(ErrorCode errorCode, String message) {
+    public static ErrorResponse of(ApiErrorCode errorCode, String message) {
         return new ErrorResponse(errorCode.getCode(), message, null, Instant.now().toString(), null, null);
     }
 

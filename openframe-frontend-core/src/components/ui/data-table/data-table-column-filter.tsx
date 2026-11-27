@@ -1,6 +1,6 @@
 'use client';
 
-import type { Column } from '@tanstack/react-table';
+import type { Column, Table } from '@tanstack/react-table';
 import { useCallback, useMemo } from 'react';
 import { cn } from '../../../utils/cn';
 import { FiltersDropdown, type FilterSection } from '../../features';
@@ -11,15 +11,31 @@ import {
   filterSectionValue,
   splitFilterSectionValues,
 } from './types';
-import { alignJustify } from './utils';
+import { alignJustify, getColumnFilterValueByKey, setColumnFilterValueByKey } from './utils';
 
 // Stable reference for "no filter selected" — avoids creating a new `[]` per
 // render when `column.getFilterValue()` is `undefined`, which would otherwise
 // invalidate `currentFilters` useMemo every render.
 const EMPTY_ARRAY: string[] = [];
 
+/**
+ * Where a filter stored under another key than its column's id lives (`meta.filter.id`): the key, and the table whose
+ * column filters hold it. One object, so a key never comes without the table it is read and written through.
+ */
+export interface DataTableColumnFilterStore {
+  table: Table<unknown>;
+  id: string;
+}
+
 export interface DataTableColumnFilterProps {
   column: Column<unknown, unknown>;
+  /**
+   * A filter stored under another key than the column's id (`meta.filter.id`), read and written through that table;
+   * the column's own API only reaches its own id. Omitted, or with the column's own id, the filter is the column's.
+   */
+  storedAs?: DataTableColumnFilterStore;
+  /** The dropdown's title and the funnel's accessible name, "Filter by <title>" (`meta.filter.title`). Default `label`. */
+  title?: string;
   options: DataTableFilterOption[];
   /** More groups in the same dropdown: see `meta.filter.sections`. */
   extraSections?: DataTableFilterSection[];
@@ -38,6 +54,8 @@ export interface DataTableColumnFilterProps {
 /** Filter dropdown wrapper that reads/writes TanStack column filter state. */
 export function DataTableColumnFilter({
   column,
+  storedAs,
+  title: titleProp,
   options,
   extraSections,
   placement = 'bottom-start',
@@ -46,16 +64,29 @@ export function DataTableColumnFilter({
   pending = false,
   variant = 'cards',
 }: DataTableColumnFilterProps) {
-  const currentValue = column.getFilterValue() as string[] | undefined;
+  // A filter stored under another key than the column's id is read and written through the table, under that key
+  // alone; one under the column's id through the column's own API, as always.
+  const key = storedAs?.id ?? column.id;
+  const keyedTable = storedAs && storedAs.id !== column.id ? storedAs.table : undefined;
+  const currentValue = (keyedTable ? getColumnFilterValueByKey(keyedTable, key) : column.getFilterValue()) as
+    string[] | undefined;
   const activeCount = currentValue?.length ?? 0;
+  const title = titleProp ?? label;
+  const setValue = useCallback(
+    (value: string[] | undefined) => {
+      if (keyedTable) setColumnFilterValueByKey(keyedTable, key, value);
+      else column.setFilterValue(value);
+    },
+    [column, keyedTable, key],
+  );
 
   const extraIds = useMemo(() => (extraSections ?? []).map(section => section.id), [extraSections]);
 
   const sections = useMemo<FilterSection[]>(
     () => [
       {
-        id: column.id,
-        title: label,
+        id: key,
+        title,
         type: 'checkbox',
         options,
         allowSelectAll: true,
@@ -70,29 +101,29 @@ export function DataTableColumnFilter({
           allowSelectAll: true,
         })),
     ],
-    [column.id, label, options, extraSections],
+    [key, title, options, extraSections],
   );
 
   const currentFilters = useMemo(() => {
-    if (extraIds.length === 0) return { [column.id]: currentValue ?? EMPTY_ARRAY };
+    if (extraIds.length === 0) return { [key]: currentValue ?? EMPTY_ARRAY };
     const { own, sections: picked } = splitFilterSectionValues(currentValue, extraIds);
-    return { [column.id]: own, ...picked };
-  }, [column.id, currentValue, extraIds]);
+    return { [key]: own, ...picked };
+  }, [key, currentValue, extraIds]);
 
   const handleApply = useCallback(
     (applied: Record<string, string[]>) => {
       const next = [
-        ...(applied[column.id] ?? []),
+        ...(applied[key] ?? []),
         ...extraIds.flatMap(id => (applied[id] ?? []).map(value => filterSectionValue(id, value))),
       ];
-      column.setFilterValue(next.length > 0 ? next : undefined);
+      setValue(next.length > 0 ? next : undefined);
     },
-    [column, extraIds],
+    [key, setValue, extraIds],
   );
 
   const handleReset = useCallback(() => {
-    column.setFilterValue(undefined);
-  }, [column]);
+    setValue(undefined);
+  }, [setValue]);
 
   // Nothing to choose from. Two ways to get here, and they look different:
   //
@@ -114,7 +145,7 @@ export function DataTableColumnFilter({
         alignJustify(align),
         isEmpty ? 'cursor-default' : 'cursor-pointer',
       )}
-      aria-label={isEmpty ? undefined : `Filter by ${label}`}
+      aria-label={isEmpty ? undefined : `Filter by ${title}`}
     >
       <span className={cn('whitespace-nowrap text-h5', applied ? 'text-ods-text-primary' : 'text-ods-text-secondary')}>
         {label}
@@ -141,7 +172,7 @@ export function DataTableColumnFilter({
       )}
       // Only a real control announces itself as one. With no options this box
       // is the plain header label the non-filterable columns beside it render.
-      aria-label={isEmpty ? undefined : `Filter by ${label}`}
+      aria-label={isEmpty ? undefined : `Filter by ${title}`}
     >
       <span
         className={cn(

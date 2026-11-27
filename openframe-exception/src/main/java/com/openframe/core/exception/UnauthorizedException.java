@@ -8,11 +8,11 @@ public class UnauthorizedException extends BaseException {
         super(ErrorCode.UNAUTHORIZED, HttpStatus.UNAUTHORIZED, message);
     }
 
-    public UnauthorizedException(ErrorCode errorCode, String message) {
+    public UnauthorizedException(ApiErrorCode errorCode, String message) {
         super(errorCode, HttpStatus.UNAUTHORIZED, message);
     }
 
-    public UnauthorizedException(ErrorCode errorCode, String message, Throwable cause) {
+    public UnauthorizedException(ApiErrorCode errorCode, String message, Throwable cause) {
         super(errorCode, HttpStatus.UNAUTHORIZED, message, cause);
     }
 }

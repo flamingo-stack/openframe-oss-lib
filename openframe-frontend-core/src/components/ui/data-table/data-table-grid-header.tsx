@@ -1,6 +1,7 @@
 'use client';
 
 import { flexRender, type Header } from '@tanstack/react-table';
+import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
 import { Arrow01DownIcon, Arrow01UpIcon, SwitchVrIcon } from '../../icons-v2-generated';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
@@ -63,6 +64,14 @@ export function DataTableGridHeader({
   const loading = inScope || loadingProp === true;
   const { headerViewportRef, onHeaderWheel, onHeaderScroll } = useGridScrollElements();
   const headerGroup = table.getHeaderGroups()[0];
+  const drawn = headerGroup != null;
+  // Tells the body a header is drawn: an empty body keeps the columns' width under it only (`controller.header`).
+  const { controller } = scroll;
+  useIsomorphicLayoutEffect(() => {
+    if (!drawn) return undefined;
+    controller.header.set(true);
+    return () => controller.header.set(false);
+  }, [controller, drawn]);
   if (!headerGroup) return null;
 
   const headers = new Map<string, AnyHeader>(headerGroup.headers.map(header => [header.column.id, header]));
@@ -196,6 +205,9 @@ function GridHeaderCell({ column, header, sort, onSortChange, loading }: GridHea
           <DataTableColumnFilter
             variant="grid"
             column={header.column}
+            // The table's fresh handle (`useDataTable`): a filter stored under another key is read through it.
+            storedAs={filter.id ? { table, id: filter.id } : undefined}
+            title={filter.title}
             options={filter.options}
             extraSections={filter.sections}
             placement={filter.placement}

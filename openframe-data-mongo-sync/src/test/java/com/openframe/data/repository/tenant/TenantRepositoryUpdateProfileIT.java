@@ -40,7 +40,7 @@ class TenantRepositoryUpdateProfileIT extends BaseMongoIntegrationTest {
     void updateProfile_objectIdTenant_setsNameWebsiteAndUpdatedAtOnly() {
         ObjectId id = new ObjectId();
         mongoTemplate.getCollection("tenants").insertOne(new Document("_id", id).append("name", "Old")
-                .append("domain", "acme").append("displayId", "T-7KQ2M9XA").append("status", "ACTIVE")
+                .append("domain", "acme").append("status", "ACTIVE")
                 .append("unknownToThisLib", "kept"));
 
         long matched = repository.updateProfile(id.toHexString(), "Acme", "https://acme.example", NOW);
@@ -48,7 +48,7 @@ class TenantRepositoryUpdateProfileIT extends BaseMongoIntegrationTest {
         Document tenant = mongoTemplate.getCollection("tenants").find(new Document("_id", id)).first();
         assertThat(matched).isEqualTo(1);
         assertThat(tenant).containsEntry("name", "Acme").containsEntry("website", "https://acme.example")
-                .containsEntry("domain", "acme").containsEntry("displayId", "T-7KQ2M9XA")
+                .containsEntry("domain", "acme")
                 .containsEntry("status", "ACTIVE").containsEntry("unknownToThisLib", "kept")
                 .containsKey("updatedAt");
     }
@@ -56,14 +56,14 @@ class TenantRepositoryUpdateProfileIT extends BaseMongoIntegrationTest {
     @Test
     void updateProfile_stringIdTenant_isFoundToo() {
         mongoTemplate.getCollection("tenants").insertOne(new Document("_id", "8f14e45f-ceea-467a-9575-0f2d4c4a8b1e")
-                .append("name", "Old").append("displayId", "T-1111111A"));
+                .append("name", "Old").append("website", "https://old.example"));
 
         long matched = repository.updateProfile("8f14e45f-ceea-467a-9575-0f2d4c4a8b1e", "Globex", null, NOW);
 
         Tenant tenant = repository.findById("8f14e45f-ceea-467a-9575-0f2d4c4a8b1e").orElseThrow();
         assertThat(matched).isEqualTo(1);
         assertThat(tenant.getName()).isEqualTo("Globex");
-        assertThat(tenant.getDisplayId()).isEqualTo("T-1111111A");
+        assertThat(tenant.getWebsite()).isNull();
     }
 
     @Test

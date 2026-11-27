@@ -17,9 +17,12 @@ import type { ProductScreenViewProps } from '../types';
 
 /**
  * The picture has nowhere to open a run and no row menu, and the Result
- * column would repeat the output opened under its row.
+ * column would repeat the output opened under its row. Every run is on behalf
+ * of the person the code pane names as its approver, so "Executed by" says
+ * nothing a row needs, and without it the time, the status and the device fit
+ * the grid beside the code (760px of the pane's 816).
  */
-const WIDE_HIDDEN_COLUMNS = ['result', 'open'];
+const WIDE_HIDDEN_COLUMNS = ['result', 'open', 'initiatorId'];
 
 /**
  * A card's width hides the device column (the product's page drops it below
@@ -173,7 +176,8 @@ export default function ScriptsScreen({ compact = false }: ProductScreenViewProp
     row.id === fixture.openExecutionId ? <ScriptExecutionResult result={row.result} empty="—" /> : null;
 
   return (
-    // The frame's tighter padding and no header row: the output opened under a run needs the height.
+    // The frame's tighter padding and no header row: the output opened under a run needs the height. The runs are the
+    // product's grid; the narrow rendering above keeps the card rows, since the grid would be cut past a phone card's edge.
     <div className="flex h-full gap-[var(--spacing-system-m)] overflow-hidden bg-ods-bg p-[var(--spacing-system-m)]">
       <div className="w-[39%] shrink-0">
         <ScriptCodePicture script={fixture.script} />
@@ -184,7 +188,7 @@ export default function ScriptsScreen({ compact = false }: ProductScreenViewProp
           hideColumns={WIDE_HIDDEN_COLUMNS}
           renderSubRow={renderOutput}
           showHeader={false}
-          compact
+          layout="grid"
         />
       </div>
     </div>

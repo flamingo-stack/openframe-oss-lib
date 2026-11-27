@@ -243,7 +243,7 @@ pub async fn check_tls_handshake(server_url: &str, machine_id: Option<&str>) -> 
             CheckCategory::Network,
             "Network: TLS handshake",
             format!(
-                "TLS handshake failed with {}. If behind a corporate proxy, you may need to add a CA certificate or use --localMode.",
+                "TLS handshake failed with {}. If behind a corporate proxy, you may need to add a CA certificate.",
                 strip_scheme(server_url)
             ),
         ),

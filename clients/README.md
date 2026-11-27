@@ -39,8 +39,10 @@ This enables the committed git hooks:
 Both hooks only fire when the change touches Rust under `clients/`, and skip
 cleanly if `cargo` (or `make`, for pre-push) is not installed, so they do not get
 in the way of Java-only work. CI (`.github/workflows/build.yml`) runs the same
-checks on PRs with the `build` label and in the merge queue. They are not
-required checks: `main` requires only `Flamingo Code Review / reviewed`.
+checks on PRs with the `build` label, in the merge queue, and again on `main`
+after each merge. They are not required checks: `main` requires only
+`Flamingo Code Review / reviewed`, so a failing run doesn't stop a merge, but
+`release-rust` doesn't tag until the run on `main` for the last Rust change passed.
 
 Requires a stable Rust toolchain (`rustup` recommended) with the `rustfmt` and
 `clippy` components.
@@ -65,6 +67,10 @@ the crate stays lean for library consumers. To build/run it directly here:
 OPENFRAME_VERSION=0.0.0-dev cargo build --features bin --bin openframe-client
 OPENFRAME_VERSION=0.0.0-dev cargo run   --features bin --bin openframe-client -- --help
 ```
+
+For a local dev server with mkcert certificates, add the dev-only `local-mode`
+feature (`--features bin,local-mode`): it brings back `install --localMode`,
+which turns off TLS certificate checks. Release builds never include it.
 
 ## Consuming the library from a tenant repo
 

@@ -19,6 +19,7 @@ fmt-check:
 
 clippy:
 	OPENFRAME_VERSION=$(OPENFRAME_VERSION) $(CARGO) clippy --all-targets -- -D warnings
+	OPENFRAME_VERSION=$(OPENFRAME_VERSION) $(CARGO) clippy --all-targets --features bin,local-mode -- -D warnings
 
 lint: fmt-check clippy
 

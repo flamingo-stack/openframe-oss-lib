@@ -8,6 +8,16 @@ import com.openframe.api.dto.rmm.osupdate.OsUpdateDeviceScope;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.osupdate.OsUpdateService;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
+import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
+import com.openframe.data.document.rmm.osupdate.OsPlatform;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOverride;
+import com.openframe.data.document.rmm.osupdate.OsUpdateOverrideAction;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTarget;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicyTargetType;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutMode;
+import com.openframe.data.document.rmm.osupdate.OsUpdateRolloutRule;
+import com.openframe.data.document.rmm.osupdate.OsUpdateUrgency;
 import graphql.ExecutionResult;
 import graphql.GraphQLError;
 import org.bson.Document;
@@ -21,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.util.ClassUtils;
 
@@ -68,6 +79,9 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
 
     private static final String ORG_A = "org-a";
     private static final String ORG_B = "org-b";
+    private static final Map<String, String> ORGANIZATION_ID_BY_MACHINE_ID = Map.of(
+            WIN_1, ORG_A, WIN_NOT_MANAGEABLE, ORG_A, WIN_2, ORG_B, WIN_4, ORG_B, MAC_1, ORG_B,
+            OTHER_TENANT_MACHINE, ORG_A);
     private static final String ORG_WITHOUT_DEVICES = "org-without-devices";
 
     private static final String CUMULATIVE = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
@@ -102,6 +116,31 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
     private static final String OS_UPDATE = """
             query($id: ID!) {
               osUpdate(id: $id) { id identifier classification pendingDeviceCount installedDeviceCount }
+            }
+            """;
+    private static final String OS_UPDATES_WITH_STATUSES = """
+            query($filter: OsUpdateFilterInput, $first: Int, $after: String) {
+              osUpdates(filter: $filter, first: $first, after: $after) {
+                edges { cursor node { identifier customerStatuses } }
+                pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
+              }
+            }
+            """;
+    private static final String CUSTOMERS = """
+            query($osUpdateId: ID!) {
+              osUpdateCustomers(osUpdateId: $osUpdateId) {
+                organizationId status policyId policyName pendingDeviceCount installedDeviceCount
+                rolloutRule { urgency mode }
+                override { organizationId action }
+              }
+            }
+            """;
+    private static final String SUMMARY = """
+            query($organizationIds: [String!]) {
+              osUpdateSummary(organizationIds: $organizationIds) {
+                deviceCount currentDeviceCount overdueDeviceCount overdueOfflineDeviceCount
+                restartPendingDeviceCount heldUpdateCount
+              }
             }
             """;
     private static final String DEVICES = """
@@ -143,12 +182,14 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         pendingCollection().deleteMany(new Document());
         historyCollection().deleteMany(new Document());
         osUpdateCollection().deleteMany(new Document());
+        mongoTemplate.remove(new Query(), OsUpdatePolicy.class);
+        mongoTemplate.remove(new Query(), OsUpdateOverride.class);
+        mongoTemplate.remove(new Query(), DeviceOsUpdateRolloutState.class);
 
-        Stream.of(WIN_1, WIN_NOT_MANAGEABLE)
-                .forEach(machineId -> machines().insertOne(machine(machineId, TENANT_ID, ORG_A)));
-        Stream.of(WIN_2, WIN_4, MAC_1)
-                .forEach(machineId -> machines().insertOne(machine(machineId, TENANT_ID, ORG_B)));
-        machines().insertOne(machine(OTHER_TENANT_MACHINE, OTHER_TENANT_ID, ORG_A));
+        Stream.of(WIN_1, WIN_NOT_MANAGEABLE, WIN_2, WIN_4, MAC_1).forEach(machineId -> machines().insertOne(
+                machine(machineId, TENANT_ID, ORGANIZATION_ID_BY_MACHINE_ID.get(machineId))));
+        machines().insertOne(machine(OTHER_TENANT_MACHINE, OTHER_TENANT_ID,
+                ORGANIZATION_ID_BY_MACHINE_ID.get(OTHER_TENANT_MACHINE)));
         stateCollection().insertOne(state(WIN_1, TENANT_ID, "MANAGEABLE"));
         stateCollection().insertOne(state(WIN_NOT_MANAGEABLE, TENANT_ID, "NOT_MANAGEABLE"));
         stateCollection().insertOne(state(OTHER_TENANT_MACHINE, OTHER_TENANT_ID, "MANAGEABLE"));
@@ -189,7 +230,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
 
         // verifications
         assertThat(beans).contains("OsUpdateDataFetcher", "OsUpdateService", "OsUpdateDeviceService", "OsUpdateResponseMapper",
-                "OsUpdateGraphQLMapper", "OsUpdateDeviceCountsDataLoader");
+                "OsUpdateGraphQLMapper", "OsUpdateDeviceCountsDataLoader", "OsUpdateCustomerStatusesDataLoader");
     }
 
     @Test
@@ -628,6 +669,166 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         assertThat(machineIds(installed)).containsExactly(WIN_1, WIN_4, GONE);
     }
 
+    @Test
+    void osUpdates_customerStatuses_statusesOfEveryUpdateAndTheFilterOverPagesWithACursor() {
+        // setup
+        storeTheHoldPolicyAndTheApprovalOfOrgB();
+
+        // execution
+        Page everyUpdate = osUpdatesWithStatuses(null, null, null);
+        Page held = osUpdatesWithStatuses(Map.of("customerStatuses", List.of("HELD")), null, null);
+        Page rejected = osUpdatesWithStatuses(Map.of("customerStatuses", List.of("REJECTED")), null, null);
+        Map<String, Object> heldOrListedOnly = Map.of("customerStatuses", List.of("HELD", "LISTED_ONLY"));
+        Page firstPage = osUpdatesWithStatuses(heldOrListedOnly, 1, null);
+        Page secondPage = osUpdatesWithStatuses(heldOrListedOnly, 1, firstPage.endCursor());
+
+        // verifications
+        assertThat(everyUpdate.nodes())
+                .extracting(node -> node.get("identifier"), node -> node.get("customerStatuses"))
+                .containsExactly(tuple(CUMULATIVE, List.of("APPROVED", "HELD")), tuple(DRIVER, List.of("LISTED_ONLY")),
+                        tuple(SAFARI, List.of()));
+        assertThat(identifiers(held)).containsExactly(CUMULATIVE);
+        assertThat(identifiers(rejected)).isEmpty();
+        assertThat(identifiers(firstPage)).containsExactly(CUMULATIVE);
+        assertThat(firstPage.hasNextPage()).isTrue();
+        assertThat(identifiers(secondPage)).containsExactly(DRIVER);
+        assertThat(secondPage.hasNextPage()).isFalse();
+    }
+
+    @Test
+    void osUpdates_customerStatusesOfOneOrganization_statusesOfThatCustomerOnly() {
+        // setup
+        storeTheHoldPolicyAndTheApprovalOfOrgB();
+
+        // execution
+        Page heldAtOrgB = osUpdatesWithStatuses(
+                Map.of("customerStatuses", List.of("HELD"), "organizationIds", List.of(ORG_B)), null, null);
+        Page approvedAtOrgB = osUpdatesWithStatuses(
+                Map.of("customerStatuses", List.of("APPROVED"), "organizationIds", List.of(ORG_B)), null, null);
+
+        // verifications
+        assertThat(identifiers(heldAtOrgB)).isEmpty();
+        assertThat(approvedAtOrgB.nodes())
+                .extracting(node -> node.get("identifier"), node -> node.get("customerStatuses"))
+                .containsExactly(tuple(CUMULATIVE, List.of("APPROVED")));
+    }
+
+    @Test
+    void osUpdates_customerStatusesWithoutAPolicy_everyWindowsUpdateListedOnly() {
+        // setup
+
+        // execution
+        Page listedOnly = osUpdatesWithStatuses(Map.of("customerStatuses", List.of("LISTED_ONLY")), null, null);
+
+        // verifications
+        assertThat(identifiers(listedOnly)).containsExactly(CUMULATIVE, DRIVER);
+    }
+
+    @Test
+    void osUpdateCustomers_updateAtTwoCustomers_rowPerCustomerWithItsStatusPolicyRuleDecisionAndCounts() {
+        // setup
+        String policyId = storeTheHoldPolicyAndTheApprovalOfOrgB();
+        Map<String, Object> holdRule = Map.of("urgency", "CRITICAL_SECURITY", "mode", "HOLD");
+
+        // execution
+        List<Map<String, Object>> customers =
+                list(data(CUSTOMERS, Map.of("osUpdateId", cumulativeId)).get("osUpdateCustomers"));
+        List<Map<String, Object>> customersOfTheDriver =
+                list(data(CUSTOMERS, Map.of("osUpdateId", driverId)).get("osUpdateCustomers"));
+        List<Map<String, Object>> customersOfSafari =
+                list(data(CUSTOMERS, Map.of("osUpdateId", safariId)).get("osUpdateCustomers"));
+
+        // verifications
+        assertThat(customers)
+                .extracting(customer -> customer.get("organizationId"), customer -> customer.get("status"),
+                        customer -> customer.get("policyId"), customer -> customer.get("policyName"),
+                        customer -> customer.get("rolloutRule"), customer -> customer.get("override"),
+                        customer -> customer.get("pendingDeviceCount"), customer -> customer.get("installedDeviceCount"))
+                .containsExactly(
+                        tuple(ORG_A, "HELD", policyId, "Default", holdRule, null, 1, 1),
+                        tuple(ORG_B, "APPROVED", policyId, "Default", holdRule,
+                                Map.of("organizationId", ORG_B, "action", "APPROVE"), 1, 1));
+        assertThat(customersOfTheDriver)
+                .extracting(customer -> customer.get("organizationId"), customer -> customer.get("status"),
+                        customer -> customer.get("rolloutRule"), customer -> customer.get("pendingDeviceCount"))
+                .containsExactly(tuple(ORG_A, "LISTED_ONLY", null, 1));
+        assertThat(customersOfSafari).isEmpty();
+    }
+
+    @Test
+    void osUpdateCustomers_idTheTenantDoesNotHave_answersOsUpdateNotFound() {
+        // setup
+
+        // execution
+        ExecutionResult ofAnotherTenant =
+                queryExecutor.execute(CUSTOMERS, Map.of("osUpdateId", otherTenantCumulativeId));
+
+        // verifications
+        assertOsUpdateNotFound(ofAnotherTenant);
+    }
+
+    @Test
+    void osUpdateSummary_tenantAndOneCustomer_countsOfTheirManageableDevicesAndRolloutStates() {
+        // setup
+        storeTheHoldPolicyAndTheApprovalOfOrgB();
+        stateCollection().insertOne(state(WIN_2, TENANT_ID, "MANAGEABLE").append("rebootPending", "YES"));
+        machines().updateOne(new Document("machineId", WIN_2), new Document("$set", new Document("telemetryStatus", "ONLINE")));
+        Instant now = Instant.now();
+        mongoTemplate.insertAll(List.of(
+                rolloutState(WIN_1, ORG_A, CUMULATIVE, now.minus(10, ChronoUnit.DAYS), now.minus(1, ChronoUnit.DAYS)),
+                rolloutState(WIN_1, ORG_A, DRIVER, now.minus(10, ChronoUnit.DAYS), now.minus(2, ChronoUnit.DAYS)),
+                rolloutState(WIN_2, ORG_B, CUMULATIVE, now.plus(3, ChronoUnit.DAYS), now.plus(10, ChronoUnit.DAYS))));
+
+        // execution
+        Map<String, Object> ofTenant = map(data(SUMMARY, new HashMap<>()).get("osUpdateSummary"));
+        Map<String, Object> ofOrgA = map(data(SUMMARY, Map.of("organizationIds", List.of(ORG_A))).get("osUpdateSummary"));
+        Map<String, Object> ofOrgB = map(data(SUMMARY, Map.of("organizationIds", List.of(ORG_B))).get("osUpdateSummary"));
+
+        // verifications
+        assertThat(ofTenant).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "deviceCount", 2, "currentDeviceCount", 1, "overdueDeviceCount", 1, "overdueOfflineDeviceCount", 1,
+                "restartPendingDeviceCount", 1, "heldUpdateCount", 1));
+        assertThat(ofOrgA).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "deviceCount", 1, "currentDeviceCount", 0, "overdueDeviceCount", 1, "overdueOfflineDeviceCount", 1,
+                "restartPendingDeviceCount", 0, "heldUpdateCount", 1));
+        assertThat(ofOrgB).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "deviceCount", 1, "currentDeviceCount", 1, "overdueDeviceCount", 0, "overdueOfflineDeviceCount", 0,
+                "restartPendingDeviceCount", 1, "heldUpdateCount", 0));
+    }
+
+    // Critical security updates wait for a technician at every customer; org-b approved the cumulative one.
+    private String storeTheHoldPolicyAndTheApprovalOfOrgB() {
+        OsUpdatePolicy holdPolicy = mongoTemplate.insert(OsUpdatePolicy.builder()
+                .tenantId(TENANT_ID).name("Default")
+                .target(OsUpdatePolicyTarget.builder().type(OsUpdatePolicyTargetType.TENANT).build())
+                .rolloutRules(Map.of(OsUpdateUrgency.CRITICAL_SECURITY,
+                        OsUpdateRolloutRule.builder().mode(OsUpdateRolloutMode.HOLD).build()))
+                .createdAt(Instant.parse("2026-11-01T00:00:00Z"))
+                .build());
+        mongoTemplate.insert(OsUpdateOverride.builder()
+                .tenantId(TENANT_ID).platform(OsPlatform.WINDOWS).identifier(CUMULATIVE).organizationId(ORG_B)
+                .action(OsUpdateOverrideAction.APPROVE).actedBy("user-1").actedAt(Instant.parse("2026-11-21T00:00:00Z"))
+                .build());
+        return holdPolicy.getId();
+    }
+
+    private static DeviceOsUpdateRolloutState rolloutState(String machineId, String organizationId,
+                                                           String identifier, Instant installFrom, Instant hardAt) {
+        return DeviceOsUpdateRolloutState.builder()
+                .tenantId(TENANT_ID).machineId(machineId).organizationId(organizationId)
+                .platform(OsPlatform.WINDOWS).identifier(identifier).policyId("policy-1")
+                .installFrom(installFrom).hardAt(hardAt)
+                .build();
+    }
+
+    private Page osUpdatesWithStatuses(Map<String, Object> filter, Integer first, String after) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("filter", filter);
+        variables.put("first", first);
+        variables.put("after", after);
+        return page(data(OS_UPDATES_WITH_STATUSES, variables).get("osUpdates"));
+    }
+
     private Page osUpdates(Map<String, Object> filter, Integer first, String after) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("filter", filter);
@@ -749,6 +950,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                                           String discoveredAt) {
         return new Document("tenantId", tenantId)
                 .append("machineId", machineId)
+                .append("organizationId", ORGANIZATION_ID_BY_MACHINE_ID.get(machineId))
                 .append("platform", platform)
                 .append("identifier", identifier)
                 .append("discoveredAt", date(discoveredAt));
@@ -758,6 +960,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                                          String operation, String result) {
         return new Document("tenantId", tenantId)
                 .append("machineId", machineId)
+                .append("organizationId", ORGANIZATION_ID_BY_MACHINE_ID.get(machineId))
                 .append("entryKey", identifier + "|" + Instant.parse(installedAt).toEpochMilli() + "|" + operation)
                 .append("identifier", identifier)
                 .append("installedAt", date(installedAt))

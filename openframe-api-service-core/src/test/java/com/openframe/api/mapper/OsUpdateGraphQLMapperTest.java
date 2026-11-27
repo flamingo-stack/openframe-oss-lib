@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
+import com.openframe.data.document.rmm.osupdate.OsUpdateCustomerStatus;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,11 +39,13 @@ class OsUpdateGraphQLMapperTest {
                 .platform(OsPlatform.WINDOWS)
                 .classifications(List.of(OsUpdateClassification.SECURITY))
                 .search("KB5051987")
+                .customerStatuses(List.of(OsUpdateCustomerStatus.HELD, OsUpdateCustomerStatus.PILOT))
                 .build();
         OsUpdateFilter expected = OsUpdateFilter.builder()
                 .platform(OsPlatform.WINDOWS)
                 .classifications(List.of(OsUpdateClassification.SECURITY))
                 .search("KB5051987")
+                .customerStatuses(List.of(OsUpdateCustomerStatus.HELD, OsUpdateCustomerStatus.PILOT))
                 .build();
 
         // execution

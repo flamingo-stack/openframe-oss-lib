@@ -23,7 +23,6 @@ import static java.util.UUID.randomUUID;
 @Document(collection = "tenants")
 public class Tenant {
 
-    public static final String DISPLAY_ID_INDEX = "tenants_display_id_unique";
 
     @Id
     private String id;
@@ -42,13 +41,6 @@ public class Tenant {
     @Indexed(unique = true)
     private String domain;
 
-    /**
-     * Public reference of the tenant ({@link TenantDisplayId}), shown where the id and domain must not be.
-     * Sparse-unique: tenants created before the field are given one by a backfill. Same index name as the one
-     * {@code MongoIndexConfig} ensures, so the two stay idempotent.
-     */
-    @Indexed(unique = true, sparse = true, name = DISPLAY_ID_INDEX)
-    private String displayId;
 
     /**
      * Tenant website URL (e.g. https://company.com). Free-form, editable via tenant-info CRUD.

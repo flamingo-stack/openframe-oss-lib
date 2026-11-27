@@ -44,6 +44,7 @@ public final class MachineFields {
     public static final MachineField<String> USER_ID = field("userId", Machine::setUserId);
     public static final MachineField<String> TIMEZONE = field("timezone", Machine::setTimezone);
     public static final MachineField<Instant> STUCK_NOTIFIED_AT = field("stuckNotifiedAt", Machine::setStuckNotifiedAt);
+    public static final MachineField<Instant> PENDING_SINCE = field("pendingSince", Machine::setPendingSince);
     public static final MachineField<Map<PackageManagerType, PackageManagerState>> PACKAGE_MANAGERS =
             field("packageManagers", Machine::setPackageManagers);
 

@@ -45,6 +45,7 @@ class DeviceOsReportParserTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String MACHINE_ID = "machine-1";
+    private static final String ORGANIZATION_ID = "org-1";
     private static final Instant RECEIVED_AT = Instant.parse("2026-11-20T09:14:03.120Z");
     private static final Instant REPORTED_AT = Instant.parse("2026-11-20T09:14:02.481293Z");
     private static final String WINDOWS_IDENTIFIER = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
@@ -70,6 +71,7 @@ class DeviceOsReportParserTest {
         machine = new Machine();
         machine.setTenantId(TENANT_ID);
         machine.setMachineId(MACHINE_ID);
+        machine.setOrganizationId(ORGANIZATION_ID);
     }
 
     @Test
@@ -230,6 +232,7 @@ class DeviceOsReportParserTest {
         DeviceOsPendingUpdate expectedPendingUpdate = DeviceOsPendingUpdate.builder()
                 .tenantId(TENANT_ID)
                 .machineId(MACHINE_ID)
+                .organizationId(ORGANIZATION_ID)
                 .platform(OsPlatform.WINDOWS)
                 .identifier(WINDOWS_IDENTIFIER)
                 .discoveredAt(RECEIVED_AT)
@@ -282,6 +285,7 @@ class DeviceOsReportParserTest {
         DeviceOsUpdateHistoryEntry expected = DeviceOsUpdateHistoryEntry.builder()
                 .tenantId(TENANT_ID)
                 .machineId(MACHINE_ID)
+                .organizationId(ORGANIZATION_ID)
                 .entryKey(WINDOWS_INSTALLED_IDENTIFIER + "|" + WINDOWS_INSTALLED_AT.toEpochMilli() + "|INSTALL")
                 .identifier(WINDOWS_INSTALLED_IDENTIFIER)
                 .title(WINDOWS_INSTALLED_TITLE)

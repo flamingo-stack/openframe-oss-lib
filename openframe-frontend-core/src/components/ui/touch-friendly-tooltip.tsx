@@ -1,6 +1,7 @@
 'use client';
 
-import { type ReactElement, useCallback, useRef, useState } from 'react';
+import { type ReactElement, type ReactNode, useCallback, useRef, useState } from 'react';
+import { cn } from '../../utils/cn';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 /**
@@ -11,9 +12,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tool
 let dismissOpenTooltip: (() => void) | null = null;
 
 export interface TouchFriendlyTooltipProps {
-  /** Tooltip text; when absent the children render bare, with no trigger wiring. */
-  content?: string;
+  /** Tooltip content (a text, or lines of one); when absent the children render bare, with no trigger wiring. */
+  content?: ReactNode;
   side?: 'top' | 'right' | 'bottom' | 'left';
+  /** More classes for the tooltip's box, merged over its own (a design's narrower `max-w-*`, say). */
+  contentClassName?: string;
   children: ReactElement;
 }
 
@@ -22,7 +25,12 @@ export interface TouchFriendlyTooltipProps {
  * opens: a tap toggles it instead. Wraps its own `TooltipProvider`, so it can be
  * dropped anywhere without a provider up the tree.
  */
-export function TouchFriendlyTooltip({ content, side = 'left', children }: TouchFriendlyTooltipProps) {
+export function TouchFriendlyTooltip({
+  content,
+  side = 'left',
+  contentClassName,
+  children,
+}: TouchFriendlyTooltipProps) {
   const [open, setOpen] = useState(false);
   const isTouchRef = useRef(false);
   const close = useCallback(() => setOpen(false), []);
@@ -62,7 +70,7 @@ export function TouchFriendlyTooltip({ content, side = 'left', children }: Touch
         >
           {children}
         </TooltipTrigger>
-        <TooltipContent side={side} className="max-w-xs">
+        <TooltipContent side={side} className={cn('max-w-xs', contentClassName)}>
           {content}
         </TooltipContent>
       </Tooltip>

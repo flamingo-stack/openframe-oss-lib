@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -22,6 +23,8 @@ public class CustomDeviceOsPendingUpdateRepositoryImpl implements CustomDeviceOs
 
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_MACHINE_ID = "machineId";
+    private static final String FIELD_ORGANIZATION_ID = "organizationId";
+    private static final String FIELD_DEVICE_COUNT = "deviceCount";
     private static final String FIELD_PLATFORM = "platform";
     private static final String FIELD_IDENTIFIER = "identifier";
     private static final String FIELD_DISCOVERED_AT = "discoveredAt";
@@ -52,6 +55,29 @@ public class CustomDeviceOsPendingUpdateRepositoryImpl implements CustomDeviceOs
         Criteria page = new Criteria().andOperator(conditions);
         Query query = Query.query(page).with(NEWEST_DISCOVERED_FIRST).limit(limit);
         return mongoTemplate.find(query, DeviceOsPendingUpdate.class);
+    }
+
+    @Override
+    public List<OsUpdateOrganizationDeviceCount> countDevicesByIdentifierAndOrganization(
+            String tenantId, OsPlatform platform, Collection<String> identifiers,
+            Collection<String> excludedMachineIds, Collection<String> machineIds) {
+        List<Criteria> conditions = new ArrayList<>();
+        conditions.add(Criteria.where(FIELD_TENANT_ID).is(tenantId).and(FIELD_PLATFORM).is(platform));
+        conditions.add(Criteria.where(FIELD_MACHINE_ID).nin(excludedMachineIds));
+        if (identifiers != null) {
+            conditions.add(Criteria.where(FIELD_IDENTIFIER).in(identifiers));
+        }
+        if (machineIds != null) {
+            conditions.add(Criteria.where(FIELD_MACHINE_ID).in(machineIds));
+        }
+        conditions.add(Criteria.where(FIELD_ORGANIZATION_ID).ne(null));
+        // A device has one row per identifier, so the rows of an identifier and a customer are its devices.
+        Aggregation devicesOfIdentifierAndOrganization = Aggregation.newAggregation(
+                Aggregation.match(new Criteria().andOperator(conditions)),
+                Aggregation.group(FIELD_IDENTIFIER, FIELD_ORGANIZATION_ID).count().as(FIELD_DEVICE_COUNT),
+                Aggregation.project(FIELD_IDENTIFIER, FIELD_ORGANIZATION_ID, FIELD_DEVICE_COUNT));
+        return mongoTemplate.aggregate(devicesOfIdentifierAndOrganization, DeviceOsPendingUpdate.class,
+                OsUpdateOrganizationDeviceCount.class).getMappedResults();
     }
 
     @Override

@@ -8,11 +8,11 @@ public class ForbiddenException extends BaseException {
         super(ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN, message);
     }
 
-    public ForbiddenException(ErrorCode errorCode, String message) {
+    public ForbiddenException(ApiErrorCode errorCode, String message) {
         super(errorCode, HttpStatus.FORBIDDEN, message);
     }
 
-    public ForbiddenException(ErrorCode errorCode, String message, Throwable cause) {
+    public ForbiddenException(ApiErrorCode errorCode, String message, Throwable cause) {
         super(errorCode, HttpStatus.FORBIDDEN, message, cause);
     }
 }

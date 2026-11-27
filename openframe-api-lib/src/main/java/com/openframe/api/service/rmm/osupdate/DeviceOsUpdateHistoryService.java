@@ -13,11 +13,13 @@ import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.InstalledOsUpdateDevice;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateDeviceCount;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOrganizationDeviceCount;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
 import java.util.List;
 
 // WARNING: client-core has a DeviceOsUpdateHistoryService bean too; the name keeps both in one context
@@ -52,6 +54,14 @@ public class DeviceOsUpdateHistoryService {
                 ? deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifier(identifiers, tenantId)
                 : deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifierOnMachines(
                         identifiers, scopeMachineIds, tenantId);
+    }
+
+    // A device that installed an update more than once is counted once. identifiers null = every update;
+    // scopeMachineIds null = every device.
+    public List<OsUpdateOrganizationDeviceCount> countInstalledDevicesByIdentifierAndOrganization(
+            Collection<String> identifiers, List<String> scopeMachineIds) {
+        return deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifierAndOrganization(
+                tenantIdProvider.getTenantId(), identifiers, scopeMachineIds);
     }
 
     public List<String> listInstalledIdentifiers(List<String> machineIds) {

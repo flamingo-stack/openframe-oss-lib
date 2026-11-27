@@ -1,5 +1,6 @@
 package com.openframe.management.controller;
 
+import com.openframe.audit.Audited;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.MachineTagEventService;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.PLATFORM_DEVICE_INDEX_SYNC;
+
 @Slf4j
 @RestController
 @RequestMapping("/v1/devices")
@@ -23,6 +26,8 @@ public class DevicePinotResyncController {
     private final MachineTagEventService machineTagEventService;
 
     @PostMapping("/pinot-resync")
+    @Audited(action = PLATFORM_DEVICE_INDEX_SYNC, compare = false, condition = "#result.body['count'] > 0",
+            details = "count=#result.body['count']")
     public ResponseEntity<Map<String, Object>> resyncAllDevicesToPinot() {
         log.info("Starting Pinot device resync for all machines");
         List<Machine> machines = machineRepository.findAll();

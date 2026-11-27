@@ -52,7 +52,7 @@ impl InitialConfigurationService {
 
     pub fn is_local_mode(&self) -> Result<bool> {
         let config = self.get()?;
-        Ok(config.local_mode)
+        Ok(cfg!(feature = "local-mode") && config.local_mode)
     }
 
     pub fn get_org_id(&self) -> Result<String> {

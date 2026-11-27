@@ -417,6 +417,11 @@ export interface GridScrollController {
   edges: EdgeStore;
   /** The id of the column being resized, or `null`: the root draws its guide, its header its accent handle. */
   resizing: ValueStore<string | null>;
+  /**
+   * A grid header is drawn (hosts leave it out of an empty table). An empty body is as wide as the columns only under
+   * one: without a header nothing lies past the edge to scroll to, and the box would scroll and shade for nothing.
+   */
+  header: ValueStore<boolean>;
   /** Page mode: the header's own viewport, kept at the body's `scrollLeft`. */
   setHeaderViewport: (element: HTMLDivElement | null) => void;
   /** The element that scrolls horizontally: the body (page mode) or the table's one viewport (fixed mode). */
@@ -460,6 +465,7 @@ export function createGridScrollController(vertical: boolean): GridScrollControl
   return {
     edges,
     resizing: createValueStore<string | null>(null),
+    header: createValueStore(false),
     setHeaderViewport: element => {
       header = element;
       if (header && viewport) header.scrollLeft = viewport.scrollLeft;

@@ -33,6 +33,8 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_MACHINE_ID = "machineId";
+    private static final String FIELD_ORGANIZATION_ID = "organizationId";
+    private static final String FIELD_DEVICE_COUNT = "deviceCount";
     private static final String FIELD_INSTALLED_AT = "installedAt";
     private static final String FIELD_IDENTIFIER = "identifier";
     private static final String FIELD_OPERATION = "operation";
@@ -85,6 +87,27 @@ public class CustomDeviceOsUpdateHistoryRepositoryImpl implements CustomDeviceOs
         AggregationResults<InstalledOsUpdateDevice> installedDevices = mongoTemplate.aggregate(
                 installedDevicePage, DeviceOsUpdateHistoryEntry.class, InstalledOsUpdateDevice.class);
         return installedDevices.getMappedResults();
+    }
+
+    @Override
+    public List<OsUpdateOrganizationDeviceCount> countInstalledDevicesByIdentifierAndOrganization(
+            String tenantId, Collection<String> identifiers, Collection<String> machineIds) {
+        Criteria installs = installs(tenantId);
+        if (identifiers != null) {
+            installs = installs.and(FIELD_IDENTIFIER).in(identifiers);
+        }
+        if (machineIds != null) {
+            installs = installs.and(FIELD_MACHINE_ID).in(machineIds);
+        }
+        installs = installs.and(FIELD_ORGANIZATION_ID).ne(null);
+        // A device that installed an update more than once is counted once.
+        Aggregation devicesOfIdentifierAndOrganization = Aggregation.newAggregation(
+                Aggregation.match(installs),
+                Aggregation.group(FIELD_IDENTIFIER, FIELD_ORGANIZATION_ID, FIELD_MACHINE_ID),
+                Aggregation.group(FIELD_IDENTIFIER, FIELD_ORGANIZATION_ID).count().as(FIELD_DEVICE_COUNT),
+                Aggregation.project(FIELD_IDENTIFIER, FIELD_ORGANIZATION_ID, FIELD_DEVICE_COUNT));
+        return mongoTemplate.aggregate(devicesOfIdentifierAndOrganization, DeviceOsUpdateHistoryEntry.class,
+                OsUpdateOrganizationDeviceCount.class).getMappedResults();
     }
 
     @Override

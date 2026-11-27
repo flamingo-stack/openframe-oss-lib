@@ -2,6 +2,7 @@ package com.openframe.data.repository.rmm.osupdate;
 
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
 import com.openframe.data.document.rmm.osupdate.OsUpdateClassification;
+import com.openframe.data.document.rmm.osupdate.OsUpdateCustomerStatus;
 import lombok.Builder;
 import lombok.Value;
 
@@ -19,4 +20,6 @@ public class OsUpdateFilter {
     String search;
     // null = every update; empty = none
     Collection<String> osUpdateIds;
+    // WARNING: the repository does not read this one. OsUpdateService turns it into osUpdateIds before the query.
+    List<OsUpdateCustomerStatus> customerStatuses;
 }

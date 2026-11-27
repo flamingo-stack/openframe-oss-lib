@@ -14,14 +14,17 @@ export interface TenantAccessCellProps {
   now?: Date;
 }
 
-/** ACCESS column: the access tag over "Last read: ..." or "Sync paused"; a phone keeps the tag alone (Figma 3033-9343). */
+/**
+ * ACCESS column: the access tag over "Last read: ..." or "Sync paused"; a phone keeps the tag alone (Figma 3033-9343),
+ * cut by its label's "…" when the row is too narrow for it beside the tenant.
+ */
 export function TenantAccessCell({ accessState, lastReadAt, syncPaused = false, now }: TenantAccessCellProps) {
   // While the tenant is read (a loading scope) the access tag and its last read are their loading forms.
   const loading = useLoadingScope();
   const line = syncPaused ? 'Sync paused' : lastReadAt ? `Last read: ${formatLastRead(lastReadAt, now)}` : null;
   return (
     <div className="flex min-w-0 flex-col justify-center gap-[var(--spacing-system-xxs)]">
-      <Tag {...accessStateTag(accessState)} loading={loading} className="self-start" />
+      <Tag {...accessStateTag(accessState)} loading={loading} className="max-w-full self-start" />
       {(loading || line) && (
         <div className="hidden min-w-0 content-md:block">
           <TruncateText variant="h6" tone="secondary" loading={loading}>
