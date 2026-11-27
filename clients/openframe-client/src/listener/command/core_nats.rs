@@ -96,9 +96,6 @@ async fn handle<H: CommandHandler>(
     message: Message,
     machine_id: &str,
 ) {
-    let payload = String::from_utf8_lossy(&message.payload);
-    info!(kind = H::KIND, "Received command message: {:?}", payload);
-
     let delivery = match serde_json::from_slice::<Envelope>(&message.payload) {
         Ok(envelope) => envelope.delivery,
         Err(e) => {
@@ -111,6 +108,7 @@ async fn handle<H: CommandHandler>(
     };
     let context = &listener.context;
     let dispatch_id = delivery.dispatch_id.clone();
+    info!(kind = H::KIND, dispatch_id = %dispatch_id, "Received command");
 
     let Some(admitted) = context.restart.admit() else {
         info!(kind = H::KIND, dispatch_id = %dispatch_id, "Restart pending, leaving the command to the backend retry");
