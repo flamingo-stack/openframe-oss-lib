@@ -18,6 +18,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,7 +39,12 @@ class PinotConfigInitializerTest {
     private static final String CONTROLLER = "pinot-controller:9000";
     private static final String DEVICES_SCHEMA_URL = "http://" + CONTROLLER + "/schemas/devices";
     private static final String DEVICES_FORCE_COMMIT_URL = "http://" + CONTROLLER + "/tables/devices/forceCommit";
+    private static final String AUDIT_EVENTS_TABLE_URL = "http://" + CONTROLLER + "/tables/audit_events_REALTIME";
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}:]+)(:[^}]*)?}");
+    private static final Map<String, String> TABLE_NAMES = Map.of(
+            "pinot.tables.devices.name", "devices",
+            "pinot.tables.logs.name", "logs",
+            "pinot.tables.audit-events.name", "audit_events");
 
     @Mock
     private RestTemplate restTemplate;
@@ -143,6 +149,25 @@ class PinotConfigInitializerTest {
                 .doesNotContain("Force commit of the consuming segments of devices answered");
     }
 
+    @Test
+    void init_auditOn_deploysTheAuditEventsTable() {
+        ReflectionTestUtils.setField(initializer, "auditEnabled", true);
+
+        initializer.init();
+
+        verify(restTemplate).exchange(eq(AUDIT_EVENTS_TABLE_URL), eq(HttpMethod.PUT), any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    void init_auditOff_deploysNoAuditEventsTable() {
+        ReflectionTestUtils.setField(initializer, "auditEnabled", false);
+
+        initializer.init();
+
+        verify(restTemplate, never()).exchange(eq(AUDIT_EVENTS_TABLE_URL), any(HttpMethod.class), any(HttpEntity.class),
+                eq(String.class));
+    }
+
     private void storedDevicesSchema(String body) {
         when(restTemplate.exchange(eq(DEVICES_SCHEMA_URL), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(body));
@@ -160,9 +185,7 @@ class PinotConfigInitializerTest {
         Matcher matcher = PLACEHOLDER.matcher(config);
         StringBuilder resolved = new StringBuilder();
         while (matcher.find()) {
-            String key = matcher.group(1);
-            String value = key.endsWith("devices.name") ? "devices" : key.contains("logs") && key.endsWith(".name") ? "logs" : "1";
-            matcher.appendReplacement(resolved, value);
+            matcher.appendReplacement(resolved, TABLE_NAMES.getOrDefault(matcher.group(1), "1"));
         }
         matcher.appendTail(resolved);
         return resolved.toString();

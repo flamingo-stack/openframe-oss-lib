@@ -10,7 +10,8 @@ class PinotConfigInitializerWiringTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(PinotConfigInitializer.class)
-            .withPropertyValues("pinot.controller.url=http://pinot-controller:9000", "pinot.config.enabled=false");
+            .withPropertyValues("pinot.controller.url=http://pinot-controller:9000", "pinot.config.enabled=false",
+                    "openframe.audit.enabled=false");
 
     @Test
     void context_createsTheInitializerThroughItsPublicConstructor() {

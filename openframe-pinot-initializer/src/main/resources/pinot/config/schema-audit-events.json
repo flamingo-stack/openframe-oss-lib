@@ -1,0 +1,42 @@
+{
+  "schemaName": "${pinot.tables.audit-events.name}",
+  "primaryKeyColumns": ["id"],
+  "dimensionFieldSpecs": [
+    { "name": "id",             "dataType": "STRING", "singleValueField": true },
+    { "name": "schemaVersion",  "dataType": "INT",    "singleValueField": true },
+    { "name": "tenantId",       "dataType": "STRING", "singleValueField": true },
+    { "name": "action",         "dataType": "STRING", "singleValueField": true },
+    { "name": "outcome",        "dataType": "STRING", "singleValueField": true },
+    { "name": "reason",         "dataType": "STRING", "singleValueField": true, "maxLength": 2048 },
+    { "name": "actorType",      "dataType": "STRING", "singleValueField": true },
+    { "name": "actorId",        "dataType": "STRING", "singleValueField": true },
+    { "name": "actorName",      "dataType": "STRING", "singleValueField": true, "maxLength": 2048 },
+    { "name": "actorEmail",     "dataType": "STRING", "singleValueField": true },
+    { "name": "actorRoles",     "dataType": "STRING", "singleValueField": false },
+    { "name": "onBehalfOfId",   "dataType": "STRING", "singleValueField": true },
+    { "name": "onBehalfOfName", "dataType": "STRING", "singleValueField": true, "maxLength": 2048 },
+    { "name": "approverId",     "dataType": "STRING", "singleValueField": true },
+    { "name": "approverName",   "dataType": "STRING", "singleValueField": true, "maxLength": 2048 },
+    { "name": "originTool",     "dataType": "STRING", "singleValueField": true },
+    { "name": "sourceIp",       "dataType": "STRING", "singleValueField": true },
+    { "name": "userAgent",      "dataType": "STRING", "singleValueField": true, "maxLength": 2048 },
+    { "name": "sessionId",      "dataType": "STRING", "singleValueField": true },
+    { "name": "correlationId",  "dataType": "STRING", "singleValueField": true },
+    { "name": "parentEventId",  "dataType": "STRING", "singleValueField": true },
+    { "name": "organizationId", "dataType": "STRING", "singleValueField": true },
+    { "name": "deviceId",       "dataType": "STRING", "singleValueField": true },
+    { "name": "targetType",     "dataType": "STRING", "singleValueField": true },
+    { "name": "targetId",       "dataType": "STRING", "singleValueField": true },
+    { "name": "targetName",     "dataType": "STRING", "singleValueField": true, "maxLength": 2048 },
+    { "name": "details",        "dataType": "JSON",   "singleValueField": true },
+    { "name": "changes",        "dataType": "JSON",   "singleValueField": true }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "occurredAt",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}
