@@ -75,7 +75,8 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(TENANT, Tenant.class, Tenant::getName)
                         .withTenantId(Tenant::getId),
                 AuditTarget.of(SCRIPT, Script.class, Script::getName)
-                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs", "contentHash")),
+                        .withIgnoredFields(Set.of("contentHash"))
+                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs")),
                 AuditTarget.of(SCRIPT_SCHEDULE, ScheduleScript.class, ScheduleScript::getName)
                         .withIgnoredFields(Set.of("nextRunAt", "lastRunAt"))
                         .withMaskedFields(Set.of("scriptCustomParams.args", "scriptCustomParams.value")),
