@@ -15,6 +15,8 @@ import {
   GRID_ACTION_COLUMN_SIZE,
   GRID_MIN_WIDTH,
   type Row,
+  type TableMetaRow,
+  tableMetaRowLayout,
   useDataTable,
 } from '../../ui/data-table';
 import { useLoadingScope } from '../../ui/loading-scope';
@@ -142,6 +144,12 @@ export interface SingleCustomerTenantsTableViewProps extends FeatureTableLayoutP
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  /**
+   * The row above the table. A paged list passes its `pager` (`useCursorPager` `footerProps`: First · Previous · Next,
+   * with the range "21–40 of 120 results"), which replaces the load-more footer; a list that refetches its page passes
+   * the auto-refresh picker as `actions`. The pager waits while `isPending` on its own.
+   */
+  metaRow?: TableMetaRow;
   /** The clock "Last read" is relative to. Default: the moment of the render. */
   now?: Date;
 }
@@ -161,6 +169,7 @@ export function SingleCustomerTenantsTableView({
   hasNextPage = false,
   isFetchingNextPage = false,
   onLoadMore,
+  metaRow: metaRowGiven,
   now,
   layout = 'cards',
   tableMaxHeight,
@@ -264,17 +273,29 @@ export function SingleCustomerTenantsTableView({
   const table = useDataTable<TenantRow>({ data: loadingRows ?? rows, columns, getRowId, enableSorting: false });
 
   const rowCount = <DataTable.RowCount itemName="result" totalCount={totalCount ?? rows.length} loading={loading} />;
+  // While the next page is read the rows on screen are the last page's: the pager's buttons wait (the range stays).
+  const metaRow = metaRowGiven && { ...metaRowGiven, loading: !!metaRowGiven.loading || isPending };
+  const { paged, drawn } = tableMetaRowLayout(metaRow, { rowCount: rows.length, loading, grid: layout === 'grid' });
 
   return (
     // Dim, don't unmount, the stale rows while a deferred search refetches.
     <div className={cn('transition-opacity duration-200', isPending && 'opacity-60')}>
       <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
-        {/* The grid's results count sits above the table; the card header carries its own (`rightSlot`). */}
-        {layout === 'grid' && <DataTable.Meta>{rowCount}</DataTable.Meta>}
+        {/* The row above the table: the grid's results count (the card header carries its own in `rightSlot`), or on a
+            paged list the page's range with the pager, and the host's controls. */}
+        {drawn && (
+          <DataTable.MetaRow
+            metaRow={metaRow}
+            paged={paged}
+            totalCount={totalCount}
+            loading={loading}
+            count={rowCount}
+          />
+        )}
         <DataTable.Header
           stickyHeader={stickyHeaderOffset !== undefined}
           stickyHeaderOffset={stickyHeaderOffset}
-          rightSlot={rowCount}
+          rightSlot={drawn ? undefined : rowCount}
         />
         <DataTable.Body
           loadingCells
@@ -286,7 +307,7 @@ export function SingleCustomerTenantsTableView({
           rowClassName="mb-[var(--spacing-system-xxs)]"
           rowHref={getHref}
         />
-        {rows.length > 0 && onLoadMore && (
+        {!paged && rows.length > 0 && onLoadMore && (
           <DataTable.InfiniteFooter
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}

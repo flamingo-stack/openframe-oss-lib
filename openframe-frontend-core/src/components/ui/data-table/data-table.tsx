@@ -4,7 +4,6 @@ import type { Table } from '@tanstack/react-table';
 import {
   Children,
   createContext,
-  isValidElement,
   useCallback,
   useContext,
   useMemo,
@@ -40,7 +39,7 @@ import {
   type GridPrefsContextValue,
 } from './data-table-grid-prefs';
 import { createDataTableLoadMoreStore, DataTableLoadMoreContext } from './data-table-load-more';
-import { DataTableMeta } from './data-table-meta';
+import { isTableMetaElement } from './data-table-meta';
 import './types';
 
 // The context holds the table at its ERASED row type; each `useDataTableContext<T>`
@@ -278,7 +277,7 @@ function DataTableGridRoot({
   }
 
   const parts = Children.toArray(children);
-  const isMeta = (child: ReactNode) => isValidElement(child) && child.type === DataTableMeta;
+  const isMeta = isTableMetaElement;
   const maxHeightValue = fill
     ? fillHeight === null
       ? FILL_HEIGHT_FALLBACK

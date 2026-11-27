@@ -11,8 +11,8 @@ import {
   type OnChangeFn,
   type RowSelectionState,
   selectionColumn,
-  TABLE_PAGINATION_PENDING,
-  type TablePagerState,
+  type TableMetaRow,
+  tableMetaRowLayout,
   useDataTable,
 } from '../../ui';
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
@@ -21,22 +21,8 @@ import { getDeviceOpenColumn, getDeviceTableColumns } from './devices-table-colu
 import { useDevicesViewConfig } from './devices-view-config';
 import type { DeviceFilters, DeviceRow } from './types';
 
-/**
- * The row above a devices table, as the host fills it: a paged list's pager, the wait for its next page, and the
- * controls at the row's right end. One prop for one row.
- */
-export interface DevicesTableMetaRow {
-  /**
-   * A paged list's pager (`useCursorPager` `footerProps`): First · Previous · Next, with the page's range ("21–40 of
-   * 340 devices") in place of the count. `null`: a paged list whose first page is being read (the pager waits).
-   * Omitted: the list is not paged.
-   */
-  pager?: (TablePagerState & { rangeStart?: number }) | null;
-  /** The pager's buttons wait: the next page is being read, and the rows on screen are the last page's. */
-  loading?: boolean;
-  /** The controls at the row's right end, after a divider when there is a pager: the auto-refresh picker. */
-  actions?: ReactNode;
-}
+/** The row above a devices table, as the host fills it: the shared {@link TableMetaRow}. */
+export type DevicesTableMetaRow = TableMetaRow;
 
 export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   devices: T[];
@@ -192,15 +178,14 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
     [isLoading, skeletonRows],
   );
 
-  const pager = metaRowGiven?.pager;
-  const pagerLoading = metaRowGiven?.loading ?? false;
-  const metaActions = metaRowGiven?.actions;
   // An empty FIRST page has no pager (the empty state is the whole answer); an empty later page keeps it, so the way
   // back stays, even where the host hides the column header.
-  const paged =
-    pager !== undefined &&
-    (pager === null || isLoading || pagerLoading || devices.length > 0 || !(pager.isFirstPage ?? true));
-  const metaRow = (showHeader && layout === 'grid') || paged || (showHeader && !!metaActions);
+  const { paged, drawn: metaRow } = tableMetaRowLayout(metaRowGiven, {
+    rowCount: devices.length,
+    loading: !!isLoading,
+    showHeader,
+    grid: layout === 'grid',
+  });
 
   const table = useDataTable<T>({
     data: loadingRows ?? devices,
@@ -225,29 +210,14 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
       {/* The row above the table: the grid's results count (the card header carries its own in `rightSlot`), or on a
           paged list the page's range with the pager, and the host's controls. */}
       {metaRow && (
-        <DataTable.Meta
-          pagination={
-            paged && (
-              <DataTable.Pagination
-                pager={pager ?? TABLE_PAGINATION_PENDING}
-                loading={pager === null || isLoading || pagerLoading}
-              />
-            )
-          }
-          actions={metaActions}
-        >
-          {paged ? (
-            <DataTable.PageRange
-              itemName="device"
-              rangeStart={pager?.rangeStart}
-              totalCount={totalCount}
-              hasNextPage={pager?.hasNextPage}
-              loading={isLoading}
-            />
-          ) : (
-            showHeader && <DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />
-          )}
-        </DataTable.Meta>
+        <DataTable.MetaRow
+          metaRow={metaRowGiven}
+          paged={paged}
+          itemName="device"
+          totalCount={totalCount}
+          loading={isLoading}
+          count={showHeader && <DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />}
+        />
       )}
       {showHeader && (
         <DataTable.Header

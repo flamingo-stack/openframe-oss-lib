@@ -21,12 +21,15 @@ import {
   GRID_MIN_WIDTH,
   multiSelectFilterFn,
   type Row,
+  type TableMetaRow,
+  tableMetaRowLayout,
   useDataTable,
 } from '../../ui/data-table';
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { FilterModal } from '../../ui/filter-modal';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { NoData, type NoDataProps } from '../../ui/no-data';
+import { isFirstPagerPage } from '../../ui/table-pagination';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
 import { GRID_ACTION_BUTTON_CLASS, GridTextWithDetailCell } from '../feature-table-grid-cells';
@@ -94,6 +97,12 @@ export interface LogsTableViewProps<T extends UiLogEntry = UiLogEntry> extends F
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  /**
+   * The row above the table. A paged list passes its `pager` (`useCursorPager` `footerProps`: First · Previous · Next,
+   * with the range "21–40 logs", as logs carry no total), which replaces the load-more footer; a list that refetches
+   * its page passes the auto-refresh picker as `actions`.
+   */
+  metaRow?: TableMetaRow;
   /** The mobile filter modal; its trigger lives in the search toolbar. */
   mobileFilterOpen?: boolean;
   onMobileFilterClose?: () => void;
@@ -196,6 +205,7 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   hasNextPage = false,
   isFetchingNextPage = false,
   onLoadMore = noop,
+  metaRow,
   mobileFilterOpen = false,
   onMobileFilterClose = noop,
   onHideSearchChange,
@@ -454,7 +464,9 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   // The applied date range counts as a query too: an empty result must keep
   // the table header so the date filter stays reachable to pick another period.
   const hasQuery = Boolean(search) || hasActiveFilters || Boolean(dateFilter?.range);
-  const noRows = !loading && logs.length === 0;
+  // An empty LATER page is not "no logs": it keeps the table and its pager, so the way back stays.
+  const laterPage = !!metaRow?.pager && !isFirstPagerPage(metaRow.pager);
+  const noRows = !loading && logs.length === 0 && !laterPage;
 
   // The standalone page and a device tab share the onboarding empty state when
   // there is no data at all (no query). An empty result under an active query
@@ -473,6 +485,12 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   // state and for an empty scoped tab, and stays while a query is active so the
   // query can be cleared.
   const hideSearch = showEmptyState || (scopedEmpty && !hasQuery);
+  const { paged: isPaged, drawn: showMetaRow } = tableMetaRowLayout(metaRow, {
+    rowCount: logs.length,
+    loading,
+    showHeader,
+    grid,
+  });
   useEffect(() => {
     onHideSearchChange?.(hideSearch);
   }, [hideSearch, onHideSearchChange]);
@@ -499,11 +517,16 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   return (
     <>
       <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
-        {/* The grid's results count sits above the table; the card header carries its own (`rightSlot`). */}
-        {showHeader && grid && (
-          <DataTable.Meta>
-            <DataTable.RowCount loading={loading} />
-          </DataTable.Meta>
+        {/* The row above the table: the grid's results count (the card header carries its own in `rightSlot`), or on a
+            paged list the page's range with the pager, and the host's controls. */}
+        {showMetaRow && (
+          <DataTable.MetaRow
+            metaRow={metaRow}
+            paged={isPaged}
+            itemName="log"
+            loading={loading}
+            count={showHeader && <DataTable.RowCount loading={loading} />}
+          />
         )}
         {showHeader && (
           <DataTable.Header
@@ -511,7 +534,7 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
             // Under the page's search toolbar (`LogsPageView` publishes its height); 96px,
             // the desktop toolbar's, where no page view measures one.
             stickyHeaderOffset="top-[var(--sticky-toolbar-h,96px)]"
-            rightSlot={<DataTable.RowCount loading={loading} />}
+            rightSlot={showMetaRow ? undefined : <DataTable.RowCount loading={loading} />}
             loading={loading}
           />
         )}
@@ -537,12 +560,14 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
           rowHref={getLogHref}
           rowClassName="mb-1"
         />
-        <DataTable.InfiniteFooter
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          onLoadMore={onLoadMore}
-          skeletonRows={pageSize}
-        />
+        {!isPaged && (
+          <DataTable.InfiniteFooter
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={onLoadMore}
+            skeletonRows={pageSize}
+          />
+        )}
       </DataTable>
 
       <FilterModal

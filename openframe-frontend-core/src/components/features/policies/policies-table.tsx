@@ -136,6 +136,11 @@ export interface PoliciesTableProps extends FeatureTableLayoutProps {
   stickyHeaderOffset?: string;
   /** Rendered at the right edge of the header (e.g. a row count). */
   rightSlot?: ReactNode;
+  /**
+   * The controls at the right end of the row above the table: the auto-refresh picker. With them the row is drawn in
+   * the card layout too, and `rightSlot` moves into it, on its left.
+   */
+  actions?: ReactNode;
   skeletonRows?: number;
   /** Infinite "load more" footer. */
   hasMore?: boolean;
@@ -161,6 +166,7 @@ export function PoliciesTable({
   stickyHeader = false,
   stickyHeaderOffset,
   rightSlot,
+  actions,
   skeletonRows,
   hasMore = false,
   onLoadMore,
@@ -335,16 +341,19 @@ export function PoliciesTable({
   // Hide the column header on the empty state: only show it while loading (skeleton rows)
   // or when there are real rows.
   const showHeader = loading || rows.length > 0;
+  // The row above the table: the grid's results row, or the host's controls (with the count beside them).
+  const metaRow = showHeader && ((layout === 'grid' && hasSlotContent(rightSlot)) || hasSlotContent(actions));
 
   return (
     <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
-      {/* The grid's results row sits above the table; the card header carries it in its right slot. */}
-      {showHeader && layout === 'grid' && hasSlotContent(rightSlot) && <DataTable.Meta>{rightSlot}</DataTable.Meta>}
+      {/* The grid's results row, or the host's controls, sit above the table; otherwise the card header carries the
+          results in its right slot. */}
+      {metaRow && <DataTable.Meta actions={actions}>{rightSlot}</DataTable.Meta>}
       {showHeader && (
         <DataTable.Header
           stickyHeader={stickyHeader}
           stickyHeaderOffset={stickyHeaderOffset}
-          rightSlot={rightSlot}
+          rightSlot={metaRow ? undefined : rightSlot}
           sort={sortState}
           onSortChange={sortable ? handleSortChange : undefined}
           loading={loading}
