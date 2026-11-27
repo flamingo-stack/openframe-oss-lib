@@ -1,0 +1,76 @@
+extend type Query {
+    """Windows versions the devices of the tenant run, one row per version, the highest version first.
+    `first`: 1-100, default 20."""
+    osVersions(filter: OsVersionFilterInput, first: Int, after: String): OsVersionConnection!
+
+    """Windows devices of one OS version, by machineId. `organizationIds`: only devices of these organizations;
+    omitted or empty = every organization. `first`: 1-100, default 20. An unknown version has no devices."""
+    osVersionDevices(osVersion: String!, organizationIds: [String!], first: Int, after: String):
+        OsVersionDeviceConnection!
+}
+
+input OsVersionFilterInput {
+    """Only devices of these organizations are counted. Omitted or empty = every organization; organizations
+    without devices = no version."""
+    organizationIds: [String!]
+}
+
+type OsVersionConnection {
+    edges: [OsVersionEdge!]!
+    pageInfo: PageInfo!
+}
+
+type OsVersionEdge {
+    node: OsVersion!
+    cursor: String!
+}
+
+"""The ends of support come from endoflife.date and are null when that source is off or cannot be read, or has no
+date for the version. The latest security build comes from the Microsoft security bulletins (MSRC) and is known
+only after the OS update enrichment has stored it for the version."""
+type OsVersion {
+    """As the agent reports it, e.g. "11 24H2"."""
+    osVersion: String!
+    deviceCount: Int!
+    """Devices whose build is below the latest security build of the version and, when that update has a hotpatch,
+    below the hotpatch build too. A device that reported no build is not counted. Null = no latest security build
+    is known for the version."""
+    devicesBehindCount: Int
+    """The latest security build of the version with its revision, e.g. "26100.9974". When none is known: the base
+    build from endoflife.date, e.g. "26100"."""
+    currentBuild: String
+    """End of support of the Home and Pro editions."""
+    endOfSupportAt: Date
+    supportEnded: Boolean
+    """End of support of the Enterprise and Education editions. A version with one end of support for every
+    edition (Windows 10 22H2) has the same date in both pairs."""
+    enterpriseEndOfSupportAt: Date
+    enterpriseSupportEnded: Boolean
+}
+
+type OsVersionDeviceConnection {
+    edges: [OsVersionDeviceEdge!]!
+    pageInfo: PageInfo!
+}
+
+type OsVersionDeviceEdge {
+    node: OsVersionDevice!
+    cursor: String!
+}
+
+type OsVersionDevice {
+    machineId: String!
+    osBuild: String
+    osProductName: String
+    """The build of the device is the latest security build of its version or above it (a preview build), or the
+    hotpatch build of that update. Null = no latest security build is known for the version, or the device
+    reported no build."""
+    upToDate: Boolean
+    """End of support of the edition of this device, by osProductName: IoT Enterprise LTSC, Enterprise LTSC,
+    Enterprise and Education, otherwise Home and Pro. Null = endoflife.date is off or cannot be read, or has no
+    date for the edition of this version."""
+    endOfSupportAt: Date
+    supportEnded: Boolean
+    """Null = the device is no longer in the tenant."""
+    machine: Machine
+}

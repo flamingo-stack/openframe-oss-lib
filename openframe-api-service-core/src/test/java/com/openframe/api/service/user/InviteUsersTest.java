@@ -1,5 +1,7 @@
 package com.openframe.api.service.user;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.shared.MutationError;
 import com.openframe.api.mapper.InvitationMapper;
@@ -15,6 +17,9 @@ import com.openframe.data.repository.auth.SsoIdentityRepository;
 import com.openframe.data.repository.user.InvitationRepository;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.notification.mail.service.EmailService;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +31,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
+import static com.openframe.data.document.audit.AuditAction.INVITATION_CREATE;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -48,14 +57,16 @@ class InviteUsersTest {
     @Mock private InvitationRepository invitationRepository;
     @Mock private InvitationProcessor invitationProcessor;
     @Mock private EmailDomainPolicy emailDomainPolicy;
+    @Mock private AuditRecorder auditRecorder;
 
     private InvitationService invitationService() {
         InvitationMapper mapper = new InvitationMapper();
         ReflectionTestUtils.setField(mapper, "ttl", Duration.ofHours(24));
         UserService userService = new UserService(userRepository, ssoIdentityRepository, new UserMapper(),
-                userProcessor, emailService);
+                userProcessor, emailService, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), auditRecorder);
         return new InvitationService(invitationRepository, mapper, emailService, userService,
-                invitationProcessor, emailDomainPolicy);
+                invitationProcessor, emailDomainPolicy, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS),
+                auditRecorder);
     }
 
     @Test
@@ -123,5 +134,38 @@ class InviteUsersTest {
         assertThat(result.errors()).hasSize(2);
         verify(emailDomainPolicy, never()).ensureEmailAllowed(anyString());
         verify(invitationRepository, never()).save(any());
+    }
+
+    @Test
+    void inviteUsers_mistypedEmail_recordsNoEvent() {
+        invitationService().inviteUsers(List.of("not-an-email"));
+
+        verify(auditRecorder, never()).record(any(AuditEntry.class));
+    }
+
+    @Test
+    void inviteUsers_emailAlreadyInvited_recordsTheRefusalWithTheLowercaseEmailAndItsReason() {
+        when(invitationRepository.findAllByEmailAndStatus("live@acme.io", InvitationStatus.PENDING))
+                .thenReturn(List.of(Invitation.builder().email("live@acme.io")
+                        .expiresAt(Instant.now().plusSeconds(3600)).build()));
+
+        invitationService().inviteUsers(List.of("Live@acme.io"));
+
+        ArgumentCaptor<AuditEntry> entry = ArgumentCaptor.forClass(AuditEntry.class);
+        verify(auditRecorder).record(entry.capture());
+        assertThat(entry.getValue())
+                .extracting(AuditEntry::getAction, AuditEntry::getOutcome, AuditEntry::getReason,
+                        AuditEntry::getTargetName)
+                .containsExactly(INVITATION_CREATE, AuditOutcome.REFUSED, "Already invited", "live@acme.io");
+    }
+
+    @Test
+    void inviteUsers_emailRefusedWhileSending_isNotRecordedASecondTime() {
+        doThrow(new IllegalArgumentException("Email domain blocked.io is not allowed"))
+                .when(emailDomainPolicy).ensureEmailAllowed("x@blocked.io");
+
+        invitationService().inviteUsers(List.of("x@blocked.io"));
+
+        verify(auditRecorder, never()).record(any());
     }
 }

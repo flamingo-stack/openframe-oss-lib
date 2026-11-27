@@ -1,13 +1,15 @@
 package com.openframe.data.repository.rmm;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -31,20 +34,11 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 /**
  * MongoTemplate-backed implementation of {@link CustomScriptRepository}.
  *
- * <p>Cursor pagination is implemented on {@code _id}: descending by default
- * ({@code newest first}), with the cursor comparison flipped when paginating
- * backward. The query is tenant-scoped, hitting the existing
- * {@code (tenantId, name)} compound index for the tenant prefix plus a natural
- * {@code _id} sort.
- *
- * <p>The cursor value is parsed into a Mongo {@link ObjectId} before being
- * applied to the query — comparing a String against a BSON {@code ObjectId}
- * field does not match correctly under Mongo's type-bracketing rules. An
- * invalid cursor (anything that is not a valid 24-char hex {@code ObjectId})
- * is logged and treated as "no cursor", returning the first page rather than
- * an opaque server error.
+ * <p>Cursor pagination is a keyset over the active sort: {@code _id} alone under the
+ * {@code _id} sort (the default, descending), otherwise {@code (sortField, _id)}, with the
+ * comparison and the sort flipped when paginating backward. The query is tenant-scoped.
+ * A position that cannot be used is rejected with {@link InvalidCursorException}.
  */
-@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class CustomScriptRepositoryImpl implements CustomScriptRepository {
@@ -59,6 +53,7 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_CREATED_BY = "createdBy";
     private static final String FIELD_TYPE = "type";
+    private static final String NO_SORT_VALUE = "";
 
     // tag_assignments fields used to resolve the tagIds filter into script ids.
     private static final String FIELD_TA_TAG_ID = "tagId";
@@ -77,18 +72,34 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
                                           String search,
                                           String sortField,
                                           Sort.Direction sortDirection,
-                                          String cursor,
+                                          CursorPosition position,
                                           boolean backward,
                                           int limit) {
-        Criteria criteria = buildBaseCriteria(tenantId, filter, search);
-        applyCursor(criteria, cursor, backward, sortDirection);
+        boolean fetchDescending = sortDirection.isDescending() != backward;
+        Optional<Criteria> keyset = keysetAnchor(tenantId, position, sortField, sortDirection)
+                .map(cursor -> keysetCriteria(cursor, sortField, fetchDescending));
+        Criteria base = buildBaseCriteria(tenantId, filter, search);
+        Criteria criteria = keyset
+                .map(pastCursor -> new Criteria().andOperator(base, pastCursor))
+                .orElse(base);
 
-        Sort.Direction effectiveDir = backward ? flip(sortDirection) : sortDirection;
+        Sort sort = sortWithIdTieBreak(sortField, fetchDescending);
         Query query = new Query(criteria)
-                .with(Sort.by(effectiveDir, sortField))
+                .with(sort)
                 .limit(limit);
 
         return mongoTemplate.find(query, Script.class);
+    }
+
+    @Override
+    public KeysetCursor keysetCursor(Script script, String sortField, Sort.Direction sortDirection) {
+        String id = script.getId();
+        return switch (sortField) {
+            case FIELD_NAME -> KeysetCursor.ofString(sortField, sortDirection, script.getName(), id);
+            case FIELD_CREATED_AT -> KeysetCursor.ofInstant(sortField, sortDirection, script.getCreatedAt(), id);
+            case FIELD_UPDATED_AT -> KeysetCursor.ofInstant(sortField, sortDirection, script.getUpdatedAt(), id);
+            default -> new KeysetCursor(sortField, sortDirection, NO_SORT_VALUE, id);
+        };
     }
 
     @Override
@@ -254,31 +265,93 @@ public class CustomScriptRepositoryImpl implements CustomScriptRepository {
         criteria.and(FIELD_NAME).regex(Pattern.quote(search.trim()), "i");
     }
 
-    private static void applyCursor(Criteria criteria, String cursor, boolean backward, Sort.Direction sortDirection) {
-        if (isBlank(cursor)) {
-            return;
-        }
-
-        ObjectId cursorId;
-        try {
-            cursorId = new ObjectId(cursor);
-        } catch (IllegalArgumentException ex) {
-            log.warn("Invalid ObjectId cursor for script pagination: '{}' — falling back to first page", cursor);
-            return;
-        }
-
-        // The comparison direction depends on BOTH the sort direction and the
-        // pagination direction: forward+DESC and backward+ASC both want
-        // {@code _id < cursor}; forward+ASC and backward+DESC want {@code _id > cursor}.
-        boolean useLessThan = (sortDirection == Sort.Direction.DESC) ^ backward;
-        if (useLessThan) {
-            criteria.and(FIELD_ID).lt(cursorId);
-        } else {
-            criteria.and(FIELD_ID).gt(cursorId);
-        }
+    private Optional<KeysetCursor> keysetAnchor(String tenantId, CursorPosition position,
+                                                String sortField, Sort.Direction sortDirection) {
+        return switch (position) {
+            case CursorPosition.None _ -> Optional.empty();
+            case KeysetCursor keyset -> {
+                keyset.requireSort(sortField, sortDirection);
+                yield Optional.of(keyset);
+            }
+            case CursorPosition.RowId rowId -> {
+                KeysetCursor anchor = rowAnchor(tenantId, rowId.id(), sortField, sortDirection);
+                yield Optional.of(anchor);
+            }
+            case CursorPosition.Unrecognised _ -> throw new InvalidCursorException();
+        };
     }
 
-    private static Sort.Direction flip(Sort.Direction direction) {
-        return direction == Sort.Direction.ASC ? Sort.Direction.DESC : Sort.Direction.ASC;
+    private KeysetCursor rowAnchor(String tenantId, String rowId, String sortField, Sort.Direction sortDirection) {
+        if (FIELD_ID.equals(sortField)) {
+            return new KeysetCursor(FIELD_ID, sortDirection, NO_SORT_VALUE, rowId);
+        }
+        Script row = cursorRow(tenantId, rowId);
+        return keysetCursor(row, sortField, sortDirection);
+    }
+
+    private Script cursorRow(String tenantId, String rowId) {
+        ObjectId id = cursorObjectId(rowId);
+        Criteria byIdInTenant = Criteria.where(FIELD_ID).is(id).and(FIELD_TENANT_ID).is(tenantId);
+        Query query = new Query(byIdInTenant);
+        Script row = mongoTemplate.findOne(query, Script.class);
+        if (row == null) {
+            throw new InvalidCursorException();
+        }
+        return row;
+    }
+
+    private static Criteria keysetCriteria(KeysetCursor cursor, String sortField, boolean fetchDescending) {
+        ObjectId cursorId = cursorObjectId(cursor.id());
+        if (FIELD_ID.equals(sortField)) {
+            Criteria id = Criteria.where(FIELD_ID);
+            return pastId(id, cursorId, fetchDescending);
+        }
+        Object sortValue = FIELD_NAME.equals(sortField) ? cursor.stringValue() : cursor.instantValue();
+        if (sortValue == null) {
+            return nullGroupKeyset(sortField, cursorId, fetchDescending);
+        }
+        return valueKeyset(sortField, sortValue, cursorId, fetchDescending);
+    }
+
+    private static Criteria nullGroupKeyset(String sortField, ObjectId cursorId, boolean fetchDescending) {
+        Criteria idInsideNullGroup = Criteria.where(sortField).is(null).and(FIELD_ID);
+        Criteria restOfNullGroup = pastId(idInsideNullGroup, cursorId, fetchDescending);
+        if (fetchDescending) {
+            return restOfNullGroup;
+        }
+        Criteria everyValue = Criteria.where(sortField).ne(null);
+        return new Criteria().orOperator(restOfNullGroup, everyValue);
+    }
+
+    private static Criteria valueKeyset(String sortField, Object sortValue, ObjectId cursorId, boolean fetchDescending) {
+        Criteria value = Criteria.where(sortField);
+        Criteria pastValue = fetchDescending ? value.lt(sortValue) : value.gt(sortValue);
+        Criteria idInsideSameValue = Criteria.where(sortField).is(sortValue).and(FIELD_ID);
+        Criteria sameValuePastId = pastId(idInsideSameValue, cursorId, fetchDescending);
+        if (fetchDescending) {
+            Criteria nullGroup = Criteria.where(sortField).is(null);
+            return new Criteria().orOperator(pastValue, sameValuePastId, nullGroup);
+        }
+        return new Criteria().orOperator(pastValue, sameValuePastId);
+    }
+
+    private static Criteria pastId(Criteria id, ObjectId cursorId, boolean fetchDescending) {
+        return fetchDescending ? id.lt(cursorId) : id.gt(cursorId);
+    }
+
+    private static ObjectId cursorObjectId(String value) {
+        if (!ObjectId.isValid(value)) {
+            throw new InvalidCursorException();
+        }
+        return new ObjectId(value);
+    }
+
+    private static Sort sortWithIdTieBreak(String sortField, boolean fetchDescending) {
+        Sort.Direction fetchDirection = fetchDescending ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort byId = Sort.by(fetchDirection, FIELD_ID);
+        if (FIELD_ID.equals(sortField)) {
+            return byId;
+        }
+        return Sort.by(fetchDirection, sortField).and(byId);
     }
 }

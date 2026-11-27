@@ -175,7 +175,10 @@ function GridHeaderCell({ column, header, sort, onSortChange, loading }: GridHea
       className={cn(
         box,
         'group/gridhead hover:bg-ods-card',
-        !column.pin && 'relative',
+        // The resize handle is placed against this cell, so the cell is a positioned box at every width. A cell pinned
+        // right is `sticky` always; the pinned-left one only on a desktop with room for it (`GRID_LEFT_PIN_CLASS`,
+        // which wins there), and on a tablet, a phone and in a narrow content column it is `relative` like the rest.
+        column.pin !== 'right' && 'relative',
         canSort && 'cursor-pointer select-none',
       )}
       style={style}
@@ -193,6 +196,9 @@ function GridHeaderCell({ column, header, sort, onSortChange, loading }: GridHea
           <DataTableColumnFilter
             variant="grid"
             column={header.column}
+            // The table's fresh handle (`useDataTable`): a filter stored under another key is read through it.
+            storedAs={filter.id ? { table, id: filter.id } : undefined}
+            title={filter.title}
             options={filter.options}
             extraSections={filter.sections}
             placement={filter.placement}

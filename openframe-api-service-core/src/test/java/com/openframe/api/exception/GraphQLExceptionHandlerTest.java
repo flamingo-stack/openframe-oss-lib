@@ -2,10 +2,14 @@ package com.openframe.api.exception;
 
 import com.openframe.api.dto.device.DeviceLogFilterInput;
 import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.loki.client.LokiQueryRejectedException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
@@ -192,6 +196,67 @@ class GraphQLExceptionHandlerTest {
                 .containsEntry("httpStatus", httpStatus);
     }
 
+    @Test
+    void handleException_invalidCursor_reportsTheInvalidCursorCodeWithAFixedMessageAndNoOtherError() {
+        // setup
+        InvalidCursorException exception = new InvalidCursorException();
+
+        // execution
+        List<GraphQLError> errors = handle(exception);
+
+        // verifications
+        assertThat(errors)
+                .singleElement()
+                .returns("Invalid cursor", GraphQLError::getMessage)
+                .extracting(GraphQLError::getExtensions, as(MAP))
+                .containsOnlyKeys("code", "httpStatus", "timestamp")
+                .containsEntry("code", "INVALID_CURSOR")
+                .containsEntry("httpStatus", 400);
+    }
+
+    @ParameterizedTest
+    @MethodSource("fleetFailures")
+    void handleException_fleetFailure_reportsAnOpenFrameError(Throwable exception, String message, String code,
+                                                              int httpStatus) {
+        List<GraphQLError> errors = handle(exception);
+
+        assertThat(errors)
+                .singleElement()
+                .returns(message, GraphQLError::getMessage)
+                .extracting(GraphQLError::getExtensions, as(MAP))
+                .containsEntry("code", code)
+                .containsEntry("httpStatus", httpStatus);
+    }
+
+    @Test
+    void handleException_fleetRefusal_logsItAsAWarningOnly(CapturedOutput output) {
+        handle(fleetRefusal(422, "Host has pending lock request."));
+
+        assertThat(output.getOut())
+                .containsPattern("WARN .*GraphQL Fleet refusal")
+                .doesNotContain("GraphQL error occurred");
+    }
+
+    private static Stream<Arguments> fleetFailures() {
+        String unavailable = "Device management is temporarily unavailable. Please try again later.";
+        return Stream.of(
+                arguments(fleetRefusal(422, "Can't wipe the host because it doesn't have MDM turned on."),
+                        "Can't wipe the host because it doesn't have MDM turned on.", "BAD_REQUEST", 400),
+                arguments(fleetRefusal(400, null), "Device management refused the request.", "BAD_REQUEST", 400),
+                arguments(fleetRefusal(409, "Host is already wiped."), "Host is already wiped.", "CONFLICT", 409),
+                arguments(fleetRefusal(402, "Requires Fleet Premium license"),
+                        "This action is not available yet.", "BAD_REQUEST", 400),
+                arguments(fleetRefusal(404, "Resource Not Found"), "Not found in device management.", "NOT_FOUND", 404),
+                arguments(fleetRefusal(401, "Authentication required"), unavailable, "FLEET_ERROR", 503),
+                arguments(fleetRefusal(500, "boom"), unavailable, "FLEET_ERROR", 503),
+                arguments(new FleetMdmException("Failed to wipe Fleet host 42", new IOException("connection reset")),
+                        unavailable, "FLEET_ERROR", 503));
+    }
+
+    private static FleetMdmApiException fleetRefusal(int status, String reason) {
+        return new FleetMdmApiException("wipe Fleet host 42 failed with HTTP " + status, status, "{}", reason);
+    }
+
     private static Stream<Arguments> failuresReportedWithTheirOwnMessage() {
         return Stream.of(
                 arguments(new NotFoundException(ErrorCode.DEVICE_NOT_FOUND, "Device not found: d-1"),
@@ -199,6 +264,9 @@ class GraphQLExceptionHandlerTest {
                 arguments(new ConflictException(ErrorCode.TAG_ALREADY_EXISTS, "Tag already exists: prod"),
                         "TAG_ALREADY_EXISTS", 409),
                 arguments(new BadRequestException("Unsupported image type"), "BAD_REQUEST", 400),
+                arguments(new InvalidCursorException(), "INVALID_CURSOR", 400),
+                arguments(new ValidationException("before is required with last on this list"),
+                        "VALIDATION_ERROR", 400),
                 arguments(new InvalidRelayIdException(WRONG_TYPE_ID), "INVALID_ID", 400),
                 arguments(new IllegalArgumentException("page size too large"), "VALIDATION_ERROR", 400),
                 arguments(new IllegalStateException("range too wide"), "VALIDATION_ERROR", 400));

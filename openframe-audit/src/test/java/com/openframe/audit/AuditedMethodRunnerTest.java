@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
@@ -39,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -440,18 +442,19 @@ class AuditedMethodRunnerTest {
     }
 
     @Test
-    void runWithoutCompare_workThrows_namesTheTargetFromAReadAfterTheFailure() {
+    void run_compareOffAndWorkThrows_namesTheTargetFromAReadAfterTheFailure() {
         ticketIdKnown();
         runsTheWork();
         stored(ticket("Printer offline", "org-1", "device-1"));
         IllegalStateException refusal = new IllegalStateException("Tag already added");
         when(outcomeResolver.ofFailure(refusal))
                 .thenReturn(new ActionOutcome(AuditOutcome.REFUSED, "Tag already added"));
+        AuditCall call = AuditCall.of(AuditAction.TICKET_TAG_ADD, AuditTargetType.TICKET, TICKET_ID,
+                Map.of("tagId", "tag-1")).withCompare(false);
 
-        assertThatThrownBy(() -> runner.runWithoutCompare(AuditAction.TICKET_TAG_ADD, AuditTargetType.TICKET,
-                TICKET_ID, Map.of("tagId", "tag-1"), () -> {
-                    throw refusal;
-                })).isSameAs(refusal);
+        assertThatThrownBy(() -> runner.run(call, () -> {
+            throw refusal;
+        })).isSameAs(refusal);
 
         assertThat(recordedEntry().getTargetName()).isEqualTo("Printer offline");
         verifyTheTargetWasReadOnceAfterTheWork(TICKET_ID);
@@ -486,14 +489,15 @@ class AuditedMethodRunnerTest {
     }
 
     @Test
-    void runWithoutCompare_supplier_recordsTheNamedDetailsFromOneReadAfterTheCall() {
+    void run_compareOff_recordsTheNamedDetailsFromOneReadAfterTheCall() {
         ticketIdKnown();
         runsTheWork();
         succeeds("added");
         stored(ticket("Printer offline", "org-1", "device-1"));
+        AuditCall call = AuditCall.of(AuditAction.TICKET_TAG_ADD, AuditTargetType.TICKET, TICKET_ID,
+                Map.of("tagId", "tag-1")).withCompare(false);
 
-        String result = runner.runWithoutCompare(AuditAction.TICKET_TAG_ADD, AuditTargetType.TICKET, TICKET_ID,
-                Map.of("tagId", "tag-1"), () -> "added");
+        String result = runner.run(call, () -> "added");
 
         assertThat(result).isEqualTo("added");
         assertThat(recordedEntry())
@@ -522,7 +526,7 @@ class AuditedMethodRunnerTest {
         runsTheWork();
         succeeds("added");
         when(writer.hadChildren(any())).thenReturn(true);
-        AuditCall call = taggedTicket().withRecordsResult(_ -> false);
+        AuditCall call = taggedTicket().withStoreIf(_ -> false);
 
         runner.run(call, () -> "added");
 
@@ -534,7 +538,7 @@ class AuditedMethodRunnerTest {
         runsTheWork();
         when(outcomeResolver.ofResult("name taken"))
                 .thenReturn(new ActionOutcome(AuditOutcome.REFUSED, "Name already taken"));
-        AuditCall call = taggedTicket().withRecordsResult(_ -> false);
+        AuditCall call = taggedTicket().withStoreIf(_ -> false);
 
         runner.run(call, () -> "name taken");
 
@@ -1064,6 +1068,158 @@ class AuditedMethodRunnerTest {
         runner.run(AuditAction.TICKET_UPDATE, TICKET_ID, () -> "saved");
 
         assertThat(recordedEntry().getChanges()).containsExactly(Map.entry("budget", new AuditChange(before, after)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("emptyValues")
+    void run_fieldSavedEmptyWhereItWasMissing_recordsNothing(Object empty) {
+        ticketIdKnown();
+        runsTheWork();
+        succeeds("saved");
+        updated(new Document(), new Document("notes", empty));
+        noChildrenRecorded();
+
+        runner.run(AuditAction.TICKET_UPDATE, TICKET_ID, () -> "saved");
+
+        verify(recorder, never()).recordAudited(any(), any());
+    }
+
+    @Test
+    void run_valueInsideAFieldGainedAnEmptyKey_recordsNothing() {
+        ticketIdKnown();
+        runsTheWork();
+        succeeds("saved");
+        updated(new Document("contact", new Document("name", "Ann")),
+                new Document("contact", new Document("name", "Ann").append("phones", List.of())));
+        noChildrenRecorded();
+
+        runner.run(AuditAction.TICKET_UPDATE, TICKET_ID, () -> "saved");
+
+        verify(recorder, never()).recordAudited(any(), any());
+    }
+
+    @Test
+    void run_valueInsideAFieldGainedAKey_recordsTheChange() {
+        ticketIdKnown();
+        runsTheWork();
+        succeeds("saved");
+        Document before = new Document("name", "Ann");
+        Document after = new Document("name", "Ann").append("phone", "555-0100");
+        updated(new Document("contact", before), new Document("contact", after));
+
+        runner.run(AuditAction.TICKET_UPDATE, TICKET_ID, () -> "saved");
+
+        assertThat(recordedEntry().getChanges()).containsExactly(Map.entry("contact", new AuditChange(before, after)));
+    }
+
+    @Test
+    void run_valueInsideAFieldLostAKey_recordsTheChange() {
+        ticketIdKnown();
+        runsTheWork();
+        succeeds("saved");
+        Document before = new Document("name", "Ann").append("phone", "555-0100");
+        Document after = new Document("name", "Ann");
+        updated(new Document("contact", before), new Document("contact", after));
+
+        runner.run(AuditAction.TICKET_UPDATE, TICKET_ID, () -> "saved");
+
+        assertThat(recordedEntry().getChanges()).containsExactly(Map.entry("contact", new AuditChange(before, after)));
+    }
+
+    @Test
+    void run_callRecordsUnchangedAndTheRecordDidNotChange_recordsTheEvent() {
+        ticketIdKnown();
+        runsTheWork();
+        succeeds("saved");
+        updated(new Document("statusKind", "OPEN"), new Document("statusKind", "OPEN"));
+        noChildrenRecorded();
+        AuditCall call = AuditCall.of(AuditAction.TICKET_UPDATE, TICKET_ID).withStoreIfUnchanged(_ -> true);
+
+        runner.run(call, () -> "saved");
+
+        assertThat(recordedEntry()).extracting(AuditEntry::getAction, AuditEntry::getChanges)
+                .containsExactly(AuditAction.TICKET_UPDATE, null);
+    }
+
+    @Test
+    void run_changesComeWithTheResult_recordsThoseChanges() {
+        runsTheWork();
+        succeeds("saved");
+
+        runner.run(settingsSaved(Map.of("enabled", new AuditChange(true, false))), () -> "saved");
+
+        assertThat(recordedEntry().getChanges()).containsExactly(Map.entry("enabled", new AuditChange(true, false)));
+    }
+
+    @Test
+    void run_changesThatComeWithTheResultAreEmpty_recordsNothing() {
+        runsTheWork();
+        succeeds("saved");
+        noChildrenRecorded();
+
+        runner.run(settingsSaved(Map.of()), () -> "saved");
+
+        verify(recorder, never()).recordAudited(any(), any());
+    }
+
+    @Test
+    void run_callOwnsCustomerAndDevice_takesThemFromTheCallNotFromTheStoredRecord() {
+        ticketIdKnown();
+        runsTheWork();
+        succeeds("saved");
+        updated(new Document("statusKind", "OPEN"), new Document("statusKind", "ARCHIVED"));
+        AuditCall call = namedByTheCall(AuditCall.of(AuditAction.TICKET_UPDATE, TICKET_ID))
+                .withIgnoresTargetOrganizationAndDevice(true);
+
+        runner.run(call, () -> "saved");
+
+        assertThat(recordedEntry())
+                .extracting(AuditEntry::getTargetName, AuditEntry::getOrganizationId, AuditEntry::getDeviceId)
+                .containsExactly("Printer offline, edited", "org-9", "device-9");
+    }
+
+    @Test
+    void run_copyAfterTheCallLacksNameCustomerAndDevice_takesThemFromTheCopyBefore() {
+        ticketIdKnown();
+        runsTheWork();
+        succeeds("saved");
+        Ticket before = ticket("Printer offline", "org-1", "device-1");
+        Ticket after = ticket(null, null, null);
+        stored(before, after);
+        writesFields(before, new Document("title", "Printer offline"));
+        writesFields(after, new Document());
+
+        runner.run(AuditAction.TICKET_UPDATE, TICKET_ID, () -> "saved");
+
+        assertThat(recordedEntry())
+                .extracting(AuditEntry::getTargetName, AuditEntry::getOrganizationId, AuditEntry::getDeviceId)
+                .containsExactly("Printer offline", "org-1", "device-1");
+    }
+
+    @Test
+    void run_workThrowsAfterClearingNameCustomerAndDevice_takesThemFromTheCopyBefore() {
+        ticketIdKnown();
+        runsTheWork();
+        stored(ticket("Printer offline", "org-1", "device-1"), ticket(null, null, null));
+        ForbiddenException refusal = refusedByTheResolver();
+
+        assertThatThrownBy(() -> runner.run(AuditAction.TICKET_UPDATE, TICKET_ID, () -> {
+            throw refusal;
+        })).isSameAs(refusal);
+
+        assertThat(recordedEntry())
+                .extracting(AuditEntry::getTargetName, AuditEntry::getOrganizationId, AuditEntry::getDeviceId)
+                .containsExactly("Printer offline", "org-1", "device-1");
+    }
+
+    private static Stream<Object> emptyValues() {
+        return Stream.of("", List.of(), new Document());
+    }
+
+    private static AuditCall settingsSaved(Map<String, AuditChange> changes) {
+        return AuditCall.of(AuditAction.NOTIFICATION_SETTINGS_UPDATE, "user-1")
+                .withCompare(false)
+                .withChangesFromResult(_ -> changes);
     }
 
     private AuditEntry entryOfAFailedUpdate(RuntimeException failure) {

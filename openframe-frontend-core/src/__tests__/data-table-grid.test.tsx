@@ -16,6 +16,7 @@ import {
   GRID_FILLER_ID,
   gridCellClass,
   type GridColumn,
+  type GridLayoutOptions,
 } from '../components/ui/data-table/data-table-grid';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
 import { LoadingScope } from '../components/ui/loading-scope';
@@ -148,10 +149,10 @@ function gridRowCheckbox(index: number): HTMLElement {
 }
 
 describe('buildGridLayout', () => {
-  function layoutOf(columns: ColumnDef<Item>[]) {
+  function layoutOf(columns: ColumnDef<Item>[], options?: GridLayoutOptions) {
     return renderHook(() => {
       const table = useDataTable<Item>({ data: ITEMS, columns });
-      return buildGridLayout(table.getVisibleFlatColumns());
+      return buildGridLayout(table.getVisibleFlatColumns(), options);
     }).result.current;
   }
 
@@ -203,6 +204,15 @@ describe('buildGridLayout', () => {
     const layout = layoutOf(COLUMNS.filter(column => column.id !== 'select'));
     expect(layout.columns[0]).toMatchObject({ id: 'name', pin: 'left', offset: 0 });
     expect(layout.pinnedLeft).toBe(280);
+  });
+
+  it('keeps a column that cannot be hidden, whatever the stored layout hides', () => {
+    const kept = COLUMNS.map(column => (column.id === 'name' ? { ...column, enableHiding: false } : column));
+    expect(layoutOf(kept, { hidden: ['name', 'owner'] }).columns.map(column => column.id)).toEqual([
+      'select',
+      'name',
+      'more',
+    ]);
   });
 });
 
@@ -432,6 +442,27 @@ describe('DataTable grid layout', () => {
     render(<Grid />);
     // name and owner only: the selection and action columns keep their width.
     expect(screen.getAllByRole('separator')).toHaveLength(2);
+  });
+
+  it('places every resize handle against its own header cell at every width, the pinned first column included', () => {
+    const { container } = render(<Grid />);
+    // The header cells of the data columns, by column id: each one holds a resize handle.
+    const cells = new Map(
+      [
+        ...gridHeaderMarkup(container).matchAll(
+          /<div class="([^"]*)"[^>]*data-grid-header-cell="true"[^>]*data-grid-col="([^"]+)"/g,
+        ),
+      ].map(match => [match[2] ?? '', (match[1] ?? '').split(' ')] as const),
+    );
+    expect([...cells.keys()]).toEqual(['name', 'owner']);
+    expect(screen.getAllByRole('separator')).toHaveLength(cells.size);
+    // A positioned box with no breakpoint on it: the left pin's `lg:content-md:sticky` is not one on a tablet, a
+    // phone or in a narrow content column, where the handle would be placed against the header's frame instead.
+    for (const classes of cells.values()) {
+      expect(classes.some(name => name === 'relative' || name === 'sticky')).toBe(true);
+    }
+    // The first data column is the pinned one, and it still pins where there is room.
+    expect(cells.get('name')).toContain('lg:content-md:sticky');
   });
 
   it('marks the column being dragged, and clears the mark on release', () => {

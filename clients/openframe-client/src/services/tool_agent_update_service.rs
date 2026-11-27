@@ -2,11 +2,12 @@ use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 use crate::models::{Installation, InstalledAsset, InstalledTool, ToolRecordState};
 use crate::platform::{
-    binary_writer, clear_aside_binary, detect_actual_installation, needs_migration, run_migration,
-    run_update, system_service, DirectoryManager, ToolUpdaterDeps,
+    binary_writer, clear_aside_binary, detect_actual_installation, needs_migration, os_version,
+    run_migration, run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::tool_ops::ToolOpGuard;
+use crate::services::tool_os_gate::{os_version_shortfall, ToolChange};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -65,7 +66,19 @@ impl ToolAgentUpdateService {
         &self,
         message: ToolAgentUpdateMessage,
         _op: ToolOpGuard,
-    ) -> Result<()> {
+    ) -> Result<ToolChange> {
+        if let Some(shortfall) = os_version_shortfall(
+            &message.download_configurations,
+            os_version::current().version.as_ref(),
+        ) {
+            info!("Not updating {}: {}", message.tool_agent_id, shortfall);
+            return Ok(ToolChange::NotSupported(shortfall));
+        }
+        self.process_update(message).await?;
+        Ok(ToolChange::Done)
+    }
+
+    async fn process_update(&self, message: ToolAgentUpdateMessage) -> Result<()> {
         let tool_agent_id = &message.tool_agent_id;
         let new_version = &message.version;
 

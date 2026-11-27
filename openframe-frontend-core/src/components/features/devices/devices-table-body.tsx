@@ -65,7 +65,11 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   hideColumns?: string[];
   /** Adds the USER and SOURCES columns, for a host whose tenant has directories. Default: neither. */
   directoryColumns?: boolean;
-  /** Column ids whose header filter is dropped while the column stays visible (e.g. ['status'] on the archive page). */
+  /**
+   * Header filters to drop while their column stays visible, by column id or by the key the filter is stored under
+   * (`meta.filter.id`): ['status'] on the archive page drops the status filter wherever it is, on the STATUS column
+   * (legacy display) or on DEVICE (lifecycle display).
+   */
   disableColumnFilters?: string[];
   /** The facet query is still in flight, see `getDeviceTableColumns`. */
   filtersPending?: boolean;
@@ -107,6 +111,12 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
    */
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+}
+
+/** Whether a column's header filter is one of `disabled`: by the column's id, or by the key its filter is stored under. */
+function filterDisabled<T>(column: ColumnDef<T>, disabled: ReadonlySet<string>): boolean {
+  const key = column.meta?.filter?.id;
+  return (column.id !== undefined && disabled.has(column.id)) || (key !== undefined && disabled.has(key));
 }
 
 /** One page of rows still being read: an id each, and nothing a cell can show (every cell draws its loading form). */
@@ -159,7 +169,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
       statusDisplay,
     })
       .filter(c => !c.id || !hidden.has(c.id))
-      .map(c => (c.id && unfiltered.has(c.id) ? { ...c, meta: { ...c.meta, filter: undefined } } : c));
+      .map(c => (filterDisabled(c, unfiltered) ? { ...c, meta: { ...c.meta, filter: undefined } } : c));
     const open = getDeviceOpenColumn<T>();
     const data = actionsColumn ? [...base, actionsColumn, open] : [...base, open];
     // The checkbox column is the grid table's first column.

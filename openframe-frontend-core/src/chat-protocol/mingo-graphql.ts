@@ -22,8 +22,44 @@ const ALIASED_FIELDS: Record<string, { alias: string; field: string }> = {
   ASK: { alias: 'askIntro', field: 'text' },
 };
 
-/** One page of a dialog's messages, newest first. */
-export const MINGO_MESSAGES_QUERY = `
+/**
+ * An email's sender and envelope (email-to-ticket). Only a backend with email-to-ticket on has the types, and a document
+ * that names a type its schema lacks is refused whole, so they are asked for only on request.
+ */
+const EMAIL_OWNER_SELECTION = `
+            ... on EmailOwner {
+              address
+              name
+            }`;
+const EMAIL_PART_SELECTION = `
+            ... on EmailData {
+              direction
+              from {
+                address
+                name
+              }
+              to {
+                address
+                name
+              }
+              cc {
+                address
+                name
+              }
+              subject
+              quotedText
+              deliveryState
+              deliveryFailureReason
+              automatic
+            }`;
+
+export interface MingoMessagesQueryOptions {
+  /** Email messages draw as emails: their sender and envelope. Only for a backend with email-to-ticket on. */
+  email?: boolean;
+}
+
+/** The document, with the email selections in their places (empty strings without them). */
+const messagesQuery = (emailOwner: string, emailPart: string) => `
   query GetDialogMessages($dialogId: ID!, $chatType: ChatType, $cursor: String, $limit: Int, $sortField: String, $sortDirection: SortDirection) {
     messages(
       dialogId: $dialogId
@@ -59,7 +95,7 @@ export const MINGO_MESSAGES_QUERY = `
               modelName
               providerName
               contextWindow
-            }
+            }${emailOwner}
           }
           parts {
             type
@@ -122,6 +158,7 @@ export const MINGO_MESSAGES_QUERY = `
               integratedToolType
               toolFunction
               result
+              resultIsAnswer
               success
               requiredApproval
               approvalStatus
@@ -187,7 +224,7 @@ export const MINGO_MESSAGES_QUERY = `
             ... on ErrorData {
               error
               details
-            }
+            }${emailPart}
           }
         }
       }
@@ -200,6 +237,14 @@ export const MINGO_MESSAGES_QUERY = `
     }
   }
 `;
+
+/** One page of a dialog's messages, newest first. */
+export function mingoMessagesQuery({ email = false }: MingoMessagesQueryOptions = {}): string {
+  return messagesQuery(email ? EMAIL_OWNER_SELECTION : '', email ? EMAIL_PART_SELECTION : '');
+}
+
+/** One page of a dialog's messages, newest first: what every chat without email reads. */
+export const MINGO_MESSAGES_QUERY = mingoMessagesQuery();
 
 /** The chat a message belongs to: an end user's (the Fae client, a ticket's client side) or the operator's Mingo. */
 export type MingoChatType = 'CLIENT_CHAT' | 'ADMIN_AI_CHAT';

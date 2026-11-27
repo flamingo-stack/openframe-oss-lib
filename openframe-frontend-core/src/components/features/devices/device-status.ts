@@ -181,9 +181,9 @@ export function getLegacyDeviceStatusConfig(
 }
 
 /**
- * The tag a device list draws for a row: OUTDATED when the server flags the device's client
- * (`clientOutdated`), otherwise the device's status. The outdated client is what the user has to
- * act on, so it takes the place of the status rather than sitting beside it.
+ * OUTDATED when the server flags the device's client (`clientOutdated`), otherwise the device's status.
+ * @deprecated No list draws its tag from this anymore. Use `deviceLifecycleTagProps` (OUTDATED replaces the tag in
+ * the legacy display only) and, in the lifecycle display, `DeviceOutdatedIcon` beside the lifecycle tag.
  */
 export function getDeviceRowStatusConfig(device: Pick<DeviceRow, 'status' | 'clientOutdated'>): DeviceStatusConfig {
   return device.clientOutdated === true ? OUTDATED_STATUS_CONFIG : getDeviceStatusConfig(device.status);

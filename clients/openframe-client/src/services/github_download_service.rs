@@ -57,24 +57,7 @@ impl GithubDownloadService {
     /// Downloads and extracts agent binary from the given download configuration
     /// Returns the binary bytes ready to be written to disk
     pub async fn download_and_extract(&self, config: &DownloadConfiguration) -> Result<Bytes> {
-        info!("Downloading from: {}", config.link);
-
-        // Download the archive with retry
-        let archive_bytes = self
-            .download_with_retry(&config.link)
-            .await
-            .with_context(|| format!("Failed to download from: {}", config.link))?;
-
-        info!("Downloaded {} bytes", archive_bytes.len());
-
-        // Validate archive size
-        if archive_bytes.len() < MIN_BINARY_SIZE_BYTES as usize {
-            return Err(anyhow!(
-                "Downloaded file too small ({} bytes), minimum expected: {} bytes",
-                archive_bytes.len(),
-                MIN_BINARY_SIZE_BYTES
-            ));
-        }
+        let archive_bytes = self.download_archive(config).await?;
 
         // Extract based on file extension
         info!(
@@ -110,6 +93,28 @@ impl GithubDownloadService {
         );
 
         Ok(binary_bytes)
+    }
+
+    /// Downloads the archive with retry and rejects one too small to hold a tool.
+    pub async fn download_archive(&self, config: &DownloadConfiguration) -> Result<Bytes> {
+        info!("Downloading from: {}", config.link);
+
+        let archive_bytes = self
+            .download_with_retry(&config.link)
+            .await
+            .with_context(|| format!("Failed to download from: {}", config.link))?;
+
+        info!("Downloaded {} bytes", archive_bytes.len());
+
+        if archive_bytes.len() < MIN_BINARY_SIZE_BYTES as usize {
+            return Err(anyhow!(
+                "Downloaded file too small ({} bytes), minimum expected: {} bytes",
+                archive_bytes.len(),
+                MIN_BINARY_SIZE_BYTES
+            ));
+        }
+
+        Ok(archive_bytes)
     }
 
     /// Download with a growing pause between attempts until the retry budget runs out.
@@ -186,7 +191,10 @@ impl GithubDownloadService {
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).context("Failed to read ZIP entry")?;
 
-            let file_name = file.name().to_string();
+            let file_name = file
+                .name()
+                .context("Failed to read ZIP entry name")?
+                .to_string();
 
             // Check if this is the target file (case-insensitive, check basename)
             if file_name
@@ -318,23 +326,19 @@ impl GithubDownloadService {
         config: &DownloadConfiguration,
         target_dir: &Path,
     ) -> Result<()> {
-        info!("Downloading archive from: {}", config.link);
-
-        let archive_bytes = self
-            .download_with_retry(&config.link)
+        let archive_bytes = self.download_archive(config).await?;
+        self.extract_archive(archive_bytes, config, target_dir)
             .await
-            .with_context(|| format!("Failed to download from: {}", config.link))?;
+    }
 
-        info!("Downloaded {} bytes", archive_bytes.len());
-
-        if archive_bytes.len() < MIN_BINARY_SIZE_BYTES as usize {
-            return Err(anyhow!(
-                "Downloaded file too small ({} bytes), minimum expected: {} bytes",
-                archive_bytes.len(),
-                MIN_BINARY_SIZE_BYTES
-            ));
-        }
-
+    /// Extracts all contents of a downloaded tar.gz or DMG archive to target path (macOS only).
+    #[cfg(target_os = "macos")]
+    pub async fn extract_archive(
+        &self,
+        archive_bytes: Bytes,
+        config: &DownloadConfiguration,
+        target_dir: &Path,
+    ) -> Result<()> {
         if config.file_name.ends_with(".tar.gz") || config.file_name.ends_with(".tgz") {
             self.extract_all_from_tar_gz(archive_bytes, target_dir)
                 .with_context(|| "Failed to extract tar.gz archive")?;

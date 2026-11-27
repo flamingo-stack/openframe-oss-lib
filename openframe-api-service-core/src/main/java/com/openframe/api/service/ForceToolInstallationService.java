@@ -8,6 +8,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.IntegratedToolAgentService;
+import com.openframe.data.service.ToolInstallationOutcome;
 import com.openframe.data.service.ToolInstallationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -119,9 +120,13 @@ public class ForceToolInstallationService {
         try {
             IntegratedToolAgent toolAgent = integratedToolAgentService.findByKey(toolAgentId)
                     .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
-            toolInstallationService.process(machineId, toolAgent, reinstall);
-
-            return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.PROCESSED);
+            ToolInstallationOutcome outcome = toolInstallationService.process(machineId, toolAgent, reinstall);
+            ForceAgentStatus status = switch (outcome) {
+                case DISPATCHED -> ForceAgentStatus.PROCESSED;
+                case NOT_SUPPORTED -> ForceAgentStatus.NOT_SUPPORTED;
+                case NOT_CARRIED, FAILED -> ForceAgentStatus.FAILED;
+            };
+            return buildResponseItem(machineId, toolAgentId, status);
         } catch (Exception e) {
             log.error("Failed to process force tool {} installation message for machine {}", toolAgentId, machineId, e);
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.FAILED);

@@ -19,6 +19,7 @@ import {
   type ChatApprovalDescriptor,
   type ChatMessage,
   type ChatMessageMetadata,
+  type ChatPart,
   type ChatSourcePart,
   type ChatToolMetadata,
 } from './chat-message';
@@ -107,6 +108,51 @@ function sourcePartOfRow(row: Record<string, unknown>): ChatSourcePart | null {
   });
 }
 
+/** An MCP quick action names an icon per host theme; the chat is dark. */
+function darkIconOf(icons: unknown): { url: string } | undefined {
+  if (!Array.isArray(icons)) return undefined;
+  const images = icons.filter(isRecord).filter(icon => nonEmpty(icon.src));
+  const image = images.find(icon => icon.theme === 'dark') ?? images[0];
+  return image ? { url: image.src as string } : undefined;
+}
+
+function withDarkIcons(groups: unknown): unknown {
+  if (!Array.isArray(groups)) return groups;
+  return (groups as unknown[]).map((group): unknown =>
+    isRecord(group) && Array.isArray(group.prompts)
+      ? {
+          ...group,
+          prompts: (group.prompts as unknown[]).map((chip): unknown =>
+            isRecord(chip) ? { ...chip, icon: darkIconOf(chip.icons) } : chip,
+          ),
+        }
+      : group,
+  );
+}
+
+function jsonObjectOf(value: unknown): Record<string, unknown> | null {
+  if (isRecord(value)) return value;
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A tool result the server returned as the turn's answer, read as the stored parts it maps to. */
+function toolAnswerParts(result: unknown): ChatPart[] {
+  const answer = jsonObjectOf(result);
+  if (!answer) return nonEmpty(result) ? [{ type: 'text', text: result as string }] : [];
+  const parts = parseStoredParts([
+    { type: 'text', text: nonEmpty(answer.text) },
+    { type: 'data-suggestions', data: { groups: withDarkIcons(answer.groups), note: answer.note } },
+  ]);
+  if (parts.length > 0) return parts;
+  return [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(answer, null, 2)}\n\`\`\`` }];
+}
+
 export function createMingoDecoder(options: { now?: () => string } = {}): MingoDecoder {
   const now = options.now ?? (() => new Date().toISOString());
   let nextId = 0;
@@ -116,6 +162,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
   let reasoningId: string | null = null;
   let compactionId: string | null = null;
   const seenTools = new Set<string>();
+  const answeredTools = new Set<string>();
   let lastSeq = Number.NEGATIVE_INFINITY;
 
   function closeOpen(out: UiChunk[]): void {
@@ -243,6 +290,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       if (seq <= lastSeq) return { seq, chunks: out };
       lastSeq = seq;
     }
+    const at = typeof raw.streamPublishedAt === 'number' ? raw.streamPublishedAt : undefined;
     const resolvedByName = str(raw.resolvedByName) ?? str(raw.displayName);
 
     switch (raw.type) {
@@ -339,6 +387,17 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
           out.push({ type: 'tool-output-error', toolCallId, dynamic: true, errorText: str(raw.result) ?? '' });
         } else {
           out.push({ type: 'tool-output-available', toolCallId, dynamic: true, output: raw.result ?? null });
+          if (raw.resultIsAnswer === true && !answeredTools.has(toolCallId)) {
+            answeredTools.add(toolCallId);
+            for (const part of toolAnswerParts(raw.result)) {
+              if (part.type === 'text') {
+                writeText(part.text, out);
+                closeText(out);
+              } else if (part.type === 'data-suggestions') {
+                out.push(part);
+              }
+            }
+          }
         }
         break;
       }
@@ -512,7 +571,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       default:
         break;
     }
-    return { ...(seq !== undefined ? { seq } : {}), chunks: out };
+    return { ...(seq !== undefined ? { seq } : {}), ...(at !== undefined ? { at } : {}), chunks: out };
   }
 
   return { decode };

@@ -30,6 +30,7 @@ public class SoftwareResponse {
     private SoftwareVulnerabilitySummaryResponse vulnerabilitySummary;
     private Boolean cpeMatched;
     private SoftwareAutoUpdateStatus autoUpdate;
+    private Integer adoptionCount;
     // not in the GraphQL schema: the osquery table Fleet took the row from, the keys a package manager matches the
     // program by, the match the read model stored for it, and the catalog package that manages the title
     private FleetSource fleetSource;
@@ -37,6 +38,7 @@ public class SoftwareResponse {
     private String bundleIdentifier;
     private List<String> appFileNames;
     private Boolean topLevelApp;
+    private Boolean userApplicationsOnly;
     private List<String> productCodes;
     private List<String> packageFamilyNames;
     private Boolean systemComponent;

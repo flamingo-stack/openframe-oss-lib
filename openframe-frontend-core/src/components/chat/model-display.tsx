@@ -3,9 +3,15 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
-import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
+import {
+  AnthropicLogoGreyIcon,
+  Chevron02DownIcon,
+  GeminiLogoGreyIcon,
+  OpenaiLogoGreyIcon,
+} from '../icons-v2-generated';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '../popover';
+import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { CircularProgress } from '../ui/circular-progress';
 import { useLoadingScope } from '../ui/loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
@@ -139,6 +145,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       outputTokens,
       onModelClick,
       modelTooltip,
+      modelMenu,
       usagePanel,
       loading = false,
       ...props
@@ -154,6 +161,9 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // v2 spells the counts out ("372 / 50,000 context budget"); classic keeps them short.
     const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
     const formatCount = (count: number) => (isV2 ? count.toLocaleString('en-US') : formatTokenCount(count));
+    const [menuOpen, setMenuOpen] = React.useState(false);
+    // A lock closes the open menu; lifting it does not open it again.
+    if (modelMenu?.disabled && menuOpen) setMenuOpen(false);
 
     if (isLoading) {
       return (
@@ -177,7 +187,38 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
         <span className="font-body">{name}</span>
       </>
     );
-    const label = onModelClick ? (
+    const label = modelMenu ? (
+      <ActionsMenuDropdown
+        groups={modelMenu.groups}
+        mobileDrillDown={modelMenu.mobileDrillDown}
+        className={modelMenu.mobileDrillDown ? 'w-60 min-w-0' : undefined}
+        variant="overlay"
+        side="top"
+        align="start"
+        sideOffset={4}
+        avoidCollisions={false}
+        open={menuOpen}
+        onOpenChange={open => setMenuOpen(open && !modelMenu.disabled)}
+        customTrigger={
+          // Disabled by aria only: a lock that lands while the button has focus must not drop it.
+          <button
+            type="button"
+            aria-label={name ? `Chat model: ${name}` : 'Chat model'}
+            aria-disabled={modelMenu.disabled || undefined}
+            // Figma mingo/model-trigger: a 20px mark, 24px high.
+            className="group flex h-6 min-w-0 items-center gap-[var(--spacing-system-xxs)] rounded px-[var(--spacing-system-xxs)] text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-ods-text-secondary data-[state=open]:bg-ods-bg-active data-[state=open]:text-ods-text-primary"
+          >
+            {icon && <span className={cn(PROVIDER_ICON_BOX_CLASS, '[&_svg]:size-5')}>{icon}</span>}
+            <span className="truncate font-body">{name}</span>
+            <Chevron02DownIcon
+              aria-hidden
+              size={16}
+              className="shrink-0 transition-transform group-data-[state=open]:rotate-180"
+            />
+          </button>
+        }
+      />
+    ) : onModelClick ? (
       <button
         type="button"
         onClick={onModelClick}
@@ -192,18 +233,19 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       // Neither: the same two spans the row always had.
       labelContent
     );
-    const labelWithTooltip = modelTooltip ? (
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>{label}</TooltipTrigger>
-          <TooltipContent side="top" align="start">
-            {modelTooltip}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ) : (
-      label
-    );
+    const labelWithTooltip =
+      modelTooltip && !modelMenu ? (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>{label}</TooltipTrigger>
+            <TooltipContent side="top" align="start">
+              {modelTooltip}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        label
+      );
 
     // Inline pill: provider icon + model name + "X / Y context budget".
     // `contextWindow` is the agent's context budget, not the model's window:
@@ -220,30 +262,36 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       </>
     );
 
+    // With the Usage panel the counter waits for a figure too: while the budget and the usage are both unknown (no
+    // chat open, a new chat before its first figures) it would read "— / — context budget", so it is not drawn, and
+    // the panel it opens is out of reach until then.
+    const panelBudget = usagePanel ? (contextWindow ?? usagePanel.context.limit) : null;
+    const panelHasFigure = usedTokens != null || (panelBudget != null && panelBudget > 0);
+
     const inline = (
       <div ref={ref} className={cn(MODEL_DISPLAY_ROW_CLASS, 'text-ods-text-secondary', className)} {...props}>
         {labelWithTooltip}
-        {usagePanel ? (
-          <UsagePanelTrigger
-            usagePanel={usagePanel}
-            usedTokens={usedTokens}
-            budget={contextWindow ?? usagePanel.context.limit}
-            text={tailText(contextWindow ?? usagePanel.context.limit)}
-          />
-        ) : (
-          contextWindow != null && (
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="ml-auto opacity-70 text-h6">{tailText(contextWindow)}</span>
-                </TooltipTrigger>
-                <TooltipContent side="top" align="end">
-                  {CONTEXT_BUDGET_HINT}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )
-        )}
+        {usagePanel
+          ? panelHasFigure && (
+              <UsagePanelTrigger
+                usagePanel={usagePanel}
+                usedTokens={usedTokens}
+                budget={panelBudget}
+                text={tailText(panelBudget)}
+              />
+            )
+          : contextWindow != null && (
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="ml-auto opacity-70 text-h6">{tailText(contextWindow)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="end">
+                    {CONTEXT_BUDGET_HINT}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
       </div>
     );
 

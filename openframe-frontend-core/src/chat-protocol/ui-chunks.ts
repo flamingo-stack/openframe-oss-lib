@@ -177,6 +177,12 @@ export type UiChunk =
  */
 export interface ChatStreamEntry {
   seq?: number;
+  /**
+   * When the stream's server stored the event (epoch ms), from the transport's envelope (JetStream's publish time).
+   * The server's clock, like a persisted row's `createdAt`: a replay of a stored row was published as that row was
+   * written, a fresh event later. Absent on a transport that does not say.
+   */
+  at?: number;
   chunks: UiChunk[];
 }
 

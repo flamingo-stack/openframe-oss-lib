@@ -274,6 +274,8 @@ public class SoftwareActionDetailService {
     private static SoftwareActionDeviceResponse fromLeaf(ScriptExecution leaf) {
         SoftwareActionKind kind = kindOf(leaf);
         return SoftwareActionDeviceResponse.builder()
+                .executionRowId(leaf.getId())
+                .executionId(leaf.getExecutionId())
                 .machineId(leaf.getMachineId())
                 .kind(kind)
                 .status(deviceStatus(leaf.getStatus()))
@@ -293,7 +295,7 @@ public class SoftwareActionDetailService {
         if (action == null) {
             return null;
         }
-        return leaf.getSource() == ExecutionSource.PACKAGE_AUTO_UPDATE ? SoftwareActionKind.AUTO_UPDATE : action.kind();
+        return leaf.getSource() == ExecutionSource.PACKAGE_AUTO_UPDATE ? SoftwareActionKind.AUTO_UPDATE : SoftwareActionKindMapper.kindOf(action);
     }
 
     private static SoftwareActionDeviceResponse pending(String machineId, SoftwareActionStatus status, String error) {

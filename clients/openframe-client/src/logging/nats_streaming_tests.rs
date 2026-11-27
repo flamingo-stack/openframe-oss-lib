@@ -62,3 +62,58 @@ fn tenant_domain_drops_the_api_prefix() {
         "acme.openframe.ai"
     );
 }
+
+fn home_with_chat_log(root: &Path, name: &str, with_log: bool) -> PathBuf {
+    let home = root.join(name);
+    let logs_dir = get_chat_logs_directory(&home);
+    std::fs::create_dir_all(&logs_dir).unwrap();
+    if with_log {
+        std::fs::write(
+            logs_dir.join("openframe-chat.log"),
+            "[2026-11-25][01:00:00][INFO][app_lib] old\n",
+        )
+        .unwrap();
+    }
+    home
+}
+
+#[test]
+fn each_home_with_a_chat_log_becomes_one_source_once() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let secured = tmp.path().join("secured");
+    std::fs::create_dir(&secured).unwrap();
+    let homes = [
+        home_with_chat_log(tmp.path(), "alice", true),
+        home_with_chat_log(tmp.path(), "bob", false),
+        home_with_chat_log(tmp.path(), "carol", true),
+    ];
+    let mut known = HashSet::new();
+
+    let sources = new_chat_sources(&mut known, &homes, &secured);
+
+    assert_eq!(sources.len(), 2);
+    assert!(sources.iter().all(|s| s.name() == "openframe-chat"));
+    assert!(new_chat_sources(&mut known, &homes, &secured).is_empty());
+}
+
+#[test]
+fn a_chat_log_created_later_is_picked_up_on_the_next_scan() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let homes = [home_with_chat_log(tmp.path(), "alice", false)];
+    let mut known = HashSet::new();
+    assert!(new_chat_sources(&mut known, &homes, tmp.path()).is_empty());
+
+    std::fs::write(
+        get_chat_logs_directory(&homes[0]).join("openframe-chat.log"),
+        "",
+    )
+    .unwrap();
+
+    assert_eq!(new_chat_sources(&mut known, &homes, tmp.path()).len(), 1);
+}
+
+#[test]
+fn the_offset_file_name_is_the_fnv1a_hash_of_the_log_path() {
+    assert_eq!(path_hash(Path::new("")), 0xcbf2_9ce4_8422_2325);
+    assert_eq!(path_hash(Path::new("a")), 0xaf63_dc4c_8601_ec8c);
+}

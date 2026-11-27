@@ -1,5 +1,7 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseCursors;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
@@ -7,6 +9,7 @@ import com.openframe.api.dto.knowledgebase.KnowledgeBaseScope;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemCursor;
@@ -25,8 +28,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -53,7 +59,7 @@ class KnowledgeBaseServicePaginationTest {
         // "No tag filter" is null, not the empty list a bare mock would answer with.
         when(tagService.findItemIdsByTags(any())).thenReturn(null);
         service = new KnowledgeBaseService(repository, tagService, mock(AssignmentService.class),
-                mock(KnowledgeBaseTempAttachmentService.class), mock(KnowledgeBaseAttachmentService.class));
+                mock(KnowledgeBaseTempAttachmentService.class), mock(KnowledgeBaseAttachmentService.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
     }
 
     // ------------------------------------------------------------ paging
@@ -88,7 +94,7 @@ class KnowledgeBaseServicePaginationTest {
 
         query(null, 3);
 
-        verify(repository).findFolders(any(), any(), any(), isNull(), eq(4));
+        verify(repository).findFolders(any(), any(), any(), isNull(), eq(false), eq(4));
     }
 
     @Test
@@ -115,7 +121,7 @@ class KnowledgeBaseServicePaginationTest {
 
         assertThat(seen).containsExactly("f0", "f1", "f2", "f3", "f4", "f5", "f6");
         assertThat(pages).isEqualTo(3);
-        verify(repository, never()).findArticles(any(), any(), any(), any(), any(), anyInt());
+        verify(repository, never()).findArticles(any(), any(), any(), any(), any(), anyBoolean(), anyInt());
         verify(repository, never()).countArticles(any(), any(), any(), any());
     }
 
@@ -148,7 +154,7 @@ class KnowledgeBaseServicePaginationTest {
     void legacyArticleCursorContinuesArticles() {
         List<KnowledgeBaseItem> articles = items("a", 3, KnowledgeBaseItemType.ARTICLE);
         stubRepository(items("f", 2, KnowledgeBaseItemType.FOLDER), articles);
-        when(repository.findById("a0")).thenReturn(Optional.of(articles.get(0)));
+        when(repository.findCursorItem("a0")).thenReturn(Optional.of(articles.get(0)));
 
         CountedGenericQueryResult<KnowledgeBaseItem> page = query("a0", 20);
 
@@ -162,7 +168,7 @@ class KnowledgeBaseServicePaginationTest {
     void legacyFolderCursorContinuesFolders() {
         List<KnowledgeBaseItem> folders = items("f", 3, KnowledgeBaseItemType.FOLDER);
         stubRepository(folders, items("a", 2, KnowledgeBaseItemType.ARTICLE));
-        when(repository.findById("f0")).thenReturn(Optional.of(folders.get(0)));
+        when(repository.findCursorItem("f0")).thenReturn(Optional.of(folders.get(0)));
 
         CountedGenericQueryResult<KnowledgeBaseItem> page = query("f0", 20);
 
@@ -170,13 +176,17 @@ class KnowledgeBaseServicePaginationTest {
     }
 
     @Test
-    @DisplayName("a bare id whose document is gone is positioned as an article cursor, as it was before")
-    void legacyCursorOfMissingItemIsAnArticleCursor() {
-        stubRepository(items("f", 2, KnowledgeBaseItemType.FOLDER), items("a", 3, KnowledgeBaseItemType.ARTICLE));
+    @DisplayName("a bare id whose document is gone names no position and is rejected")
+    void legacyCursorOfMissingItemIsAnInvalidCursor() {
+        when(repository.findCursorItem("a0")).thenReturn(Optional.empty());
+        KnowledgeBaseFilterCriteria filter = KnowledgeBaseFilterCriteria.builder().build();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().cursor("a0").limit(20).build();
 
-        CountedGenericQueryResult<KnowledgeBaseItem> page = query("a0", 20);
+        Throwable thrown = catchThrowable(() -> service.queryItems(filter, null, pagination));
 
-        assertThat(page.getItems()).extracting(KnowledgeBaseItem::getId).containsExactly("a1", "a2");
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage("Invalid cursor");
+        verify(repository, never()).findFolders(any(), any(), any(), any(), anyBoolean(), anyInt());
+        verify(repository, never()).findArticles(any(), any(), any(), any(), any(), anyBoolean(), anyInt());
     }
 
     @Test
@@ -196,6 +206,7 @@ class KnowledgeBaseServicePaginationTest {
         verify(repository).findArchivedArticles(
                 isNull(), isNull(),
                 eq(new KnowledgeBaseItemCursor(KnowledgeBaseItemType.ARTICLE, "a9", null, updatedAt)),
+                eq(false),
                 eq(21));
     }
 
@@ -307,7 +318,7 @@ class KnowledgeBaseServicePaginationTest {
 
         assertThat(page.getItems()).extracting(KnowledgeBaseItem::getId).containsExactly("f0", "f1");
         assertThat(folderParent()).isEqualTo(KnowledgeBaseParentFilter.any());
-        verify(repository, never()).findArticles(any(), any(), any(), any(), any(), anyInt());
+        verify(repository, never()).findArticles(any(), any(), any(), any(), any(), anyBoolean(), anyInt());
     }
 
     @Test
@@ -321,7 +332,7 @@ class KnowledgeBaseServicePaginationTest {
 
         KnowledgeBaseParentFilter parent = articleParent();
         assertThat(parent.parentIds()).containsExactlyInAnyOrder("p", "c1");
-        verify(repository).findFolders(eq(parent), isNull(), eq(List.of("a0")), isNull(), anyInt());
+        verify(repository).findFolders(eq(parent), isNull(), eq(List.of("a0")), isNull(), eq(false), anyInt());
     }
 
     @Test
@@ -356,27 +367,27 @@ class KnowledgeBaseServicePaginationTest {
 
     private KnowledgeBaseParentFilter folderParent() {
         ArgumentCaptor<KnowledgeBaseParentFilter> captor = ArgumentCaptor.forClass(KnowledgeBaseParentFilter.class);
-        verify(repository).findFolders(captor.capture(), any(), any(), any(), anyInt());
+        verify(repository).findFolders(captor.capture(), any(), any(), any(), eq(false), anyInt());
         return captor.getValue();
     }
 
     private KnowledgeBaseParentFilter articleParent() {
         ArgumentCaptor<KnowledgeBaseParentFilter> captor = ArgumentCaptor.forClass(KnowledgeBaseParentFilter.class);
-        verify(repository).findArticles(captor.capture(), any(), any(), any(), any(), anyInt());
+        verify(repository).findArticles(captor.capture(), any(), any(), any(), any(), eq(false), anyInt());
         return captor.getValue();
     }
 
     private void stubRepository(List<KnowledgeBaseItem> folders, List<KnowledgeBaseItem> articles) {
         when(repository.countFolders(any(), any(), any())).thenReturn((long) folders.size());
-        when(repository.findFolders(any(), any(), any(), any(), anyInt())).thenAnswer(invocation -> {
+        when(repository.findFolders(any(), any(), any(), any(), eq(false), anyInt())).thenAnswer(invocation -> {
             KnowledgeBaseItemCursor cursor = invocation.getArgument(3);
-            int limit = invocation.getArgument(4);
+            int limit = invocation.getArgument(5);
             return pageAfter(folders, cursor, limit);
         });
         when(repository.countArticles(any(), any(), any(), any())).thenReturn((long) articles.size());
-        when(repository.findArticles(any(), any(), any(), any(), any(), anyInt())).thenAnswer(invocation -> {
+        when(repository.findArticles(any(), any(), any(), any(), any(), eq(false), anyInt())).thenAnswer(invocation -> {
             KnowledgeBaseItemCursor cursor = invocation.getArgument(4);
-            int limit = invocation.getArgument(5);
+            int limit = invocation.getArgument(6);
             return pageAfter(articles, cursor, limit);
         });
     }

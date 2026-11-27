@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { formatRelativeTime } from '../../../../utils/date-utils';
 import { CheckCircleIcon, MonitorIcon, PlusCircleIcon, TrashIcon } from '../../../icons-v2-generated';
 import {
   Button,
@@ -8,6 +9,8 @@ import {
   type ColumnFiltersState,
   DataTable,
   EntityImage,
+  GRID_ACTION_COLUMN_SIZE,
+  GRID_MIN_WIDTH,
   type OnChangeFn,
   type Row,
   type TabItem,
@@ -35,12 +38,14 @@ import {
 } from '../device-statuses';
 import { DeviceTypeTile } from '../device-type-tile';
 import { DevicesFilterToolbar } from '../devices-filter-toolbar';
-import { getDeviceFilterColumns } from '../devices-table-columns';
+import { DeviceNameGridCell, getDeviceFilterColumns, OrganizationGridCell } from '../devices-table-columns';
 import { useDeviceImageUrl } from '../devices-view-config';
 import type { DeviceFilters, DeviceRow } from '../types';
 import { useTagFilterModal } from '../use-tag-filter-modal';
 import { DeviceSelectionModeRadio } from './device-selection-mode-radio';
-import type { DeviceSelectorProps, SubTab } from './device-selector.types';
+import type { DeviceSelectionMode, DeviceSelectorProps, SubTab } from './device-selector.types';
+import { type ArmedGridAction, type GridActionArming, GridActionArmingContext } from './grid-action-arming';
+import { GridRowAction } from './grid-row-action';
 import { useDeviceSelector } from './use-device-selector';
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
@@ -105,6 +110,34 @@ function InertInScope({ children }: { children: ReactNode }) {
     </InertWhileLoading>
   );
 }
+
+/* ───────────────────────── grid-layout cells: one 48px line each ───────────────────────── */
+
+/**
+ * The STATUS cell in the grid: the status tag with when the device was last online beside it. A card row prints that
+ * time under the device's name ("Last Online: 5m ago"); a grid row has one line, so it sits with the status, as in the
+ * devices list.
+ */
+function StatusGridCell({ device }: { device: DeviceRow }) {
+  const loading = useLoadingScope();
+  const lastSeen = device.last_seen || device.lastSeen;
+  return (
+    <DataTable.Cell
+      tag={
+        loading ? (
+          <Tag loading label="" />
+        ) : (
+          <DeviceLifecycleTag status={device.status} connectivity={device.connectivity} />
+        )
+      }
+      // While the device is read there is no time to print: the tag's own loading form is the cell.
+      secondary={loading ? undefined : lastSeen ? formatRelativeTime(lastSeen) : 'Never'}
+    />
+  );
+}
+
+/** The add / remove control's icon in the grid: 20px, the size of every icon in a 48px row. */
+const GRID_ACTION_ICON_SIZE = 20;
 
 /** A device still being read: a row the table keys, nothing a cell can show (every cell draws its loading form). */
 function loadingDevices<T extends DeviceRow>(count: number): T[] {
@@ -184,13 +217,32 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   // not the ones used, the parent's query already answered those questions.
   const client = useDeviceSelector({ devices, selectedIds, getDeviceKey });
 
+  // The grid's add / remove button a finger armed (the first tap names the device, the second applies; see
+  // `GridRowAction`). Anything that changes what the table lists clears it without applying.
+  const [armedAction, setArmedAction] = useState<ArmedGridAction | null>(null);
+  const disarmGridAction = useCallback((match?: Pick<ArmedGridAction, 'rowId' | 'label'>) => {
+    setArmedAction(current =>
+      current && match && (current.rowId !== match.rowId || current.label !== match.label) ? current : null,
+    );
+  }, []);
+
   const searchTerm = server ? server.search : client.searchTerm;
-  const setSearchTerm = server ? server.onSearchChange : client.setSearchTerm;
-  const activeSubTab = server ? server.activeTab : client.activeSubTab;
-  const handleTabChange = useMemo(
-    () => (server ? (tabId: string) => server.onTabChange(tabId as SubTab) : client.handleTabChange),
-    [server, client.handleTabChange],
+  const changeSearchTerm = server ? server.onSearchChange : client.setSearchTerm;
+  const setSearchTerm = useCallback(
+    (value: string) => {
+      setArmedAction(null);
+      changeSearchTerm(value);
+    },
+    [changeSearchTerm],
   );
+  const activeSubTab = server ? server.activeTab : client.activeSubTab;
+  const handleTabChange = useMemo(() => {
+    const changeTab = server ? (tabId: string) => server.onTabChange(tabId as SubTab) : client.handleTabChange;
+    return (tabId: string) => {
+      setArmedAction(null);
+      changeTab(tabId);
+    };
+  }, [server, client.handleTabChange]);
 
   // Read latest selectedIds via ref so toggleDevice can stay reference-stable.
   // The DataTable rows are React.memo'd; rows that don't re-render keep an old
@@ -212,6 +264,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
 
   const setColumnFilters = useCallback(
     (next: ColumnFiltersState) => {
+      setArmedAction(null);
       if (server) server.onNarrowingChange({ columnFilters: next, tags: server.narrowing.tags });
       else setClientColumnFilters(next);
     },
@@ -229,6 +282,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
 
   const setSelectedTags = useCallback(
     (next: string[]) => {
+      setArmedAction(null);
       if (server) server.onNarrowingChange({ columnFilters: server.narrowing.columnFilters, tags: next });
       else setClientTags(next);
     },
@@ -285,6 +339,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
 
   const removeAllSelected = useCallback(() => {
     if (disabled) return;
+    setArmedAction(null);
     if (server) {
       server.onRemoveAll();
       return;
@@ -352,6 +407,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
 
   const addAllDevices = useCallback(() => {
     if (disabled) return;
+    setArmedAction(null);
     if (server) {
       server.onAddAll();
       return;
@@ -548,6 +604,17 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         header: 'DEVICE',
         cell: ({ row }: { row: Row<T> }) => <DeviceCell device={row.original} />,
         enableSorting: false,
+        // The name says which device a row adds: the grid's settings menu cannot hide it.
+        enableHiding: false,
+        size: 280,
+        minSize: GRID_MIN_WIDTH.icon,
+        meta: {
+          label: 'Device',
+          // The picker has a STATUS column of its own: the name carries no tag or outdated mark beside it.
+          gridCell: ({ row }) => (
+            <DeviceNameGridCell device={row.original} unreadMark={false} statusAdornments={false} />
+          ),
+        },
       },
       {
         id: 'organization',
@@ -555,7 +622,13 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         header: 'CUSTOMER',
         cell: ({ row }: { row: Row<T> }) => <CustomerCell device={row.original} />,
         enableSorting: false,
+        size: 280,
+        minSize: GRID_MIN_WIDTH.media,
         meta: {
+          label: 'Customer',
+          // The logo and the name, as in the devices list. The contact a card row prints under the name has no line
+          // of its own here, and beside the name it would take the name's width.
+          gridCell: ({ row }) => <OrganizationGridCell device={row.original} />,
           width: 'w-[320px]',
           hideAt: 'lg',
           filter: { options: orgFilterOptions, placement: 'bottom-end' },
@@ -569,7 +642,13 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
           <OSTypeBadge osType={row.original.osType} iconSize="w-4 h-4 content-md:w-6 content-md:h-6" />
         ),
         enableSorting: false,
+        size: 160,
+        minSize: GRID_MIN_WIDTH.icon,
         meta: {
+          label: 'OS',
+          gridCell: ({ row }) => (
+            <OSTypeBadge osType={row.original.osType} iconSize="w-5 h-5" className="min-w-0 truncate" />
+          ),
           width: 'w-[200px] content-md:w-1/6',
           hideAt: 'md',
         },
@@ -580,7 +659,11 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         header: 'STATUS',
         cell: ({ row }: { row: Row<T> }) => <StatusCell device={row.original} />,
         enableSorting: false,
+        // The tag and a relative time beside it ("3d ago").
+        size: 220,
         meta: {
+          label: 'Status',
+          gridCell: ({ row }) => <StatusGridCell device={row.original} />,
           width: 'w-auto shrink-0 content-md:w-[160px]',
           filter: { options: statusFilterOptions, sections: connectivitySections },
         },
@@ -657,7 +740,70 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
           </InertInScope>
         ),
         enableSorting: false,
-        meta: { width: 'w-12 content-md:w-auto content-md:min-w-[130px] shrink-0 flex-none', align: 'right' },
+        enableHiding: false,
+        size: GRID_ACTION_COLUMN_SIZE,
+        meta: {
+          width: 'w-12 content-md:w-auto content-md:min-w-[130px] shrink-0 flex-none',
+          align: 'right',
+          // In the grid the control is an action column: 56px, pinned right, not in the gear menu.
+          gridKind: 'action',
+          gridCell: ({ row }) => (
+            <InertInScope>
+              {((): ReactNode => {
+                const device = row.original;
+                const name = getDeviceName(device);
+                const disabledReason = isDeviceDisabled?.(device);
+                if (disabledReason) {
+                  return (
+                    <GridRowAction
+                      rowId={row.id}
+                      action="add"
+                      deviceName={name}
+                      icon={<PlusCircleIcon size={GRID_ACTION_ICON_SIZE} />}
+                      reason={disabledReason}
+                      disabled
+                    />
+                  );
+                }
+
+                const key = getDeviceKey(device);
+                if (key === undefined) return null;
+                if (activeSubTab === 'selected') {
+                  return (
+                    <GridRowAction
+                      rowId={row.id}
+                      action="remove"
+                      deviceName={name}
+                      icon={<TrashIcon size={GRID_ACTION_ICON_SIZE} />}
+                      tone="remove"
+                      onClick={() => toggleDevice(device)}
+                      disabled={disabled}
+                    />
+                  );
+                }
+
+                const isSelected = selectedIds.has(key);
+                return (
+                  <GridRowAction
+                    rowId={row.id}
+                    action={isSelected ? 'remove' : 'add'}
+                    deviceName={name}
+                    icon={
+                      isSelected ? (
+                        <CheckCircleIcon size={GRID_ACTION_ICON_SIZE} />
+                      ) : (
+                        <PlusCircleIcon size={GRID_ACTION_ICON_SIZE} />
+                      )
+                    }
+                    tone={isSelected ? 'added' : 'default'}
+                    onClick={() => toggleDevice(device)}
+                    disabled={disabled}
+                  />
+                );
+              })()}
+            </InertInScope>
+          ),
+        },
       },
     ],
     [
@@ -686,10 +832,11 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     () => (loading ? loadingDevices<T>(skeletonRows ?? DATA_TABLE_SKELETON_ROWS) : null),
     [loading, skeletonRows],
   );
+  const getRowId = useCallback((row: T) => String(getDeviceKey(row) ?? row.id), [getDeviceKey]);
   const table = useDataTable<T>({
     data: loadingRows ?? devicesForTable,
     columns: visibleColumns,
-    getRowId: row => String(getDeviceKey(row) ?? row.id),
+    getRowId,
     enableSorting: false,
     state: { columnFilters },
     onColumnFiltersChange: handleTableColumnFiltersChange,
@@ -731,6 +878,37 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   );
 
   const availableInfiniteScroll = activeSubTab === 'available' ? infiniteScroll : undefined;
+  const loadMore = availableInfiniteScroll?.onLoadMore;
+  const handleLoadMore = useCallback(() => {
+    setArmedAction(null);
+    loadMore?.();
+  }, [loadMore]);
+
+  const handleSelectionModeChange = useMemo(
+    () =>
+      onSelectionModeChange &&
+      ((mode: DeviceSelectionMode) => {
+        setArmedAction(null);
+        onSelectionModeChange(mode);
+      }),
+    [onSelectionModeChange],
+  );
+
+  // The armed row left the list (the host's data changed under it, a criteria preview took the table, the rows went
+  // back to loading): it is cleared, not kept for the row's return. Set during render, as React's "adjusting state when
+  // a prop changes" does, so the bubble never draws for a row that is gone.
+  const armedRowListed =
+    armedAction !== null &&
+    !isCriteria &&
+    !loading &&
+    !disabled &&
+    devicesForTable.some(device => getRowId(device) === armedAction.rowId);
+  if (armedAction !== null && !armedRowListed) setArmedAction(null);
+  const armedGridAction = armedRowListed ? armedAction : null;
+  const gridActionArming = useMemo<GridActionArming>(
+    () => ({ armed: armedGridAction, arm: setArmedAction, disarm: disarmGridAction }),
+    [armedGridAction, disarmGridAction],
+  );
 
   // Column headers over nothing are just noise, drop them when the list is
   // empty. Except when the emptiness is the RESULT of narrowing (search, tag
@@ -763,33 +941,42 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   );
 
   const deviceTable = (
-    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
-      {/* The grid shows the same slot above the table; the card header carries it at its right end. */}
-      {showHeader && layout === 'grid' && <DataTable.Meta>{headerSlot}</DataTable.Meta>}
-      {showHeader && <DataTable.Header rightSlot={headerSlot} loading={loading} />}
-      <DataTable.Body
-        loading={loading}
-        loadingCells
-        loadingRegion={loadingRegion}
-        skeletonRows={skeletonRows}
-        emptyMessage={
-          isCriteria
-            ? 'No devices match these criteria'
-            : activeSubTab === 'selected'
-              ? 'No devices selected'
-              : 'No devices found'
-        }
-        rowClassName={rowClassName}
-      />
-      {availableInfiniteScroll && (
-        <DataTable.InfiniteFooter
-          hasNextPage={availableInfiniteScroll.hasNextPage}
-          isFetchingNextPage={availableInfiniteScroll.isFetchingNextPage}
-          onLoadMore={availableInfiniteScroll.onLoadMore}
-          skeletonRows={availableInfiniteScroll.skeletonRows}
+    <GridActionArmingContext.Provider value={gridActionArming}>
+      <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+        {/* The grid shows the same slot above the table; the card header carries it at its right end. */}
+        {showHeader && layout === 'grid' && <DataTable.Meta>{headerSlot}</DataTable.Meta>}
+        {showHeader && <DataTable.Header rightSlot={headerSlot} loading={loading} />}
+        <DataTable.Body
+          loading={loading}
+          loadingCells
+          loadingRegion={loadingRegion}
+          skeletonRows={skeletonRows}
+          emptyMessage={
+            isCriteria
+              ? 'No devices match these criteria'
+              : activeSubTab === 'selected'
+                ? 'No devices selected'
+                : 'No devices found'
+          }
+          rowClassName={rowClassName}
         />
+        {availableInfiniteScroll && (
+          <DataTable.InfiniteFooter
+            hasNextPage={availableInfiniteScroll.hasNextPage}
+            isFetchingNextPage={availableInfiniteScroll.isFetchingNextPage}
+            onLoadMore={handleLoadMore}
+            skeletonRows={availableInfiniteScroll.skeletonRows}
+          />
+        )}
+      </DataTable>
+      {/* A finger's first tap on a grid add / remove button arms it: say what the second tap does. Present before
+          anything is armed, so the change is announced. The card layout has no two-step tap. */}
+      {layout === 'grid' && (
+        <p className="sr-only" role="status" aria-live="polite">
+          {armedGridAction?.hint ?? ''}
+        </p>
       )}
-    </DataTable>
+    </GridActionArmingContext.Provider>
   );
 
   return (
@@ -800,7 +987,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
       {headerContent}
 
       {showSelectionModeRadio && (
-        <DeviceSelectionModeRadio value={selectionMode} onChange={onSelectionModeChange} disabled={disabled} />
+        <DeviceSelectionModeRadio value={selectionMode} onChange={handleSelectionModeChange} disabled={disabled} />
       )}
 
       {/* Criteria mode (design 460:85294) has no card at all: the rule's fields

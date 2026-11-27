@@ -1,5 +1,7 @@
 package com.openframe.api.service.knowledgebase;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.assignment.AssignmentTarget;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
@@ -27,8 +29,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -64,7 +68,7 @@ class KnowledgeBaseServiceAssignedToTest {
         // "No tag filter" is null, not the empty list a bare mock would answer with.
         when(tagService.findItemIdsByTags(any())).thenReturn(null);
         service = new KnowledgeBaseService(repository, tagService, assignmentService,
-                mock(KnowledgeBaseTempAttachmentService.class), mock(KnowledgeBaseAttachmentService.class));
+                mock(KnowledgeBaseTempAttachmentService.class), mock(KnowledgeBaseAttachmentService.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class, CALLS_REAL_METHODS));
     }
 
     // ------------------------------------------------------------ the assigned set
@@ -79,9 +83,9 @@ class KnowledgeBaseServiceAssignedToTest {
 
         assertThat(page.getItems()).extracting(KnowledgeBaseItem::getId).containsExactly("a0", "a1");
         assertThat(page.getFilteredCount()).isEqualTo(2);
-        verify(repository).findArticles(any(), isNull(), eq(List.of("a0", "a1")), isNull(), isNull(), eq(21));
+        verify(repository).findArticles(any(), isNull(), eq(List.of("a0", "a1")), isNull(), isNull(), eq(false), eq(21));
         verify(repository).countArticles(any(), isNull(), eq(List.of("a0", "a1")), isNull());
-        verify(repository, never()).findFolders(any(), any(), any(), any(), anyInt());
+        verify(repository, never()).findFolders(any(), any(), any(), any(), anyBoolean(), anyInt());
         verify(repository, never()).countFolders(any(), any(), any());
     }
 
@@ -139,7 +143,7 @@ class KnowledgeBaseServiceAssignedToTest {
 
         query(assignedTo(ORGANIZATION), "vpn", null, 20);
 
-        verify(repository).findArticles(any(), eq("vpn"), eq(List.of("a0")), isNull(), isNull(), eq(21));
+        verify(repository).findArticles(any(), eq("vpn"), eq(List.of("a0")), isNull(), isNull(), eq(false), eq(21));
         verify(repository).countArticles(any(), eq("vpn"), eq(List.of("a0")), isNull());
     }
 
@@ -158,7 +162,7 @@ class KnowledgeBaseServiceAssignedToTest {
 
         query(filter, null, null, 20);
 
-        verify(repository).findArticles(any(), isNull(), eq(List.of("a1", "a2")), isNull(), isNull(), eq(21));
+        verify(repository).findArticles(any(), isNull(), eq(List.of("a1", "a2")), isNull(), isNull(), eq(false), eq(21));
         verify(repository).countArticles(any(), isNull(), eq(List.of("a1", "a2")), isNull());
     }
 
@@ -176,7 +180,7 @@ class KnowledgeBaseServiceAssignedToTest {
         CountedGenericQueryResult<KnowledgeBaseItem> page = query(filter, null, null, 20);
 
         assertThat(page.getItems()).isEmpty();
-        verify(repository).findArticles(any(), isNull(), eq(List.of()), isNull(), isNull(), eq(21));
+        verify(repository).findArticles(any(), isNull(), eq(List.of()), isNull(), isNull(), eq(false), eq(21));
         verify(repository).countArticles(any(), isNull(), eq(List.of()), isNull());
     }
 
@@ -193,7 +197,7 @@ class KnowledgeBaseServiceAssignedToTest {
         assertThat(page.getItems()).isEmpty();
         assertThat(page.getFilteredCount()).isZero();
         assertThat(page.getPageInfo().isHasNextPage()).isFalse();
-        verify(repository).findArticles(any(), isNull(), eq(List.of()), isNull(), isNull(), eq(21));
+        verify(repository).findArticles(any(), isNull(), eq(List.of()), isNull(), isNull(), eq(false), eq(21));
     }
 
     // ------------------------------------------------------------ paging
@@ -276,7 +280,7 @@ class KnowledgeBaseServiceAssignedToTest {
 
     private KnowledgeBaseParentFilter articleParent() {
         ArgumentCaptor<KnowledgeBaseParentFilter> captor = ArgumentCaptor.forClass(KnowledgeBaseParentFilter.class);
-        verify(repository).findArticles(captor.capture(), any(), any(), any(), any(), anyInt());
+        verify(repository).findArticles(captor.capture(), any(), any(), any(), any(), eq(false), anyInt());
         return captor.getValue();
     }
 
@@ -284,10 +288,10 @@ class KnowledgeBaseServiceAssignedToTest {
     private void stubArticles(List<KnowledgeBaseItem> articles) {
         when(repository.countArticles(any(), any(), any(), any())).thenAnswer(invocation ->
                 (long) restrict(articles, invocation.getArgument(2)).size());
-        when(repository.findArticles(any(), any(), any(), any(), any(), anyInt())).thenAnswer(invocation -> {
+        when(repository.findArticles(any(), any(), any(), any(), any(), eq(false), anyInt())).thenAnswer(invocation -> {
             List<KnowledgeBaseItem> candidates = restrict(articles, invocation.getArgument(2));
             KnowledgeBaseItemCursor cursor = invocation.getArgument(4);
-            int limit = invocation.getArgument(5);
+            int limit = invocation.getArgument(6);
             return pageAfter(candidates, cursor, limit);
         });
     }

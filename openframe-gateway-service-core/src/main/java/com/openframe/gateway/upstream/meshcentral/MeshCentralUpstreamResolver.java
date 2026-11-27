@@ -129,7 +129,7 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
         try {
             return new URI(sb.toString());
         } catch (URISyntaxException e) {
-            throw new IllegalStateException("Failed to build mesh upstream URI", e);
+            throw new IllegalStateException("Failed to build mesh upstream URI for path " + newPath + ": " + e.getReason());
         }
     }
 }

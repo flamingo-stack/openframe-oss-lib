@@ -81,13 +81,14 @@ import { useChatEngineContext } from './engine/chat-engine-context';
 import { renderChatInlineEntityCard } from './entity-cards/dispatch';
 import type { ChatCardDispatchExtras } from './entity-cards/dispatch';
 import { GuideModeBanner } from './guide-mode-banner';
-import { GuideWelcome, type GuideWelcomeProps } from './guide-welcome';
+import { type GuideQuickAction, GuideWelcome, type GuideWelcomeProps } from './guide-welcome';
 import { useChatAttachmentImageGallery } from './hooks/use-chat-attachment-image-gallery';
 import { useChatAttachments } from './hooks/use-chat-attachments';
 import { useChatDialogManager } from './hooks/use-chat-dialog-manager';
 import { useChatIdentity } from './hooks/use-chat-identity';
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation';
 import { useEmptyStateConfig } from './hooks/use-empty-state-config';
+import { useOpenFrameDropZone } from './hooks/use-openframe-file-intake';
 import {
   fetchSlashCommands,
   useSlashCommandRegistry,
@@ -103,12 +104,26 @@ import { ChatDialogModals } from './mingo-chat-modals';
 import { MingoChatRail } from './mingo-chat-rail';
 import { MingoHistoryRail } from './mingo-history-rail';
 import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onboarding-card';
-import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
+import { MingoQuickActionWall } from './mingo-quick-action-wall';
+import { type MingoQuickAction, MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
-import { type QuickActionAccent, accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
+import { OpenFrameDropOverlay } from './openframe-drop-overlay';
+import {
+  type QuickActionAccent,
+  accentFromIdentityIcon,
+  getAgentAccent,
+  renderQuickActionIcon,
+} from './quick-action-chip';
 import { RecordActionsProvider } from './record-actions';
 import { CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
-import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
+import type {
+  SlashCommandSummary,
+  ChatInputRef,
+  DialogItem,
+  ModelDisplayProps,
+  OpenFrameChatAttachments,
+  SlashCommandActionId,
+} from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { ChatDialogCapabilities, UnifiedSendMessageOptions } from './types/unified-chat-state.types';
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
@@ -514,6 +529,23 @@ export interface EmbeddableChatProps {
   /** The composer's side inset (`ChatComposer` `inset`). Default `'always'`. */
   composerInset?: 'always' | 'wide';
   /**
+   * OpenFrame (Mingo) attachments: the composer's tray, "Upload File" in the `+` menu, paste, drop over the thread or
+   * the composer, the Send gate, and the click on a sent file. Absent → the chat is unchanged (the hub's Guide mode
+   * keeps its own attachments).
+   */
+  openframeAttachments?: OpenFrameChatAttachments;
+  /**
+   * Split layout: draw the chat's quick actions in a row over the composer, the very ones its empty state shows
+   * (the page's own, read with the page's topic), with the page's topic stamp where the host asks for it. For a
+   * composer that stands alone, its empty state not on screen: a host's composer dock under every page. Only the
+   * host knows whether its thread is on screen (it may keep it in a hidden column), so it says so here. Default
+   * `false`.
+   */
+  composerQuickActions?: boolean;
+  /** A click on a quick action in that row sends its prompt here (a host's dock: in a new chat). Omitted, it is
+   *  sent in the chat that is open. */
+  onQuickActionSend?: (prompt: string) => void;
+  /**
    * The thread's column inside `threadContainer` — e.g. `mx-auto max-w-[760px]` to
    * centre it at the composer's width on a wide chat page; the header stays full
    * width. Omitted: the column fills the container (a narrow panel, a sheet).
@@ -528,6 +560,8 @@ export interface EmbeddableChatProps {
   onModelClick?: () => void;
   /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
   modelTooltip?: string;
+  /** The model is picked from the composer: its model name opens this menu. */
+  composerModelMenu?: ModelDisplayProps['modelMenu'];
   /** The composer's own ⋯ menu, at the end of its input row (e.g. "Compact
    *  Chat Memory", disabled when there is nothing to compact). */
   composerMenuItems?: ActionsMenuItem[];
@@ -854,6 +888,8 @@ function EmbeddableChatInner({
   onGuidePromptConsumed,
   contextMemory,
   aboveComposer,
+  onQuickActionSend,
+  composerQuickActions: showComposerQuickActions = false,
   onWhatToAsk,
   chatMenuExtraItems,
   rail = 'auto',
@@ -862,10 +898,12 @@ function EmbeddableChatInner({
   threadHeaderLook = 'page',
   threadFadeEnd = false,
   composerInset = 'always',
+  openframeAttachments,
   threadContentClassName,
   showModel = true,
   onModelClick,
   modelTooltip,
+  composerModelMenu,
   composerMenuItems,
   composerFooterActions,
   composerContextLeading,
@@ -1279,6 +1317,11 @@ function EmbeddableChatInner({
     clear: clearAttachments,
   } = useChatAttachments();
   const { panelRef: galleryPanelRef, modal: galleryModal } = useChatAttachmentImageGallery();
+  // OpenFrame attachments: files dropped on the thread join the composer's tray (the composer is a drop zone too).
+  const onOpenFrameMessageSend = openframeAttachments?.onMessageSend;
+  const threadDropZone = useOpenFrameDropZone(
+    openframeAttachments && !composerLock ? openframeAttachments.onAddFiles : undefined,
+  );
 
   // ─── Entity-context picker state (host-driven via `contextPicker`) ─────────
   // The lib owns selection + open/mention UI state; the host owns the data
@@ -1620,8 +1663,10 @@ function EmbeddableChatInner({
       if (contextItems.length > 0) {
         setContextItems([]);
       }
+      // The OpenFrame tray is the host's: it moves its ready files into the message and clears them.
+      onOpenFrameMessageSend?.(text);
     },
-    [composerLock, sendMessage, readyAttachments, clearAttachments, contextItems],
+    [composerLock, sendMessage, readyAttachments, clearAttachments, contextItems, onOpenFrameMessageSend],
   );
 
   /**
@@ -1687,6 +1732,15 @@ function EmbeddableChatInner({
       prompt: q,
     }));
   }, [effectiveQuickActions, effectiveSuggestedQueries, effectiveAssistantIcon, activeAgentSlug, quickActionAccent]);
+  // The Guide's chips, wherever the chat draws them (its empty state, a lone composer's row). When an AGENT is
+  // active and its fetched chips arrived, the agent's chips win: the host array is the platform default, not the
+  // agent's. (`agentConfigUrl` is the same derived value that drives the config fetch, so this can never disagree
+  // with what was fetched; while the fetch is in flight the fetched list is [] and the host's chips show.) Outside
+  // agent mode the host's `guideWelcome.quickActions` wins.
+  const guideQuickActions: ReadonlyArray<GuideQuickAction> =
+    agentConfigUrl && guideSuggestedActions.length > 0
+      ? guideSuggestedActions
+      : (guideWelcome?.quickActions ?? guideSuggestedActions);
 
   // Dialog-history concerns (archive page, read-only archived conversation,
   // rename/archive/unarchive modals) live in one hook so this component stays
@@ -2490,8 +2544,10 @@ function EmbeddableChatInner({
     <div
       ref={galleryPanelRef}
       data-testid="chat-content-panel"
+      {...threadDropZone.handlers}
       className={cn(
         'flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]',
+        openframeAttachments && 'relative',
         // With a host block above the composer the thread keeps room
         // for a line and the working status: the block gives way
         // instead (below), so the status never lands on it. Not when
@@ -2501,6 +2557,9 @@ function EmbeddableChatInner({
         hasAboveComposer && !splitMode && 'min-h-32',
       )}
     >
+      {openframeAttachments && (
+        <OpenFrameDropOverlay profile={openframeAttachments.profile} visible={threadDropZone.dragging} />
+      )}
       <div key={contentViewKey} className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0">
         {hasConversation ? (
           <div className="flex min-h-0 flex-1 flex-col">
@@ -2576,6 +2635,7 @@ function EmbeddableChatInner({
                 hasNextPage={hasMoreMessages}
                 isFetchingNextPage={isMessagesLoading}
                 onLoadMore={loadMoreMessages}
+                onOpenAttachment={openframeAttachments?.onOpenAttachment}
               />
             </RecordActionsProvider>
           </div>
@@ -2626,20 +2686,8 @@ function EmbeddableChatInner({
             // deterministic.
             title={effectiveAssistantName ?? guideWelcome?.title}
             icon={effectiveAssistantIcon ?? guideWelcome?.icon}
-            // Admin "try-asking chips" → Guide quick-action chips.
-            // Precedence: when an AGENT is active and its fetched chips
-            // arrived, the agent's chips win — the host array is the
-            // platform default, not the agent's. (`agentConfigUrl` is
-            // the same derived value that drives the config fetch, so
-            // this can never disagree with what was fetched; while the
-            // fetch is in-flight the fetched list is [] and host chips
-            // show.) Outside agent mode the host-provided
-            // `guideWelcome.quickActions` wins as before.
-            quickActions={
-              agentConfigUrl && guideSuggestedActions.length > 0
-                ? guideSuggestedActions
-                : (guideWelcome?.quickActions ?? guideSuggestedActions)
-            }
+            // Admin "try-asking chips" → Guide quick-action chips (`guideQuickActions`).
+            quickActions={guideQuickActions}
             // A quick action sends its prompt at once.
             onQuickAction={action => {
               handleSend(action.prompt ?? action.label);
@@ -2685,6 +2733,57 @@ function EmbeddableChatInner({
     </div>
   );
 
+  // The quick actions over a composer that stands alone (split layout, the host's `composerQuickActions`): the
+  // empty state's own chips, Mingo's from the host or the Guide's read with the
+  // page's topic, drawn by the one row (`MingoQuickActionWall`, which keeps the topic stamp on a page with none).
+  const sendQuickAction = (prompt: string) => {
+    if (onQuickActionSend) onQuickActionSend(prompt);
+    else handleSend(prompt);
+    focusComposer();
+  };
+  const composerQuickActions: MingoQuickAction[] =
+    activeMode === 'mingo'
+      ? (mingoWelcome?.quickActions ?? []).map(action => ({
+          ...action,
+          onClick: () => {
+            sendQuickAction(action.prompt ?? action.label);
+            action.onClick?.();
+          },
+        }))
+      : guideQuickActions.map(action => ({
+          id: action.id,
+          label: action.label,
+          prompt: action.prompt,
+          variant: 'outline' as const,
+          icon: renderQuickActionIcon({
+            name: action.iconName ?? undefined,
+            url: action.iconUrl ?? undefined,
+            props: action.iconProps ?? undefined,
+            accent: action.accent ?? quickActionAccent,
+          }),
+          onClick: () => sendQuickAction(action.prompt ?? action.label),
+        }));
+  const composerQuickActionsLoading =
+    activeMode === 'mingo' ? !!mingoWelcome?.quickActionsLoading : !!emptyStateUrl && emptyStateLoading;
+  const composerQuickActionsNode =
+    showComposerQuickActions && splitMode ? (
+      <div
+        data-testid="chat-composer-quick-actions"
+        className={cn(
+          'mb-[var(--spacing-system-xs)]',
+          composerInset === 'wide' ? 'px-0 content-md:px-[var(--spacing-system-m)]' : 'px-[var(--spacing-system-m)]',
+        )}
+      >
+        <MingoQuickActionWall
+          quickActions={composerQuickActions}
+          loading={composerQuickActionsLoading && composerQuickActions.length === 0}
+          accent={activeMode === 'mingo' ? mingoWelcome?.quickActionAccent : quickActionAccent}
+          // One line whatever the page holds (its actions, none, or still loading): the composer under it never moves.
+          reserve
+        />
+      </div>
+    ) : null;
+
   // Host block pinned above the composer (`aboveComposer`): the thread's own
   // bottom padding separates them, the composer's horizontal inset is repeated
   // so the two line up. It may shrink: in a short panel the block (which scrolls
@@ -2722,6 +2821,7 @@ function EmbeddableChatInner({
       safeAreaBottom={safeAreaBottom}
       edgeLight={composerEdgeLight}
       inset={composerInset}
+      openframeAttachments={openframeAttachments}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}
@@ -2758,6 +2858,7 @@ function EmbeddableChatInner({
               usagePanel: usagePanel ?? undefined,
               onModelClick,
               modelTooltip,
+              modelMenu: composerModelMenu,
             }
           : undefined
       }
@@ -3207,6 +3308,7 @@ function EmbeddableChatInner({
           className={cn('flex min-w-0 flex-col', previewMode && 'pointer-events-none select-none')}
         >
           {threadContainer ? createPortal(threadRegion, threadContainer) : null}
+          {composerQuickActionsNode}
           {aboveComposerNode}
           {attachmentStrip}
           {composerNode}

@@ -1,18 +1,22 @@
 use std::fmt;
 use std::fs;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use tracing::{debug, error, info};
 
-use super::log_parser::{parse_log_line, LogDeduplicator, LogEntry};
+use super::log_parser::{parse_chat_format, parse_log_line, LogDeduplicator, LogEntry};
+use crate::utils::fs::open_regular_file;
+
+/// A longer line is skipped, so a line without a newline cannot fill memory.
+const MAX_LINE_BYTES: u64 = 64 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogSourceKind {
     Openframe,
     Meshcentral,
+    OpenframeChat,
 }
 
 impl fmt::Display for LogSourceKind {
@@ -20,6 +24,7 @@ impl fmt::Display for LogSourceKind {
         match self {
             LogSourceKind::Openframe => write!(f, "openframe"),
             LogSourceKind::Meshcentral => write!(f, "meshcentral-agent"),
+            LogSourceKind::OpenframeChat => write!(f, "openframe-chat"),
         }
     }
 }
@@ -33,6 +38,7 @@ pub trait LogSource: Send + Sync {
 
 pub struct FileLogSource {
     name: String,
+    parse: fn(&str) -> Option<LogEntry>,
     log_path: PathBuf,
     offset_path: PathBuf,
     committed_offset: u64,
@@ -42,13 +48,31 @@ pub struct FileLogSource {
 impl FileLogSource {
     pub fn new(kind: LogSourceKind, log_path: PathBuf, offset_path: PathBuf) -> Self {
         let offset = load_offset(&offset_path);
+        let parse = match kind {
+            LogSourceKind::OpenframeChat => parse_chat_format,
+            LogSourceKind::Openframe | LogSourceKind::Meshcentral => parse_log_line,
+        };
         Self {
             name: kind.to_string(),
+            parse,
             log_path,
             offset_path,
             committed_offset: offset,
             pending_offset: offset,
         }
+    }
+
+    /// Like `new`, but with no saved offset it starts at the current end of the file and saves that,
+    /// so an old backlog is not sent and a restart does not skip what came after.
+    pub fn new_at_end(kind: LogSourceKind, log_path: PathBuf, offset_path: PathBuf) -> Self {
+        let mut source = Self::new(kind, log_path, offset_path);
+        if !source.offset_path.exists() {
+            let end = fs::metadata(&source.log_path).map_or(0, |m| m.len());
+            source.committed_offset = end;
+            source.pending_offset = end;
+            save_offset(&source.offset_path, end);
+        }
+        source
     }
 }
 
@@ -59,7 +83,7 @@ impl LogSource for FileLogSource {
 
     fn read(&mut self, max_count: usize) -> Result<Vec<LogEntry>> {
         let (entries, new_offset) =
-            read_log_file(&self.log_path, self.committed_offset, max_count)?;
+            read_log_file(&self.log_path, self.pending_offset, max_count, self.parse)?;
         self.pending_offset = new_offset;
         Ok(entries)
     }
@@ -74,36 +98,52 @@ impl LogSource for FileLogSource {
     }
 }
 
-fn read_log_file(path: &Path, position: u64, max_count: usize) -> Result<(Vec<LogEntry>, u64)> {
-    let mut file = File::open(path).context("Failed to open log file")?;
+fn read_log_file(
+    path: &Path,
+    position: u64,
+    max_count: usize,
+    parse: fn(&str) -> Option<LogEntry>,
+) -> Result<(Vec<LogEntry>, u64)> {
+    let mut file = open_regular_file(path).context("Failed to open log file")?;
     let metadata = file.metadata()?;
-    let start_position = if metadata.len() < position {
+    let mut position = if metadata.len() < position {
         0
     } else {
         position
     };
 
-    file.seek(SeekFrom::Start(start_position))?;
+    file.seek(SeekFrom::Start(position))?;
 
-    let reader = BufReader::new(&file);
+    let mut reader = BufReader::new(file);
     let mut entries = Vec::new();
+    let mut line = Vec::new();
 
-    for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => continue,
-        };
-
-        if let Some(entry) = parse_log_line(&line) {
-            entries.push(entry);
-            if entries.len() >= max_count {
+    while entries.len() < max_count {
+        line.clear();
+        let read = (&mut reader)
+            .take(MAX_LINE_BYTES)
+            .read_until(b'\n', &mut line)?;
+        if read == 0 {
+            break;
+        }
+        if !line.ends_with(b"\n") {
+            if (read as u64) < MAX_LINE_BYTES {
                 break;
             }
+            position += read as u64 + reader.skip_until(b'\n')? as u64;
+            continue;
+        }
+        position += read as u64;
+
+        let Ok(text) = std::str::from_utf8(&line) else {
+            continue;
+        };
+        if let Some(entry) = parse(text.trim_end_matches(['\r', '\n'])) {
+            entries.push(entry);
         }
     }
 
-    let new_position = file.stream_position()?;
-    Ok((entries, new_position))
+    Ok((entries, position))
 }
 
 fn load_offset(path: &Path) -> u64 {
@@ -121,12 +161,15 @@ fn save_offset(path: &Path, offset: u64) {
 
 pub struct LogSourceRegistry {
     sources: Vec<Box<dyn LogSource>>,
+    /// Which of the sources after the first one is read first, moved by one on every `read_all`.
+    next_start: usize,
 }
 
 impl LogSourceRegistry {
     pub fn new() -> Self {
         Self {
             sources: Vec::new(),
+            next_start: 0,
         }
     }
 
@@ -139,6 +182,13 @@ impl LogSourceRegistry {
         let mut all_logs = Vec::new();
         let mut remaining = max_total;
         let mut active: Vec<bool> = vec![true; self.sources.len()];
+        // The first source (the client log) is always read first; the rest take turns at going next,
+        // so with more sources than budget the ones registered last still get read.
+        let others = self.sources.len().saturating_sub(1);
+        let order: Vec<usize> = (0..self.sources.len().min(1))
+            .chain((0..others).map(|k| 1 + (self.next_start + k) % others))
+            .collect();
+        self.next_start = (self.next_start + 1) % others.max(1);
 
         while remaining > 0 && active.iter().any(|&a| a) {
             let active_count = active.iter().filter(|&&a| a).count();
@@ -147,10 +197,11 @@ impl LogSourceRegistry {
             // Minimum 1 log per source to make progress
             let quota = quota_per_source.max(1);
 
-            for (i, source) in self.sources.iter_mut().enumerate() {
+            for &i in &order {
                 if !active[i] || remaining == 0 {
                     continue;
                 }
+                let source = &mut self.sources[i];
 
                 let to_read = quota.min(remaining);
 

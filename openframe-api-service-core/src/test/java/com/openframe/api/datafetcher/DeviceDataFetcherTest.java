@@ -1,7 +1,12 @@
 package com.openframe.api.datafetcher;
 
 import com.openframe.graphql.relay.RelayIdCodec;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
@@ -12,6 +17,10 @@ import com.openframe.api.dataloader.MachineTagDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationKey;
 import com.openframe.api.dto.notification.NotificationRecipient;
+import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.SortDirection;
+import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.NotificationRecipientResolver;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
@@ -23,6 +32,12 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.document.toolagent.IntegratedToolAgent;
+import com.openframe.data.document.toolagent.UnsupportedTool;
+import com.openframe.data.repository.cursor.KeysetCursor;
+import com.openframe.data.service.ToolOsSupportService;
+import com.openframe.data.service.ToolOsSupportService.AgentWithToolType;
+import graphql.GraphQLContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +48,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 
 import org.dataloader.DataLoader;
 
@@ -45,6 +61,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +74,7 @@ class DeviceDataFetcherTest {
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     @Mock private NotificationRecipientResolver recipientResolver;
+    @Mock private ToolOsSupportService toolOsSupportService;
     @Mock private DgsDataFetchingEnvironment dfe;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
     @Spy private ClientVersionThreshold clientVersionThreshold = new ClientVersionThreshold("1.6.0");
@@ -89,6 +107,36 @@ class DeviceDataFetcherTest {
 
         assertThat(result.getNickname()).isNull();
         verify(deviceService).updateNickname("m1", null);
+    }
+
+    @Test
+    void devices_lastAndBefore_serviceGetsTheBackwardPageOfTheConnectionArguments() {
+        // setup
+        KeysetCursor cursor = KeysetCursor.ofString("hostname", Sort.Direction.ASC, "host-c", "65f1a2b3c4d5e6f708192a3b");
+        String before = cursor.encode();
+        ConnectionArgs lastBefore = ConnectionArgs.builder().last(5).before(before).build();
+        CursorPaginationCriteria backwardPage = CursorPaginationCriteria.fromConnectionArgs(lastBefore);
+        DeviceFilterInput noFilter = null;
+        DeviceFilterCriteria everyDevice = DeviceFilterCriteria.builder().build();
+        SortInput byHostname = SortInput.builder().field("hostname").direction(SortDirection.ASC).build();
+        CountedGenericQueryResult<Machine> page = CountedGenericQueryResult.<Machine>builder().items(List.of()).build();
+        CountedGenericConnection<GenericEdge<Machine>> connection =
+                CountedGenericConnection.<GenericEdge<Machine>>builder().edges(List.of()).build();
+        when(mapper.toDeviceFilterCriteria(noFilter)).thenReturn(everyDevice);
+        when(mapper.toCursorPaginationCriteria(lastBefore)).thenReturn(backwardPage);
+        when(deviceService.queryDevices(everyDevice, backwardPage, "mac", byHostname)).thenReturn(page);
+        when(mapper.toDeviceConnection(page)).thenReturn(connection);
+
+        // execution
+        CountedGenericConnection<GenericEdge<Machine>> result =
+                fetcher.devices(noFilter, null, null, 5, before, "mac", byHostname);
+
+        // verifications
+        assertThat(result).isSameAs(connection);
+        assertThat(backwardPage)
+                .returns(true, CursorPaginationCriteria::isBackward)
+                .returns(5, CursorPaginationCriteria::getLimit);
+        assertThat(KeysetCursor.parseDecoded(backwardPage.getCursor())).isEqualTo(cursor);
     }
 
     @Test
@@ -136,6 +184,67 @@ class DeviceDataFetcherTest {
 
         // verifications
         assertThat(result).isEqualTo(expected);
+    }
+
+    @Test
+    void unsupportedTools_machineBelowMinimum_serviceListReturned() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        List<AgentWithToolType> agents = List.of(new AgentWithToolType(new IntegratedToolAgent(), ToolType.FLEET_MDM));
+        List<UnsupportedTool> unsupported = List.of(new UnsupportedTool("fleetmdm-agent", ToolType.FLEET_MDM, "13.0", "11.7.10"));
+        when(dfe.getSource()).thenReturn(machine);
+        when(dfe.getGraphQlContext()).thenReturn(GraphQLContext.newContext().build());
+        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.unsupportedTools(machine, agents)).thenReturn(unsupported);
+
+        // execution
+        List<UnsupportedTool> result = fetcher.unsupportedTools(dfe);
+
+        // verifications
+        assertThat(result).isSameAs(unsupported);
+    }
+
+    @Test
+    void unsupportedTools_severalMachinesInOneRequest_agentsLoadedOnce() {
+        // setup
+        Machine first = new Machine();
+        first.setMachineId("m1");
+        Machine second = new Machine();
+        second.setMachineId("m2");
+        List<AgentWithToolType> agents = List.of(new AgentWithToolType(new IntegratedToolAgent(), ToolType.FLEET_MDM));
+        when(dfe.getSource()).thenReturn(first, second);
+        when(dfe.getGraphQlContext()).thenReturn(GraphQLContext.newContext().build());
+        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.unsupportedTools(first, agents)).thenReturn(List.of());
+        when(toolOsSupportService.unsupportedTools(second, agents)).thenReturn(List.of());
+
+        // execution
+        fetcher.unsupportedTools(dfe);
+        fetcher.unsupportedTools(dfe);
+
+        // verifications
+        verify(toolOsSupportService).agentsWithMinOsVersion();
+        verify(toolOsSupportService).unsupportedTools(second, agents);
+    }
+
+    @Test
+    void unsupportedTools_separateRequests_agentsLoadedPerRequest() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        List<AgentWithToolType> agents = List.of();
+        when(dfe.getSource()).thenReturn(machine);
+        when(dfe.getGraphQlContext()).thenReturn(GraphQLContext.newContext().build(), GraphQLContext.newContext().build());
+        when(toolOsSupportService.agentsWithMinOsVersion()).thenReturn(agents);
+        when(toolOsSupportService.unsupportedTools(machine, agents)).thenReturn(List.of());
+
+        // execution
+        fetcher.unsupportedTools(dfe);
+        fetcher.unsupportedTools(dfe);
+
+        // verifications
+        verify(toolOsSupportService, times(2)).agentsWithMinOsVersion();
     }
 
     private static Stream<Arguments> clientOutdatedCases() {

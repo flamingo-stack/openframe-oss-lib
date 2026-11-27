@@ -5,13 +5,14 @@ import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.ForbiddenException;
@@ -23,6 +24,8 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.document.rmm.filter.ScriptQueryFilter;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,10 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_DELETE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_UPDATE;
 
 @Slf4j
 @Service
@@ -51,6 +58,11 @@ public class ScriptService {
     private final ScriptPrivilegeValidator privilegeValidator;
     private final ScheduleDeliveryRefresher deliveryRefresher;
 
+    @Audited(action = SCRIPT_CREATE, targetId = "#result.id", targetName = "#input.name",
+            details = {"creationSource=#creationSource", "shell=#result == null ? #input.shell : null",
+                    "privilegeLevel=#result == null ? #input.privilegeLevel : null",
+                    "supportedPlatforms=#result == null ? #input.supportedPlatforms : null",
+                    "defaultTimeoutSeconds=#result == null ? #input.defaultTimeoutSeconds : null"})
     public ScriptResponse create(CreateScriptInput input, String createdBy, ScriptCreationSource creationSource) {
         String tenantId = tenantIdProvider.getTenantId();
 
@@ -127,27 +139,22 @@ public class ScriptService {
         String sortField = resolveSortField(sort);
         Sort.Direction sortDirection = resolveSortDirection(sort);
         ScriptQueryFilter queryFilter = toQueryFilter(filter);
+        CursorPosition position = KeysetCursor.parseDecoded(normalized.getCursor());
 
         // Full matching total (tenant + filter + search), independent of the page —
         // lets the UI show the count up front while items load page by page.
         long filteredCount = scriptRepository.countForTenant(tenantId, queryFilter, search);
 
-        List<Script> page = scriptRepository.findPageForTenant(
+        List<Script> fetched = scriptRepository.findPageForTenant(
                 tenantId, queryFilter, search, sortField, sortDirection,
-                normalized.getCursor(), normalized.isBackward(), limit + 1);
+                position, normalized.isBackward(), limit + 1);
+        CursorPage<Script> page = CursorPage.assemble(fetched, normalized);
 
-        boolean hasMore = page.size() > limit;
-        List<Script> items = hasMore ? page.subList(0, limit) : page;
-
-        if (normalized.isBackward()) {
-            items = items.reversed();
-        }
-
-        List<ScriptResponse> views = items.stream().map(scriptMapper::toResponse).toList();
+        List<ScriptResponse> views = page.items().stream().map(scriptMapper::toResponse).toList();
 
         return CountedGenericQueryResult.<ScriptResponse>builder()
                 .items(views)
-                .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .pageInfo(buildPageInfo(page, sortField, sortDirection))
                 .filteredCount((int) filteredCount)
                 .build();
     }
@@ -188,6 +195,11 @@ public class ScriptService {
                 .build();
     }
 
+    @Audited(action = SCRIPT_UPDATE, targetId = "#input.id",
+            details = {"name=#result == null ? #input.name : null", "shell=#result == null ? #input.shell : null",
+                    "privilegeLevel=#result == null ? #input.privilegeLevel : null",
+                    "supportedPlatforms=#result == null ? #input.supportedPlatforms : null",
+                    "defaultTimeoutSeconds=#result == null ? #input.defaultTimeoutSeconds : null"})
     public ScriptResponse update(UpdateScriptInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
@@ -213,6 +225,7 @@ public class ScriptService {
         return scriptMapper.toResponse(saved);
     }
 
+    @Audited(action = SCRIPT_DELETE, targetId = "#id")
     public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadOrThrow(tenantId, id);
@@ -279,19 +292,21 @@ public class ScriptService {
         return script;
     }
 
-    private static PageInfo buildPageInfo(List<ScriptResponse> items, boolean hasMore,
-                                          CursorPaginationCriteria criteria) {
-        String startCursor = items.isEmpty() ? null : CursorCodec.encode(items.getFirst().getId());
-        String endCursor = items.isEmpty() ? null : CursorCodec.encode(items.getLast().getId());
-
-        boolean hasNextPage = criteria.isBackward() ? criteria.hasCursor() : hasMore;
-        boolean hasPreviousPage = criteria.isBackward() ? hasMore : criteria.hasCursor();
+    private PageInfo buildPageInfo(CursorPage<Script> page, String sortField, Sort.Direction sortDirection) {
+        List<Script> items = page.items();
+        String startCursor = items.isEmpty() ? null : pageCursor(items.getFirst(), sortField, sortDirection);
+        String endCursor = items.isEmpty() ? null : pageCursor(items.getLast(), sortField, sortDirection);
 
         return PageInfo.builder()
-                .hasNextPage(hasNextPage)
-                .hasPreviousPage(hasPreviousPage)
+                .hasNextPage(page.hasNextPage())
+                .hasPreviousPage(page.hasPreviousPage())
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
+    }
+
+    private String pageCursor(Script script, String sortField, Sort.Direction sortDirection) {
+        KeysetCursor cursor = scriptRepository.keysetCursor(script, sortField, sortDirection);
+        return cursor.encode();
     }
 }

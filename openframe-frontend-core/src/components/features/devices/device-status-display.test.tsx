@@ -1,6 +1,6 @@
 import { act, render, renderHook, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeviceConnectivityIcon } from './device-connectivity-icon';
 import { DeviceLifecycleTag, deviceLifecycleTagProps } from './device-lifecycle-tag';
 import { getLegacyDeviceStatusConfig } from './device-status';
@@ -109,6 +109,72 @@ describe('DeviceConnectivityIcon', () => {
   });
 });
 
+describe('DeviceConnectivityIcon states (CU-17tkuw68jdu)', () => {
+  const NOW = new Date('2026-11-20T12:00:00Z');
+  const daysAgo = (days: number) => new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+  /** The fill of the icon's dot: its first path, drawn in `secondaryColor`. */
+  const dotFill = (icon: HTMLElement) => /<path fill="([^"]+)"/.exec(icon.innerHTML)?.[1];
+  /** Opens the tooltip by keyboard focus and returns its one line (Radix renders it twice: visible + a11y copy). */
+  const openTooltip = (icon: HTMLElement) => {
+    act(() => {
+      icon.focus();
+    });
+    return screen.getAllByText(/^(Online|Last seen .+|Never seen)$/)[0]?.textContent;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('draws an offline device with a red dot and "Last seen 2 days ago" when focused', () => {
+    render(<DeviceConnectivityIcon connectivity="OFFLINE" lastSeen={daysAgo(2)} />);
+    const icon = screen.getByRole('img', { name: /^Offline\. Last seen / });
+    expect(icon.getAttribute('data-connectivity')).toBe('offline');
+    expect(dotFill(icon)).toBe('var(--color-error)');
+    expect(icon.tabIndex).toBe(0);
+    expect(openTooltip(icon)).toBe('Last seen 2 days ago');
+  });
+
+  it('takes the relative time when the tooltip opens, not when the row rendered', () => {
+    render(<DeviceConnectivityIcon connectivity="OFFLINE" lastSeen={daysAgo(2)} />);
+    const icon = screen.getByRole('img');
+    vi.setSystemTime(new Date(NOW.getTime() + 24 * 60 * 60 * 1000));
+    expect(openTooltip(icon)).toBe('Last seen 3 days ago');
+  });
+
+  it('keeps the grey dot and says "Never seen" for a device that never reported', () => {
+    render(<DeviceConnectivityIcon connectivity={null} lastSeen={null} />);
+    const icon = screen.getByRole('img', { name: 'Never seen' });
+    expect(icon.getAttribute('data-connectivity')).toBe('unknown');
+    expect(dotFill(icon)).toBe('var(--color-border)');
+    expect(openTooltip(icon)).toBe('Never seen');
+  });
+
+  it('reads a never-reported device as "Never seen" even when it carries a last seen', () => {
+    render(<DeviceConnectivityIcon connectivity={null} lastSeen={daysAgo(2)} />);
+    const icon = screen.getByRole('img', { name: 'Never seen' });
+    expect(dotFill(icon)).toBe('var(--color-border)');
+    expect(openTooltip(icon)).toBe('Never seen');
+  });
+
+  it('says "Never seen" for an offline device with no readable last seen, still red', () => {
+    render(<DeviceConnectivityIcon connectivity="OFFLINE" lastSeen="not a date" />);
+    const icon = screen.getByRole('img', { name: 'Offline. Never seen' });
+    expect(dotFill(icon)).toBe('var(--color-error)');
+    expect(openTooltip(icon)).toBe('Never seen');
+  });
+
+  it('keeps the green dot for an online device and says only "Online"', () => {
+    render(<DeviceConnectivityIcon connectivity="ONLINE" lastSeen={daysAgo(0)} />);
+    const icon = screen.getByRole('img', { name: 'Online' });
+    expect(dotFill(icon)).toBe('var(--color-success)');
+    expect(openTooltip(icon)).toBe('Online');
+  });
+});
+
 describe('getDeviceFilterColumns in the legacy display', () => {
   const columns = getDeviceFilterColumns(FACETS, { statusDisplay: 'legacy' });
   const status = columns.find(column => column.key === 'status')?.filterOptions ?? [];
@@ -192,15 +258,34 @@ describe('useTagFilterModal in the legacy display', () => {
 });
 
 describe('an outdated client (clientOutdated)', () => {
-  it('reads OUTDATED in place of the status tag in either display', () => {
-    expect(deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', clientOutdated: true })).toEqual({
-      label: 'OUTDATED',
-      variant: 'warning',
-    });
+  it('reads OUTDATED in place of the status tag in the legacy display only', () => {
     expect(
       deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', display: 'legacy', clientOutdated: true }),
     ).toEqual({ label: 'OUTDATED', variant: 'warning' });
-    expect(deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', clientOutdated: false }).label).toBe('MANAGED');
+    expect(
+      deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', display: 'legacy', clientOutdated: false }).label,
+    ).toBe('ONLINE');
+  });
+
+  it('never hides the lifecycle tag in the lifecycle display (CU-17tkuw6818w)', () => {
+    // The default display is the lifecycle one: the tag says the status, whatever the client.
+    expect(deviceLifecycleTagProps('MANAGED', { connectivity: 'ONLINE', clientOutdated: true })).toMatchObject({
+      label: 'MANAGED',
+      variant: 'success',
+    });
+    for (const [status, label] of [
+      ['PENDING', 'PENDING'],
+      ['PENDING_DELETION', 'PENDING DELETION'],
+      ['DELETED', 'DELETED'],
+    ] as const) {
+      expect(deviceLifecycleTagProps(status, { display: 'lifecycle', clientOutdated: true }).label).toBe(label);
+    }
+  });
+
+  it('draws PENDING DELETION, not OUTDATED, on the tag in the lifecycle display', () => {
+    render(<DeviceLifecycleTag status="PENDING_DELETION" connectivity="OFFLINE" clientOutdated />);
+    expect(screen.getByText('PENDING DELETION')).toBeInTheDocument();
+    expect(screen.queryByText('OUTDATED')).not.toBeInTheDocument();
   });
 
   it('draws OUTDATED on the tag in the legacy display', () => {

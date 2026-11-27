@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -430,6 +431,126 @@ class SoftwareProjectorTest {
         assertThat(saved.getBundleIdentifier()).isEqualTo(changed.bundleIdentifier());
         assertThat(saved.getAppFileNames()).isEqualTo(changed.appFileNames());
         assertThat(saved.getTopLevelApp()).isEqualTo(changed.topLevelApp());
+    }
+
+    @Test
+    void project_titleWithoutAName_isNamedByItsWingetId() {
+        // setup
+        SoftwareTitleRollup nameless = rollup().name(null).source("programs").wingetIds(List.of("Contoso.Agent"))
+                .appFileNames(List.of("Contoso Agent")).packageFamilyNames(List.of("Contoso.Agent_8wekyb3d8bbwe")).build();
+        stubFirstProjection(nameless);
+
+        // execution
+        projector.project("t1", 9L);
+
+        // verifications
+        Software saved = savedSoftware();
+        assertThat(saved.getName()).isEqualTo("Contoso.Agent");
+        assertThat(saved.getNameLower()).isEqualTo("contoso.agent");
+    }
+
+    @Test
+    void project_titleWithoutANameOrWingetId_isNamedByItsAppFileName() {
+        // setup
+        SoftwareTitleRollup nameless = rollup().name(null).appFileNames(List.of("Contoso Agent"))
+                .packageFamilyNames(List.of("Contoso.Agent_8wekyb3d8bbwe")).build();
+        stubFirstProjection(nameless);
+
+        // execution
+        projector.project("t1", 9L);
+
+        // verifications
+        assertThat(savedSoftware().getName()).isEqualTo("Contoso Agent");
+    }
+
+    @Test
+    void project_titleWithOnlyAPackageFamilyName_isNamedByIt() {
+        // setup
+        SoftwareTitleRollup nameless = rollup().name(null).source("programs")
+                .packageFamilyNames(List.of("Contoso.Agent_8wekyb3d8bbwe")).build();
+        stubFirstProjection(nameless);
+
+        // execution
+        projector.project("t1", 9L);
+
+        // verifications
+        assertThat(savedSoftware().getName()).isEqualTo("Contoso.Agent_8wekyb3d8bbwe");
+    }
+
+    @Test
+    void project_titleWithNothingToNameItBy_staysNameless() {
+        // setup
+        SoftwareTitleRollup nameless = rollup().name(null).build();
+        stubFirstProjection(nameless);
+
+        // execution
+        projector.project("t1", 9L);
+
+        // verifications
+        Software saved = savedSoftware();
+        assertThat(saved.getName()).isNull();
+        assertThat(saved.getNameLower()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"${{arpDisplayName}}", "{8A69D345-D564-463C-AFF1-A69D9E530F96}"})
+    void project_placeholderOrGuidOnlyName_isNamedByItsWingetId(String placeholder) {
+        // setup
+        SoftwareTitleRollup placeholderNamed = rollup().name(placeholder).source("programs")
+                .wingetIds(List.of("Contoso.Agent")).build();
+        stubFirstProjection(placeholderNamed);
+
+        // execution
+        projector.project("t1", 9L);
+
+        // verifications
+        assertThat(savedSoftware().getName()).isEqualTo("Contoso.Agent");
+    }
+
+    @Test
+    void project_placeholderName_isNotGivenToTheMatcher() {
+        // setup
+        SoftwareTitleRollup placeholderNamed = rollup().name("${{arpDisplayName}}").source("programs")
+                .wingetIds(List.of("Contoso.Agent")).build();
+        when(aggregationRepository.rollUpTitle("t1", 9L)).thenReturn(Optional.of(placeholderNamed));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 9L)).thenReturn(Optional.empty());
+        List<InstalledProgram> asked = stubMatch(PackageMatch.noPackage());
+
+        // execution
+        projector.project("t1", 9L);
+
+        // verifications
+        assertThat(asked.getFirst().getName()).isNull();
+        assertThat(asked.getFirst().getWingetIds()).containsExactly("Contoso.Agent");
+    }
+
+    @Test
+    void project_titleNamedByItsWingetIdWithTheSameKeysAndAFreshMatch_keepsTheStoredMatchWithoutAsking() {
+        // setup
+        SoftwareTitleRollup nameless = rollup().name(null).source("programs").wingetIds(List.of("Contoso.Agent")).build();
+        Software stored = Software.builder().tenantId("t1").softwareTitleId(9L).name("Contoso.Agent").source("programs")
+                .arpKeys(List.of()).packageFamilyNames(List.of()).wingetIds(List.of("Contoso.Agent"))
+                .appFileNames(List.of()).systemComponent(false)
+                .packageMatch(new SoftwarePackageMatch(PackageMatchState.NO_PACKAGE, null, null, Instant.now()))
+                .build();
+        when(aggregationRepository.rollUpTitle("t1", 9L)).thenReturn(Optional.of(nameless));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 9L)).thenReturn(Optional.of(stored));
+
+        // execution
+        projector.project("t1", 9L);
+
+        // verifications
+        verifyNoInteractions(packageMatcher);
+    }
+
+    private void stubFirstProjection(SoftwareTitleRollup rollup) {
+        when(aggregationRepository.rollUpTitle("t1", 9L)).thenReturn(Optional.of(rollup));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 9L)).thenReturn(Optional.empty());
+    }
+
+    private Software savedSoftware() {
+        verify(softwareRepository).save(softwareCaptor.capture());
+        return softwareCaptor.getValue();
     }
 
     private static Stream<SoftwareTitleRollup> slackRollupsWithAChangedAppKey() {

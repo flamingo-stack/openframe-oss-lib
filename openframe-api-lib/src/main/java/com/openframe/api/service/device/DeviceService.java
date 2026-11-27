@@ -3,7 +3,7 @@ package com.openframe.api.service.device;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilters;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
@@ -12,6 +12,8 @@ import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -21,6 +23,8 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import com.openframe.data.repository.device.MachineNameMatches;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
@@ -29,6 +33,7 @@ import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.DeletedMachineCleanup.LifecycleChange;
 import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -46,12 +51,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_RENAME;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_STATUS_CHANGE;
 import static com.openframe.data.service.machine.MachineFields.NICKNAME;
 import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
+/** Resolves and manages devices for dashboard and API operations. */
 @Service
 @Slf4j
 @Validated
@@ -67,6 +76,7 @@ public class DeviceService {
 
     private final MachineRepository machineRepository;
     private final DeletedMachineCleanup deletedMachineCleanup;
+    private final AuditRecorder auditRecorder;
     private final DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
@@ -91,6 +101,20 @@ public class DeviceService {
         List<Machine> result = machineRepository.findByMachineIdIn(machineIds);
         log.debug("Found {} of {} machines", result.size(), machineIds.size());
         return result;
+    }
+
+    public void verifyExists(String machineId) {
+        if (findByMachineId(machineId).isEmpty()) {
+            throw new DeviceNotFoundException("Device not found: " + machineId);
+        }
+    }
+
+    // The devices of these organizations in the tenant, whatever their status but DELETED.
+    public List<String> findDeviceIdsOfOrganizations(Collection<String> organizationIds) {
+        MachineQueryFilter machineQueryFilter = MachineQueryFilter.builder()
+                .organizationIds(List.copyOf(organizationIds))
+                .build();
+        return machineRepository.findMachineIdsByCriteria(tenantIdProvider.getTenantId(), machineQueryFilter, null);
     }
 
     public void verifyDispatchable(List<String> machineIds) {
@@ -180,21 +204,17 @@ public class DeviceService {
         String tenantId = tenantIdProvider.getTenantId();
         MachineQueryFilter filter = scheduleDeviceFilter(filterOptions, platformNames, restrictToMachineIds);
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
+        CursorPosition position = KeysetCursor.parseDecoded(normalized.getCursor());
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
-        List<Machine> page = machineRepository.findAvailableForScheduleWithCursor(
-                tenantId, filter, search, assignedMachineIds, normalized.getCursor(), normalized.getLimit() + 1);
-        boolean hasNextPage = page.size() > normalized.getLimit();
-        if (hasNextPage) {
-            page = page.subList(0, normalized.getLimit());
-        }
+        List<Machine> fetched = machineRepository.findAvailableForScheduleWithCursor(tenantId, filter, search,
+                assignedMachineIds, position, normalized.isBackward(), normalized.getLimit() + 1);
+        CursorPage<Machine> page = CursorPage.assemble(fetched, normalized);
 
-        PageInfo pageInfo = PageInfo.builder()
-                .hasNextPage(hasNextPage)
-                .hasPreviousPage(normalized.hasCursor())
-                .build();   // startCursor/endCursor (compound bucket|id) filled in by the mapper
+        PageInfo pageInfo = buildPageInfo(page,
+                machine -> machineRepository.availableForScheduleKeysetCursor(machine, assignedMachineIds));
         return CountedGenericQueryResult.<Machine>builder()
-                .items(page)
+                .items(page.items())
                 .pageInfo(pageInfo)
                 .filteredCount((int) totalFilteredCount)
                 .build();
@@ -270,30 +290,33 @@ public class DeviceService {
         String sortField = validateSortField(sort != null ? sort.getField() : null);
         SortDirection sortDirection = (sort != null && sort.getDirection() != null) ?
                 sort.getDirection() : SortDirection.DESC;
+        String direction = sortDirection.name();
+        CursorPosition position = KeysetCursor.parseDecoded(normalizedPagination.getCursor());
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
 
         int limit = normalizedPagination.getLimit();
-        List<Machine> raw = machineRepository.findMachinesWithCursor(tenantId, filter, search,
-                normalizedPagination.getCursor(), limit + 1, sortField, sortDirection.name());
-        boolean hasNextPage = raw.size() > limit;
-        List<Machine> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
+        List<Machine> fetched = machineRepository.findMachinesWithCursor(tenantId, filter, search,
+                position, normalizedPagination.isBackward(), limit + 1, sortField, direction);
+        CursorPage<Machine> page = CursorPage.assemble(fetched, normalizedPagination);
 
-        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
+        PageInfo pageInfo = buildPageInfo(page,
+                machine -> machineRepository.keysetCursor(machine, sortField, direction));
 
         return CountedGenericQueryResult.<Machine>builder()
-                .items(pageItems)
+                .items(page.items())
                 .pageInfo(pageInfo)
                 .filteredCount((int) totalFilteredCount)
                 .build();
     }
 
-    private PageInfo buildPageInfo(List<Machine> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
-        String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getFirst().getId());
-        String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(pageItems.getLast().getId());
+    private PageInfo buildPageInfo(CursorPage<Machine> page, Function<Machine, KeysetCursor> keysetCursor) {
+        List<Machine> items = page.items();
+        String startCursor = items.isEmpty() ? null : keysetCursor.apply(items.getFirst()).encode();
+        String endCursor = items.isEmpty() ? null : keysetCursor.apply(items.getLast()).encode();
         return PageInfo.builder()
-                .hasNextPage(hasNextPage)
-                .hasPreviousPage(hasPreviousPage)
+                .hasNextPage(page.hasNextPage())
+                .hasPreviousPage(page.hasPreviousPage())
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
@@ -393,29 +416,22 @@ public class DeviceService {
                 .collect(Collectors.toList());
     }
 
+    @Audited(action = DEVICE_STATUS_CHANGE, targetId = "#machineId", details = "status=#status")
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
         if (!API_SETTABLE_STATUSES.contains(status)) {
             throw new BadRequestException("Device status can only be set to DELETED or ARCHIVED, got " + status);
         }
-        Machine machine = machineRepository.findByMachineId(machineId)
+        Machine machine = machineRepository.findOnPrimaryByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         if (machine.getStatus() == status) {
+            if (status == DeviceStatus.DELETED) {
+                auditRecorder.recordAll(deletedMachineCleanup.markDeleted(machine).scheduleRemovals());
+            }
             log.info("Device {} already has status {}", machineId, status);
             return;
         }
-        DeviceStatus previousStatus = machine.getStatus();
-        boolean connected = status.isConnected();
-        if (status == DeviceStatus.DELETED) {
-            deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
-        } else if (previousStatus.isConnected() != connected) {
-            deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, connected);
-        }
-
-        // Field-level: a whole-document save would overwrite what other writers set on the machine since the read
-        Machine updated = machineWriter.update(machineId, machineUpdate().set(STATUS, status))
-                .map(MachineWriteResult::after)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        Machine updated = writeDeviceStatus(machine, status);
         log.info("Device {} status updated to {}", machineId, status);
 
         try {
@@ -425,6 +441,25 @@ public class DeviceService {
         }
     }
 
+    private Machine writeDeviceStatus(Machine machine, DeviceStatus status) {
+        String machineId = machine.getMachineId();
+        if (status == DeviceStatus.DELETED) {
+            LifecycleChange deleted = deletedMachineCleanup.markDeleted(machine);
+            auditRecorder.recordAll(deleted.scheduleRemovals());
+            return deleted.machine();
+        }
+
+        boolean inFleet = !DeviceStatus.FROZEN.contains(status);
+        boolean wasInFleet = !DeviceStatus.FROZEN.contains(machine.getStatus());
+        if (wasInFleet != inFleet) {
+            deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, inFleet);
+        }
+        return machineWriter.update(machineId, machineUpdate().set(STATUS, status))
+                .map(MachineWriteResult::after)
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+    }
+
+    @Audited(action = DEVICE_RENAME, targetId = "#machineId")
     public Machine updateNickname(@NotBlank String machineId, String nickname) {
         log.info("Updating device nickname. machineId={}", machineId);
         MachineWriteResult result = machineWriter

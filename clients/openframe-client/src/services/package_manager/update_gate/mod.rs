@@ -80,6 +80,30 @@ pub fn check(
     }
 }
 
+/// An app bundle at `install_dir`; its main images sit directly in Contents/MacOS, nested helper bundles never match.
+pub fn app_bundle(install_dir: PathBuf) -> AppIdentity {
+    let mut names: Vec<String> = std::fs::read_dir(install_dir.join("Contents").join("MacOS"))
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.file_type().is_ok_and(|t| t.is_file()))
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+
+    let main_images = if names.is_empty() {
+        MainImages::Unknown
+    } else {
+        MainImages::Derived(names)
+    };
+    AppIdentity::App {
+        install_dir,
+        main_images,
+    }
+}
+
 pub async fn snapshot() -> Result<Vec<RunningProcess>, Undetermined> {
     tokio::task::spawn_blocking(process_snapshot::snapshot)
         .await

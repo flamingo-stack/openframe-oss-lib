@@ -14,6 +14,10 @@ pub mod machine_heartbeat_message;
 pub mod machine_timezone_message;
 pub mod openframe_client_info;
 pub mod openframe_client_update_message;
+pub mod os_info_report_message;
+pub mod os_version_number;
+pub mod package_adopt;
+pub mod package_adopt_status;
 pub mod package_ref;
 pub mod package_update;
 pub mod package_update_status;
@@ -23,6 +27,7 @@ pub mod tool_connection;
 pub mod tool_connection_message;
 pub mod tool_installation_message;
 pub mod tool_installation_result;
+pub mod tool_uninstall_message;
 pub mod tool_version_overrides;
 pub mod update_state;
 
@@ -40,7 +45,8 @@ pub use agent_registration_response::AgentRegistrationResponse;
 pub use agent_token_response::AgentTokenResponse;
 pub use delivery::{
     delivery_result_subject, DeliveryRef, DeliveryResult, DeliveryResultMessage,
-    CLIENT_UPDATE_DELIVERY_TYPE, DELIVERY_RESULT_KIND, PACKAGE_UPDATE_DELIVERY_TYPE,
+    CLIENT_UPDATE_DELIVERY_TYPE, DELIVERY_RESULT_KIND, PACKAGE_ADOPT_DELIVERY_TYPE,
+    PACKAGE_UPDATE_DELIVERY_TYPE,
 };
 pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};
@@ -56,6 +62,13 @@ pub use machine_heartbeat_message::MachineHeartbeatMessage;
 pub use machine_timezone_message::MachineTimezoneMessage;
 pub use openframe_client_info::OpenFrameClientInfo;
 pub use openframe_client_update_message::OpenFrameClientUpdateMessage;
+pub use os_info_report_message::OsInfoReportMessage;
+pub use os_version_number::OsVersionNumber;
+pub use package_adopt::{PackageAdoptMessage, PACKAGE_ADOPT_KIND};
+pub use package_adopt_status::{
+    package_adopt_status_subject, AdoptFailReason, AdoptOutcome, AdoptState,
+    PackageAdoptStatusMessage, PACKAGE_ADOPT_STATUS_KIND,
+};
 pub use package_ref::{BrewKind, PackageRef};
 pub use package_update::{
     PackageUpdateMessage, SourceKind, SourceOrigin, UpdateMode, UpdateSource, PACKAGE_UPDATE_KIND,
@@ -71,4 +84,5 @@ pub use tool_connection::ToolConnection;
 pub use tool_connection_message::ToolConnectionMessage;
 pub use tool_installation_message::ToolInstallationMessage;
 pub use tool_installation_result::ToolInstallationResult;
+pub use tool_uninstall_message::ToolUninstallMessage;
 pub use update_state::{UpdatePhase, UpdateState};

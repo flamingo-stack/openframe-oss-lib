@@ -1,13 +1,16 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import com.openframe.audit.Audited;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dto.rmm.software.AdoptSoftwareInput;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.service.rmm.software.SoftwareInstallUpdateManagementService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +22,10 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+
 @DgsComponent
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -27,15 +34,38 @@ import java.util.List;
 public class SoftwareInstallUpdatedDataFetcher {
 
     private final SoftwareInstallUpdateManagementService softwareInstallUpdateManagementService;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsMutation
+    @Audited(action = SOFTWARE_INSTALL, compare = false, condition = "!#result.isEmpty()",
+            targetId = "#input.machineIds.size() == 1 ? #input.machineIds[0] : null",
+            details = {"machineIds=#input.machineIds",
+                    "packages=#result == null ? #input.packages.![packageName ?: softwareId] : #result.![packageName]",
+                    "executionIds=#result.![executionId]"})
     public List<SoftwareDispatchResult> installSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.install(input, getCurrentUserId(), ExecutionSource.PACKAGE_INSTALLATION);
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_UPDATE, compare = false, condition = "!#result.isEmpty()",
+            targetId = "#input.machineIds.size() == 1 ? #input.machineIds[0] : null",
+            details = {"machineIds=#input.machineIds",
+                    "packages=#result == null ? #input.packages.![packageName ?: softwareId] : #result.![packageName]",
+                    "executionIds=#result.![executionId]"})
     public List<SoftwareDispatchResult> updateSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.update(input, getCurrentUserId(), ExecutionSource.PACKAGE_UPDATE);
+    }
+
+    @DgsMutation
+    public List<String> adoptSoftware(@InputArgument @Valid AdoptSoftwareInput input) {
+        List<String> machineGlobalIds = input.getMachineIds();
+        List<String> machineIds = relayIdCodec.decodeAll(machineGlobalIds, MACHINE);
+        input.setMachineIds(machineIds);
+        String initiatedBy = getCurrentUserId();
+        List<String> orderedMachineIds = softwareInstallUpdateManagementService.adopt(input, initiatedBy);
+        return orderedMachineIds.stream()
+                .map(machineId -> relayIdCodec.encode(MACHINE, machineId))
+                .toList();
     }
 
     private String getCurrentUserId() {

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 pub const DELIVERY_RESULT_KIND: &str = "delivery.result";
 pub const CLIENT_UPDATE_DELIVERY_TYPE: &str = "CLIENT_UPDATE";
 pub const PACKAGE_UPDATE_DELIVERY_TYPE: &str = "PACKAGE_UPDATE";
+pub const PACKAGE_ADOPT_DELIVERY_TYPE: &str = "PACKAGE_ADOPT";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +43,14 @@ impl DeliveryResultMessage {
 
     pub fn failed(delivery: DeliveryRef, reason: impl Into<String>) -> Self {
         Self::new(delivery, DeliveryResult::Failed, Some(reason.into()))
+    }
+
+    pub fn not_supported(delivery: DeliveryRef, detail: &str) -> Self {
+        Self::new(
+            delivery,
+            DeliveryResult::Done,
+            Some(format!("NOT_SUPPORTED: {detail}")),
+        )
     }
 
     pub fn new(delivery: DeliveryRef, result: DeliveryResult, error: Option<String>) -> Self {

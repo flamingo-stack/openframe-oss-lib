@@ -11,7 +11,7 @@ import {
   type WheelEvent,
 } from 'react';
 import { cn } from '../../../utils/cn';
-import { GRID_ACTION_COLUMN_SIZE } from './data-table-grid-columns';
+import { GRID_ACTION_COLUMN_SIZE, GRID_MIN_WIDTH } from './data-table-grid-columns';
 import { alignJustify } from './utils';
 
 /**
@@ -84,6 +84,22 @@ export interface GridLayoutOptions {
   settings?: boolean;
 }
 
+/** The share of the table's width a pinned first data column takes at most when the viewer resizes it. */
+export const GRID_PINNED_MAX_SHARE = 0.4;
+
+/**
+ * Whether the viewer can hide a data column (the settings menu, a stored layout): not when the column says
+ * `enableHiding: false`. Only the column's own flag counts, so the menu and the layout always agree.
+ */
+export function gridCanHide<T>(column: Column<T, unknown>): boolean {
+  return column.columnDef.enableHiding !== false;
+}
+
+/** A column's least width in the grid: its own `minSize`, never below a text column's. */
+export function gridMinWidth<T>(column: Column<T, unknown>): number {
+  return Math.max(column.columnDef.minSize ?? 0, GRID_MIN_WIDTH.text);
+}
+
 /**
  * The designed order with the viewer's order laid over it. Columns the viewer ordered come in that order; a column
  * the viewer's list does not name (it was added to the table later) goes after the column it follows by design, so
@@ -142,13 +158,15 @@ export function buildGridLayout<T>(
     };
     (kind === 'select' ? select : kind === 'action' ? action : designed).push(entry);
   }
+  // A column the table says can never be hidden stays, whatever an older stored layout says.
+  const unhideable = new Set(visibleColumns.filter(column => !gridCanHide(column)).map(column => column.id));
 
   const byId = new Map(designed.map(column => [column.id, column]));
   const ordered = mergeColumnOrder(
     designed.map(column => column.id),
     order,
   ).map(id => byId.get(id) as GridColumn);
-  const hiddenIds = new Set(hidden);
+  const hiddenIds = new Set(hidden?.filter(id => !unhideable.has(id)));
   const shown = ordered.filter(column => !hiddenIds.has(column.id));
   // A stored layout that hides every column the table now has would leave a table of nothing: it is not applied.
   const data = shown.length > 0 ? shown : ordered;

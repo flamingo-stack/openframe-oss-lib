@@ -8,6 +8,12 @@
          self-hosted, the same files every OpenFrame app loads. The body font is fetched at once. -->
     <link rel="preload" as="font" type="font/woff2" crossorigin th:href="@{/fonts/dm-sans-latin-500-normal.woff2}">
     <link rel="stylesheet" th:href="@{/fonts.css}">
+    <!-- Loaded with the page, not on the click: the score reads how the page was used before the request. -->
+    <script th:if="${recaptchaSiteKey}" id="recaptchaScript" async
+            th:src="@{https://www.google.com/recaptcha/enterprise.js(render=${recaptchaSiteKey})}"></script>
+    <script th:if="${recaptchaSessionSiteKey}" id="recaptchaSessionScript" async
+            th:src="@{https://www.google.com/recaptcha/enterprise.js(render=${recaptchaSessionSiteKey},waf='session')}"
+            onerror="this.setAttribute('data-failed', 'true')"></script>
     <style>
         :root {
             --color-bg: #161616;
@@ -467,7 +473,7 @@
 
         <div class="form-actions" style="margin-top: 24px;">
             <button th:if="${passwordResetUrl}" type="button" class="btn btn-ghost" id="forgotPasswordBtn"
-                    th:data-url="${passwordResetUrl}">
+                    th:data-url="${passwordResetUrl}" th:data-recaptcha-key="${recaptchaSiteKey}">
                 <span id="forgotBtnText">Forgot Password?</span>
                 <span id="forgotBtnSpinner" class="spinner-ghost" style="display: none;"></span>
             </button>
@@ -565,6 +571,58 @@
             }, 4000);
         }
 
+        // The edge firewall refuses the reset request without a reCAPTCHA Enterprise token (action password_reset), so
+        // one is read first. A script that is blocked or never answers must not hold the button: after the timeout the
+        // request goes without a token, the same as the web app's recaptcha.ts.
+        function recaptchaToken(siteKey) {
+            if (!siteKey) return Promise.resolve(null);
+            return new Promise(function (resolve) {
+                var timer = setTimeout(function () { resolve(null); }, 10000);
+                function done(token) { clearTimeout(timer); resolve(token || null); }
+                withEnterprise(function (enterprise) {
+                    if (!enterprise) { done(null); return; }
+                    enterprise.ready(function () {
+                        enterprise.execute(siteKey, { action: 'password_reset' }).then(done, function () { done(null); });
+                    });
+                });
+            });
+        }
+
+        // The script is async: a click before it has loaded waits for it rather than going without a token.
+        function withEnterprise(callback) {
+            var enterprise = window.grecaptcha && window.grecaptcha.enterprise;
+            if (enterprise && enterprise.execute) { callback(enterprise); return; }
+            var script = document.getElementById('recaptchaScript');
+            if (!script) { callback(null); return; }
+            script.addEventListener('load', function () {
+                callback((window.grecaptcha && window.grecaptcha.enterprise) || null);
+            });
+            script.addEventListener('error', function () { callback(null); });
+        }
+
+        var SESSION_COOKIE_PREFIX = 'recaptcha-ca-t=';
+        var SESSION_HOLD_MS = 3000;
+        var SESSION_POLL_MS = 100;
+        var sessionScript = document.getElementById('recaptchaSessionScript');
+
+        function hasSessionCookie() {
+            return document.cookie.split('; ').some(function (cookie) {
+                return cookie.indexOf(SESSION_COOKIE_PREFIX) === 0;
+            });
+        }
+
+        function sessionSettled() {
+            return !sessionScript || sessionScript.hasAttribute('data-failed') || hasSessionCookie();
+        }
+
+        function whenSessionSettled(callback) {
+            var deadline = Date.now() + SESSION_HOLD_MS;
+            (function check() {
+                if (sessionSettled() || Date.now() >= deadline) { callback(); return; }
+                setTimeout(check, SESSION_POLL_MS);
+            })();
+        }
+
         // Forgot password handler
         if (forgotBtn) {
             forgotBtn.addEventListener('click', function () {
@@ -575,10 +633,16 @@
                 }
                 setGlobalLoading(true, 'forgot');
                 var url = forgotBtn.getAttribute('data-url');
-                fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: email })
+                new Promise(whenSessionSettled).then(function () {
+                    return recaptchaToken(forgotBtn.getAttribute('data-recaptcha-key'));
+                }).then(function (token) {
+                    var headers = { 'Content-Type': 'application/json' };
+                    if (token) headers['X-Recaptcha-Token'] = token;
+                    return fetch(url, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ email: email })
+                    });
                 }).then(function (res) {
                     if (res.ok || res.status === 202) {
                         showToast('Password reset email sent. Check your inbox.', 'success');
@@ -600,8 +664,11 @@
         // (network error after the transaction is already consumed), and a
         // fetch-then-resubmit scheme authenticates twice. Failed logins
         // re-render this page with the server-side errorMessage toast.
-        form.addEventListener('submit', function () {
+        form.addEventListener('submit', function (event) {
             setGlobalLoading(true, 'submit');
+            if (sessionSettled()) return;
+            event.preventDefault();
+            whenSessionSettled(function () { form.submit(); });
         });
     })();
 </script>

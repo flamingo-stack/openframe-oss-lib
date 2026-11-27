@@ -5,20 +5,11 @@ import type React from 'react';
 import { useContext, useSyncExternalStore } from 'react';
 import { cn } from '../../../utils/cn';
 import { PanelResizeGrip } from '../panel-resize-handle';
-import { useGridScroll, type GridColumn } from './data-table-grid';
+import { GRID_PINNED_MAX_SHARE, gridMinWidth, useGridScroll, type GridColumn } from './data-table-grid';
 import { GridPrefsContext, useGridPref } from './data-table-grid-prefs';
-
-/**
- * The narrowest a grid column may be, by what its cells hold (the design's "min width rules"): about nine characters
- * of text before the ellipsis, plus the leading mark and its gap. A column states its own with `minSize`; these are
- * the values to state.
- */
-export const GRID_MIN_WIDTH = { text: 120, icon: 148, media: 160 } as const;
 
 /** A tag is never cut: a column with tags is at least its widest tag plus the cell's two insets. */
 const TAG_INSET = 24;
-/** The pinned first data column takes at most this share of the table's width. */
-const PINNED_MAX_SHARE = 0.4;
 /** How far an arrow key moves the column's edge, in px. */
 const KEY_STEP = 16;
 /** How many loaded rows an auto-fit measures. */
@@ -64,7 +55,7 @@ function resizeLimits(column: Column<unknown, unknown>, gridColumn: GridColumn, 
   const root = headerCell.closest<HTMLElement>('[data-grid-root]');
   // The table library's own default minimum (20px) is not a stated one: a resizable column holds at least a text
   // column's nine characters.
-  const stated = Math.max(column.columnDef.minSize ?? 0, GRID_MIN_WIDTH.text);
+  const stated = gridMinWidth(column);
   let widestTag = 0;
   const tags = root?.querySelectorAll<HTMLElement>(`[data-grid-col="${CSS.escape(gridColumn.id)}"] [data-part="tag"]`);
   for (const tag of Array.from(tags ?? [])) {
@@ -74,7 +65,7 @@ function resizeLimits(column: Column<unknown, unknown>, gridColumn: GridColumn, 
   const statedMax = column.columnDef.maxSize ?? Number.POSITIVE_INFINITY;
   // The cap is for a column that IS pinned: the left block is not on a tablet or a phone, where it scrolls away.
   const pinned = gridColumn.pin === 'left' && getComputedStyle(headerCell).position === 'sticky';
-  const max = pinned && root ? Math.min(statedMax, Math.floor(root.clientWidth * PINNED_MAX_SHARE)) : statedMax;
+  const max = pinned && root ? Math.min(statedMax, Math.floor(root.clientWidth * GRID_PINNED_MAX_SHARE)) : statedMax;
   return { min, max: Math.max(min, max) };
 }
 

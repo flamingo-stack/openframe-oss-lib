@@ -102,6 +102,7 @@ function incompleteStateOfParts(parts: readonly ChatPart[]): IncompleteMessageSt
       //   is no agent turn to continue.
       // - `data-error` ended the turn; resuming it would re-open a bubble the backend has already abandoned.
       // - `data-suggestions` arrives whole: a command's fixed answer (`/what-can-you-do`).
+      // - `data-email` is a stored email's envelope, a person's message: no agent turn to continue.
       case 'text':
       case 'reasoning':
       case 'source-url':
@@ -113,6 +114,7 @@ function incompleteStateOfParts(parts: readonly ChatPart[]): IncompleteMessageSt
       case 'data-ticket-event':
       case 'data-error':
       case 'data-suggestions':
+      case 'data-email':
         break;
 
       default: {

@@ -1,9 +1,9 @@
 package com.openframe.data.repository.knowledgebase;
 
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
-import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -14,10 +14,10 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-@Slf4j
 public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBaseItemRepository {
 
     private static final String FIELD_TYPE = "type";
@@ -44,13 +44,10 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
 
     @Override
     public List<KnowledgeBaseItem> findFolders(KnowledgeBaseParentFilter parent, String search, List<String> itemIds,
-                                               KnowledgeBaseItemCursor cursor, int limit) {
+                                               KnowledgeBaseItemCursor cursor, boolean backward, int limit) {
         Query query = buildFolderQuery(parent, search, itemIds);
-        addComposites(query, folderPosition(cursor));
-        query.with(Sort.by(
-                Sort.Order.asc(FIELD_NAME),
-                Sort.Order.desc(ID_FIELD)
-        ));
+        addComposites(query, folderPosition(cursor, backward));
+        query.with(folderSort(backward));
         query.collation(FOLDER_NAME_COLLATION);
         query.limit(limit);
         return mongoTemplate.find(query, KnowledgeBaseItem.class);
@@ -64,10 +61,10 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
     @Override
     public List<KnowledgeBaseItem> findArticles(KnowledgeBaseParentFilter parent, String search, List<String> itemIds,
                                                  List<KnowledgeBaseArticleStatus> statuses,
-                                                 KnowledgeBaseItemCursor cursor, int limit) {
+                                                 KnowledgeBaseItemCursor cursor, boolean backward, int limit) {
         Query query = buildArticleQuery(parent, itemIds, statuses);
-        addComposites(query, articleSearch(search), articlePosition(cursor));
-        return executeWithArticleSort(query, limit);
+        addComposites(query, articleSearch(search), articlePosition(cursor, backward));
+        return executeWithArticleSort(query, backward, limit);
     }
 
     @Override
@@ -87,10 +84,10 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
 
     @Override
     public List<KnowledgeBaseItem> findArchivedArticles(String search, List<String> itemIds,
-                                                         KnowledgeBaseItemCursor cursor, int limit) {
+                                                         KnowledgeBaseItemCursor cursor, boolean backward, int limit) {
         Query query = buildArchivedArticlesQuery(itemIds);
-        addComposites(query, articleSearch(search), articlePosition(cursor));
-        return executeWithArticleSort(query, limit);
+        addComposites(query, articleSearch(search), articlePosition(cursor, backward));
+        return executeWithArticleSort(query, backward, limit);
     }
 
     @Override
@@ -107,6 +104,18 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         query.addCriteria(Criteria.where(FIELD_STATUS).ne(KnowledgeBaseArticleStatus.ARCHIVED));
         query.with(Sort.by(Sort.Order.asc(FIELD_NAME), Sort.Order.desc(ID_FIELD)));
         return mongoTemplate.find(query, KnowledgeBaseItem.class);
+    }
+
+    @Override
+    public Optional<KnowledgeBaseItem> findCursorItem(String id) {
+        ObjectId itemId = toObjectId(id);
+        if (itemId == null) {
+            return Optional.empty();
+        }
+        Criteria byId = Criteria.where(ID_FIELD).is(itemId);
+        Query query = new Query(byId);
+        KnowledgeBaseItem item = mongoTemplate.findOne(query, KnowledgeBaseItem.class);
+        return Optional.ofNullable(item);
     }
 
     private Query buildFolderQuery(KnowledgeBaseParentFilter parent, String search, List<String> itemIds) {
@@ -178,57 +187,69 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
                 Criteria.where(FIELD_SUMMARY).regex(quoted, "i"));
     }
 
+    private static Sort folderSort(boolean backward) {
+        return backward
+                ? Sort.by(Sort.Order.desc(FIELD_NAME), Sort.Order.asc(ID_FIELD))
+                : Sort.by(Sort.Order.asc(FIELD_NAME), Sort.Order.desc(ID_FIELD));
+    }
+
     /**
-     * Folders after the cursor in (name asc, _id desc) order. "After" and "same name" are decided by
-     * the query's collation, so names that differ only in case tie and fall back to the id.
+     * Folders past the cursor: after it in (name asc, _id desc) order, or before it when paging
+     * backward. "Past" and "same name" are decided by the query's collation, so names that differ
+     * only in case tie and fall back to the id.
      *
      * Every branch returns an operator criteria (a null key), never a bare field one: the folder
      * query already holds criteria on name (the search) and may hold one on _id (the tag filter),
      * and Spring Data Mongo rejects a second criteria on the same key.
      */
-    private static Criteria folderPosition(KnowledgeBaseItemCursor cursor) {
+    private static Criteria folderPosition(KnowledgeBaseItemCursor cursor, boolean backward) {
         if (cursor == null || cursor.name() == null) {
             return null;
         }
-        Criteria pastName = Criteria.where(FIELD_NAME).gt(cursor.name());
+        Criteria name = Criteria.where(FIELD_NAME);
+        Criteria pastName = backward ? name.lt(cursor.name()) : name.gt(cursor.name());
         ObjectId cursorId = toObjectId(cursor.id());
         if (cursorId == null) {
             return new Criteria().orOperator(pastName);
         }
-        Criteria sameNamePastId = new Criteria().andOperator(
-                Criteria.where(FIELD_NAME).is(cursor.name()),
-                Criteria.where(ID_FIELD).lt(cursorId)
-        );
+        Criteria sameName = Criteria.where(FIELD_NAME).is(cursor.name());
+        Criteria pastId = pastId(cursorId, backward);
+        Criteria sameNamePastId = new Criteria().andOperator(sameName, pastId);
         return new Criteria().orOperator(pastName, sameNamePastId);
     }
 
     /**
-     * Articles after the cursor in (updatedAt desc, _id desc) order. A cursor without a sort value
-     * (a document that has none, or a legacy cursor whose document is gone) falls back to the id
-     * alone. Operator criteria throughout, for the reason given on {@link #folderPosition}.
+     * Articles past the cursor: after it in (updatedAt desc, _id desc) order, or before it when
+     * paging backward. A cursor of a document without a sort value falls back to the id alone.
+     * Operator criteria throughout, for the reason given on {@link #folderPosition}.
      */
-    private static Criteria articlePosition(KnowledgeBaseItemCursor cursor) {
+    private static Criteria articlePosition(KnowledgeBaseItemCursor cursor, boolean backward) {
         if (cursor == null) {
             return null;
         }
         ObjectId cursorId = toObjectId(cursor.id());
         if (cursor.updatedAt() == null) {
             if (cursorId == null) {
-                log.warn("Knowledge base cursor carries neither a sort value nor a valid id: {}", cursor.id());
-                return null;
+                throw new InvalidCursorException();
             }
-            return new Criteria().andOperator(Criteria.where(ID_FIELD).lt(cursorId));
+            Criteria pastId = pastId(cursorId, backward);
+            return new Criteria().andOperator(pastId);
         }
 
-        Criteria pastSortValue = Criteria.where(FIELD_UPDATED_AT).lt(cursor.updatedAt());
+        Criteria updatedAt = Criteria.where(FIELD_UPDATED_AT);
+        Criteria pastSortValue = backward ? updatedAt.gt(cursor.updatedAt()) : updatedAt.lt(cursor.updatedAt());
         if (cursorId == null) {
             return new Criteria().orOperator(pastSortValue);
         }
-        Criteria sameSortValuePastId = new Criteria().andOperator(
-                Criteria.where(FIELD_UPDATED_AT).is(cursor.updatedAt()),
-                Criteria.where(ID_FIELD).lt(cursorId)
-        );
+        Criteria sameSortValue = Criteria.where(FIELD_UPDATED_AT).is(cursor.updatedAt());
+        Criteria pastId = pastId(cursorId, backward);
+        Criteria sameSortValuePastId = new Criteria().andOperator(sameSortValue, pastId);
         return new Criteria().orOperator(pastSortValue, sameSortValuePastId);
+    }
+
+    private static Criteria pastId(ObjectId cursorId, boolean backward) {
+        Criteria id = Criteria.where(ID_FIELD);
+        return backward ? id.gt(cursorId) : id.lt(cursorId);
     }
 
     private static ObjectId toObjectId(String id) {
@@ -249,11 +270,9 @@ public class CustomKnowledgeBaseItemRepositoryImpl implements CustomKnowledgeBas
         }
     }
 
-    private List<KnowledgeBaseItem> executeWithArticleSort(Query query, int limit) {
-        query.with(Sort.by(
-                Sort.Order.desc(FIELD_UPDATED_AT),
-                Sort.Order.desc(ID_FIELD)
-        ));
+    private List<KnowledgeBaseItem> executeWithArticleSort(Query query, boolean backward, int limit) {
+        Sort.Direction fetchDirection = backward ? Sort.Direction.ASC : Sort.Direction.DESC;
+        query.with(Sort.by(fetchDirection, FIELD_UPDATED_AT, ID_FIELD));
         query.limit(limit);
         return mongoTemplate.find(query, KnowledgeBaseItem.class);
     }

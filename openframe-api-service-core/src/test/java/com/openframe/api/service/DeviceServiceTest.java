@@ -2,7 +2,7 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
-import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
@@ -11,13 +11,23 @@ import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.InvalidCursorException;
+import com.openframe.data.config.ClientVersionThreshold;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.model.audit.AuditEntry;
+import com.openframe.data.repository.cursor.CursorBase64;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
+import com.openframe.data.repository.device.CustomMachineRepository;
+import com.openframe.data.repository.device.CustomMachineRepositoryImpl;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -26,13 +36,16 @@ import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.DeletedMachineCleanup.LifecycleChange;
 import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -40,24 +53,31 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
 import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -67,9 +87,24 @@ import static org.mockito.Mockito.when;
 class DeviceServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
+    private static final CursorPosition NO_POSITION = new CursorPosition.None();
+    private static final String ROW_1 = "65f1a2b3c4d5e6f708192a01";
+    private static final String ROW_2 = "65f1a2b3c4d5e6f708192a02";
+    private static final String ROW_3 = "65f1a2b3c4d5e6f708192a03";
+    private static final String ROW_4 = "65f1a2b3c4d5e6f708192a04";
+    private static final String ROW_5 = "65f1a2b3c4d5e6f708192a05";
+    private static final List<String> ROWS = List.of(ROW_1, ROW_2, ROW_3, ROW_4, ROW_5);
+    private static final String HOSTNAME = "hostname";
+    private static final String ASC = "ASC";
+    private static final String KEYSET_PREFIX = "k1|";
+    private static final String INVALID_CURSOR = "Invalid cursor";
+    private static final Instant LAST_SEEN = Instant.ofEpochMilli(1_700_000_000_000L);
+    private static final long OUTDATED_VERSION_KEY = 1_000_005_000_009L;
+    private static final List<String> ASSIGNED_MACHINE_IDS = List.of("m-1", "m-2");
 
     @Mock private MachineRepository machineRepository;
     @Mock private DeletedMachineCleanup deletedMachineCleanup;
+    @Mock private AuditRecorder auditRecorder;
     @Mock private DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     @Mock private MachineWriter machineWriter;
     @Mock private TagRepository tagRepository;
@@ -83,17 +118,21 @@ class DeviceServiceTest {
     @Captor private ArgumentCaptor<MachineUpdate> statusUpdateCaptor;
     @Captor private ArgumentCaptor<MachineQueryFilter> machineQueryFilterCaptor;
 
+    private final CustomMachineRepository cursorIssuer =
+            new CustomMachineRepositoryImpl(mock(MongoTemplate.class), new ClientVersionThreshold("1.6.0"));
+
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, deviceSoftwareConnectivitySync,
+        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, auditRecorder,
+                deviceSoftwareConnectivitySync,
                 machineWriter, tagRepository, tagAssignmentRepository,
                 deviceStatusProcessor, deviceFilterOptionMapper, tenantIdProvider,
                 eventPublisher);
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         lenient().when(machineRepository.countMachines(any(), any(MachineQueryFilter.class), any())).thenReturn(0L);
         lenient().when(machineRepository.findMachinesWithCursor(any(), any(MachineQueryFilter.class), any(),
-                any(), anyInt(), any(), any())).thenReturn(List.of());
+                any(), anyBoolean(), anyInt(), any(), any())).thenReturn(List.of());
         lenient().when(machineRepository.findAvailableForScheduleWithCursor(any(), any(MachineQueryFilter.class), any(),
-                any(), any(), anyInt())).thenReturn(List.of());
+                any(), any(), anyBoolean(), anyInt())).thenReturn(List.of());
         lenient().when(machineRepository.findMachineIds(any(), any(MachineQueryFilter.class), any())).thenReturn(List.of());
         return s;
     }
@@ -334,7 +373,7 @@ class DeviceServiceTest {
 
         // verifications
         verify(machineRepository).findAvailableForScheduleWithCursor(eq(TENANT_ID), machineQueryFilterCaptor.capture(),
-                isNull(), eq(List.of("m1")), isNull(), eq(11));
+                isNull(), eq(List.of("m1")), eq(NO_POSITION), eq(false), eq(11));
         assertThat(machineQueryFilterCaptor.getValue().getRestrictToMachineIds()).containsExactly("m1", "m2");
         assertThat(capturedFilter().getRestrictToMachineIds()).containsExactly("m1", "m2");
     }
@@ -467,30 +506,64 @@ class DeviceServiceTest {
         m.setMachineId("m-del");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
-        stubStatusWrite(m);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
+        when(deletedMachineCleanup.markDeleted(m)).thenReturn(new LifecycleChange(m, List.of()));
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
-        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
+        verify(deletedMachineCleanup).markDeleted(m);
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: cleanup runs BEFORE the DELETED save — if cleanup throws, status stays put so the next attempt can retry")
-    void deletingDevice_cleanupFailsBeforeSave_statusStaysUnchanged() {
+    void updateStatusByMachineId_deletedDeviceWasOnSchedules_recordsItsRemovalFromThem() {
         Machine m = new Machine();
         m.setMachineId("m-del");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
+        List<AuditEntry> removals = List.of(AuditEntry.builder()
+                .action(AuditAction.SCRIPT_SCHEDULE_DEVICES_REMOVE)
+                .targetId("schedule-1")
+                .build());
+        when(deletedMachineCleanup.markDeleted(m)).thenReturn(new LifecycleChange(m, removals));
+
+        service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
+
+        verify(auditRecorder).recordAll(removals);
+    }
+
+    @Test
+    void deletingAlreadyDeletedDeviceRepeatsScheduleCleanupWithoutPublishingAgain() {
+        // setup
+        Machine machine = new Machine();
+        machine.setTenantId("t-1");
+        machine.setStatus(DeviceStatus.DELETED);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(machine));
+        when(deletedMachineCleanup.markDeleted(machine)).thenReturn(new LifecycleChange(machine, List.of()));
+
+        // execution
+        service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
+
+        // verifications
+        verify(deletedMachineCleanup).markDeleted(machine);
+        verifyNoInteractions(machineWriter, deviceStatusProcessor);
+    }
+
+    @Test
+    @DisplayName("A failed deletion does not run the device status post-processor")
+    void deletingDevice_failedDeletionDoesNotPostProcess() {
+        Machine m = new Machine();
+        m.setMachineId("m-del");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
         doThrow(new RuntimeException("mongo hiccup"))
-                .when(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
+                .when(deletedMachineCleanup).markDeleted(m);
 
         assertThatThrownBy(() -> service().updateStatusByMachineId("m-del", DeviceStatus.DELETED))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("mongo hiccup");
 
-        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(machineWriter, never()).update(any(), any(MachineUpdate.class));
         verify(machineRepository, never()).save(any());
         assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
@@ -504,12 +577,12 @@ class DeviceServiceTest {
         m.setMachineId("m-arc");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-arc")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
 
-        verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
+        verify(deletedMachineCleanup, never()).markDeleted(any());
     }
 
     @Test
@@ -519,7 +592,7 @@ class DeviceServiceTest {
         m.setMachineId("m-arc");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-arc")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
@@ -531,19 +604,40 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: archiving a PENDING device was never CONNECTED, so the counters are not touched")
-    void archivingPending_noConnectivitySync() {
+    @DisplayName("updateStatusByMachineId: a PENDING device counts in Software, so archiving it takes it out of the counters")
+    void archivingPending_syncsConnectivityOff() {
+        // setup
         Machine m = new Machine();
         m.setMachineId("m-pen");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.PENDING);
-        when(machineRepository.findByMachineId("m-pen")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-pen")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
+        // execution
         service().updateStatusByMachineId("m-pen", DeviceStatus.ARCHIVED);
 
+        // verifications
+        verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-pen", false);
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: archiving a DELETED device has nothing left in Software to take out")
+    void archivingDeleted_noConnectivitySync() {
+        // setup
+        Machine m = new Machine();
+        m.setMachineId("m-del");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.DELETED);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
+
+        // execution
+        service().updateStatusByMachineId("m-del", DeviceStatus.ARCHIVED);
+
+        // verifications
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
-        verify(machineWriter).update(eq("m-pen"), any(MachineUpdate.class));
+        verify(machineWriter).update(eq("m-del"), any(MachineUpdate.class));
     }
 
     @ParameterizedTest
@@ -556,7 +650,7 @@ class DeviceServiceTest {
                 () -> s.updateStatusByMachineId("m-1", status));
 
         assertThat(ex.getMessage()).contains("only be set to DELETED or ARCHIVED");
-        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).findOnPrimaryByMachineId(any());
         verify(machineRepository, never()).save(any());
         verifyNoInteractions(deletedMachineCleanup, deviceSoftwareConnectivitySync, deviceStatusProcessor);
     }
@@ -568,12 +662,11 @@ class DeviceServiceTest {
         m.setMachineId("m-del");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
-        stubStatusWrite(m);
+        when(machineRepository.findOnPrimaryByMachineId("m-del")).thenReturn(Optional.of(m));
+        when(deletedMachineCleanup.markDeleted(m)).thenReturn(new LifecycleChange(m, List.of()));
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
-        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
     }
 
@@ -584,7 +677,7 @@ class DeviceServiceTest {
         m.setMachineId("m-arc");
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-arc")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
@@ -603,7 +696,7 @@ class DeviceServiceTest {
         Machine m = new Machine();
         m.setMachineId("m-arc");
         m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineRepository.findOnPrimaryByMachineId("m-arc")).thenReturn(Optional.of(m));
         when(machineWriter.update(eq("m-arc"), any(MachineUpdate.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED))
@@ -738,8 +831,9 @@ class DeviceServiceTest {
     void queryDevices_rowsReturnedAgainstLimit_pageTrimmedAndNextPageFlagged(
             int returned, int limit, int expectedItems, boolean expectedHasNextPage) {
         DeviceService s = service();
+        stubIdCursors();
         when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
-                isNull(), eq(limit + 1), isNull(), eq("DESC"))).thenReturn(machinesWithIds(returned));
+                eq(NO_POSITION), eq(false), eq(limit + 1), isNull(), eq("DESC"))).thenReturn(machinesWithIds(returned));
 
         CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(limit, null), null, null);
 
@@ -750,15 +844,16 @@ class DeviceServiceTest {
     @Test
     void queryDevices_moreRowsThanLimit_endCursorIsLastShownRowNotProbeRow() {
         DeviceService s = service();
+        stubIdCursors();
         when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
-                isNull(), eq(3), isNull(), eq("DESC"))).thenReturn(machinesWithIds(3));
+                eq(NO_POSITION), eq(false), eq(3), isNull(), eq("DESC"))).thenReturn(machinesWithIds(3));
 
         CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(2, null), null, null);
 
         assertThat(result.getItems()).extracting(Machine::getId).containsExactly("id-1", "id-2");
         assertThat(result.getPageInfo())
-                .returns(CursorCodec.encode("id-1"), PageInfo::getStartCursor)
-                .returns(CursorCodec.encode("id-2"), PageInfo::getEndCursor);
+                .returns(idCursor("id-1").encode(), PageInfo::getStartCursor)
+                .returns(idCursor("id-2").encode(), PageInfo::getEndCursor);
     }
 
     @Test
@@ -777,10 +872,11 @@ class DeviceServiceTest {
     @Test
     void queryDevices_cursorGiven_hasPreviousPage() {
         DeviceService s = service();
+        stubIdCursors();
         when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
-                eq("id-0"), eq(3), isNull(), eq("DESC"))).thenReturn(machinesWithIds(1));
+                eq(new CursorPosition.RowId(ROW_1)), eq(false), eq(3), isNull(), eq("DESC"))).thenReturn(machinesWithIds(1));
 
-        CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(2, "id-0"), null, null);
+        CountedGenericQueryResult<Machine> result = s.queryDevices(null, page(2, ROW_1), null, null);
 
         assertThat(result.getPageInfo().isHasPreviousPage()).isTrue();
     }
@@ -832,7 +928,7 @@ class DeviceServiceTest {
 
         // verifications
         verify(machineRepository).findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
-                isNull(), eq(11), eq("hostname"), eq("ASC"));
+                eq(NO_POSITION), eq(false), eq(11), eq("hostname"), eq("ASC"));
     }
 
     @Test
@@ -866,6 +962,305 @@ class DeviceServiceTest {
         assertThat(capturedFilter().getRestrictToMachineIds()).containsExactly("m1", "m2");
     }
 
+    @ParameterizedTest
+    @MethodSource("deviceSorts")
+    void queryDevices_pageOneThenPageTwoThenBeforePageTwo_returnsPageOneAgain(String sortField, SortDirection direction) {
+        // setup
+        DeviceService s = service();
+        SortInput sort = SortInput.builder().field(sortField).direction(direction).build();
+        stubDevicePages(sortField, direction.name());
+
+        // execution
+        CountedGenericQueryResult<Machine> pageOne = s.queryDevices(null, forward(2, null), null, sort);
+        CountedGenericQueryResult<Machine> pageTwo =
+                s.queryDevices(null, forward(2, pageOne.getPageInfo().getEndCursor()), null, sort);
+        CountedGenericQueryResult<Machine> backToPageOne =
+                s.queryDevices(null, backward(2, pageTwo.getPageInfo().getStartCursor()), null, sort);
+
+        // verifications
+        assertThat(pageOne.getItems()).extracting(Machine::getId).containsExactly(ROW_1, ROW_2);
+        assertThat(pageTwo.getItems()).extracting(Machine::getId).containsExactly(ROW_3, ROW_4);
+        assertThat(backToPageOne.getItems()).extracting(Machine::getId).containsExactly(ROW_1, ROW_2);
+        assertThat(backToPageOne.getPageInfo())
+                .returns(pageOne.getPageInfo().getStartCursor(), PageInfo::getStartCursor)
+                .returns(pageOne.getPageInfo().getEndCursor(), PageInfo::getEndCursor);
+    }
+
+    @ParameterizedTest
+    @MethodSource("pagesOfFiveRows")
+    void queryDevices_eachPageInEachDirection_rowsInDisplayOrderWithBothFlags(
+            boolean backward, int anchorRow, List<String> expectedRows, boolean hasPreviousPage, boolean hasNextPage) {
+        // setup
+        DeviceService s = service();
+        SortInput sort = SortInput.builder().field(HOSTNAME).direction(SortDirection.ASC).build();
+        stubDevicePages(HOSTNAME, ASC);
+        String cursor = cursorOfRow(anchorRow, HOSTNAME, ASC);
+        CursorPaginationCriteria pagination = connectionPage(backward, 2, cursor);
+
+        // execution
+        CountedGenericQueryResult<Machine> result = s.queryDevices(null, pagination, null, sort);
+
+        // verifications
+        assertThat(result.getItems()).extracting(Machine::getId).containsExactlyElementsOf(expectedRows);
+        assertThat(result.getPageInfo())
+                .returns(hasPreviousPage, PageInfo::isHasPreviousPage)
+                .returns(hasNextPage, PageInfo::isHasNextPage);
+    }
+
+    @Test
+    void queryDevices_lastWithoutBefore_lastRowsInDisplayOrderAndNoNextPage() {
+        // setup
+        DeviceService s = service();
+        SortInput sort = SortInput.builder().field(HOSTNAME).direction(SortDirection.ASC).build();
+        stubDevicePages(HOSTNAME, ASC);
+
+        // execution
+        CountedGenericQueryResult<Machine> result = s.queryDevices(null, backward(2, null), null, sort);
+
+        // verifications
+        assertThat(result.getItems()).extracting(Machine::getId).containsExactly(ROW_4, ROW_5);
+        assertThat(result.getPageInfo())
+                .returns(false, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+        verify(machineRepository).findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                eq(NO_POSITION), eq(true), eq(3), eq(HOSTNAME), eq(ASC));
+    }
+
+    @ParameterizedTest
+    @MethodSource("keysetsOfTheFirstTwoRows")
+    void queryDevices_pageInfoCursors_keysetCursorsOfTheFirstAndLastShownRows(
+            String sortField, SortDirection direction, KeysetCursor expectedStart, KeysetCursor expectedEnd) {
+        // setup
+        DeviceService s = service();
+        SortInput sort = SortInput.builder().field(sortField).direction(direction).build();
+        stubDevicePages(sortField, direction.name());
+
+        // execution
+        PageInfo pageInfo = s.queryDevices(null, forward(2, null), null, sort).getPageInfo();
+
+        // verifications
+        assertThat(KeysetCursor.parse(pageInfo.getStartCursor())).isEqualTo(expectedStart);
+        assertThat(KeysetCursor.parse(pageInfo.getEndCursor())).isEqualTo(expectedEnd);
+        assertThat(CursorBase64.decode(pageInfo.getStartCursor())).startsWith(KEYSET_PREFIX);
+        assertThat(CursorBase64.decode(pageInfo.getEndCursor())).startsWith(KEYSET_PREFIX);
+    }
+
+    @Test
+    void queryDevices_decodedKeysetCursorBackward_repositoryGetsTheKeysetPositionAndTheDirection() {
+        // setup
+        DeviceService s = service();
+        SortInput sort = SortInput.builder().field(HOSTNAME).direction(SortDirection.ASC).build();
+        when(machineRepository.isSortableField(HOSTNAME)).thenReturn(true);
+        KeysetCursor cursor = KeysetCursor.ofString(HOSTNAME, Sort.Direction.ASC, "host-c", ROW_3);
+        CursorPaginationCriteria pagination = backward(2, cursor.encode());
+
+        // execution
+        s.queryDevices(null, pagination, null, sort);
+
+        // verifications
+        verify(machineRepository).findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                eq(cursor), eq(true), eq(3), eq(HOSTNAME), eq(ASC));
+    }
+
+    @Test
+    void queryDevices_decodedRowIdCursor_repositoryGetsTheRowId() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.queryDevices(null, page(2, ROW_3), null, null);
+
+        // verifications
+        verify(machineRepository).findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                eq(new CursorPosition.RowId(ROW_3)), eq(false), eq(3), isNull(), eq("DESC"));
+    }
+
+    @Test
+    void queryDevices_cursorInAnotherFormat_leftToTheRepositoryToReject() {
+        // setup
+        DeviceService s = service();
+        CursorPosition unrecognised = new CursorPosition.Unrecognised("not-a-device-cursor");
+        when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                eq(unrecognised), eq(false), eq(3), isNull(), eq("DESC"))).thenThrow(new InvalidCursorException());
+        CursorPaginationCriteria pagination = page(2, "not-a-device-cursor");
+
+        // execution
+        Throwable thrown = catchThrowable(() -> s.queryDevices(null, pagination, null, null));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
+    }
+
+    @Test
+    void queryDevices_malformedKeysetPayload_throwsInvalidCursorBeforeAnyPageIsRead() {
+        // setup
+        DeviceService s = service();
+        CursorPaginationCriteria pagination = page(2, "k1|hostname|ASC");
+
+        // execution
+        Throwable thrown = catchThrowable(() -> s.queryDevices(null, pagination, null, null));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
+        verify(machineRepository, never()).findMachinesWithCursor(any(), any(MachineQueryFilter.class), any(),
+                any(CursorPosition.class), anyBoolean(), anyInt(), any(), any());
+    }
+
+    @Test
+    void queryAvailableDevicesForSchedule_pageOneThenPageTwoThenBeforePageTwo_returnsPageOneAgain() {
+        // setup
+        DeviceService s = service();
+        stubAvailablePages();
+
+        // execution
+        CountedGenericQueryResult<Machine> pageOne =
+                s.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, null, forward(2, null), null);
+        CountedGenericQueryResult<Machine> pageTwo = s.queryAvailableDevicesForSchedule(
+                null, ASSIGNED_MACHINE_IDS, null, forward(2, pageOne.getPageInfo().getEndCursor()), null);
+        CountedGenericQueryResult<Machine> backToPageOne = s.queryAvailableDevicesForSchedule(
+                null, ASSIGNED_MACHINE_IDS, null, backward(2, pageTwo.getPageInfo().getStartCursor()), null);
+
+        // verifications
+        assertThat(pageOne.getItems()).extracting(Machine::getId).containsExactly(ROW_1, ROW_2);
+        assertThat(pageTwo.getItems()).extracting(Machine::getId).containsExactly(ROW_3, ROW_4);
+        assertThat(backToPageOne.getItems()).extracting(Machine::getId).containsExactly(ROW_1, ROW_2);
+        assertThat(backToPageOne.getPageInfo())
+                .returns(pageOne.getPageInfo().getStartCursor(), PageInfo::getStartCursor)
+                .returns(pageOne.getPageInfo().getEndCursor(), PageInfo::getEndCursor)
+                .returns(false, PageInfo::isHasPreviousPage)
+                .returns(true, PageInfo::isHasNextPage);
+    }
+
+    @Test
+    void queryAvailableDevicesForSchedule_pageInfoCursors_bucketKeysetCursorsOfTheFirstAndLastShownRows() {
+        // setup
+        DeviceService s = service();
+        stubAvailablePages();
+        KeysetCursor assignedOnline = new KeysetCursor("bucket", Sort.Direction.ASC, "0", ROW_1);
+        KeysetCursor unassignedOnline = new KeysetCursor("bucket", Sort.Direction.ASC, "2", ROW_3);
+
+        // execution
+        PageInfo pageInfo = s.queryAvailableDevicesForSchedule(
+                null, ASSIGNED_MACHINE_IDS, null, forward(3, null), null).getPageInfo();
+
+        // verifications
+        assertThat(KeysetCursor.parse(pageInfo.getStartCursor())).isEqualTo(assignedOnline);
+        assertThat(KeysetCursor.parse(pageInfo.getEndCursor())).isEqualTo(unassignedOnline);
+        assertThat(CursorBase64.decode(pageInfo.getEndCursor())).startsWith(KEYSET_PREFIX);
+    }
+
+    @Test
+    void queryAvailableDevicesForSchedule_lastWithoutBefore_lastRowsInDisplayOrderAndNoNextPage() {
+        // setup
+        DeviceService s = service();
+        stubAvailablePages();
+
+        // execution
+        CountedGenericQueryResult<Machine> result =
+                s.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, null, backward(2, null), null);
+
+        // verifications
+        assertThat(result.getItems()).extracting(Machine::getId).containsExactly(ROW_4, ROW_5);
+        assertThat(result.getPageInfo())
+                .returns(false, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+        verify(machineRepository).findAvailableForScheduleWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class),
+                isNull(), eq(ASSIGNED_MACHINE_IDS), eq(NO_POSITION), eq(true), eq(3));
+    }
+
+    @Test
+    void queryAvailableDevicesForSchedule_middlePageBackward_bothFlagsSet() {
+        // setup
+        DeviceService s = service();
+        stubAvailablePages();
+        String beforeRowFour = cursorIssuer.availableForScheduleKeysetCursor(devices().get(3), ASSIGNED_MACHINE_IDS).encode();
+
+        // execution
+        CountedGenericQueryResult<Machine> result = s.queryAvailableDevicesForSchedule(
+                null, ASSIGNED_MACHINE_IDS, null, backward(2, beforeRowFour), null);
+
+        // verifications
+        assertThat(result.getItems()).extracting(Machine::getId).containsExactly(ROW_2, ROW_3);
+        assertThat(result.getPageInfo())
+                .returns(true, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+    }
+
+    @Test
+    void queryAvailableDevicesForSchedule_cursorInTheOlderBucketFormat_repositoryGetsItAsItIs() {
+        // setup
+        DeviceService s = service();
+        String olderFormat = "1|" + ROW_2;
+
+        // execution
+        s.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, null, page(2, olderFormat), null);
+
+        // verifications
+        verify(machineRepository).findAvailableForScheduleWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class),
+                isNull(), eq(ASSIGNED_MACHINE_IDS), eq(new CursorPosition.Unrecognised(olderFormat)), eq(false), eq(3));
+    }
+
+    @Test
+    void queryAvailableDevicesForSchedule_malformedKeysetPayload_throwsInvalidCursorBeforeAnyPageIsRead() {
+        // setup
+        DeviceService s = service();
+        CursorPaginationCriteria pagination = page(2, "k1|bucket|ASC");
+
+        // execution
+        Throwable thrown = catchThrowable(
+                () -> s.queryAvailableDevicesForSchedule(null, ASSIGNED_MACHINE_IDS, null, pagination, null));
+
+        // verifications
+        assertThat(thrown).isInstanceOf(InvalidCursorException.class).hasMessage(INVALID_CURSOR);
+        verify(machineRepository, never()).findAvailableForScheduleWithCursor(any(), any(MachineQueryFilter.class), any(),
+                any(), any(CursorPosition.class), anyBoolean(), anyInt());
+    }
+
+    private static Stream<Arguments> deviceSorts() {
+        return Stream.of("_id", HOSTNAME, "displayName", "nickname", "lastSeen", "status", "connectivity", "clientOutdated")
+                .flatMap(sortField -> Stream.of(
+                        arguments(sortField, SortDirection.ASC),
+                        arguments(sortField, SortDirection.DESC)));
+    }
+
+    private static Stream<Arguments> pagesOfFiveRows() {
+        return Stream.of(
+                arguments(false, 0, List.of(ROW_1, ROW_2), false, true),
+                arguments(false, 2, List.of(ROW_3, ROW_4), true, true),
+                arguments(false, 4, List.of(ROW_5), true, false),
+                arguments(false, 5, List.of(), true, false),
+                arguments(true, 0, List.of(ROW_4, ROW_5), true, false),
+                arguments(true, 4, List.of(ROW_2, ROW_3), true, true),
+                arguments(true, 3, List.of(ROW_1, ROW_2), false, true),
+                arguments(true, 2, List.of(ROW_1), false, true),
+                arguments(true, 1, List.of(), false, true));
+    }
+
+    private static Stream<Arguments> keysetsOfTheFirstTwoRows() {
+        return Stream.of(
+                arguments("_id", SortDirection.DESC,
+                        new KeysetCursor("_id", Sort.Direction.DESC, "", ROW_1),
+                        new KeysetCursor("_id", Sort.Direction.DESC, "", ROW_2)),
+                arguments(HOSTNAME, SortDirection.ASC,
+                        KeysetCursor.ofString(HOSTNAME, Sort.Direction.ASC, "host-1", ROW_1),
+                        KeysetCursor.ofString(HOSTNAME, Sort.Direction.ASC, "host-2", ROW_2)),
+                arguments("nickname", SortDirection.ASC,
+                        KeysetCursor.ofString("nickname", Sort.Direction.ASC, null, ROW_1),
+                        KeysetCursor.ofString("nickname", Sort.Direction.ASC, "nick-2", ROW_2)),
+                arguments("lastSeen", SortDirection.DESC,
+                        KeysetCursor.ofInstant("lastSeen", Sort.Direction.DESC, LAST_SEEN.plusSeconds(1), ROW_1),
+                        KeysetCursor.ofInstant("lastSeen", Sort.Direction.DESC, LAST_SEEN.plusSeconds(2), ROW_2)),
+                arguments("status", SortDirection.DESC,
+                        new KeysetCursor("status", Sort.Direction.DESC, "5", ROW_1),
+                        new KeysetCursor("status", Sort.Direction.DESC, "2", ROW_2)),
+                arguments("connectivity", SortDirection.DESC,
+                        new KeysetCursor("connectivity", Sort.Direction.DESC, "1", ROW_1),
+                        new KeysetCursor("connectivity", Sort.Direction.DESC, "0", ROW_2)),
+                arguments("clientOutdated", SortDirection.DESC,
+                        new KeysetCursor("clientOutdated", Sort.Direction.DESC, "1", ROW_1),
+                        new KeysetCursor("clientOutdated", Sort.Direction.DESC, "0", ROW_2)));
+    }
+
     private static CursorPaginationCriteria page(int limit, String cursor) {
         return CursorPaginationCriteria.builder().limit(limit).cursor(cursor).build();
     }
@@ -876,5 +1271,128 @@ class DeviceServiceTest {
             m.setId("id-" + i);
             return m;
         }).toList();
+    }
+
+    private static CursorPaginationCriteria forward(int first, String after) {
+        ConnectionArgs args = ConnectionArgs.builder().first(first).after(after).build();
+        return CursorPaginationCriteria.fromConnectionArgs(args);
+    }
+
+    private static CursorPaginationCriteria backward(int last, String before) {
+        ConnectionArgs args = ConnectionArgs.builder().last(last).before(before).build();
+        return CursorPaginationCriteria.fromConnectionArgs(args);
+    }
+
+    private static CursorPaginationCriteria connectionPage(boolean backward, int limit, String cursor) {
+        return backward ? backward(limit, cursor) : forward(limit, cursor);
+    }
+
+    private static List<Machine> devices() {
+        return IntStream.rangeClosed(1, ROWS.size()).mapToObj(DeviceServiceTest::device).toList();
+    }
+
+    private static Machine device(int row) {
+        boolean first = row == 1;
+        Machine machine = new Machine();
+        machine.setId(ROWS.get(row - 1));
+        machine.setMachineId("m-" + row);
+        machine.setHostname("host-" + row);
+        machine.setDisplayName("Display " + row);
+        machine.setNickname(first ? null : "nick-" + row);
+        machine.setLastSeen(LAST_SEEN.plusSeconds(row));
+        machine.setStatus(first ? DeviceStatus.MANAGED : DeviceStatus.PENDING);
+        machine.setTelemetryStatus(row % 2 == 1 ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
+        machine.setAgentVersionKey(first ? OUTDATED_VERSION_KEY : null);
+        return machine;
+    }
+
+    private static List<Machine> rowsPast(List<Machine> displayOrder, CursorPosition position, boolean backward, int limit) {
+        List<Machine> fetchOrder = backward ? displayOrder.reversed() : displayOrder;
+        List<String> ids = fetchOrder.stream().map(Machine::getId).toList();
+        int anchor = ids.indexOf(anchorId(position));
+        return fetchOrder.stream().skip(anchor + 1L).limit(limit).toList();
+    }
+
+    private static String anchorId(CursorPosition position) {
+        return switch (position) {
+            case KeysetCursor keyset -> keyset.id();
+            case CursorPosition.RowId rowId -> rowId.id();
+            case CursorPosition.Unrecognised unrecognised -> unrecognised.decoded();
+            case CursorPosition.None none -> "";
+        };
+    }
+
+    private static KeysetCursor idCursor(String id) {
+        return new KeysetCursor("_id", Sort.Direction.DESC, "", id);
+    }
+
+    private String cursorOfRow(int row, String sortField, String direction) {
+        return row == 0 ? null : cursorIssuer.keysetCursor(device(row), sortField, direction).encode();
+    }
+
+    private void stubIdCursors() {
+        lenient().when(machineRepository.keysetCursor(any(Machine.class), isNull(), eq("DESC")))
+                .thenAnswer(call -> idCursor(call.<Machine>getArgument(0).getId()));
+    }
+
+    private void stubDevicePages(String sortField, String direction) {
+        List<Machine> displayOrder = devices();
+        when(machineRepository.isSortableField(sortField)).thenReturn(true);
+        when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                any(CursorPosition.class), anyBoolean(), anyInt(), eq(sortField), eq(direction)))
+                .thenAnswer(call -> rowsPast(displayOrder, call.getArgument(3), call.getArgument(4), call.getArgument(5)));
+        lenient().when(machineRepository.keysetCursor(any(Machine.class), eq(sortField), eq(direction)))
+                .thenAnswer(call -> cursorIssuer.keysetCursor(call.getArgument(0), sortField, direction));
+    }
+
+    private void stubAvailablePages() {
+        List<Machine> displayOrder = devices();
+        when(machineRepository.findAvailableForScheduleWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                eq(ASSIGNED_MACHINE_IDS), any(CursorPosition.class), anyBoolean(), anyInt()))
+                .thenAnswer(call -> rowsPast(displayOrder, call.getArgument(4), call.getArgument(5), call.getArgument(6)));
+        when(machineRepository.availableForScheduleKeysetCursor(any(Machine.class), eq(ASSIGNED_MACHINE_IDS)))
+                .thenAnswer(call -> cursorIssuer.availableForScheduleKeysetCursor(call.getArgument(0), ASSIGNED_MACHINE_IDS));
+    }
+
+    @Test
+    void verifyExists_knownDevice_passes() {
+        // setup
+        when(machineRepository.findByMachineId("machine-1")).thenReturn(Optional.of(new Machine()));
+
+        // execution
+        service().verifyExists("machine-1");
+
+        // verifications
+        verify(machineRepository).findByMachineId("machine-1");
+    }
+
+    @Test
+    void verifyExists_unknownDevice_throwsDeviceNotFound() {
+        // setup
+        when(machineRepository.findByMachineId("machine-1")).thenReturn(Optional.empty());
+
+        // execution
+        DeviceNotFoundException ex =
+                assertThrows(DeviceNotFoundException.class, () -> service().verifyExists("machine-1"));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Device not found: machine-1");
+    }
+
+    @Test
+    void findDeviceIdsOfOrganizations_organizations_machineIdsOfTheTenantInThoseOrganizations() {
+        // setup
+        when(machineRepository.findMachineIdsByCriteria(eq(TENANT_ID),
+                argThat(machineQueryFilter ->
+                        List.of("org-1").equals(machineQueryFilter.getOrganizationIds())
+                                && machineQueryFilter.getStatuses() == null
+                                && machineQueryFilter.getExcludeStatuses() == null),
+                isNull())).thenReturn(List.of("machine-1"));
+
+        // execution
+        List<String> machineIds = service().findDeviceIdsOfOrganizations(List.of("org-1"));
+
+        // verifications
+        assertThat(machineIds).containsExactly("machine-1");
     }
 }

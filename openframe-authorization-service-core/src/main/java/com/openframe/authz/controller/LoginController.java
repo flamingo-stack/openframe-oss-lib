@@ -15,6 +15,16 @@ public class LoginController {
     @Value("${openframe.password-reset.page-url:}")
     private String passwordResetPageUrl;
 
+    /**
+     * reCAPTCHA Enterprise site key. The edge firewall refuses the password-reset request without a token, so the
+     * page asks Google for one before sending it. Blank (self-hosted) sends the request without one, as before.
+     */
+    @Value("${openframe.recaptcha.site-key:}")
+    private String recaptchaSiteKey;
+
+    @Value("${openframe.recaptcha.session-site-key:}")
+    private String recaptchaSessionSiteKey;
+
     @GetMapping("/login")
     public String login(Model model,
                         @RequestParam(value = "error", required = false) String error) {
@@ -25,6 +35,12 @@ public class LoginController {
 
         if (!passwordResetPageUrl.isBlank()) {
             model.addAttribute("passwordResetUrl", passwordResetPageUrl);
+        }
+
+        if (!recaptchaSessionSiteKey.isBlank()) {
+            model.addAttribute("recaptchaSessionSiteKey", recaptchaSessionSiteKey);
+        } else if (!passwordResetPageUrl.isBlank() && !recaptchaSiteKey.isBlank()) {
+            model.addAttribute("recaptchaSiteKey", recaptchaSiteKey);
         }
 
         return "login";

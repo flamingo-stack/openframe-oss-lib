@@ -1,6 +1,6 @@
 package com.openframe.data.repository.rmm;
 
-import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.InvalidCursorException;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.script.ScriptExecution;
@@ -251,7 +251,7 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
 
         int sep = cursor.lastIndexOf(CURSOR_SEPARATOR);
         if (sep < 0) {
-            throw new BadRequestException("Invalid compound schedule-runs cursor (no separator): " + cursor);
+            throw new InvalidCursorException();
         }
         Instant value = parseInstant(cursor.substring(0, sep));
         ObjectId id = parseCursorId(cursor.substring(sep + 1));
@@ -273,7 +273,7 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
         try {
             return new ObjectId(hex);
         } catch (IllegalArgumentException ex) {
-            throw new BadRequestException("Invalid ObjectId in schedule-runs cursor: " + hex);
+            throw new InvalidCursorException(ex);
         }
     }
 
@@ -281,7 +281,7 @@ public class CustomScheduleScriptExecutionRepositoryImpl implements CustomSchedu
         try {
             return Instant.ofEpochMilli(Long.parseLong(millis));
         } catch (NumberFormatException ex) {
-            throw new BadRequestException("Unparseable epoch millis in schedule-runs cursor: " + millis);
+            throw new InvalidCursorException(ex);
         }
     }
 }

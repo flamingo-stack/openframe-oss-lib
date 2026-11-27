@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { DeviceStatusDisplayProvider } from './device-status-display';
 import { DevicesTableBody } from './devices-table-body';
 import type { DeviceRow } from './types';
 
@@ -102,8 +103,12 @@ describe('DevicesTableBody, grid layout', () => {
     expect(header()).toMatch(/>Device</i);
   });
 
-  it('puts the last-seen time beside the status tag, not under it', () => {
-    const { container } = render(<DevicesTableBody devices={DEVICES} layout="grid" />);
+  it('legacy display: puts the last-seen time beside the status tag, not under it', () => {
+    const { container } = render(
+      <DeviceStatusDisplayProvider display="legacy">
+        <DevicesTableBody devices={DEVICES} layout="grid" />
+      </DeviceStatusDisplayProvider>,
+    );
     const [first, second] = gridRows(container);
     expect(first).toMatch(/data-part="tag"[\s\S]*data-part="secondary"/);
     // A device that was never seen says so in the same place.

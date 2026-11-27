@@ -46,8 +46,8 @@ use crate::config::update_config::{
 };
 use crate::listener::command::{
     ClientUninstallHandler, ClientUpdateHandler, CommandContext, CommandListener,
-    FeatureFlagsHandler, PackageUpdateHandler, RestartGate, ToolInstallationHandler,
-    ToolUpdateHandler,
+    FeatureFlagsHandler, PackageAdoptHandler, PackageUpdateHandler, RestartGate,
+    ToolInstallationHandler, ToolUninstallHandler, ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
@@ -78,6 +78,11 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::os_info_report_publisher::OsInfoReportPublisher;
+use crate::services::os_updates::report_publisher::OsUpdatesReportPublisher;
+use crate::services::os_updates::report_run_manager::OsUpdatesReportRunManager;
+use crate::services::package_manager::adopt::PackageAdoptRunner;
+use crate::services::package_manager::brew::BrewLock;
 use crate::services::package_manager::package_update::{
     OrderStore, PackageUpdateRunManager, RestartSignals, StatusReporter,
 };
@@ -99,7 +104,7 @@ use crate::services::MachineIdService;
 use crate::services::{
     AgentAuthService, AgentRegistrationService, InitialConfigurationService,
     ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolOps,
-    ToolRunManager, ToolUrlParamsResolver,
+    ToolRunManager, ToolUninstallService, ToolUrlParamsResolver,
 };
 use crate::services::{
     LastKnownGoodService, LogKeyService, UpdateCleanupService, UpdateHandlerService,
@@ -172,6 +177,11 @@ struct PackageUpdate {
     manager: PackageUpdateRunManager,
 }
 
+struct PackageAdopt {
+    listener: CommandListener<PackageAdoptHandler>,
+    runner: Arc<PackageAdoptRunner>,
+}
+
 pub struct Client {
     config: Arc<RwLock<ClientConfiguration>>,
     directory_manager: DirectoryManager,
@@ -182,9 +192,11 @@ pub struct Client {
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
     tool_installation_listener: CommandListener<ToolInstallationHandler>,
     tool_update_listener: CommandListener<ToolUpdateHandler>,
+    tool_uninstall_listener: CommandListener<ToolUninstallHandler>,
     client_update_listener: CommandListener<ClientUpdateHandler>,
     client_uninstall_listener: CommandListener<ClientUninstallHandler>,
     package_update: Option<PackageUpdate>,
+    package_adopt: PackageAdopt,
     restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
@@ -197,7 +209,9 @@ pub struct Client {
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
     package_manager_report_run_manager: PackageManagerReportRunManager,
+    os_updates_report_run_manager: Option<OsUpdatesReportRunManager>,
     hostname_report_publisher: HostnameReportPublisher,
+    os_info_report_publisher: OsInfoReportPublisher,
     machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
@@ -281,6 +295,7 @@ impl Client {
             device_data_fetcher.clone(),
             config_service.clone(),
             initial_configuration_service.clone(),
+            machine_id_service.clone(),
         );
 
         // Initialize registration processor
@@ -392,6 +407,9 @@ impl Client {
         let package_auto_update_enabled = feature_flags_service
             .flags()
             .is_enabled(Feature::PackageAutoUpdate);
+        let os_update_report_enabled = feature_flags_service
+            .flags()
+            .is_enabled(Feature::OsUpdateReport);
 
         // Initialize tool run manager
         let tool_run_manager = ToolRunManager::new(
@@ -547,6 +565,25 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let brew_lock = BrewLock::default();
+        let package_adopt_runner = Arc::new(PackageAdoptRunner::new(
+            nats_message_publisher.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+            RestartSignals {
+                client_update: tool_run_manager.client_update_pending(),
+                agent_restart: agent_restart.view(),
+            },
+            package_upgrades.clone(),
+            brew_lock.clone(),
+        ));
+        let package_adopt = PackageAdopt {
+            listener: CommandListener::new(
+                PackageAdoptHandler::new(package_adopt_runner.clone()),
+                command_context.clone(),
+            ),
+            runner: package_adopt_runner,
+        };
         let package_update = package_auto_update_enabled.then(|| {
             let orders = Arc::new(OrderStore::load(
                 directory_manager.secured_dir().join("package_updates.json"),
@@ -571,6 +608,7 @@ impl Client {
                 },
                 package_upgrades.clone(),
                 tool_run_manager.clone(),
+                brew_lock,
             );
             PackageUpdate { listener, manager }
         });
@@ -591,6 +629,20 @@ impl Client {
                 tool_agent_update_service.clone(),
                 tool_ops.clone(),
                 tool_run_manager.client_update_pending(),
+            ),
+            command_context.clone(),
+        );
+        let tool_uninstall_listener = CommandListener::new(
+            ToolUninstallHandler::new(
+                ToolUninstallService::new(
+                    installed_tools_service.clone(),
+                    tool_command_params_resolver.clone(),
+                    tool_kill_service.clone(),
+                    directory_manager.clone(),
+                    tool_connection_service.clone(),
+                ),
+                tool_run_manager.clone(),
+                tool_ops.clone(),
             ),
             command_context.clone(),
         );
@@ -625,6 +677,12 @@ impl Client {
                 config_service.clone(),
                 package_auto_update_enabled,
             ));
+        let os_updates_report_run_manager = os_update_report_enabled.then(|| {
+            OsUpdatesReportRunManager::new(OsUpdatesReportPublisher::new(
+                nats_message_publisher.clone(),
+                config_service.clone(),
+            ))
+        });
 
         let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(
             nats_connection_manager.clone(),
@@ -664,6 +722,8 @@ impl Client {
             config_service.clone(),
             device_data_fetcher.clone(),
         );
+        let os_info_report_publisher =
+            OsInfoReportPublisher::new(nats_message_publisher.clone(), config_service.clone());
 
         let machine_timezone_run_manager = MachineTimezoneRunManager::new(
             MachineTimezonePublisher::new(nats_message_publisher.clone(), config_service.clone()),
@@ -681,9 +741,11 @@ impl Client {
             feature_flags_listener,
             tool_installation_listener,
             tool_update_listener,
+            tool_uninstall_listener,
             client_update_listener,
             client_uninstall_listener,
             package_update,
+            package_adopt,
             restart_gate,
             command_execution_listener,
             script_execution_listener,
@@ -696,7 +758,9 @@ impl Client {
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
             package_manager_report_run_manager,
+            os_updates_report_run_manager,
             hostname_report_publisher,
+            os_info_report_publisher,
             machine_timezone_run_manager,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
@@ -783,6 +847,7 @@ impl Client {
         if let Some(package_update) = &self.package_update {
             package_update.listener.start().await?;
         }
+        self.package_adopt.listener.start().await?;
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
             restart_gate.requested().await;
@@ -839,11 +904,13 @@ impl Client {
         self.machine_heartbeat_run_manager.start();
         self.machine_timezone_run_manager.start();
 
-        // One-shot hostname report: client startup covers both machine and client restarts.
+        // One-shot hostname and OS reports: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
+        self.os_info_report_publisher.publish().await;
 
         self.tool_installation_listener.start().await?;
         self.tool_update_listener.start().await?;
+        self.tool_uninstall_listener.start().await?;
         self.client_update_listener.start().await?;
         self.client_uninstall_listener.start().await?;
 
@@ -873,9 +940,13 @@ impl Client {
         info!("Script schedule execution listener started");
 
         self.package_manager_report_run_manager.start();
+        if let Some(os_updates_report) = &self.os_updates_report_run_manager {
+            os_updates_report.start();
+        }
         if let Some(package_update) = &self.package_update {
             package_update.manager.start();
         }
+        self.package_adopt.runner.start();
 
         if let Err(e) = self.tool_run_manager.run().await {
             error!("Failed to start tool run manager: {:#}", e);

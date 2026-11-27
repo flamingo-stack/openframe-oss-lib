@@ -3,11 +3,15 @@ package com.openframe.api.mapper;
 import com.openframe.api.dto.SSOConfigRequest;
 import com.openframe.api.dto.SSOConfigResponse;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.core.exception.EncryptionException;
 import com.openframe.data.document.sso.SSOConfig;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import static java.lang.Boolean.TRUE;
 
+@Slf4j
 @Component
 public class SSOConfigMapper {
 
@@ -25,10 +29,25 @@ public class SSOConfigMapper {
 
     public void updateEntity(SSOConfig existing, SSOConfigRequest request, EncryptionService encryptionService) {
         existing.setClientId(request.getClientId());
-        existing.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
+        if (isNewSecret(existing.getClientSecret(), request.getClientSecret(), encryptionService)) {
+            existing.setClientSecret(encryptionService.encryptClientSecret(request.getClientSecret()));
+        }
         existing.setAutoProvisionUsers(TRUE.equals(request.getAutoProvisionUsers()));
         existing.setMsTenantId(request.getMsTenantId());
         existing.setAllowedDomains(request.getAllowedDomains());
+    }
+
+    private static boolean isNewSecret(String storedSecret, String requestedSecret,
+                                       EncryptionService encryptionService) {
+        if (!StringUtils.hasText(storedSecret)) {
+            return true;
+        }
+        try {
+            return !requestedSecret.equals(encryptionService.decryptClientSecret(storedSecret));
+        } catch (EncryptionException e) {
+            log.warn("Stored SSO client secret cannot be read, replacing it: {}", e.getMessage());
+            return true;
+        }
     }
 
     public SSOConfigResponse toResponse(SSOConfig entity, String decryptedSecret) {

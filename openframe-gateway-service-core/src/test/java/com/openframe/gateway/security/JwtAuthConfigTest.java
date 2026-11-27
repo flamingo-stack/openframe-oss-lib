@@ -101,7 +101,8 @@ class JwtAuthConfigTest {
 
         LoadingCache<String, ReactiveAuthenticationManager> cache =
                 config.issuerManagersCache(new ReactiveJwtAuthenticationConverter(), jwtConfig, issuerUrlProvider);
-        resolver = config.jwtIssuerAuthenticationManagerResolver(cache, jwtConfig, issuerUrlProvider);
+        TokenRevocationChecker revocationOff = new TokenRevocationChecker(null, null, null, false, Duration.ofSeconds(10), 100L);
+        resolver = config.jwtIssuerAuthenticationManagerResolver(cache, jwtConfig, issuerUrlProvider, revocationOff);
     }
 
     @AfterEach

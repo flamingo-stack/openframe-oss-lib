@@ -1,5 +1,7 @@
 package com.openframe.api.service.user;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.invitation.InvitationFilterInput;
 import com.openframe.api.dto.invitation.InvitationFilters;
@@ -45,11 +47,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static com.openframe.api.dto.invitation.InvitationStatus.EXPIRED;
 import static com.openframe.api.dto.invitation.InvitationStatus.PENDING;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -69,12 +74,14 @@ class UserListingTest {
     @Mock private EmailDomainPolicy emailDomainPolicy;
 
     private UserService userService() {
-        return new UserService(userRepository, ssoIdentityRepository, new UserMapper(), userProcessor, emailService);
+        return new UserService(userRepository, ssoIdentityRepository, new UserMapper(), userProcessor, emailService,
+                mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class));
     }
 
     private InvitationService invitationService() {
         return new InvitationService(invitationRepository, new InvitationMapper(), emailService, userService(),
-                invitationProcessor, emailDomainPolicy);
+                invitationProcessor, emailDomainPolicy, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS),
+                mock(AuditRecorder.class, CALLS_REAL_METHODS));
     }
 
     @Test
@@ -83,7 +90,7 @@ class UserListingTest {
         List<UserStatus> statuses = List.of(UserStatus.ACTIVE);
         UserListFilter listFilter = new UserListFilter(statuses, Set.of(), List.of("u0"), "jane");
         when(userRepository.countUsers(listFilter)).thenReturn(7L);
-        when(userRepository.findUsersPage(listFilter, "a@acme.io_u0", 3))
+        when(userRepository.findUsersPage(listFilter, "a@acme.io_u0", false, 3))
                 .thenReturn(List.of(user("u1", "b@acme.io"), user("u2", "c@acme.io"), user("u3", "d@acme.io")));
 
         CountedGenericQueryResult<UserResponse> page = userService().queryUsers(
@@ -105,7 +112,7 @@ class UserListingTest {
     void usersLastAndEmptyPage() {
         UserListFilter unfiltered = new UserListFilter(null, null, null, null);
         when(userRepository.countUsers(unfiltered)).thenReturn(1L, 0L);
-        when(userRepository.findUsersPage(unfiltered, null, 21))
+        when(userRepository.findUsersPage(unfiltered, null, false, 21))
                 .thenReturn(List.of(user("u1", "b@acme.io")), List.of());
 
         CountedGenericQueryResult<UserResponse> last =
@@ -122,7 +129,7 @@ class UserListingTest {
     @Test
     @DisplayName("users: a role filter asks for the granted roles, so ADMIN finds the owners too")
     void usersRoleFilterMatchesEffectiveRoles() {
-        when(userRepository.findUsersPage(any(), any(), anyInt())).thenReturn(List.of());
+        when(userRepository.findUsersPage(any(), any(), anyBoolean(), anyInt())).thenReturn(List.of());
 
         for (List<UserRole> roles : List.of(List.of(UserRole.ADMIN), List.of(UserRole.OWNER), List.<UserRole>of())) {
             userService().queryUsers(UserFilterInput.builder().roles(roles).build(), null,
@@ -130,7 +137,7 @@ class UserListingTest {
         }
 
         ArgumentCaptor<UserListFilter> filters = ArgumentCaptor.forClass(UserListFilter.class);
-        verify(userRepository, times(3)).findUsersPage(filters.capture(), any(), anyInt());
+        verify(userRepository, times(3)).findUsersPage(filters.capture(), any(), anyBoolean(), anyInt());
         assertThat(filters.getAllValues()).extracting(UserListFilter::roles).containsExactly(
                 Set.of(UserRole.ADMIN, UserRole.OWNER), Set.of(UserRole.OWNER), Set.of());
     }
@@ -183,7 +190,7 @@ class UserListingTest {
     @DisplayName("invitations: PENDING and EXPIRED narrow by expiry, both or none keep every open invitation")
     void invitationStatusFilter() {
         when(invitationRepository.countOpenInvitations(any(), any())).thenReturn(0L);
-        when(invitationRepository.findOpenInvitationsPage(any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(invitationRepository.findOpenInvitationsPage(any(), any(), any(), anyBoolean(), anyInt())).thenReturn(List.of());
 
         for (InvitationFilterInput filter : Arrays.asList(
                 filter(EXPIRED), filter(PENDING), filter(PENDING, EXPIRED), filter(), null)) {
@@ -191,7 +198,7 @@ class UserListingTest {
         }
 
         ArgumentCaptor<InvitationListFilter> filters = ArgumentCaptor.forClass(InvitationListFilter.class);
-        verify(invitationRepository, times(5)).findOpenInvitationsPage(filters.capture(), any(), any(), eq(21));
+        verify(invitationRepository, times(5)).findOpenInvitationsPage(filters.capture(), any(), any(), anyBoolean(), eq(21));
         assertThat(filters.getAllValues()).extracting(InvitationListFilter::expired)
                 .containsExactly(true, false, null, null, null);
     }
@@ -199,13 +206,13 @@ class UserListingTest {
     @Test
     @DisplayName("invitations: a role filter asks for the granted roles")
     void invitationRoleFilter() {
-        when(invitationRepository.findOpenInvitationsPage(any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(invitationRepository.findOpenInvitationsPage(any(), any(), any(), anyBoolean(), anyInt())).thenReturn(List.of());
 
         invitationService().queryInvitations(InvitationFilterInput.builder().roles(List.of(UserRole.ADMIN)).build(),
                 null, CursorPaginationCriteria.builder().build());
 
         ArgumentCaptor<InvitationListFilter> filter = ArgumentCaptor.forClass(InvitationListFilter.class);
-        verify(invitationRepository).findOpenInvitationsPage(filter.capture(), any(), any(), anyInt());
+        verify(invitationRepository).findOpenInvitationsPage(filter.capture(), any(), any(), anyBoolean(), anyInt());
         assertThat(filter.getValue().roles()).isEqualTo(Set.of(UserRole.ADMIN, UserRole.OWNER));
     }
 
@@ -237,7 +244,7 @@ class UserListingTest {
         Instant createdAt = Instant.ofEpochMilli(1_750_000_000_000L);
         InvitationListFilter acme = new InvitationListFilter(null, null, "acme");
         when(invitationRepository.countOpenInvitations(eq(acme), any())).thenReturn(2L);
-        when(invitationRepository.findOpenInvitationsPage(eq(acme), any(), any(), eq(2)))
+        when(invitationRepository.findOpenInvitationsPage(eq(acme), any(), any(), eq(false), eq(2)))
                 .thenReturn(List.of(invitation("inv-2", createdAt), invitation("inv-1", createdAt.minusSeconds(60))));
 
         CountedGenericQueryResult<InvitationResponse> page = invitationService().queryInvitations(

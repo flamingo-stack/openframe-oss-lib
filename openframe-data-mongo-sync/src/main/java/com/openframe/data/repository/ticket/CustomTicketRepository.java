@@ -4,6 +4,8 @@ import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.model.ClientOwnerScope;
+import com.openframe.data.repository.cursor.CursorPosition;
+import com.openframe.data.repository.cursor.KeysetCursor;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
@@ -24,8 +26,10 @@ public interface CustomTicketRepository {
     Query buildTicketQuery(TicketQueryFilter filter, String search,
                            List<String> restrictToTicketIds, ClientOwnerScope ownerScope);
 
-    List<Ticket> findTicketsWithCursor(Query query, String cursor, int limit,
-                                        String sortField, String sortDirection);
+    List<Ticket> findTicketsWithCursor(Query query, CursorPosition position, boolean backward, int limit,
+                                       String sortField, String sortDirection);
+
+    KeysetCursor keysetCursor(Ticket ticket, String sortField, String sortDirection);
 
     long countTickets(Query query);
 
@@ -39,7 +43,9 @@ public interface CustomTicketRepository {
 
     int reassignTicketsToStatus(String fromStatusId, String toStatusId, TicketStatusKind toKind);
 
-    int reassignTicketsToStatus(Query query, String toStatusId, TicketStatusKind toKind);
+    List<Ticket> findAuditFieldsByStatusId(String statusId);
+
+    Optional<Ticket> moveFromStatus(String ticketId, String fromStatusId, String toStatusId, TicketStatusKind toKind);
 
     void updateTitle(String ticketId, String title);
 

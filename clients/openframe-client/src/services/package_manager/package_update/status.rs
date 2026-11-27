@@ -1,19 +1,19 @@
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use tokio::sync::Notify;
-use tokio::time::{timeout, Duration};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use super::orders::Order;
-use crate::config::update_config::FLUSH_PUBLISH_TIMEOUT_SECS;
 use crate::models::{
     package_update_status_subject, Done, FailReason, Failed, PackageRef, PackageUpdateMessage,
     PackageUpdateStatusMessage, UpdateSource, UpdateStatus, Waiting,
 };
 use crate::services::nats_message_publisher::NatsMessagePublisher;
+use crate::services::package_manager::status_outbox::StatusOutbox;
 use crate::services::result_store::ResultStore;
+
+const OUTBOX_KIND: &str = "package-update-status";
 
 pub(super) enum Report {
     Waiting(Waiting),
@@ -21,7 +21,6 @@ pub(super) enum Report {
     Failed(Failed),
 }
 
-/// Publishes status events through the durable outbox, so a report survives a disconnect.
 #[derive(Clone)]
 pub struct StatusReporter {
     sink: Sink,
@@ -29,15 +28,9 @@ pub struct StatusReporter {
 
 #[derive(Clone)]
 enum Sink {
-    Outbox(Arc<Outbox>),
+    Outbox(Arc<StatusOutbox>),
     #[cfg(test)]
     Memory(Arc<std::sync::Mutex<Vec<PackageUpdateStatusMessage>>>),
-}
-
-struct Outbox {
-    publisher: NatsMessagePublisher,
-    store: Arc<ResultStore>,
-    flush: Arc<Notify>,
 }
 
 impl StatusReporter {
@@ -47,11 +40,7 @@ impl StatusReporter {
         flush: Arc<Notify>,
     ) -> Self {
         Self {
-            sink: Sink::Outbox(Arc::new(Outbox {
-                publisher,
-                store,
-                flush,
-            })),
+            sink: Sink::Outbox(Arc::new(StatusOutbox::new(publisher, store, flush))),
         }
     }
 
@@ -77,45 +66,14 @@ impl StatusReporter {
         );
         match &self.sink {
             Sink::Outbox(outbox) => {
-                let Outbox {
-                    publisher,
-                    store,
-                    flush,
-                } = outbox.as_ref();
                 let subject = package_update_status_subject(&event.machine_id);
-                let bytes = match serde_json::to_vec(&event) {
-                    Ok(bytes) => bytes,
-                    Err(e) => {
-                        error!("Cannot serialize a package update status event: {:#}", e);
-                        return;
+                match serde_json::to_vec(&event) {
+                    Ok(bytes) => {
+                        outbox
+                            .publish(OUTBOX_KIND, subject, &event.event_id, bytes)
+                            .await
                     }
-                };
-                if store.enabled() {
-                    let at = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .map(|elapsed| elapsed.as_nanos())
-                        .unwrap_or_default();
-                    let key = outbox_key(at, &event.event_id);
-                    match store.enqueue(key, subject, bytes).await {
-                        Ok(()) => flush.notify_one(),
-                        Err(e) => error!(
-                            event_id = %event.event_id,
-                            "Failed to persist a package update status event, it is lost: {:#}", e
-                        ),
-                    }
-                    return;
-                }
-                let published = timeout(
-                    Duration::from_secs(FLUSH_PUBLISH_TIMEOUT_SECS),
-                    publisher.publish_acked(&subject, &bytes),
-                )
-                .await
-                .unwrap_or_else(|_| Err(anyhow::anyhow!("publish timed out")));
-                if let Err(e) = published {
-                    warn!(
-                        event_id = %event.event_id,
-                        "Failed to publish a package update status event without a durable store: {:#}", e
-                    );
+                    Err(e) => error!("Cannot serialize a package update status event: {:#}", e),
                 }
             }
             #[cfg(test)]
@@ -206,11 +164,6 @@ pub(super) fn build(
         }
     }
     event
-}
-
-/// Time first: the outbox sends in key order, so the events of a request leave in the order they happened.
-fn outbox_key(unix_nanos: u128, event_id: &str) -> String {
-    format!("package-update-status:{unix_nanos:020}:{event_id}")
 }
 
 pub(super) fn rfc3339(unix_secs: u64) -> String {

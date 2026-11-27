@@ -24,7 +24,10 @@ class ErrorCodeTest {
             "EMAIL_FORWARDING_TEST_IN_PROGRESS, EMAIL_FORWARDING_TEST_IN_PROGRESS, 409",
             "EMAIL_FORWARDING_TEST_NOT_PASSED, EMAIL_FORWARDING_TEST_NOT_PASSED, 409",
             "EMAIL_FORWARDING_TEST_SEND_FAILED, EMAIL_FORWARDING_TEST_SEND_FAILED, 502",
-            "EMAIL_SEND_AS_ALREADY_SIGNED_IN, EMAIL_SEND_AS_ALREADY_SIGNED_IN, 409"
+            "EMAIL_SEND_AS_ALREADY_SIGNED_IN, EMAIL_SEND_AS_ALREADY_SIGNED_IN, 409",
+            "EMAIL_BLOCK_LIST_INVALID_VALUE, EMAIL_BLOCK_LIST_INVALID_VALUE, 400",
+            "EMAIL_BLOCK_LIST_DUPLICATE, EMAIL_BLOCK_LIST_DUPLICATE, 409",
+            "EMAIL_BLOCK_LIST_ENTRY_NOT_FOUND, EMAIL_BLOCK_LIST_ENTRY_NOT_FOUND, 404"
     })
     void valueOf_emailToTicketCode_codeStringAndHttpStatus(String name, String code, int httpStatus) {
         // execution
@@ -36,7 +39,17 @@ class ErrorCodeTest {
     }
 
     @Test
-    void values_emailOrMailboxPrefix_exactlyTheNineCodes() {
+    void valueOf_invalidCursor_codeStringAndBadRequestStatus() {
+        // execution
+        ErrorCode errorCode = ErrorCode.valueOf("INVALID_CURSOR");
+
+        // verifications
+        assertThat(errorCode.getCode()).isEqualTo("INVALID_CURSOR");
+        assertThat(errorCode.getHttpStatus()).isEqualTo(400);
+    }
+
+    @Test
+    void values_emailOrMailboxPrefix_exactlyTheTwelveCodes() {
         // execution
         List<String> emailToTicketCodes = Arrays.stream(ErrorCode.values())
                 .map(ErrorCode::name)
@@ -53,6 +66,9 @@ class ErrorCodeTest {
                 "EMAIL_FORWARDING_TEST_IN_PROGRESS",
                 "EMAIL_FORWARDING_TEST_NOT_PASSED",
                 "EMAIL_FORWARDING_TEST_SEND_FAILED",
-                "EMAIL_SEND_AS_ALREADY_SIGNED_IN");
+                "EMAIL_SEND_AS_ALREADY_SIGNED_IN",
+                "EMAIL_BLOCK_LIST_INVALID_VALUE",
+                "EMAIL_BLOCK_LIST_DUPLICATE",
+                "EMAIL_BLOCK_LIST_ENTRY_NOT_FOUND");
     }
 }

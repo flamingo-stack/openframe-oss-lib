@@ -29,6 +29,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.mapper.GraphQLScriptScheduleMapper;
+import com.openframe.audit.Audited;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
@@ -62,6 +63,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_ARCHIVE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_CRITERIA_SET;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_UNARCHIVE;
 import static com.openframe.graphql.relay.NodeType.MACHINE;
 import static com.openframe.graphql.relay.NodeType.SCRIPT;
 import static com.openframe.graphql.relay.NodeType.SCRIPT_SCHEDULE;
@@ -158,12 +162,14 @@ public class ScriptScheduleDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = SCRIPT_SCHEDULE_ARCHIVE, targetId = "rawId(#id)")
     public ScriptScheduleResponse archiveScriptSchedule(@InputArgument @NotBlank String id) {
         String scheduleId = relayIdCodec.decode(id, SCRIPT_SCHEDULE);
         return scheduleService.archive(scheduleId);
     }
 
     @DgsMutation
+    @Audited(action = SCRIPT_SCHEDULE_UNARCHIVE, targetId = "rawId(#id)")
     public ScriptScheduleResponse unarchiveScriptSchedule(@InputArgument @NotBlank String id) {
         String scheduleId = relayIdCodec.decode(id, SCRIPT_SCHEDULE);
         return scheduleService.unarchive(scheduleId);
@@ -244,6 +250,9 @@ public class ScriptScheduleDataFetcher {
      * that match the rule are picked up automatically.
      */
     @DgsMutation
+    @Audited(action = SCRIPT_SCHEDULE_CRITERIA_SET, targetId = "rawId(#scheduleId)",
+            details = {"organizationIds=#criteria?.organizationIds", "deviceTypes=#criteria?.deviceTypes",
+                    "osTypes=#criteria?.osTypes"})
     public ScriptScheduleResponse setScheduleDeviceCriteria(@InputArgument @NotBlank String scheduleId,
                                                             @InputArgument @Valid ScheduleDeviceCriteriaInput criteria,
                                                             @AuthenticationPrincipal AuthPrincipal principal) {
@@ -266,8 +275,6 @@ public class ScriptScheduleDataFetcher {
         String userId = getCurrentUserId();
         return scriptDispatchService.runSchedule(rawScheduleId, userId);
     }
-
-    /** Returns the Relay global id ("ScriptSchedule:&lt;rawId&gt;") for the {@code id} field. */
 
     /**
      * Resolves {@code ScriptSchedule.scripts} from the stored script ids.

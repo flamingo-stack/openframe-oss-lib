@@ -36,6 +36,9 @@ public class GraphQLDeviceMapper {
         if (input == null) {
             return DeviceFilterCriteria.builder().build();
         }
+        if (filtersByMdmState(input)) {
+            throw new IllegalArgumentException("Filtering devices by MDM or disk encryption state is not available yet");
+        }
 
         return DeviceFilterCriteria.builder()
                 .statuses(input.getStatuses())
@@ -49,6 +52,14 @@ public class GraphQLDeviceMapper {
                 .directorySources(input.getDirectorySources())
                 .userLinks(input.getUserLinks())
                 .build();
+    }
+
+    private static boolean filtersByMdmState(DeviceFilterInput input) {
+        return hasValues(input.getMdmStates()) || hasValues(input.getDiskEncryptionStates());
+    }
+
+    private static boolean hasValues(List<String> values) {
+        return values != null && !values.isEmpty();
     }
 
     public DeviceFilterCriteria toDeviceFilterCriteria(DeviceFilterInput input,
@@ -141,8 +152,8 @@ public class GraphQLDeviceMapper {
         PageInfo pageInfo = PageInfo.builder()
                 .hasNextPage(base != null && base.isHasNextPage())
                 .hasPreviousPage(base != null && base.isHasPreviousPage())
-                .startCursor(edges.isEmpty() ? null : edges.get(0).getCursor())
-                .endCursor(edges.isEmpty() ? null : edges.get(edges.size() - 1).getCursor())
+                .startCursor(base == null ? null : base.getStartCursor())
+                .endCursor(base == null ? null : base.getEndCursor())
                 .build();
 
         return CountedGenericConnection.<AvailableDeviceEdge>builder()

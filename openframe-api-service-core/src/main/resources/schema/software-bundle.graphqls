@@ -105,13 +105,19 @@ type SoftwareBundle implements Node {
 
     "Number of assigned devices."
     deviceCount: Int!
-    "Assigned devices. Same filter/search/sort/pagination as the top-level devices query."
+    """
+    Assigned devices. Same filter/search/sort/pagination as the top-level devices query.
+    Sortable fields and default order as on devices. When both directions are sent, last/before wins.
+    Only pageInfo.startCursor / endCursor are valid paging cursors.
+    """
     assignedDevices(filter: DeviceFilterInput, first: Int, after: String, last: Int, before: String, search: String, sort: SortInput): DeviceConnection!
     """
     The picker's "Available Devices". Each edge carries assigned.
     softwareId: only the devices that have this Software (the Update and Auto-update forms). Null: every device.
     It is applied only when the software read model is on (openframe.features.software-read-model.enabled);
     otherwise it is ignored and every device is listed.
+    The order is fixed: assigned devices first, then online before offline; sort is ignored.
+    When both directions are sent, last/before wins. Only pageInfo.startCursor / endCursor are valid paging cursors.
     """
     availableDevices(filter: DeviceFilterInput, first: Int, after: String, last: Int, before: String, search: String, sort: SortInput, softwareId: ID): AvailableDeviceConnection!
     assignedDeviceFilters(filter: DeviceFilterInput, search: String): DeviceFilters!

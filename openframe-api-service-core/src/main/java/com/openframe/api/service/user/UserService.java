@@ -1,6 +1,7 @@
 package com.openframe.api.service.user;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.shared.CursorPage;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorCodec;
@@ -15,10 +16,19 @@ import com.openframe.api.exception.OwnerDeleteNotAllowedException;
 import com.openframe.api.exception.UserNotFoundException;
 import com.openframe.api.mapper.UserMapper;
 import com.openframe.api.service.processor.UserProcessor;
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.Audited;
+import com.openframe.audit.AuditedMethodRunner;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
+import com.openframe.data.model.audit.AuditActor;
+import com.openframe.data.model.audit.AuditEntry;
 import com.openframe.data.repository.auth.SsoIdentityRepository;
 import com.openframe.data.repository.user.UserListFilter;
 import com.openframe.data.repository.user.UserPageCursor;
@@ -36,8 +46,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.USER_DELETE;
+import static com.openframe.data.document.audit.AuditAction.USER_OWNERSHIP_TRANSFER;
+import static com.openframe.data.document.audit.AuditAction.USER_OWN_ACCOUNT_DELETE;
+import static com.openframe.data.document.audit.AuditAction.USER_UPDATE;
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static com.openframe.data.document.user.UserRole.OWNER;
 import static com.openframe.data.document.user.UserRole.grantedFor;
@@ -55,6 +70,8 @@ public class UserService {
     private final UserMapper userMapper;
     private final UserProcessor userProcessor;
     private final EmailService emailService;
+    private final AuditedMethodRunner auditedMethodRunner;
+    private final AuditRecorder auditRecorder;
 
     public Optional<User> getUserByEmail(String email) {
         return userRepository.findByEmail(email);
@@ -90,14 +107,15 @@ public class UserService {
         CursorPaginationCriteria page = pagination.normalize();
         UserListFilter listFilter = toListFilter(filter, search);
         long filteredCount = userRepository.countUsers(listFilter);
-        List<User> raw = userRepository.findUsersPage(listFilter, page.getCursor(), page.getLimit() + 1);
-        boolean hasNextPage = raw.size() > page.getLimit();
-        List<UserResponse> items = toResponses(hasNextPage ? raw.subList(0, page.getLimit()) : raw);
+        List<User> fetched = userRepository.findUsersPage(
+                listFilter, page.getCursor(), page.isBackward(), page.getLimit() + 1);
+        CursorPage<User> cursorPage = CursorPage.assemble(fetched, page);
+        List<UserResponse> items = toResponses(cursorPage.items());
         return CountedGenericQueryResult.<UserResponse>builder()
                 .items(items)
                 .pageInfo(PageInfo.builder()
-                        .hasNextPage(hasNextPage)
-                        .hasPreviousPage(page.hasCursor())
+                        .hasNextPage(cursorPage.hasNextPage())
+                        .hasPreviousPage(cursorPage.hasPreviousPage())
                         .startCursor(items.isEmpty() ? null : cursorOf(items.getFirst()))
                         .endCursor(items.isEmpty() ? null : cursorOf(items.getLast()))
                         .build())
@@ -161,6 +179,9 @@ public class UserService {
         return pageResponse.getItems();
     }
 
+    @Audited(action = USER_UPDATE, targetId = "#id",
+            details = {"firstName=#result == null ? #request.firstName : null",
+                    "lastName=#result == null ? #request.lastName : null"})
     public UserResponse updateUser(String id, UpdateUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
@@ -181,27 +202,49 @@ public class UserService {
         return toResponses(List.of(savedUser)).getFirst();
     }
 
-    public void softDeleteUser(String id, String requesterUserId) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id));
-
-        if (user.getRoles().contains(OWNER)) {
-            throw new OwnerDeleteNotAllowedException("Owner accounts can’t be deleted; transfer ownership first");
-        }
-
+    @Audited(action = USER_DELETE, targetId = "#id")
+    public void deleteUser(String id) {
+        User user = requireDeletable(id);
         if (user.getStatus() != ACTIVE) {
             return;
         }
+        user.setStatus(DELETED);
+        completeDeletion(user, user.getEmail());
+    }
 
+    public void deleteOwnAccount(String id) {
+        AuditCall auditCall = AuditCall.of(USER_OWN_ACCOUNT_DELETE, id)
+                .withCompare(false)
+                .withStoreIf(Boolean.TRUE::equals)
+                .withDetailsFromResult(deleted -> Boolean.TRUE.equals(deleted)
+                        ? Map.of("status", SELF_DELETED.name()) : Map.of());
+        AuditActor actorWithoutNameAndEmail = auditRecorder.context().actor().withName(null).withEmail(null);
+        AuditContext context = auditRecorder.context(actorWithoutNameAndEmail);
+        auditRecorder.runInContext(context, () -> auditedMethodRunner.run(auditCall, () -> anonymizeAndDelete(id)));
+    }
+
+    private boolean anonymizeAndDelete(String id) {
+        User user = requireDeletable(id);
+        if (user.getStatus() != ACTIVE) {
+            return false;
+        }
         // Self-deletion anonymizes the email, so capture the real address for the notification
         String originalEmail = user.getEmail();
+        user.setStatus(SELF_DELETED);
+        anonymize(user);
+        completeDeletion(user, originalEmail);
+        return true;
+    }
 
-        if (requesterUserId.equals(user.getId())) {
-            user.setStatus(SELF_DELETED);
-            anonymize(user);
-        } else {
-            user.setStatus(DELETED);
+    private User requireDeletable(String id) {
+        User user = userRepository.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+        if (user.getRoles().contains(OWNER)) {
+            throw new OwnerDeleteNotAllowedException("Owner accounts can’t be deleted; transfer ownership first");
         }
+        return user;
+    }
+
+    private void completeDeletion(User user, String emailToNotify) {
         User savedUser = userRepository.save(user);
 
         // A deleted user's federated identity links must not keep resolving future SSO logins
@@ -216,9 +259,9 @@ public class UserService {
 
         // Notification failure must not fail the already-completed deletion
         try {
-            emailService.sendAccountDeletedEmail(originalEmail);
+            emailService.sendAccountDeletedEmail(emailToNotify);
         } catch (Exception e) {
-            log.error("Failed to send account deletion email to {}", originalEmail, e);
+            log.error("Failed to send account deletion email to {}", emailToNotify, e);
         }
     }
 
@@ -228,6 +271,7 @@ public class UserService {
      * requester demoted after, so a failure in between leaves two owners (recoverable by a
      * second transfer) rather than none.
      */
+    @Audited(action = USER_OWNERSHIP_TRANSFER, targetId = "#newOwnerId")
     public void transferOwnership(String newOwnerId, String requesterUserId) {
         User requester = userRepository.findById(requesterUserId)
                 .orElseThrow(() -> new UserNotFoundException(requesterUserId));
@@ -249,9 +293,16 @@ public class UserService {
         User savedNewOwner = userRepository.save(newOwner);
         userProcessor.postProcessUserUpdated(savedNewOwner);
 
+        List<String> requesterRoles = roleNames(requester.getRoles());
         requester.setRoles(new ArrayList<>(List.of(ADMIN)));
         User savedRequester = userRepository.save(requester);
         userProcessor.postProcessUserUpdated(savedRequester);
+        auditRecorder.record(AuditEntry.builder()
+                .action(USER_OWNERSHIP_TRANSFER)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(savedRequester.getId())
+                .changes(Map.of("roles", new AuditChange(requesterRoles, roleNames(savedRequester.getRoles()))))
+                .build());
 
         // Notification failure must not fail the already-completed transfer
         try {
@@ -277,6 +328,10 @@ public class UserService {
             authUser.setExternalUserId(null);
             authUser.setImageUrl(null);
         }
+    }
+
+    private static List<String> roleNames(List<UserRole> roles) {
+        return roles.stream().map(UserRole::name).toList();
     }
 }
 

@@ -1,5 +1,6 @@
 package com.openframe.api.service;
 
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
@@ -14,7 +15,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.util.List;
+import java.util.Optional;
 
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,13 +37,14 @@ class AssignmentServiceReplaceTest {
             mock(OrganizationRepository.class),
             mock(MachineRepository.class),
             mock(TicketRepository.class),
-            mock(KnowledgeBaseItemRepository.class));
+            mock(KnowledgeBaseItemRepository.class), mock(AuditedMethodRunner.class, CALLS_REAL_METHODS));
 
     @Test
     @DisplayName("replacing assigns the missing targets, unassigns the rest and does not re-assign the kept ones")
     void replaceAppliesOnlyTheDifference() {
         when(repository.findByItemIdAndTargetType("a1", ORGANIZATION))
                 .thenReturn(List.of(assigned("o1"), assigned("o2")));
+        when(repository.findByItemIdAndTargetTypeAndTargetId("a1", ORGANIZATION, "o1")).thenReturn(Optional.of(assigned("o1")));
 
         service.replaceAssignments("a1", AssignmentItemType.KNOWLEDGE_ARTICLE, ORGANIZATION, List.of("o2", "o3"));
 
@@ -58,6 +62,7 @@ class AssignmentServiceReplaceTest {
     @DisplayName("an empty list unassigns every target of that type")
     void emptyListClears() {
         when(repository.findByItemIdAndTargetType("a1", ORGANIZATION)).thenReturn(List.of(assigned("o1")));
+        when(repository.findByItemIdAndTargetTypeAndTargetId("a1", ORGANIZATION, "o1")).thenReturn(Optional.of(assigned("o1")));
 
         service.replaceAssignments("a1", AssignmentItemType.KNOWLEDGE_ARTICLE, ORGANIZATION, List.of());
 
@@ -82,6 +87,7 @@ class AssignmentServiceReplaceTest {
                 .itemType(AssignmentItemType.KNOWLEDGE_ARTICLE)
                 .targetType(ORGANIZATION)
                 .targetId(targetId)
+                .displayName("Customer " + targetId)
                 .build();
     }
 }

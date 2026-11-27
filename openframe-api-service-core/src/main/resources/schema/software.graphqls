@@ -10,8 +10,10 @@ extend type Query {
 
     """Paginated list of software titles installed across the tenant's fleet.
     One row = one software title (aggregated across devices).
-    Sortable fields: name, devicesCount, cveCount, highestSeverity, adoptionCount (default: Fleet order by name).
-    An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error."""
+    Sortable fields: name, devicesCount, cveCount, highestSeverity (default: Fleet order by name).
+    An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     softwares(
         filter: SoftwareFilterInput,
         first: Int,
@@ -25,7 +27,9 @@ extend type Query {
     """Devices that have a given software title installed, with each device's own
     installed version and per-device software status (OUTDATED / SCHEDULED_UPDATE / …),
     who installed it, its adoption and auto-update. Powers the Software → Devices tab.
-    Sortable fields: softwareVersion."""
+    Sortable fields: softwareVersion.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     softwareDevices(
         softwareId: ID!,
         filter: SoftwareOnDeviceFilterInput,
@@ -39,7 +43,9 @@ extend type Query {
 
     """CVEs affecting a given software title. Powers the Software → Vulnerabilities tab.
     Sortable fields: cveId, severity, cvssScore, discoveredAt, affectedVersion (version order, missing versions last).
-    An unknown sort field is rejected as a client error (BAD_REQUEST)."""
+    An unknown sort field is rejected as a client error (BAD_REQUEST).
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     softwareVulnerabilities(
         softwareId: ID!,
         filter: SoftwareVulnerabilityFilterInput,
@@ -68,7 +74,9 @@ extend type Query {
     vulnerability(cveId: String!): Vulnerability
 
     """Global list of CVEs across every software title in the tenant's fleet.
-    Powers the Vulnerabilities page. One row = one CVE (not one CVE × software)."""
+    Powers the Vulnerabilities page. One row = one CVE (not one CVE × software).
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     vulnerabilities(
         filter: VulnerabilityFilterInput,
         first: Int,
@@ -88,7 +96,10 @@ extend type Query {
     to their OpenFrame Machine. Powers the vulnerability-detail "Devices" table. Each node is a Machine
     (same shape as the top-level `devices` query). With the software read model on, `filter`, `search` and
     `sort` work as on `devices` (deleted devices hidden unless `filter.statuses` asks for them; sortable fields
-    as on `devices`, default hostname ASC). With it off, Fleet lists the devices: `filter` and `sort` are ignored."""
+    as on `devices`, default hostname ASC). With it off, Fleet lists the devices: `filter` and `sort` are ignored.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    With the software read model off, last requires before. Only pageInfo.startCursor / endCursor are valid
+    paging cursors."""
     vulnerabilityDevices(
         cveId: String!,
         filter: DeviceFilterInput,
@@ -108,7 +119,9 @@ extend type Query {
     """Software installed on one device. One row = one installed title, the same node as `softwares`.
     Version fields are read in this device's scope: `currentVersion` is the version installed here.
     Sortable fields: name, cveCount, highestSeverity (default: name).
-    Unknown machineId → NOT_FOUND; a known device with nothing installed → empty connection."""
+    Unknown machineId → NOT_FOUND; a known device with nothing installed → empty connection.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     deviceSoftware(
         machineId: String!,
         filter: SoftwareFilterInput,
@@ -128,7 +141,9 @@ extend type Query {
     `affectedSoftware` is scoped to this host and populated on every row; `devicesCount` is null here
     (the fleet-wide count would cost one Fleet call per row).
     Sortable fields: severity (by cvssScore, unrated last), discoveredAt (default: severity DESC, cveId ASC).
-    Unknown machineId → NOT_FOUND; a known device with no CVEs → empty connection."""
+    Unknown machineId → NOT_FOUND; a known device with no CVEs → empty connection.
+    first/after page forward, last/before page backward; when both after and before are sent, before wins.
+    last requires before on this list. Only pageInfo.startCursor / endCursor are valid paging cursors."""
     deviceVulnerabilities(
         machineId: String!,
         filter: VulnerabilityFilterInput,
@@ -187,8 +202,7 @@ type Software {
 
     """Devices that have this title installed manually (installedBy UNMANAGED) and can be adopted — the
     ADOPTION column and the "N devices have … installed manually" banner with Adopt. Null or 0 = "–", no banner;
-    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with).
-    Sortable as adoptionCount."""
+    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with)."""
     adoptionCount: Int
 
     """The package Adopt reinstalls this title with, shown to the admin for confirmation: the best match of a
@@ -484,11 +498,13 @@ input VulnerabilityFilterInput {
 #
 # PackageManagerType and BrewPackageType are declared in package-search.graphqls and reused here.
 
-"""Install vs update — the two software management actions. Also scopes a package's Execution
-History (softwareExecutions)."""
+"""The software management actions. Also scopes a package's Execution History (softwareExecutions)."""
 enum SoftwareAction {
     INSTALL
     UPDATE
+    """A hand-installed copy reinstalled with a package manager (adoptSoftware). Not a bundle or schedule action:
+    BAD_REQUEST there."""
+    ADOPT
 }
 
 extend type Mutation {
@@ -500,11 +516,16 @@ extend type Mutation {
     dispatched as its own RMM execution; returns one result (with its executionId) per package."""
     updateSoftware(input: SoftwareManagementInput!): [SoftwareDispatchResult!]!
 
-    """Adopt a software title on devices that have it installed manually: reinstall it with a package manager,
-    so it can be updated. Runs now; an offline device starts when it comes online. The device picker lists
-    softwareDevices(softwareId, filter: {installedBy: [UNMANAGED]}). Returns one result per package manager used
-    (each its own execution, shown as an ADOPT row in Software Actions)."""
-    adoptSoftware(input: AdoptSoftwareInput!): [SoftwareDispatchResult!]!
+    """Adopt a software title on devices that have it installed by hand: the device reinstalls it with the title's
+    adoption package (Software.adoptionPackage), so it can be updated later. Sends the order to the devices now.
+    SoftwareOnDevice.adoption shows the device's latest adoption of the title: ADOPTING until the device reports the
+    reinstall done, then null; FAILED with the error when the reinstall or its delivery failed. Each call is one ADOPT
+    row in Software Actions with one Execution History row per device.
+    Returns the devices (Machine global ids) the order was sent to. Left out: devices of another OS, devices without
+    the package manager reported PRESENT, devices whose copy is only in ~/Applications, and devices the order cannot
+    reach (the order is switched off or the agent is too old for it). NOT_FOUND for an unknown title. BAD_REQUEST
+    when the title has no adoption package, when no device is left, and when a device is not managed."""
+    adoptSoftware(input: AdoptSoftwareInput!): [ID!]!
 
     """Save the Auto-update form: on with these settings for the bundle's devices, off for the title's other
     devices. Runs no update; the bundle becomes COMPLETED."""
@@ -520,25 +541,11 @@ extend type Mutation {
 # ────────── Adopt ──────────
 
 input AdoptSoftwareInput {
-    "The software title (Software.id) to adopt."
+    """The software title (Software.id). It is adopted into its Software.adoptionPackage: a Homebrew cask on
+    macOS, a Chocolatey package on Windows."""
     softwareId: ID!
-    """Selected devices (Machine global ids), 1..100. Devices that do not have the title installed manually are
-    skipped. Null = every device matching filter + search ("Add All Devices")."""
-    machineIds: [ID!]
-    """With machineIds null: the devices to adopt, as the picker's softwareDevices(softwareId, filter, search) lists
-    them. Always narrowed to installedBy UNMANAGED. Ignored when machineIds is set."""
-    filter: SoftwareOnDeviceFilterInput
-    search: String
-    "Package Manager for Windows. macOS devices always adopt with Brew."
-    windowsPackageManager: SoftwareAdoptionWindowsManager! = MATCH_CUSTOMER
-}
-
-"""Which package manager adopts the title on Windows devices."""
-enum SoftwareAdoptionWindowsManager {
-    "The manager each customer already uses for this app; Winget if none."
-    MATCH_CUSTOMER
-    WINGET
-    CHOCOLATEY
+    "The devices (Machine global ids), 1..100."
+    machineIds: [ID!]!
 }
 
 """A set of catalog packages to install/update on a set of devices."""

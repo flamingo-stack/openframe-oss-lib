@@ -1,10 +1,15 @@
 package com.openframe.api.service;
 
+import com.openframe.data.nats.delivery.route.DeviceCommandSender;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceToolAgentUpdateResponseItem;
 import com.openframe.api.dto.update.ForceToolAgentUpdateRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateResponse;
+import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.nats.delivery.ToolUpdateDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
@@ -16,17 +21,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,16 +49,21 @@ class ForceToolAgentUpdateServiceTest {
     @Mock private MachineRepository machineRepository;
     @Mock private DeliveryRouter deliveryRouter;
     @Captor private ArgumentCaptor<ToolUpdateDeliverySeed> seedCaptor;
-    @InjectMocks private ForceToolAgentUpdateService service;
+    private ForceToolAgentUpdateService service;
 
     private IntegratedToolAgent toolAgent;
     private ForceToolAgentUpdateRequest request;
 
     @BeforeEach
     void setUp() {
+        service = new ForceToolAgentUpdateService(toolAgentRepository, machineRepository,
+                new DeviceCommandSender(deliveryRouter, mock(AuditedMethodRunner.class, CALLS_REAL_METHODS), mock(AuditRecorder.class)));
         toolAgent = new IntegratedToolAgent();
         toolAgent.setKey(TOOL_AGENT_KEY);
         toolAgent.setVersion("1.2.3");
+        toolAgent.setDownloadConfigurations(List.of(
+                DownloadConfiguration.builder().os("windows").build(),
+                DownloadConfiguration.builder().os("macos").minOsVersion("13.0").build()));
         request = new ForceToolAgentUpdateRequest();
         request.setToolAgentId(TOOL_AGENT_KEY);
         request.setMachineIds(List.of(MACHINE_ID, OTHER_MACHINE_ID));
@@ -129,9 +141,67 @@ class ForceToolAgentUpdateServiceTest {
         assertThatThrownBy(() -> service.process(request)).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void process_macBelowMinimum_notSupportedAndOnlyOtherMachineDispatched() {
+        // setup
+        when(toolAgentRepository.findByKey(TOOL_AGENT_KEY)).thenReturn(Optional.of(toolAgent));
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(mac(MACHINE_ID, "11.7.10")));
+        when(machineRepository.findByMachineId(OTHER_MACHINE_ID)).thenReturn(Optional.of(mac(OTHER_MACHINE_ID, "14.2")));
+        when(deliveryRouter.dispatch(any())).thenReturn(true);
+
+        // execution
+        ForceToolAgentUpdateResponse response = service.process(request);
+
+        // verifications
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(OTHER_MACHINE_ID);
+        assertThat(response.getItems()).extracting(ForceToolAgentUpdateResponseItem::getStatus)
+                .containsExactly(ForceAgentStatus.NOT_SUPPORTED, ForceAgentStatus.PROCESSED);
+    }
+
+    @Test
+    void process_everyMacBelowMinimum_nothingDispatched() {
+        // setup
+        when(toolAgentRepository.findByKey(TOOL_AGENT_KEY)).thenReturn(Optional.of(toolAgent));
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(mac(MACHINE_ID, "12.7")));
+        when(machineRepository.findByMachineId(OTHER_MACHINE_ID)).thenReturn(Optional.of(mac(OTHER_MACHINE_ID, "11.7.10")));
+
+        // execution
+        ForceToolAgentUpdateResponse response = service.process(request);
+
+        // verifications
+        verify(deliveryRouter, never()).dispatch(any());
+        assertThat(response.getItems()).extracting(ForceToolAgentUpdateResponseItem::getStatus)
+                .containsOnly(ForceAgentStatus.NOT_SUPPORTED);
+    }
+
+    @Test
+    void process_macWithUnknownVersion_dispatched() {
+        // setup
+        when(toolAgentRepository.findByKey(TOOL_AGENT_KEY)).thenReturn(Optional.of(toolAgent));
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(mac(MACHINE_ID, null)));
+        when(machineRepository.findByMachineId(OTHER_MACHINE_ID)).thenReturn(Optional.empty());
+        when(deliveryRouter.dispatch(any())).thenReturn(true);
+
+        // execution
+        ForceToolAgentUpdateResponse response = service.process(request);
+
+        // verifications
+        verify(deliveryRouter, times(2)).dispatch(any());
+        assertThat(response.getItems()).extracting(ForceToolAgentUpdateResponseItem::getStatus)
+                .containsOnly(ForceAgentStatus.PROCESSED);
+    }
+
     private static Machine machine(String machineId) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
+        return machine;
+    }
+
+    private static Machine mac(String machineId, String osVersion) {
+        Machine machine = machine(machineId);
+        machine.setOsType(OsType.MAC_OS);
+        machine.setOsVersion(osVersion);
         return machine;
     }
 }

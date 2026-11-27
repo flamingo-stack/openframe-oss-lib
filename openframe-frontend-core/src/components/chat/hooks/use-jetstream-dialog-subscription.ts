@@ -70,6 +70,8 @@ export function useJetStreamDialogSubscription({
   onConnect,
   onDisconnect,
   onSubscribed,
+  onReplayComplete,
+  onCatchUpStart,
   onBeforeReconnect,
   getNatsWsUrl,
   clientConfig = {},
@@ -140,6 +142,16 @@ export function useJetStreamDialogSubscription({
   useEffect(() => {
     onSubscribedRef.current = onSubscribed;
   }, [onSubscribed]);
+
+  const onReplayCompleteRef = useRef(onReplayComplete);
+  useEffect(() => {
+    onReplayCompleteRef.current = onReplayComplete;
+  }, [onReplayComplete]);
+
+  const onCatchUpStartRef = useRef(onCatchUpStart);
+  useEffect(() => {
+    onCatchUpStartRef.current = onCatchUpStart;
+  }, [onCatchUpStart]);
 
   const onBeforeReconnectRef = useRef(onBeforeReconnect);
   useEffect(() => {
@@ -396,6 +408,9 @@ export function useJetStreamDialogSubscription({
     if (!owesCatchUp) tailOpenedAtRef.current = { dialogId, count: reconnectionCount };
 
     let cancelled = false;
+    // A consumer that resumes after a gap first delivers what the stream held meanwhile: its caller hears so before the
+    // first of those messages.
+    if (owesCatchUp) onCatchUpStartRef.current?.();
     // Settles an owed catch-up once the replay is in, or once there can be none
     // (a failed resume, below) — never as the tail comes back: a refetch that
     // lands first merges without the turns the replay is still delivering, and
@@ -429,6 +444,11 @@ export function useJetStreamDialogSubscription({
               if (typeof streamSeq === 'number') {
                 (parsed as { streamSeq?: number }).streamSeq = streamSeq;
               }
+              // The server's publish time: a replay of a stored row was published as the row was written.
+              const publishedNanos = msg.info.timestampNanos;
+              if (typeof publishedNanos === 'number' && publishedNanos > 0) {
+                (parsed as { streamPublishedAt?: number }).streamPublishedAt = Math.floor(publishedNanos / 1e6);
+              }
               cb(parsed, topic);
             } catch {
               // Ignore malformed payloads.
@@ -445,6 +465,8 @@ export function useJetStreamDialogSubscription({
             signal: abortController.signal,
             onRecovered: () => {
               if (cancelled) return;
+              // nats.ws rebuilt the consumer: it redelivers from the last message seen, whatever the throttle below says.
+              onCatchUpStartRef.current?.();
               const now = Date.now();
               if (now - lastRecoveryReportRef.current < RECOVERY_REPORT_FLOOR_MS) return;
               lastRecoveryReportRef.current = now;
@@ -452,6 +474,9 @@ export function useJetStreamDialogSubscription({
               setRecoveryCount(c => c + 1);
             },
             onCaughtUp: settleCatchUp,
+            onReplayComplete: () => {
+              if (!cancelled) onReplayCompleteRef.current?.();
+            },
           },
         );
       } catch {

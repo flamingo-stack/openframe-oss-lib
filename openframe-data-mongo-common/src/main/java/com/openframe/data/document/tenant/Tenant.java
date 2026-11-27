@@ -23,6 +23,7 @@ import static java.util.UUID.randomUUID;
 @Document(collection = "tenants")
 public class Tenant {
 
+
     @Id
     private String id;
 
@@ -39,6 +40,7 @@ public class Tenant {
      */
     @Indexed(unique = true)
     private String domain;
+
 
     /**
      * Tenant website URL (e.g. https://company.com). Free-form, editable via tenant-info CRUD.

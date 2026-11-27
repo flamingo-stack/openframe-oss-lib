@@ -1,9 +1,12 @@
 package com.openframe.client.controller;
 
 import com.openframe.client.dto.AgentTokenResponse;
+import com.openframe.client.exception.MachineDeletedException;
+import com.openframe.client.exception.TenantBlockedException;
 import com.openframe.client.service.AgentAuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +32,16 @@ public class AgentAuthController {
         try {
             AgentTokenResponse response = agentAuthService.issueClientToken(grantType, refreshToken, clientId, clientSecret);
             return ResponseEntity.ok(response);
+        } catch (MachineDeletedException e) {
+            return ResponseEntity.status(HttpStatus.GONE)
+                    .body(Map.of(
+                            "message", e.getMessage()
+                    ));
+        } catch (TenantBlockedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                            "message", e.getMessage()
+                    ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(401)
                     .body(Map.of(

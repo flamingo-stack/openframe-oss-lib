@@ -7,6 +7,8 @@ import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.rmm.command.CommandExecution;
+import com.openframe.data.document.rmm.osupdate.OsUpdate;
+import com.openframe.data.document.rmm.osupdate.OsUpdatePolicy;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.script.Script;
@@ -21,6 +23,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.User;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -35,6 +38,8 @@ import static com.openframe.data.document.audit.AuditTargetType.KB_ARTICLE;
 import static com.openframe.data.document.audit.AuditTargetType.KB_FOLDER;
 import static com.openframe.data.document.audit.AuditTargetType.OAUTH_CLIENT;
 import static com.openframe.data.document.audit.AuditTargetType.ORGANIZATION;
+import static com.openframe.data.document.audit.AuditTargetType.OS_UPDATE;
+import static com.openframe.data.document.audit.AuditTargetType.OS_UPDATE_POLICY;
 import static com.openframe.data.document.audit.AuditTargetType.SCRIPT;
 import static com.openframe.data.document.audit.AuditTargetType.SCRIPT_SCHEDULE;
 import static com.openframe.data.document.audit.AuditTargetType.SOFTWARE_SCHEDULE;
@@ -52,7 +57,7 @@ public class OssAuditTargets implements AuditTargetProvider {
     @Override
     public List<AuditTarget<?>> targets() {
         return List.of(
-                AuditTarget.of(TICKET, Ticket.class, Ticket::getTitle)
+                AuditTarget.of(TICKET, Ticket.class, OssAuditTargets::ticketName)
                         .withOrganizationId(Ticket::getOrganizationId)
                         .withDeviceId(Ticket::getDeviceId)
                         .withIgnoredFields(Set.of("lastActivityAt", "awaitingClientSince", "hasPendingApproval")),
@@ -63,7 +68,8 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withIgnoredFields(Set.of("lastSeen", "telemetryStatus", "packageManagers", "securityState",
                                 "complianceState", "securityAlerts", "lastSecurityScan", "lastComplianceScan",
                                 "stuckNotifiedAt", "hostFactsCheckedAt", "computerName", "directorySources",
-                                "directoryUserLink", "directoryUserIds", "directoryUserName")),
+                                "directoryUserLink", "directoryUserIds", "directoryUserName",
+                                "organizationAssignedAt", "agentVersionKey")),
                 AuditTarget.of(USER, User.class, User::nameOrEmail)
                         .withIgnoredFields(Set.of("crmSynced", "lastLogin"))
                         .withMaskedFields(Set.of("passwordHash")),
@@ -74,6 +80,9 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withTenantId(Tenant::getId),
                 AuditTarget.of(SCRIPT, Script.class, Script::getName)
                         .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs", "contentHash")),
+                AuditTarget.of(OS_UPDATE, OsUpdate.class, OsUpdate::getDisplayName),
+                AuditTarget.of(OS_UPDATE_POLICY, OsUpdatePolicy.class, OsUpdatePolicy::getName)
+                        .withIgnoredFields(Set.of("updatedAt")),
                 AuditTarget.of(SCRIPT_SCHEDULE, ScheduleScript.class, ScheduleScript::getName)
                         .withIgnoredFields(Set.of("nextRunAt", "lastRunAt"))
                         .withMaskedFields(Set.of("scriptCustomParams.args", "scriptCustomParams.value")),
@@ -85,7 +94,7 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withMaskedFields(Set.of("stdout", "stderr", "error")),
                 AuditTarget.of(EXECUTION, CommandExecution.class, CommandExecution::getExecutionId)
                         .withDeviceId(CommandExecution::getMachineId)
-                        .withMaskedFields(Set.of("command", "stdout", "stderr", "error")),
+                        .withMaskedFields(Set.of("stdout", "stderr", "error")),
                 AuditTarget.of(TAG, Tag.class, Tag::getKey),
                 AuditTarget.of(KB_ARTICLE, KnowledgeBaseItem.class, KnowledgeBaseItem::getName)
                         .withMaskedFields(Set.of("content")),
@@ -93,7 +102,7 @@ public class OssAuditTargets implements AuditTargetProvider {
                         .withMaskedFields(Set.of("content")),
                 AuditTarget.of(IMAGE, KnowledgeBaseImage.class, KnowledgeBaseImage::getFileName),
                 AuditTarget.of(TICKET_STATUS, TicketStatusDefinition.class, TicketStatusDefinition::getName),
-                AuditTarget.of(TIME_ENTRY, TimeEntry.class, TimeEntry::getTicketTitle)
+                AuditTarget.of(TIME_ENTRY, TimeEntry.class, OssAuditTargets::timeEntryName)
                         .withOrganizationId(TimeEntry::getOrganizationId),
                 AuditTarget.of(API_KEY, ApiKey.class, ApiKey::getName)
                         .withMaskedFields(Set.of("hashedKey")),
@@ -107,5 +116,16 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(SSO_CONFIG, SSOConfig.class, SSOConfig::getProvider)
                         .withIdField("provider")
                         .withMaskedFields(Set.of("clientSecret")));
+    }
+
+    public static String ticketName(Ticket ticket) {
+        return StringUtils.hasText(ticket.getTitle()) ? ticket.getTitle() : String.valueOf(ticket.getTicketNumber());
+    }
+
+    private static String timeEntryName(TimeEntry entry) {
+        if (StringUtils.hasText(entry.getTicketTitle())) {
+            return entry.getTicketTitle();
+        }
+        return entry.getTicketNumber() == null ? null : String.valueOf(entry.getTicketNumber());
     }
 }
