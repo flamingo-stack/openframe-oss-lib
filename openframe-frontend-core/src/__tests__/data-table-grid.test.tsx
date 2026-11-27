@@ -375,9 +375,70 @@ describe('DataTable grid layout', () => {
     expect(container.innerHTML).not.toContain('data-grid-blank-row');
   });
 
-  it('keeps the minRows height on an empty body', () => {
-    const { container } = render(<Grid items={[]} minRows={5} />);
-    expect(openingTag(container, 'sticky left-0 w-0')).toContain('min-height: 240px');
+  // CU-17tkuw6af0q: `minRows` reserves a short page's height without drawing it. The grid drew the missing rows as
+  // empty 48px rows with dividers, so a short page showed a block of blank rows under its real ones.
+  it('reserves a short page’s missing rows as room under the block, drawing no row for them', () => {
+    const { container } = render(<Grid minRows={5} />);
+    expect(rowSlots(container)).toBe(3);
+    // No blank row of cells: the only blank row the body may hold is the empty state's zero-high one.
+    expect(container.innerHTML).not.toContain('data-grid-blank-row');
+    // The block closes at the last real row; the two missing rows (2 × 48px) are room under it, on the bordered
+    // element itself, so it stays the header's peer (a wrapper would bring back its top edge and corners).
+    const body = openingTag(container, 'data-grid-body');
+    expect(body).toContain('margin-bottom: 96px');
+    expect(body).toContain('peer-data-[grid-header]/gridheader:border-t-0');
+  });
+
+  it('adds no room under a full page', () => {
+    const { container } = render(<Grid minRows={3} />);
+    expect(openingTag(container, 'data-grid-body')).not.toContain('margin-bottom');
+  });
+
+  it('pads nothing in fixed-height mode: the table’s height is the host’s', () => {
+    const { container } = render(<Grid minRows={5} maxHeight={360} />);
+    expect(rowSlots(container)).toBe(3);
+    expect(container.innerHTML).not.toContain('data-grid-blank-row');
+    expect(container.innerHTML).not.toContain('margin-bottom');
+  });
+
+  describe('an empty body with minRows', () => {
+    const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    afterEach(() => {
+      if (offsetHeight) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight);
+    });
+
+    /** jsdom lays nothing out: the empty state's box measures `height`, everything else 0. */
+    function measureEmptyBox(height: number) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+        configurable: true,
+        get(this: HTMLElement) {
+          return this.hasAttribute('data-grid-empty') ? height : 0;
+        },
+      });
+    }
+
+    it('draws the message at its own height and keeps the rest of the page as room under the block', () => {
+      measureEmptyBox(100);
+      const { container } = render(<Grid items={[]} minRows={5} />);
+      expect(screen.getByText('No results found')).toBeTruthy();
+      // No box the page's height around the message: it sits at the top of a block of its own height.
+      expect(container.innerHTML).not.toContain('min-height');
+      // 5 × 48px = 240px reserved in all: 100px of block, 140px of room under it.
+      expect(openingTag(container, 'data-grid-body')).toContain('margin-bottom: 140px');
+    });
+
+    it('adds no room when the message is taller than the page', () => {
+      measureEmptyBox(300);
+      const { container } = render(<Grid items={[]} minRows={5} />);
+      expect(openingTag(container, 'data-grid-body')).not.toContain('margin-bottom');
+    });
+
+    it('reserves nothing in fixed-height mode', () => {
+      measureEmptyBox(100);
+      const { container } = render(<Grid items={[]} minRows={5} maxHeight={360} />);
+      expect(container.innerHTML).not.toContain('min-height');
+      expect(container.innerHTML).not.toContain('margin-bottom');
+    });
   });
 
   it('draws loading rows as grid rows: one bar per data cell, none in the utility cells', () => {
