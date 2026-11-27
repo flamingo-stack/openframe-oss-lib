@@ -1,7 +1,7 @@
 'use client';
 
 import { useLoadingScope } from '../loading-scope';
-import { TablePagination, type TablePaginationProps } from '../table-pagination';
+import { isFirstPagerPage, TablePagination, type TablePaginationProps } from '../table-pagination';
 import { useDataTableContext } from './data-table';
 
 export type DataTablePaginationProps = TablePaginationProps;
@@ -23,7 +23,7 @@ export function DataTablePagination(props: DataTablePaginationProps) {
   const loadingScope = useLoadingScope();
   const rowsCount = table.getRowModel().rows.length;
 
-  if (rowsCount === 0 && !(props.loading || loadingScope) && (props.pager.isFirstPage ?? true)) return null;
+  if (rowsCount === 0 && !(props.loading || loadingScope) && isFirstPagerPage(props.pager)) return null;
 
   return <TablePagination {...props} />;
 }

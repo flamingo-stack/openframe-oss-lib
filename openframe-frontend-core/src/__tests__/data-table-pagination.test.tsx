@@ -166,6 +166,12 @@ describe('DataTable.Pagination', () => {
     expect(screen.getByRole('button', { name: 'Go to first page' })).toBeTruthy();
   });
 
+  it('keeps the pager on an empty page 3 whose host leaves isFirstPage out', () => {
+    const { isFirstPage: _omitted, ...page3 } = PAGE_3;
+    render(<PagedTable items={[]} pager={page3} />);
+    expect(screen.getByRole('navigation', { name: 'Pagination' })).toBeTruthy();
+  });
+
   it('keeps the pending pager of a first page still being read', () => {
     render(<PagedTable items={[]} pager={TABLE_PAGINATION_PENDING} pagerLoading />);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Go to next page' }).disabled).toBe(true);

@@ -19,7 +19,10 @@ export interface TablePagerState {
   hasNextPage: boolean;
   /** Previous can go somewhere (browser history, page 2's way to the first page, or the server). */
   hasPreviousPage?: boolean;
-  /** The table shows its first page: Previous is disabled and First is not drawn. */
+  /**
+   * The table shows its first page: Previous is disabled, First is not drawn, and an empty table draws no pager. Left
+   * out, it follows `page`: page 1, or no index at all, is the first page ({@link isFirstPagerPage}).
+   */
   isFirstPage?: boolean;
   /**
    * 1-based index of the page, when known. First is drawn from page 3 on (on page 2 Previous already goes to page 1),
@@ -69,6 +72,11 @@ export const TABLE_PAGINATION_PENDING: TablePagerState = {
   onPrevious: noop,
 };
 
+/** Whether the pager is on its first page: `isFirstPage` when the host says, else page 1 or no index at all. */
+export function isFirstPagerPage({ isFirstPage, page }: Pick<TablePagerState, 'isFirstPage' | 'page'>): boolean {
+  return isFirstPage ?? (page === undefined || page <= 1);
+}
+
 /** A disabled arrow sits on the page's deepest ground, not the card colour of the live ones. */
 const ARROW_CLASS = 'disabled:bg-ods-bg-base aria-disabled:bg-ods-bg-base';
 
@@ -84,8 +92,9 @@ const ARROW_CLASS = 'disabled:bg-ods-bg-base aria-disabled:bg-ods-bg-base';
  * Below the content's md width the row spans the width: rows-per-page on the left, the arrows on the right.
  */
 export function TablePagination({ pager, loading: loadingProp = false, rowsPerPage, className }: TablePaginationProps) {
-  const { hasNextPage, hasPreviousPage = false, isFirstPage = true, page, startCursor, endCursor } = pager;
+  const { hasNextPage, hasPreviousPage = false, page, startCursor, endCursor } = pager;
   const { onNext, onPrevious, onFirst } = pager;
+  const isFirstPage = isFirstPagerPage(pager);
   const loading = useLoadingScope() || loadingProp;
   const firstShown = !!onFirst && !isFirstPage && page !== 2;
   const pageSizeOptions = rowsPerPage?.options ?? DEFAULT_PAGE_SIZE_OPTIONS;
@@ -138,7 +147,7 @@ export function TablePagination({ pager, loading: loadingProp = false, rowsPerPa
           variant="outline"
           size="icon-sm"
           onClick={handleNext}
-          disabled={!hasNextPage || loading}
+          disabled={!hasNextPage || !onNext || loading}
           className={ARROW_CLASS}
           leftIcon={<Chevron02RightIcon />}
           aria-label="Go to next page"

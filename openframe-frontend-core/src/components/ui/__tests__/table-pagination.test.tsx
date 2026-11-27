@@ -57,6 +57,22 @@ describe('TablePagination', () => {
     expect(previous()?.disabled).toBe(true);
   });
 
+  it('takes the first page from the index when the host leaves isFirstPage out', () => {
+    const { rerender } = render(<TablePagination pager={pagerAt({ hasPreviousPage: true, page: 3 })} />);
+    expect(first()?.disabled).toBe(false);
+
+    rerender(<TablePagination pager={pagerAt({ hasPreviousPage: false, page: 1 })} />);
+    expect(first()).toBeNull();
+    // No index at all: the first page.
+    rerender(<TablePagination pager={pagerAt({ hasPreviousPage: false })} />);
+    expect(first()).toBeNull();
+  });
+
+  it('draws Next waiting when the host gives it nowhere to go', () => {
+    render(<TablePagination pager={{ hasNextPage: true, isFirstPage: true, page: 1, endCursor: 'e1' }} />);
+    expect(next()?.disabled).toBe(true);
+  });
+
   it('pages back through history with no start cursor', () => {
     const pager = pagerAt({ hasNextPage: false, hasPreviousPage: true, isFirstPage: false, page: 4 });
     render(<TablePagination pager={pager} />);
