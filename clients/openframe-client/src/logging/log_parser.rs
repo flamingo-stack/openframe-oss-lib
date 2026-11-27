@@ -1,9 +1,6 @@
-use anyhow::{Context, Result};
+use chrono::{Local, NaiveDateTime, SecondsFormat, Utc};
 use indexmap::IndexMap;
 use serde::Serialize;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LogEntry {
@@ -24,44 +21,6 @@ pub struct LogBatchMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub organization_id: Option<String>,
     pub logs: Vec<LogEntry>,
-}
-
-pub fn read_new_logs(
-    log_file_path: &PathBuf,
-    position: u64,
-    max_count: usize,
-) -> Result<(Vec<LogEntry>, u64)> {
-    let mut file = File::open(log_file_path).context("Failed to open log file")?;
-
-    // Check if file was truncated (rotated)
-    let metadata = file.metadata()?;
-    let start_position = if metadata.len() < position {
-        0
-    } else {
-        position
-    };
-
-    file.seek(SeekFrom::Start(start_position))?;
-
-    let reader = BufReader::new(&file);
-    let mut logs = Vec::new();
-
-    for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => continue,
-        };
-
-        if let Some(entry) = parse_log_line(&line) {
-            logs.push(entry);
-            if logs.len() >= max_count {
-                break;
-            }
-        }
-    }
-    let new_position = file.stream_position()?;
-
-    Ok((logs, new_position))
 }
 
 pub fn parse_log_line(line: &str) -> Option<LogEntry> {
@@ -98,6 +57,25 @@ fn is_client_log(entry: &LogEntry) -> bool {
         return false;
     }
     entry.msg.starts_with("openframe") || entry.msg.starts_with("async_nats")
+}
+
+/// Parse openframe-chat (tauri-plugin-log) format: `[date][time][LEVEL][target] msg`, in local time.
+/// The only parser for chat files: a user can write them, so their lines never pass as client or tool lines.
+pub fn parse_chat_format(line: &str) -> Option<LogEntry> {
+    let (local, rest) = NaiveDateTime::parse_and_remainder(line, "[%Y-%m-%d][%H:%M:%S][").ok()?;
+    let (level, rest) = rest.split_once("][")?;
+    let (target, msg) = rest.split_once("] ")?;
+    let ts = local
+        .and_local_timezone(Local)
+        .earliest()?
+        .with_timezone(&Utc);
+
+    Some(LogEntry {
+        ts: ts.to_rfc3339_opts(SecondsFormat::Micros, true),
+        level: level.to_uppercase(),
+        msg: format!("[chat] {target}: {msg}"),
+        count: None,
+    })
 }
 
 /// Parse OpenFrame tracing compact format

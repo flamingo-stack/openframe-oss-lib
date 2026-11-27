@@ -1,4 +1,6 @@
 use anyhow::{Context, Result};
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -41,6 +43,27 @@ pub fn get_console_user() -> Option<ConsoleUser> {
 /// The console owner is root at the login window and a `_` system account during Setup Assistant.
 pub(crate) fn is_login_user(user: &str) -> bool {
     !user.is_empty() && user != "root" && !user.starts_with('_')
+}
+
+/// Home folders of the login accounts under `/Users`.
+pub(crate) fn user_homes() -> Vec<PathBuf> {
+    homes_under(Path::new("/Users"))
+}
+
+fn homes_under(root: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(root) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter(|entry| {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            name != "Shared" && !name.starts_with('.') && is_login_user(&name)
+        })
+        .filter(|entry| entry.file_type().is_ok_and(|t| t.is_dir()))
+        .map(|entry| entry.path())
+        .collect()
 }
 
 /// The console user; a Mac has one GUI session, so the process's session tells nothing more.

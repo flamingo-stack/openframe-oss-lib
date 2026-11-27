@@ -14,4 +14,10 @@ public interface CustomDeviceOsPendingUpdateRepository {
                                                String cursor, int limit);
 
     String encodeDeviceCursor(DeviceOsPendingUpdate pendingUpdate);
+
+    // The devices each update is pending on, per customer. identifiers null = every update; machineIds null =
+    // every device.
+    List<OsUpdateOrganizationDeviceCount> countDevicesByIdentifierAndOrganization(
+            String tenantId, OsPlatform platform, Collection<String> identifiers,
+            Collection<String> excludedMachineIds, Collection<String> machineIds);
 }

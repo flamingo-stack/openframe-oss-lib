@@ -64,11 +64,15 @@ function Grid({
   layout = 'grid',
   loading = false,
   maxHeight,
+  minRows,
+  header = true,
 }: {
   items?: Item[];
   layout?: 'grid' | 'cards';
   loading?: boolean;
   maxHeight?: number | 'fill';
+  minRows?: number;
+  header?: boolean;
 }) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sort, setSort] = useState<DataTableSortState | null>(null);
@@ -85,12 +89,19 @@ function Grid({
       <DataTable.Meta>
         <DataTable.RowCount />
       </DataTable.Meta>
-      <DataTable.Header
-        sort={sort}
-        onSortChange={id => setSort({ id, desc: sort?.id === id ? !sort.desc : false })}
+      {header && (
+        <DataTable.Header
+          sort={sort}
+          onSortChange={id => setSort({ id, desc: sort?.id === id ? !sort.desc : false })}
+          loading={loading}
+        />
+      )}
+      <DataTable.Body<Item>
         loading={loading}
+        skeletonRows={2}
+        minRows={minRows}
+        rowHref={item => `/items/${item.id}`}
       />
-      <DataTable.Body<Item> loading={loading} skeletonRows={2} rowHref={item => `/items/${item.id}`} />
     </DataTable>
   );
 }
@@ -327,6 +338,46 @@ describe('DataTable grid layout', () => {
     const shades = gradientStyles(container);
     expect(shades).toHaveLength(4);
     expect(shades.every(shade => shade.includes('var(--color-bg) 100%'))).toBe(true);
+  });
+
+  // CU-17tkuw69x1m: an empty body only one viewport wide could not scroll, and the header (kept at the body's scroll
+  // position) left the columns past the right edge, an applied filter included, out of reach.
+  it.each([
+    ['page', undefined],
+    ['fixed-height', 360],
+  ] as const)('keeps an empty body as wide as its columns, with the message in view (%s mode)', (_mode, maxHeight) => {
+    const { container } = render(<Grid items={[]} maxHeight={maxHeight} />);
+    const body = gridBodyMarkup(container);
+    expect(screen.getByText('No results found')).toBeTruthy();
+    // One box as wide as its widest child: a sticky message moves only inside its parent.
+    expect(openingTag(container, 'data-grid-empty')).toMatch(/class="w-max min-w-full"/);
+    // A zero-high row of every column, in the grid's order, each at its column's width.
+    const start = body.indexOf('data-grid-blank-row');
+    const blankRow = body.slice(start, body.indexOf('</div></div>', start));
+    expect([...blankRow.matchAll(/width: var\(--dtc(\d)-w\)/g)].map(match => match[1])).toEqual(['0', '1', '2', '3']);
+    expect(blankRow).not.toContain('h-12');
+    // The message: one viewport wide, kept at the left edge, under the gradients (no z-index of its own).
+    const message = openingTag(container, 'sticky left-0 w-0');
+    expect(message).toContain('min-w-[min(100%,var(--dt-viewport-w,100%))]');
+    expect(message).not.toMatch(/\bz-\[/);
+  });
+
+  // Hosts leave the header out of an empty table (LiveTable `showHeader`): with nothing past the edge to reach, the box
+  // must not scroll or shade.
+  it.each([
+    ['page', undefined],
+    ['fixed-height', 360],
+  ] as const)('keeps an empty body one viewport wide when no header is drawn (%s mode)', (_mode, maxHeight) => {
+    const { container } = render(<Grid items={[]} maxHeight={maxHeight} header={false} />);
+    expect(screen.getByText('No results found')).toBeTruthy();
+    expect(container.innerHTML).not.toContain('data-grid-header');
+    expect(openingTag(container, 'data-grid-empty')).toMatch(/class="w-max min-w-full"/);
+    expect(container.innerHTML).not.toContain('data-grid-blank-row');
+  });
+
+  it('keeps the minRows height on an empty body', () => {
+    const { container } = render(<Grid items={[]} minRows={5} />);
+    expect(openingTag(container, 'sticky left-0 w-0')).toContain('min-height: 240px');
   });
 
   it('draws loading rows as grid rows: one bar per data cell, none in the utility cells', () => {

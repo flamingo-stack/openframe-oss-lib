@@ -610,7 +610,10 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         minSize: GRID_MIN_WIDTH.icon,
         meta: {
           label: 'Device',
-          gridCell: ({ row }) => <DeviceNameGridCell device={row.original} unreadMark={false} />,
+          // The picker has a STATUS column of its own: the name carries no tag or outdated mark beside it.
+          gridCell: ({ row }) => (
+            <DeviceNameGridCell device={row.original} unreadMark={false} statusAdornments={false} />
+          ),
         },
       },
       {

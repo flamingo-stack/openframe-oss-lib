@@ -149,6 +149,30 @@ pub fn get_logs_directory() -> PathBuf {
     }
 }
 
+/// Returns the openframe-chat logs directory inside a user's home folder
+pub fn get_chat_logs_directory(home: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        home.join("AppData")
+            .join("Local")
+            .join("com.openframe.chat")
+            .join("logs")
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        home.join("Library").join("Logs").join("com.openframe.chat")
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        home.join(".local")
+            .join("share")
+            .join("com.openframe.chat")
+            .join("logs")
+    }
+}
+
 /// Returns the platform-specific secured directory path (admin/root access only)
 pub fn get_secured_directory() -> PathBuf {
     #[cfg(target_os = "windows")]
@@ -790,14 +814,31 @@ impl DirectoryManager {
         match executable_path {
             Some(path) if Path::new(path).is_absolute() => PathBuf::from(path),
             Some(path) => self.app_support_dir().join(tool_agent_id).join(path),
-            None => {
-                let agent_name = if cfg!(target_os = "windows") {
-                    "agent.exe"
-                } else {
-                    "agent"
-                };
-                self.app_support_dir().join(tool_agent_id).join(agent_name)
-            }
+            None => self
+                .app_support_dir()
+                .join(tool_agent_id)
+                .join(Self::agent_file_name()),
+        }
+    }
+
+    /// The default agent executable's file name inside a tool folder.
+    pub(crate) fn agent_file_name() -> &'static str {
+        if cfg!(target_os = "windows") {
+            "agent.exe"
+        } else {
+            "agent"
+        }
+    }
+
+    /// An executable's file name on this OS: `.exe` is added on Windows when it is missing.
+    pub(crate) fn executable_file_name(name: &str) -> String {
+        let has_exe_extension = Path::new(name)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"));
+        if cfg!(target_os = "windows") && !has_exe_extension {
+            format!("{}.exe", name)
+        } else {
+            name.to_string()
         }
     }
 
@@ -813,11 +854,8 @@ impl DirectoryManager {
         asset_filename: &str,
         is_executable: bool,
     ) -> PathBuf {
-        let has_exe_extension = Path::new(asset_filename)
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"));
-        let asset_name = if cfg!(target_os = "windows") && is_executable && !has_exe_extension {
-            format!("{}.exe", asset_filename)
+        let asset_name = if is_executable {
+            Self::executable_file_name(asset_filename)
         } else {
             asset_filename.to_string()
         };

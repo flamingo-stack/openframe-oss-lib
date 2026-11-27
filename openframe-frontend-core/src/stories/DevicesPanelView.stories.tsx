@@ -95,3 +95,24 @@ export const TableGridLayoutWithDirectory: Story = { args: { tableLayout: 'grid'
 
 /** The grid layout while the request has not answered. */
 export const TableGridLayoutLoading: Story = { args: { tableLayout: 'grid', loading: true, devices: [] } };
+
+/**
+ * The lifecycle display's statuses (Figma 5108:198472): a managed and a pending device on an outdated agent (the
+ * warning mark after the name), a pending deletion one on an outdated agent (no mark: nothing to reinstall there) and
+ * a pending one never seen ("—" in LAST SEEN). The mark and the PENDING tag explain themselves on hover, focus or tap.
+ */
+const LIFECYCLE_DEVICES: DeviceRow[] = DEVICES_FIXTURE.devices.map((device, index) => {
+  if (index === 0) return { ...device, clientOutdated: true };
+  if (index === 1) return { ...device, status: 'PENDING', clientOutdated: true };
+  if (index === 2) return { ...device, status: 'PENDING_DELETION', clientOutdated: true };
+  if (index === 3) return { ...device, status: 'PENDING', last_seen: undefined, lastSeen: undefined };
+  return device;
+});
+
+/** The lifecycle statuses in the grid layout: tag after the name unless managed, then the outdated mark. */
+export const LifecycleStatuses: Story = {
+  args: { tableLayout: 'grid', devices: LIFECYCLE_DEVICES },
+};
+
+/** The lifecycle statuses on the grid view's cards: "Managed · Last seen", or the tag, then the outdated mark. */
+export const LifecycleStatusesCards: Story = { args: { viewMode: 'grid', devices: LIFECYCLE_DEVICES } };

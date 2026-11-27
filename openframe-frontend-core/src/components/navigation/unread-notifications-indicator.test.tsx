@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockPush } from '../../../vitest.setup';
 import { type ChatRuntime, ChatRuntimeContext } from '../../contexts/chat-runtime-context';
 import { DevicesGrid } from '../features/devices/devices-grid';
-import { DevicesTableBody } from '../features/devices/devices-table-columns';
+import { DevicesTableBody } from '../features/devices/devices-table-body';
 import { DevicesViewConfigProvider } from '../features/devices/devices-view-config';
 import type { DeviceRow } from '../features/devices/types';
 import { UnreadNotificationsIndicator, unreadNotificationsLabel } from './unread-notifications-indicator';

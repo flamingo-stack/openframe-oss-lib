@@ -34,4 +34,5 @@ public class DeviceOsPendingUpdateResponse {
     private Instant discoveredAt;
     private Boolean downloaded;
     private MacosUpdatePresence macosPresence;
+    private DeviceOsUpdateRolloutStateResponse rolloutState;
 }

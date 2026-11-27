@@ -16,6 +16,8 @@ public interface DeviceOsPendingUpdateRepository
     List<DeviceOsPendingUpdate> findByTenantIdAndMachineIdOrderByDiscoveredAtDescIdentifierAsc(
             String tenantId, String machineId);
 
+    List<DeviceOsPendingUpdate> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
+
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 
     // A device has one pending row per update, so the rows of an identifier are its devices.

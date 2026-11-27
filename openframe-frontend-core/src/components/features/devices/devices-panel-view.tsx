@@ -22,7 +22,8 @@ import { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-
 import { DevicesGrid } from './devices-grid';
 import { DevicesGridFilters } from './devices-grid-filters';
 import { DEVICE_VIEW_MODE_ITEMS } from './devices-panel-header';
-import { DevicesTableBody, type DeviceFilterColumn, getDeviceFilterColumns } from './devices-table-columns';
+import { DevicesTableBody } from './devices-table-body';
+import { type DeviceFilterColumn, getDeviceFilterColumns } from './devices-table-columns';
 import type { DeviceFilters, DeviceRow } from './types';
 
 export type DevicesViewMode = 'table' | 'grid';

@@ -24,6 +24,26 @@ extend type Query {
     `first`: 1-100, default 20. Unknown osUpdateId → OS_UPDATE_NOT_FOUND."""
     osUpdateDevices(osUpdateId: ID!, status: OsUpdateDeviceStatus!, organizationIds: [String!], first: Int,
         after: String): OsUpdateDeviceConnection!
+
+    """The numbers of the cards above the OS update list. Windows devices only; devices we cannot manage are not
+    counted. `organizationIds`: only these customers, the same as in the list filter; omitted or empty = every
+    customer."""
+    osUpdateSummary(organizationIds: [String!]): OsUpdateSummary!
+}
+
+type OsUpdateSummary {
+    """Windows devices that report their OS and can be managed."""
+    deviceCount: Int!
+    """Of them, the devices with no pending update they may already install."""
+    currentDeviceCount: Int!
+    """Devices with a pending update past its hard restart deadline."""
+    overdueDeviceCount: Int!
+    """Of the overdue devices, the ones that are not online now."""
+    overdueOfflineDeviceCount: Int!
+    """Devices that installed an update and wait for a restart."""
+    restartPendingDeviceCount: Int!
+    """Updates with the status HELD at a customer and pending on a device of that customer."""
+    heldUpdateCount: Int!
 }
 
 input OsUpdateFilterInput {
@@ -35,6 +55,9 @@ input OsUpdateFilterInput {
     """Only updates pending on or installed by a device of these organizations, and both device counts count only
     those devices. Omitted or empty = every organization; organizations without devices = no update."""
     organizationIds: [String!]
+    """Only updates with any of these statuses at a customer; with `organizationIds`, at one of those customers.
+    Windows updates only. Omitted or empty = every update."""
+    customerStatuses: [OsUpdateCustomerStatus!]
 }
 
 type OsUpdateConnection {
@@ -89,6 +112,9 @@ type OsUpdate {
     stored history goes no further. A device that installed the update and waits for a restart may be counted
     as pending too."""
     installedDeviceCount: Int!
+    """The distinct statuses of the update over the customers that have a device the update is pending on or
+    installed by; in a list filtered by organizations, over those customers only. Empty for a macOS update."""
+    customerStatuses: [OsUpdateCustomerStatus!]!
 }
 
 """Set once, when the update is first stored. The rule is a first draft and Windows only: every macOS update is
@@ -249,6 +275,9 @@ type DeviceOsPendingUpdate {
     discoveredAt: Instant!
     downloaded: Boolean
     macosPresence: MacosUpdatePresence
+    """Null = no policy rolls the update out to this device: no policy covers the device, or the policy has no rule
+    for the urgency of the update."""
+    rolloutState: DeviceOsUpdateRolloutState
 }
 
 enum OsUpdateSeverity {

@@ -15,6 +15,7 @@ import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateHistoryEntry;
 import com.openframe.data.repository.rmm.osupdate.DeviceOsUpdateHistoryRepository;
 import com.openframe.data.repository.rmm.osupdate.InstalledOsUpdateDevice;
 import com.openframe.data.repository.rmm.osupdate.OsUpdateDeviceCount;
+import com.openframe.data.repository.rmm.osupdate.OsUpdateOrganizationDeviceCount;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -177,6 +178,23 @@ class DeviceOsUpdateHistoryServiceTest {
         // verifications
         assertThat(everyDevice).isSameAs(ofAll);
         assertThat(scoped).isSameAs(ofScope);
+    }
+
+    @Test
+    void countInstalledDevicesByIdentifierAndOrganization_everyUpdateOfEveryDevice_groupedReadOfTheTenant() {
+        // setup
+        List<OsUpdateOrganizationDeviceCount> deviceCounts =
+                List.of(new OsUpdateOrganizationDeviceCount(IDENTIFIER, "org-1", 3));
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(deviceOsUpdateHistoryRepository.countInstalledDevicesByIdentifierAndOrganization(
+                TENANT_ID, null, EVERY_DEVICE)).thenReturn(deviceCounts);
+
+        // execution
+        List<OsUpdateOrganizationDeviceCount> found =
+                deviceOsUpdateHistoryService.countInstalledDevicesByIdentifierAndOrganization(null, EVERY_DEVICE);
+
+        // verifications
+        assertThat(found).isSameAs(deviceCounts);
     }
 
     @Test

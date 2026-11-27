@@ -213,6 +213,38 @@ fn parse_json<T: DeserializeOwned>(path: &Path, bytes: &[u8]) -> Result<T, Corru
     })
 }
 
+/// Opens a file for reading only when it is a regular file reached without a symlink and,
+/// on unix, with no other hard link, so a user-writable path cannot point the service elsewhere.
+/// On Windows the hard-link count is not checked (std has no stable way to read it).
+pub(crate) fn open_regular_file(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let file = options.open(path)?;
+    let metadata = file.metadata()?;
+    #[cfg(unix)]
+    let single_link = std::os::unix::fs::MetadataExt::nlink(&metadata) == 1;
+    #[cfg(not(unix))]
+    let single_link = true;
+    if !metadata.is_file() || !single_link {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "not a regular file",
+        ));
+    }
+    Ok(file)
+}
+
 pub(crate) fn quarantine_path(path: &Path) -> PathBuf {
     let mut name = path.file_name().unwrap_or_default().to_os_string();
     name.push(".corrupt");

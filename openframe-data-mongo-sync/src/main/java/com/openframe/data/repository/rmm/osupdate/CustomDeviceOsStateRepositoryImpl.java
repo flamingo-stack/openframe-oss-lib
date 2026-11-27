@@ -2,6 +2,8 @@ package com.openframe.data.repository.rmm.osupdate;
 
 import com.openframe.data.document.rmm.osupdate.DeviceOsState;
 import com.openframe.data.document.rmm.osupdate.OsPlatform;
+import com.openframe.data.document.rmm.osupdate.OsRebootPending;
+import com.openframe.data.document.rmm.osupdate.OsUpdateManageabilityState;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
 import org.springframework.data.domain.Sort;
@@ -27,6 +29,9 @@ public class CustomDeviceOsStateRepositoryImpl implements CustomDeviceOsStateRep
     private static final String FIELD_OS_VERSION = "osVersion";
     private static final String FIELD_OS_BUILD = "osBuild";
     private static final String FIELD_DEVICE_COUNT = "deviceCount";
+    private static final String FIELD_MANAGEABILITY_STATE = "manageability.state";
+    private static final String FIELD_REBOOT_PENDING = "rebootPending";
+    private static final String FIELD_REBOOT_PENDING_DEVICE_COUNT = "rebootPendingDeviceCount";
     private static final String FIELD_OS_VERSION_BUILD_COUNTS = "osVersionBuildCounts";
     private static final String GROUPED_OS_BUILD = "$_id.osBuild";
     private static final String ID = "_id";
@@ -52,5 +57,27 @@ public class CustomDeviceOsStateRepositoryImpl implements CustomDeviceOsStateRep
                 Aggregation.sort(Sort.Direction.DESC, ID),
                 Aggregation.limit(limit));
         return mongoTemplate.aggregate(osVersionPage, OsVersionDeviceCounts.class).getMappedResults();
+    }
+
+    @Override
+    public ManageableOsDeviceCounts countManageableDevices(String tenantId, OsPlatform platform,
+                                                           Collection<String> machineIds) {
+        Criteria manageable = Criteria.where(FIELD_TENANT_ID).is(tenantId)
+                .and(FIELD_PLATFORM).is(platform)
+                .and(FIELD_MANAGEABILITY_STATE).is(OsUpdateManageabilityState.MANAGEABLE);
+        if (machineIds != null) {
+            manageable = manageable.and(FIELD_MACHINE_ID).in(machineIds);
+        }
+        Document rebootPending = new Document("$eq", List.of("$" + FIELD_REBOOT_PENDING, OsRebootPending.YES.name()));
+        Document rebootPendingOrNot = new Document("$cond", List.of(rebootPending, 1, 0));
+        Document manageableDeviceCounts = new Document("$group", new Document(ID, null)
+                .append(FIELD_DEVICE_COUNT, new Document("$sum", 1))
+                .append(FIELD_REBOOT_PENDING_DEVICE_COUNT, new Document("$sum", rebootPendingOrNot)));
+        Aggregation manageableDevices = Aggregation.newAggregation(
+                Aggregation.match(manageable),
+                context -> manageableDeviceCounts);
+        List<ManageableOsDeviceCounts> deviceCounts = mongoTemplate.aggregate(manageableDevices,
+                DeviceOsState.class, ManageableOsDeviceCounts.class).getMappedResults();
+        return deviceCounts.isEmpty() ? ManageableOsDeviceCounts.NONE : deviceCounts.getFirst();
     }
 }
