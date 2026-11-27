@@ -79,7 +79,8 @@ public class OssAuditTargets implements AuditTargetProvider {
                 AuditTarget.of(TENANT, Tenant.class, Tenant::getName)
                         .withTenantId(Tenant::getId),
                 AuditTarget.of(SCRIPT, Script.class, Script::getName)
-                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs", "contentHash")),
+                        .withIgnoredFields(Set.of("contentHash"))
+                        .withMaskedFields(Set.of("scriptBody", "envVars.value", "defaultArgs")),
                 AuditTarget.of(OS_UPDATE, OsUpdate.class, OsUpdate::getDisplayName),
                 AuditTarget.of(OS_UPDATE_POLICY, OsUpdatePolicy.class, OsUpdatePolicy::getName)
                         .withIgnoredFields(Set.of("updatedAt")),
