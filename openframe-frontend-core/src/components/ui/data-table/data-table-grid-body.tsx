@@ -21,6 +21,7 @@ import {
 import { useGridStructure } from './data-table-grid-prefs';
 import { DataTableGridRow } from './data-table-grid-row';
 import { DataTableLoadMoreContext } from './data-table-load-more';
+import { useGridEmptyReserve } from './use-grid-empty-reserve';
 import { DATA_TABLE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 /** Server snapshot: no page is loading during a server render. */
@@ -80,9 +81,10 @@ export function DataTableGridBody<T = unknown>({
   );
   const visibleColumns = table.getVisibleFlatColumns();
   const layout = useGridStructure(visibleColumns);
+  const reservedHeight = minRows && minRows > 0 ? minRows * GRID_ROW_HEIGHT : 0;
   // The empty state's box, measured: the room under the block is what the message leaves of a full page.
   const [emptyBox, setEmptyBox] = useState<HTMLDivElement | null>(null);
-  const emptyHeight = useBoxHeight(emptyBox);
+  const emptyReserve = useGridEmptyReserve(emptyBox, reservedHeight);
 
   const loading = inScope || loadingProp;
   const rows = table.getRowModel().rows;
@@ -93,7 +95,6 @@ export function DataTableGridBody<T = unknown>({
   const skeletonRows =
     skeletonRowsProp ?? dataTablePageSize(table) ?? (minRows && minRows > 0 ? minRows : DATA_TABLE_SKELETON_ROWS);
 
-  const reservedHeight = minRows && minRows > 0 ? minRows * GRID_ROW_HEIGHT : 0;
   // The room under the block (page mode only): the missing rows' height, never drawn.
   let reserve = 0;
   let content: ReactNode;
@@ -136,7 +137,7 @@ export function DataTableGridBody<T = unknown>({
     // because a sticky element moves only inside its parent, and a plain block is one viewport wide.
     // The box is the message's own height, the message at its top: centred in a full page of room (twenty rows) it sat
     // below the fold, the lesson the card layout's empty state learned too.
-    reserve = emptyHeight === undefined ? 0 : Math.max(0, reservedHeight - emptyHeight);
+    reserve = emptyReserve;
     content = (
       <div ref={setEmptyBox} data-grid-empty className="w-max min-w-full">
         {headerDrawn && <GridBlankRow layout={layout} />}
@@ -221,22 +222,4 @@ function GridBlankRow({ layout }: { layout: GridLayout }) {
       ))}
     </div>
   );
-}
-
-/** An element's border-box height, kept current; `undefined` with no element or before it is measured. */
-function useBoxHeight(element: HTMLElement | null): number | undefined {
-  const [height, setHeight] = useState<number | undefined>(undefined);
-  useIsomorphicLayoutEffect(() => {
-    if (!element) {
-      setHeight(undefined);
-      return undefined;
-    }
-    const measure = () => setHeight(element.offsetHeight);
-    measure();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [element]);
-  return height;
 }
