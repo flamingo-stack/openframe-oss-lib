@@ -258,6 +258,10 @@ export default defineConfig([
       'src/__tests__/route-styles-client.test.tsx',
       // FadePreview's item mode: the contract is the height it measures onto its role-less clamp box.
       'src/components/ui/__tests__/fade-preview.test.tsx',
+      // A product screen is a picture: its frame is `role="img"` and the screen inside is `inert` and `aria-hidden`, so
+      // no `screen` query reaches a row. The contract is the grid's geometry (the column widths it sets on its root)
+      // against the frame's layout width (the frame's inner box style).
+      'src/__tests__/product-demo-tables-layout.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',
