@@ -243,4 +243,14 @@ describe('useJetStreamDialogSubscription caughtUpCount', () => {
     expect(payloads[0].streamPublishedAt).toBeGreaterThanOrEqual(before);
     expect(payloads[0].streamPublishedAt).toBeLessThanOrEqual(Date.now());
   });
+
+  it('reads the publish time to the exact millisecond where nanoseconds lose precision', async () => {
+    // 1795780428002 * 1e6 is past the doubles' exact integers: dividing back lands just under 1795780428002, which a floor read as 1 ms early.
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1795780428002);
+    const seq = publish('precise');
+    now.mockRestore();
+    render(<Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seq - 1} />);
+    await until(() => payloads.length === 1);
+    expect(payloads[0].streamPublishedAt).toBe(1795780428002);
+  });
 });
