@@ -17,3 +17,13 @@ extend type Message {
 extend input SendMessageInput {
   attachmentIds: [ID!]
 }
+
+type TicketAttachmentReceipt {
+  attachedFileCount: Int!
+  ticketId: ID!
+  ticketNumber: Int
+}
+
+extend type MessagePayload {
+  ticketAttachmentReceipt: TicketAttachmentReceipt
+}

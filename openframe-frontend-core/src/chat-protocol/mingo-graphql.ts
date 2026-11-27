@@ -462,6 +462,20 @@ export const MINGO_SEND_MESSAGE_MUTATION = `
   }
 `;
 
+/**
+ * `sendMessage` for a message with files: the payload also says how many of them a client chat's ticket took
+ * (`ticketAttachmentReceipt`, Fae's "N files added to ticket #id"). A backend without the field refuses the whole
+ * mutation, so a message without files keeps {@link MINGO_SEND_MESSAGE_MUTATION}.
+ */
+export const MINGO_SEND_MESSAGE_WITH_FILES_MUTATION = `
+  mutation SendMessageWithFiles($input: SendMessageInput!) {
+    sendMessage(input: $input) {
+      ticketAttachmentReceipt { ticketId ticketNumber attachedFileCount }
+      userErrors { field message code }
+    }
+  }
+`;
+
 /** Stop the running answer. Without one: `ILLEGAL_STATE`. */
 export const MINGO_STOP_DIALOG_GENERATION_MUTATION = `
   mutation StopDialogGeneration($input: StopDialogGenerationInput!) {
@@ -630,6 +644,18 @@ export interface MingoDialogsConnection {
 }
 
 /** A mutation's own refusals. */
+/** The files a client chat's ticket took from a sent message, as the server counted them. */
+export interface MingoTicketAttachmentReceipt {
+  ticketId: string;
+  ticketNumber?: number | null;
+  attachedFileCount: number;
+}
+
+/** What {@link MINGO_SEND_MESSAGE_WITH_FILES_MUTATION} answers. No receipt: the dialog has no ticket. */
+export interface MingoSendMessagePayload extends MingoUserErrors {
+  ticketAttachmentReceipt?: MingoTicketAttachmentReceipt | null;
+}
+
 export interface MingoUserErrors {
   userErrors?: Array<{ field?: string[] | null; message: string; code?: string | null }> | null;
 }

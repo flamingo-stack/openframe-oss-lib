@@ -8,7 +8,12 @@ import { resolve } from 'node:path';
 import { buildSchema, parse, validate } from 'graphql';
 import { describe, expect, it } from 'vitest';
 import { createMingoDecoder } from '../message-decoder';
-import { MINGO_MESSAGES_QUERY, mingoMessagesQuery } from '../mingo-graphql';
+import {
+  MINGO_MESSAGES_QUERY,
+  MINGO_SEND_MESSAGE_MUTATION,
+  MINGO_SEND_MESSAGE_WITH_FILES_MUTATION,
+  mingoMessagesQuery,
+} from '../mingo-graphql';
 import { openFrameMessageAttachmentsOf, openFrameMessageContentKey } from '../openframe-message-attachments';
 import type { ChatParticipantChunk } from '../ui-chunks';
 
@@ -47,6 +52,23 @@ describe('the history query', () => {
     const both = mingoMessagesQuery({ email: true, attachments: true });
     expect(both).toMatch(/attachments \{/);
     expect(both).toMatch(/\.\.\. on EmailData \{/);
+  });
+});
+
+describe('the send with files', () => {
+  it("asks for the ticket's receipt against the chat attachments schema, and the plain send does not", () => {
+    const base = fixture('ai-agent-schema.graphqls');
+    const feature = fixture('ai-agent-chat-attachments-schema.graphqls');
+    const errors = (sdl: string, document: string) =>
+      validate(subgraphSchema(sdl), parse(document)).map(error => error.message);
+
+    expect(MINGO_SEND_MESSAGE_WITH_FILES_MUTATION).toMatch(
+      /ticketAttachmentReceipt \{\s*ticketId\s*ticketNumber\s*attachedFileCount\s*\}/,
+    );
+    expect(errors(`${base}\n${feature}`, MINGO_SEND_MESSAGE_WITH_FILES_MUTATION)).toEqual([]);
+    expect(errors(base, MINGO_SEND_MESSAGE_WITH_FILES_MUTATION).length).toBeGreaterThan(0);
+    expect(MINGO_SEND_MESSAGE_MUTATION).not.toMatch(/ticketAttachmentReceipt/);
+    expect(errors(base, MINGO_SEND_MESSAGE_MUTATION)).toEqual([]);
   });
 });
 
