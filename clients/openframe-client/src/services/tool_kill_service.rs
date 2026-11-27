@@ -3,8 +3,11 @@ use crate::config::service_stop::{
     PROCESS_CHECK_INTERVAL_MS,
 };
 use crate::models::{Installation, InstalledTool};
-use crate::platform::{process_kill, system_service};
+use crate::platform::binary_writer::aside_path;
+use crate::platform::orphan_reaper::normalize_exe;
+use crate::platform::{process_kill, system_service, DirectoryManager};
 use anyhow::Result;
+use std::path::{Path, PathBuf};
 use sysinfo::{Pid, ProcessRefreshKind, System, UpdateKind};
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
@@ -24,31 +27,30 @@ impl ToolKillService {
         Self
     }
 
-    /// Stop a tool process by tool ID
-    ///
-    /// This method will search for any running processes that match the tool's
-    /// command pattern and kill them, retrying the kill until they exit.
+    /// Stop the processes running the tool's agent binary, retrying the kill until they exit.
     pub async fn stop_tool(&self, tool_id: &str) -> Result<()> {
-        let pattern = Self::build_tool_cmd_pattern(tool_id);
-        self.stop_processes_by_pattern(&pattern, &format!("tool: {}", tool_id))
+        let target = Self::relative_agent_path(tool_id);
+        self.stop_processes_running_from(target, &format!("tool: {}", tool_id))
             .await
     }
 
-    /// Stop an asset process by asset ID and tool ID
-    ///
-    /// This method will search for any running processes that match the asset's
-    /// command pattern and kill them, retrying the kill until they exit.
+    /// Stop the processes running the tool's asset binary, retrying the kill until they exit.
     pub async fn stop_asset(&self, asset_id: &str, tool_id: &str) -> Result<()> {
-        let pattern = Self::build_asset_cmd_pattern(asset_id, tool_id);
-        self.stop_processes_by_pattern(
-            &pattern,
+        let target = Self::relative_asset_path(asset_id, tool_id);
+        self.stop_processes_running_from(
+            target,
             &format!("asset: {} (tool: {})", asset_id, tool_id),
         )
         .await
     }
 
-    /// Collect (pid, exe) of processes whose cmdline or exe path contains any of the patterns.
-    fn collect_matching_processes(patterns: &[String]) -> Vec<(Pid, String)> {
+    /// Collect (pid, image) of processes other than this one that run from any of the targets.
+    fn collect_matching_processes(targets: &[PathBuf]) -> Vec<(Pid, String)> {
+        let targets: Vec<PathBuf> = targets
+            .iter()
+            .flat_map(|target| [normalize(target), normalize(&resolve_symlinks(target))])
+            .collect();
+        let own_pid = Pid::from_u32(std::process::id());
         let mut sys = System::new();
         sys.refresh_processes_specifics(
             ProcessRefreshKind::new()
@@ -57,60 +59,53 @@ impl ToolKillService {
         );
         sys.processes()
             .iter()
+            .filter(|(pid, _)| **pid != own_pid)
             .filter_map(|(pid, process)| {
-                let cmdline = process.cmd().join(" ").to_lowercase();
-                let exe_path = process
-                    .exe()
-                    .map(|p| p.to_string_lossy().to_lowercase())
-                    .unwrap_or_default();
-                patterns
+                let image =
+                    process_image(process.exe(), process.cmd().first().map(String::as_str))?;
+                targets
                     .iter()
-                    .any(|p| cmdline.contains(p.as_str()) || exe_path.contains(p.as_str()))
-                    .then(|| (*pid, exe_path.clone()))
+                    .any(|target| runs_from(&image, target))
+                    .then(|| (*pid, image.display().to_string()))
             })
             .collect()
     }
 
-    /// Check whether the installed tool's process is running; the pattern set mirrors stop_for_installation's kill targets.
+    /// Check whether the installed tool's process is running; the target set mirrors stop_for_installation's kill targets.
     pub async fn is_installed_tool_running(&self, tool: &InstalledTool) -> bool {
-        let mut patterns: Vec<String> = Vec::new();
+        let mut targets: Vec<PathBuf> = Vec::new();
         match &tool.installation {
             Installation::GuiApp {
                 executable_path, ..
-            } => patterns.push(executable_path.to_lowercase()),
+            } => targets.push(PathBuf::from(executable_path)),
             Installation::Standard { executable_path } => {
                 if let Some(path) = executable_path {
-                    patterns.push(path.to_lowercase());
+                    targets.push(PathBuf::from(path));
                 }
-                patterns.push(Self::build_tool_cmd_pattern(&tool.tool_agent_id));
+                targets.push(Self::relative_agent_path(&tool.tool_agent_id));
             }
             Installation::Service {
                 executable_path, ..
             } => match executable_path {
-                Some(path) => patterns.push(path.to_lowercase()),
-                // No registered path to mirror: fall back to the tool pattern rather than reporting a blind false.
-                None => patterns.push(Self::build_tool_cmd_pattern(&tool.tool_agent_id)),
+                Some(path) => targets.push(PathBuf::from(path)),
+                // No registered path to mirror: fall back to the agent path rather than reporting a blind false.
+                None => targets.push(Self::relative_agent_path(&tool.tool_agent_id)),
             },
         }
-        tokio::task::spawn_blocking(move || !Self::collect_matching_processes(&patterns).is_empty())
+        tokio::task::spawn_blocking(move || !Self::collect_matching_processes(&targets).is_empty())
             .await
             .unwrap_or(false)
     }
 
-    /// Generic method to stop processes matching a command pattern
-    ///
-    /// This method will search for any running processes that match the given
-    /// pattern and kill them with retries and verification.
-    async fn stop_processes_by_pattern(&self, pattern: &str, description: &str) -> Result<()> {
+    /// Stop every process running from `target` (see [`runs_from`]), with retries and verification.
+    async fn stop_processes_running_from(&self, target: PathBuf, description: &str) -> Result<()> {
         info!("Attempting to stop {}", description);
-        info!("Using pattern to stop: {}", pattern);
+        info!("Stopping processes running from: {}", target.display());
 
-        let pattern_string = pattern.to_string();
-        let matches = tokio::task::spawn_blocking(move || {
-            Self::collect_matching_processes(&[pattern_string])
-        })
-        .await
-        .unwrap_or_default();
+        let matches =
+            tokio::task::spawn_blocking(move || Self::collect_matching_processes(&[target]))
+                .await
+                .unwrap_or_default();
 
         let mut pids_to_stop = Vec::new();
         for (pid, exe_path) in matches {
@@ -296,9 +291,11 @@ impl ToolKillService {
     }
 
     pub async fn stop_tool_by_path(&self, executable_path: &str) -> Result<()> {
-        let pattern = executable_path.to_lowercase();
-        self.stop_processes_by_pattern(&pattern, &format!("path: {}", executable_path))
-            .await
+        self.stop_processes_running_from(
+            PathBuf::from(executable_path),
+            &format!("path: {}", executable_path),
+        )
+        .await
     }
 
     pub async fn stop_installed_tool(
@@ -352,29 +349,49 @@ impl ToolKillService {
         }
     }
 
-    /// Build the command pattern to match for a given tool ID
-    /// Pattern: {tool}\agent (Windows) or {tool}/agent (Unix)
-    fn build_tool_cmd_pattern(tool_id: &str) -> String {
-        #[cfg(target_os = "windows")]
-        {
-            format!("{}\\agent", tool_id).to_lowercase()
-        }
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        {
-            format!("{}/agent", tool_id).to_lowercase()
-        }
+    /// The tool's agent binary relative to the tools folder: `{tool}/agent`, `{tool}\agent.exe` on Windows.
+    fn relative_agent_path(tool_id: &str) -> PathBuf {
+        Path::new(tool_id).join(DirectoryManager::agent_file_name())
     }
 
-    /// Build the command pattern to match for a given asset ID and tool ID
-    /// Pattern: \{tool}\{asset} (Windows) or /{tool}/{asset} (Unix)
-    fn build_asset_cmd_pattern(asset_id: &str, tool_id: &str) -> String {
-        #[cfg(target_os = "windows")]
-        {
-            format!("\\{}\\{}", tool_id, asset_id).to_lowercase()
-        }
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        {
-            format!("/{}/{}", tool_id, asset_id).to_lowercase()
-        }
+    /// The tool's asset binary relative to the tools folder: `{tool}/{asset}`, `{tool}\{asset}.exe` on Windows.
+    fn relative_asset_path(asset_id: &str, tool_id: &str) -> PathBuf {
+        Path::new(tool_id).join(DirectoryManager::executable_file_name(asset_id))
     }
 }
+
+/// The process's executable, or its argv[0] when the executable can't be read.
+fn process_image(exe: Option<&Path>, argv0: Option<&str>) -> Option<PathBuf> {
+    exe.map(Path::to_path_buf)
+        .or_else(|| argv0.map(PathBuf::from))
+        .map(|image| normalize(&image))
+}
+
+fn normalize(path: &Path) -> PathBuf {
+    PathBuf::from(normalize_exe(&path.to_string_lossy(), true))
+}
+
+fn resolve_symlinks(target: &Path) -> PathBuf {
+    if target.is_absolute() {
+        std::fs::canonicalize(target).unwrap_or_else(|_| target.to_path_buf())
+    } else {
+        target.to_path_buf()
+    }
+}
+
+/// The image is the target or its aside copy, or lies under an absolute target; a relative target matches its last components.
+fn runs_from(image: &Path, target: &Path) -> bool {
+    [target.to_path_buf(), aside_path(target)]
+        .iter()
+        .any(|target| {
+            if target.is_absolute() {
+                image.starts_with(target)
+            } else {
+                image.ends_with(target)
+            }
+        })
+}
+
+#[cfg(test)]
+#[path = "tool_kill_service_tests.rs"]
+mod tests;
