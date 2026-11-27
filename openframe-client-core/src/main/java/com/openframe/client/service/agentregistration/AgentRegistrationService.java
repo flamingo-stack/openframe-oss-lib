@@ -184,7 +184,9 @@ public class AgentRegistrationService {
     private Machine createMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
-        backToPending(registrationRequestFields(request)).applyTo(machine);
+        MachineUpdate update = registrationRequestFields(request);
+        backToPending(update);
+        update.applyTo(machine);
         machine.setOrganizationId(organizationId);
         machine.setOrganizationAssignedAt(Instant.now());
         machine.setType(DeviceType.DESKTOP);
@@ -282,7 +284,8 @@ public class AgentRegistrationService {
     private Machine updateMachine(String machineId, AgentRegistrationRequest request,
                                   Map<String, Object> auditDetails) {
         Optional<Machine> existing = machineRepository.findOnPrimaryByMachineId(machineId);
-        MachineUpdate update = backToPending(registrationRequestFields(request));
+        MachineUpdate update = registrationRequestFields(request);
+        backToPending(update);
         String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
         addClaimedOrganization(auditDetails, request, organizationId);
         update.set(ORGANIZATION_ID, organizationId);
@@ -357,8 +360,8 @@ public class AgentRegistrationService {
     }
 
     // The stuck-in-PENDING clock restarts and the alert re-arms; registeredAt stays the first registration the UI shows
-    private static MachineUpdate backToPending(MachineUpdate update) {
-        return update.set(STATUS, DeviceStatus.PENDING)
+    private static void backToPending(MachineUpdate update) {
+        update.set(STATUS, DeviceStatus.PENDING)
                 .set(PENDING_SINCE, Instant.now())
                 .set(STUCK_NOTIFIED_AT, null);
     }
