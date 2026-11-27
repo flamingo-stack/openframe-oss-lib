@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useSyncExternalStore, type ReactNode } from 'react';
+import { useContext, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
 import { LoadingFallback } from '../../loading/loading-fallback';
@@ -21,6 +21,7 @@ import {
 import { useGridStructure } from './data-table-grid-prefs';
 import { DataTableGridRow } from './data-table-grid-row';
 import { DataTableLoadMoreContext } from './data-table-load-more';
+import { useGridEmptyReserve } from './use-grid-empty-reserve';
 import { DATA_TABLE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 /** Server snapshot: no page is loading during a server render. */
@@ -29,7 +30,7 @@ const getNoRows = () => 0;
 /** Server snapshot: the header tells the body it is drawn from a layout effect, which a server render does not run. */
 const getNoHeader = () => false;
 
-/** A grid row's height in px: what a `minRows` pad reserves per missing row. */
+/** A grid row's height in px: what `minRows` reserves per missing row. */
 const GRID_ROW_HEIGHT = 48;
 
 /**
@@ -46,8 +47,12 @@ const GRID_STACK_CLASS = '[&>*:last-child>*]:border-b-0';
 const GRID_EMPTY_MESSAGE_CLASS = 'sticky left-0 w-0 min-w-[min(100%,var(--dt-viewport-w,100%))]';
 
 /**
- * The body of a grid table, at every width. The same states as the card body, re-laid: loading rows are 48px grid rows, the empty state sits inside the bordered block, `minRows` pads with
- * 48px rows. `compact`, `rowHeightClassName` and `rowClassName` are card-row options and are not read here.
+ * The body of a grid table, at every width. The same states as the card body, re-laid: loading rows are 48px grid rows,
+ * the empty state sits inside the bordered block. `minRows` keeps a short or empty page as tall as a full one without
+ * drawing anything for the missing rows: the block ends at its last row (or at the empty state's own height) and the
+ * rest is room under it, as the card layout's invisible pad rows are (CU-17tkuw6af0q). A fixed-height table reserves
+ * nothing: its height is the host's. `compact`, `rowHeightClassName` and `rowClassName` are card-row options and are
+ * not read here.
  */
 export function DataTableGridBody<T = unknown>({
   loading: loadingProp,
@@ -76,6 +81,10 @@ export function DataTableGridBody<T = unknown>({
   );
   const visibleColumns = table.getVisibleFlatColumns();
   const layout = useGridStructure(visibleColumns);
+  const reservedHeight = minRows && minRows > 0 ? minRows * GRID_ROW_HEIGHT : 0;
+  // The empty state's box, measured: the room under the block is what the message leaves of a full page.
+  const [emptyBox, setEmptyBox] = useState<HTMLDivElement | null>(null);
+  const emptyReserve = useGridEmptyReserve(emptyBox, reservedHeight);
 
   const loading = inScope || loadingProp;
   const rows = table.getRowModel().rows;
@@ -86,6 +95,8 @@ export function DataTableGridBody<T = unknown>({
   const skeletonRows =
     skeletonRowsProp ?? dataTablePageSize(table) ?? (minRows && minRows > 0 ? minRows : DATA_TABLE_SKELETON_ROWS);
 
+  // The room under the block (page mode only): the missing rows' height, never drawn.
+  let reserve = 0;
   let content: ReactNode;
   if (loading && loadingCells && hasRows) {
     content = (
@@ -124,20 +135,19 @@ export function DataTableGridBody<T = unknown>({
     // box their width; with no header drawn there is nothing to reach and the box stays one viewport wide. The message
     // is one viewport wide and sticky, so it stays in view however far the box scrolls. Both sit in one `w-max` box
     // because a sticky element moves only inside its parent, and a plain block is one viewport wide.
+    // The box is the message's own height, the message at its top: centred in a full page of room (twenty rows) it sat
+    // below the fold, the lesson the card layout's empty state learned too.
+    reserve = emptyReserve;
     content = (
-      <div data-grid-empty className="w-max min-w-full">
+      <div ref={setEmptyBox} data-grid-empty className="w-max min-w-full">
         {headerDrawn && <GridBlankRow layout={layout} />}
-        <div
-          className={cn('flex items-center justify-center bg-ods-card', GRID_EMPTY_MESSAGE_CLASS)}
-          style={minRows ? { minHeight: minRows * GRID_ROW_HEIGHT } : undefined}
-        >
-          {empty}
-        </div>
+        <div className={cn('flex items-center justify-center bg-ods-card', GRID_EMPTY_MESSAGE_CLASS)}>{empty}</div>
       </div>
     );
   } else {
     // Load-more rows are row slots too, so they count against `minRows`.
     const padCount = minRows ? Math.max(0, minRows - rows.length - loadMorePageSize) : 0;
+    reserve = padCount * GRID_ROW_HEIGHT;
     content = (
       <div className={GRID_STACK_CLASS}>
         {rows.map(row => {
@@ -160,7 +170,6 @@ export function DataTableGridBody<T = unknown>({
             {() => <DataTableGridRow row={null} layout={layout} data-loading-item />}
           </LoadingItems>
         )}
-        {padCount > 0 && <GridPadRows count={padCount} layout={layout} />}
       </div>
     );
   }
@@ -183,6 +192,8 @@ export function DataTableGridBody<T = unknown>({
         'peer-data-[grid-header]/gridheader:rounded-t-none peer-data-[grid-header]/gridheader:border-t-0',
         className,
       )}
+      // On the bordered element itself, not a wrapper: the body must stay the header's next sibling (its `peer`).
+      style={reserve > 0 ? { marginBottom: reserve } : undefined}
     >
       {/* The horizontal scroller. Not an ancestor of the header, which is sticky to the page. */}
       <div ref={viewportRef} className="overflow-x-auto" onScroll={onViewportScroll}>
@@ -196,33 +207,16 @@ export function DataTableGridBody<T = unknown>({
 }
 
 /**
- * `minRows` in the grid: the missing rows' height, drawn as empty rows so the dividers and the fill carry on. They are
- * not rows being read, so they are not loading items.
+ * A zero-high row of the layout's columns, each as wide as its column and taking the free width the same way: it only
+ * gives its parent the columns' width (the empty state).
  */
-function GridPadRows({ count, layout }: { count: number; layout: GridLayout }) {
-  return (
-    <>
-      {Array.from({ length: count }, (_, index) => (
-        <GridBlankRow key={index} layout={layout} cellClassName="h-12 border-b border-ods-border bg-ods-card" />
-      ))}
-    </>
-  );
-}
-
-/**
- * A row of the layout's columns with nothing in them, each as wide as its column and taking the free width the same
- * way. With no `cellClassName` it is zero high: it only gives its parent the columns' width (the empty state).
- */
-function GridBlankRow({ layout, cellClassName }: { layout: GridLayout; cellClassName?: string }) {
+function GridBlankRow({ layout }: { layout: GridLayout }) {
   return (
     <div data-grid-blank-row aria-hidden="true" className="pointer-events-none flex w-max min-w-full">
       {layout.columns.map(column => (
         <div
           key={column.id}
-          className={cn(
-            cellClassName,
-            column.kind === 'filler' ? 'flex-1' : column.grow ? 'flex-auto shrink-0' : 'flex-none',
-          )}
+          className={column.kind === 'filler' ? 'flex-1' : column.grow ? 'flex-auto shrink-0' : 'flex-none'}
           style={column.kind === 'filler' ? undefined : { width: gridCellStyle(column)?.width }}
         />
       ))}

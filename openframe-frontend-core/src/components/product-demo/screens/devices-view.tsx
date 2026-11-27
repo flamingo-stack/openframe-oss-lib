@@ -30,6 +30,10 @@ export interface DevicesScreenViewProps {
  * match. No title row (the job is named above the picture) and no row menu (a closed menu carries nothing and
  * the customer needs the room). The narrow rendering drops the customer column and keeps device, status and OS.
  *
+ * The table is the product's grid (one bordered block of 48px one-line rows), as the product's tables are, at every
+ * frame width. Under the frame's scale step (a phone) it is drawn at its real size and the columns past the frame's
+ * edge are cut under the scroll shade: the picture cannot scroll, so the device column is what a phone shows.
+ *
  * Read by the screen (with its fixture) and by its skeleton (`loading`: the panel's own loading state, the real
  * toolbar locked and the rows skeletons), so the two are one layout.
  */
@@ -47,6 +51,7 @@ export function DevicesScreenView({
         headerSlot={NO_HEADER}
         toolbar={TOOLBAR}
         viewMode="table"
+        tableLayout="grid"
         devices={devices}
         deviceFilters={deviceFilters}
         totalCount={totalCount}
