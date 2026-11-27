@@ -48,16 +48,19 @@ public class CustomDeviceOsUpdateRolloutStateRepositoryImpl implements CustomDev
     public OsUpdateOverdueDeviceCounts countOverdueDevices(String tenantId, Collection<String> organizationIds,
                                                            Instant now) {
         Criteria overdue = ofCustomers(tenantId, organizationIds).and(FIELD_HARD_AT).lt(now);
+        Query overdueRows = Query.query(overdue);
         List<String> overdueMachineIds = mongoTemplate.findDistinct(
-                Query.query(overdue), FIELD_MACHINE_ID, DeviceOsUpdateRolloutState.class, String.class);
+                overdueRows, FIELD_MACHINE_ID, DeviceOsUpdateRolloutState.class, String.class);
         if (overdueMachineIds.isEmpty()) {
             return OsUpdateOverdueDeviceCounts.NONE;
         }
         Criteria onlineOfThem = Criteria.where(FIELD_TENANT_ID).is(tenantId)
                 .and(FIELD_MACHINE_ID).in(overdueMachineIds)
                 .and(FIELD_TELEMETRY_STATUS).is(TelemetryStatus.ONLINE);
-        long onlineDeviceCount = mongoTemplate.count(Query.query(onlineOfThem), Machine.class);
-        return new OsUpdateOverdueDeviceCounts(overdueMachineIds.size(), overdueMachineIds.size() - onlineDeviceCount);
+        Query onlineMachines = Query.query(onlineOfThem);
+        long onlineDeviceCount = mongoTemplate.count(onlineMachines, Machine.class);
+        long overdueDeviceCount = overdueMachineIds.size();
+        return new OsUpdateOverdueDeviceCounts(overdueDeviceCount, overdueDeviceCount - onlineDeviceCount);
     }
 
     private static Criteria ofCustomers(String tenantId, Collection<String> organizationIds) {
