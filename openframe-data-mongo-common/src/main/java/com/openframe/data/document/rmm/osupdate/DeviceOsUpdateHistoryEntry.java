@@ -39,6 +39,9 @@ public class DeviceOsUpdateHistoryEntry implements TenantScoped {
 
     private String machineId;
 
+    // The customer of the device, copied at the report: a device keeps its customer for life.
+    private String organizationId;
+
     // identifier + installedAt + operation: one install is one entry, however many reports repeat it.
     private String entryKey;
 

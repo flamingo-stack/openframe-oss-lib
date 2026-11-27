@@ -1,13 +1,14 @@
 package com.openframe.data.repository.rmm.osupdate;
 
+import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.osupdate.DeviceOsUpdateRolloutState;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -25,8 +26,7 @@ public class CustomDeviceOsUpdateRolloutStateRepositoryImpl implements CustomDev
     private static final String FIELD_INSTALL_FROM = "installFrom";
     private static final String FIELD_HARD_AT = "hardAt";
     private static final String FIELD_DEVICE_COUNT = "deviceCount";
-    private static final String FIELD_OFFLINE_DEVICE_COUNT = "offlineDeviceCount";
-    private static final String MACHINE_TELEMETRY_STATUS = "$" + OsUpdateMachineStages.FIELD_MACHINE + ".telemetryStatus";
+    private static final String FIELD_TELEMETRY_STATUS = "telemetryStatus";
 
     private final MongoTemplate mongoTemplate;
 
@@ -48,20 +48,19 @@ public class CustomDeviceOsUpdateRolloutStateRepositoryImpl implements CustomDev
     public OsUpdateOverdueDeviceCounts countOverdueDevices(String tenantId, Collection<String> organizationIds,
                                                            Instant now) {
         Criteria overdue = ofCustomers(tenantId, organizationIds).and(FIELD_HARD_AT).lt(now);
-        Document telemetryStatus = new Document("$arrayElemAt", List.of(MACHINE_TELEMETRY_STATUS, 0));
-        Document notOnline = new Document("$ne", List.of(telemetryStatus, TelemetryStatus.ONLINE.name()));
-        Document offlineOrNot = new Document("$cond", List.of(notOnline, 1, 0));
-        Document overdueDeviceCounts = new Document("$group", new Document(FIELD_ID, null)
-                .append(FIELD_DEVICE_COUNT, new Document("$sum", 1))
-                .append(FIELD_OFFLINE_DEVICE_COUNT, new Document("$sum", offlineOrNot)));
-        List<AggregationOperation> stages = List.of(
-                Aggregation.match(overdue),
-                Aggregation.group(FIELD_MACHINE_ID),
-                OsUpdateMachineStages.lookupMachineOfGroup(tenantId),
-                context -> overdueDeviceCounts);
-        List<OsUpdateOverdueDeviceCounts> deviceCounts = mongoTemplate.aggregate(Aggregation.newAggregation(stages),
-                DeviceOsUpdateRolloutState.class, OsUpdateOverdueDeviceCounts.class).getMappedResults();
-        return deviceCounts.isEmpty() ? OsUpdateOverdueDeviceCounts.NONE : deviceCounts.getFirst();
+        Query overdueRows = Query.query(overdue);
+        List<String> overdueMachineIds = mongoTemplate.findDistinct(
+                overdueRows, FIELD_MACHINE_ID, DeviceOsUpdateRolloutState.class, String.class);
+        if (overdueMachineIds.isEmpty()) {
+            return OsUpdateOverdueDeviceCounts.NONE;
+        }
+        Criteria onlineOfThem = Criteria.where(FIELD_TENANT_ID).is(tenantId)
+                .and(FIELD_MACHINE_ID).in(overdueMachineIds)
+                .and(FIELD_TELEMETRY_STATUS).is(TelemetryStatus.ONLINE);
+        Query onlineMachines = Query.query(onlineOfThem);
+        long onlineDeviceCount = mongoTemplate.count(onlineMachines, Machine.class);
+        long overdueDeviceCount = overdueMachineIds.size();
+        return new OsUpdateOverdueDeviceCounts(overdueDeviceCount, overdueDeviceCount - onlineDeviceCount);
     }
 
     private static Criteria ofCustomers(String tenantId, Collection<String> organizationIds) {

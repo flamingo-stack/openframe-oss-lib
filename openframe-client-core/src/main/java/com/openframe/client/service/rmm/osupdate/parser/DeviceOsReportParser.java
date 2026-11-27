@@ -70,6 +70,7 @@ public class DeviceOsReportParser {
         return ReportingDevice.builder()
                 .tenantId(machine.getTenantId())
                 .machineId(machine.getMachineId())
+                .organizationId(machine.getOrganizationId())
                 .platform(platform)
                 .receivedAt(receivedAt)
                 .build();

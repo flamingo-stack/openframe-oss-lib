@@ -33,6 +33,7 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +46,10 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String OTHER_TENANT_ID = "tenant-2";
+    // machine-4 has no customer
+    private static final Map<String, String> ORGANIZATION_ID_BY_MACHINE_ID = Map.of(
+            "machine-1", "org-1", "machine-2", "org-1", "machine-3", "org-2", "machine-5", "org-1",
+            "machine-9", "org-9");
     private static final Instant CREATED_AT = Instant.parse("2026-10-01T00:00:00Z");
 
     @Autowired private MongoTemplate mongoTemplate;
@@ -320,27 +325,27 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
     // a customer; machine-5 of org-1; machine-9 of the other tenant.
     private void saveMachines() {
         mongoTemplate.insertAll(List.of(
-                machine(TENANT_ID, "machine-1", "org-1", TelemetryStatus.ONLINE),
-                machine(TENANT_ID, "machine-2", "org-1", TelemetryStatus.OFFLINE),
-                machine(TENANT_ID, "machine-3", "org-2", null),
-                machine(TENANT_ID, "machine-4", null, TelemetryStatus.ONLINE),
-                machine(TENANT_ID, "machine-5", "org-1", TelemetryStatus.ONLINE),
-                machine(OTHER_TENANT_ID, "machine-9", "org-9", TelemetryStatus.ONLINE)));
+                machine(TENANT_ID, "machine-1", TelemetryStatus.ONLINE),
+                machine(TENANT_ID, "machine-2", TelemetryStatus.OFFLINE),
+                machine(TENANT_ID, "machine-3", null),
+                machine(TENANT_ID, "machine-4", TelemetryStatus.ONLINE),
+                machine(TENANT_ID, "machine-5", TelemetryStatus.ONLINE),
+                machine(OTHER_TENANT_ID, "machine-9", TelemetryStatus.ONLINE)));
     }
 
-    private static Machine machine(String tenantId, String machineId, String organizationId,
-                                   TelemetryStatus telemetryStatus) {
+    private static Machine machine(String tenantId, String machineId, TelemetryStatus telemetryStatus) {
         Machine machine = new Machine();
         machine.setTenantId(tenantId);
         machine.setMachineId(machineId);
-        machine.setOrganizationId(organizationId);
+        machine.setOrganizationId(ORGANIZATION_ID_BY_MACHINE_ID.get(machineId));
         machine.setTelemetryStatus(telemetryStatus);
         return machine;
     }
 
     private static DeviceOsPendingUpdate pendingUpdate(String tenantId, String machineId, String identifier) {
         return DeviceOsPendingUpdate.builder()
-                .tenantId(tenantId).machineId(machineId).platform(OsPlatform.WINDOWS).identifier(identifier)
+                .tenantId(tenantId).machineId(machineId).organizationId(ORGANIZATION_ID_BY_MACHINE_ID.get(machineId))
+                .platform(OsPlatform.WINDOWS).identifier(identifier)
                 .build();
     }
 
@@ -348,7 +353,8 @@ class OsUpdateRolloutRepositoriesIT extends BaseMongoIntegrationTest {
                                                            OsUpdateOperation operation,
                                                            OsUpdateInstallResult result) {
         return DeviceOsUpdateHistoryEntry.builder()
-                .tenantId(TENANT_ID).machineId(machineId).entryKey("entry-" + number).identifier(identifier)
+                .tenantId(TENANT_ID).machineId(machineId).organizationId(ORGANIZATION_ID_BY_MACHINE_ID.get(machineId))
+                .entryKey("entry-" + number).identifier(identifier)
                 .installedAt(CREATED_AT.plusSeconds(number)).operation(operation).result(result)
                 .build();
     }
