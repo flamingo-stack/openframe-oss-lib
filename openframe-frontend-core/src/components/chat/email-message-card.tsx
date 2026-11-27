@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { ChatEmailAddress, ChatEmailEnvelope } from '../../chat-protocol/chat-message';
 import { cn } from '../../utils/cn';
 import { EmailIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 import { TouchFriendlyTooltip } from '../ui/touch-friendly-tooltip';
 
 const addressOf = (entry: ChatEmailAddress): string => entry.address;
@@ -55,13 +56,15 @@ export function EmailMessageCard({ email, body, self }: EmailMessageCardProps) {
           {cc && (
             // Who was copied opens on hover, keyboard focus and tap alike; the button also names them to a screen reader.
             <TouchFriendlyTooltip content={cc} side="top">
-              <button
+              <Button
                 type="button"
+                variant="bare"
+                size="wrap"
                 aria-label={`${ccCount}: ${cc}`}
-                className="shrink-0 cursor-default rounded-sm text-ods-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+                className="shrink-0 cursor-default"
               >
                 {ccCount}
-              </button>
+              </Button>
             </TouchFriendlyTooltip>
           )}
           {email.automatic && <span className="ml-auto shrink-0 text-ods-text-secondary">Automatic reply</span>}
