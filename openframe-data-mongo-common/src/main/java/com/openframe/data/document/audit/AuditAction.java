@@ -383,6 +383,7 @@ public enum AuditAction {
     STAFF_TENANT_ACCESS_START("staff.tenant_access.start", REMOTE_ACCESS, TENANT),
     BACKOFFICE_CUSTOMER_DATA_VIEW("backoffice.customer_data.view", SENSITIVE_READ, TENANT),
     BACKOFFICE_AUTH_FAIL("backoffice.auth.fail", LOGIN, REQUEST),
+    POLICY_API_AUTH_FAIL("policy_api.auth.fail", LOGIN, REQUEST),
     BACKOFFICE_ANNOUNCEMENT_SEND("backoffice.announcement.send", CHANGE, ANNOUNCEMENT),
     TENANT_BLOCK("tenant.block", CHANGE, TENANT),
     TENANT_UNBLOCK("tenant.unblock", CHANGE, TENANT),
