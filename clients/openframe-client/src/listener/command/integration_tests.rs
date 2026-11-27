@@ -2014,13 +2014,15 @@ fn run_tool_process(path: &std::path::Path) -> ToolExit {
         std::fs::copy(r"C:\Windows\System32\PING.EXE", path).unwrap();
         ["-n", "300", "127.0.0.1"].as_slice()
     };
-    // A script, not a copied system binary: macOS may SIGKILL a copied signed binary at any time.
     #[cfg(unix)]
     let args = {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::write(path, "#!/bin/sh\nwhile :; do sleep 1; done\n").unwrap();
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
-        <&[&str]>::default()
+        std::fs::copy(std::env::current_exe().unwrap(), path).unwrap();
+        [
+            "--ignored",
+            "--exact",
+            "listener::command::integration_tests::tool_process_helper",
+        ]
+        .as_slice()
     };
     let mut child = tokio::process::Command::new(path)
         .args(args)
@@ -2032,6 +2034,12 @@ fn run_tool_process(path: &std::path::Path) -> ToolExit {
         let _ = exited.send(format!("{:?}", child.wait().await));
     });
     on_exit
+}
+
+#[test]
+#[ignore = "helper process started by run_tool_process"]
+fn tool_process_helper() {
+    std::thread::sleep(std::time::Duration::from_secs(300));
 }
 
 fn agent_file_name() -> &'static str {
