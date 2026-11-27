@@ -13,6 +13,7 @@ public class ReportingDevice {
     String tenantId;
 
     String machineId;
+    String organizationId;
 
     OsPlatform platform;
 

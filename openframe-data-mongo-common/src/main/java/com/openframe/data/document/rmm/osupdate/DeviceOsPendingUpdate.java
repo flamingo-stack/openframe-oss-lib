@@ -32,6 +32,9 @@ public class DeviceOsPendingUpdate implements TenantScoped {
 
     private String machineId;
 
+    // The customer of the device, copied at the report: a device keeps its customer for life.
+    private String organizationId;
+
     private OsPlatform platform;
 
     private String identifier;

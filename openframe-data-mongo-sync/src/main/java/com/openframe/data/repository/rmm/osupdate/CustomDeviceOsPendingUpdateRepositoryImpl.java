@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -24,6 +23,8 @@ public class CustomDeviceOsPendingUpdateRepositoryImpl implements CustomDeviceOs
 
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_MACHINE_ID = "machineId";
+    private static final String FIELD_ORGANIZATION_ID = "organizationId";
+    private static final String FIELD_DEVICE_COUNT = "deviceCount";
     private static final String FIELD_PLATFORM = "platform";
     private static final String FIELD_IDENTIFIER = "identifier";
     private static final String FIELD_DISCOVERED_AT = "discoveredAt";
@@ -69,10 +70,13 @@ public class CustomDeviceOsPendingUpdateRepositoryImpl implements CustomDeviceOs
         if (machineIds != null) {
             conditions.add(Criteria.where(FIELD_MACHINE_ID).in(machineIds));
         }
-        List<AggregationOperation> stages = new ArrayList<>();
-        stages.add(Aggregation.match(new Criteria().andOperator(conditions)));
-        stages.addAll(OsUpdateMachineStages.countDevicesByIdentifierAndOrganization(tenantId));
-        return mongoTemplate.aggregate(Aggregation.newAggregation(stages), DeviceOsPendingUpdate.class,
+        conditions.add(Criteria.where(FIELD_ORGANIZATION_ID).ne(null));
+        // A device has one row per identifier, so the rows of an identifier and a customer are its devices.
+        Aggregation devicesOfIdentifierAndOrganization = Aggregation.newAggregation(
+                Aggregation.match(new Criteria().andOperator(conditions)),
+                Aggregation.group(FIELD_IDENTIFIER, FIELD_ORGANIZATION_ID).count().as(FIELD_DEVICE_COUNT),
+                Aggregation.project(FIELD_IDENTIFIER, FIELD_ORGANIZATION_ID, FIELD_DEVICE_COUNT));
+        return mongoTemplate.aggregate(devicesOfIdentifierAndOrganization, DeviceOsPendingUpdate.class,
                 OsUpdateOrganizationDeviceCount.class).getMappedResults();
     }
 

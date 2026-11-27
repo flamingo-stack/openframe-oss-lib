@@ -79,6 +79,9 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
 
     private static final String ORG_A = "org-a";
     private static final String ORG_B = "org-b";
+    private static final Map<String, String> ORGANIZATION_ID_BY_MACHINE_ID = Map.of(
+            WIN_1, ORG_A, WIN_NOT_MANAGEABLE, ORG_A, WIN_2, ORG_B, WIN_4, ORG_B, MAC_1, ORG_B,
+            OTHER_TENANT_MACHINE, ORG_A);
     private static final String ORG_WITHOUT_DEVICES = "org-without-devices";
 
     private static final String CUMULATIVE = "a1b2c3d4-0000-4444-8888-99aabbccddee:201";
@@ -183,11 +186,10 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
         mongoTemplate.remove(new Query(), OsUpdateOverride.class);
         mongoTemplate.remove(new Query(), DeviceOsUpdateRolloutState.class);
 
-        Stream.of(WIN_1, WIN_NOT_MANAGEABLE)
-                .forEach(machineId -> machines().insertOne(machine(machineId, TENANT_ID, ORG_A)));
-        Stream.of(WIN_2, WIN_4, MAC_1)
-                .forEach(machineId -> machines().insertOne(machine(machineId, TENANT_ID, ORG_B)));
-        machines().insertOne(machine(OTHER_TENANT_MACHINE, OTHER_TENANT_ID, ORG_A));
+        Stream.of(WIN_1, WIN_NOT_MANAGEABLE, WIN_2, WIN_4, MAC_1).forEach(machineId -> machines().insertOne(
+                machine(machineId, TENANT_ID, ORGANIZATION_ID_BY_MACHINE_ID.get(machineId))));
+        machines().insertOne(machine(OTHER_TENANT_MACHINE, OTHER_TENANT_ID,
+                ORGANIZATION_ID_BY_MACHINE_ID.get(OTHER_TENANT_MACHINE)));
         stateCollection().insertOne(state(WIN_1, TENANT_ID, "MANAGEABLE"));
         stateCollection().insertOne(state(WIN_NOT_MANAGEABLE, TENANT_ID, "NOT_MANAGEABLE"));
         stateCollection().insertOne(state(OTHER_TENANT_MACHINE, OTHER_TENANT_ID, "MANAGEABLE"));
@@ -948,6 +950,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                                           String discoveredAt) {
         return new Document("tenantId", tenantId)
                 .append("machineId", machineId)
+                .append("organizationId", ORGANIZATION_ID_BY_MACHINE_ID.get(machineId))
                 .append("platform", platform)
                 .append("identifier", identifier)
                 .append("discoveredAt", date(discoveredAt));
@@ -957,6 +960,7 @@ class OsUpdatesReadIT extends BaseMongoIntegrationTest {
                                          String operation, String result) {
         return new Document("tenantId", tenantId)
                 .append("machineId", machineId)
+                .append("organizationId", ORGANIZATION_ID_BY_MACHINE_ID.get(machineId))
                 .append("entryKey", identifier + "|" + Instant.parse(installedAt).toEpochMilli() + "|" + operation)
                 .append("identifier", identifier)
                 .append("installedAt", date(installedAt))

@@ -30,6 +30,7 @@ class DeviceOsUpdateHistoryParserTest {
 
     private static final String TENANT_ID = "tenant-1";
     private static final String MACHINE_ID = "machine-1";
+    private static final String ORGANIZATION_ID = "org-1";
     private static final String UPDATE_ID = "ffeeddcc-1111-2222-3333-445566778899";
     private static final String TITLE = "2026-10 Cumulative Update for Windows 11 Version 24H2 (KB5049981)";
     private static final Instant RECEIVED_AT = Instant.parse("2026-11-20T09:14:03.120Z");
@@ -58,6 +59,7 @@ class DeviceOsUpdateHistoryParserTest {
         reportingDevice = ReportingDevice.builder()
                 .tenantId(TENANT_ID)
                 .machineId(MACHINE_ID)
+                .organizationId(ORGANIZATION_ID)
                 .platform(OsPlatform.WINDOWS)
                 .receivedAt(RECEIVED_AT)
                 .build();
@@ -69,6 +71,7 @@ class DeviceOsUpdateHistoryParserTest {
         DeviceOsUpdateHistoryEntry expected = DeviceOsUpdateHistoryEntry.builder()
                 .tenantId(TENANT_ID)
                 .machineId(MACHINE_ID)
+                .organizationId(ORGANIZATION_ID)
                 .entryKey(UPDATE_ID + ":198|" + INSTALLED_AT.toEpochMilli() + "|INSTALL")
                 .identifier(UPDATE_ID + ":198")
                 .title(TITLE)
