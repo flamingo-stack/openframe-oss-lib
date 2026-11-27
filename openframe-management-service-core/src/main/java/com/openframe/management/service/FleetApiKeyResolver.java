@@ -42,7 +42,7 @@ public class FleetApiKeyResolver {
     }
 
     public String resolve(IntegratedTool tool) {
-        String fleetUrl = extractApiUrl(tool);
+        String fleetUrl = apiUrlOf(tool);
         FleetMdmSetupClient client = new FleetMdmSetupClient(fleetUrl, tenantId);
 
         ToolCredentials credentials = tool.getCredentials();
@@ -51,7 +51,7 @@ public class FleetApiKeyResolver {
         return createOrLoginApiUser(client, credentials, adminToken);
     }
 
-    private String extractApiUrl(IntegratedTool tool) {
+    static String apiUrlOf(IntegratedTool tool) {
         ToolUrl toolUrl = tool.getToolUrls().stream()
                 .filter(u -> u.getType() == ToolUrlType.API)
                 .findFirst()
