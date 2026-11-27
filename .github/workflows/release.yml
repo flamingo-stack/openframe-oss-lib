@@ -225,6 +225,7 @@ jobs:
     permissions:
       contents: write
       actions: read
+      checks: read
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'rust' && !inputs.snapshot
 
     steps:
@@ -260,8 +261,9 @@ jobs:
         run: |
           set -euo pipefail
           sha=$(git log -1 --format=%H -- clients .github/steps/rust-setup .github/workflows/build.yml)
-          conclusion=$(gh run list --workflow build.yml --event push --commit "$sha" --json conclusion --jq '.[0].conclusion // "no run"')
-          [ "$conclusion" = success ] || { echo "::error::Rust jobs on ${sha::9}: ${conclusion:-still running}"; exit 1; }
+          run=$(gh run list --workflow build.yml --event push --commit "$sha" --json databaseId --jq '.[0].databaseId // empty')
+          [ -n "$run" ] || { echo "::error::No build.yml run on main for ${sha::9}"; exit 1; }
+          gh run watch "$run" --exit-status --compact --interval 30 || { echo "::error::Rust jobs on ${sha::9} failed"; exit 1; }
 
       - name: Push Tag ${{ env.NEW_VERSION }}
         run: |

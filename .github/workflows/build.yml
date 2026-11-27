@@ -14,8 +14,8 @@ on:
     branches: [main]
 
 concurrency:
-  # A push run has its own group, so the next merge doesn't cancel its cache save.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  # By event and commit, so a push run cancels neither the merge-queue run of its commit nor the previous push's cache save.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 env:
