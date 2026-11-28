@@ -4,7 +4,8 @@ import { useState } from 'react';
 import type { ChatEmailAddress, ChatEmailEnvelope } from '../../chat-protocol/chat-message';
 import { cn } from '../../utils/cn';
 import { EmailIcon } from '../icons-v2-generated';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { Button } from '../ui/button';
+import { TouchFriendlyTooltip } from '../ui/touch-friendly-tooltip';
 
 const addressOf = (entry: ChatEmailAddress): string => entry.address;
 
@@ -32,6 +33,8 @@ interface EmailMessageCardProps {
 export function EmailMessageCard({ email, body, self }: EmailMessageCardProps) {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const to = email.to.map(addressOf).join(', ');
+  const cc = email.cc.map(addressOf).join(', ');
+  const ccCount = `+${email.cc.length} in CC`;
   const delivery = deliveryLineOf(email);
   return (
     <div className={cn('flex min-w-0', self ? 'justify-end' : 'justify-start')} data-testid="chat-email-message">
@@ -50,17 +53,19 @@ export function EmailMessageCard({ email, body, self }: EmailMessageCardProps) {
               </span>
             </>
           )}
-          {email.cc.length > 0 && (
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="shrink-0 cursor-default text-ods-text-secondary">+{email.cc.length} in CC</span>
-                </TooltipTrigger>
-                <TooltipContent side="top" align="start">
-                  {email.cc.map(addressOf).join(', ')}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          {cc && (
+            // Who was copied opens on hover, keyboard focus and tap alike; the button also names them to a screen reader.
+            <TouchFriendlyTooltip content={cc} side="top">
+              <Button
+                type="button"
+                variant="bare"
+                size="wrap"
+                aria-label={`${ccCount}: ${cc}`}
+                className="shrink-0 cursor-default"
+              >
+                {ccCount}
+              </Button>
+            </TouchFriendlyTooltip>
           )}
           {email.automatic && <span className="ml-auto shrink-0 text-ods-text-secondary">Automatic reply</span>}
         </div>

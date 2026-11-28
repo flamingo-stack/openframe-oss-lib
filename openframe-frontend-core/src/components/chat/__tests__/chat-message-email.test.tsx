@@ -3,7 +3,7 @@
  * folded, a failed reply saying so. The body is the email's plain text, never markdown.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ChatEmailEnvelope } from '../../../chat-protocol/chat-message';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
@@ -39,6 +39,14 @@ describe('an email message', () => {
     expect(card.textContent).toContain('to');
     expect(card.textContent).toContain('support@brightpath-it.com');
     expect(card.textContent).toContain('+1 in CC');
+  });
+
+  it('shows who was copied to a keyboard: the count takes focus and opens the list', async () => {
+    renderEmail({ ...INBOUND, cc: [{ address: 'john@mail.com' }, { address: 'ann@mail.com' }] }, 'Hi team');
+    const trigger = screen.getByRole('button', { name: '+2 in CC: john@mail.com, ann@mail.com' });
+    act(() => trigger.focus());
+    expect(trigger).toHaveFocus();
+    expect((await screen.findByRole('tooltip')).textContent).toBe('john@mail.com, ann@mail.com');
   });
 
   it("draws its body as the email's plain text, not markdown", () => {
