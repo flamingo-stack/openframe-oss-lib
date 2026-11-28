@@ -5,7 +5,7 @@ import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.ticket.TicketCreationSource;
-import com.openframe.data.document.ticket.TicketStatus;
+import com.openframe.data.document.ticket.TicketStatusKind;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.GraphQLAppliedDirective;
@@ -342,13 +342,13 @@ class ApiSubgraphSchemaTest {
 
     private static Stream<Arguments> ticketEnumFields() {
         return Stream.of(
-                Arguments.of("status", "TicketStatus"),
+                Arguments.of("statusKind", "TicketStatusKind"),
                 Arguments.of("creationSource", "TicketCreationSource"));
     }
 
     private static Stream<Arguments> ticketEnums() {
         return Stream.of(
-                Arguments.of("TicketStatus", TicketStatus.class),
+                Arguments.of("TicketStatusKind", TicketStatusKind.class),
                 Arguments.of("TicketCreationSource", TicketCreationSource.class));
     }
 
