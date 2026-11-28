@@ -48,3 +48,12 @@ describe('the contact contract', () => {
     expect(splitName('')).toEqual({ firstname: undefined, lastname: undefined });
   });
 });
+
+describe('the company contract', () => {
+  it('labels every company field, and edits every field but the page a shared inbox was read on', async () => {
+    const { COMPANY_FIELDS, COMPANY_FIELD_LABELS, COMPANY_EDITABLE_FIELDS } = await import('../contact-fields');
+    expect(Object.keys(COMPANY_FIELD_LABELS).sort()).toEqual([...COMPANY_FIELDS].sort());
+    expect(COMPANY_EDITABLE_FIELDS).toEqual(COMPANY_FIELDS.filter(f => f !== 'shared_inbox_source'));
+    expect(COMPANY_FIELDS).toContain('naics_code');
+  });
+});
