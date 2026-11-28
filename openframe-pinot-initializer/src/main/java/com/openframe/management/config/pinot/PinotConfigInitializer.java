@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
 import tools.jackson.databind.json.JsonMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,9 @@ public class PinotConfigInitializer {
     @Value("${pinot.config.retry.delay-ms:5000}")
     private long retryDelayMs;
 
+    @Value("${openframe.audit.enabled}")
+    private boolean auditEnabled;
+
     private static final List<String> FIELD_SPECS =
             List.of("dimensionFieldSpecs", "metricFieldSpecs", "dateTimeFieldSpecs", "complexFieldSpecs");
 
@@ -61,6 +65,9 @@ public class PinotConfigInitializer {
             new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
             new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
     );
+
+    private static final PinotConfig AUDIT_EVENTS_CONFIG = new PinotConfig("audit_events",
+            "schema-audit-events.json", "table-config-audit-events-realtime.json", null);
 
     // Two constructors and none marked: Spring would look for a no-arg one and fail.
     @Autowired
@@ -84,8 +91,11 @@ public class PinotConfigInitializer {
 
         log.info("Starting Pinot configuration deployment to {}", pinotControllerUrl);
 
+        List<PinotConfig> configs = auditEnabled
+                ? Stream.concat(PINOT_CONFIGS.stream(), Stream.of(AUDIT_EVENTS_CONFIG)).toList()
+                : PINOT_CONFIGS;
         List<String> failed = new ArrayList<>();
-        for (PinotConfig config : PINOT_CONFIGS) {
+        for (PinotConfig config : configs) {
             try {
                 deployPinotConfig(config);
             } catch (Exception e) {
@@ -100,7 +110,7 @@ public class PinotConfigInitializer {
             log.error("Pinot configuration deployment FAILED for {} of {} table(s): {}. "
                     + "Affected tables may be missing, stale, or rejected by the controller. "
                     + "See preceding stack traces for the underlying cause.",
-                    failed.size(), PINOT_CONFIGS.size(), failed);
+                    failed.size(), configs.size(), failed);
         }
     }
 
@@ -249,8 +259,8 @@ public class PinotConfigInitializer {
     // A column added to the schema only materialises in already-persisted segments when they are
     // reloaded; without this, queries selecting the new column see it missing on historical data.
     private void reloadSegments(String tableConfig) {
+        String tableName = resolveTableNameWithType(tableConfig);
         try {
-            String tableName = resolveTableNameWithType(tableConfig);
             String url = String.format("http://%s/segments/%s/reload", pinotControllerUrl, tableName);
 
             HttpHeaders headers = createHeaders();
@@ -264,6 +274,8 @@ public class PinotConfigInitializer {
                 throw new RuntimeException("Failed to trigger segment reload. Status: " + response.getStatusCode());
             }
 
+        } catch (HttpClientErrorException.NotFound e) {
+            log.info("No segments in {} yet, nothing to reload", tableName);
         } catch (Exception e) {
             log.error("Error triggering segment reload", e);
             throw new RuntimeException("Failed to trigger segment reload", e);

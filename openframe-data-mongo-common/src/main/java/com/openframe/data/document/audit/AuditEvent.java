@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.convert.ValueConverter;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -18,7 +19,7 @@ import java.util.Map;
 @Document(collection = "audit_events")
 public class AuditEvent {
 
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     @Id
     private String id;
@@ -48,6 +49,8 @@ public class AuditEvent {
     private AuditTargetType targetType;
     private String targetId;
     private String targetName;
+    @ValueConverter(AuditJsonTextConverter.class)
     private Map<String, Object> details;
+    @ValueConverter(AuditJsonTextConverter.class)
     private Map<String, AuditChange> changes;
 }
