@@ -12,6 +12,7 @@ public enum AuditTargetType {
     BILLING_PLAN,
     BLOCKED_EMAIL,
     BLOCKED_EMAIL_DOMAIN,
+    CHAT_ATTACHMENT,
     CUSTOMER_USER,
     DEVICE,
     DIALOG,

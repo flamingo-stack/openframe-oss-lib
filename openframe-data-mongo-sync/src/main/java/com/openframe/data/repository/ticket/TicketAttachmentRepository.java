@@ -9,8 +9,10 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/** Reads and writes metadata for files linked to tickets. */
 @Repository
-public interface TicketAttachmentRepository extends MongoRepository<TicketAttachment, String> {
+public interface TicketAttachmentRepository extends MongoRepository<TicketAttachment, String>,
+        CustomTicketAttachmentRepository {
 
     List<TicketAttachment> findByTicketId(String ticketId);
 
