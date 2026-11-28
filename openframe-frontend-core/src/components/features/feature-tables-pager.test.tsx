@@ -143,6 +143,13 @@ describe('PoliciesTable pager', () => {
     expect(rowCount(container.innerHTML)).toBe(2);
   });
 
+  it('reads the range over the total the host gives', () => {
+    const { container } = render(
+      <PoliciesTable {...POLICIES_TABLE.loaded} totalCount={52} metaRow={{ pager: pager() }} />,
+    );
+    expect(container.innerHTML).toContain('21–22 of 52 results');
+  });
+
   it("takes the pager row's own actions over the table's", () => {
     render(
       <PoliciesTable

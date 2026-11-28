@@ -149,6 +149,8 @@ export interface PoliciesTableProps extends FeatureTableLayoutProps {
    * back to `actions`). `pager: null` while the first page is read. A paged table draws no "load more" footer.
    */
   metaRow?: TableMetaRow;
+  /** The list's total, for a paged table's range ("21–40 of 52 results"). Without it the range has no total. */
+  totalCount?: number;
   skeletonRows?: number;
   /** Infinite "load more" footer. */
   hasMore?: boolean;
@@ -176,6 +178,7 @@ export function PoliciesTable({
   rightSlot,
   actions,
   metaRow: metaRowGiven,
+  totalCount,
   skeletonRows,
   hasMore = false,
   onLoadMore,
@@ -371,7 +374,13 @@ export function PoliciesTable({
           results in its right slot. */}
       {metaRow &&
         (pagedRow ? (
-          <DataTable.MetaRow metaRow={pagedRow} paged={paged} count={rightSlot} loading={loading} />
+          <DataTable.MetaRow
+            metaRow={pagedRow}
+            paged={paged}
+            count={rightSlot}
+            totalCount={loading ? undefined : totalCount}
+            loading={loading}
+          />
         ) : (
           <DataTable.Meta actions={actions}>{rightSlot}</DataTable.Meta>
         ))}
