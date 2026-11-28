@@ -3,7 +3,6 @@ package com.openframe.management.config.pinot;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +40,7 @@ public class PinotConfigInitializer {
     private final Environment environment;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final List<PinotTableDefinition> tables;
 
     @Value("${pinot.controller.url}")
     private String pinotControllerUrl;
@@ -57,20 +57,18 @@ public class PinotConfigInitializer {
     private static final List<String> FIELD_SPECS =
             List.of("dimensionFieldSpecs", "metricFieldSpecs", "dateTimeFieldSpecs", "complexFieldSpecs");
 
-    private static final List<PinotConfig> PINOT_CONFIGS = Arrays.asList(
-            new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
-            new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
-    );
-
     // Two constructors and none marked: Spring would look for a no-arg one and fail.
     @Autowired
-    public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
-        this(resourceLoader, environment, new RestTemplate());
+    public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment,
+                                  List<PinotTableDefinition> tables) {
+        this(resourceLoader, environment, tables, new RestTemplate());
     }
 
-    PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment, RestTemplate restTemplate) {
+    PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment,
+                           List<PinotTableDefinition> tables, RestTemplate restTemplate) {
         this.resourceLoader = resourceLoader;
         this.environment = environment;
+        this.tables = tables;
         this.restTemplate = restTemplate;
         this.objectMapper = new JsonMapper();
     }
@@ -85,12 +83,12 @@ public class PinotConfigInitializer {
         log.info("Starting Pinot configuration deployment to {}", pinotControllerUrl);
 
         List<String> failed = new ArrayList<>();
-        for (PinotConfig config : PINOT_CONFIGS) {
+        for (PinotTableDefinition table : tables) {
             try {
-                deployPinotConfig(config);
+                deployPinotConfig(table);
             } catch (Exception e) {
-                log.error("Failed to deploy Pinot configuration for {}", config.getName(), e);
-                failed.add(config.getName());
+                log.error("Failed to deploy Pinot configuration for {}", table.getName(), e);
+                failed.add(table.getName());
             }
         }
 
@@ -100,27 +98,25 @@ public class PinotConfigInitializer {
             log.error("Pinot configuration deployment FAILED for {} of {} table(s): {}. "
                     + "Affected tables may be missing, stale, or rejected by the controller. "
                     + "See preceding stack traces for the underlying cause.",
-                    failed.size(), PINOT_CONFIGS.size(), failed);
+                    failed.size(), tables.size(), failed);
         }
     }
 
-    private void deployPinotConfig(PinotConfig config) {
+    private void deployPinotConfig(PinotTableDefinition config) {
         log.info("Deploying Pinot configuration for: {}", config.getName());
 
         try {
             String schemaConfig = resolvePlaceholders(loadResource(config.getSchemaFile()));
-            String realtimeTableConfig = resolvePlaceholders(loadResource(config.getTableRealtimeConfigFile()));
+            String realtimeTableConfig = resolvePlaceholders(loadResource(config.getRealtimeTableConfigFile()));
 
             AtomicBoolean schemaChanged = new AtomicBoolean();
             deployWithRetry(() -> schemaChanged.set(columnsChange(schemaConfig)), "schema comparison for " + config.getName());
             deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
             deployWithRetry(() -> deployTableConfig(realtimeTableConfig, config.getName()), "realtime table config for " + config.getName());
 
-
-            if (config.getTableOfflineConfigFile() != null) {
-                String offlineTableConfig = resolvePlaceholders(loadResource(config.getTableOfflineConfigFile()));
+            if (config.hasOfflineTable()) {
+                String offlineTableConfig = resolvePlaceholders(loadResource(config.getOfflineTableConfigFile()));
                 deployWithRetry(() -> deployTableConfig(offlineTableConfig, config.getName()), "offline table config for " + config.getName());
-
             }
 
             deployWithRetry(() -> reloadSegments(realtimeTableConfig), "segment reload for " + config.getName());
