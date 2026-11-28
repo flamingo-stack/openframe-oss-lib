@@ -3,7 +3,7 @@
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { useLoadingScope } from '../loading-scope';
-import { useDataTableContext } from './data-table';
+import { useOptionalDataTableContext } from './data-table';
 
 export interface DataTableRowCountProps {
   /** Singular item name. Pluralized by adding an "s". */
@@ -55,10 +55,10 @@ export function DataTableRowCount({
   loading = false,
   className,
 }: DataTableRowCountProps) {
-  const table = useDataTableContext();
+  const table = useOptionalDataTableContext();
   // While the page is read the count is not known: the number is a bar beside the item name.
   const inScope = useLoadingScope() || loading;
-  const count = totalCount ?? table.getRowModel().rows.length;
+  const count = totalCount ?? table?.getRowModel().rows.length ?? 0;
   if (inScope) {
     return <DataTableRowCountSkeleton label={pluralize?.(2, itemName) ?? `${itemName}s`} className={className} />;
   }

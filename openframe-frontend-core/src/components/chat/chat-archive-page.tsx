@@ -3,6 +3,7 @@
 import { Chevron02LeftIcon, BoxArchiveIcon } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
+import { DataTable, type TableMetaRow, tableMetaRowLayout } from '../ui/data-table';
 import { useLoadingScope } from '../ui/loading-scope';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
@@ -23,6 +24,13 @@ interface ChatArchivePageBaseProps {
   hasMore?: boolean;
   /** Fetch the next page. */
   onLoadMore?: () => void;
+  /**
+   * A paged host's row above the list (`useCursorPager` `footerProps`): the page's range ("21–40 chats") with
+   * First · Previous · Next, and its controls (the auto-refresh picker). `pager: null` while the first page is read;
+   * `loading` while the next one is (the chats on screen are the last page's). A paged list grows on no scroll and
+   * shows no "Show more": `hasMore` / `onLoadMore` are for a list read page after page.
+   */
+  metaRow?: TableMetaRow;
   /** The first page failed with nothing to show: "Couldn’t load your chats"
    *  (`ChatListLoadError`) instead of the empty state. Ignored while archived
    *  chats are listed (they stay on screen) and while `isLoading` (a retry's
@@ -73,10 +81,14 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
     loadError = false,
     onRetry,
     pageSize,
+    metaRow,
   } = props;
   // ONE switch: a first page with nothing to show yet (in flight at all, or the page's loading state) is the list's
   // own loading state, never a blank.
   const firstLoad = useLoadingScope() || ((isLoading || isFetching) && dialogs.length === 0);
+  const paged = metaRow?.pager !== undefined;
+  // An empty FIRST page has no pager (the empty state is the whole answer); an empty later page keeps it.
+  const meta = tableMetaRowLayout(metaRow, { rowCount: dialogs.length, loading: firstLoad });
   return (
     <>
       {/* Mobile (<md): the shared mobile header — back to the list + a ⋯ menu
@@ -114,6 +126,16 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]">
+        {meta.drawn && (
+          <DataTable.MetaRow
+            metaRow={metaRow}
+            paged={meta.paged}
+            itemName="chat"
+            rowCount={dialogs.length}
+            loading={firstLoad}
+            count={null}
+          />
+        )}
         {firstLoad || dialogs.length > 0 ? (
           // The first load is the list's own loading state — the SAME grouped/
           // bordered rows the active list draws, so the archive loads and lands
@@ -123,9 +145,9 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
             pageSize={pageSize}
             dialogs={dialogs}
             onSelectDialog={onSelectDialog}
-            hasMore={hasMore}
-            isLoadingMore={isLoading && dialogs.length > 0}
-            onLoadMore={onLoadMore}
+            hasMore={!paged && hasMore}
+            isLoadingMore={!paged && isLoading && dialogs.length > 0}
+            onLoadMore={paged ? undefined : onLoadMore}
           />
         ) : loadError ? (
           // A failed first page: the wording every Mingo chat list uses, with
