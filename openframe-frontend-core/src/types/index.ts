@@ -51,6 +51,7 @@ export * from './user';
 
 // Communication types
 export * from './slack';
+export * from './waitlist';
 
 // Business logic types
 export * from './faq';

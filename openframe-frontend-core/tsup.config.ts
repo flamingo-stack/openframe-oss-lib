@@ -41,6 +41,8 @@ export default defineConfig([
       // `./utils/humanity-signals` without pulling the full utils barrel.
       'utils/humanity-signals': 'src/utils/humanity-signals.ts',
       'utils/form-rescue': 'src/utils/form-rescue.ts',
+      // The contact and company field contract: pure, read by the hub's client and server code alike.
+      'utils/contact-fields': 'src/utils/contact-fields.ts',
       'utils/page-topics': 'src/utils/page-topics.ts',
       'utils/named-icon': 'src/utils/named-icon.ts',
       'utils/mobile-app': 'src/utils/mobile-app.ts',

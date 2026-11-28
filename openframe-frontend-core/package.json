@@ -292,6 +292,12 @@
       "require": "./dist/utils/form-rescue.cjs",
       "default": "./dist/utils/form-rescue.js"
     },
+    "./utils/contact-fields": {
+      "types": "./dist/utils/contact-fields.d.ts",
+      "import": "./dist/utils/contact-fields.js",
+      "require": "./dist/utils/contact-fields.cjs",
+      "default": "./dist/utils/contact-fields.js"
+    },
     "./utils/page-topics": {
       "types": "./dist/utils/page-topics.d.ts",
       "import": "./dist/utils/page-topics.js",
