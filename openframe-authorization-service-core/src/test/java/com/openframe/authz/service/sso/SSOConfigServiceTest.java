@@ -2,7 +2,12 @@ package com.openframe.authz.service.sso;
 
 import com.openframe.authz.config.oidc.GoogleSSOProperties;
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
+import com.google.crypto.tink.KeysetHandle;
+import com.google.crypto.tink.aead.AeadConfig;
+import com.google.crypto.tink.aead.PredefinedAeadParameters;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.core.exception.EncryptionException;
 import com.openframe.core.exception.AuthErrorCode;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.sso.SSOConfig;
@@ -11,9 +16,11 @@ import com.openframe.data.repository.tenant.SSOPerTenantConfigRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.Optional;
 
+import static com.openframe.core.crypto.service.SecretPurpose.SSO_CLIENT_SECRET;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -24,7 +31,7 @@ import static org.mockito.Mockito.when;
 class SSOConfigServiceTest {
 
     private final SSOPerTenantConfigRepository repository = mock(SSOPerTenantConfigRepository.class);
-    private final EncryptionService encryption = new EncryptionService("0123456789abcdef0123456789abcdef", "0123456789abcdef");
+    private final EncryptionService encryption = tinkEncryption();
     private SSOConfigService service;
 
     @BeforeEach
@@ -35,6 +42,15 @@ class SSOConfigServiceTest {
         MicrosoftSSOProperties microsoft = new MicrosoftSSOProperties();
         service = new SSOConfigService(repository, encryption, List.of(google, microsoft));
         when(repository.findFirstByTenantIdAndProviderAndEnabledTrue(anyString(), anyString())).thenReturn(Optional.empty());
+    }
+
+    private static EncryptionService tinkEncryption() {
+        try {
+            AeadConfig.register();
+            return EncryptionService.withKeyset(KeysetHandle.generateNew(PredefinedAeadParameters.AES256_GCM), true, null, null);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static SSOPerTenantConfig tenantConfig(String provider, String clientId) {
@@ -61,6 +77,42 @@ class SSOConfigServiceTest {
         assertThat(generic.getClientId()).isEqualTo("generic-google");
         assertThat(generic.getClientSecret()).isNotEqualTo("generic-secret");
         assertThat(service.getDecryptedClientSecret(generic)).isEqualTo("generic-secret");
+    }
+
+    @Test
+    void shouldEncryptConfiguredDefaultForThePlatformNotForTheTenant() {
+        SSOConfig generic = service.getEffectiveSSOConfig("acme", "google").orElseThrow();
+
+        assertThat(generic.getTenantId()).isNull();
+        assertThat(encryption.decrypt(generic.getClientSecret(), EncryptionContext.platform(SSO_CLIENT_SECRET)))
+                .isEqualTo("generic-secret");
+        assertThatThrownBy(() -> encryption.decrypt(generic.getClientSecret(),
+                EncryptionContext.forTenant("acme", SSO_CLIENT_SECRET)))
+                .isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    void shouldDecryptTenantSecretWithTheTenantsContext() {
+        SSOPerTenantConfig own = tenantConfig("google", "acme-google");
+        own.setClientSecret(encryption.encrypt("acme-secret", EncryptionContext.forTenant("acme", SSO_CLIENT_SECRET)));
+
+        assertThat(service.getDecryptedClientSecret(own)).isEqualTo("acme-secret");
+    }
+
+    @Test
+    void shouldRejectTenantSecretEncryptedForAnotherTenant() {
+        SSOPerTenantConfig own = tenantConfig("google", "acme-google");
+        own.setClientSecret(encryption.encrypt("globex-secret", EncryptionContext.forTenant("globex", SSO_CLIENT_SECRET)));
+
+        assertThatThrownBy(() -> service.getDecryptedClientSecret(own)).isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    void shouldRejectTenantSecretEncryptedForThePlatform() {
+        SSOPerTenantConfig own = tenantConfig("google", "acme-google");
+        own.setClientSecret(encryption.encrypt("platform-secret", EncryptionContext.platform(SSO_CLIENT_SECRET)));
+
+        assertThatThrownBy(() -> service.getDecryptedClientSecret(own)).isInstanceOf(EncryptionException.class);
     }
 
     @Test

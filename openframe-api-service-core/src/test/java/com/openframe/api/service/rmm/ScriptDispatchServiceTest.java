@@ -520,7 +520,7 @@ class ScriptDispatchServiceTest {
     @DisplayName("runSchedule: with encryption on, the batch that goes to the router carries its secrets encrypted")
     void runSchedule_secretsSealedInTheBatch() {
         String scheduleId = "sched-1";
-        ScriptSecretSealer sealer = new ScriptSecretSealer(TestEncryption.SERVICE);
+        ScriptSecretSealer sealer = new ScriptSecretSealer(TestEncryption.SERVICE, TestEncryption.tenant());
         when(secretSealer.getIfAvailable()).thenReturn(sealer);
         when(scheduleScriptService.get(scheduleId)).thenReturn(com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse.builder()
                 .id(scheduleId)

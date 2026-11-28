@@ -3,6 +3,8 @@ package com.openframe.client.service.rmm;
 import java.util.List;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.client.support.TestEncryption;
+import com.openframe.core.crypto.service.EncryptionContext;
+import com.openframe.core.exception.EncryptionException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -28,7 +30,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Instant;
 import java.util.Optional;
 
+import static com.openframe.core.crypto.service.SecretPurpose.AGENT_LOG_KEY;
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -57,7 +62,7 @@ class PackageManagerBootstrapServiceTest {
         scriptBootstrapNatsPublisher = mock(ScriptBootstrapNatsPublisher.class);
         service = new PackageManagerBootstrapService(
                 machineRepository, scriptRepository, scriptExecutionRepository,
-                scriptBootstrapNatsPublisher, TestEncryption.SERVICE);
+                scriptBootstrapNatsPublisher, TestEncryption.SERVICE, TestEncryption.tenant());
         ReflectionTestUtils.setField(service, "cooldownSeconds", COOLDOWN_SECONDS);
     }
 
@@ -109,7 +114,7 @@ class PackageManagerBootstrapServiceTest {
         givenMachine(DeviceStatus.ONLINE);
         Script script = givenSeededScript();
         ScriptEnvVar secret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build();
-        ScriptEnvVar sealed = secret.sealed(TestEncryption.SERVICE::encrypt);
+        ScriptEnvVar sealed = secret.sealed(TestEncryption::seal);
         script.setEnvVars(List.of(sealed));
         when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
                 any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -121,6 +126,35 @@ class PackageManagerBootstrapServiceTest {
         ScriptEnvVar sent = message.getValue().getEnvVars().get(0);
         assertThat(sent.getValue()).isEqualTo("s3cr3t");
         assertThat(sent.isEncrypted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a secret sealed for another tenant is never sent: the dispatch fails")
+    void secretOfAnotherTenant_notSent() {
+        givenSealedSecret(EncryptionContext.forTenant("tenant-2", SCRIPT_ENV_VAR));
+
+        assertThatThrownBy(() -> service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET))
+                .isInstanceOf(EncryptionException.class);
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("a secret sealed for another purpose is never sent: the dispatch fails")
+    void secretOfAnotherPurpose_notSent() {
+        givenSealedSecret(EncryptionContext.forTenant(TENANT_ID, AGENT_LOG_KEY));
+
+        assertThatThrownBy(() -> service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET))
+                .isInstanceOf(EncryptionException.class);
+        verify(scriptBootstrapNatsPublisher, never()).publishBootstrapScript(anyString(), any());
+    }
+
+    private void givenSealedSecret(EncryptionContext context) {
+        givenMachine(DeviceStatus.ONLINE);
+        Script script = givenSeededScript();
+        ScriptEnvVar secret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build();
+        script.setEnvVars(List.of(secret.sealed(v -> TestEncryption.SERVICE.encrypt(v, context))));
+        when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
+                any(), any(), any(), any())).thenReturn(Optional.empty());
     }
 
     @Test

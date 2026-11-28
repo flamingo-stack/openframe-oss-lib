@@ -7,10 +7,12 @@ import com.openframe.api.dto.SSOConfigStatusResponse;
 import com.openframe.api.dto.SSOProviderInfo;
 import com.openframe.api.mapper.SSOConfigMapper;
 import com.openframe.api.service.processor.SSOConfigProcessor;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.core.email.EmailDomainPolicy;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.repository.sso.SSOConfigRepository;
+import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+import static com.openframe.core.crypto.service.SecretPurpose.SSO_CLIENT_SECRET;
 import static com.openframe.data.document.sso.SSOConfig.OPENFRAME_PROVIDER;
 import static java.lang.Boolean.TRUE;
 
@@ -38,6 +41,7 @@ public class SSOConfigService {
     private final SSOConfigMapper ssoConfigMapper;
     private final DomainValidationService domainValidationService;
     private final EmailDomainPolicy emailDomainPolicy;
+    private final TenantIdProvider tenantIdProvider;
 
     private static final String MICROSOFT = "microsoft";
 
@@ -72,10 +76,7 @@ public class SSOConfigService {
             return openframeLoginConfig(provider);
         }
         return ssoConfigRepository.findByProvider(provider)
-                .map(config -> ssoConfigMapper.toResponse(
-                        config,
-                        encryptionService.decryptClientSecret(config.getClientSecret())
-                ))
+                .map(this::toResponseWithClientSecret)
                 .orElse(SSOConfigResponse.builder()
                         .id(null)
                         .provider(provider)
@@ -85,6 +86,14 @@ public class SSOConfigService {
                         .autoProvisionUsers(false)
                         .enabled(false)
                         .build());
+    }
+
+    private SSOConfigResponse toResponseWithClientSecret(SSOConfig config) {
+        String tenantId = tenantIdProvider.getTenantId();
+        EncryptionContext context = EncryptionContext.forTenant(tenantId, SSO_CLIENT_SECRET);
+        String storedClientSecret = config.getClientSecret();
+        String clientSecret = encryptionService.decrypt(storedClientSecret, context);
+        return ssoConfigMapper.toResponse(config, clientSecret);
     }
 
     private SSOConfigResponse saveConfig(String provider, @Valid SSOConfigRequest request) {

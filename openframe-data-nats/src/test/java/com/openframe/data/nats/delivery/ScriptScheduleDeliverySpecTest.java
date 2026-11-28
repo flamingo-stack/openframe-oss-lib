@@ -1,5 +1,12 @@
 package com.openframe.data.nats.delivery;
 
+import com.google.crypto.tink.KeysetHandle;
+import com.google.crypto.tink.aead.AeadConfig;
+import com.google.crypto.tink.aead.PredefinedAeadParameters;
+import com.openframe.core.crypto.service.EncryptionContext;
+import com.openframe.core.exception.EncryptionException;
+import com.openframe.data.service.TenantIdProvider;
+import java.security.GeneralSecurityException;
 import org.springframework.beans.factory.ObjectProvider;
 import java.util.Map;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -16,7 +23,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static com.openframe.core.crypto.service.SecretPurpose.AI_PROVIDER_KEY;
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ScriptScheduleDeliverySpecTest {
 
@@ -24,17 +34,77 @@ class ScriptScheduleDeliverySpecTest {
     private static final String EXECUTION_ID = "exec-1";
     private static final long WINDOW_SECONDS = 7_200L;
 
-    private final EncryptionService encryptionService =
-            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+    private static final String TENANT = "tenant-1";
+    private static final EncryptionContext SCRIPT_CONTEXT = EncryptionContext.forTenant(TENANT, SCRIPT_ENV_VAR);
+
+    private final EncryptionService encryptionService = tinkEncryption();
     private final StaticListableBeanFactory beans = new StaticListableBeanFactory(Map.of("encryptionService", encryptionService));
     private final ObjectProvider<EncryptionService> encryptionProvider = beans.getBeanProvider(EncryptionService.class);
-    private final ScriptScheduleDeliverySpec spec = new ScriptScheduleDeliverySpec(encryptionProvider);
+    private final TenantIdProvider tenantIdProvider = () -> TENANT;
+    private final ScriptScheduleDeliverySpec spec = new ScriptScheduleDeliverySpec(encryptionProvider, tenantIdProvider);
+
+    private static EncryptionService tinkEncryption() {
+        try {
+            AeadConfig.register();
+            return EncryptionService.withKeyset(KeysetHandle.generateNew(PredefinedAeadParameters.AES256_GCM), true, null, null);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static ScriptScheduleExecutionMessage storedBatch(ScriptEnvVar envVar) {
+        ScriptScheduleExecutionItem item = ScriptScheduleExecutionItem.builder().scriptId("script-a")
+                .envVars(List.of(envVar)).build();
+        return ScriptScheduleExecutionMessage.builder().executionId(EXECUTION_ID).scripts(List.of(item)).build();
+    }
+
+    private ScriptEnvVar secretSealedFor(EncryptionContext context) {
+        return ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(value -> encryptionService.encrypt(value, context));
+    }
+
+    @Test
+    void wireForm_revealsWithThePodTenantAndTheScriptPurpose() {
+        // execution
+        ScriptScheduleExecutionMessage onTheWire = spec.wireForm(storedBatch(secretSealedFor(SCRIPT_CONTEXT)));
+
+        // verifications
+        assertThat(onTheWire.getScripts().get(0).getEnvVars().get(0).getValue()).isEqualTo("s3cr3t");
+    }
+
+    @Test
+    void wireForm_secretOfAnotherTenant_fails() {
+        // setup
+        ScriptScheduleExecutionMessage stored = storedBatch(secretSealedFor(EncryptionContext.forTenant("tenant-2", SCRIPT_ENV_VAR)));
+
+        // execution + verifications
+        assertThatThrownBy(() -> spec.wireForm(stored)).isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    void wireForm_secretOfAnotherPurpose_fails() {
+        // setup
+        ScriptScheduleExecutionMessage stored = storedBatch(secretSealedFor(EncryptionContext.forTenant(TENANT, AI_PROVIDER_KEY)));
+
+        // execution + verifications
+        assertThatThrownBy(() -> spec.wireForm(stored)).isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
+    void wireForm_followsTheTenantTheProviderReports() {
+        // setup
+        ScriptScheduleDeliverySpec otherPod = new ScriptScheduleDeliverySpec(encryptionProvider, () -> "tenant-2");
+
+        // execution + verifications
+        assertThatThrownBy(() -> otherPod.wireForm(storedBatch(secretSealedFor(SCRIPT_CONTEXT))))
+                .isInstanceOf(EncryptionException.class);
+    }
 
     @Test
     void wireForm_secretsInTheClear_theStoredBatchAndTheDeliveryBlockUntouched() {
         // setup
         ScriptEnvVar sealedSecret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
-                .sealed(encryptionService::encrypt);
+                .sealed(value -> encryptionService.encrypt(value, SCRIPT_CONTEXT));
         ScriptScheduleExecutionItem item = ScriptScheduleExecutionItem.builder().scriptId("script-a")
                 .envVars(List.of(sealedSecret)).build();
         DeliveryRef delivery = new DeliveryRef(DeliveryType.SCRIPT_SCHEDULE, EXECUTION_ID, "dispatch-1");

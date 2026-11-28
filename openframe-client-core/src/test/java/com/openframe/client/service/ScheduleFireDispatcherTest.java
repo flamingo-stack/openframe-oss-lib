@@ -4,7 +4,6 @@ import com.openframe.client.support.TestEncryption;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
-import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
@@ -76,8 +75,6 @@ class ScheduleFireDispatcherTest {
     @Mock private DeviceOnlineDispatchRepository dispatchRepository;
     @Mock private com.openframe.client.service.rmm.ScriptDeliveryRetryStore retryStore;
 
-    private final EncryptionService encryptionService = TestEncryption.SERVICE;
-
     private ScheduleFireDispatcher dispatcher;
 
     @BeforeEach
@@ -94,7 +91,7 @@ class ScheduleFireDispatcherTest {
         ScheduleScript schedule = schedule(List.of("script-a"));
         Script script = script("script-a", ScriptShell.BASH);
         script.setEnvVars(List.of(ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
-                .sealed(encryptionService::encrypt)));
+                .sealed(TestEncryption::seal)));
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));

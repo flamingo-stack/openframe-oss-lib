@@ -1,13 +1,49 @@
 package com.openframe.client.support;
 
+import com.google.crypto.tink.KeysetHandle;
+import com.google.crypto.tink.aead.AeadConfig;
+import com.google.crypto.tink.aead.PredefinedAeadParameters;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.data.service.TenantIdProvider;
 
-// one test key for every test that seals or reveals script secrets
+import java.security.GeneralSecurityException;
+
+import static com.openframe.core.crypto.service.SecretPurpose.SCRIPT_ENV_VAR;
+
+// one test keyset for every test that seals or reveals secrets; the pod belongs to TENANT
 public final class TestEncryption {
 
-    public static final EncryptionService SERVICE =
-            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+    public static final String TENANT = "tenant-1";
+    public static final EncryptionContext SCRIPT_CONTEXT = EncryptionContext.forTenant(TENANT, SCRIPT_ENV_VAR);
+    public static final EncryptionService SERVICE = tinkService();
 
     private TestEncryption() {
+    }
+
+    public static EncryptionService tinkService() {
+        try {
+            AeadConfig.register();
+            return EncryptionService.withKeyset(KeysetHandle.generateNew(PredefinedAeadParameters.AES256_GCM), true, null, null);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public static TenantIdProvider tenant() {
+        return tenant(TENANT);
+    }
+
+    public static TenantIdProvider tenant(String tenantId) {
+        return () -> tenantId;
+    }
+
+    // a script secret as this pod stores it
+    public static String seal(String plain) {
+        return SERVICE.encrypt(plain, SCRIPT_CONTEXT);
+    }
+
+    public static String reveal(String ciphertext) {
+        return SERVICE.decrypt(ciphertext, SCRIPT_CONTEXT);
     }
 }

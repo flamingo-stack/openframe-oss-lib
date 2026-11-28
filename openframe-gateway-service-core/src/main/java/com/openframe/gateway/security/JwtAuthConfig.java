@@ -1,5 +1,7 @@
 package com.openframe.gateway.security;
 
+import com.openframe.gateway.security.revocation.RevokedKeyRegistry;
+import com.openframe.gateway.security.revocation.RevokedKeyValidator;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
@@ -70,7 +72,8 @@ public class JwtAuthConfig {
     public LoadingCache<String, ReactiveAuthenticationManager> issuerManagersCache(
             ReactiveJwtAuthenticationConverter converter,
             JwtConfig jwtConfig,
-            IssuerUrlProvider issuerUrlProvider) {
+            IssuerUrlProvider issuerUrlProvider,
+            RevokedKeyRegistry revokedKeyRegistry) {
 
         WebClient discoveryClient = discoveryWebClient();
 
@@ -95,7 +98,8 @@ public class JwtAuthConfig {
 
                     var defaultValidator = JwtValidators.createDefault();
                     var strictIssuerValidator = createStrictIssuerValidator(issuerUrlProvider);
-                    dec.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultValidator, strictIssuerValidator));
+                    dec.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaultValidator, strictIssuerValidator,
+                            new RevokedKeyValidator(revokedKeyRegistry)));
 
                     var jwtManager = new JwtReactiveAuthenticationManager(dec);
                     jwtManager.setJwtAuthenticationConverter(converter);

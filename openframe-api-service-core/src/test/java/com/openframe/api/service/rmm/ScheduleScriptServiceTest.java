@@ -81,7 +81,8 @@ class ScheduleScriptServiceTest {
         deviceLocalDispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
         onlineDeviceDispatchRepository = mock(DeviceOnlineDispatchRepository.class);
         deliveryRefresher = mock(ScheduleDeliveryRefresher.class);
-        ScriptScheduleMapper scheduleMapper = new ScriptScheduleMapper(TestEncryption.service(), TestEncryption.sealerOn());
+        ScriptScheduleMapper scheduleMapper = new ScriptScheduleMapper(TestEncryption.service(), TestEncryption.sealerOn(),
+                TestEncryption.tenant());
         scheduleService = new ScheduleScriptService(scheduleRepository, scheduleMapper,
                 scriptService, tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository, deliveryRefresher);
 

@@ -1,7 +1,6 @@
 package com.openframe.api.mapper;
 
 import com.openframe.api.support.TestEncryption;
-import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import org.junit.jupiter.api.Test;
 
@@ -12,8 +11,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 // ScriptEnvVar lives in openframe-data-mongo-common, which has no tests of its own
 class ScriptEnvVarSealingTest {
 
-    private final EncryptionService encryptionService = TestEncryption.SERVICE;
-
     @Test
     void sealAll_encryptsOnlyNonEmptySecrets_andRevealAllRestoresThem() {
         // setup
@@ -23,9 +20,9 @@ class ScriptEnvVarSealingTest {
         List<ScriptEnvVar> envVars = List.of(secret, emptySecret, plain);
 
         // execution
-        List<ScriptEnvVar> sealed = ScriptEnvVar.sealAll(envVars, encryptionService::encrypt);
-        List<ScriptEnvVar> sealedAgain = ScriptEnvVar.sealAll(sealed, encryptionService::encrypt);
-        List<ScriptEnvVar> revealed = ScriptEnvVar.revealAll(sealedAgain, encryptionService::decrypt);
+        List<ScriptEnvVar> sealed = ScriptEnvVar.sealAll(envVars, TestEncryption::seal);
+        List<ScriptEnvVar> sealedAgain = ScriptEnvVar.sealAll(sealed, TestEncryption::seal);
+        List<ScriptEnvVar> revealed = ScriptEnvVar.revealAll(sealedAgain, TestEncryption::reveal);
 
         // verifications
         assertThat(sealed.get(0).isEncrypted()).isTrue();
@@ -40,7 +37,7 @@ class ScriptEnvVarSealingTest {
     @Test
     void sealAll_and_revealAll_null_staysNull() {
         // execution + verifications
-        assertThat(ScriptEnvVar.sealAll(null, encryptionService::encrypt)).isNull();
-        assertThat(ScriptEnvVar.revealAll(null, encryptionService::decrypt)).isNull();
+        assertThat(ScriptEnvVar.sealAll(null, TestEncryption::seal)).isNull();
+        assertThat(ScriptEnvVar.revealAll(null, TestEncryption::reveal)).isNull();
     }
 }

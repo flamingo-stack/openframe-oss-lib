@@ -8,9 +8,11 @@ import com.openframe.audit.Audited;
 import com.openframe.audit.AuditedMethodRunner;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.service.SecretKeyGenerator;
+import com.openframe.core.crypto.service.EncryptionContext;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
+import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ import java.util.Map;
 import static com.openframe.data.document.audit.AuditAction.AGENT_REGISTRATION_SECRET_ROTATE;
 import static com.openframe.data.document.audit.AuditAction.AGENT_REGISTRATION_SECRET_VIEW;
 
+import static com.openframe.core.crypto.service.SecretPurpose.AGENT_REGISTRATION_SECRET;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,17 +36,13 @@ public class AgentRegistrationSecretService {
     private final EncryptionService encryptionService;
     private final SecretKeyGenerator secretGenerator;
     private final AgentRegistrationSecretProcessor secretProcessor;
+    private final TenantIdProvider tenantIdProvider;
     private final AuditedMethodRunner auditedMethodRunner;
 
     @Audited(action = AGENT_REGISTRATION_SECRET_VIEW, details = "secretIds={#result.id}")
     public AgentRegistrationSecretResponse getActiveSecret() {
         return secretRepository.findByActiveTrue()
-                .map(secret -> AgentRegistrationSecretResponse.builder()
-                        .id(secret.getId())
-                        .key(encryptionService.decrypt(secret.getSecretKey()))
-                        .createdAt(secret.getCreatedAt())
-                        .active(secret.isActive())
-                        .build())
+                .map(this::toResponse)
                 .orElseThrow(() -> new AgentRegistrationSecretNotFoundException(ErrorCode.AGENT_REGISTRATION_SECRET_NOT_FOUND, "Active agent registration secret not found"));
     }
 
@@ -50,12 +50,7 @@ public class AgentRegistrationSecretService {
     public List<AgentRegistrationSecretResponse> getAllSecrets() {
         List<AgentRegistrationSecret> secrets = secretRepository.findAll();
         return secrets.stream()
-                .map(secret -> AgentRegistrationSecretResponse.builder()
-                        .id(secret.getId())
-                        .key(encryptionService.decrypt(secret.getSecretKey()))
-                        .createdAt(secret.getCreatedAt())
-                        .active(secret.isActive())
-                        .build())
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -70,7 +65,9 @@ public class AgentRegistrationSecretService {
         String newSecretKey = secretGenerator.generate();
 
         AgentRegistrationSecret newSecret = new AgentRegistrationSecret();
-        newSecret.setSecretKey(encryptionService.encrypt(newSecretKey));
+        EncryptionContext context = context();
+        String encryptedSecretKey = encryptionService.encrypt(newSecretKey, context);
+        newSecret.setSecretKey(encryptedSecretKey);
         newSecret.setCreatedAt(Instant.now());
         newSecret.setActive(true);
 
@@ -97,5 +94,22 @@ public class AgentRegistrationSecretService {
 
         secretProcessor.postProcessSecretDeactivated(activeSecret);
         return activeSecret.getId();
+    }
+
+    private AgentRegistrationSecretResponse toResponse(AgentRegistrationSecret secret) {
+        EncryptionContext context = context();
+        String storedSecretKey = secret.getSecretKey();
+        String key = encryptionService.decrypt(storedSecretKey, context);
+        return AgentRegistrationSecretResponse.builder()
+                .id(secret.getId())
+                .key(key)
+                .createdAt(secret.getCreatedAt())
+                .active(secret.isActive())
+                .build();
+    }
+
+    private EncryptionContext context() {
+        String tenantId = tenantIdProvider.getTenantId();
+        return EncryptionContext.forTenant(tenantId, AGENT_REGISTRATION_SECRET);
     }
 }
