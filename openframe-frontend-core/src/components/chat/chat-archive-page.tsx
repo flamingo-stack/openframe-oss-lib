@@ -3,7 +3,8 @@
 import { Chevron02LeftIcon, BoxArchiveIcon } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
-import { DataTable, type TableMetaRow, tableMetaRowLayout } from '../ui/data-table';
+// The meta row's own module, not the data-table barrel (which reaches `features/index` through the column filter).
+import { DataTableMetaRow, type TableMetaRow, tableMetaRowLayout } from '../ui/data-table/data-table-meta-row';
 import { useLoadingScope } from '../ui/loading-scope';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
@@ -127,7 +128,7 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
       )}
       <div className="flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]">
         {meta.drawn && (
-          <DataTable.MetaRow
+          <DataTableMetaRow
             metaRow={metaRow}
             paged={meta.paged}
             itemName="chat"

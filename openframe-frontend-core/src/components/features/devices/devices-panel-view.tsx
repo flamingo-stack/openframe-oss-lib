@@ -16,7 +16,9 @@ import {
   type DataTableLayout,
   type DataTableSettings,
 } from '../../ui';
-import { type TableMetaRow, tableMetaRowLayout } from '../../ui/data-table';
+// The meta row's own module, not the data-table barrel: the barrel reaches `features/index` (the column filter), and a
+// view of `features` importing it changes the order the ui barrel loads in, leaving its re-exports half-filled.
+import { type TableMetaRow, tableMetaRowLayout } from '../../ui/data-table/data-table-meta-row';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { useDeviceStatusDisplay } from './device-status-display';
 import { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-filter-toolbar';
