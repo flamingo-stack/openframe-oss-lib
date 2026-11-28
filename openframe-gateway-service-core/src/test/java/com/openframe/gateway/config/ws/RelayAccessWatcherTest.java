@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 class RelayAccessWatcherTest {
 
     private static final String SESSION_ID = "session-1";
-    private static final String TENANT_ID = "4d256d67-c365-4e25-ba89-4e0e767c5036";
+    private static final String TENANT_ID = "00000000-0000-0000-0000-000000000001";
     private static final String MACHINE_ID = "8daa5e90-707c-4fab-8cda-d11550b0d26b";
     private static final String CONTEXT_KEY = "shared-domain";
     private static final Duration UNTIL_FIRST_CHECK = Duration.ofMinutes(8);

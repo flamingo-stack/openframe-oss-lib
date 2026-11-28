@@ -50,7 +50,7 @@ class WebSocketServiceSecurityDecoratorExpiryTest {
     private static final String SESSION_ID = "session-1";
     private static final String SUBJECT = "agent_8daa5e90-707c-4fab-8cda-d11550b0d26b";
     private static final String MACHINE_ID = "8daa5e90-707c-4fab-8cda-d11550b0d26b";
-    private static final String TENANT_ID = "4d256d67-c365-4e25-ba89-4e0e767c5036";
+    private static final String TENANT_ID = "00000000-0000-0000-0000-000000000001";
     private static final String TOOL = "meshcentral-server";
     private static final String BROWSER_RELAY_PATH = "/ws/tools/meshcentral-server/meshrelay.ashx";
     private static final String AGENT_RELAY_PATH = "/ws/tools/agent/meshcentral-server/meshrelay.ashx";
