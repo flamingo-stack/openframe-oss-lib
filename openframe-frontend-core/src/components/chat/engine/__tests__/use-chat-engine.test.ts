@@ -98,6 +98,23 @@ describe('useChatEngine over a replaying tail', () => {
     expect(drawn[drawn.length - 1]).toEqual(['user', 'next']);
   });
 
+  it('sends a message of OpenFrame files alone: the publish carries them and the bubble draws them', async () => {
+    const { result, transport } = setup();
+    await waitFor(() => expect(result.current.messages).toHaveLength(2));
+    const file = { id: 'att_1', name: 'disk.log', mediaType: 'text/plain', size: 2048 };
+    await act(async () => {
+      await result.current.sendMessage('', { openframeAttachments: [file] });
+    });
+    expect(transport.publish).toHaveBeenCalledWith(
+      '',
+      expect.objectContaining({ dialogId: 'd1', openframeAttachments: [file] }),
+    );
+    const users = result.current.messages.filter(message => message.role === 'user');
+    const bubble = users[users.length - 1];
+    expect(bubble?.parts).toEqual([]);
+    expect(bubble?.metadata?.openframeAttachments).toEqual([file]);
+  });
+
   it("draws a history page's assistant rows as the assistant it is given", async () => {
     const author = (result: { current: { messages: { role: string; metadata?: { author?: unknown } }[] } }) =>
       result.current.messages.find(message => message.role === 'assistant')?.metadata?.author;

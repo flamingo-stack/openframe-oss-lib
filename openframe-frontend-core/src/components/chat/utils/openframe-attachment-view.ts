@@ -53,6 +53,7 @@ export function attachmentErrorCaption(
   const captions: Record<OpenFrameAttachmentErrorCode, string> = {
     TOO_LARGE: `Over ${openFrameMaxFileMegabytes(profile)} MB`,
     TYPE_NOT_ALLOWED: 'Format not allowed',
+    ARCHIVE_NOT_ALLOWED: 'Format not allowed',
     CHAT_LIMIT: 'Chat limit reached',
     MESSAGE_LIMIT: 'Message limit reached',
     BLOCKED: 'Blocked by scan',
@@ -66,6 +67,7 @@ export function attachmentErrorNote(error: OpenFrameAttachmentErrorCode, profile
   const notes: Record<OpenFrameAttachmentErrorCode, string> = {
     TOO_LARGE: `Larger than ${openFrameMaxFileMegabytes(profile)} MB`,
     TYPE_NOT_ALLOWED: "This file type can't be sent",
+    ARCHIVE_NOT_ALLOWED: "Archives can't be sent yet. Attach the files inside",
     CHAT_LIMIT: `This chat has reached ${profile.maxFilesPerChat} files`,
     MESSAGE_LIMIT: `A message can carry up to ${profile.maxFilesPerMessage} files`,
     BLOCKED: 'Blocked by security scan',
@@ -138,10 +140,17 @@ export interface OpenFrameTraySummary {
   sendBlocked: boolean;
   /** One note per refused file, in tray order. */
   errorNotes: { id: string; name: string; text: string }[];
-  /** "Send is available when 2 files finish uploading and scanning." while any is pending. */
+  /** "Send is available when 2 files finish uploading and scanning" while any is pending. */
   pendingNote: string | null;
   /** "1 file won't be sent" while refused files remain. */
   leftOutNote: string | null;
+  /** The model's tokens the staged files are expected to cost (their estimates; files without one count 0). */
+  stagedTokens: number;
+  /**
+   * The files need more of the context than is left: Send waits until some are removed. With the profile's
+   * `showTokenEstimate` (Mingo) it gives the numbers; without it (Fae) it says so in words.
+   */
+  overContextNote: string | null;
 }
 
 /** The tray's counter, notes and Send gate for the items staged now and the files the chat already holds. */
@@ -149,8 +158,14 @@ export function summarizeOpenFrameTray(
   items: readonly OpenFrameAttachmentItem[],
   profile: OpenFrameAttachmentProfile,
   chatFileCount: number,
+  contextTokensLeft?: number,
 ): OpenFrameTraySummary {
   const errored = items.filter(item => item.state === 'error');
+  const stagedTokens = items.reduce(
+    (sum, item) => (item.state === 'error' ? sum : sum + Math.max(0, item.tokenEstimate ?? 0)),
+    0,
+  );
+  const overContext = contextTokensLeft !== undefined && stagedTokens > Math.max(0, contextTokensLeft);
   const messageCount = items.length - errored.length;
   const chatCount = chatFileCount + messageCount;
   const pendingCount = items.filter(item => item.state === 'uploading' || item.state === 'scanning').length;
@@ -160,7 +175,7 @@ export function summarizeOpenFrameTray(
     counter: `${messageCount}/${profile.maxFilesPerMessage} · ${chatCount}/${profile.maxFilesPerChat} in chat`,
     pendingCount,
     erroredCount: errored.length,
-    sendBlocked: pendingCount > 0,
+    sendBlocked: pendingCount > 0 || overContext,
     errorNotes: errored.map(item => ({
       id: item.id,
       name: item.name,
@@ -168,9 +183,15 @@ export function summarizeOpenFrameTray(
     })),
     pendingNote:
       pendingCount > 0
-        ? `Send is available when ${files(pendingCount)} ${pendingCount === 1 ? 'finishes' : 'finish'} uploading and scanning.`
+        ? `Send is available when ${files(pendingCount)} ${pendingCount === 1 ? 'finishes' : 'finish'} uploading and scanning`
         : null,
     leftOutNote: errored.length > 0 ? `${files(errored.length)} won't be sent` : null,
+    stagedTokens,
+    overContextNote: !overContext
+      ? null
+      : profile.showTokenEstimate
+        ? `These files need ${formatTokenEstimate(stagedTokens)} tokens, but only ${formatTokenEstimate(Math.max(0, contextTokensLeft ?? 0))} are left in this chat. Remove a file to send`
+        : "There's not enough room in this chat for these files. Remove a file or start a new chat",
   };
 }
 

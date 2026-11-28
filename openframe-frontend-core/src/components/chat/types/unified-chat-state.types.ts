@@ -16,6 +16,7 @@
  */
 
 import type { ChatAttachment } from '../../../chat-protocol/attachment';
+import type { OpenFrameMessageAttachment } from '../../../chat-protocol/attachment-profiles';
 import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import type { ChatRef } from '../chat-ref.types';
 import type { ChatUsagePanelData } from '../usage/chat-usage';
@@ -208,6 +209,13 @@ export interface UnifiedSendMessageOptions {
    * Empty/undefined when the picker isn't configured or nothing is selected.
    */
   contextItems?: ChatContextItem[];
+
+  /**
+   * The OpenFrame (Mingo, Fae) chat files the message carries: ready files, each `id` the server's attachment id. The
+   * optimistic bubble draws them, and the host's publish sends their ids (`MingoSendMessageInput.attachmentIds`). With
+   * files the text may be empty. Absent without the feature.
+   */
+  openframeAttachments?: readonly OpenFrameMessageAttachment[];
 }
 
 // ─── Return shape ────────────────────────────────────────────────────────────

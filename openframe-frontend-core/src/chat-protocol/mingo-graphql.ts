@@ -13,6 +13,7 @@
  */
 
 import type { HistoricalMessage } from '../components/chat/types/message.types';
+import { MINGO_MESSAGE_ATTACHMENTS_SELECTION } from './openframe-message-attachments';
 
 /** Response key → the field it is selected for, per persisted part type. */
 const ALIASED_FIELDS: Record<string, { alias: string; field: string }> = {
@@ -56,10 +57,12 @@ const EMAIL_PART_SELECTION = `
 export interface MingoMessagesQueryOptions {
   /** Email messages draw as emails: their sender and envelope. Only for a backend with email-to-ticket on. */
   email?: boolean;
+  /** Each message's files (`Message.attachments`). Only for a backend with chat attachments. */
+  attachments?: boolean;
 }
 
-/** The document, with the email selections in their places (empty strings without them). */
-const messagesQuery = (emailOwner: string, emailPart: string) => `
+/** The document, with the optional selections in their places (empty strings without them). */
+const messagesQuery = (emailOwner: string, emailPart: string, attachments: string) => `
   query GetDialogMessages($dialogId: ID!, $chatType: ChatType, $cursor: String, $limit: Int, $sortField: String, $sortDirection: SortDirection) {
     messages(
       dialogId: $dialogId
@@ -76,7 +79,7 @@ const messagesQuery = (emailOwner: string, emailPart: string) => `
           chatType
           dialogMode
           createdAt
-          lastChunkStreamSeq
+          lastChunkStreamSeq${attachments}
           owner {
             type
             ... on AdminOwner {
@@ -239,8 +242,12 @@ const messagesQuery = (emailOwner: string, emailPart: string) => `
 `;
 
 /** One page of a dialog's messages, newest first. */
-export function mingoMessagesQuery({ email = false }: MingoMessagesQueryOptions = {}): string {
-  return messagesQuery(email ? EMAIL_OWNER_SELECTION : '', email ? EMAIL_PART_SELECTION : '');
+export function mingoMessagesQuery({ email = false, attachments = false }: MingoMessagesQueryOptions = {}): string {
+  return messagesQuery(
+    email ? EMAIL_OWNER_SELECTION : '',
+    email ? EMAIL_PART_SELECTION : '',
+    attachments ? MINGO_MESSAGE_ATTACHMENTS_SELECTION : '',
+  );
 }
 
 /** One page of a dialog's messages, newest first: what every chat without email reads. */
@@ -455,6 +462,20 @@ export const MINGO_SEND_MESSAGE_MUTATION = `
   }
 `;
 
+/**
+ * `sendMessage` for a message with files: the payload also says how many of them a client chat's ticket took
+ * (`ticketAttachmentReceipt`, Fae's "N files added to ticket #id"). A backend without the field refuses the whole
+ * mutation, so a message without files keeps {@link MINGO_SEND_MESSAGE_MUTATION}.
+ */
+export const MINGO_SEND_MESSAGE_WITH_FILES_MUTATION = `
+  mutation SendMessageWithFiles($input: SendMessageInput!) {
+    sendMessage(input: $input) {
+      ticketAttachmentReceipt { ticketId ticketNumber attachedFileCount }
+      userErrors { field message code }
+    }
+  }
+`;
+
 /** Stop the running answer. Without one: `ILLEGAL_STATE`. */
 export const MINGO_STOP_DIALOG_GENERATION_MUTATION = `
   mutation StopDialogGeneration($input: StopDialogGenerationInput!) {
@@ -512,6 +533,11 @@ export interface MingoSendMessageInput {
   currentList?: object;
   /** The page open when the message was sent: its kind and the name the user sees. */
   currentPage?: object;
+  /**
+   * The ready chat files the message carries, by their server ids (at most 10). With files `content` may be empty.
+   * Only for a backend with chat attachments: leave it out otherwise, so a send without files is the same request.
+   */
+  attachmentIds?: string[];
 }
 
 export interface MingoStopDialogGenerationInput {
@@ -618,6 +644,18 @@ export interface MingoDialogsConnection {
 }
 
 /** A mutation's own refusals. */
+/** The files a client chat's ticket took from a sent message, as the server counted them. */
+export interface MingoTicketAttachmentReceipt {
+  ticketId: string;
+  ticketNumber?: number | null;
+  attachedFileCount: number;
+}
+
+/** What {@link MINGO_SEND_MESSAGE_WITH_FILES_MUTATION} answers. No receipt: the dialog has no ticket. */
+export interface MingoSendMessagePayload extends MingoUserErrors {
+  ticketAttachmentReceipt?: MingoTicketAttachmentReceipt | null;
+}
+
 export interface MingoUserErrors {
   userErrors?: Array<{ field?: string[] | null; message: string; code?: string | null }> | null;
 }

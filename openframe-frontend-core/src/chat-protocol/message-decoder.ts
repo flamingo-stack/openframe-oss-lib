@@ -23,6 +23,7 @@ import {
   type ChatSourcePart,
   type ChatToolMetadata,
 } from './chat-message';
+import { openFrameMessageAttachmentsOf } from './openframe-message-attachments';
 import { policyReviewField } from './policy-review';
 import { normalizeRecordUris, normalizeSourceId } from './record-link';
 import type { ChatStreamEntry, UiChunk } from './ui-chunks';
@@ -515,7 +516,9 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       case MESSAGE_TYPE.MESSAGE_REQUEST:
       case MESSAGE_TYPE.DIRECT_MESSAGE:
       case MESSAGE_TYPE.SYSTEM: {
-        if (raw.type !== MESSAGE_TYPE.MESSAGE_REQUEST && typeof raw.text !== 'string') break;
+        const attachments =
+          raw.type === MESSAGE_TYPE.SYSTEM ? undefined : openFrameMessageAttachmentsOf(raw.attachments);
+        if (raw.type !== MESSAGE_TYPE.MESSAGE_REQUEST && typeof raw.text !== 'string' && !attachments) break;
         const kind =
           raw.type === MESSAGE_TYPE.MESSAGE_REQUEST
             ? ('message-request' as const)
@@ -542,6 +545,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
             ...(displayName !== undefined ? { displayName } : {}),
             ...(userId !== undefined ? { userId } : {}),
             ...(contextItems ? { contextItems } : {}),
+            ...(attachments ? { attachments } : {}),
           },
         });
         break;

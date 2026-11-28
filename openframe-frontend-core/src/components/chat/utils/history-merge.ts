@@ -6,6 +6,7 @@ import {
   type ChatMessage,
   type ChatPart,
 } from '../../../chat-protocol/chat-message';
+import { openFrameMessageContentKey } from '../../../chat-protocol/openframe-message-attachments';
 
 /**
  * Reconciliation between persisted dialog history (processed GraphQL pages)
@@ -191,9 +192,10 @@ function withoutPersistedTicketEvents(
  *  the operator IS the admin, so the rule stays symmetric per host). */
 function userTwinKey(m: ChatMessage): string {
   if (m.role !== 'user') return '';
-  const text = textOfParts(m.parts);
-  if (text === '') return '';
-  return `${m.metadata?.author?.authorType ?? 'user'}\u0000${text}`;
+  // The files count: a message of files alone has no text, and two sends of one text with different files are two.
+  const content = openFrameMessageContentKey(textOfParts(m.parts), m.metadata?.openframeAttachments);
+  if (content === '') return '';
+  return `${m.metadata?.author?.authorType ?? 'user'}\u0000${content}`;
 }
 
 /** What a set of rows says about the turns they render, so another copy of one

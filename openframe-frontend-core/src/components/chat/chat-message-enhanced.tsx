@@ -15,6 +15,7 @@ import {
   textOfParts,
 } from '../../chat-protocol/chat-message';
 import { parseCitationHref, textWithCitationChips } from '../../chat-protocol/citations';
+import { openFrameTicketFilesText } from '../../chat-protocol/openframe-ticket-files';
 import { normalizeRecordUri, parseRecordHref, recordHref, recordLinksInParts } from '../../chat-protocol/record-link';
 import {
   CHAT_INTERRUPTED_AFTER_RUN_NOTICE,
@@ -30,6 +31,7 @@ import { AgentMark } from '../agent-mark';
 import type { MdRenderProps } from '../ui/markdown/base-components';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
 import { SquareAvatar } from '../ui/square-avatar';
+import { StatusBadge } from '../ui/status-badge';
 import { ApprovalBatchMessage } from './approval-batch-message';
 import { AskDisplay } from './ask-display';
 import { ChatAppearanceContext, useChatAppearance } from './chat-appearance-context';
@@ -197,6 +199,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       NavLinkAnchor,
       openframeAttachments,
       onOpenAttachment,
+      openframeTicketFiles,
       ...props
     },
     ref,
@@ -458,6 +461,30 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         : approvalRan
           ? CHAT_INTERRUPTED_AFTER_RUN_NOTICE
           : CHAT_INTERRUPTED_NOTICE;
+
+    // A ticket receipt ("2 files added to ticket #1003") is one centred chip, the same in both appearances: no face,
+    // no name line, no time.
+    if (openframeTicketFiles) {
+      return (
+        <div
+          ref={ref}
+          className={cn(
+            'relative flex justify-center',
+            CHAT_MESSAGE_ROW_PADDING_CLASS[isV2 ? CHAT_APPEARANCE.V2 : CHAT_APPEARANCE.CLASSIC],
+            className,
+          )}
+          data-testid="openframe-ticket-files-receipt"
+          {...props}
+        >
+          <StatusBadge
+            variant="card"
+            colorScheme="default"
+            staticText
+            text={openFrameTicketFilesText(openframeTicketFiles)}
+          />
+        </div>
+      );
+    }
 
     // v2 draws a system line (e.g. a technician joining) as an in-thread
     // receipt card rather than as an author row with no body.
@@ -744,7 +771,8 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.interrupted === nextProps.interrupted &&
     prevProps.NavLinkAnchor === nextProps.NavLinkAnchor &&
     prevProps.openframeAttachments === nextProps.openframeAttachments &&
-    prevProps.onOpenAttachment === nextProps.onOpenAttachment
+    prevProps.onOpenAttachment === nextProps.onOpenAttachment &&
+    prevProps.openframeTicketFiles === nextProps.openframeTicketFiles
   );
 });
 

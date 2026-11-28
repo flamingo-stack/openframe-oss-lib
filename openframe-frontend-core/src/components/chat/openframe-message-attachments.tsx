@@ -111,6 +111,16 @@ export function OpenFrameMessageAttachments({
         isOpen={openImage !== null}
         initialIndex={openImage ?? 0}
         onClose={() => setOpenImage(null)}
+        showCloseButton
+        // The host signs and opens (downloads) a file, the image shown included.
+        onDownload={
+          onOpenAttachment
+            ? index => {
+                const image = images[index];
+                if (image) onOpenAttachment(image);
+              }
+            : undefined
+        }
       />
     </div>
   );

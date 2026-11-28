@@ -361,6 +361,14 @@ export interface ChatEmailEnvelope {
   automatic?: boolean;
 }
 
+/** Files of an OpenFrame chat added to a ticket: what the thread's receipt chip says (`openFrameTicketFilesMessage`). */
+export interface OpenFrameTicketFilesReceipt {
+  ticketId: string;
+  /** The ticket's number as people read it ("#1003"); absent → "the ticket". */
+  ticketNumber?: number | null;
+  attachedFileCount: number;
+}
+
 /** JSON-serializable. */
 export interface ChatMessageMetadata {
   // A stored row.
@@ -391,6 +399,8 @@ export interface ChatMessageMetadata {
   contextItems?: ChatContextItem[];
   /** The files an OpenFrame (Mingo, Fae) user message carries, as the host maps its backend parts into them. */
   openframeAttachments?: OpenFrameMessageAttachment[];
+  /** A system row that is a ticket receipt: the thread draws it as one centred chip ("2 FILES ADDED TO TICKET #1003"). */
+  openframeTicketFiles?: OpenFrameTicketFilesReceipt;
   /** The highest chunk sequence consumed into this row: what the history merge decides coverage with. */
   streamSeq?: number;
 }

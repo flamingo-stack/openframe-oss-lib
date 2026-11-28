@@ -99,10 +99,21 @@ describe('ChatInput with openframeAttachments (Fae)', () => {
     const editor = screen.getByRole('textbox');
     const dropped = new File(['x'], 'a.log');
     fireEvent.dragEnter(editor, { dataTransfer: { types: ['Files'], files: [] } });
-    expect(screen.getByTestId('openframe-drop-overlay')).toHaveTextContent('Drop files to attach');
+    expect(screen.getByTestId('openframe-drop-overlay').textContent).toBe('Drop files here');
     fireEvent.drop(editor, { dataTransfer: { types: ['Files'], files: [dropped] } });
     expect(attachments.onAddFiles).toHaveBeenCalledWith([dropped]);
     expect(screen.queryByTestId('openframe-drop-overlay')).toBeNull();
+  });
+
+  it('draws no zone of its own when a card around it owns the drop', () => {
+    const attachments = config();
+    render(<ChatInput onSend={() => {}} openframeAttachments={attachments} openframeDropZone={false} />);
+    fireEvent.dragEnter(screen.getByRole('textbox'), { dataTransfer: { types: ['Files'], files: [] } });
+    expect(screen.queryByTestId('openframe-drop-overlay')).toBeNull();
+    fireEvent.drop(screen.getByRole('textbox'), {
+      dataTransfer: { types: ['Files'], files: [new File(['x'], 'a.log')] },
+    });
+    expect(attachments.onAddFiles).not.toHaveBeenCalled();
   });
 
   it('ignores a drag that carries no files', () => {
@@ -121,7 +132,7 @@ describe('ChatInput with openframeAttachments (Fae)', () => {
     fireEvent.keyDown(editor, { key: 'Enter' });
     expect(onSend).not.toHaveBeenCalled();
     expect(screen.getByTestId('openframe-attachment-notes')).toHaveTextContent(
-      'Send is available when 1 file finishes uploading and scanning.',
+      'Send is available when 1 file finishes uploading and scanning',
     );
   });
 
@@ -198,6 +209,47 @@ describe('ChatComposer with openframeAttachments (Mingo)', () => {
     render(<Host />);
     expect(screen.getByRole('menuitem', { name: 'Assign Item' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Upload File' })).toBeNull();
+  });
+
+  it('makes the whole card the drop zone: one overlay, over a chip strip too, and the files reach onAddFiles', () => {
+    const attachments = config({ profile: OPENFRAME_MINGO_ATTACHMENT_PROFILE });
+    function Host() {
+      return (
+        <ChatComposer
+          inputRef={createRef<ChatInputRef>()}
+          onSend={() => {}}
+          onStop={() => {}}
+          sending={false}
+          placeholder="Ask a question..."
+          contextPicker={picker}
+          selectedContextItems={[{ id: 'd1', type: 'device', label: 'LAPTOP-01' }]}
+          openframeAttachments={attachments}
+        />
+      );
+    }
+    render(<Host />);
+    const chip = screen.getByText('LAPTOP-01');
+    fireEvent.dragEnter(chip, { dataTransfer: { types: ['Files'], files: [] } });
+    expect(screen.getAllByTestId('openframe-drop-overlay')).toHaveLength(1);
+    // Crossing into the input keeps the one overlay up.
+    fireEvent.dragEnter(screen.getByRole('textbox'), { dataTransfer: { types: ['Files'], files: [] } });
+    fireEvent.dragLeave(chip, { dataTransfer: { types: ['Files'], files: [] } });
+    expect(screen.getAllByTestId('openframe-drop-overlay')).toHaveLength(1);
+    const dropped = new File(['x'], 'a.log');
+    fireEvent.drop(screen.getByRole('textbox'), { dataTransfer: { types: ['Files'], files: [dropped] } });
+    expect(attachments.onAddFiles).toHaveBeenCalledTimes(1);
+    expect(attachments.onAddFiles).toHaveBeenCalledWith([dropped]);
+    expect(screen.queryByTestId('openframe-drop-overlay')).toBeNull();
+  });
+
+  it('keeps the input as the drop zone when there is no card', () => {
+    const attachments = config({ profile: OPENFRAME_MINGO_ATTACHMENT_PROFILE });
+    renderMingo(attachments, false);
+    fireEvent.dragEnter(screen.getByRole('textbox'), { dataTransfer: { types: ['Files'], files: [] } });
+    expect(screen.getAllByTestId('openframe-drop-overlay')).toHaveLength(1);
+    const dropped = new File(['x'], 'a.log');
+    fireEvent.drop(screen.getByRole('textbox'), { dataTransfer: { types: ['Files'], files: [dropped] } });
+    expect(attachments.onAddFiles).toHaveBeenCalledWith([dropped]);
   });
 
   it('falls back to the attach button when there is no + menu', () => {

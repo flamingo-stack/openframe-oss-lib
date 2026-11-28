@@ -35,6 +35,7 @@
  */
 
 import { applyChunkToMessages, createWireState, messageHoldingChunk } from '../../../chat-protocol/apply-chunk';
+import type { OpenFrameMessageAttachment } from '../../../chat-protocol/attachment-profiles';
 import {
   isSourcePart,
   textOfParts,
@@ -42,6 +43,7 @@ import {
   type ChatMessage,
   type ChatMessageMetadata,
 } from '../../../chat-protocol/chat-message';
+import { openFrameMessageContentKey } from '../../../chat-protocol/openframe-message-attachments';
 import {
   approvalStatusOfResponse,
   isOwnRowGrant,
@@ -271,8 +273,9 @@ export interface ChatStreamReducer {
   // ── Thread commands (adapter-driven, not wire events) ──────────────────
   setMessages(messages: ChatMessage[]): void;
   prependMessages(messages: ChatMessage[]): void;
-  /** Optimistic local send: user bubble (+ echo record) + assistant placeholder. */
-  pushOptimisticSend(text: string, hidden?: boolean): void;
+  /** Optimistic local send: user bubble (+ echo record) + assistant placeholder. `attachments`: the OpenFrame files the
+   *  message carries, drawn under the bubble; a send of files alone draws its bubble too. */
+  pushOptimisticSend(text: string, hidden?: boolean, attachments?: readonly OpenFrameMessageAttachment[]): void;
   /** Wipe the thread, keep approval statuses. */
   clearThread(): void;
   /** Per-dialog reset (keeps approval statuses: request-ids are global). */
@@ -402,6 +405,22 @@ function isClientMinted(id: string): boolean {
 }
 
 /** The last row read from the history, past the ones this client minted after it. */
+/** A user row's text and files, for telling its copies apart (`openFrameMessageContentKey`). */
+function contentKeyOf(message: ChatMessage): string {
+  return openFrameMessageContentKey(textOfParts(message.parts), message.metadata?.openframeAttachments);
+}
+
+/** The parts and the files of a person's row: no empty text part for a message of files alone. */
+function userRowContent(
+  text: string,
+  attachments: readonly OpenFrameMessageAttachment[] | undefined,
+): Pick<ChatMessage, 'parts'> & { files: { openframeAttachments?: OpenFrameMessageAttachment[] } } {
+  return {
+    parts: text ? [{ type: 'text', text }] : [],
+    files: attachments && attachments.length > 0 ? { openframeAttachments: [...attachments] } : {},
+  };
+}
+
 function lastPersisted(messages: readonly ChatMessage[]): ChatMessage | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     if (!isClientMinted(messages[index].id)) return messages[index];
@@ -822,7 +841,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
    * after a match the next same-text echo is a send.
    */
   function isReplayOfTrailingPrompt(
-    text: string,
+    key: string,
     authorType: 'admin' | 'user',
     seq: number,
     at: number | undefined,
@@ -832,7 +851,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     if (!last || last.role !== 'user' || isClientMinted(last.id)) return false;
     // A direct or system row carries its persisted seq: seq coverage, not text, decides those.
     if (typeof last.metadata?.streamSeq === 'number') return false;
-    if ((last.metadata?.author?.authorType ?? 'user') !== authorType || textOfParts(last.parts) !== text) return false;
+    if ((last.metadata?.author?.authorType ?? 'user') !== authorType || contentKeyOf(last) !== key) return false;
     if (messages.some(m => typeof m.metadata?.streamSeq === 'number' && m.metadata.streamSeq >= seq)) return false;
     if (at !== undefined) {
       const written = Date.parse(last.metadata?.createdAt ?? '');
@@ -843,8 +862,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   }
 
   function applyUserMessage(data: ChatParticipantChunk['data'], seq: number | undefined, at: number | undefined): void {
-    const { text } = data;
-    if (!text) return;
+    const { text, attachments } = data;
+    const key = openFrameMessageContentKey(text, attachments);
+    if (!key) return;
     // ADMIN rows are only echo-consumable when the host declares that its
     // operator IS the admin (see `ownEchoIncludesAdmin`). Otherwise an
     // ADMIN row is someone else's message and must always render.
@@ -871,22 +891,20 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     // with the same text, whose own echo then draws a second bubble. Undated, the check cannot tell the replay from that
     // send's own echo, so the entry goes first, as before.
     const dated = typeof seq === 'number' && at !== undefined;
-    if (dated && isReplayOfTrailingPrompt(text, authorType, seq, at)) return;
+    if (dated && isReplayOfTrailingPrompt(key, authorType, seq, at)) return;
     if (adminEchoAllowed && authorEchoAllowed && consumeOwnEcho(text, authorMatched)) return;
-    if (typeof seq === 'number' && !dated && isReplayOfTrailingPrompt(text, authorType, seq, undefined)) return;
+    if (typeof seq === 'number' && !dated && isReplayOfTrailingPrompt(key, authorType, seq, undefined)) return;
     if (
       typeof seq !== 'number' &&
       hasRecentMessage(
         messages,
-        m =>
-          m.role === 'user' &&
-          (m.metadata?.author?.authorType ?? 'user') === authorType &&
-          textOfParts(m.parts) === text,
+        m => m.role === 'user' && (m.metadata?.author?.authorType ?? 'user') === authorType && contentKeyOf(m) === key,
         CONTENT_DEDUP_WINDOW,
       )
     ) {
       return;
     }
+    const { parts, files } = userRowContent(text, attachments);
     setMessagesInternal([
       ...messages,
       {
@@ -899,16 +917,18 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
           ...(typeof seq === 'number' ? { streamSeq: seq } : {}),
           author: { ...(data.displayName ? { name: data.displayName } : {}), authorType },
           ...(data.contextItems && data.contextItems.length > 0 ? { contextItems: data.contextItems } : {}),
+          ...files,
         },
-        parts: [{ type: 'text', text }],
+        parts,
       },
     ]);
   }
 
   /** Technician / admin direct message into the dialog. */
   function applyDirectMessage(data: ChatParticipantChunk['data'], seq: number | undefined): void {
-    const { text } = data;
-    if (!text) return;
+    const { text, attachments } = data;
+    const key = openFrameMessageContentKey(text, attachments);
+    if (!key) return;
     // A person wrote into the chat: the technician (ADMIN, and a row naming no owner), or the end user (any other
     // owner), whose reply a ticket's client chat carries beside the technician's.
     const authorType = data.ownerType && data.ownerType !== OWNER_TYPE.ADMIN ? ('user' as const) : ('admin' as const);
@@ -918,12 +938,13 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       typeof seq !== 'number' &&
       hasRecentMessage(
         messages,
-        m => m.role === 'user' && m.metadata?.author?.authorType === authorType && textOfParts(m.parts) === text,
+        m => m.role === 'user' && m.metadata?.author?.authorType === authorType && contentKeyOf(m) === key,
         CONTENT_DEDUP_WINDOW,
       )
     ) {
       return;
     }
+    const { parts, files } = userRowContent(text, attachments);
     setMessagesInternal([
       ...messages,
       {
@@ -936,8 +957,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
             authorType === 'admin'
               ? { name: data.displayName ?? 'Admin', authorType }
               : { ...(data.displayName ? { name: data.displayName } : {}), authorType },
+          ...files,
         },
-        parts: [{ type: 'text', text }],
+        parts,
       },
     ]);
   }
@@ -1246,7 +1268,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       messages = [...older, ...messages];
       invalidate();
     },
-    pushOptimisticSend(text, hidden = false) {
+    pushOptimisticSend(text, hidden, attachments) {
       // Record the text so the backend's MESSAGE_REQUEST echo consumes this
       // send instead of rendering a duplicate row (cap keeps the list from
       // growing if a backend never echoes).
@@ -1254,16 +1276,18 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       if (pendingEchoTexts.length > MAX_PENDING_ECHOES) pendingEchoTexts.shift();
       const placeholder = nextId('assistant');
       const createdAt = nowIso();
+      const optimistic = userRowContent(text, attachments);
       messages = [
         ...messages,
-        // An EMPTY-text send is out-of-band metadata, not something the user said. Never materialize a row for it.
-        ...(text.length > 0
+        // An EMPTY-text send without files is out-of-band metadata, not something the user said. Never materialize a row
+        // for it. A send of files alone is something the user sent: its row draws the files.
+        ...(openFrameMessageContentKey(text, attachments) !== ''
           ? ([
               {
                 id: nextId('user'),
                 role: 'user',
-                metadata: { createdAt, ...(hidden ? { hidden: true } : {}) },
-                parts: [{ type: 'text', text }],
+                metadata: { createdAt, ...(hidden ? { hidden: true } : {}), ...optimistic.files },
+                parts: optimistic.parts,
               },
             ] satisfies ChatMessage[])
           : []),

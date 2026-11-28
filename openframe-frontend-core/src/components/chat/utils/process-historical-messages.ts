@@ -14,6 +14,7 @@
 import { applyChunkToMessages, createWireState } from '../../../chat-protocol/apply-chunk';
 import { isSourcePart, type ChatEmailEnvelope, type ChatMessage } from '../../../chat-protocol/chat-message';
 import { createMingoDecoder } from '../../../chat-protocol/message-decoder';
+import { openFrameMessageAttachmentsOf } from '../../../chat-protocol/openframe-message-attachments';
 import type { UiChunk } from '../../../chat-protocol/ui-chunks';
 import { isAnsweredStatus, knownApprovalAnswer, resolutionChunks } from '../stream/message-mutations';
 import {
@@ -222,8 +223,11 @@ export function processHistoricalMessages(
       const email = emailEnvelopeOfEntries(entries);
       const texts = entries.filter((data): data is TextMessageData => data.type === MESSAGE_TYPE.TEXT && !!data.text);
       // An email is a message whatever its body holds: one of attachments alone still says who wrote to whom.
-      const bodies: TextMessageData[] = email && texts.length === 0 ? [{ type: MESSAGE_TYPE.TEXT, text: '' }] : texts;
-      for (const data of bodies) {
+      const files = openFrameMessageAttachmentsOf(row.attachments);
+      // So is a message of files alone: its row draws the files under an empty bubble.
+      const bodies: TextMessageData[] =
+        (email || files) && texts.length === 0 ? [{ type: MESSAGE_TYPE.TEXT, text: '' }] : texts;
+      bodies.forEach((data, bodyIndex) => {
         const contextItems = contextItemsOf(data);
         const avatar = getOwnerAvatar(row.owner);
         messages = [
@@ -235,6 +239,8 @@ export function processHistoricalMessages(
               createdAt: isoOf(row.createdAt),
               author: { name: getOwnerDisplayName(row.owner), authorType, ...(avatar !== undefined ? { avatar } : {}) },
               ...(contextItems.length > 0 ? { contextItems } : {}),
+              // The row's files belong to the message once: on its last body.
+              ...(files && bodyIndex === bodies.length - 1 ? { openframeAttachments: files } : {}),
               ...(typeof row.lastChunkStreamSeq === 'number' ? { streamSeq: row.lastChunkStreamSeq } : {}),
             },
             parts: [
@@ -243,7 +249,7 @@ export function processHistoricalMessages(
             ],
           },
         ];
-      }
+      });
       return;
     }
 

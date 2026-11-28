@@ -7,6 +7,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { OpenFrameMessageAttachment } from '../../../chat-protocol/attachment-profiles';
 import type { ChatMessage } from '../../../chat-protocol/chat-message';
+import { FileImageIcon } from '../../icons-v2-generated/documents';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import { ChatMessageList } from '../chat-message-list';
 import { OpenFrameMessageAttachments } from '../openframe-message-attachments';
@@ -65,12 +66,35 @@ describe('OpenFrameMessageAttachments', () => {
     expect(screen.queryByAltText('Screenshot 1')).toBeNull();
   });
 
+  it('gives the lightbox a Close button and a Download that hands the image shown to the host', () => {
+    const onOpen = vi.fn();
+    render(<OpenFrameMessageAttachments attachments={attachments} onOpenAttachment={onOpen} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open screen-0921-1142.png' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    expect(onOpen).toHaveBeenLastCalledWith(attachments[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Next image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+    expect(onOpen).toHaveBeenLastCalledWith(attachments[2]);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByAltText('Screenshot 2')).toBeNull();
+  });
+
+  it('offers no Download in the lightbox when the host cannot open files, but still the Close', () => {
+    render(<OpenFrameMessageAttachments attachments={attachments} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open screen-0921-1142.png' }));
+    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
   it('treats an image with no picture as a file', () => {
     const onOpen = vi.fn();
     const bare = { id: 'i3', name: 'raw.png', mediaType: 'image/png' };
-    render(<OpenFrameMessageAttachments attachments={[bare]} onOpenAttachment={onOpen} />);
+    const { container } = render(<OpenFrameMessageAttachments attachments={[bare]} onOpenAttachment={onOpen} />);
     fireEvent.click(screen.getByRole('button', { name: 'Open raw.png' }));
     expect(onOpen).toHaveBeenCalledWith(bare);
+    // Led by the image icon, not the generic file icon.
+    const imageIcon = render(<FileImageIcon size={24} className="text-ods-text-secondary" />).container.innerHTML;
+    expect(container.innerHTML).toContain(imageIcon);
   });
 });
 

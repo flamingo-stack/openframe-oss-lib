@@ -9,7 +9,7 @@
 import type { OpenFrameAttachmentItem, OpenFrameAttachmentProfile } from '../../chat-protocol/attachment-profiles';
 import Image from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
-import { FileBannedIcon, FileContentIcon } from '../icons-v2-generated/documents';
+import { FileBannedIcon, FileContentIcon, FileImageIcon } from '../icons-v2-generated/documents';
 import { DotsLoaderIcon } from '../icons-v2-generated/loaders';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
@@ -34,13 +34,17 @@ export interface OpenFrameAttachmentTileProps {
   className?: string;
 }
 
-/** The leading 32px square: a loader on its way up, the picture of a ready image, a type icon, or the banned icon. */
+/**
+ * The leading 32px square: a loader on its way up, the picture of a ready image, a type icon (the image icon for an
+ * image with no picture), or the banned icon.
+ */
 function TileLeading({ item }: { item: OpenFrameAttachmentItem }) {
   if (item.state === 'error') return <FileBannedIcon size={24} className="text-ods-error" />;
   if (item.state === 'uploading' || item.state === 'scanning') {
     return <DotsLoaderIcon size={24} className="text-ods-text-secondary" />;
   }
-  if (item.thumbnailUrl && isImageAttachment(item)) {
+  const image = isImageAttachment(item);
+  if (item.thumbnailUrl && image) {
     return (
       <Image
         src={item.thumbnailUrl}
@@ -53,6 +57,7 @@ function TileLeading({ item }: { item: OpenFrameAttachmentItem }) {
       />
     );
   }
+  if (image) return <FileImageIcon size={24} className="text-ods-text-secondary" />;
   return <FileContentIcon size={24} className="text-ods-text-secondary" />;
 }
 

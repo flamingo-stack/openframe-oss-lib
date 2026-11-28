@@ -11,12 +11,13 @@ export interface OpenFrameAttachmentNotesProps {
 }
 
 /**
- * One note per refused file ("Larger than 20 MB"), "Send is available when 2 files finish uploading and scanning."
- * while any is on its way, and "1 file won't be sent" while refused files remain. Nothing when there is nothing to say.
+ * One note per refused file ("Larger than 20 MB"), "Send is available when 2 files finish uploading and scanning"
+ * while any is on its way, the context the files would overrun, and "1 file won't be sent" while refused files
+ * remain. Nothing when there is nothing to say.
  */
 export function OpenFrameAttachmentNotes({ summary, className }: OpenFrameAttachmentNotesProps) {
-  const { errorNotes, pendingNote, leftOutNote } = summary;
-  if (errorNotes.length === 0 && !pendingNote && !leftOutNote) return null;
+  const { errorNotes, pendingNote, leftOutNote, overContextNote } = summary;
+  if (errorNotes.length === 0 && !pendingNote && !leftOutNote && !overContextNote) return null;
   return (
     <div
       role="status"
@@ -29,6 +30,7 @@ export function OpenFrameAttachmentNotes({ summary, className }: OpenFrameAttach
           <span className="text-ods-text-primary">{note.name}</span> {note.text}
         </p>
       ))}
+      {overContextNote && <p className="m-0 text-ods-error">{overContextNote}</p>}
       {pendingNote && <p className="m-0 text-ods-text-secondary">{pendingNote}</p>}
       {leftOutNote && <p className="m-0 text-ods-text-secondary">{leftOutNote}</p>}
     </div>

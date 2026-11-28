@@ -444,10 +444,12 @@ export function useJetStreamDialogSubscription({
               if (typeof streamSeq === 'number') {
                 (parsed as { streamSeq?: number }).streamSeq = streamSeq;
               }
-              // The server's publish time: a replay of a stored row was published as the row was written.
+              // The server's publish time: a replay of a stored row was published as the row was written. Rounded, not
+              // floored: nanoseconds since 1970 are past the doubles' exact integers, so the division can land a hair
+              // under the true millisecond and a floor would read it 1 ms early.
               const publishedNanos = msg.info.timestampNanos;
               if (typeof publishedNanos === 'number' && publishedNanos > 0) {
-                (parsed as { streamPublishedAt?: number }).streamPublishedAt = Math.floor(publishedNanos / 1e6);
+                (parsed as { streamPublishedAt?: number }).streamPublishedAt = Math.round(publishedNanos / 1e6);
               }
               cb(parsed, topic);
             } catch {
