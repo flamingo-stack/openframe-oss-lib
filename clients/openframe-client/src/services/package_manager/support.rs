@@ -1,4 +1,5 @@
 use super::ManagerId;
+use crate::platform::dotnet_framework::{dotnet_release, DOTNET_4_8_RELEASE};
 use std::collections::BTreeMap;
 use std::sync::{Once, OnceLock};
 use tracing::info;
@@ -53,16 +54,47 @@ const STORELESS_EDITIONS: &[&str] = &[
 
 const MULTI_SESSION_EDITIONS: &[&str] = &["ServerRdsh"];
 
-pub fn is_supported(id: ManagerId) -> bool {
-    support_of(id, current()) == Support::Supported
+static CHOCOLATEY_ENABLED: OnceLock<bool> = OnceLock::new();
+
+pub(crate) fn enable_chocolatey(enabled: bool) {
+    let _ = CHOCOLATEY_ENABLED.set(enabled);
 }
 
-fn support_of(id: ManagerId, spec: &OsSpec) -> Support {
+pub(crate) fn chocolatey_enabled() -> bool {
+    CHOCOLATEY_ENABLED.get().copied().unwrap_or(false)
+}
+
+pub fn is_supported(id: ManagerId) -> bool {
+    support_of(id, current(), chocolatey_enabled(), dotnet_release()) == Support::Supported
+}
+
+fn support_of(
+    id: ManagerId,
+    spec: &OsSpec,
+    chocolatey_enabled: bool,
+    dotnet_release: Option<u32>,
+) -> Support {
     match id {
         ManagerId::Brew => brew(spec),
         ManagerId::Winget => winget(spec),
-        ManagerId::Choco => Support::Unsupported("Chocolatey is not enabled"),
+        ManagerId::Choco => choco(spec, chocolatey_enabled, dotnet_release),
     }
+}
+
+fn choco(spec: &OsSpec, enabled: bool, dotnet_release: Option<u32>) -> Support {
+    if !enabled {
+        return Support::Unsupported("Chocolatey is not enabled");
+    }
+
+    if spec.os != Os::Windows {
+        return Support::Unsupported("Chocolatey is Windows only");
+    }
+
+    if dotnet_release.is_some_and(|release| release < DOTNET_4_8_RELEASE) {
+        return Support::Unsupported("Chocolatey needs .NET Framework 4.8");
+    }
+
+    Support::Supported
 }
 
 fn brew(spec: &OsSpec) -> Support {
@@ -119,9 +151,15 @@ fn current() -> &'static OsSpec {
 }
 
 fn log_spec(spec: &OsSpec) {
+    let dotnet_release = dotnet_release();
     let verdicts: BTreeMap<ManagerId, Support> = ManagerId::ALL
         .iter()
-        .map(|id| (*id, support_of(*id, spec)))
+        .map(|id| {
+            (
+                *id,
+                support_of(*id, spec, chocolatey_enabled(), dotnet_release),
+            )
+        })
         .collect();
 
     info!(
@@ -130,6 +168,7 @@ fn log_spec(spec: &OsSpec) {
         product_type = ?spec.product_type,
         edition_id = ?spec.edition_id,
         build = ?spec.build,
+        dotnet_release = ?dotnet_release,
         verdicts = ?verdicts,
         "Resolved package manager support"
     );

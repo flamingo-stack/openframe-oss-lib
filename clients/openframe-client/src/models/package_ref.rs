@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum PackageRef {
     Winget { id: String },
     Brew { kind: BrewKind, name: String },
-    Choco { id: String },
+    Choco { id: String, feed: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -16,10 +16,11 @@ pub enum BrewKind {
 }
 
 impl PackageRef {
-    /// Winget ids are case-insensitive; the rest compare as written.
+    /// Winget and choco ids are case-insensitive, a choco id from any feed is the same package; brew names compare as written.
     pub fn matches(&self, other: &PackageRef) -> bool {
         match (self, other) {
-            (PackageRef::Winget { id: a }, PackageRef::Winget { id: b }) => {
+            (PackageRef::Winget { id: a }, PackageRef::Winget { id: b })
+            | (PackageRef::Choco { id: a, .. }, PackageRef::Choco { id: b, .. }) => {
                 a.eq_ignore_ascii_case(b)
             }
             _ => self == other,

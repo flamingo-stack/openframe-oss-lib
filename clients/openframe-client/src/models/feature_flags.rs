@@ -14,15 +14,17 @@ pub enum Feature {
     DeliveryClientUninstall,
     DeliveryClientUpdate,
     PackageAutoUpdate,
+    Chocolatey,
     OsUpdateReport,
 }
 
 impl Feature {
-    pub const ALL: [Feature; 5] = [
+    pub const ALL: [Feature; 6] = [
         Feature::DeliveryToolInstallation,
         Feature::DeliveryClientUninstall,
         Feature::DeliveryClientUpdate,
         Feature::PackageAutoUpdate,
+        Feature::Chocolatey,
         Feature::OsUpdateReport,
     ];
 
@@ -32,6 +34,7 @@ impl Feature {
             Feature::DeliveryClientUninstall => "delivery-client-uninstall",
             Feature::DeliveryClientUpdate => "delivery-client-update",
             Feature::PackageAutoUpdate => "package-auto-update",
+            Feature::Chocolatey => "chocolatey",
             Feature::OsUpdateReport => "os-update-report",
         }
     }
@@ -41,7 +44,8 @@ impl Feature {
             Feature::DeliveryToolInstallation
             | Feature::DeliveryClientUninstall
             | Feature::DeliveryClientUpdate
-            | Feature::PackageAutoUpdate => false,
+            | Feature::PackageAutoUpdate
+            | Feature::Chocolatey => false,
             Feature::OsUpdateReport => true,
         }
     }

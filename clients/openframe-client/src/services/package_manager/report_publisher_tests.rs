@@ -15,6 +15,7 @@ fn report_serialises_to_the_agreed_wire_shape() {
             name: Dependency::WingetClientModule,
             state: ManagerState::Missing,
         }],
+        chocolatey: None,
     })
     .unwrap();
 
