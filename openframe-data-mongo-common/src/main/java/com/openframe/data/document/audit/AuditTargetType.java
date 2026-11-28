@@ -15,6 +15,7 @@ public enum AuditTargetType {
     CUSTOMER_USER,
     DEVICE,
     DIALOG,
+    CHAT_ATTACHMENT,
     DIRECTORY_CONNECTION,
     DIRECTORY_GROUP,
     DIRECTORY_USER,

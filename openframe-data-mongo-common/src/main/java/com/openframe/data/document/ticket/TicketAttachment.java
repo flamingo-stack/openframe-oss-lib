@@ -4,6 +4,7 @@ import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.experimental.FieldNameConstants;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
@@ -17,6 +18,7 @@ import java.time.Instant;
  * Files are stored externally (S3/MinIO), this stores metadata.
  */
 @Data
+@FieldNameConstants
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
