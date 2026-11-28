@@ -16,6 +16,9 @@ import {
   type DataTableLayout,
   type DataTableSettings,
 } from '../../ui';
+// The meta row's own module, not the data-table barrel: the barrel reaches `features/index` (the column filter), and a
+// view of `features` importing it changes the order the ui barrel loads in, leaving its re-exports half-filled.
+import { type TableMetaRow, tableMetaRowLayout } from '../../ui/data-table/data-table-meta-row';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { useDeviceStatusDisplay } from './device-status-display';
 import { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-filter-toolbar';
@@ -122,6 +125,13 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
   /** The tenant has no customers yet: a banner says a device needs one. */
   noOrganizations?: boolean;
 
+  /**
+   * The row above the rows, in the table and in the tiles alike: on a paged list (`pager` given) the page's range
+   * with First · Previous · Next in place of the count, and the host's controls (the auto-refresh picker) at its right
+   * end. `pager: null` while a paged list's first page is read. A paged list draws no infinite footer and no grid
+   * sentinel: `hasNextPage` / `onLoadMore` / `gridSentinelRef` are for a list read page after page.
+   */
+  metaRow?: TableMetaRow;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
@@ -174,6 +184,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   emptyMessage = 'No devices found. Try adjusting your search or filters.',
   emptyState,
   noOrganizations = false,
+  metaRow: metaRowGiven,
   hasNextPage = false,
   isFetchingNextPage = false,
   onLoadMore = noop,
@@ -188,6 +199,16 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   const { toolbarRef, containerStyle } = useStickyToolbar();
   const statusDisplay = useDeviceStatusDisplay();
   const measured = toolbar.toolbarRef === undefined;
+  // A paged list: the pager replaces the infinite footer and the tiles' sentinel. While a filter or search change
+  // resolves, the rows on screen are the last answer's, so the pager waits for the new one (the range stays).
+  const paged = metaRowGiven?.pager !== undefined;
+  const metaRow = metaRowGiven && { ...metaRowGiven, loading: !!metaRowGiven.loading || isNarrowing };
+  // The tiles' own row above the cards: the range and the pager, or the host's controls beside the count. With it,
+  // the filter row leaves its count out, so the count is drawn once.
+  const { paged: tilesPaged, drawn: showTilesMeta } = tableMetaRowLayout(metaRow, {
+    rowCount: devices.length,
+    loading,
+  });
   const gridColumns =
     filterColumns ??
     getDeviceFilterColumns(deviceFilters, { directoryColumns, statusDisplay }).filter(
@@ -229,8 +250,9 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           directoryColumns={directoryColumns}
           disableColumnFilters={hideFilters}
           totalCount={loading ? undefined : totalCount}
+          metaRow={metaRow}
           footerSlot={
-            loading ? undefined : (
+            loading || paged ? undefined : (
               <DataTable.InfiniteFooter
                 hasNextPage={hasNextPage}
                 isFetchingNextPage={isFetchingNextPage}
@@ -249,16 +271,27 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
             filterColumns={gridColumns}
             currentFilters={gridFilters}
             onFilterChange={onGridFiltersChange}
-            totalCount={loading ? undefined : totalCount}
+            totalCount={loading || showTilesMeta ? undefined : totalCount}
             isLoading={loading}
           />
+          {showTilesMeta && (
+            <DataTable.MetaRow
+              metaRow={metaRow}
+              paged={tilesPaged}
+              itemName="device"
+              totalCount={loading ? undefined : totalCount}
+              rowCount={devices.length}
+              loading={loading}
+              count={<DataTable.RowCount itemName="device" totalCount={totalCount} loading={loading} />}
+            />
+          )}
           <DevicesGrid
             devices={devices}
             isLoading={loading}
             loadingRegion={false}
-            hasNextPage={hasNextPage}
-            isFetchingNextPage={isFetchingNextPage}
-            sentinelRef={gridSentinelRef}
+            hasNextPage={!paged && hasNextPage}
+            isFetchingNextPage={!paged && isFetchingNextPage}
+            sentinelRef={paged ? undefined : gridSentinelRef}
             emptyMessage={loading ? '' : emptyMessage}
             pageSize={pageSize}
           />

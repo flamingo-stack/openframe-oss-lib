@@ -73,12 +73,17 @@ export interface DataTableMetaRowProps {
   totalCount?: number | null;
   /** The table's first page, or placeholder rows, is being read. */
   loading?: boolean;
+  /**
+   * Rows on the page, for the range. Inside a `DataTable` the table's row model gives it; a list drawn without one
+   * (tiles, a chat list) passes it, and the row works the same above it.
+   */
+  rowCount?: number;
 }
 
 /**
  * The row above a feature view's table (`DataTable.Meta`) from the host's {@link TableMetaRow}: on a paged list the
  * page's range on the left and the pager on the right, else the count; the host's controls at the right end. Draw it
- * when {@link tableMetaRowLayout} says `drawn`.
+ * when {@link tableMetaRowLayout} says `drawn`. Above a list that is not a `DataTable`, pass `rowCount`.
  */
 export function DataTableMetaRow({
   metaRow,
@@ -87,6 +92,7 @@ export function DataTableMetaRow({
   itemName,
   totalCount,
   loading = false,
+  rowCount,
 }: DataTableMetaRowProps) {
   const pager = metaRow?.pager;
   return (
@@ -107,6 +113,7 @@ export function DataTableMetaRow({
           rangeStart={pager?.rangeStart}
           totalCount={totalCount}
           hasNextPage={pager?.hasNextPage}
+          currentCount={rowCount}
           loading={loading}
         />
       ) : (

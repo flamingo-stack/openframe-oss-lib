@@ -4,7 +4,7 @@ import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { cursorPaginationText } from '../cursor-pagination';
 import { useLoadingScope } from '../loading-scope';
-import { useDataTableContext } from './data-table';
+import { useOptionalDataTableContext } from './data-table';
 
 export interface DataTablePageRangeProps {
   /** 1-based position of the page's first row. Without it the text is the count ("Showing 20 of 216 results"). */
@@ -17,7 +17,7 @@ export interface DataTablePageRangeProps {
   pluralize?: (count: number, itemName: string) => string;
   /** Read only for the count form without a total ("Showing 20+ results"). */
   hasNextPage?: boolean;
-  /** Override the page's row count. Defaults to the rows in the table's row model. */
+  /** Override the page's row count. Defaults to the rows in the table's row model (outside a `DataTable`, pass it). */
   currentCount?: number;
   /** The table holds no page of its own yet (its first page, or placeholder rows, is being read): the text is a bar. */
   loading?: boolean;
@@ -40,9 +40,9 @@ export function DataTablePageRange({
   loading = false,
   className,
 }: DataTablePageRangeProps) {
-  const table = useDataTableContext();
+  const table = useOptionalDataTableContext();
   const inScope = useLoadingScope() || loading;
-  const count = currentCount ?? table.getRowModel().rows.length;
+  const count = currentCount ?? table?.getRowModel().rows.length ?? 0;
   const plural = pluralize?.(2, itemName) ?? `${itemName}s`;
 
   // The rows are still being read (placeholder rows, or none): the range is not known yet. A NEXT page read keeps the

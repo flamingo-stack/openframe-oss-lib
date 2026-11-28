@@ -117,3 +117,58 @@ describe('PoliciesTable actions', () => {
     expect(container.innerHTML).not.toContain('data-table-meta');
   });
 });
+
+describe('PoliciesTable pager', () => {
+  it('puts the range and the pager in the row above the table, then the actions, and no load-more footer', () => {
+    const { container } = render(
+      <PoliciesTable
+        {...POLICIES_TABLE.loaded}
+        hasMore
+        onLoadMore={vi.fn()}
+        isLoadingMore
+        metaRow={{ pager: pager({ rangeStart: 21 }) }}
+        actions={<span>Refresh picker</span>}
+      />,
+    );
+    inOrder(container.innerHTML, [
+      'data-table-meta',
+      '21–22 results',
+      'aria-label="Pagination"',
+      'Refresh picker',
+      'Disk encryption enabled',
+    ]);
+    // The pager's range stands for the count: the host's count is not drawn beside it.
+    expect(screen.queryByText('2 policies')).toBeNull();
+    // Only the page's two rows: no load-more skeleton rows under them.
+    expect(rowCount(container.innerHTML)).toBe(2);
+  });
+
+  it('reads the range over the total the host gives', () => {
+    const { container } = render(
+      <PoliciesTable {...POLICIES_TABLE.loaded} totalCount={52} metaRow={{ pager: pager() }} />,
+    );
+    expect(container.innerHTML).toContain('21–22 of 52 results');
+  });
+
+  it("takes the pager row's own actions over the table's", () => {
+    render(
+      <PoliciesTable
+        {...POLICIES_TABLE.loaded}
+        metaRow={{ pager: pager(), actions: <span>Row picker</span> }}
+        actions={<span>Table picker</span>}
+      />,
+    );
+    expect(screen.getByText('Row picker')).toBeTruthy();
+    expect(screen.queryByText('Table picker')).toBeNull();
+  });
+
+  it('waits while the next page is read', () => {
+    render(<PoliciesTable {...POLICIES_TABLE.loaded} metaRow={{ pager: pager(), loading: true }} />);
+    expect(nextButton().disabled).toBe(true);
+  });
+
+  it('draws a waiting pager while the first page is read', () => {
+    render(<PoliciesTable {...POLICIES_TABLE.loading} metaRow={{ pager: null }} />);
+    expect(nextButton().disabled).toBe(true);
+  });
+});

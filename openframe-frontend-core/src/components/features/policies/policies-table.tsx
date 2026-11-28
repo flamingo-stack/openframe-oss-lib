@@ -14,6 +14,8 @@ import {
   GRID_ACTION_COLUMN_SIZE,
   type Row,
   type SortingState,
+  type TableMetaRow,
+  tableMetaRowLayout,
   useDataTable,
 } from '../../ui/data-table';
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
@@ -141,6 +143,14 @@ export interface PoliciesTableProps extends FeatureTableLayoutProps {
    * the card layout too, and `rightSlot` moves into it, on its left.
    */
   actions?: ReactNode;
+  /**
+   * A paged host's row above the table (`useCursorPager` `footerProps`, or the same shape from a list paged in the
+   * browser): the page's range with First · Previous · Next in place of `rightSlot`'s count, and its controls (falling
+   * back to `actions`). `pager: null` while the first page is read. A paged table draws no "load more" footer.
+   */
+  metaRow?: TableMetaRow;
+  /** The list's total, for a paged table's range ("21–40 of 52 results"). Without it the range has no total. */
+  totalCount?: number;
   skeletonRows?: number;
   /** Infinite "load more" footer. */
   hasMore?: boolean;
@@ -167,6 +177,8 @@ export function PoliciesTable({
   stickyHeaderOffset,
   rightSlot,
   actions,
+  metaRow: metaRowGiven,
+  totalCount,
   skeletonRows,
   hasMore = false,
   onLoadMore,
@@ -341,14 +353,37 @@ export function PoliciesTable({
   // Hide the column header on the empty state: only show it while loading (skeleton rows)
   // or when there are real rows.
   const showHeader = loading || rows.length > 0;
-  // The row above the table: the grid's results row, or the host's controls (with the count beside them).
-  const metaRow = showHeader && ((layout === 'grid' && hasSlotContent(rightSlot)) || hasSlotContent(actions));
+  // A paged host's row: its controls, or the table's own `actions` when it brings none.
+  const pagedRow = metaRowGiven && { ...metaRowGiven, actions: metaRowGiven.actions ?? actions };
+  const pagedLayout = tableMetaRowLayout(pagedRow, {
+    rowCount: rows.length,
+    loading,
+    showHeader,
+    grid: layout === 'grid',
+  });
+  // The row above the table: the grid's results row, the host's controls (with the count beside them), or a paged
+  // list's range and pager.
+  const metaRow = pagedRow
+    ? pagedLayout.drawn
+    : showHeader && ((layout === 'grid' && hasSlotContent(rightSlot)) || hasSlotContent(actions));
+  const paged = !!pagedRow && pagedLayout.paged;
 
   return (
     <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
       {/* The grid's results row, or the host's controls, sit above the table; otherwise the card header carries the
           results in its right slot. */}
-      {metaRow && <DataTable.Meta actions={actions}>{rightSlot}</DataTable.Meta>}
+      {metaRow &&
+        (pagedRow ? (
+          <DataTable.MetaRow
+            metaRow={pagedRow}
+            paged={paged}
+            count={rightSlot}
+            totalCount={loading ? undefined : totalCount}
+            loading={loading}
+          />
+        ) : (
+          <DataTable.Meta actions={actions}>{rightSlot}</DataTable.Meta>
+        ))}
       {showHeader && (
         <DataTable.Header
           stickyHeader={stickyHeader}
@@ -368,7 +403,7 @@ export function PoliciesTable({
         rowClassName="mb-1"
         rowHref={rowHref}
       />
-      {hasMore && onLoadMore && (
+      {!paged && hasMore && onLoadMore && (
         <DataTable.InfiniteFooter hasNextPage isFetchingNextPage={isLoadingMore} onLoadMore={onLoadMore} />
       )}
     </DataTable>
