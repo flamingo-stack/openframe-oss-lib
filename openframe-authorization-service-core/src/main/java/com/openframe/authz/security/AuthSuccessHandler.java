@@ -1,9 +1,11 @@
 package com.openframe.authz.security;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.metrics.PasswordLoginMetrics;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.web.ClientIp;
+import com.openframe.authz.web.RecaptchaSessionCookie;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,9 +36,13 @@ import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 @RequiredArgsConstructor
 public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHandler {
 
+    private static final String NOT_PASSWORD_LOGIN = "n/a";
+    private static final String NOT_RECORDED = "unknown";
+
     private final UserService userService;
     private final SsoFlowSuccessHandler ssoFlowSuccessHandler;
     private final SsoProviderRegistry ssoProviderRegistry;
+    private final PasswordLoginMetrics passwordLoginMetrics;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -45,10 +51,11 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         try {
             String tenantId = TenantContext.getTenantId();
             String email = extractEmail(authentication);
-            log.info("Login success email={} tenantId={} provider={} ip={} ua={}", email, tenantId,
+            String recaptchaSession = recordRecaptchaSession(request, authentication);
+            log.info("Login success email={} tenantId={} provider={} ip={} ua={} recaptchaSession={}", email, tenantId,
                     authentication instanceof OAuth2AuthenticationToken oauth2
                             ? oauth2.getAuthorizedClientRegistrationId() : "password",
-                    ClientIp.of(request), request.getHeader(HttpHeaders.USER_AGENT));
+                    ClientIp.of(request), request.getHeader(HttpHeaders.USER_AGENT), recaptchaSession);
             if (tenantId != null && email != null && !email.isBlank()) {
                 userService.touchLastLogin(email, tenantId);
                 maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);
@@ -58,6 +65,19 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         }
 
         ssoFlowSuccessHandler.onAuthenticationSuccess(request, response, authentication);
+    }
+
+    private String recordRecaptchaSession(HttpServletRequest request, Authentication authentication) {
+        if (authentication instanceof OAuth2AuthenticationToken) {
+            return NOT_PASSWORD_LOGIN;
+        }
+        try {
+            boolean recaptchaSessionPresent = RecaptchaSessionCookie.presentIn(request);
+            return passwordLoginMetrics.recordSucceeded(recaptchaSessionPresent);
+        } catch (RuntimeException e) {
+            log.warn("Failed to record the reCAPTCHA session state of a password login", e);
+            return NOT_RECORDED;
+        }
     }
 
     private void maybeMarkEmailVerifiedFromSso(Authentication authentication, String tenantId, String email) {
