@@ -56,6 +56,7 @@ fn result_serializes_snake_case() {
         execution_time_ms: 1,
         timed_out: false,
         error: None,
+        failure_reason: None,
         script_id: Some("scr-1".into()),
         schedule_id: None,
     };
@@ -65,6 +66,10 @@ fn result_serializes_snake_case() {
     assert!(v.get("execution_time_ms").is_some());
     assert!(v.get("timed_out").is_some());
     assert!(v.get("error").is_none(), "None error must be omitted");
+    assert!(
+        v.get("failure_reason").is_none(),
+        "None failure_reason must be omitted"
+    );
     assert_eq!(v.get("script_id").and_then(|s| s.as_str()), Some("scr-1"));
     assert!(
         v.get("schedule_id").is_none(),
@@ -203,4 +208,30 @@ fn routed_script_messages_share_the_script_payload_but_not_the_policy() {
 
     assert_eq!(SoftwareScriptMessage::KIND, "software-execution");
     assert_eq!(BootstrapScriptMessage::KIND, "script-bootstrap-execution");
+}
+
+#[test]
+fn failure_reason_goes_out_under_its_wire_name() {
+    for (reason, wire) in [
+        (FailureReason::AgentTimedOut, "AGENT_TIMED_OUT"),
+        (FailureReason::NoUserSession, "NO_USER_SESSION"),
+        (FailureReason::CouldNotLaunch, "COULD_NOT_LAUNCH"),
+        (FailureReason::Interrupted, "INTERRUPTED"),
+    ] {
+        let r = RmmResult {
+            execution_id: "e".into(),
+            machine_id: "m".into(),
+            stdout: String::new(),
+            stderr: String::new(),
+            exit_code: 85,
+            execution_time_ms: 0,
+            timed_out: false,
+            error: None,
+            failure_reason: Some(reason),
+            script_id: None,
+            schedule_id: None,
+        };
+        let v = serde_json::to_value(&r).unwrap();
+        assert_eq!(v["failure_reason"], wire);
+    }
 }

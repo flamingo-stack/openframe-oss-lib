@@ -24,7 +24,7 @@ pub async fn execute_script(params: ScriptParams<'_>) -> ExecResult {
     let interpreter = match resolve_interpreter(params.shell) {
         Some(interpreter) => interpreter,
         None => {
-            return spawn_error(format!(
+            return ExecResult::not_launched(anyhow!(
                 "unsupported shell '{}' (expected powershell or cmd)",
                 params.shell
             ))
@@ -39,14 +39,14 @@ pub async fn execute_script(params: ScriptParams<'_>) -> ExecResult {
 
     let tmp_file = match create_temp_script(params.code, interpreter.ext) {
         Ok(path) => path,
-        Err(e) => return spawn_error(e.to_string()),
+        Err(e) => return ExecResult::not_launched(e),
     };
     let _cleanup = TempFileGuard {
         path: tmp_file.clone(),
     };
 
     if wait_until_readable(&tmp_file).await {
-        return spawn_error("Script file locked by another process".to_string());
+        return ExecResult::not_launched(anyhow!("Script file locked by another process"));
     }
 
     match elevation {
@@ -82,15 +82,6 @@ async fn wait_until_readable(path: &Path) -> bool {
         }
     }
     false
-}
-
-fn spawn_error(msg: String) -> ExecResult {
-    ExecResult {
-        stdout: String::new(),
-        stderr: msg,
-        retcode: 85,
-        timed_out: false,
-    }
 }
 
 fn resolve_interpreter(shell: &str) -> Option<Interpreter> {

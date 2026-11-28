@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::models::{ExecutionRequest, RmmResult};
+use crate::models::{ExecutionRequest, FailureReason, RmmResult};
 
 #[cfg(windows)]
 use crate::models::PrivilegePolicy;
@@ -56,7 +56,7 @@ impl ExecutionService {
 
         #[cfg(any(unix, windows))]
         {
-            use crate::executor::{execute_script, ScriptParams};
+            use crate::executor::{execute_script, AgentFailure, ScriptParams};
             use tracing::{info, warn};
 
             let timeout_secs = match req.timeout_secs {
@@ -81,16 +81,23 @@ impl ExecutionService {
             })
             .await;
 
-            let error = if result.retcode == 85 {
+            if let Some(failure) = result.agent_failure {
                 warn!(
                     execution_id = req.execution_id,
                     privilege = ?privilege,
+                    failure = ?failure,
                     detail = %result.stderr,
                     "Script did not start"
                 );
-                Some(result.stderr.clone())
+            }
+            let error = result.agent_failure.map(|_| result.stderr.clone());
+            let failure_reason = if result.timed_out {
+                Some(FailureReason::AgentTimedOut)
             } else {
-                None
+                result.agent_failure.map(|failure| match failure {
+                    AgentFailure::NoUserSession => FailureReason::NoUserSession,
+                    AgentFailure::CouldNotLaunch => FailureReason::CouldNotLaunch,
+                })
             };
 
             RmmResult {
@@ -102,6 +109,7 @@ impl ExecutionService {
                 execution_time_ms: start.elapsed().as_millis() as u64,
                 timed_out: result.timed_out,
                 error,
+                failure_reason,
                 script_id: req.script_id.map(str::to_string),
                 schedule_id: req.schedule_id.map(str::to_string),
             }
@@ -118,6 +126,7 @@ impl ExecutionService {
                 execution_time_ms: start.elapsed().as_millis() as u64,
                 timed_out: false,
                 error: Some("unsupported platform".to_string()),
+                failure_reason: Some(FailureReason::CouldNotLaunch),
                 script_id: req.script_id.map(str::to_string),
                 schedule_id: req.schedule_id.map(str::to_string),
             }

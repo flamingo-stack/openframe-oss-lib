@@ -5,7 +5,7 @@ use tokio::process::Command;
 use tokio::time::{timeout, Duration};
 
 use crate::executor::output::{clean_string, join_reads, read_capped};
-use crate::executor::ExecResult;
+use crate::executor::{AgentFailure, ExecResult};
 
 const READ_GRACE: Duration = Duration::from_secs(5);
 
@@ -15,14 +15,7 @@ pub(crate) async fn execute_with_timeout(mut cmd: Command, timeout_secs: u32) ->
 
     let mut child = match spawn_with_retry(&mut cmd, 5).await {
         Ok(child) => child,
-        Err(e) => {
-            return ExecResult {
-                stdout: String::new(),
-                stderr: e.to_string(),
-                retcode: 85,
-                timed_out: false,
-            }
-        }
+        Err(e) => return ExecResult::not_launched(e.into()),
     };
 
     let pid = child.id().unwrap_or(0);
@@ -43,6 +36,7 @@ pub(crate) async fn execute_with_timeout(mut cmd: Command, timeout_secs: u32) ->
                 stderr: clean_string(&err),
                 retcode,
                 timed_out: false,
+                agent_failure: None,
             }
         }
         Ok(Err(e)) => {
@@ -55,6 +49,7 @@ pub(crate) async fn execute_with_timeout(mut cmd: Command, timeout_secs: u32) ->
                 stderr: format!("{}\n{}", clean_string(&err), e),
                 retcode: 1,
                 timed_out: false,
+                agent_failure: Some(AgentFailure::CouldNotLaunch),
             }
         }
         Err(_) => {
@@ -73,6 +68,7 @@ pub(crate) async fn execute_with_timeout(mut cmd: Command, timeout_secs: u32) ->
                 ),
                 retcode: 98,
                 timed_out: true,
+                agent_failure: None,
             }
         }
     }

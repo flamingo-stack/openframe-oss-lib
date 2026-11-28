@@ -33,4 +33,5 @@ async fn maps_unsupported_shell_to_error() {
         .await;
     assert_eq!(r.exit_code, 85);
     assert!(r.error.is_some());
+    assert_eq!(r.failure_reason, Some(FailureReason::CouldNotLaunch));
 }
