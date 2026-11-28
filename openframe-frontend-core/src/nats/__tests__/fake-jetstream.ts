@@ -203,7 +203,10 @@ export class FakeJetStream {
             const toJsMsg = (m: StoredMsg, pending: number) => ({
               data: m.data,
               subject: m.subject,
-              info: { streamSequence: m.seq, pending, timestampNanos: m.time * 1e6 },
+              // Real JetStream nanoseconds fall inside a millisecond. A whole millisecond in nanoseconds (~1.8e18) is
+              // past Number.MAX_SAFE_INTEGER and is stored rounded down for about 1 timestamp in 8, so a reader's
+              // `Math.floor(nanos / 1e6)` would see the millisecond before; the middle of the millisecond never crosses.
+              info: { streamSequence: m.seq, pending, timestampNanos: m.time * 1e6 + 500_000 },
             });
 
             // Highest stream sequence handed to the client — where a recreation resumes.
