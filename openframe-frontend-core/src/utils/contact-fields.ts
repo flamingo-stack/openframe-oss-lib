@@ -72,11 +72,15 @@ export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
   not_found: 'No address found',
 };
 
-/** A company's fields, named the same wherever a company is stored. Its identity is its HubSpot company id. */
+/**
+ * A company's fields, named the same wherever a company is stored (a target list's company, a HubSpot company, the
+ * company modal), the company half of this contract. Its identity is its HubSpot company id.
+ */
 export const COMPANY_FIELDS = [
   'name',
   'website',
   'company_size',
+  'naics_code',
   'city',
   'state',
   'country',
@@ -84,6 +88,26 @@ export const COMPANY_FIELDS = [
   'shared_inbox_source',
 ] as const;
 export type CompanyField = (typeof COMPANY_FIELDS)[number];
+export type CompanyFields = Partial<Record<CompanyField, string | null>>;
+
+/** The company fields a person edits and the enrichment researches: every field but the page a shared inbox was read on. */
+export const COMPANY_EDITABLE_FIELDS = COMPANY_FIELDS.filter(
+  (f): f is Exclude<CompanyField, 'shared_inbox_source'> => f !== 'shared_inbox_source',
+);
+export type CompanyEditableField = (typeof COMPANY_EDITABLE_FIELDS)[number];
+
+/** What a person calls each company field, for every form, table and modal that shows one. */
+export const COMPANY_FIELD_LABELS: Record<CompanyField, string> = {
+  name: 'Name',
+  website: 'Website',
+  company_size: 'Company size',
+  naics_code: 'NAICS code',
+  city: 'City',
+  state: 'State',
+  country: 'Country',
+  shared_inbox: 'Shared inbox',
+  shared_inbox_source: 'Where the shared inbox is shown',
+};
 
 /** Split a full name into the first and last name HubSpot keeps. */
 export function splitName(full: string | null | undefined): { firstname?: string; lastname?: string } {
